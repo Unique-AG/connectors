@@ -156,7 +156,8 @@ export class McpToolsHandler extends McpHandlerBase {
         const transformedResult = this.formatToolResult(result, toolInfo.metadata.outputSchema);
 
         this.logger.debug('CallToolRequestSchema result');
-        this.logger.log('Tool call completed', {
+        this.logger.log({
+          msg: 'Tool call completed',
           tool: toolName,
           callerId,
           outcome: 'success',
@@ -166,7 +167,8 @@ export class McpToolsHandler extends McpHandlerBase {
         return transformedResult;
       } catch (error) {
         this.logger.error(error);
-        this.logger.log('Tool call completed', {
+        this.logger.log({
+          msg: 'Tool call completed',
           tool: toolName,
           callerId,
           outcome: 'error',
