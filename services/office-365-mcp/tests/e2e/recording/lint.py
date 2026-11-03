@@ -310,10 +310,13 @@ def _ids(name: str, value: object) -> list[str]:
     found = [
         f"{name} at {path}: an id the mapper did not make"
         for path, key, text in _strings(value)
-        if (SCHEMA.get(key) == "id" and not made_by_the_mapper(text))
-        or any(
-            not made_by_the_mapper(token)
-            for token in cast("list[str]", _ID_TOKEN.findall(unquote(text)))
+        if (
+            not made_by_the_mapper(text)
+            if SCHEMA.get(key) == "id"
+            else any(
+                not made_by_the_mapper(token)
+                for token in cast("list[str]", _ID_TOKEN.findall(unquote(text)))
+            )
         )
     ]
     return found[:1]

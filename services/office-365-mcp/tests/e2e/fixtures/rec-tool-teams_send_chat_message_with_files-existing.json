@@ -1,0 +1,98 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Meeting Notes"
+          },
+          "size": 1
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message_with_files-existing.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message_with_files-existing.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "3.plrKIo6H2tJMCORm7KiGyaPlt8RzmdZcXWJYeBK8xwPKyZW6VutKkTG1ZdzpR1xnDM0UeGsJSoLeT4R0Oii1OKG6URYFQ2MiFuCEnCSsWXjDwTp5SSVDQucVAKUFLRBmAfCFC20iWXoJrnE2TUsFFP5Qb4vKXL18URYFn6gbWjGmJ7k5TOwUo68iTGDGQWJ4ZCTRFY3LIFXQrrb4AnZppN4IMHWArfD4Q2zZx3jdOUJggHn3VQgZtDZ4CKDHLS58RHQETTtLM3GOHNJLTsBAI8XLOIFgRGURkPUbiJGFuV5FU5cYALC5ZTHcUaWNBISHQWYkSDkmCUEEN3f9OmzLsoQLTERSNQPyRzjvWeuOSwjfFd1bGeNajACyIidXceIqiHFCaFK3H9bRTXbGBc1kXCTLSMP0FrrCuISC9Syyd8ngCvCxSGwraS3qFPgEjBS2JHWky26kYHtHgu58HUabve7vCBlQguVSPBB2CyRmi3rfEgWrdiKCO02FaIOhXDWYO5ixUGp1gvIRMfhtWqRjH684ANUWCkHBfuDmV48CcKEDCJ1iUSMgvQGgH3RLsVongtM4"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message_with_files-existing.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+    "query": {
+      "$select": "id,name,eTag,webDavUrl,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message_with_files-existing.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages",
+    "json": {
+      "attachments": [
+        {
+          "contentType": "reference",
+          "contentUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt",
+          "id": "00000000-4897-4dbd-827c-66309915e60d",
+          "name": "seed-v1 Meeting Notes.txt"
+        }
+      ],
+      "body": {
+        "content": "<p>seed-v1 case-teams_send_chat_message_with_files-existing notes</p> <attachment id=\"00000000-4897-4dbd-827c-66309915e60d\"></attachment>",
+        "contentType": "html"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2012/chats('synthetic%20text%2013')/messages('6973447256982')"
+    },
+    "body": "rec-tool-teams_send_chat_message_with_files-existing.05.json"
+  }
+]

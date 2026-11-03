@@ -23,7 +23,8 @@ class Step:
     content_type: str | None = None
     key: str | None = None
     lookup: str | None = None  # "tagged", "named", "subject", "drive-folder", "drive-children",
-    # "single" (one object, found under `key`) or "attachments" (found under `attachment:<key>:<name>`)
+    # "single" (one object, found under `key`),
+    # "attachments" (found under `attachment:<key>:<name>`) or "replies" (found under `reply:<key>:<text>`)
     poll: bool = False  # the answer is 202: wait for the operation in its Location header
     learns: str | None = (
         None  # "team", "drive" or "chat": the id of the found or created item joins the guard

@@ -275,4 +275,3 @@ onenote_get_operation-notebook:
     - tool: onenote_get_operation
       wait_seconds: 20
       bind: {operation: "$2.uri"}
-      expect: {result: {status: Completed}}

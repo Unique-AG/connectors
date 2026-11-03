@@ -332,7 +332,7 @@ teams_list_channels-seed:
       bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
 
 teams_list_channels-private:
-  needs: [teams-seed-team]
+  needs: [teams-seed-team, teams-private-channel]
   chain:
     - *teams
     - tool: teams_list_channels
@@ -341,7 +341,7 @@ teams_list_channels-private:
       bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
 
 teams_get_channel_files_folder-private:
-  needs: [teams-seed-team]
+  needs: [teams-seed-team, teams-private-channel]
   chain:
     - *teams
     - tool: teams_list_channels
@@ -376,7 +376,7 @@ teams_browse_channel-long:
         channel_id: "$prev.channels[display_name=seed-v1 Long channel].channel_id"
 
 teams_browse_channel-private:
-  needs: [teams-seed-team]
+  needs: [teams-seed-team, teams-private-channel]
   chain:
     - *teams
     - *seed_all_channels
@@ -410,7 +410,7 @@ teams_list_message_replies-thread-small:
     - *seed_channels
     - *posts_of_the_seed
     - tool: teams_list_message_replies
-      expect: {result: {more_replies: false, "messages[0].sender.display_name": Tom Berger}}
+      expect: {result: {more_replies: false, "messages[0].body": I bring the hosting costs.}}
       bind: {uri: "$prev.messages[subject=seed-v1 post p02].uri"}
 
 teams_read_message-channel-post:
@@ -518,8 +518,8 @@ teams_search_messages-person-window:
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages
-      args: {sender: "persona:anna", sent_after: "2026-01-01", sent_before: "~tomorrow", size: 5}
-      expect: {result: {"messages[0].sender.display_name": Anna Meier}}
+      args: {sender: "persona:tom", sent_after: "2026-01-01", sent_before: "~tomorrow", size: 5}
+      expect: {result: {"messages[0].sender.display_name": Tom Berger}}
 
 teams_read_meeting-attendance:
   needs: [teams-meeting-attendance]

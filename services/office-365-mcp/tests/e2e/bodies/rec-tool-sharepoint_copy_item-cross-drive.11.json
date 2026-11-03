@@ -1,0 +1,42 @@
+{
+  "@odata.etag": "\"{00000000-9440-45F2-86A7-9BA16AB5BC29},1\"",
+  "createdBy": {
+    "application": {
+      "displayName": "synthetic text 08",
+      "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+    },
+    "user": {
+      "displayName": "Mia Keller",
+      "email": "mia@example.test",
+      "id": "00000000-aa0f-4286-8305-d989485e14b5"
+    }
+  },
+  "createdDateTime": "2026-11-02T20:45:14Z",
+  "folder": {
+    "childCount": 3
+  },
+  "id": "01AJJQY18ZRSXENJOTWRNUQYAE4F9UKVN3",
+  "lastModifiedBy": {
+    "application": {
+      "displayName": "synthetic text 08",
+      "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+    },
+    "user": {
+      "displayName": "Mia Keller",
+      "email": "mia@example.test",
+      "id": "00000000-aa0f-4286-8305-d989485e14b5"
+    }
+  },
+  "lastModifiedDateTime": "2026-11-02T20:45:14Z",
+  "name": "seed-v1 Reports",
+  "parentReference": {
+    "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+    "driveType": "business",
+    "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+    "name": "seed-v1 Seed Files",
+    "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+    "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+  },
+  "size": 1855,
+  "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Reports"
+}

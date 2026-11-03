@@ -86,6 +86,12 @@ Team.Create. Graph answers with 202, and the seed waits at most two minutes for 
 succeed. `cleanup` never deletes a team, and lists it as "kept". Graph cannot delete a chat, so
 every chat with `seed-v1 case-` in its topic stays.
 
+Some tenants refuse to create a private channel. Set `SEED_TEAMS_PRIVATE=0` to skip the private
+channel and its two posts. The three recorder cases that need it then stay blocked.
+
+A user without a Teams licence cannot post. Set `SEED_TEAMS_ANNA_AS=tom` and the posts of Anna
+become posts of Tom. Then run the phases for the indexes 1 and 3 only.
+
 The teams family has two more phases: `teams-posts` and `teams-chats`. They post about 76
 messages. Graph does not delete a message for good. `cleanup --phases teams-posts,teams-chats`
 soft-deletes the seed messages of the signed-in user only. Nobody opens the chat
@@ -207,6 +213,8 @@ the fallback that makes plain drafts.
   - The paths of `teams/<id>/channels`, `groups/<id>/events|calendar|drive|onenote`, `drives/<id>`
     and `chats/<id>/messages`, and only for an id that an earlier step of the same run found or
     created for this user (`Step.learns`: `team`, `drive` or `chat`).
+  - `GET /v1.0/groups/<id>/members` and `POST /v1.0/groups/<id>/members/$ref`, for the team id
+    that an earlier step found or created. They add Anna and Tom to the team of the seed.
   - `/v1.0/users/<SEED_SHARED_UPN>/mailFolders`, when the variable is set.
   - `POST /v1.0/me/sendMail`, in the phase `mail-people` only, 12 at most.
   - `PUT` of one chunk to the `uploadUrl` of the session that is open, with no token.

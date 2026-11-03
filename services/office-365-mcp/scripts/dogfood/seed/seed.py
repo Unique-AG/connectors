@@ -46,7 +46,10 @@ EXTRA_ENV = ("SEED_DIRECTORY_UPN", "SEED_GUEST_UPN", "SEED_ROOM_UPN", "SEED_SHAR
 SHARED_ENV = "SEED_SHARED_UPN"
 MEMBER_PATHS = (
     ("team", re.compile(r"/v1\.0/teams/([^/]+)/channels(?:/.*)?")),
-    ("team", re.compile(r"/v1\.0/groups/([^/]+)/(?:events|calendar\w*|drive|onenote)(?:/.*)?")),
+    (
+        "team",
+        re.compile(r"/v1\.0/groups/([^/]+)/(?:events|calendar\w*|drive|onenote|members)(?:/.*)?"),
+    ),
     ("drive", re.compile(r"/v1\.0/drives/([^/]+)(?:/.*)?")),
     ("chat", re.compile(r"/v1\.0/chats/([^/]+)/messages")),
 )
@@ -863,8 +866,12 @@ def run_lookup(
             key = f"{step.phase}:{name}" if name.startswith(f"{TAG} ") else None
         elif step.lookup == "subject":
             key = f"subject:{item.get('subject')}"
+        elif step.lookup == "members":
+            key = f"member:{str(item.get('userPrincipalName') or '').lower()}"
         elif step.lookup == "attachments":
             key = f"attachment:{step.key}:{item.get('name')}"
+        elif step.lookup == "replies":
+            key = f"reply:{step.key}:{item['body']['content']}"
         else:
             key = f"file:{item.get('name')}" if step.lookup == "drive-children" else _key_of(item)
         if key:

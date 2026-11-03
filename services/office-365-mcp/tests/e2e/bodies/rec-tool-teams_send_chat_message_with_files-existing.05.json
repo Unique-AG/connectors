@@ -1,0 +1,46 @@
+{
+  "attachments": [
+    {
+      "content": null,
+      "contentType": "reference",
+      "contentUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt",
+      "id": "00000000-4897-4dbd-827c-66309915e60d",
+      "name": "seed-v1 Meeting Notes.txt",
+      "teamsAppId": null,
+      "thumbnailUrl": null
+    }
+  ],
+  "body": {
+    "content": "synthetic text 14",
+    "contentType": "html"
+  },
+  "channelIdentity": null,
+  "chatId": "19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2",
+  "createdDateTime": "2026-11-03T10:27:39.726Z",
+  "deletedDateTime": null,
+  "etag": "6973447256982",
+  "eventDetail": null,
+  "from": {
+    "application": null,
+    "device": null,
+    "user": {
+      "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+      "displayName": "synthetic text 01",
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "userIdentityType": "aadUser"
+    }
+  },
+  "id": "6973447256982",
+  "importance": "normal",
+  "lastEditedDateTime": null,
+  "lastModifiedDateTime": "2026-11-03T10:27:39.726Z",
+  "locale": "en-us",
+  "mentions": [],
+  "messageType": "message",
+  "reactions": [],
+  "replyToId": null,
+  "subject": null,
+  "summary": null,
+  "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2015/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/6973447256982"
+}

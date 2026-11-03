@@ -337,9 +337,7 @@ def discover(
                 if meeting is None
                 else path.replace("{meeting}", quote(meeting["id"], safe=""))
             )
-            found[key] = (
-                "{meeting}" not in asked and get(token(sh, upns[persona - 1]), asked) >= minimum
-            )
+            found[key] = "{" not in asked and get(token(sh, upns[persona - 1]), asked) >= minimum
     if not dry:
         STATE.mkdir(exist_ok=True)
         _ = known.write_text(json.dumps(found, indent=2, sort_keys=True))

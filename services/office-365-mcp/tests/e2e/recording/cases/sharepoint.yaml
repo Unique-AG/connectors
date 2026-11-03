@@ -283,6 +283,7 @@ sharepoint_browse_folder-team-drive:
     - &channel-folder
       tool: teams_get_channel_files_folder
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[display_name=seed-v1 Long channel].channel_id"}
+    - &channel-item {tool: sharepoint_resolve_url, bind: {url: "$prev.web_url"}}
     - &library {tool: sharepoint_browse_folder, args: {limit: 100}, bind: {folder: "$prev.parent_uri"}}
     - tool: sharepoint_browse_folder
       args: {limit: 100}
@@ -311,14 +312,15 @@ sharepoint_copy_item-cross-drive:
     - *teams
     - *channels
     - *channel-folder
+    - *channel-item
     - *library
     - *root
     - *seed
     - tool: sharepoint_create_folder
       args: {name: seed-v1 case-sharepoint_copy_item-cross-drive}
-      bind: {parent: "$4.items[name=seed-v1 Team Files].uri"}
+      bind: {parent: "$5.items[name=seed-v1 Team Files].uri"}
     - tool: sharepoint_copy_item
-      bind: {item: "$6.items[name=seed-v1 Reports].uri", to_folder: "$prev.uri"}
+      bind: {item: "$7.items[name=seed-v1 Reports].uri", to_folder: "$prev.uri"}
 
 sharepoint_invite-write-notify:
   external: true

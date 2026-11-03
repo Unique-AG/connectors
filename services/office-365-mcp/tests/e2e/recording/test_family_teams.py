@@ -136,7 +136,7 @@ class TestCases:
     def test_a_case_needs_a_key_that_a_probe_can_check(self) -> None:
         merged = load()
         keys = {"teams-team", "teams-seed-team", "teams-seed-chats", "teams-chat"}
-        keys |= {"teams-meeting", "teams-meeting-attendance"}
+        keys |= {"teams-meeting", "teams-meeting-attendance", "teams-private-channel"}
         needed = {key for case in CASES for key in resolve(case).needs}
         assert needed == keys | {"sharepoint-seed-files"}
         assert keys <= set(merged.needs)

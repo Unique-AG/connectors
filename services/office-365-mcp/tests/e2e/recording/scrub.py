@@ -104,6 +104,10 @@ _GUID = re.compile(r"[0-9a-fA-F]{8}-(?:[0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}")
 _ELEMENT_ID = re.compile(rf"[a-z]+:\{{{_GUID.pattern}\}}\{{\d+\}}")
 _DATE = re.compile(r"\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d{2}:\d{2})?)?")
 _ENUM = re.compile(r"[A-Za-z#][A-Za-z0-9 .#()+\-:/_;=]{0,99}")
+_SEARCH_TERM = re.compile(
+    r"(?:from|to):[^\s@]+@\S+|sent[<>]=\d{4}-\d{2}-\d{2}(?:T[\d:]+Z)?"
+    + r"|(?:hasAttachment|IsRead|IsMentioned):(?:true|false)|mentions:[0-9a-f]{32}"
+)
 _TOKEN = re.compile(r"[A-Za-z#$][A-Za-z0-9._#$\-]{0,63}")
 _TOKEN_LIST = re.compile(r"[a-z][A-Za-z]*(?:, ?[a-z][A-Za-z]*)+")
 _TIME = re.compile(r"\d{2}:\d{2}:\d{2}(?:\.\d+)?")
@@ -151,6 +155,7 @@ _SAFE_TAG = re.compile(
 )
 _ANY_TAG = re.compile(r"<[^>]*>")
 _ATTACHMENT = re.compile(rf'<attachment id="({_GUID.pattern})"></attachment>')
+_MENTION = re.compile(r'<at id="\d{1,3}">([^<>]*)</at>')
 _ELLIPSIS = re.compile(r"<ddd/>|…|\.\.\.", re.I)
 _EMOJI_JOINERS = frozenset({"\u200d", "\ufe0f"})
 MAX_EMOJI_CODE_POINTS = 8
@@ -224,7 +229,8 @@ class Corpus:
     def accepts(self, value: str, extra: str = "") -> bool:
         if _PLACEHOLDER.fullmatch(value) or value in WELL_KNOWN_TEXT:
             return True
-        for part in _ELLIPSIS.split(_STYLE.sub(" ", _COMMENT.sub(" ", value))):
+        cleaned = _STYLE.sub(" ", _COMMENT.sub(" ", _MENTION.sub(r"…\1…", value)))
+        for part in _ELLIPSIS.split(cleaned):
             plain = _SAFE_TAG.sub(" ", _INLINE.sub("", part))
             if _ANY_TAG.search(plain):
                 return False
@@ -665,7 +671,14 @@ class Mapper:
             )
         if _ADDRESS.fullmatch(raw.strip().casefold()):
             return self.address(raw)
-        return self.url(raw) if raw.startswith("https://") else self.text(raw)
+        if raw.split() and all(_SEARCH_TERM.fullmatch(term) for term in raw.split()):
+            return self.plain(raw)
+        return self.url(raw) if raw.startswith("https://") else self.text(self._named(raw))
+
+    def _named(self, raw: str) -> str:
+        for name, owner in self.speakers.items():
+            raw = re.sub(rf"(?<!\w){re.escape(name)}(?!\w)", owner, raw, flags=re.IGNORECASE)
+        return raw
 
     def response(self, value: object, kind: Kind = "object") -> object:
         if value is None or isinstance(value, bool | int | float):
@@ -723,7 +736,7 @@ class Mapper:
             case "number" if _NUMBER.fullmatch(raw):
                 return raw
             case _:
-                return self.text(raw)
+                return self.voice(raw)
 
     def request(self, value: object, symbolize: Callable[[str], str]) -> object:
         if isinstance(value, str):

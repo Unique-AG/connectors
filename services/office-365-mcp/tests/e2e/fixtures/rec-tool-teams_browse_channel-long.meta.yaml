@@ -2,14 +2,15 @@ scenario: teams_browse_channel-long
 fixture: rec-tool-teams_browse_channel-long
 source: recorded
 target: graph
-recorded_at: '2026-11-02T21:08:02+00:00'
+recorded_at: '2026-11-03T11:40:36+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 10
-  keys dropped: 28
+  ids mapped: 413
+  keys dropped: 128
+  query parameters dropped: 200
   response headers dropped: 24
-  text kept: 5
-  text replaced: 3
+  text kept: 105
+  text replaced: 153
 literals:
 - standard
 sdk_versions:

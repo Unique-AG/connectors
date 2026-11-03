@@ -30,6 +30,7 @@ from tests.e2e.recording.scrub import (
     map_id,
     mapped_guid,
     mapped_id,
+    normalized,
     scrub,
 )
 from tests.e2e.test_scenarios import items, mapping, select
@@ -313,6 +314,35 @@ def test_a_page_element_id_in_a_request_maps_like_the_one_in_the_page() -> None:
     raw = f"p:{{{stand_in.TENANT_ID}}}{{12}}"
     assert mapper.request_value(raw) == mapper.page_attribute("id", raw)
     assert mapper.request_value(raw) == f"p:{{{mapped_guid(stand_in.TENANT_ID)}}}{{12}}"
+
+
+def test_a_search_query_of_operators_keeps_its_terms_and_maps_its_addresses() -> None:
+    mapper = Mapper(load_corpus(), {"tester2@dogfood.test": "anna"}, frozenset(), "")
+    asked = "from:tester2@dogfood.test sent>=2026-01-01 sent<=2026-11-04 IsRead:false"
+    assert mapper.request_value(asked) == (
+        "from:anna@example.test sent>=2026-01-01 sent<=2026-11-04 IsRead:false"
+    )
+    assert mapper.request_value("from:Lena sent>=2026-01-01") == "synthetic text 01"
+    assert mapper.request_value("from:a@b.test secret") == "synthetic text 02"
+
+
+def test_a_request_names_a_persona_as_the_answer_that_named_it_did() -> None:
+    mapper = Mapper(load_corpus(), {"tester2@dogfood.test": "anna"}, frozenset(), "")
+    member = {"email": "tester2@dogfood.test", "displayName": "Tester Two"}
+    assert mapper.response(member) == {"displayName": "Anna Meier", "email": "anna@example.test"}
+    assert mapper.request_value("Tester Two") == "Anna Meier"
+    assert mapper.request_value("Tester Twos") == "synthetic text 01"
+    assert mapper.response({"mentionText": "Tester Two"}) == {"mentionText": "Anna Meier"}
+
+
+def test_a_mention_tag_keeps_its_text_when_the_name_and_the_words_are_known() -> None:
+    mapper = Mapper(load_corpus(), {}, frozenset(), normalized("seed-v1 case-x hello"))
+    known = '<p><at id="0">Anna Meier</at> seed-v1 case-x hello</p>'
+    assert mapper.request_value(known) == known
+    assert mapper.request_value('<p><at id="0">Anna Meier</at> a private word</p>') == (
+        "synthetic text 01"
+    )
+    assert mapper.request_value('<p><at id="0" href="x">Anna Meier</at></p>') == "synthetic text 02"
 
 
 def test_a_page_read_keeps_the_include_ids_flag_in_its_query() -> None:

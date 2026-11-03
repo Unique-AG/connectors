@@ -2,16 +2,18 @@ scenario: onenote_list_pages-team
 fixture: rec-tool-onenote_list_pages-team
 source: recorded
 target: graph
-recorded_at: '2026-11-02T22:47:49+00:00'
+recorded_at: '2026-11-03T11:32:35+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 5
-  keys dropped: 25
-  response headers dropped: 17
-  text kept: 2
-  text replaced: 2
+  ids mapped: 48
+  keys dropped: 36
+  query parameters dropped: 3
+  response headers dropped: 44
+  text kept: 18
+  text replaced: 32
 literals:
 - Team plan
+- seed-v1 Shared
 sdk_versions:
   msgraph-sdk: 1.62.0
   msgraph-core: 1.5.2

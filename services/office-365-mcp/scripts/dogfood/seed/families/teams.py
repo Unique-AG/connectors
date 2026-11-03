@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable, Iterator, Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -15,6 +16,8 @@ PHASES: tuple[str, ...] = ("teams", "teams-posts", "teams-chats")
 OPT_IN = PHASES
 UNSUPPORTED = (400, 403, 404, 405, 501)
 OWNER = "mia"
+WITH_PRIVATE = os.environ.get("SEED_TEAMS_PRIVATE", "1") != "0"
+ANNA_AS = os.environ.get("SEED_TEAMS_ANNA_AS", "anna")
 MEMBER = "#microsoft.graph.aadUserConversationMember"
 CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "teams.yaml"
 SPEC: Mapping[str, Any] = yaml.safe_load(CORPUS.read_text(encoding="utf-8"))
@@ -59,6 +62,7 @@ def _channel_body(ctx: Context, channel: Mapping[str, Any]) -> dict[str, object]
 
 def _team_steps(ctx: Context) -> list[Step]:
     channels = f"/teams/{_ref('teams', TEAM_NAME)}/channels"
+    members = f"/groups/{_ref('teams', TEAM_NAME)}/members"
     body = {
         "template@odata.bind": "https://graph.microsoft.com/v1.0/teamsTemplates('standard')",
         "displayName": TEAM_NAME,
@@ -78,6 +82,25 @@ def _team_steps(ctx: Context) -> list[Step]:
             learns="team",
         ),
         Step("teams", "lookup", "GET", channels, NAMED, lookup="named"),
+        Step(
+            "teams",
+            "lookup",
+            "GET",
+            members,
+            (("$select", "id,userPrincipalName"),),
+            lookup="members",
+        ),
+        *(
+            Step(
+                "teams",
+                "create",
+                "POST",
+                f"{members}/$ref",
+                body={"@odata.id": f"https://graph.microsoft.com/v1.0/users/{address}"},
+                key=f"member:{address.lower()}",
+            )
+            for address in ctx.upns[1:]
+        ),
         *(
             Step(
                 "teams",
@@ -88,8 +111,13 @@ def _team_steps(ctx: Context) -> list[Step]:
                 key=f"teams:{one['name']}",
             )
             for one in SPEC["channels"]
+            if WITH_PRIVATE or not one.get("private")
         ),
     ]
+
+
+def _author(who: str) -> str:
+    return ANNA_AS if who == "anna" else who
 
 
 def threads() -> list[Message]:
@@ -99,20 +127,25 @@ def threads() -> list[Message]:
         {
             "id": f"l{n:02d}",
             "channel": "long",
-            "author": cycle[(n - 1) % len(cycle)],
+            "author": _author(cycle[(n - 1) % len(cycle)]),
             "text": long["text"].format(n=n),
         }
         for n in range(1, long["count"] + 1)
     ]
-    return [*SPEC["threads"], *made]
+    kept = [
+        {**one, "author": _author(one["author"])}
+        for one in SPEC["threads"]
+        if WITH_PRIVATE or one["channel"] != "private"
+    ]
+    return [*kept, *made]
 
 
 def replies_of(thread: Message) -> list[Message]:
     spec = thread.get("replies", [])
     if isinstance(spec, list):
-        return spec
+        return [{**one, "author": _author(one["author"])} for one in spec]
     return [
-        {"author": spec["author"], "text": spec["text"].format(n=n)}
+        {"author": _author(spec["author"]), "text": spec["text"].format(n=n)}
         for n in range(1, spec["count"] + 1)
     ]
 
@@ -131,16 +164,12 @@ def _reply_steps(
 ) -> tuple[list[Step], list[Step]]:
     path = f"{root}/replies"
     probe = f"replies:{thread['id']}"
-    first = _ref("attachment", f"{probe}:None")
     mine = [
-        (f"reply:{thread['id']}:{n}", reply)
-        for n, reply in enumerate(replies_of(thread), 1)
+        (f"reply:{probe}:{reply['text']}", reply)
+        for reply in replies_of(thread)
         if reply["author"] == owner
     ]
-    guards = [
-        Step(phase, "lookup", "GET", path, lookup="attachments", key=probe),
-        *(Step(phase, "lookup", "GET", f"{path}/{first}", lookup="single", key=k) for k, _ in mine),
-    ]
+    guards = [Step(phase, "lookup", "GET", path, lookup="replies", key=probe)]
     creates = [
         Step(phase, "create", "POST", path, body=_text_body(reply["text"]), key=key)
         for key, reply in mine

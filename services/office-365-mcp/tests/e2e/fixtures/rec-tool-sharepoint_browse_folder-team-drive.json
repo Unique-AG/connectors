@@ -1,0 +1,74 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_browse_folder-team-drive.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$filter": "membershipType eq 'standard'",
+      "$select": "id,displayName,description,createdDateTime,membershipType"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_browse_folder-team-drive.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels/19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2/filesFolder",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_browse_folder-team-drive.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/shares/u!aHR0cHM6Ly9jb250b3NvLnNoYXJlcG9pbnQuY29tL3RlYW1zL3N5bnRoZXRpYyUyMHRleHQlMjAwMy9TaGFyZWQlMjBEb2N1bWVudHMvc2VlZC12MSUyMExvbmclMjBjaGFubmVs/driveItem",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_browse_folder-team-drive.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx/items/01AJCD5XI7T5ZWGK0455DSL247JHGBPAYN/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_browse_folder-team-drive.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx/items/01TQND7ZFUM9D432E4WAQ0BEOZALZKSJIH/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-sharepoint_browse_folder-team-drive.06.json"
+  }
+]

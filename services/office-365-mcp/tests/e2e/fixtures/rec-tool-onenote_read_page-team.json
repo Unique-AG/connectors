@@ -1,0 +1,96 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-onenote_read_page-team.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks",
+    "query": {
+      "$filter": "contains(tolower(displayName),'seed-v1 shared')",
+      "$select": "id,displayName,isDefault,isShared,userRole,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-team.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName,isDefault,createdBy,createdDateTime,lastModifiedDateTime,links"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-team.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sectionGroups",
+    "query": {
+      "$expand": "parentNotebook,parentSectionGroup",
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-team.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections/3-00000000-817c-43b5-8f03-52cac459f595/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "contains(tolower(title),'team plan')",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-team.05.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/pages/0-16733x41ly4530p2985k1h8x1rl3w03w!474-00000000-817c-43b5-8f03-52cac459f595",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-team.06.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/pages/0-16733x41ly4530p2985k1h8x1rl3w03w!474-00000000-817c-43b5-8f03-52cac459f595/content",
+    "query": {
+      "includeIDs": "true"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/html; charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_read_page-team.07.html"
+  }
+]

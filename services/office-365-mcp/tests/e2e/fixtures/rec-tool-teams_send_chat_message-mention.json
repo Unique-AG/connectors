@@ -1,0 +1,79 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message-mention.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "8.trwPUl1B2pCKONGx7DfNrcXpx2FexvCdRSNAzTF5esBGvHZ6XwaDjZZ1LncbZ9ubWE2MuVgUCvNxQ6C6Jmn2MWV2JMOFC8MgLmDIiZBmEWyPhPd9CBLWStjOITUVQZBoIfSHZ51kMHvRqhQ8ZDzZRB8Re6yVWH72FPOBy1laEfQeT0c3JQaUi16hLRDBGTP5DMFFPG4QRZTGIXC8NDnCoZ7GYRaUchX8S3qYr9cdOUAxhJo8UJjDeYH5PPUITO00HNZNMUlLV2GPSYRRQdHVG2FFVSEcZBJMrKJkeBAXyJ5FX7hSBJC0INNzMkFHDYKQVZDeIRjuUCONK8q1GczUgoJPHASFRAJcBaclOupXSpiyEl7rVtHsuOMqBohQurDleJYSaON2M0aRTQrUAx9lFARILPO3YqsZbOYT0Vcyz1rpBoCvFMkhrI3zCAqKtJD0VGSfo93vKTxQld46MUvtqo0uJNaMerLUFCB3VrDeg1nxHnPvhhAGB55MnAAbJPMJR8jaHJf4esYUWtmgFsOwM970WHAWVsGXqiYmQ40SiOFVAU1kMWVkjFWnP0HImVaihjX0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message-mention.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/members",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message-mention.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/members",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_send_chat_message-mention.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages",
+    "json": {
+      "body": {
+        "content": "<p><at id=\"0\">Anna Meier</at> seed-v1 case-teams_send_chat_message-mention hello</p>",
+        "contentType": "html"
+      },
+      "mentions": [
+        {
+          "id": 0,
+          "mentionText": "Anna Meier",
+          "mentioned": {
+            "@odata.type": "#microsoft.graph.chatMessageMentionedIdentitySet",
+            "user": {
+              "displayName": "Anna Meier",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "userIdentityType": "aadUser"
+            }
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2012/chats('synthetic%20text%2013')/messages('0803312038904')"
+    },
+    "body": "rec-tool-teams_send_chat_message-mention.05.json"
+  }
+]

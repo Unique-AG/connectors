@@ -1,0 +1,23 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "entityTypes": ["chatMessage"],
+          "from": 0,
+          "query": {
+            "queryString": "from:tom@example.test sent>=~day-306 sent<=~tomorrow"
+          },
+          "size": 5
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-tool-teams_search_messages-person-window.01.json"
+  }
+]

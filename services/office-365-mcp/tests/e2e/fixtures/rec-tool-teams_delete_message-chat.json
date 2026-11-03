@@ -1,0 +1,76 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_delete_message-chat.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "5.zryUKo5V4rSTRNWx2MrYenDsr9LpsjWtYVPKqQT4ffQJjVG5KcpFzVZ6SmeuM4cwNB2WcTkOZmGmP7K5Kec9UBA1PEMKQ6NiRqKTmXHzSVdDkHg5APLLPukJLAPIKEOxEjCOU51kBFnIvvV3HGvDHM3Tq8wHOF40NUUKa3huRjKgH1k1MCnKc58bUYEXMYE9GAYDZT1LIGUVCDE2FbIJhY9COOLVcwW3O8lRp2kzRMYprMa8NHfQwOP4RTRKRK01KGLONZvRV9MIGWHKThQUR7UGROElADTVsEXebUNAyD3DL8oBEWJ0PCAeQaMLKRIAFIWySUzzDWACM8l7TihIwfTUVYIQRCAuNbvuTmfXSzgwKr9dDbRkxPKsKajCspFyjHQWnSY3X2ePODsYCt1yRTZIJMS6BfbCnFWL3Qzhq9vtJgLyRRpobJ0gBBuRjNJ9DIUja74rCEgCui15ZBfomd3wSOiGupNXNYV8BfHac4ogDhKgbcMRE30KfOIjZMEAH8xlUQk0zoMJLhapMpPlJ198UNJLRvJRfmUrN50WdJRWSJ6eAFEuvZMiJ1VMhCmgapO9"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_delete_message-chat.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages",
+    "json": {
+      "body": {
+        "content": "<p>seed-v1 case-teams_delete_message-chat doomed</p>",
+        "contentType": "html"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2012/chats('synthetic%20text%2013')/messages('0077258554479')"
+    },
+    "body": "rec-tool-teams_delete_message-chat.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/0077258554479",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_delete_message-chat.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_delete_message-chat.05.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/0077258554479/softDelete",
+    "status": 204
+  }
+]

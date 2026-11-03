@@ -1,0 +1,40 @@
+{
+  "@odata.etag": "\"{00000000-E4A3-48D7-8455-8FB66C2DADE1},7\"",
+  "createdBy": {
+    "application": {
+      "displayName": "synthetic text 04",
+      "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+    },
+    "user": {
+      "displayName": "Mia Keller",
+      "email": "mia@example.test"
+    }
+  },
+  "createdDateTime": "2026-11-02T20:43:11Z",
+  "folder": {
+    "childCount": 1
+  },
+  "id": "01DATL9FYRRNGD3FMPGDOFA8GO2GHSTU9J",
+  "lastModifiedBy": {
+    "application": {
+      "displayName": "synthetic text 04",
+      "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+    },
+    "user": {
+      "displayName": "Mia Keller",
+      "email": "mia@example.test"
+    }
+  },
+  "lastModifiedDateTime": "2026-11-02T20:43:11Z",
+  "name": "seed-v1 Long channel",
+  "parentReference": {
+    "driveId": "b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx",
+    "driveType": "documentLibrary",
+    "id": "01AJCD5XI7T5ZWGK0455DSL247JHGBPAYN",
+    "name": "synthetic text 05",
+    "path": "/drives/b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx/root:",
+    "siteId": "00000000-e263-472b-8fb7-39fbafc89342"
+  },
+  "size": 52,
+  "webUrl": "https://contoso.sharepoint.com/teams/synthetic%20text%2003/Shared%20Documents/seed-v1%20Long%20channel"
+}

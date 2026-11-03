@@ -1,0 +1,23 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "entityTypes": ["chatMessage"],
+          "from": 0,
+          "query": {
+            "queryString": "Lena Fischer"
+          },
+          "size": 3
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "body": "rec-tool-teams_search_messages-lena.01.json"
+  }
+]

@@ -1,0 +1,76 @@
+{
+  "value": [
+    {
+      "createdByAppId": "RBHMU-00000000-2CE7-4CFD-8583-FEC34DB3BE6C",
+      "createdDateTime": "2026-11-03T10:19:03Z",
+      "id": "0-16733x41ly4530p2985k1h8x1rl3w03w!474-00000000-817c-43b5-8f03-52cac459f595",
+      "lastModifiedDateTime": "2026-11-03T10:19:03Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 07"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso.sharepoint.com/teams/synthetic%20text%2004/Shared%20Documents/synthetic%20text%2005/seed-v1%20Shared%20Notes"
+        }
+      },
+      "parentNotebook": {
+        "createdBy": {
+          "user": {
+            "displayName": "synthetic text 02"
+          }
+        },
+        "createdDateTime": "2026-11-02T20:44:41Z",
+        "displayName": "seed-v1 Shared Notes",
+        "id": "7-00000000-8967-4371-86c6-2c88ccb17532",
+        "isDefault": false,
+        "isShared": false,
+        "lastModifiedBy": {
+          "user": {
+            "displayName": "synthetic text 02"
+          }
+        },
+        "lastModifiedDateTime": "2026-11-02T20:44:41Z",
+        "links": {
+          "oneNoteClientUrl": {
+            "href": "synthetic text 03"
+          },
+          "oneNoteWebUrl": {
+            "href": "https://contoso.sharepoint.com/teams/synthetic%20text%2004/Shared%20Documents/synthetic%20text%2005/seed-v1%20Shared%20Notes"
+          }
+        },
+        "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks/7-00000000-8967-4371-86c6-2c88ccb17532/sectionGroups",
+        "sectionsUrl": "https://graph.microsoft.com/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks/7-00000000-8967-4371-86c6-2c88ccb17532/sections",
+        "self": "https://graph.microsoft.com/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/notebooks/7-00000000-8967-4371-86c6-2c88ccb17532",
+        "userRole": "Owner"
+      },
+      "parentSection": {
+        "createdBy": {
+          "user": {
+            "displayName": "synthetic text 02"
+          }
+        },
+        "createdDateTime": "2026-11-02T20:44:46Z",
+        "displayName": "seed-v1 Team notes",
+        "id": "3-00000000-817c-43b5-8f03-52cac459f595",
+        "isDefault": false,
+        "lastModifiedBy": {
+          "user": {
+            "displayName": "synthetic text 02"
+          }
+        },
+        "lastModifiedDateTime": "2026-11-03T10:19:04Z",
+        "links": {
+          "oneNoteClientUrl": {
+            "href": "synthetic text 06"
+          },
+          "oneNoteWebUrl": {
+            "href": "https://contoso.sharepoint.com/teams/synthetic%20text%2004/Shared%20Documents/synthetic%20text%2005/seed-v1%20Shared%20Notes"
+          }
+        },
+        "pagesUrl": "https://graph.microsoft.com/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections/3-00000000-817c-43b5-8f03-52cac459f595/pages",
+        "self": "https://graph.microsoft.com/v1.0/groups/00000000-e7a0-41c6-863d-0548ee2dacdd/onenote/sections/3-00000000-817c-43b5-8f03-52cac459f595"
+      },
+      "title": "seed-v1 Team plan"
+    }
+  ]
+}

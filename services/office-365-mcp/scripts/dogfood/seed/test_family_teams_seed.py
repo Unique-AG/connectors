@@ -31,6 +31,7 @@ class TeamsGraph:
         self.me = "mia"
         self.team: str | None = None
         self.channels: dict[str, dict[str, Any]] = {}
+        self.members: list[str] = []
         self.chats: dict[str, dict[str, Any]] = {}
         self.count = 0
 
@@ -63,6 +64,7 @@ class TeamsGraph:
             return httpx.Response(202, headers=headers)
         if path == OPERATION:
             self.team = TEAM
+            self.members = [UPNS[0]]
             general = {"displayName": "General", "members": PERSONAS}
             self.channels = {"general": {"id": "general", **general, "posts": []}}
             return httpx.Response(200, json={"status": "succeeded"})
@@ -76,6 +78,13 @@ class TeamsGraph:
     def handle_content(
         self, request: httpx.Request, path: str, method: str, body: dict[str, Any]
     ) -> httpx.Response:
+        if path == f"/groups/{TEAM}/members":
+            return self.page(
+                request, [{"id": f"id-{u}", "userPrincipalName": u} for u in self.members]
+            )
+        if method == "POST" and path == f"/groups/{TEAM}/members/$ref":
+            self.members.append(body["@odata.id"].rsplit("/", 1)[-1])
+            return httpx.Response(204)
         if path == f"/teams/{TEAM}/channels":
             if method == "POST":
                 members = [PERSONAS[0], PERSONAS[1]] if body.get("members") else PERSONAS
@@ -164,11 +173,16 @@ def test_only_mia_creates_the_team_and_only_when_the_phase_is_on() -> None:
     assert teams.steps(context(), "anna", {"teams"}) == []
     assert teams.steps(context(), "tom", {"teams"}) == []
     assert teams.steps(context(), "mia", {"mail"}) == []
-    lookup, create, channels, *made = teams.steps(context(), "mia", {"teams"})
+    lookup, create, channels, members, anna, tom, *made = teams.steps(context(), "mia", {"teams"})
     assert (lookup.method, lookup.path, lookup.lookup) == ("GET", "/me/joinedTeams", "named")
     assert (create.method, create.path, create.poll) == ("POST", "/teams", True)
     assert create.key == f"teams:{teams.TEAM_NAME}" == "teams:seed-v1 team"
     assert (channels.path, channels.lookup) == ("/teams/{teams:seed-v1 team}/channels", "named")
+    assert (members.path, members.lookup) == ("/groups/{teams:seed-v1 team}/members", "members")
+    assert [(s.method, s.path, s.key) for s in (anna, tom)] == [
+        ("POST", "/groups/{teams:seed-v1 team}/members/$ref", f"member:{upn.lower()}")
+        for upn in UPNS[1:]
+    ]
     assert [step.key for step in made] == [f"teams:{one}" for one in (POSTS, LONG, PRIVATE)]
     assert {lookup.learns, create.learns} == {"team"}
 
@@ -218,6 +232,27 @@ def test_the_personas_in_order_seed_the_team_once_and_a_second_run_creates_nothi
     again = [fake.run(who, teams.steps(context(), who, PHASES), context()) for who in PERSONAS]
     assert [created for created, _ in again] == [0, 0, 0]
     assert (len(fake.channels), len(fake.chats), fake.count) == before
+
+
+def test_a_run_that_stopped_inside_a_thread_adds_only_the_missing_replies() -> None:
+    fake = seeded()
+    thread = next(
+        p for one in fake.channels.values() for p in one["posts"] if p["subject"].endswith("t51")
+    )
+    thread["replies"] = thread["replies"][:8]
+    again = fake.run("anna", teams.steps(context(), "anna", PHASES), context())
+    assert again[0] == 43
+    texts = [r["body"]["content"] for r in thread["replies"]]
+    assert texts == [f"Note {n} of the long thread." for n in range(1, 9)] + texts[8:]
+    assert len(set(texts)) == 51
+
+
+def test_a_second_apply_adds_no_member_because_the_lookup_finds_anna_and_tom() -> None:
+    fake = seeded()
+    assert fake.members == list(UPNS)
+    steps = teams.steps(context(), "mia", {"teams"})
+    assert fake.run("mia", steps, context())[0] == 0
+    assert fake.members == list(UPNS)
 
 
 def test_each_persona_posts_only_as_that_persona_and_tom_never_reaches_the_private_channel() -> (
@@ -374,3 +409,21 @@ def test_a_cleanup_that_graph_refuses_names_nothing_and_stops_quietly() -> None:
     graph = Forbidden()
     assert list(teams.cleanup(graph, context(), "tom", PHASES)) == []  # pyright: ignore[reportArgumentType]
     assert list(teams.sweep(graph, "tom")) == []  # pyright: ignore[reportArgumentType]
+
+
+def test_the_private_channel_and_its_posts_are_skipped_when_the_tenant_refuses_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(teams, "WITH_PRIVATE", False)
+    created = [s.key for s in teams.steps(context(), "mia", {"teams"}) if s.kind == "create"]
+    assert f"teams:{PRIVATE}" not in created
+    assert not [one for one in teams.threads() if one["channel"] == "private"]
+
+
+def test_the_posts_of_anna_go_to_the_user_that_the_tenant_names(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(teams, "ANNA_AS", "tom")
+    authors = {one["author"] for one in teams.threads()}
+    replies = {reply["author"] for one in teams.threads() for reply in teams.replies_of(one)}
+    assert "anna" not in authors | replies

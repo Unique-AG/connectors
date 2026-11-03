@@ -135,6 +135,12 @@ NEEDS: Mapping[str, str] = {
         + "have consented to Team.Create and Channel.Create. Then run record_all.sh discover again."
     ),
     "teams-seed-chats": f"{_SEED_ORDER} Then run record_all.sh discover again.",
+    "teams-private-channel": (
+        "This tenant refuses to create a private channel. An administrator switches on "
+        + '"Create private channels" in the Teams admin centre, under Teams policies. Then run '
+        + "run_all.sh apply --phases teams,teams-posts,teams-chats for the index 1, with "
+        + "SEED_TEAMS_PRIVATE=1. Then run record_all.sh discover again."
+    ),
     "teams-chat": (
         "Sign in to Teams as Mia. Start a group chat with Anna and Tom. Send one message in the "
         + "chat."
@@ -147,6 +153,7 @@ PROBES: Mapping[str, tuple[int, str, int]] = {
     "teams-team": (1, "/me/joinedTeams", 1),
     "teams-seed-team": (1, "/me/joinedTeams#seed", 1),
     "teams-seed-chats": (1, _SEED_CHAT, 1),
+    "teams-private-channel": (1, "/teams/{private-channel}/channels", 1),
     "teams-chat": (1, "/me/chats", 1),
     "teams-meeting-attendance": (1, "/me/onlineMeetings/{meeting}/attendanceReports", 1),
     "teams-meeting": (1, "/me/onlineMeetings/{meeting}/transcripts", 1),

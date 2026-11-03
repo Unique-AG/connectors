@@ -29,7 +29,7 @@ READ_GETS: Mapping[str, tuple[str, ...]] = {
     ),
     "onenote_list_pages": (f"GET {GROUP}/pages", f"GET {GROUP}/sections/*/pages"),
     "onenote_preview_page": (f"GET {GROUP}/pages/*/preview",),
-    "onenote_read_page": (f"GET {GROUP}/pages/*/content",),
+    "onenote_read_page": (f"GET {GROUP}/pages/*", f"GET {GROUP}/pages/*/content"),
     "onenote_read_resource": (f"GET {GROUP}/resources/*/content",),
     "onenote_get_operation": (f"GET {GROUP}/operations/*",),
     "onenote_create_page": (f"GET {GROUP}/sections/*", f"GET {GROUP}/notebooks/*"),
