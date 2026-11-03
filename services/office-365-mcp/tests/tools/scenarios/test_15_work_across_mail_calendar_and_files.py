@@ -33,7 +33,7 @@ from tests.tools.conftest import (
 )
 from tests.tools.conftest import search_response as teams_hits
 from tests.tools.scenarios.support import Person, call, response, serve
-from tests.tools.test_teams_list_chats import chat_payload, online_meeting_info
+from tests.tools.teams_recordings import chat_payload, online_meeting_info
 
 YESTERDAY = "2026-10-29"
 TODAY = "2026-10-30"

@@ -422,8 +422,7 @@ uc-11-26:
     (tools/outlook_set_focused_override.py:25), and retrying will not help. Busy, seam.py:509-513,
     left alone for 30 seconds, retry after that and not sooner. The tool never asks Mia
     (tools/outlook_set_focused_override.py:34-35). Its POST and PATCH carry no no_retry option, so
-    the SDK retry handler waits out up to 3 busy answers
-    (tests/tools/test_outlook_set_focused_override.py:383-413) and the text reaches the assistant
+    the SDK retry handler waits out up to 3 busy answers and the text reaches the assistant
     only when every try is busy. OPEN: the same 60 s limit as uc-11-25. A refusal or a busy answer
     changes no tab.
 
@@ -446,7 +445,7 @@ uc-11-27:
     timeout (:43), so the seam does not treat the failed write as outcome unknown (seam.py:392-396).
     A status of 500 or more, graph_client/errors.py:332-335, and a timeout or lost connection,
     errors.py:218-227, both reach the assistant. A 503 or 504 is sent again by the SDK before the
-    assistant sees it (tests/tools/test_outlook_set_focused_override.py:383-413). A sender holds
+    assistant sees it. A sender holds
     one row, so a repeat leaves the sender once in the list.
 
 uc-11-28:

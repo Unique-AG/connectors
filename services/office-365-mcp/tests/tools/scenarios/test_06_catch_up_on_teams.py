@@ -26,7 +26,7 @@ from tests.tools.conftest import (
     transcript_payload,
 )
 from tests.tools.scenarios.support import Person, call, serve
-from tests.tools.test_teams_list_chats import aad_member, chat_payload, online_meeting_info
+from tests.tools.teams_recordings import aad_member, chat_payload, online_meeting_info
 
 type Row = Mapping[str, object]
 
