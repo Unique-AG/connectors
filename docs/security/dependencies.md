@@ -180,6 +180,7 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 | The agent run crashes. | The PR has no agent label. | Run the agent again, as in [One agent run for every PR](#one-agent-run-for-every-pr). |
 | A fix PR from the agent and a nightly PR change the same package. | Both PRs conflict, or one has a conflict after the other merges. | Merge the PR that has the fix. Then close the other PR. A closed PR skips only its own target versions. |
 | A handled PR has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
+| A bump job is red. | The job `Bump <slug>` shows the cause as an error annotation and in its job summary. No PR opens for that update. | Read the cause. If a package pins the new version, wait for a release of that package. If other packages move too, put them in one group in `.github/deps-groups.json`. |
 | The report says "safe with a gap". | The report names one check. | Run that check, for example one real request in QA. Then merge. |
 
 ## Dependency review
