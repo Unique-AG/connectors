@@ -193,7 +193,7 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: vuln
-          severity: CRITICAL,HIGH
+          severity: CRITICAL,HIGH,MEDIUM
           limit-severities-for-sarif: true
           ignore-unfixed: true
           format: sarif
@@ -226,7 +226,7 @@ jobs:
         with:
           scan-type: config
           scan-ref: .
-          severity: CRITICAL,HIGH
+          severity: CRITICAL,HIGH,MEDIUM
           limit-severities-for-sarif: true
           format: sarif
           output: trivy-config.sarif
@@ -286,21 +286,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
-          alerts=$(gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&tool_name=Trivy&per_page=100" --paginate --jq '.[] | [.most_recent_instance.category, (.rule.security_severity_level // "unknown")] | @tsv' || true)
+          if ! alerts=$(gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&tool_name=Trivy&ref=${GITHUB_REF}&per_page=100" --paginate --jq '.[] | [.most_recent_instance.category, (.rule.security_severity_level // "unknown")] | @tsv'); then
+            echo "::warning title=Alerts unavailable::The open alerts could not be read, so the report says so."
+            exit 0
+          fi
           count() {
-            printf '%s\n' "$alerts" | awk -F'\t' -v category="$1" '$1 == category { found[$2]++ } END { printf "%d critical, %d high", found["critical"], found["high"] }'
+            printf '%s\n' "$alerts" | awk -F'\t' -v category="$1" '$1 == category { found[$2]++ } END { printf "{\"critical\":%d,\"high\":%d,\"medium\":%d}", found["critical"], found["high"], found["medium"] }'
           }
-          {
-            echo 'text<<EOF'
-            echo ":package: Lock files of main: $(count trivy-lockfiles)"
-            echo ":page_facing_up: Misconfiguration of main: $(count trivy-config)"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
+          echo "alerts={\"lockfiles\":$(count trivy-lockfiles),\"config\":$(count trivy-config)}" >> "$GITHUB_OUTPUT"
 
       - uses: ./.github/actions/trivy-report-slack
         if: steps.webhook.outputs.configured == 'true'
         with:
-          other_alerts: ${{ steps.other.outputs.text }}
+          repository_alerts: ${{ steps.other.outputs.alerts }}
           webhook: ${{ env.SLACK_LEGACY_WEBHOOK_URL }}
           channel: C0C1PR9CNMP
           title: Security Trivy Scan (Registry)

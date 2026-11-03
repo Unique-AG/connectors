@@ -170,16 +170,20 @@ export function applyActions(files, { name, to, data }) {
 }
 
 export function createActionsLookup(token, fetchImpl = fetch) {
-  const headers = {
+  const publicHeaders = {
     Accept: 'application/vnd.github+json',
     'X-GitHub-Api-Version': '2022-11-28',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
+  const request = (path, headers) =>
+    fetchImpl(`${API}/repos/${path}`, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   const get = async (path) => {
-    const response = await fetchImpl(`${API}/repos/${path}`, {
-      headers,
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    });
+    let response = await request(
+      path,
+      token ? { ...publicHeaders, Authorization: `Bearer ${token}` } : publicHeaders,
+    );
+    if (token && (response.status === 401 || response.status === 403)) {
+      response = await request(path, publicHeaders);
+    }
     if (response.status === 404 || response.status === 422) {
       return null;
     }

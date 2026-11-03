@@ -439,6 +439,16 @@ describe('createActionsLookup', () => {
     assert.ok(calls[0].init.signal instanceof AbortSignal);
   });
 
+  it('asks again without the token after a 401 or 403', async () => {
+    let count = 0;
+    const { calls, fetchImpl } = record(() => respond(++count === 1 ? 403 : 200, []));
+    await createActionsLookup('secret', fetchImpl).releases('aquasecurity/trivy-action');
+
+    assert.equal(calls[0].init.headers.Authorization, 'Bearer secret');
+    assert.equal(calls[1].init.headers.Authorization, undefined);
+    assert.equal(calls[1].url, calls[0].url);
+  });
+
   describe('without any release', () => {
     const tagNames = ['v1.0.0', 'v1.1.0', 'v2.0.0-rc1', 'latest'];
     const tagFetch = (tags) =>

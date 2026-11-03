@@ -5,17 +5,16 @@ import { join } from 'node:path';
 import test from 'node:test';
 import {
   buildHeadlineText,
-  buildImageDetailText,
   buildMainSectionText,
   buildPayload,
+  buildRepositoryBlocks,
+  buildRepositoryHeadlineText,
   buildTopOffendersBlocks,
   formatHeaderTitle,
   formatSeveritySummary,
   formatSummedPerImageLine,
-  IMAGES_LIMIT,
   summarize,
   topOffendingImages,
-  VULNERABILITIES_PER_IMAGE_LIMIT,
 } from './build-payload.mjs';
 
 const vulnerability = (id, severity, pkg = 'openssl') => ({
@@ -194,14 +193,14 @@ test('topOffendingImages does not change the input order', () => {
   );
 });
 
-test('buildTopOffendersBlocks returns a table with the image tag and a row limit', () => {
-  const images = Array.from({ length: IMAGES_LIMIT + 3 }, (_, index) =>
+test('buildTopOffendersBlocks lists every image with findings, with its tag', () => {
+  const images = Array.from({ length: 13 }, (_, index) =>
     image(`service-${String(index).padStart(2, '0')}`, [vulnerability(`CVE-${index}`, 'high')]),
   );
   const [table] = buildTopOffendersBlocks(images);
 
   assert.equal(table.type, 'table');
-  assert.equal(table.rows.length, IMAGES_LIMIT + 1);
+  assert.equal(table.rows.length, 14);
   assert.deepEqual(
     table.rows[0].map((cell) => cell.text),
     ['Service', '🟣 Critical', '🔴 High', '🟠 Medium'],
@@ -222,37 +221,7 @@ test('buildTopOffendersBlocks returns no table for clean images', () => {
   assert.deepEqual(buildTopOffendersBlocks([image('admin')]), []);
 });
 
-test('buildImageDetailText lists id, package, versions, and severity', () => {
-  const text = buildImageDetailText(
-    image('admin', [vulnerability('CVE-2025-1', 'high', 'libssl')]),
-  );
-
-  assert.equal(
-    text,
-    '*admin:1.2.3* 🟣 0 critical · 🔴 1 high · 🟠 0 medium\n🔴 HIGH `CVE-2025-1` libssl 3.0.1 → 3.0.2',
-  );
-});
-
-test('buildImageDetailText caps the list and counts the rest', () => {
-  const vulnerabilities = Array.from({ length: VULNERABILITIES_PER_IMAGE_LIMIT + 4 }, (_, index) =>
-    vulnerability(`CVE-${String(index).padStart(2, '0')}`, 'medium'),
-  );
-  const lines = buildImageDetailText(image('admin', vulnerabilities)).split('\n');
-
-  assert.equal(lines.length, VULNERABILITIES_PER_IMAGE_LIMIT + 2);
-  assert.equal(lines.at(-1), '_4 more not shown_');
-});
-
-test('buildImageDetailText escapes Slack control characters', () => {
-  const text = buildImageDetailText(
-    image('admin', [vulnerability('CVE-1', 'high', '<!channel>&')]),
-  );
-
-  assert.equal(text.includes('<!channel>'), false);
-  assert.match(text, /&lt;!channel&gt;&amp;/);
-});
-
-test('buildPayload reads the reports and builds header, table, details, and footer', () => {
+test('buildPayload reads the reports and builds header, table, repository section, and footer', () => {
   const payload = withReports(
     (root) => {
       writeReport(root, 'admin', {
@@ -278,6 +247,7 @@ test('buildPayload reads the reports and builds header, table, details, and foot
     (root) =>
       buildPayload({
         ...baseEnv,
+        REPOSITORY_ALERTS: JSON.stringify({ lockfiles: noAlerts, config: noAlerts }),
         REPORTS_PATH: root,
         SERVICES: JSON.stringify([
           { service: 'admin', version: '1.2.3' },
@@ -299,8 +269,6 @@ test('buildPayload reads the reports and builds header, table, details, and foot
     payload.blocks[2].rows[1].map((cell) => cell.text),
     ['admin:1.2.3', '1', '0', '1'],
   );
-  assert.match(payload.blocks[3].text.text, /`CVE-1` openssl 3\.0\.1 → 3\.0\.2/);
-  assert.equal(payload.blocks[3].text.text.includes('CVE-3'), false);
   const footer = payload.blocks.at(-1).elements[0].text;
   assert.equal(
     footer.startsWith(
@@ -379,26 +347,54 @@ test('buildPayload rejects a SERVICES value that is not an array', () => {
   );
 });
 
-test('buildPayload adds a section for the other alerts only when it has text', () => {
-  const base = {
-    CHANNEL: 'C0C1PR9CNMP',
-    TITLE: 'Security Trivy Scan',
-    VERSION_LABEL: 'published-images',
-    REPORTS_PATH: '/nonexistent',
-    SERVICES: '[]',
-    TRIGGER_LABEL: 'scheduled',
-    REPOSITORY: 'unique-ag/connectors',
-    ACTOR: 'octocat',
-    WORKFLOW_NAME: 'Trivy',
-    RUN_URL: 'https://github.com/unique-ag/connectors/actions/runs/1',
-  };
-  const without = buildPayload(base);
-  const withOther = buildPayload({
-    ...base,
-    OTHER_ALERTS: ':package: Lock files of main: 0 critical, 2 high',
-  });
-  assert.equal(withOther.blocks.length, without.blocks.length + 1);
-  assert.equal(withOther.blocks[2].text.text, ':package: Lock files of main: 0 critical, 2 high');
+const repositoryAlerts = (lockfiles, config) => ({ lockfiles, config });
+const noAlerts = { critical: 0, high: 0, medium: 0 };
+
+test('buildRepositoryHeadlineText sums the counts of both scans', () => {
+  assert.equal(
+    buildRepositoryHeadlineText(
+      repositoryAlerts({ critical: 0, high: 0, medium: 5 }, { critical: 0, high: 0, medium: 1 }),
+    ),
+    '🟣 0 critical · 🔴 0 high · 🟠 6 medium across 2 scans',
+  );
+  assert.equal(
+    buildRepositoryHeadlineText(
+      repositoryAlerts({ critical: 1, high: 2, medium: 3 }, { critical: 0, high: 1, medium: 0 }),
+    ),
+    '🟣 1 critical · 🔴 3 high · 🟠 3 medium across 2 scans',
+  );
+});
+
+test('buildRepositoryBlocks always has the title and the headline, and a row only for a scan with findings', () => {
+  const [section, table] = buildRepositoryBlocks(
+    repositoryAlerts({ critical: 0, high: 0, medium: 5 }, noAlerts),
+  );
+
+  assert.equal(
+    section.text.text,
+    '*Repository (main)*\n🟣 0 critical · 🔴 0 high · 🟠 5 medium across 2 scans',
+  );
+  assert.deepEqual(
+    table.rows.map((row) => row.map((cell) => cell.text)),
+    [
+      ['Scan', '🟣 Critical', '🔴 High', '🟠 Medium'],
+      ['📦 Lock files', '0', '0', '5'],
+    ],
+  );
+});
+
+test('buildRepositoryBlocks has no table when both scans are clean', () => {
+  const blocks = buildRepositoryBlocks(repositoryAlerts(noAlerts, noAlerts));
+
+  assert.equal(blocks.length, 1);
+  assert.match(blocks[0].text.text, /0 critical · 🔴 0 high · 🟠 0 medium across 2 scans$/);
+});
+
+test('buildRepositoryBlocks says so when the alerts could not be read', () => {
+  const blocks = buildRepositoryBlocks(null);
+
+  assert.equal(blocks.length, 1);
+  assert.match(blocks[0].text.text, /The open alerts could not be read\.$/);
 });
 
 test('buildPayload sets the channel for a legacy webhook', () => {

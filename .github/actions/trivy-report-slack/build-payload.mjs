@@ -8,6 +8,8 @@ const ICON = {
   high: '🔴',
   medium: '🟠',
   warn: '⚠️',
+  lockfiles: '📦',
+  config: '📄',
   shield: '🛡️',
 };
 
@@ -16,8 +18,6 @@ const HEADER_TEXT_LIMIT = 150;
 const SECTION_TEXT_LIMIT = 3000;
 const CONTEXT_TEXT_LIMIT = 2000;
 
-export const IMAGES_LIMIT = 10;
-export const VULNERABILITIES_PER_IMAGE_LIMIT = 5;
 
 function truncate(text, limit) {
   return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
@@ -153,7 +153,7 @@ export function formatHeaderTitle(title, versionLabel) {
   return `${ICON.shield} ${title} → ${versionLabel}`;
 }
 
-export function topOffendingImages(images, limit = IMAGES_LIMIT) {
+export function topOffendingImages(images) {
   return images
     .filter((image) => image.failed || image.vulnerabilities.length > 0)
     .sort((left, right) => {
@@ -168,8 +168,7 @@ export function topOffendingImages(images, limit = IMAGES_LIMIT) {
         }
       }
       return left.service.localeCompare(right.service);
-    })
-    .slice(0, limit);
+    });
 }
 
 export function buildMainSectionText(summary) {
@@ -201,67 +200,84 @@ function rawText(text) {
   return { type: 'raw_text', text };
 }
 
+function severityHeader(firstColumn) {
+  return [
+    rawText(firstColumn),
+    rawText(`${ICON.critical} Critical`),
+    rawText(`${ICON.high} High`),
+    rawText(`${ICON.medium} Medium`),
+  ];
+}
+
+function tableBlock(rows) {
+  return {
+    type: 'table',
+    column_settings: [
+      { is_wrapped: true },
+      { align: 'right' },
+      { align: 'right' },
+      { align: 'right' },
+    ],
+    rows,
+  };
+}
+
 export function buildTopOffendersBlocks(images) {
   const offenders = topOffendingImages(images);
   if (offenders.length === 0) {
     return [];
   }
-  const rows = [
-    [
-      rawText('Service'),
-      rawText(`${ICON.critical} Critical`),
-      rawText(`${ICON.high} High`),
-      rawText(`${ICON.medium} Medium`),
-    ],
-    ...offenders.map((image) => [
-      rawText(`${image.service}:${image.version}${image.failed ? ' (scan failed)' : ''}`),
-      rawText(String(image.critical)),
-      rawText(String(image.high)),
-      rawText(String(image.medium)),
+  return [
+    tableBlock([
+      severityHeader('Service'),
+      ...offenders.map((image) => [
+        rawText(`${image.service}:${image.version}${image.failed ? ' (scan failed)' : ''}`),
+        rawText(String(image.critical)),
+        rawText(String(image.high)),
+        rawText(String(image.medium)),
+      ]),
     ]),
   ];
+}
+
+const REPOSITORY_TITLE = 'Repository (main)';
+const REPOSITORY_SCANS = [
+  { key: 'lockfiles', label: 'Lock files', icon: ICON.lockfiles },
+  { key: 'config', label: 'Configuration', icon: ICON.config },
+];
+
+export function buildRepositoryHeadlineText(alerts) {
+  const totals = Object.fromEntries(
+    SEVERITIES.map((severity) => [
+      severity,
+      REPOSITORY_SCANS.reduce((sum, { key }) => sum + alerts[key][severity], 0),
+    ]),
+  );
+  return `${formatSeveritySummary(totals)} across ${REPOSITORY_SCANS.length} scans`;
+}
+
+export function buildRepositoryBlocks(alerts) {
+  const title = `*${REPOSITORY_TITLE}*`;
+  if (!alerts) {
+    return [sectionBlock(`${title}\n${ICON.warn} The open alerts could not be read.`)];
+  }
+  const rows = REPOSITORY_SCANS.filter(({ key }) =>
+    SEVERITIES.some((severity) => alerts[key][severity] > 0),
+  );
   return [
-    {
-      type: 'table',
-      column_settings: [
-        { is_wrapped: true },
-        { align: 'right' },
-        { align: 'right' },
-        { align: 'right' },
-      ],
-      rows,
-    },
+    sectionBlock(`${title}\n${buildRepositoryHeadlineText(alerts)}`),
+    ...(rows.length === 0
+      ? []
+      : [
+          tableBlock([
+            severityHeader('Scan'),
+            ...rows.map(({ key, label, icon }) => [
+              rawText(`${icon} ${label}`),
+              ...SEVERITIES.map((severity) => rawText(String(alerts[key][severity]))),
+            ]),
+          ]),
+        ]),
   ];
-}
-
-export function buildImageDetailText(image) {
-  const shown = image.vulnerabilities.slice(0, VULNERABILITIES_PER_IMAGE_LIMIT);
-  const hidden = image.vulnerabilities.length - shown.length;
-  const lines = [
-    `*${escapeMrkdwn(image.service)}:${escapeMrkdwn(image.version)}* ${formatSeveritySummary(image)}`,
-    ...shown.map(
-      (vulnerability) =>
-        `${ICON[vulnerability.severity]} ${vulnerability.severity.toUpperCase()} \`${escapeMrkdwn(vulnerability.id)}\` ${escapeMrkdwn(vulnerability.pkg)} ${escapeMrkdwn(vulnerability.installed)} → ${escapeMrkdwn(vulnerability.fixed || 'no fix')}`,
-    ),
-  ];
-  if (hidden > 0) {
-    lines.push(`_${hidden} more not shown_`);
-  }
-  return lines.join('\n');
-}
-
-function buildDetailBlocks(images) {
-  const offenders = topOffendingImages(images);
-  const omitted = topOffendingImages(images, Number.POSITIVE_INFINITY).length - offenders.length;
-  const blocks = offenders
-    .filter((image) => image.vulnerabilities.length > 0)
-    .map((image) => sectionBlock(buildImageDetailText(image)));
-  if (omitted > 0) {
-    blocks.push(
-      sectionBlock(`_${omitted} more image(s) have findings. Open the run for the full list._`),
-    );
-  }
-  return blocks;
 }
 
 function sectionBlock(text) {
@@ -298,12 +314,13 @@ export function buildPayload(env) {
     ACTOR,
     WORKFLOW_NAME,
     RUN_URL,
-    OTHER_ALERTS = '',
+    REPOSITORY_ALERTS = '',
   } = env;
   const expected = JSON.parse(SERVICES);
   assert.ok(Array.isArray(expected), 'SERVICES must be a JSON array');
   assert.ok(RUN_URL, 'RUN_URL is required');
   assert.ok(CHANNEL, 'CHANNEL is required');
+  const repositoryAlerts = REPOSITORY_ALERTS.trim() === '' ? null : JSON.parse(REPOSITORY_ALERTS);
 
   const summary = summarize(expected.map((entry) => readImage(REPORTS_PATH, entry)));
   const headerTitle = truncate(formatHeaderTitle(TITLE, VERSION_LABEL), HEADER_TEXT_LIMIT);
@@ -322,9 +339,8 @@ export function buildPayload(env) {
     blocks: [
       { type: 'header', text: { type: 'plain_text', text: headerTitle } },
       sectionBlock(buildMainSectionText(summary)),
-      ...(OTHER_ALERTS.trim() === '' ? [] : [sectionBlock(OTHER_ALERTS.trim())]),
       ...buildTopOffendersBlocks(summary.images),
-      ...buildDetailBlocks(summary.images),
+      ...buildRepositoryBlocks(repositoryAlerts),
       {
         type: 'context',
         elements: [{ type: 'mrkdwn', text: truncate(footer, CONTEXT_TEXT_LIMIT) }],
