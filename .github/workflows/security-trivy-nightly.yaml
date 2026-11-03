@@ -287,7 +287,7 @@ jobs:
         run: |
           set -uo pipefail
           if ! alerts=$(gh api "repos/${GITHUB_REPOSITORY}/code-scanning/alerts?state=open&tool_name=Trivy&ref=${GITHUB_REF}&per_page=100" --paginate --jq '.[] | [.most_recent_instance.category, (.rule.security_severity_level // "unknown")] | @tsv'); then
-            echo "::warning title=Alerts unavailable::The open alerts could not be read, so the report has no repository table."
+            echo "::warning title=Alerts unavailable::The open alerts could not be read, so the report says so."
             exit 0
           fi
           count() {

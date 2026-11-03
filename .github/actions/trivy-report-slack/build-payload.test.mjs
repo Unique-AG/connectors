@@ -7,6 +7,8 @@ import {
   buildHeadlineText,
   buildMainSectionText,
   buildPayload,
+  buildRepositoryBlocks,
+  buildRepositoryHeadlineText,
   buildTopOffendersBlocks,
   formatHeaderTitle,
   formatSeveritySummary,
@@ -235,7 +237,7 @@ test('buildTopOffendersBlocks returns no table for clean images', () => {
   assert.deepEqual(buildTopOffendersBlocks([image('admin')]), []);
 });
 
-test('buildPayload reads the reports and builds header, table, and footer', () => {
+test('buildPayload reads the reports and builds header, table, repository section, and footer', () => {
   const payload = withReports(
     (root) => {
       writeReport(root, 'admin', {
@@ -261,6 +263,7 @@ test('buildPayload reads the reports and builds header, table, and footer', () =
     (root) =>
       buildPayload({
         ...baseEnv,
+        REPOSITORY_ALERTS: JSON.stringify({ lockfiles: noAlerts, config: noAlerts }),
         REPORTS_PATH: root,
         SERVICES: JSON.stringify([
           { service: 'admin', version: '1.2.3' },
@@ -272,7 +275,7 @@ test('buildPayload reads the reports and builds header, table, and footer', () =
   const types = payload.blocks.map((block) => block.type);
 
   assert.equal(payload.text, '🛡️ Security Trivy Scan (Registry) → published-images');
-  assert.deepEqual(types, ['header', 'section', 'table', 'context']);
+  assert.deepEqual(types, ['header', 'section', 'table', 'section', 'context']);
   assert.match(
     payload.blocks[1].text.text,
     /🟣 1 critical · 🔴 0 high · 🟠 1 medium unique across 2 images/,
@@ -360,46 +363,54 @@ test('buildPayload rejects a SERVICES value that is not an array', () => {
   );
 });
 
-test('buildPayload adds the repository title and a table row only for a scan with findings', () => {
-  const base = {
-    CHANNEL: 'C0C1PR9CNMP',
-    TITLE: 'Security Trivy Scan',
-    VERSION_LABEL: 'published-images',
-    REPORTS_PATH: '/nonexistent',
-    SERVICES: '[]',
-    TRIGGER_LABEL: 'scheduled',
-    REPOSITORY: 'unique-ag/connectors',
-    ACTOR: 'octocat',
-    WORKFLOW_NAME: 'Trivy',
-    RUN_URL: 'https://github.com/unique-ag/connectors/actions/runs/1',
-  };
-  const none = { critical: 0, high: 0, medium: 0 };
-  const without = buildPayload(base);
-  const withFindings = buildPayload({
-    ...base,
-    REPOSITORY_ALERTS: JSON.stringify({
-      lockfiles: { critical: 0, high: 2, medium: 1 },
-      config: none,
-    }),
-  });
-  const withNone = buildPayload({
-    ...base,
-    REPOSITORY_ALERTS: JSON.stringify({ lockfiles: none, config: none }),
-  });
+const repositoryAlerts = (lockfiles, config) => ({ lockfiles, config });
+const noAlerts = { critical: 0, high: 0, medium: 0 };
 
-  assert.equal(withFindings.blocks.length, without.blocks.length + 2);
+test('buildRepositoryHeadlineText sums both scans and ends with a check mark when no critical and no high is left', () => {
   assert.equal(
-    withFindings.blocks[2].text.text,
-    '*Repository (main): lock files and configuration*',
+    buildRepositoryHeadlineText(
+      repositoryAlerts({ critical: 0, high: 0, medium: 5 }, { critical: 0, high: 0, medium: 1 }),
+    ),
+    '🟣 0 critical · 🔴 0 high · 🟠 6 medium across 2 scans ✅',
+  );
+  assert.equal(
+    buildRepositoryHeadlineText(
+      repositoryAlerts({ critical: 1, high: 2, medium: 3 }, { critical: 0, high: 1, medium: 0 }),
+    ),
+    '🟣 1 critical · 🔴 3 high · 🟠 3 medium across 2 scans',
+  );
+});
+
+test('buildRepositoryBlocks always has the title and the headline, and a row only for a scan with findings', () => {
+  const [section, table] = buildRepositoryBlocks(
+    repositoryAlerts({ critical: 0, high: 0, medium: 5 }, noAlerts),
+  );
+
+  assert.equal(
+    section.text.text,
+    '*Repository (main): lock files and configuration*\n🟣 0 critical · 🔴 0 high · 🟠 5 medium across 2 scans ✅',
   );
   assert.deepEqual(
-    withFindings.blocks[3].rows.map((row) => row.map((cell) => cell.text)),
+    table.rows.map((row) => row.map((cell) => cell.text)),
     [
       ['Scan', '🟣 Critical', '🔴 High', '🟠 Medium'],
-      ['📦 Lock files', '0', '2', '1'],
+      ['📦 Lock files', '0', '0', '5'],
     ],
   );
-  assert.equal(withNone.blocks.length, without.blocks.length);
+});
+
+test('buildRepositoryBlocks has no table when both scans are clean', () => {
+  const blocks = buildRepositoryBlocks(repositoryAlerts(noAlerts, noAlerts));
+
+  assert.equal(blocks.length, 1);
+  assert.match(blocks[0].text.text, /0 critical · 🔴 0 high · 🟠 0 medium across 2 scans ✅$/);
+});
+
+test('buildRepositoryBlocks says so when the alerts could not be read', () => {
+  const blocks = buildRepositoryBlocks(null);
+
+  assert.equal(blocks.length, 1);
+  assert.match(blocks[0].text.text, /The open alerts could not be read\.$/);
 });
 
 test('buildPayload sets the channel for a legacy webhook', () => {

@@ -249,20 +249,38 @@ const REPOSITORY_SCANS = [
   { key: 'config', label: 'Configuration', icon: ICON.config },
 ];
 
-export function buildRepositoryBlocks(alerts) {
-  const rows = REPOSITORY_SCANS.filter(({ key }) => SEVERITIES.some((severity) => alerts?.[key][severity] > 0));
-  if (rows.length === 0) {
-    return [];
-  }
-  return [
-    sectionBlock(`*${REPOSITORY_TITLE}*`),
-    tableBlock([
-      severityHeader('Scan'),
-      ...rows.map(({ key, label, icon }) => [
-        rawText(`${icon} ${label}`),
-        ...SEVERITIES.map((severity) => rawText(String(alerts[key][severity]))),
-      ]),
+export function buildRepositoryHeadlineText(alerts) {
+  const totals = Object.fromEntries(
+    SEVERITIES.map((severity) => [
+      severity,
+      REPOSITORY_SCANS.reduce((sum, { key }) => sum + alerts[key][severity], 0),
     ]),
+  );
+  const allClear = totals.critical === 0 && totals.high === 0;
+  return `${formatSeveritySummary(totals)} across ${REPOSITORY_SCANS.length} scans${allClear ? ` ${ICON.ok}` : ''}`;
+}
+
+export function buildRepositoryBlocks(alerts) {
+  const title = `*${REPOSITORY_TITLE}*`;
+  if (!alerts) {
+    return [sectionBlock(`${title}\n${ICON.warn} The open alerts could not be read.`)];
+  }
+  const rows = REPOSITORY_SCANS.filter(({ key }) =>
+    SEVERITIES.some((severity) => alerts[key][severity] > 0),
+  );
+  return [
+    sectionBlock(`${title}\n${buildRepositoryHeadlineText(alerts)}`),
+    ...(rows.length === 0
+      ? []
+      : [
+          tableBlock([
+            severityHeader('Scan'),
+            ...rows.map(({ key, label, icon }) => [
+              rawText(`${icon} ${label}`),
+              ...SEVERITIES.map((severity) => rawText(String(alerts[key][severity]))),
+            ]),
+          ]),
+        ]),
   ];
 }
 
