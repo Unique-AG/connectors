@@ -32,11 +32,14 @@ export const pnpmInstallArgs = (releaseAge) => [
   releaseAge,
 ];
 
-export function withOverrides(packageJson, members) {
+export function withOverrides(packageJson, members, locked) {
   const parsed = JSON.parse(packageJson);
   const pins = Object.fromEntries(
     members.flatMap(({ name, from, to }) =>
       to.split(', ').map((target) => {
+        if (locked.get(name)?.length === 1) {
+          return [name, target];
+        }
         const old = from
           .split(', ')
           .find((version) => versionLine(version) === versionLine(target));

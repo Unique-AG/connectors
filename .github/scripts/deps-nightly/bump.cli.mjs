@@ -48,7 +48,7 @@ function bumpNpm() {
   const transitive = entry.members.filter(({ direct }) => !direct);
   const manifest = readFileSync('package.json', 'utf8');
   if (transitive.length > 0) {
-    writeFileSync('package.json', withOverrides(manifest, transitive));
+    writeFileSync('package.json', withOverrides(manifest, transitive, parsePnpmPackages(lock)));
   }
   try {
     installLock();
@@ -70,7 +70,7 @@ function bumpNpm() {
     assert.deepStrictEqual(
       problems,
       [],
-      `The bump does not match the entry:\n${problems.join('\n')}`,
+      `The bump does not match the entry. Put packages that must move together in one group in .github/deps-groups.json.\n${problems.join('\n')}`,
     );
   }
 }

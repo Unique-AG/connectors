@@ -52,37 +52,57 @@ describe('pnpmCommands', () => {
 
 describe('withOverrides', () => {
   const packageJson = JSON.stringify({ name: 'root', pnpm: { overrides: { esbuild: '0.28.2' } } });
+  const held = (entries) => new Map(Object.entries(entries));
 
-  it('pins each member to the version line that it leaves, and keeps the other overrides', () => {
-    const text = withOverrides(packageJson, [{ name: 'qs', from: '6.17.0', to: '6.17.1' }]);
-    assert.deepStrictEqual(JSON.parse(text).pnpm.overrides, {
-      esbuild: '0.28.2',
-      'qs@>=6.0.0 <7.0.0': '6.17.1',
-    });
+  it('pins a package that the lock holds once by its name, and keeps the other overrides', () => {
+    const text = withOverrides(
+      packageJson,
+      [{ name: 'qs', from: '6.17.0', to: '6.17.1' }],
+      held({ qs: ['6.17.0'] }),
+    );
+    assert.deepStrictEqual(JSON.parse(text).pnpm.overrides, { esbuild: '0.28.2', qs: '6.17.1' });
   });
 
-  it('adds one pin for each version line of a member', () => {
-    const text = withOverrides('{"name":"root"}', [
-      { name: 'parser', from: '7.29.11, 8.0.8', to: '7.29.12, 8.0.10' },
-    ]);
+  it('pins a 0.x minor bump of a package that the lock holds once', () => {
+    const text = withOverrides(
+      '{"name":"root"}',
+      [{ name: 'types', from: '0.155.0', to: '0.156.0' }],
+      held({ types: ['0.155.0'] }),
+    );
+    assert.deepStrictEqual(JSON.parse(text).pnpm.overrides, { types: '0.156.0' });
+  });
+
+  it('adds one pin for each version line of a package that the lock holds twice', () => {
+    const text = withOverrides(
+      '{"name":"root"}',
+      [{ name: 'parser', from: '7.29.11, 8.0.8', to: '7.29.12, 8.0.10' }],
+      held({ parser: ['7.29.11', '8.0.8'] }),
+    );
     assert.deepStrictEqual(JSON.parse(text).pnpm.overrides, {
       'parser@>=7.0.0 <8.0.0': '7.29.12',
       'parser@>=8.0.0 <9.0.0': '8.0.10',
     });
   });
 
-  it('limits a 0.x version to its minor line', () => {
-    const text = withOverrides('{"name":"root"}', [
-      { name: 'confbox', from: '0.3.1', to: '0.3.2' },
-    ]);
+  it('limits a 0.x version to its minor line when the lock holds two versions', () => {
+    const text = withOverrides(
+      '{"name":"root"}',
+      [{ name: 'confbox', from: '0.3.1', to: '0.3.2' }],
+      held({ confbox: ['0.2.4', '0.3.1'] }),
+    );
     assert.deepStrictEqual(JSON.parse(text).pnpm.overrides, {
       'confbox@>=0.3.0 <0.4.0': '0.3.2',
     });
   });
 
-  it('throws when a new version has no old version on the same line', () => {
+  it('throws when the lock holds two versions and the new one has no old version on its line', () => {
     assert.throws(
-      () => withOverrides('{"name":"root"}', [{ name: 'qs', from: '6.17.0', to: '7.0.0' }]),
+      () =>
+        withOverrides(
+          '{"name":"root"}',
+          [{ name: 'qs', from: '6.17.0', to: '7.0.0' }],
+          held({ qs: ['6.17.0', '5.0.0'] }),
+        ),
       /no old version on the same line/,
     );
   });

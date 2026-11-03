@@ -9,7 +9,7 @@
     { "name": "suites", "ecosystem": "npm", "patterns": ["@suites/*"] },
     { "name": "swc", "ecosystem": "npm", "patterns": ["@swc/*"] },
     { "name": "rollup", "ecosystem": "npm", "patterns": ["rollup", "@rollup/*"] },
-    { "name": "rolldown", "ecosystem": "npm", "patterns": ["rolldown", "@rolldown/*"] },
+    { "name": "rolldown", "ecosystem": "npm", "patterns": ["rolldown", "@rolldown/*", "@oxc-project/*"] },
     { "name": "esbuild", "ecosystem": "npm", "patterns": ["esbuild", "@esbuild/*"] },
     { "name": "babel", "ecosystem": "npm", "patterns": ["@babel/*"] },
     { "name": "biome", "ecosystem": "npm", "patterns": ["@biomejs/*"] },
