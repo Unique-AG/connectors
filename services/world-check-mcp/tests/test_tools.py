@@ -293,6 +293,9 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                         "name": "Ada Lovelace",
                         "entityType": "INDIVIDUAL",
                         "groupId": "g1",
+                        # LSEG sends null email/status here; the generated model rejects it.
+                        "creator": {"id": "u1", "name": "svc", "email": None, "status": None},
+                        "modifier": {"id": "u1", "name": "svc", "email": None, "status": None},
                     }
                 ],
                 "pagination": {"pageReferences": {"next": "page-2"}},

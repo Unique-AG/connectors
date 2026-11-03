@@ -11,6 +11,7 @@ import yaml
 
 from world_check_mcp.upstream.generated.vendor_requests import MRZGenerationRequestInput
 from world_check_mcp.upstream.generated.vendor_responses import AbstractScreeningResult
+from world_check_mcp.upstream.generated.vendor_responses import UserSummaryDetails
 
 _SPEC: object = cast(
     object,
@@ -102,6 +103,13 @@ def test_spec_resolve_results_still_returns_no_json_body() -> None:
     through call_untyped: without a 2xx JSON body the codegen cannot model the operation.
     """
     assert not _has_json_success(_responses("resolveResults"))
+
+
+def test_generated_user_summary_still_requires_fields_the_api_sends_as_null() -> None:
+    """Justifies upstream.queries.CaseHitWire and CaseSearchWire: the generated CaseSearchResponse
+    nests UserSummaryDetails with a required email, which the API returns as null.
+    """
+    assert UserSummaryDetails.model_fields["email"].annotation is str
 
 
 def test_generated_mrz_request_still_types_the_date_of_birth_as_a_datetime() -> None:

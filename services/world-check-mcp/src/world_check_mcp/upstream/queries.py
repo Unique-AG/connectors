@@ -7,7 +7,31 @@ from pydantic import Field
 from pydantic import TypeAdapter
 
 from world_check_mcp.upstream.generated.vendor_requests import GetResultsRequest
+from world_check_mcp.upstream.generated.vendor_requests import SearchCasesRequest
 from world_check_mcp.upstream.generated.vendor_responses import PaginationReferenceResponse
+
+
+class CaseHitWire(BaseModel):
+    """A case search hit. Hand-written because the generated CaseSearchResponse requires
+    creator/modifier.email and .status as strings, which the API sends as null.
+    Pinned by tests/test_spec_overrides.py.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    case_id: str | None = Field(default=None, alias="caseId")
+    case_system_id: str | None = Field(default=None, alias="caseSystemId")
+    name: str | None = None
+    entity_type: str | None = Field(default=None, alias="entityType")
+    group_id: str | None = Field(default=None, alias="groupId")
+    lifecycle_state: str | None = Field(default=None, alias="lifecycleState")
+
+
+class CaseSearchWire(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    results: list[CaseHitWire] = []
+    pagination: PaginationReferenceResponse | None = None
 
 
 class ResultWire(BaseModel):
@@ -61,6 +85,11 @@ class ScreeningStatusWire(BaseModel):
 # getResults keeps its generated request model but a hand-written response, since the results carry
 # the passport mrzLine fields the generated model drops.
 GET_RESULTS = Operation[ResultsWire, GetResultsRequest]("getResults", TypeAdapter(ResultsWire))
+# searchCases keeps its generated request model but a hand-written response: the generated one
+# requires creator/modifier fields the API returns as null.
+SEARCH_CASES = Operation[CaseSearchWire, SearchCasesRequest](
+    "searchCases", TypeAdapter(CaseSearchWire)
+)
 # getScreeningStatus has a JSON response but the generated model types reviewRequired as a bool
 # where the API sends the count, so it stays hand-written and call_untyped.
 # Pinned by tests/test_spec_overrides.py.

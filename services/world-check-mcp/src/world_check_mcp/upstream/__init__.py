@@ -29,7 +29,6 @@ from world_check_mcp.upstream.generated.operations import GET_PROVIDERS
 from world_check_mcp.upstream.generated.operations import GET_RECORD
 from world_check_mcp.upstream.generated.operations import GET_RESOLUTION_TOOLKITS_FOR_GROUP
 from world_check_mcp.upstream.generated.operations import GET_SEARCH_FILTERS
-from world_check_mcp.upstream.generated.operations import SEARCH_CASES
 from world_check_mcp.upstream.generated.vendor_requests import CaseBulkOngoingScreeningRequestInput
 from world_check_mcp.upstream.generated.vendor_requests import CaseSearchRequestInput
 from world_check_mcp.upstream.generated.vendor_requests import CaseSystemId
@@ -80,6 +79,7 @@ from world_check_mcp.upstream.queries import GET_RESULTS
 from world_check_mcp.upstream.queries import GET_SCREENING_STATUS
 from world_check_mcp.upstream.queries import next_page
 from world_check_mcp.upstream.queries import ResultWire
+from world_check_mcp.upstream.queries import SEARCH_CASES
 from world_check_mcp.upstream.settings import UpstreamSettings
 
 __all__ = [
