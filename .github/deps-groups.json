@@ -16,6 +16,7 @@
     { "name": "opentelemetry", "ecosystem": "uv", "patterns": ["opentelemetry-*"] },
     { "name": "unique", "ecosystem": "uv", "patterns": ["unique-*"] },
     { "name": "fastmcp", "ecosystem": "uv", "patterns": ["fastmcp", "fastmcp-slim"] },
-    { "name": "microsoft-kiota", "ecosystem": "uv", "patterns": ["microsoft-kiota-*"] }
+    { "name": "microsoft-kiota", "ecosystem": "uv", "patterns": ["microsoft-kiota-*"] },
+    { "name": "pydantic", "ecosystem": "uv", "patterns": ["pydantic", "pydantic-core"] }
   ]
 }
