@@ -3,7 +3,7 @@ from pathlib import Path
 
 from mcp.types import Icon
 
-_ICON_PNG = (Path(__file__).parent / "assets" / "icon-192.png").read_bytes()
+_ICON_PNG = (Path(__file__).parent / "assets" / "icon.png").read_bytes()
 
 SERVER_ICONS = [
     Icon(
