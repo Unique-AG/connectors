@@ -3,6 +3,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { applyActions } from './actions.mjs';
+import { reportUncaughtFailure } from './annotate.mjs';
 import { pnpmCommands, pnpmInstallArgs, uvLockArgs, withOverrides } from './bump.mjs';
 import { applyDocker } from './docker.mjs';
 import {
@@ -34,6 +35,7 @@ import { generateLock, LOCK_FILE, mergeLockBlock } from './terraform-lock.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
 
 const entry = JSON.parse(process.env.ENTRY);
+reportUncaughtFailure(`Bump ${entry.slug} failed`);
 
 function installLock() {
   runOrThrow('pnpm', pnpmInstallArgs(releaseAge));
