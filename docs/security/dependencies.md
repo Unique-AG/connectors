@@ -22,7 +22,7 @@ Our policy pins every GitHub Action to a commit, so a moved tag cannot change a 
 
 A package build can run code. The `uv` tool builds a package that has no wheel. So a first job makes the update with no secret and saves a patch. A second job applies the patch to a fresh checkout and checks that the patch changes only the files of that ecosystem. Only then does it create the App token and push. The second job builds the PR title and body itself, from the plan and the patched files. The patch is the only thing that it takes from the first job.
 
-A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. A scheduled run is not a dry run. It opens PRs, and it needs the credentials of the GitHub App. See [Required configuration](../../SECURITY-PROCESS.md#required-configuration).
+A manual run of the nightly job is a dry run by default. It writes the plan to the job summary and opens no PR. A scheduled run is not a dry run. It opens PRs, and it needs the credentials of the GitHub App. The job `credentials` checks them first. See [Required configuration](../../SECURITY-PROCESS.md#required-configuration).
 
 ## One agent run for every PR
 
