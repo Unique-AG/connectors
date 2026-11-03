@@ -73,7 +73,9 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has the counts of critical, high, and medium findings, and one row for each image with its image tag. A check mark in front of a count means that it holds no critical and no high finding. It also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The Slack report also counts the open alerts for the lock files and for the misconfiguration. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
+Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has the counts of critical, high, and medium findings, and a table with one row for each image that has findings. A check mark at the end of the counts means that the images hold no critical and no high finding. A second table lists the lock files and the configuration of `main`. It has a row only for a scan that has a finding.
+
+The scan also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
 
 The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
 
