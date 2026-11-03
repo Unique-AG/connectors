@@ -8,7 +8,6 @@ const ICON = {
   high: '🔴',
   medium: '🟠',
   warn: '⚠️',
-  ok: '✅',
   lockfiles: '📦',
   config: '📄',
   shield: '🛡️',
@@ -143,9 +142,7 @@ export function formatSeveritySummary(counts) {
 
 export function buildHeadlineText(summary) {
   const noun = summary.scanned === 1 ? 'image' : 'images';
-  const allClear =
-    summary.status === 'success' && summary.unique.critical === 0 && summary.unique.high === 0;
-  return `${formatSeveritySummary(summary.unique)} unique across ${summary.scanned} ${noun}${allClear ? ` ${ICON.ok}` : ''}`;
+  return `${formatSeveritySummary(summary.unique)} unique across ${summary.scanned} ${noun}`;
 }
 
 export function formatSummedPerImageLine(summary) {
@@ -256,8 +253,7 @@ export function buildRepositoryHeadlineText(alerts) {
       REPOSITORY_SCANS.reduce((sum, { key }) => sum + alerts[key][severity], 0),
     ]),
   );
-  const allClear = totals.critical === 0 && totals.high === 0;
-  return `${formatSeveritySummary(totals)} across ${REPOSITORY_SCANS.length} scans${allClear ? ` ${ICON.ok}` : ''}`;
+  return `${formatSeveritySummary(totals)} across ${REPOSITORY_SCANS.length} scans`;
 }
 
 export function buildRepositoryBlocks(alerts) {

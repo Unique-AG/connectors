@@ -121,22 +121,6 @@ test('buildHeadlineText uses the unique counts', () => {
   );
 });
 
-test('buildHeadlineText ends with a check mark when no critical and no high finding is left', () => {
-  const unique = { critical: 0, high: 0, medium: 27 };
-
-  assert.equal(
-    buildHeadlineText({ status: 'success', scanned: 3, unique }),
-    '🟣 0 critical · 🔴 0 high · 🟠 27 medium unique across 3 images ✅',
-  );
-  assert.equal(buildHeadlineText({ status: 'partial', scanned: 3, unique }).endsWith('✅'), false);
-  assert.equal(
-    buildHeadlineText({ status: 'success', scanned: 3, unique: { ...unique, high: 1 } }).endsWith(
-      '✅',
-    ),
-    false,
-  );
-});
-
 test('buildHeadlineText uses the singular for one image', () => {
   assert.match(
     buildHeadlineText({ scanned: 1, unique: { critical: 0, high: 0, medium: 0 } }),
@@ -366,12 +350,12 @@ test('buildPayload rejects a SERVICES value that is not an array', () => {
 const repositoryAlerts = (lockfiles, config) => ({ lockfiles, config });
 const noAlerts = { critical: 0, high: 0, medium: 0 };
 
-test('buildRepositoryHeadlineText sums both scans and ends with a check mark when no critical and no high is left', () => {
+test('buildRepositoryHeadlineText sums the counts of both scans', () => {
   assert.equal(
     buildRepositoryHeadlineText(
       repositoryAlerts({ critical: 0, high: 0, medium: 5 }, { critical: 0, high: 0, medium: 1 }),
     ),
-    '🟣 0 critical · 🔴 0 high · 🟠 6 medium across 2 scans ✅',
+    '🟣 0 critical · 🔴 0 high · 🟠 6 medium across 2 scans',
   );
   assert.equal(
     buildRepositoryHeadlineText(
@@ -388,7 +372,7 @@ test('buildRepositoryBlocks always has the title and the headline, and a row onl
 
   assert.equal(
     section.text.text,
-    '*Repository (main)*\n🟣 0 critical · 🔴 0 high · 🟠 5 medium across 2 scans ✅',
+    '*Repository (main)*\n🟣 0 critical · 🔴 0 high · 🟠 5 medium across 2 scans',
   );
   assert.deepEqual(
     table.rows.map((row) => row.map((cell) => cell.text)),
@@ -403,7 +387,7 @@ test('buildRepositoryBlocks has no table when both scans are clean', () => {
   const blocks = buildRepositoryBlocks(repositoryAlerts(noAlerts, noAlerts));
 
   assert.equal(blocks.length, 1);
-  assert.match(blocks[0].text.text, /0 critical · 🔴 0 high · 🟠 0 medium across 2 scans ✅$/);
+  assert.match(blocks[0].text.text, /0 critical · 🔴 0 high · 🟠 0 medium across 2 scans$/);
 });
 
 test('buildRepositoryBlocks says so when the alerts could not be read', () => {
