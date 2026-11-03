@@ -51,6 +51,11 @@ outlook_list_events-week-40-whole:
       args: {starts_on: "~nextMonday+14", ends_on: "~nextMonday+18", subject_contains: Slot, limit: 40}
       expect: {result: {capped: false, "events[0].subject": Slot 01, "events[39].subject": Slot 40}}
 
+outlook_list_events-not-cancelled:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", cancelled: false}
+
 outlook_list_events-invitations-waiting:
   chain:
     - tool: outlook_list_events
@@ -92,6 +97,14 @@ outlook_read_event-answers-open:
     - tool: outlook_read_event
       bind: {uri: "$prev.events[0].uri"}
       expect: {result: {"attendees[*].response": [tentativelyAccepted, none]}}
+
+outlook_read_event-series-master:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday", subject_contains: Weekly design sync}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].series_master_uri"}
+      expect: {result: {"recurrence.pattern.kind": weekly}}
 
 outlook_read_event-no-new-time:
   chain:

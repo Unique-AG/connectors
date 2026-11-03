@@ -530,3 +530,183 @@ Feature: Organizing the mailbox
       Then the invoice is in "Finance"
       And Mia's drafts hold a note to Tom that says the invoice is filed
       But nothing is sent
+
+  Rule: A value that does not fit changes nothing
+
+    @unhappy @uc-05-59
+    Scenario Outline: A name in place of a handle changes nothing
+      Given Mia asks her assistant to change <thing>
+      When the assistant names the <thing> by its name and not by the handle that the lists gave
+      Then nothing of Mia changes
+      And the assistant is told to take the handle from the list
+
+      Examples:
+        | thing                   |
+        | a message               |
+        | a folder                |
+        | the parent of a folder  |
+        | an inbox rule           |
+
+    @unhappy @uc-05-60
+    Scenario Outline: A marking whose values do not fit together changes nothing
+      Given Mia asks her assistant to mark a message
+      When the assistant asks for <marking>
+      Then no message changes
+      And the assistant is told what to correct
+
+      Examples:
+        | marking                                          |
+        | no change at all                                 |
+        | a flag and a status in two forms                 |
+        | a due date and no start date                     |
+        | dates on a flag that is complete                 |
+        | a start date that is not a time                  |
+        | a due date that is not a time                    |
+        | one category that it adds and removes            |
+
+    @happy @uc-05-61
+    Scenario: A start date with a zone flags the message
+      Given Mia asks her assistant to flag a message from the 30th of October
+      When the assistant gives the start date and the time zone and no due date
+      Then the message is flagged
+      And the flag has a start date and no due date
+
+  Rule: A change in a mailbox that is not Mia's is asked first
+
+    @happy @uc-05-62
+    Scenario: A marking in a shared mailbox lists every change
+      Given Mia asks her assistant to mark a message in the shared mailbox "support"
+      When the assistant asks for a read mark, a flag with dates, a high importance, and two categories
+      Then the assistant asks Mia to approve the marking
+      And the question lists every change
+      And the message changes after Mia agrees
+
+    @happy @uc-05-63
+    Scenario: A folder in a shared mailbox is made or renamed after Mia agrees
+      Given Mia asks her assistant to make the folder "Alpha" in the shared mailbox "support"
+      When the assistant makes the folder, and then renames another folder
+      Then the assistant asks Mia to approve each change
+      And each folder changes after Mia agrees
+
+    @unhappy @uc-05-64
+    Scenario Outline: A folder or a marking in a shared mailbox is not changed without Mia's agreement
+      Given Mia asks her assistant to change a folder or mark mail in the shared mailbox "support"
+      When Mia's answer is <answer>
+      Then nothing in the shared mailbox changes
+      And the assistant tells Mia that nothing changed
+
+      Examples:
+        | answer                  |
+        | no                      |
+        | lost on the way to her  |
+
+    @happy @uc-05-65
+    Scenario: A program of the newer kind shows Mia the question itself
+      Given Mia works in a program that shows questions in its own way
+      When the assistant asks for a change that needs her approval
+      Then Mia's program receives the question
+      And nothing changes before she answers
+
+  Rule: A folder that Outlook makes stays as it is
+
+    @unhappy @uc-05-66
+    Scenario Outline: A folder that Outlook makes is neither renamed nor deleted
+      Given Mia asks her assistant to change the folder "<folder>"
+      When the assistant names the folder by <how>
+      Then the folder keeps its name and its place
+      And the assistant tells Mia that Outlook makes this folder
+
+      Examples:
+        | folder        | how                              |
+        | Inbox         | the name of the built-in folder  |
+        | Inbox         | its own handle                   |
+        | Deleted Items | the name of the built-in folder  |
+
+    @happy @uc-05-67
+    Scenario: A folder inside another folder is renamed
+      Given Mia has the folder "Alpha" inside her folder "Projects"
+      When Mia asks her assistant to rename "Alpha" to "Beta"
+      Then the folder is named "Beta"
+      And it stays inside "Projects"
+
+    @unhappy @uc-05-68
+    Scenario: A folder that is in Deleted Items is not deleted again
+      Given Mia has the folder "Old" in "Deleted Items"
+      When Mia asks her assistant to delete "Old"
+      Then the folder stays where it is
+      And the assistant tells Mia to erase it in Outlook
+
+  Rule: A rule that does not fit is not made and not changed
+
+    @unhappy @uc-05-69
+    Scenario Outline: A rule that cannot be made is not made
+      Given Mia asks her assistant to make an inbox rule
+      When the assistant gives <flaw>
+      Then no rule is made
+      And the assistant is told what to correct
+
+      Examples:
+        | flaw                                  |
+        | no action                             |
+        | the name of a folder and no handle    |
+        | a folder that Mia cannot see          |
+
+    @happy @uc-05-70
+    Scenario: A rule files large mail in a folder of Mia
+      Given Mia has the folder "Finance"
+      When Mia asks her assistant to file all mail above 500 kilobytes in "Finance"
+      Then the rule is made with the size limit
+      And the rule moves matching mail to "Finance"
+
+    @unhappy @uc-05-71
+    Scenario Outline: A rule change that does not fit changes nothing
+      Given Mia has the rule "Receipts"
+      When the assistant asks for <change>
+      Then the rule stays as it is
+      And the assistant is told what to correct
+
+      Examples:
+        | change                                      |
+        | no change at all                            |
+        | a sender that is a name and an address      |
+        | a list of conditions with no condition      |
+        | an action that it gives and removes         |
+        | the name of a folder and no handle          |
+        | a folder that Mia cannot see                |
+        | the removal of the only action              |
+
+    @unhappy @uc-05-72
+    Scenario: A rule that Outlook locks is not changed and not erased
+      Given Mia has the rule "Company policy" and Outlook locks it
+      When Mia asks her assistant to change the rule and then to erase it
+      Then the rule stays as it is
+      And the assistant tells Mia that nobody can change this rule here
+
+    @happy @uc-05-73
+    Scenario: A rule that is off changes without a question
+      Given Mia has the rule "Forward to Anna" and the rule is off
+      When Mia asks her assistant to move the rule to place 4
+      Then the rule is in place 4
+      And Mia is not asked
+
+    @happy @uc-05-74
+    Scenario: A rule that forwards mail is changed only after Mia agrees
+      Given Mia has the rule "Forward to Anna" and the rule is on
+      When Mia asks her assistant to move the rule to place 4
+      Then the assistant asks Mia to approve the change
+      And the question names the address "anna@example.com"
+      And the rule is in place 4 after Mia agrees
+
+    @happy @uc-05-75
+    Scenario: A rule that holds no action is still shown and changed
+      Given Mia has a rule that holds no action
+      When Mia asks her assistant to make the rule mark mail as read
+      Then the rule marks mail as read
+      And Mia can turn the rule off
+
+    @happy @uc-05-76
+    Scenario: A rule that forwards mail is turned off and the address is named
+      Given Mia has the rule "Forward to Anna" and the rule is on
+      When Mia asks her assistant to turn the rule off
+      Then the rule is off
+      And the assistant tells Mia that mail no longer goes to "anna@example.com"

@@ -178,3 +178,49 @@ Feature: Managing contacts
       When Mia asks her assistant for the telephone number of Anna Meier
       Then the assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that
       But it does not tell Mia that Anna Meier is not in her contacts
+
+  Rule: A change keeps the addresses that a contact holds
+
+    @happy @uc-12-21
+    Scenario: An address is added next to the addresses of a contact
+      Given Mia has the contact "Tom Berger" with the address "tom@acme.example"
+      When Mia asks her assistant to add the address "tom.berger@home.example" to the contact
+      Then the contact holds both addresses
+      And an address that the contact holds already is not added a second time
+
+    @happy @uc-12-22
+    Scenario: An address is removed and the others stay
+      Given Mia has the contact "Tom Berger" with two addresses
+      When Mia asks her assistant to remove the address "tom@acme.example" from the contact
+      Then the contact holds the other address
+
+  Rule: A value that does not fit changes nothing
+
+    @unhappy @uc-12-23
+    Scenario Outline: A value that does not fit changes no contact
+      Given Mia asks her assistant to work with a contact
+      When the assistant gives <flaw>
+      Then nothing of Mia changes
+      And the assistant is told what to correct
+
+      Examples:
+        | flaw                                                 |
+        | a name in place of an address for the search         |
+        | a name in place of the handle of a contact           |
+        | a change with nothing in it                          |
+        | an address that is not an address                    |
+        | the same address twice                               |
+        | one address that it adds and removes                 |
+        | one number that it adds and removes                  |
+
+    @happy @uc-12-24
+    Scenario: A contact that holds no postal address is read as having none
+      Given Mia has the contact "Tom Berger" with no postal address
+      When Mia asks her assistant for the details of "Tom Berger"
+      Then the assistant gives no postal address
+
+    @happy @uc-12-25
+    Scenario: The contacts that hold one address are listed
+      Given Mia has the contact "Tom Berger" with the address "tom@acme.example"
+      When Mia asks her assistant which contact has the address "tom@acme.example"
+      Then the assistant lists "Tom Berger"

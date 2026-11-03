@@ -466,3 +466,88 @@ uc-11-28:
     it. The assistant calls the tool twice and no third time. OPEN: the tool has no text for the
     1001st sender (tools/outlook_set_focused_override.py:41-42 says a mailbox holds 1000 at most), so
     no scenario states what Mia is told then.
+
+uc-11-29:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_with_no_end_that_goes_to_contacts_only"
+  ask: "Is my automatic reply on?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+  note: "tools/outlook_get_mailbox_settings.py:316-335: the tool reports alwaysEnabled and contactsOnly as Microsoft stores them, and a missing start or end as null (:107-111)."
+
+uc-11-30:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_reply_as_a_reply_with_no_state"
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_setting_with_no_state_and_no_audience"
+  ask: "Is my automatic reply on?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+  note: "expected behaviour from tools/outlook_get_mailbox_settings.py:138-150 (from_setting None): every field of the reply is null and status is null, so the answer never says off."
+
+uc-11-31:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reports_the_state_that_microsoft_stored_after_a_change"
+  ask: "Turn my automatic reply off."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: disabled}
+  note: "tools/outlook_set_automatic_reply.py:104-115 and :273-293: the report holds the state that the answer of Microsoft holds, and null for a state that is missing."
+
+uc-11-32:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_names_the_contacts_who_get_the_reply_in_the_question"
+  ask: "Turn on an automatic reply from Monday to Saturday for my contacts outside the company."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: scheduled, external_audience: contactsOnly}
+  note: "tools/outlook_set_automatic_reply.py:178-186 names the audience in the question."
+
+uc-11-33:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_the_time_zone_the_hours_the_language_and_the_archive_folder"
+  ask: "What are my working hours, language and archive folder?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: preferences}
+  note: "tools/outlook_get_mailbox_settings.py:173-177 and :207-231 read the preferences part."
+
+uc-11-34:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_language_as_no_language"
+  ask: "What are my working hours, language and archive folder?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: preferences}
+  note: "expected behaviour from tools/outlook_get_mailbox_settings.py:173-177 (from_locale_info None) and :222-226: a missing language and a missing archive folder are null."
+
+uc-11-35:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_lists_the_category_names_of_the_mailbox"
+  ask: "Which categories do I have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: categories}
+  note: "tools/outlook_get_mailbox_settings.py:300-313 lists the category names and says whether the list stopped short."

@@ -3,7 +3,7 @@ import functools
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
-from typing import cast
+from typing import Never, cast
 
 import httpx
 import pytest
@@ -43,14 +43,18 @@ def _server() -> FastMCP[None]:
     return build_server()
 
 
-async def _read(file: str = _FILE, **arguments: object) -> tuple[str, bytes]:
+async def _resource(file: str, **arguments: object) -> TextResourceContents | BlobResourceContents:
     with pytest.MonkeyPatch.context() as patch:
         patch_obo(patch)
         async with Client(FastMCPTransport(_server()), mode="legacy") as client:
             answer = await client.call_tool("sharepoint_read_file", {"file": file, **arguments})
     [block] = answer.content
     assert isinstance(block, EmbeddedResource)
-    resource = block.resource
+    return block.resource
+
+
+async def _read(file: str = _FILE, **arguments: object) -> tuple[str, bytes]:
+    resource = await _resource(file, **arguments)
     if isinstance(resource, TextResourceContents):
         return resource.mime_type or "", resource.text.encode()
     assert isinstance(resource, BlobResourceContents)
@@ -558,3 +562,236 @@ class TestFindingASite:
 
         assert len(_rows(found, "sites")) == 1000
         assert found["capped"] is True
+
+
+class TestARequestThatCannotSucceed:
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "told"),
+        [
+            ("sharepoint_read_file", {"file": _FOLDER}, "did not get a file handle"),
+            ("sharepoint_browse_folder", {"folder": _FILE}, "takes a folder handle"),
+        ],
+        ids=["read-with-a-folder-handle", "browse-with-a-file-handle"],
+    )
+    async def test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, told: str
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await call(tool, **cast("dict[str, Never]", arguments))
+
+        assert told in str(refused.value)
+        assert not graph.calls
+
+    async def test_a_window_that_runs_backwards_is_refused(self, graph: respx.MockRouter) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await call(
+                "sharepoint_search_files",
+                query="Brightway",
+                modified_after="2026-10-30",
+                modified_before="2026-10-26",
+            )
+
+        assert "`modified_before` falls before `modified_after`" in str(refused.value)
+        assert not graph.calls
+
+    async def test_a_search_with_no_word_in_it_is_refused(self, graph: respx.MockRouter) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await call("sharepoint_search_files", query="   ")
+
+        assert "holds no word to look for" in str(refused.value)
+        assert not graph.calls
+
+    @pytest.mark.parametrize(
+        "value",
+        ["Plan.docx", "http://contoso.sharepoint.invalid/Plan.docx", "https://["],
+        ids=["name", "http", "broken-host"],
+    )
+    async def test_an_address_that_is_not_a_web_address_is_refused(
+        self, graph: respx.MockRouter, value: str
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await call("sharepoint_resolve_url", url=value)
+
+        assert "did not get a web address" in str(refused.value)
+        assert not graph.calls
+
+
+class TestAFileInTheFormThatMiaNeeds:
+    @pytest.mark.parametrize(
+        ("name", "uri"),
+        [
+            ("Plan.docx", "file:///Plan.pdf"),
+            ("Plan", "file:///Plan.pdf"),
+            ("Plan.v2.docx", "file:///Plan.v2.pdf"),
+            (None, "file:///resource.pdf"),
+        ],
+        ids=["extension", "no-extension", "two-dots", "no-name"],
+    )
+    async def test_a_converted_file_comes_back_as_a_pdf_with_a_pdf_name(
+        self, graph: respx.MockRouter, name: str | None, uri: str
+    ) -> None:
+        body = {
+            key: value for key, value in _item(size=7, mime_type=_DOCX).items() if key != "name"
+        }
+        _ = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=body | ({} if name is None else {"name": name}))
+        )
+        content = graph.get(f"{_ITEM_PATH}/content").mock(
+            return_value=httpx.Response(200, content=b"%PDF-1.")
+        )
+
+        resource = await _resource(_FILE, convert_to="pdf")
+
+        assert (str(resource.uri), resource.mime_type) == (uri, _PDF)
+        assert "format=pdf" in str(content.calls.last.request.url)
+
+    @pytest.mark.parametrize(
+        ("facet", "content"),
+        [({"file": {}}, b"abc"), ({"file": {"mimeType": "text/plain"}}, b"caf\xe9")],
+        ids=["no-type", "text-that-is-not-valid"],
+    )
+    async def test_a_file_with_no_usable_type_is_read_as_plain_bytes(
+        self, graph: respx.MockRouter, facet: Row, content: bytes
+    ) -> None:
+        _ = graph.get(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=_item(facet, size=len(content)))
+        )
+        _ = graph.get(f"{_ITEM_PATH}/content").mock(
+            return_value=httpx.Response(200, content=content)
+        )
+
+        assert await _read(_FILE) == ("application/octet-stream", content)
+
+    async def test_a_file_larger_than_microsoft_said_is_refused_while_it_comes_in(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=_item(size=4)))
+        _ = graph.get(f"{_ITEM_PATH}/content").mock(
+            return_value=httpx.Response(200, content=b"x" * (10 * _MEGABYTE + 1))
+        )
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _read(_FILE)
+
+        assert "more than 10.0 MB" in str(refused.value)
+        assert "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf" in str(refused.value)
+
+
+class TestAFolderInTheOrderThatMiaAsksFor:
+    async def test_a_folder_is_listed_in_the_order_of_the_names(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-sharepoint_browse_folder-newest-first")
+        ordered = await _seed_uri("seed-v1 Ordered")
+
+        level = await call("sharepoint_browse_folder", folder=ordered, order_by="name")
+
+        assert _names(level, "items") == [f"seed-v1 Order {letter}.txt" for letter in "ABC"]
+
+
+def _search_answer(*containers: Row) -> Row:
+    return {"value": [{"hitsContainers": list(containers)}]}
+
+
+class TestWhatTheSearchAndTheListingsShow:
+    async def test_a_search_on_a_site_names_the_site(self, graph: respx.MockRouter) -> None:
+        sales = "https://contoso.sharepoint.invalid/sites/Sales"
+        mine = "https://contoso-my.sharepoint.invalid/personal/mia"
+        grouped = _search_answer(
+            {
+                "hits": [],
+                "total": 0,
+                "moreResultsAvailable": False,
+                "aggregations": [
+                    {
+                        "field": "SPSiteURL",
+                        "buckets": [
+                            {"key": sales, "count": 3},
+                            {"key": mine, "count": 1},
+                            {"key": None, "count": 2},
+                        ],
+                    }
+                ],
+            }
+        )
+        _ = graph.post("/search/query").mock(return_value=httpx.Response(200, json=grouped))
+
+        found = await call("sharepoint_search_files", query="Team Charter")
+
+        assert _rows(found, "sites") == [
+            {"web_url": sales, "match_count": 3},
+            {"web_url": mine, "match_count": 1},
+        ]
+
+    @pytest.mark.parametrize(
+        "answer",
+        [
+            _search_answer(),
+            _search_answer(
+                {
+                    "hits": [],
+                    "total": 0,
+                    "moreResultsAvailable": False,
+                    "aggregations": [
+                        {"field": "FileType", "buckets": [{"key": "docx", "count": 3}]}
+                    ],
+                }
+            ),
+        ],
+        ids=["no-group", "group-of-another-kind"],
+    )
+    async def test_a_search_answer_with_no_site_list_shows_no_site(
+        self, graph: respx.MockRouter, answer: Row
+    ) -> None:
+        _ = graph.post("/search/query").mock(return_value=httpx.Response(200, json=answer))
+
+        found = await call("sharepoint_search_files", query="Brightway")
+
+        assert (found["files"], found["sites"]) == ([], [])
+
+    async def test_a_time_window_with_exact_times_is_searched_to_the_moment(
+        self, graph: respx.MockRouter
+    ) -> None:
+        route = serve(graph, "rec-tool-sharepoint_search_files-plan")[("POST", "/search/query")]
+
+        _ = await call(
+            "sharepoint_search_files",
+            query="Brightway",
+            modified_after="2026-10-26T08:00:00+00:00",
+            modified_before="2026-10-30T17:45:30.250000+00:00",
+        )
+
+        asked = _query_string(route)
+        assert "LastModifiedTime>=2026-10-26T08:00:00Z" in asked
+        assert "LastModifiedTime<=2026-10-30T17:45:30.250000Z" in asked
+
+    @pytest.mark.parametrize(
+        ("tool", "path", "rows", "key"),
+        [
+            (
+                "sharepoint_list_drives",
+                "/me/drives",
+                [{"id": "b!SYNTHETICDRIVE", "name": "OneDrive"}, {"name": "No id"}],
+                "drives",
+            ),
+            (
+                "sharepoint_search_sites",
+                "/sites",
+                [
+                    {"id": "s1", "displayName": "Sales", "webUrl": "https://x.invalid/sales"},
+                    {"id": "s2", "displayName": "No address"},
+                ],
+                "sites",
+            ),
+        ],
+        ids=["drive-without-id", "site-without-address"],
+    )
+    async def test_an_entry_without_an_id_or_an_address_is_left_out(
+        self, graph: respx.MockRouter, tool: str, path: str, rows: list[Row], key: str
+    ) -> None:
+        _ = graph.get(path).mock(return_value=httpx.Response(200, json={"value": rows}))
+        arguments: Row = {"query": "Sales"} if key == "sites" else {}
+
+        listed = await call(tool, **cast("dict[str, Never]", arguments))
+
+        assert len(_rows(listed, key)) == 1

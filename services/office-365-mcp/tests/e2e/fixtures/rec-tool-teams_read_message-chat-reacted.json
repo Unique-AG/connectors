@@ -1,0 +1,79 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_read_message-chat-reacted.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "9.zivFYj1I5rYLKRTq2DzYuiFtr8AcxcOyMQFPkON5ybBTxVY4QpdLiIZ9AggnZ3ndDQ7DsHeCVmFaA2V2Eoo5AAA6WXHOM0ZyYdNGvQQqRHsWhAc1IYLIKrjXNRDCBNByTdQRJ12eZBuQplR9BPlMJW4Ab9rNDW03CJPIe5dkNiAcT3p0HKoEb66sQZJSQXD1DYKBPG6FFNHOWBb3KUTOfP10IXwVyvW2C1kNy7egVZYeaFr6RSyTpBF7HZTQGZ18SQNPTUzGQ0TIIARELfTRO7UMDUPlLUQKhMXrwREOsV6EI0kGSEY3PNPuJtIITPIDXGAyILqdVGPQC6c1AdtNfaXQUMMJMOSyYaqhEkzYKdtqDh9pVzPueKRiMzwLguKqmTPMtUF1S8wKAHyIIr6qcnQDDWw8NsfdpIBV2Ekaw0apZtBzTUeamQ4mEBaQvYI4LHUvc08tYGyYmr95RSmodn9vUTfKctIVZZJ9XaTbr3hyVfAtcrQKV48ViLFcHETUH4fmPCu1cnNIGvrcQdUqS526QYUZWzXVyaGlD24UlNHAMI7pBXLmsMVtS4XHrVpyejD1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_read_message-chat-reacted.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages",
+    "json": {
+      "body": {
+        "content": "<p>seed-v1 case-teams_read_message-chat-reacted target</p>",
+        "contentType": "html"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2011/chats('synthetic%20text%2012')/messages('8153158008519')"
+    },
+    "body": "rec-tool-teams_read_message-chat-reacted.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/8153158008519",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_read_message-chat-reacted.04.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/8153158008519/setReaction",
+    "json": {
+      "reactionType": "👍"
+    },
+    "status": 204
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/8153158008519",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_read_message-chat-reacted.06.json"
+  }
+]

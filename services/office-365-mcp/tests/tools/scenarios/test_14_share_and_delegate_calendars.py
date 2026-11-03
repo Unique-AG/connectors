@@ -457,6 +457,21 @@ class TestActingOnTheCalendarOfAManager:
         assert create.call_count == 1
 
 
+class TestATeamsMeetingOnTheCalendarOfAManager:
+    async def test_it_is_asked_first_and_sent_when_the_calendar_takes_one(
+        self, graph: respx.MockRouter
+    ) -> None:
+        booked = _delegated(graph)
+        mia = Person()
+
+        _ = await _call(
+            "outlook_create_event_on_behalf", person=mia, online_meeting=True, **_BOOKING
+        )
+
+        assert "as a Teams meeting" in mia.asked[0]
+        assert _posted(booked)["isOnlineMeeting"] is True
+
+
 class TestATeamCalendar:
     async def test_it_lists_the_four_events_of_the_calendar_of_a_team(
         self, graph: respx.MockRouter
@@ -587,11 +602,37 @@ _APPROVAL_ROWS = [
         _BOOKING | {"starts_at": "2026-11-02T15:00", "ends_at": "2026-11-02T15:30"},
         id="book-on-the-calendar-of-a-manager",
     ),
+    pytest.param(
+        "outlook_delete_calendar",
+        {"calendar_ref": f"outlook:///calendars/{_MIA_CALENDAR}"},
+        {"calendar_ref": f"outlook:///calendars/{_MIA_CALENDAR}-spare"},
+        id="delete-a-calendar",
+    ),
 ]
 
 
+def _removable(graph: respx.MockRouter) -> list[respx.Route]:
+    _ = graph.get("/me").mock(
+        return_value=httpx.Response(
+            200, json={"id": "user-mia", "mail": _MIA["address"], "displayName": _MIA["name"]}
+        )
+    )
+    deletes: list[respx.Route] = []
+    for calendar_id in (_MIA_CALENDAR, f"{_MIA_CALENDAR}-spare"):
+        _ = graph.get(f"/me/calendars/{calendar_id}").mock(
+            return_value=httpx.Response(200, json=_calendar(calendar_id, _MIA))
+        )
+        _ = graph.get(f"/me/calendars/{calendar_id}/events").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+        deletes.append(
+            graph.delete(f"/me/calendars/{calendar_id}").mock(return_value=httpx.Response(204))
+        )
+    return deletes
+
+
 def _writes(graph: respx.MockRouter) -> list[respx.Route]:
-    return [_shareable(graph), *_shared_with_two(graph), _delegated(graph)]
+    return [_shareable(graph), *_shared_with_two(graph), _delegated(graph), *_removable(graph)]
 
 
 class TestNothingIsDoneWithoutAnApproval:
@@ -737,3 +778,79 @@ class TestDeletingACalendar:
 
         assert "holds at least one event" in str(refused.value)
         assert routes[next(key for key in routes if key[0] == "DELETE")].called is False
+
+    async def test_a_calendar_that_gets_a_meeting_while_mia_decides_is_not_deleted(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes, spare = await self._spare(graph)
+        calendar_id = unquote(str(spare["uri"]).rsplit("/", 1)[1])
+        _ = routes[("GET", f"/me/calendars/{calendar_id}/events")].mock(
+            side_effect=[
+                httpx.Response(200, json={"value": []}),
+                httpx.Response(200, json={"value": [{"id": "AAMkSYNTHETIC-event-1"}]}),
+            ]
+        )
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call("outlook_delete_calendar", person=mia, calendar_ref=spare["uri"])
+
+        assert len(mia.asked) == 1
+        assert "holds at least one event" in str(refused.value)
+        assert routes[next(key for key in routes if key[0] == "DELETE")].called is False
+
+
+_LINKS = [
+    pytest.param(
+        "outlook_list_calendar_shares",
+        {"calendar_ref": "Calendar"},
+        "This tool read nothing",
+        id="list",
+    ),
+    pytest.param(
+        "outlook_share_calendar",
+        {"calendar_ref": "Calendar", "address": "anna@example.test", "role": "read"},
+        "Nothing was shared",
+        id="share",
+    ),
+    pytest.param(
+        "outlook_unshare_calendar", {"share_ref": "Anna Meier"}, "Nothing was removed", id="unshare"
+    ),
+    pytest.param(
+        "outlook_delete_calendar",
+        {"calendar_ref": "Spare calendar"},
+        "Nothing was deleted",
+        id="delete",
+    ),
+]
+
+
+class TestALinkThatIsNotACalendarLink:
+    @pytest.mark.parametrize(("tool", "arguments", "told"), _LINKS)
+    async def test_it_reads_and_changes_nothing_and_asks_nothing(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, told: str
+    ) -> None:
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, person=mia, **arguments)
+
+        assert told in str(refused.value)
+        assert (mia.asked, graph.calls.call_count) == ([], 0)
+
+    async def test_a_name_in_place_of_an_address_shares_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_share_calendar",
+                person=mia,
+                calendar_ref=f"outlook:///calendars/{_MIA_CALENDAR}",
+                address="Anna Meier",
+                role="read",
+            )
+
+        assert "takes one SMTP address in `address`" in str(refused.value)
+        assert (mia.asked, graph.calls.call_count) == ([], 0)

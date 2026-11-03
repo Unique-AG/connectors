@@ -13,6 +13,7 @@ from respx import MockRouter, Route
 
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import build_server, patch_obo
+from tests.tools.scenarios.mail_support import refusal_of
 from tests.tools.scenarios.support import call, response, serve
 
 CONTACTS = "/me/contacts"
@@ -491,3 +492,148 @@ class TestAContactThatMicrosoftWillNotSaveIsNotCreated:
         assert "Do not call this tool again first" in message
         assert "outlook_list_contacts" in message
         assert saving.call_count == 1
+
+
+_NOT_A_HANDLE = "Tom Berger"
+
+
+class TestAChangeToTheAddressesOfAContactKeepsTheOthers:
+    async def test_it_adds_an_address_next_to_the_ones_the_contact_has_and_skips_a_repeat(
+        self, graph: MockRouter
+    ) -> None:
+        tom = Contact(
+            graph,
+            emailAddresses=[{"name": "Tom Berger", "address": "tom@acme.example"}],
+        )
+
+        changed = await call(
+            "outlook_update_contact",
+            uri=TOM,
+            add_email_addresses=["TOM@acme.example", "tom.berger@home.example"],
+        )
+
+        assert tom.sent[0]["emailAddresses"] == [
+            {"name": "Tom Berger", "address": "tom@acme.example"},
+            {"address": "tom.berger@home.example"},
+        ]
+        assert [
+            row["address"] for row in cast("list[dict[str, str]]", changed["email_addresses"])
+        ] == [
+            "tom@acme.example",
+            "tom.berger@home.example",
+        ]
+
+    async def test_it_removes_an_address_whatever_its_case_and_keeps_the_others(
+        self, graph: MockRouter
+    ) -> None:
+        tom = Contact(
+            graph,
+            emailAddresses=[
+                {"address": "tom@acme.example"},
+                {"name": "No address"},
+                {"address": "tom.berger@home.example"},
+            ],
+        )
+
+        _ = await call(
+            "outlook_update_contact", uri=TOM, remove_email_addresses=["TOM@ACME.example"]
+        )
+
+        assert tom.sent[0]["emailAddresses"] == [
+            {"name": "No address"},
+            {"address": "tom.berger@home.example"},
+        ]
+
+
+class TestAContactValueThatDoesNotFitChangesNothing:
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "told"),
+        [
+            ("outlook_list_contacts", {"address": "Tom"}, "takes one SMTP address"),
+            ("outlook_read_contact", {"uri": _NOT_A_HANDLE}, "is not one"),
+            ("outlook_update_contact", {"uri": _NOT_A_HANDLE, "job_title": "CTO"}, "is not one"),
+            ("outlook_update_contact", {"uri": TOM}, "needs at least one field to change"),
+            (
+                "outlook_update_contact",
+                {"uri": TOM, "add_email_addresses": ["tom at acme"]},
+                "'tom at acme'",
+            ),
+            (
+                "outlook_update_contact",
+                {"uri": TOM, "add_email_addresses": ["a@acme.example", "A@acme.example"]},
+                "twice",
+            ),
+            (
+                "outlook_update_contact",
+                {
+                    "uri": TOM,
+                    "add_email_addresses": ["a@acme.example"],
+                    "remove_email_addresses": ["A@acme.example"],
+                },
+                "is in both `add_email_addresses` and `remove_email_addresses`",
+            ),
+            (
+                "outlook_update_contact",
+                {
+                    "uri": TOM,
+                    "add_home_phones": ["+41 44 555 01 03"],
+                    "remove_home_phones": ["+41 44 555 01 03"],
+                },
+                "is in both `add_home_phones` and `remove_home_phones`",
+            ),
+        ],
+        ids=[
+            "list-name-for-address",
+            "read-name-for-handle",
+            "update-name-for-handle",
+            "update-nothing",
+            "update-bad-address",
+            "update-repeated-address",
+            "update-address-in-both-lists",
+            "update-phone-in-both-lists",
+        ],
+    )
+    async def test_it_refuses_the_call_before_it_asks_microsoft(
+        self, graph: MockRouter, tool: str, arguments: dict[str, object], told: str
+    ) -> None:
+        advice = await refusal_of(tool, arguments)
+
+        assert told in advice
+        assert graph.calls.call_count == 0
+
+
+class TestAContactIsReadAsMicrosoftHoldsIt:
+    async def test_it_reads_a_contact_that_holds_no_postal_address_as_having_none(
+        self, graph: MockRouter
+    ) -> None:
+        _ = Contact(graph)
+
+        read = await call("outlook_read_contact", uri=TOM)
+
+        assert (read["business_address"], read["home_address"], read["other_address"]) == (
+            None,
+            None,
+            None,
+        )
+
+    async def test_it_lists_the_contacts_that_hold_one_address(self, graph: MockRouter) -> None:
+        listing = graph.get(CONTACTS).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "id": TOM_ID,
+                            "displayName": "Tom Berger",
+                            "emailAddresses": [{"address": "tom@acme.example"}],
+                        }
+                    ]
+                },
+            )
+        )
+
+        listed = await call("outlook_list_contacts", address=" tom@o'brien.example ")
+
+        asked = listing.calls.last.request.url.params["$filter"]
+        assert asked == "emailAddresses/any(a:a/address eq 'tom@o''brien.example')"
+        assert [row["display_name"] for row in _rows(listed)] == ["Tom Berger"]

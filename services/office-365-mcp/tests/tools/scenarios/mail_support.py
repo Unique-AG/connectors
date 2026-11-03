@@ -11,12 +11,14 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
+from mcp.types import InputRequiredResult
 
 from tests.e2e.test_scenarios import Person, build_server, patch_obo
 from tests.graph_fixtures import E2E, V1, Json, response
 
 __all__ = [
     "a_draft_to_send",
+    "asked_of",
     "handle_of",
     "marking_every_message",
     "moving_every_message",
@@ -88,6 +90,15 @@ async def invoke_as(
             mode="legacy",
         ) as client:
             return await client.call_tool(tool, dict(arguments))
+
+
+async def asked_of(tool: str, arguments: Mapping[str, object]) -> InputRequiredResult:
+    with pytest.MonkeyPatch.context() as patch:
+        patch_obo(patch)
+        async with Client(FastMCPTransport(_server())) as client:
+            first = await client.session.call_tool(tool, dict(arguments), allow_input_required=True)
+    assert isinstance(first, InputRequiredResult), f"{tool} did not hand the question back"
+    return first
 
 
 async def call_with(tool: str, arguments: Mapping[str, object]) -> Mapping[str, object]:

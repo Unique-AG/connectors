@@ -665,3 +665,145 @@ uc-01-36:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the workbook from the second search}
+
+uc-01-37:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked"
+  ask: "Read the folder Tenders."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_read_file, sharepoint_browse_folder]
+  note: "expected behaviour per row from tools/sharepoint_read_file.py:69-80 (_NOT_A_FILE_HANDLE: a folder handle is not a file handle) and tools/sharepoint_browse_folder.py:62-70 (_NOT_A_FOLDER_HANDLE: a file handle is not a folder handle). Both checks come before any Graph call."
+
+uc-01-38:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileInTheFormThatMiaNeeds::test_a_converted_file_comes_back_as_a_pdf_with_a_pdf_name"
+  ask: "What is the launch date in the Brightway launch plan?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_read_file
+      args: {convert_to: pdf}
+      uses: {file: handle of the file}
+  note: "expected behaviour from tools/sharepoint_read_file.py:220-224 (_converted_name): the name of the PDF is the name of the file with its last extension replaced by .pdf, and a name with no extension gets .pdf added. A real conversion cannot be recorded: the recorder refuses the converted PDF, which is a binary body that the seed generator did not make."
+
+uc-01-39:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFolderInTheOrderThatMiaAsksFor::test_a_folder_is_listed_in_the_order_of_the_names"
+  ask: "List the folder Ordered by name."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_browse_folder
+      args: {order_by: name}
+      uses: {folder: handle of the folder Ordered}
+
+uc-01-40:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileInTheFormThatMiaNeeds::test_a_file_with_no_usable_type_is_read_as_plain_bytes"
+  ask: "Read the file Notes.txt."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_read_file
+      uses: {file: handle of the file}
+  note: "expected behaviour from tools/sharepoint_read_file.py:227-241 (_media_type, _is_utf8): a file with no type from Microsoft, and a text type with a body that is not valid UTF-8, come back as application/octet-stream."
+
+uc-01-41:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileInTheFormThatMiaNeeds::test_a_file_larger_than_microsoft_said_is_refused_while_it_comes_in"
+  ask: "Summarize the Brightway annual report PDF."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_read_file
+      uses: {file: handle of the file}
+  note: "expected behaviour from tools/sharepoint_read_file.py:179-180 and 254-270 (_too_large with no size): the download stops at 10 MB, and the text says that the file is more than 10 MB and gives the web address of the file."
+
+uc-01-42:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_a_window_that_runs_backwards_is_refused"
+  ask: "Find the Brightway files that changed between 30 October and 26 October."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Brightway, modified_after: "2026-10-30", modified_before: "2026-10-26"}
+  note: "expected behaviour from tools/sharepoint_search_files.py:66-72 (_WINDOW_RUNS_BACKWARDS): put the earlier point in modified_after and the later one in modified_before, then call again. The check comes before any Graph call."
+
+uc-01-43:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_a_search_with_no_word_in_it_is_refused"
+  ask: "Search for files."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+  note: "expected behaviour from tools/sharepoint_search_files.py:74-78 (_NOTHING_TO_SEARCH_FOR): query holds no word to look for and no other argument was given, so the tool searches nothing."
+
+uc-01-44:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_a_search_on_a_site_names_the_site"
+  ask: "Find Team Charter."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Team Charter}
+  note: "expected behaviour from tools/sharepoint_search_files.py:203-217 (_sites): the sites come from the group of results for the field SPSiteURL, ranked by the count that Microsoft gives, and a bucket with no key or no count is left out. The test tenant answers with no group of results, so the answer in the test is made by hand."
+
+uc-01-45:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_a_search_answer_with_no_site_list_shows_no_site"
+  ask: "Find the Brightway files."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Brightway}
+  note: "expected behaviour from tools/sharepoint_search_files.py:203-221 (_sites, _hits_container): an answer with no group of results, or with a group of another field only, gives an empty files list and an empty sites list. An empty list is never a sign that the matches have no site."
+
+uc-01-46:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_a_time_window_with_exact_times_is_searched_to_the_moment"
+  ask: "Find the Brightway files that changed from 08:00 on 26 October to 17:45:30 on 30 October."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: Brightway, modified_after: "2026-10-26T08:00:00+00:00", modified_before: "2026-10-30T17:45:30.250000+00:00"}
+  note: "expected behaviour from tools/sharepoint_search_files.py:251-260 (_closing_term, _wire): a time as the upper bound closes the window at that moment, and a time with a fraction of a second keeps the fraction."
+
+uc-01-47:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_an_address_that_is_not_a_web_address_is_refused"
+  ask: "Open Plan.docx."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_resolve_url
+  note: "expected behaviour from tools/sharepoint_resolve_url.py:42-48 (_NOT_A_WEB_ADDRESS) and 84-89 (_is_web_address): the tool takes a full address that starts with https:// and names a host. A name, an http address and an address that urlsplit cannot read are refused before any Graph call."
+
+uc-01-48:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_an_entry_without_an_id_or_an_address_is_left_out"
+  ask: "Which drives and sites do I have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_list_drives, sharepoint_search_sites]
+  note: "expected behaviour from tools/sharepoint_list_drives.py:82-86 (a drive with no id is left out, because the tool cannot address it) and tools/sharepoint_search_sites.py:61-65 (a site with no web address is left out)."

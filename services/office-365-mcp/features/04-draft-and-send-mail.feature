@@ -405,3 +405,130 @@ Feature: Drafting and sending mail
       Then Mia's drafts hold a reply to everyone without the text "Friday works"
       And the assistant tells Mia that the text was not saved, and gives the reason that Microsoft gave
       But the assistant does not say that the reply is ready
+
+  Rule: An address or a message name that does not fit stops the draft
+
+    @unhappy @uc-04-45
+    Scenario Outline: An address that does not fit stops the draft
+      Given Mia asks her assistant to write to Anna
+      When the assistant gives <flaw>
+      Then no draft is made or changed
+      And the assistant is told what to correct
+
+      Examples:
+        | flaw                                          |
+        | the same address twice in one list            |
+        | the same address in two lists                 |
+        | a name with an address in one entry           |
+        | no address for a forward                      |
+        | a change with nothing in it                   |
+
+    @unhappy @uc-04-46
+    Scenario Outline: A subject line in place of a message handle makes and changes no draft
+      Given Mia asks her assistant to <task>
+      When the assistant names the message by its subject line and not by the handle that the lists gave
+      Then no draft is made or changed
+      And the assistant is told to take the handle from the list
+
+      Examples:
+        | task                                 |
+        | reply to a message                   |
+        | reply to everyone on a message       |
+        | change a draft                       |
+
+    @unhappy @uc-04-47
+    Scenario Outline: A copy to the person who gets the reply makes no draft
+      Given Anna wrote to Mia and asked that the answer goes to <address>
+      When Mia asks her assistant to reply and to copy <address>
+      Then no draft is made
+      And the assistant is told that the reply already goes to that address
+
+      Examples:
+        | address               |
+        | Anna                  |
+        | the reply-to address  |
+
+    @happy @uc-04-48
+    Scenario: A copy to someone else is added to a reply
+      Given Anna wrote to Mia
+      When Mia asks her assistant to reply and to copy Tom
+      Then the draft is addressed to Anna
+      And the draft is copied to Tom
+
+  Rule: A reply or a change in a shared mailbox is asked first
+
+    @happy @uc-04-49
+    Scenario Outline: A reply or a change in a shared mailbox is made after Mia agrees
+      Given Mia asks her assistant to <task> in the shared mailbox "support"
+      When the assistant makes the draft
+      Then the assistant asks Mia to approve the draft
+      And the question names the draft and the shared mailbox
+      And the draft appears after Mia agrees
+
+      Examples:
+        | task                                 |
+        | forward a message                    |
+        | reply to everyone on a message       |
+        | change a draft                       |
+
+    @unhappy @uc-04-50
+    Scenario Outline: A reply or a change in a shared mailbox is not made without Mia's agreement
+      Given Mia asks her assistant to <task> in the shared mailbox "support"
+      When Mia's answer is <answer>
+      Then the shared mailbox holds no new draft and no change
+      And the assistant tells Mia that nothing changed
+
+      Examples:
+        | task                              | answer                  |
+        | forward a message                 | no                      |
+        | forward a message                 | lost on the way to her  |
+        | reply to everyone on a message    | no                      |
+        | reply to everyone on a message    | lost on the way to her  |
+        | change a draft                    | no                      |
+        | change a draft                    | lost on the way to her  |
+
+    @happy @uc-04-51
+    Scenario: A program of the newer kind shows Mia the question of a draft
+      Given Mia works in a program that shows questions in its own way
+      When the assistant makes a draft in the shared mailbox "support"
+      Then Mia's program receives the question
+      And no draft appears before she answers
+
+    @happy @uc-04-52
+    Scenario: A message with no subject and no sender is named by the question
+      Given Mia has a message with no subject and no sender in the shared mailbox "support"
+      When Mia asks her assistant to reply to it
+      Then the question says that the message has no subject
+      And the question says that Microsoft chooses the address
+
+  Rule: A reply whose text cannot be saved is reported
+
+    @unhappy @uc-04-53
+    Scenario: A reply whose text Microsoft cannot save is reported as not saved
+      Given Mia asks her assistant to reply to Anna with a text that Microsoft refuses
+      When the assistant makes the reply
+      Then the draft exists without the text
+      And the assistant tells Mia that the text is not saved
+
+  Rule: A person is found in the mail of Mia when the directory does not list her
+
+    @unhappy @uc-04-54
+    Scenario: A query with no word in it is refused
+      Given Mia asks her assistant to find a person
+      When the assistant searches for "??"
+      Then nobody is looked up
+      And the assistant is told to give a name, an alias, or an address
+
+    @happy @uc-04-55
+    Scenario: A person who is not in the directory is found in past mail
+      Given Anna is not in the directory and she wrote to Mia
+      When Mia asks her assistant to find Anna
+      Then the assistant finds the address of Anna in the mail of Mia
+      And the newest correspondent comes first
+
+    @happy @uc-04-56
+    Scenario: People of the directory are told apart by kind
+      Given the directory lists a team, a room, and a person that are all called "Anna"
+      When Mia asks her assistant to find Anna
+      Then the assistant tells the team, the room, and the person apart
+      And a person with no address is left out

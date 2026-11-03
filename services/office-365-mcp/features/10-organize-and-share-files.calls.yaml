@@ -562,3 +562,159 @@ uc-10-38:
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Contracts}
   note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:48) and tools/sharepoint_create_folder.py:68-69: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:168), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:66), and the failure comes after the question."
+
+uc-10-39:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked"
+  ask: "Move Q3 Plan.pptx into the folder Archive."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_move_item, sharepoint_copy_item, sharepoint_rename_item, sharepoint_delete_item, sharepoint_invite, sharepoint_create_share_link, sharepoint_create_folder, sharepoint_create_text_file]
+  note: "expected behaviour per row: each tool refuses a value that is no handle of the needed kind before any Graph call and before the question. Move tools/sharepoint_move_item.py:73-89 (_NOT_AN_ITEM_HANDLE, _NOT_A_FOLDER_HANDLE). Copy tools/sharepoint_copy_item.py:86-103. Rename tools/sharepoint_rename_item.py:62. Delete tools/sharepoint_delete_item.py:62. Invite tools/sharepoint_invite.py:90. Link tools/sharepoint_create_share_link.py:77. Folder tools/sharepoint_create_folder.py:72. Text file tools/sharepoint_create_text_file.py:95. Each text ends with: this same value fails again, so do not retry it."
+
+uc-10-40:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_name_of_blank_spaces_is_refused"
+  ask: "Rename Q3 Plan.pptx to a name of spaces."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_create_folder, sharepoint_rename_item, sharepoint_copy_item, sharepoint_create_text_file]
+  note: "expected behaviour from shared/files.py:410-412 and 422-424 (_BLANK_NAME): the name is empty or has only spaces in it, use a name with at least one other character. Every tool that takes a name calls unusable_name before any Graph call."
+
+uc-10-41:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_file_in_the_place_of_a_folder_is_refused_and_nobody_is_asked"
+  ask: "Create the folder 2026 in Plan v1.docx."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [sharepoint_create_folder, sharepoint_create_text_file, sharepoint_copy_item, sharepoint_move_item]
+  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:82-86 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:110-114. Copy tools/sharepoint_copy_item.py:110-114 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:110-114. Every refusal comes before the question to Mia."
+
+uc-10-42:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_folder_is_not_moved_into_itself"
+  ask: "Move the folder Archive into the folder Archive."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_move_item
+      uses: {item: handle of the folder Archive, to_folder: handle of the folder Archive}
+  note: "expected behaviour from tools/sharepoint_move_item.py:98-102 (_INTO_ITSELF): item and to_folder name the same item, use the handle of a different folder. The check comes before any Graph call."
+
+uc-10-43:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_person_named_twice_is_not_invited"
+  ask: "Give Anna edit access to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_invite
+      args: {role: write}
+      uses: {item: handle of the file}
+  note: "expected behaviour from tools/sharepoint_invite.py:121-125 (_repeated) and 239-247 (_addresses): the tool refuses an address that recipients names twice, ignoring case, before any Graph call."
+
+uc-10-44:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_person_with_an_error_from_microsoft_is_named_with_the_reason"
+  ask: "Give Anna and Ben edit access to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_invite
+      args: {role: write}
+      uses: {item: handle of the file}
+  note: "expected behaviour from tools/sharepoint_invite.py:74 (_NO_REASON_FROM_GRAPH) and 291-296 (_error_of): the row of a person carries the message that Graph gives, or the text that Microsoft gave no reason. A row with no error shows null."
+
+uc-10-45:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_the_question_about_a_folder_delete_says_how_full_the_folder_is"
+  ask: "Delete the folder Old drafts."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_search_files, sharepoint_browse_folder]
+    - tool: sharepoint_delete_item
+      uses: {item: handle of the folder}
+  note: the question says that the folder and everything in it go to the recycle bin, and it adds the item count when Microsoft sends one (tools/sharepoint_delete_item.py:159-177)
+
+uc-10-46:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_the_approval_question_is_passed_back_before_anything_changes"
+  ask: "Rename Plan v1.docx to Plan v2.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_copy_item, sharepoint_create_folder, sharepoint_delete_item, sharepoint_invite, sharepoint_move_item, sharepoint_rename_item]
+  note: on the newer protocol path the tool returns the question as a request for input and makes no change until the answer comes back with the request state
+
+uc-10-47:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_link_without_an_address_is_not_reported_as_made"
+  ask: "Give me a view-only link to Q3 Plan.pptx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: organization}
+      uses: {item: handle of the file}
+  note: "expected behaviour from tools/sharepoint_create_share_link.py:86-91 (_NO_WEB_ADDRESS) and 195-199: Microsoft accepted the request but its answer has no web address, the link can already exist, call this tool again one time with the same arguments."
+
+uc-10-48:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_place_with_no_name_is_named_in_a_general_way"
+  ask: "Create the folder 2026 in the top folder of the Sales library."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [sharepoint_create_folder, sharepoint_invite, sharepoint_rename_item]
+  note: "expected behaviour from shared/files.py:311-340 (folder_label, item_label, parent_folder_label): the question says the top folder of the drive for a root, an unnamed folder for a folder with no name, and the name of the folder of an item when Microsoft sends a name and no path."
+
+uc-10-49:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_change_that_microsoft_answers_without_the_item_is_checked_by_a_second_read"
+  ask: "Rename Plan v1.docx to Plan v2.docx."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_rename_item
+      args: {name: Plan v2.docx}
+      uses: {item: handle of the file Plan v1.docx}
+  note: "expected behaviour from shared/files.py:366-382 (summary_after_write) and tools/sharepoint_rename_item.py:88-93 (_WRITTEN_BUT_UNREAD): the tool reads the item again when the answer has none, and when that read fails it says that the rename happened and that a second call sets the same name again."
+
+uc-10-50:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_notebook_is_not_attached_to_a_post"
+  ask: "Post the OneNote notebook Customers in the channel Launch."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_send_channel_message_with_files
+      uses: {attachments: handle of the notebook}
+  note: "expected behaviour from shared/files.py:284-290 (_attachable): the item is not a plain file in Microsoft 365, a OneNote notebook is an example, this tool attaches files only. The refusal comes before the question to Mia."
+
+uc-10-51:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_move_of_an_item_with_no_known_old_folder_gives_no_way_back"
+  ask: "Move Plan v1.docx into Archive."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_move_item
+      uses: {item: handle of the file, to_folder: handle of the folder Archive}
+  note: "expected behaviour from tools/sharepoint_move_item.py:150-155 and 246-251 (_previous_parent_uri): previous_parent_uri is null when Graph reported no parent folder, so there is no value to pass as to_folder for a move back."

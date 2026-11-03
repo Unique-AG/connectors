@@ -924,3 +924,246 @@ uc-05-58:
       uses: {to: address of Tom from outlook_find_recipient}
   must_not: [outlook_send_draft]
   note: the logs show both orders, and the assistant can draft the note before it files the invoice. The folder listing is optional because no logged session shows one; the intent of the note is inferred
+
+uc-05-59:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAValueThatIsNotAHandleChangesNothing"
+  ask: "Rename my Projects folder to Work."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+    - tool: outlook_rename_folder
+      uses: {folder_ref: uri of Projects from outlook_browse_folders}
+  note: "expected behaviour from the handle check at the start of each tool: tools/outlook_mark_mail.py:404-408, tools/outlook_create_folder.py:134-138, tools/outlook_rename_folder.py:153-155, tools/outlook_delete_folder.py:188-190, tools/outlook_browse_folders.py:136-138, tools/outlook_disable_mail_rule.py:134-136, tools/outlook_delete_mail_rule.py:118-120, tools/outlook_update_mail_rule.py:137-139. Each tool refuses before it reads or writes, so no Graph call is made."
+
+uc-05-60:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAMarkingWhoseValuesDoNotFitTogetherChangesNothing::test_it_refuses_the_marking_before_it_asks_microsoft"
+  ask: "Flag this message and give it a due date."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_mark_mail
+      uses: {message_refs: uri of the message from the previous listing}
+  note: "expected behaviour from tools/outlook_mark_mail.py:310-340: nothing to change (:312), two flag forms (:314), a due date without a start date (:321), dates on a flag that is not flagged (:326), a time that is not a wall-clock time (:329, :334), and a category in both lists (:338-340). The tool refuses before any Graph call."
+
+uc-05-61:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAMarkingWhoseValuesDoNotFitTogetherChangesNothing::test_a_start_date_with_a_zone_and_no_due_date_flags_the_message"
+  ask: "Flag this message from the 30th of October."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_mark_mail
+      uses: {message_refs: uri of the message from the previous listing}
+  note: "tools/outlook_mark_mail.py:343-350: a start date with no status means flagged. A start date with no due date is valid (:330-331)."
+
+uc-05-62:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_marking_names_every_change_in_the_question"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_marking_with_one_change_names_that_change"
+  ask: "In the shared mailbox support, mark the message from Anna as read and flag it."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_mark_mail
+      uses: {message_refs: uri of the message from the previous listing}
+  note: "tools/outlook_mark_mail.py:286-290 asks before a write with mailbox, and :353-392 builds the question from every change."
+
+uc-05-63:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_new_folder_is_made_only_after_mia_agrees"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_new_folder_inside_a_folder_names_the_place_in_the_question"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_rename_asks_first_and_then_renames"
+  ask: "In the shared mailbox support, make a folder Alpha."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_create_folder
+  note: "tools/outlook_create_folder.py:109-115 asks before a write with mailbox, and :141-151 builds the question. tools/outlook_rename_folder.py:126-132 asks before a rename with mailbox."
+
+uc-05-64:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_folder_that_mia_does_not_approve_is_not_made_marked_or_renamed"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAChangeInASharedMailboxAsksBeforeItIsMade::test_a_rename_that_mia_declines_changes_nothing"
+  ask: "In the shared mailbox support, make a folder Alpha."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_create_folder
+  note: "expected behaviour from shared/seam.py:268-293: a decline gives _not_agreed and no answer gives _no_answer. The write comes after the answer (tools/outlook_create_folder.py:109-121), so the mailbox is not touched."
+
+uc-05-65:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestInAClientOfTheNewerProtocolTheQuestionGoesBackToTheClient"
+  ask: "In the shared mailbox support, make a folder Alpha."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_create_folder
+  note: "shared/seam.py:208-293: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing. Each tool returns that result before it writes (for example tools/outlook_create_folder.py:118-119)."
+
+uc-05-66:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAFolderThatOutlookMakesIsNeverRenamedOrDeleted::test_it_refuses_the_name_of_a_built_in_folder_before_it_asks_microsoft"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAFolderThatOutlookMakesIsNeverRenamedOrDeleted::test_it_refuses_a_rename_by_the_real_id_of_a_folder_that_outlook_makes"
+  ask: "Rename my Inbox folder to Work."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_rename_folder
+      uses: {folder_ref: uri of Inbox from outlook_browse_folders}
+  note: "expected behaviour from tools/outlook_rename_folder.py:156-158 and :124-125, and tools/outlook_delete_folder.py:191-194 and :211-212: a built-in name is refused before any Graph call, and a real id is refused after shared/mail.py:393-406 finds that Outlook makes the folder."
+
+uc-05-67:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAFolderThatOutlookMakesIsNeverRenamedOrDeleted::test_a_folder_inside_a_folder_of_mia_is_renamed"
+  ask: "Rename my folder Alpha inside Projects to Beta."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+      repeat: many
+    - tool: outlook_rename_folder
+      uses: {folder_ref: uri of Alpha from outlook_browse_folders}
+  note: "shared/mail.py:398-399: a folder whose parent is not a root folder of Outlook is not a folder that Outlook makes."
+
+uc-05-68:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestAFolderThatOutlookMakesIsNeverRenamedOrDeleted::test_a_folder_that_is_already_in_deleted_items_is_not_moved_again"
+  ask: "Delete my folder Old."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+    - tool: outlook_delete_folder
+      uses: {folder_ref: uri of Old from outlook_browse_folders}
+  note: "expected behaviour from tools/outlook_delete_folder.py:208-214 (_ALREADY_IN_DELETED_ITEMS): the folder is not moved, and the text tells the assistant to leave the erase to the user."
+
+uc-05-69:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleThatCannotBeMadeIsNotMade::test_it_refuses_the_rule_before_it_asks_microsoft"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleThatCannotBeMadeIsNotMade::test_a_folder_that_is_hidden_from_mia_does_not_get_a_rule"
+  ask: "Make a rule that moves mail from billing to my Finance folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+      optional: true
+    - tool: outlook_create_mail_rule
+      uses: {actions: move_to_folder with the uri of Finance}
+  note: "expected behaviour from tools/outlook_create_mail_rule.py:96-99 and :109-110: no action (NO_RULE_ACTION), a folder that is not a name or a handle (NOT_A_RULE_FOLDER), and a hidden folder (HIDDEN_RULE_FOLDER). Nothing is written."
+
+uc-05-70:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleThatCannotBeMadeIsNotMade::test_a_rule_with_a_folder_handle_and_a_size_range_is_made_as_asked"
+  ask: "Make a rule that moves all mail above 500 kilobytes to my Finance folder."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_browse_folders
+    - tool: outlook_create_mail_rule
+      uses: {actions: move_to_folder with the uri of Finance from outlook_browse_folders}
+  note: "shared/rules.py:1170-1173 turns a size range into the Graph size range, and :1146-1150 turns a folder handle into its id."
+
+uc-05-71:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_it_refuses_the_change_before_it_asks_microsoft"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_a_folder_that_is_hidden_from_mia_gets_no_rule_action"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_removing_the_only_action_of_a_rule_leaves_a_rule_that_does_nothing"
+  ask: "Change my Receipts rule."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
+  note: "expected behaviour from tools/outlook_update_mail_rule.py:143-158 and :167-174: nothing to change, a bad address, a list of conditions with no condition, an action that is given and removed, a folder that is not a handle, a hidden folder, and no action left. The first five refuse before any Graph call."
+
+uc-05-72:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_a_rule_that_outlook_locks_is_not_changed_or_erased"
+  ask: "Change my rule Company policy and then erase it."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      uses: {rule_ref: uri of the rule Company policy from outlook_get_mailbox_settings}
+    - tool: outlook_delete_mail_rule
+      uses: {rule_ref: uri of the rule Company policy from outlook_get_mailbox_settings}
+  note: "expected behaviour from tools/outlook_update_mail_rule.py:214-216 and tools/outlook_delete_mail_rule.py:126-127 (READ_ONLY_RULE). The tool reads the rule first and refuses before it writes."
+
+uc-05-73:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_a_rule_that_is_off_changes_without_a_question_even_when_it_forwards"
+  ask: "Move my rule Forward to Anna to place 4."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      args: {sequence: 4}
+      uses: {rule_ref: uri of the rule Forward to Anna from outlook_get_mailbox_settings}
+  note: "tools/outlook_update_mail_rule.py:223-226: a rule that is off after the change sends nothing, so the tool asks no question."
+
+uc-05-74:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_a_rule_that_forwards_is_changed_only_after_mia_agrees"
+  ask: "Move my rule Forward to Anna to place 4."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      args: {sequence: 4}
+      uses: {rule_ref: uri of the rule Forward to Anna from outlook_get_mailbox_settings}
+  note: "tools/outlook_update_mail_rule.py:183-197 asks before a change of a rule that runs and forwards. A decline gives _not_agreed (shared/seam.py:268-293)."
+
+uc-05-75:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_a_rule_that_holds_no_action_is_listed_changed_and_disabled"
+  ask: "Make my rule mark mail as read."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_update_mail_rule
+      args: {actions: {mark_as_read: true}}
+      uses: {rule_ref: uri of the rule from outlook_get_mailbox_settings}
+    - tool: outlook_disable_mail_rule
+  note: "shared/rules.py:571-573 and :1038: a stored rule with no actions reads as no actions and merges with the given ones."
+
+uc-05-76:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestARuleChangeThatDoesNotFitChangesNothing::test_disabling_a_rule_that_forwards_names_the_address_it_stopped"
+  ask: "Turn off my rule Forward to Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_get_mailbox_settings
+    - tool: outlook_disable_mail_rule
+      uses: {rule_ref: uri of the rule Forward to Anna from outlook_get_mailbox_settings}
+  note: "tools/outlook_disable_mail_rule.py:120-130 names the addresses that the rule forwarded to."

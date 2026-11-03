@@ -641,3 +641,282 @@ uc-06-40:
       uses: {team_id: id of the team, channel_id: id of the channel}
   note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner."
 
+uc-06-42:
+  deferred:
+    - teams_search_messages-alpine
+    - teams_search_messages-lena
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_the_full_text_and_the_reactions_of_each_hit_when_mia_asks_for_it"
+  ask: "Find the messages about the offer and show me what they say."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {query: offer, include_body: true}
+  note: "Microsoft sends chatMessage without a hash, so the tool drops every real hit today. The test answers with hits that have the hash. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:247: with include_body the tool reads the full message of each hit, in its chat or its channel."
+
+uc-06-43:
+  deferred:
+    - teams_search_messages-person-window
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_narrows_a_search_by_one_more_condition"
+  ask: "Find what Tom wrote about the offer before 9:00."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {query: offer}
+  note: "Rows 1 to 4 are recipient, mentions, has_attachment, and sent_before. Microsoft sends chatMessage without a hash, so the tool drops every real hit today. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:170: each condition becomes one term of the search text."
+
+uc-06-44:
+  deferred:
+    - teams_search_messages-alpine
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_leaves_out_a_hit_that_names_no_sender_or_no_message"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_gives_no_handle_and_reads_no_text_for_a_hit_that_has_no_address"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_a_hit_without_its_text_when_microsoft_cannot_read_the_message"
+  ask: "Find the messages about the offer and show me what they say."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {query: offer, include_body: true}
+  note: "Row 1 is a hit with no sender or no message id, and row 2 is a hit with no chat and no channel. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:106 and src/office_365_mcp/tools/teams_search_messages.py:299: a hit with no sender or no message id is left out; a hit with no address has no uri, and the tool reads no text for it."
+
+uc-06-45:
+  deferred:
+    - teams_search_messages-alpine
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_finds_nothing_when_microsoft_answers_with_no_hits_container"
+  ask: "Find the messages about the offer."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_search_messages
+      args: {query: offer}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:292: an answer with no list of results is an answer with no hits."
+
+uc-06-47:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_reference_that_is_not_one_and_asks_microsoft_nothing"
+  ask: "Read the message Launch."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [teams_read_message, teams_list_message_replies, teams_list_meeting_transcripts, teams_list_meeting_recordings, teams_read_transcript]
+  note: "Rows 1 to 7 are teams_read_message, teams_list_message_replies with a name, a chat handle, and a reply handle, teams_list_meeting_transcripts, teams_list_meeting_recordings, and teams_read_transcript. Expected behaviour from src/office_365_mcp/shared/handles.py:357, src/office_365_mcp/tools/teams_list_message_replies.py:54, src/office_365_mcp/tools/teams_list_meeting_transcripts.py:89, src/office_365_mcp/tools/teams_list_meeting_recordings.py:77, and src/office_365_mcp/tools/teams_read_transcript.py:62: the tool says which tool gives the handle, and a retry fails the same way."
+
+uc-06-48:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_transcript_window_that_cannot_match_a_turn"
+  ask: "Read the transcript of Design review from minute 2 to minute 1."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      args: {from_seconds: 120, to_seconds: 60}
+      uses: {uri: uri of the transcript}
+  note: "Row 1 is a window that ends before it starts, and row 2 is a blank speaker. Expected behaviour from src/office_365_mcp/tools/teams_read_transcript.py:69 and src/office_365_mcp/tools/teams_read_transcript.py:75: the tool refuses before it reads the transcript."
+
+uc-06-49:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_reports_a_meeting_that_microsoft_does_not_show_as_not_found"
+  ask: "Which recordings does Design review have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_recordings
+      uses: {meeting_uri: uri of the meeting}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_recordings.py:238: no meeting that the user can see matched the join address; the status is meeting_not_found."
+
+uc-06-50:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_tells_a_meeting_that_may_still_get_a_recording_from_one_that_has_none"
+  ask: "Which recordings does Design review have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_recordings
+      uses: {meeting_uri: uri of the meeting}
+  note: "Row 1 is a meeting that ended ten minutes ago and row 2 is a meeting that ended two days ago. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_recordings.py:268: status not_ready for a meeting that is not settled, and status not_recorded for a settled meeting."
+
+uc-06-51:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_says_unknown_when_microsoft_names_no_organizer_and_no_end_for_a_recording"
+  ask: "Which recordings does Design review have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_recordings
+      uses: {meeting_uri: uri of the meeting}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_recordings.py:286 and src/office_365_mcp/tools/teams_list_meeting_recordings.py:297: with no organizer the content access is unknown; with no end the length is null."
+
+uc-06-52:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_reads_the_text_without_speakers_when_the_company_forbids_speaker_names"
+  ask: "What did Design review say?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_transcript.py:255: when Microsoft refuses speaker names with the code SpeakerAttributionNotAllowed, the tool reads the text form of the transcript and speaker_attribution is false."
+
+uc-06-53:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_skips_a_turn_that_holds_no_words"
+  ask: "What did Design review say?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_transcript.py:145: a turn with no words is not a turn."
+
+uc-06-54:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_lists_a_transcript_once_when_microsoft_sends_it_on_two_pages"
+  ask: "Which transcripts does Design review have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+  note: "Expected behaviour from src/office_365_mcp/shared/meetings.py:199: one entry for each artifact id, in the order that Microsoft first sent it, because Microsoft repeats entries when it pages these lists."
+
+uc-06-55:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatTheListsOfTeamsKeepApart::test_it_reports_no_channels_when_microsoft_ignores_the_kind_asked_for"
+  ask: "Which standard channels does Sales have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      args: {membership_type: standard}
+      uses: {team_id: id of the team}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_channels.py:167: when Microsoft ignores the filter, the tool reports no channels and says to list again without membership_type."
+
+uc-06-56:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatTheListsOfTeamsKeepApart::test_it_describes_a_system_event_and_a_post_of_a_bot_in_a_chat"
+  ask: "What is new in Design review?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting}
+    - tool: teams_list_chat_messages
+      uses: {chat_id: id of the chat}
+  note: "Expected behaviour from src/office_365_mcp/shared/messages.py:286: a system event has an event name or the words that Microsoft sent no detail; a bot shows its application name."
+
+uc-06-57:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAMeetingChatThatHoldsNoJoinAddress::test_it_lists_the_chat_without_a_meeting_reference"
+  ask: "Which meeting chats do I have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting}
+  note: "Expected behaviour from src/office_365_mcp/shared/handles.py:488: with no join address the chat has no meeting_uri."
+
+uc-06-58:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestOlderMessagesOfAChat::test_it_reads_the_messages_sent_before_a_day_or_a_moment"
+  ask: "Show me the messages of Launch up to the end of 4 November."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {topic_contains: Launch}
+    - tool: teams_list_chat_messages
+      args: {sent_before: 2026-11-04}
+      uses: {chat_id: id of the chat}
+  note: "Row 1 is a day and row 2 is a moment. Expected behaviour from src/office_365_mcp/tools/teams_list_chat_messages.py:95: a day includes all of its hours; a moment includes its own second."
+
+uc-06-59:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAReplyReadByItsOwnReference::test_it_reads_one_reply_of_a_thread_in_full"
+  ask: "Read the reply of Tom to the post Hosting plan."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_my_teams
+    - tool: teams_list_channels
+      args: {membership_type: standard}
+      uses: {team_id: id of the team}
+    - tool: teams_browse_channel
+      uses: {team_id: id of the team, channel_id: id of the channel}
+    - tool: teams_list_message_replies
+      uses: {uri: uri of the post}
+    - tool: teams_read_message
+      uses: {uri: uri of the reply}
+  note: "Expected behaviour from src/office_365_mcp/shared/handles.py:337 and src/office_365_mcp/shared/messages.py:256: a reply handle names the team, the channel, the post, and the reply; the tool reads the reply at that place."
+
+uc-06-60:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheReactionsOfAMessage::test_it_shows_who_reacted_to_a_message_of_a_chat"
+  ask: "Show me the message that I wrote in the chat Launch and who reacted."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {topic_contains: Launch}
+    - tool: teams_read_message
+      uses: {uri: uri of the message}
+  note: "Expected behaviour from src/office_365_mcp/shared/messages.py:125: each reaction has the reaction type, the id of the person, and the time."
+
+uc-06-46:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_reports_any_other_refusal_of_the_transcript_without_a_second_try"
+  ask: "What did Design review say?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - tool: teams_list_meeting_transcripts
+      uses: {meeting_uri: uri of the meeting}
+    - tool: teams_read_transcript
+      uses: {uri: uri of the transcript}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_transcript.py:255: only the refusal SpeakerAttributionNotAllowed leads to a second try in the text form; every other refusal stands."

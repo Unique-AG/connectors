@@ -489,7 +489,7 @@ uc-08-34:
     - any_of: [onenote_list_pages, onenote_list_notebooks]
     - tool: teams_list_my_teams
       optional: true
-    - any_of: [onenote_delete_page, onenote_edit_page, onenote_create_page, onenote_copy_notebook, onenote_copy_section, onenote_copy_page]
+    - any_of: [onenote_delete_page, onenote_edit_page, onenote_create_page, onenote_copy_notebook, onenote_copy_section, onenote_copy_page, onenote_append_to_page, onenote_rename_page, onenote_create_notebook, onenote_create_section, onenote_create_section_group]
   note: "expected behaviour for every row from shared/seam.py:236-241 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam.py:187-189). The page delete always asks (tools/onenote_delete_page.py:49), a replace always asks (tools/onenote_edit_page.py:83), and a page in a team notebook asks (tools/onenote_create_page.py:101-103). The row for the date uses the ask Change the launch date on my Planning page to 21 June, and the row for the team notebook uses Add the page Retro to the notebook of the Platform team. The notebook copy asks when it names a group (tools/onenote_copy_notebook.py:121-123), and the section copy and the page copy ask when the destination notebook is shared or belongs to somebody else (tools/onenote_copy_section.py:158-160, tools/onenote_copy_page.py:137-139). The copy rows use the asks Copy my Customers notebook into the Platform team, Copy the section Work into the notebook of the Platform team and Copy the page Retro into the section Planning of the Platform team, with the notebook list, the section list or the page list as the first step, and the team list as an optional step. The text for the assistant allows a new call only on a new request from Mia, and the scenario states only that the assistant does not ask again. The rows of the retired uc-08-49 sit here."
 
 uc-08-35:
@@ -508,6 +508,8 @@ uc-08-36:
   status: untested
   tests:
     - "tests/tools/test_onenote_delete_page.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_request_deletes_nothing"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAnApprovalInEveryEra::test_an_approval_that_is_bound_to_no_request_makes_no_change"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAnApprovalInEveryEra::test_an_approval_that_came_with_no_question_makes_no_change"
   ask: "Erase my Old draft page."
   provenance: drafted
   asks_user: true
@@ -742,6 +744,7 @@ uc-08-51:
   status: untested
   tests:
     - "tests/tools/scenarios/test_08_work_with_notes.py::TestCopying::test_a_copy_that_cannot_be_followed_is_looked_for_later_and_not_started_again"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFollowingACopy::test_a_copy_that_nothing_can_follow_is_not_started_again_for_every_kind"
   ask: "Copy my Customers notebook as Customers 2026."
   provenance: drafted
   asks_user: false
@@ -904,3 +907,205 @@ uc-08-60:
     - tool: onenote_read_page
       uses: {page: handle of the page}
   note: "expected behaviour from tools/onenote_read_resource.py:76-81 (GRAPH_NOT_FOUND): Microsoft 365 has no such resource, it was most likely deleted along with the page that held it, an image in a group, team, or site notebook can also be out of reach through the sign-in of the connector, re-read the page that holds it with onenote_read_page and take a fresh address from its html, and the same address fails again."
+
+uc-08-61:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestArgumentsThatCannotWork::test_a_value_that_names_no_note_is_refused_before_microsoft_is_asked"
+  ask: "Read my Acme kickoff page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour for every row from the refusals of each tool that takes a handle, an operation or a picture address, for example tools/onenote_read_page.py (_NOT_A_PAGE_HANDLE): the text names the kind of handle that the tool takes, names the tool that gives it, and says that the same value fails again."
+
+uc-08-62:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestArgumentsThatCannotWork::test_arguments_that_contradict_each_other_are_refused_before_microsoft_is_asked"
+  ask: "List the pages of my Work section and of the Platform team."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+  note: "expected behaviour for every row from tools/onenote_list_pages.py (_GROUP_WITH_A_SECTION, _PAGELEVEL_NEEDS_A_SECTION, _MODIFIED_WINDOW_RUNS_BACKWARDS, _CREATED_WINDOW_RUNS_BACKWARDS), shared/notes.py (group_and_site_refused), tools/onenote_create_page.py (_BOTH_SECTION_AND_SECTION_NAME) and tools/onenote_copy_section.py (_NEED_EXACTLY_ONE_DESTINATION): each text says why the choices cannot work together and that the same choices fail again."
+
+uc-08-63:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNarrowingAListing::test_pages_are_asked_for_inside_the_window_that_was_given"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNarrowingAListing::test_pages_in_a_window_are_given_by_microsoft_in_a_real_answer"
+  ask: "Show my notes that I changed since 1 March."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {modified_after: "2026-03-01"}
+  note: "A date bound covers the whole day. A bound with a time is exact."
+
+uc-08-64:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNarrowingAListing::test_notebooks_are_asked_for_by_their_sharing_and_the_role_of_the_person"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNarrowingAListing::test_the_notebooks_that_a_person_owns_alone_are_given_by_microsoft_in_a_real_answer"
+  ask: "Show the notebooks that are shared with me."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {shared: true}
+
+uc-08-65:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAnApprovalInEveryEra::test_a_change_in_the_notes_of_a_team_is_made_once_after_the_person_approves"
+  ask: "Add the page Retro to the notebook of the Platform team."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_my_teams
+      optional: true
+    - any_of: [onenote_list_notebooks, onenote_list_sections, onenote_list_pages]
+    - any_of: [onenote_delete_page, onenote_edit_page, onenote_create_page, onenote_copy_notebook, onenote_copy_section, onenote_copy_page, onenote_append_to_page, onenote_rename_page, onenote_create_notebook, onenote_create_section, onenote_create_section_group]
+  note: "The test runs every row with a client of the newer protocol, where the question comes back with the answer, and with the question that the older handshake sends. The change is sent once."
+
+uc-08-66:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestARenameAHeadAndAPreview::test_a_change_that_was_made_but_cannot_be_shown_is_not_made_twice"
+  ask: "Change the launch date on my Planning page to 21 June."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Planning}
+    - tool: onenote_edit_page
+      uses: {page: handle of the page}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour from tools/onenote_edit_page.py (_WRITTEN_BUT_UNREAD): Microsoft 365 changed the page, then the connector did not receive the updated page, use onenote_read_page to see the changes, and do not send the same commands again, because a second call applies them again."
+
+uc-08-67:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestTheQuestionTellsWhy::test_the_question_says_why_the_notebook_needs_an_approval"
+  ask: "Add a task list at the end of my Planning page."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Planning}
+    - tool: onenote_append_to_page
+      args: {body_html: task list}
+      uses: {page: handle of the page}
+  note: "The reason comes from shared/notes.py (NotebookAudience.reason)."
+
+uc-08-68:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageWithNoSection::test_a_page_with_no_section_goes_to_the_default_notebook"
+  ask: "Add the page Retro to my notes."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_create_page
+      args: {title: Retro, body_html: one paragraph}
+  note: "The tool asks for approval only when the default notebook is shared, belongs to somebody else, or cannot be told from the others."
+
+uc-08-69:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestAPageWithNoSection::test_a_page_with_a_section_name_goes_to_a_section_of_that_name"
+  ask: "Add the page Retro to a section Work in my default notebook."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_create_page
+      args: {title: Retro, body_html: one paragraph, section_name: Work}
+
+uc-08-70:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_notebook_listing_leaves_out_what_has_no_address_and_names_no_creator_it_lacks"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_section_listing_leaves_out_what_has_no_address_and_is_narrowed_by_creator"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_page_listing_leaves_out_what_has_no_address_and_shows_no_link_it_lacks"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_preview_with_no_picture_link_gives_only_its_words"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_preview_with_a_picture_link_gives_the_link"
+  ask: "List my notebooks, sections and pages."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [onenote_list_notebooks, onenote_list_sections, onenote_list_pages, onenote_preview_page]
+
+uc-08-71:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_notebook_listing_leaves_out_what_has_no_address_and_names_no_creator_it_lacks"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_section_listing_leaves_out_what_has_no_address_and_is_narrowed_by_creator"
+  ask: "Show the notebooks and the sections that Mia made."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_notebooks
+      args: {created_by: Mia}
+    - tool: onenote_list_sections
+      args: {created_by: Mia}
+      uses: {parent: handle of the notebook}
+
+uc-08-72:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_page_that_is_not_text_is_explained_and_sent_to_the_browser_if_it_can_be"
+  ask: "Summarize my notes from the Acme kickoff."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+  note: "expected behaviour from tools/onenote_read_page.py (_cannot_decode): the bytes are not valid UTF-8 text, open the page in a browser at the web address when Microsoft gave one, and a second call fails the same way."
+
+uc-08-73:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestWhatMicrosoftLeavesOut::test_a_picture_with_no_type_is_given_as_plain_bytes"
+  ask: "Show me the picture on my Acme kickoff page."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Acme kickoff}
+    - tool: onenote_read_page
+      uses: {page: handle of the page}
+    - tool: onenote_read_resource
+      uses: {resource: the src of the picture in the html of the page}
+
+uc-08-74:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFollowingACopy::test_a_finished_copy_names_what_it_made"
+  ask: "Has my copy of the page finished?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_get_operation
+      uses: {operation: handle of the copy}
+
+uc-08-75:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestFollowingACopy::test_a_copy_that_microsoft_names_only_in_a_header_is_followed_by_that_name"
+  ask: "Copy my page Weekly sync into the section Archive."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: onenote_list_pages
+      args: {title_contains: Weekly sync}
+    - tool: onenote_copy_page
+      uses:
+        page: handle of the page
+        to_section: handle of the section Archive

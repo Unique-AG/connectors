@@ -16,6 +16,7 @@ from tests.tools.scenarios.mail_support import (
     advice_for,
     answer_of,
     answers,
+    asked_of,
     call_with,
     every_time,
     invoke_as,
@@ -1196,3 +1197,682 @@ def _recorded_folders() -> httpx.Response:
 
 def _timing_out(request: httpx.Request) -> httpx.Response:
     raise httpx.ReadTimeout("no answer in time", request=request)
+
+
+_RULE = "/me/mailFolders/inbox/messageRules/RULE1%3D"
+_RULE_REF = "outlook:///rules/RULE1%3D"
+_SHARED = "support@example.com"
+_FIXTURE_DELETE = "rec-tool-outlook_delete_folder-created"
+_FIXTURE_RENAME = "rec-tool-outlook_rename_folder-renamed"
+
+
+def _a_rule(graph: respx.MockRouter, **fields: object) -> respx.Route:
+    stored: dict[str, object] = {
+        "id": "RULE1=",
+        "displayName": "Receipts",
+        "sequence": 10,
+        "isEnabled": True,
+        "isReadOnly": False,
+        "hasError": False,
+        "conditions": {"subjectContains": ["receipt"]},
+        "actions": {"markAsRead": True},
+    } | fields
+    _ = graph.get(_RULE).mock(return_value=httpx.Response(200, json=stored))
+    _ = graph.delete(_RULE).mock(return_value=httpx.Response(204))
+    return graph.patch(_RULE).mock(return_value=httpx.Response(200, json=stored))
+
+
+def _well_known(fixture: str, name: str) -> str:
+    return cast("str", answer_of(fixture, "GET", f"/me/mailFolders/{name}")["id"])
+
+
+def _a_folder(graph: respx.MockRouter, folder_id: str, **fields: object) -> str:
+    _ = graph.get(f"{_FOLDERS}/{folder_id}").mock(
+        return_value=httpx.Response(
+            200,
+            json={"id": folder_id, "displayName": "Projects", "totalItemCount": 4} | fields,
+        )
+    )
+    return f"outlook:///folders/{folder_id}"
+
+
+class TestAValueThatIsNotAHandleChangesNothing:
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("outlook_mark_mail", {"message_refs": ["Q3 budget review"], "is_read": True}),
+            ("outlook_create_folder", {"name": "Alpha", "parent_ref": "Projects"}),
+            ("outlook_rename_folder", {"folder_ref": "Projects", "name": "Alpha"}),
+            ("outlook_delete_folder", {"folder_ref": "Projects"}),
+            ("outlook_browse_folders", {"parent": "Projects"}),
+            ("outlook_disable_mail_rule", {"rule_ref": "Receipts", "enabled": False}),
+            ("outlook_delete_mail_rule", {"rule_ref": "Receipts"}),
+            ("outlook_update_mail_rule", {"rule_ref": "Receipts", "is_enabled": True}),
+        ],
+        ids=[
+            "mark-mail",
+            "create-folder",
+            "rename-folder",
+            "delete-folder",
+            "browse-folders",
+            "disable-rule",
+            "delete-rule",
+            "update-rule",
+        ],
+    )
+    async def test_it_refuses_a_name_in_place_of_a_handle_before_it_asks_microsoft(
+        self, graph: respx.MockRouter, tool: str, arguments: dict[str, object]
+    ) -> None:
+        person = Person()
+
+        advice = await refusal_of(tool, arguments, person=person)
+
+        assert "handle" in advice
+        assert graph.calls.call_count == 0
+        assert person.asked == []
+
+
+class TestAMarkingWhoseValuesDoNotFitTogetherChangesNothing:
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            ({}, "needs at least one of"),
+            ({"flagged": True, "flag_status": "complete"}, "both set the follow-up status"),
+            ({"flag_due_at": "2026-11-06T17:00:00"}, "needs `flag_starts_at`"),
+            (
+                {
+                    "flag_status": "complete",
+                    "flag_starts_at": "2026-10-30T00:00:00",
+                    "flag_time_zone": "UTC",
+                },
+                "go only with the status `flagged`",
+            ),
+            (
+                {"flag_starts_at": "next week", "flag_time_zone": "UTC"},
+                "cannot read 'next week' in `flag_starts_at`",
+            ),
+            (
+                {
+                    "flag_starts_at": "2026-10-30T00:00:00",
+                    "flag_due_at": "soon",
+                    "flag_time_zone": "UTC",
+                },
+                "cannot read 'soon' in `flag_due_at`",
+            ),
+            (
+                {"add_categories": ["Reading"], "remove_categories": ["Reading"]},
+                "is in both `add_categories` and `remove_categories`",
+            ),
+        ],
+        ids=[
+            "nothing-to-change",
+            "two-flag-forms",
+            "due-without-start",
+            "dates-on-a-complete-flag",
+            "start-not-a-time",
+            "due-not-a-time",
+            "category-added-and-removed",
+        ],
+    )
+    async def test_it_refuses_the_marking_before_it_asks_microsoft(
+        self, graph: respx.MockRouter, arguments: dict[str, object], told: str
+    ) -> None:
+        advice = await advice_for("outlook_mark_mail", message_refs=[_Q3_MESSAGE], **arguments)
+
+        assert told in advice
+        assert graph.calls.call_count == 0
+
+    async def test_a_start_date_with_a_zone_and_no_due_date_flags_the_message(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = marking_every_message(graph)
+
+        marked = await call(
+            "outlook_mark_mail",
+            message_refs=[_Q3_MESSAGE],
+            flag_starts_at="2026-10-30T00:00:00",
+            flag_time_zone="UTC",
+        )
+
+        assert _rows(marked, "messages", "flag_status") == ["flagged"]
+        (flag,) = [
+            cast("dict[str, object]", body["flag"]) for body in sent_jsons(graph, "PATCH", "")
+        ]
+        assert "dueDateTime" not in flag
+
+    async def test_a_failed_message_gives_the_request_id_of_microsoft(
+        self, graph: respx.MockRouter
+    ) -> None:
+        refs = [_Q3_MESSAGE.replace("UVs", prefix) for prefix in ("UVa", "UVb")]
+        _ = graph.route(method="PATCH", path__regex=r".*UVa.*").mock(
+            return_value=httpx.Response(
+                404,
+                headers={"request-id": "req-77"},
+                json={"error": {"code": "ErrorItemNotFound", "message": "gone"}},
+            )
+        )
+        _ = marking_every_message(graph)
+
+        marked = await call("outlook_mark_mail", message_refs=refs, is_read=True)
+
+        failed = [row for row in cast("list[dict[str, str]]", marked["messages"]) if row["failure"]]
+        assert len(failed) == 1
+        assert "request id req-77" in failed[0]["failure"]
+
+
+class TestAChangeInASharedMailboxAsksBeforeItIsMade:
+    async def test_a_marking_names_every_change_in_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = marking_every_message(graph)
+        person = Person()
+
+        marked = await invoke_as(
+            "outlook_mark_mail",
+            {
+                "mailbox": _SHARED,
+                "message_refs": [_Q3_MESSAGE],
+                "is_read": True,
+                "flagged": True,
+                "flag_starts_at": "2026-10-30T00:00:00",
+                "flag_due_at": "2026-11-06T17:00:00",
+                "flag_time_zone": "UTC",
+                "importance": "high",
+                "add_categories": ["Reading"],
+                "remove_categories": ["Old"],
+            },
+            person=person,
+        )
+
+        (question,) = person.asked
+        assert _SHARED in question
+        assert "mark them as read" in question
+        assert "flag them for follow-up from 2026-10-30T00:00:00 to 2026-11-06T17:00:00" in question
+        assert "set their importance to high" in question
+        assert "add the category 'Reading' and remove the category 'Old'" in question
+        assert marked.structured_content is not None
+
+    async def test_a_marking_with_one_change_names_that_change(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = marking_every_message(graph)
+        person = Person()
+
+        _ = await invoke_as(
+            "outlook_mark_mail",
+            {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "flag_status": "complete"},
+            person=person,
+        )
+
+        assert "mark their follow-up complete" in person.asked[0]
+
+    async def test_a_new_folder_is_made_only_after_mia_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve_as(graph, "rec-tool-outlook_create_folder-top", _SHARED)
+        person = Person()
+
+        made = await invoke_as(
+            "outlook_create_folder", {"mailbox": _SHARED, "name": "Alpha"}, person=person
+        )
+
+        assert _SHARED in person.asked[0]
+        assert made.structured_content is not None
+        assert times_asked(graph, "POST", "/mailFolders") == 1
+
+    async def test_a_new_folder_inside_a_folder_names_the_place_in_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route(method="POST", path__regex=r".*/PARENT1/childFolders").mock(
+            return_value=httpx.Response(201, json={"id": "CHILD1", "displayName": "Alpha"})
+        )
+        person = Person()
+
+        _ = await invoke_as(
+            "outlook_create_folder",
+            {"mailbox": _SHARED, "name": "Alpha", "parent_ref": "outlook:///folders/PARENT1"},
+            person=person,
+        )
+
+        assert "inside" in person.asked[0]
+
+    @pytest.mark.parametrize(
+        ("approval", "told"),
+        [("no", "was not confirmed"), ("unanswered", "received no answer")],
+        ids=["declines", "chat-program-fails"],
+    )
+    async def test_a_folder_that_mia_does_not_approve_is_not_made_marked_or_renamed(
+        self, graph: respx.MockRouter, approval: str, told: str
+    ) -> None:
+        _ = serve_as(graph, "rec-tool-outlook_create_folder-top", _SHARED)
+
+        advice = await refusal_of(
+            "outlook_create_folder",
+            {"mailbox": _SHARED, "name": "Alpha"},
+            person=Person(approval=approval),
+        )
+        marking = await refusal_of(
+            "outlook_mark_mail",
+            {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "is_read": True},
+            person=Person(approval=approval),
+        )
+
+        assert told in advice
+        assert told in marking
+        assert methods_asked(graph) == set()
+
+    async def test_a_rename_asks_first_and_then_renames(self, graph: respx.MockRouter) -> None:
+        listing = answer_of(_FIXTURE_RENAME, "POST", "/me/mailFolders")
+        folder_id = cast("str", listing["id"])
+        routes = serve_as(graph, _FIXTURE_RENAME, _SHARED)
+        person = Person()
+
+        renamed = await invoke_as(
+            "outlook_rename_folder",
+            {
+                "mailbox": _SHARED,
+                "folder_ref": f"outlook:///folders/{folder_id}",
+                "name": "Archive 2025",
+            },
+            person=person,
+        )
+
+        assert routes
+        assert "Rename the folder" in person.asked[0]
+        assert _SHARED in person.asked[0]
+        assert renamed.structured_content is not None
+
+    async def test_a_rename_that_mia_declines_changes_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        listing = answer_of(_FIXTURE_RENAME, "POST", "/me/mailFolders")
+        _ = serve_as(graph, _FIXTURE_RENAME, _SHARED)
+
+        advice = await refusal_of(
+            "outlook_rename_folder",
+            {
+                "mailbox": _SHARED,
+                "folder_ref": f"outlook:///folders/{listing['id']}",
+                "name": "Archive 2025",
+            },
+            person=Person(approval="no"),
+        )
+
+        assert "was not confirmed" in advice
+        assert times_asked(graph, "PATCH", "") == 0
+
+
+class TestInAClientOfTheNewerProtocolTheQuestionGoesBackToTheClient:
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            (
+                "outlook_mark_mail",
+                {"mailbox": _SHARED, "message_refs": [_Q3_MESSAGE], "is_read": True},
+            ),
+            ("outlook_create_folder", {"mailbox": _SHARED, "name": "Alpha"}),
+            (
+                "outlook_create_mail_rule",
+                {
+                    "display_name": "To Anna",
+                    "sequence": 1,
+                    "actions": {"forward_to": ["anna@example.com"]},
+                },
+            ),
+        ],
+        ids=["mark-mail", "create-folder", "create-rule"],
+    )
+    async def test_it_hands_the_question_back_and_writes_nothing(
+        self, graph: respx.MockRouter, tool: str, arguments: dict[str, object]
+    ) -> None:
+        asked = await asked_of(tool, arguments)
+
+        assert asked.input_requests
+        assert graph.calls.call_count == 0
+
+    async def test_a_rename_hands_the_question_back_after_one_read(
+        self, graph: respx.MockRouter
+    ) -> None:
+        listing = answer_of(_FIXTURE_RENAME, "POST", "/me/mailFolders")
+        _ = serve_as(graph, _FIXTURE_RENAME, _SHARED)
+
+        asked = await asked_of(
+            "outlook_rename_folder",
+            {
+                "mailbox": _SHARED,
+                "folder_ref": f"outlook:///folders/{listing['id']}",
+                "name": "Archive 2025",
+            },
+        )
+
+        assert asked.input_requests
+        assert times_asked(graph, "PATCH", "") == 0
+
+    async def test_a_folder_delete_hands_the_question_back_before_the_move(
+        self, graph: respx.MockRouter
+    ) -> None:
+        listing = answer_of(_FIXTURE_DELETE, "POST", "/me/mailFolders")
+        _ = serve(graph, _FIXTURE_DELETE)
+
+        asked = await asked_of(
+            "outlook_delete_folder", {"folder_ref": f"outlook:///folders/{listing['id']}"}
+        )
+
+        assert asked.input_requests
+        assert times_asked(graph, "POST", "/move") == 0
+
+    async def test_a_rule_change_and_a_rule_delete_hand_the_question_back(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _a_rule(graph, actions={"forwardTo": [{"emailAddress": {"address": "a@example.com"}}]})
+
+        changed = await asked_of("outlook_update_mail_rule", {"rule_ref": _RULE_REF, "sequence": 3})
+        erased = await asked_of("outlook_delete_mail_rule", {"rule_ref": _RULE_REF})
+
+        assert changed.input_requests
+        assert erased.input_requests
+        assert times_asked(graph, "PATCH", "") + times_asked(graph, "DELETE", "") == 0
+
+
+class TestAFolderThatOutlookMakesIsNeverRenamedOrDeleted:
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("outlook_rename_folder", {"folder_ref": "outlook:///folders/inbox", "name": "Alpha"}),
+            ("outlook_delete_folder", {"folder_ref": "outlook:///folders/inbox"}),
+            ("outlook_delete_folder", {"folder_ref": "outlook:///folders/deleteditems"}),
+        ],
+        ids=["rename-inbox", "delete-inbox", "delete-deleted-items"],
+    )
+    async def test_it_refuses_the_name_of_a_built_in_folder_before_it_asks_microsoft(
+        self, graph: respx.MockRouter, tool: str, arguments: dict[str, object]
+    ) -> None:
+        advice = await advice_for(tool, **arguments)
+
+        assert "Outlook creates the folder" in advice or "Deleted Items itself" in advice
+        assert graph.calls.call_count == 0
+
+    @pytest.mark.parametrize("which", ["inbox", "msgfolderroot"])
+    async def test_it_refuses_a_rename_by_the_real_id_of_a_folder_that_outlook_makes(
+        self, graph: respx.MockRouter, which: str
+    ) -> None:
+        _ = serve(graph, _FIXTURE_RENAME)
+        root = _well_known(_FIXTURE_RENAME, "msgfolderroot")
+        folder_id = _well_known(_FIXTURE_RENAME, which)
+        ref = _a_folder(graph, folder_id, parentFolderId=root, displayName=which)
+
+        advice = await advice_for("outlook_rename_folder", folder_ref=ref, name="Alpha")
+
+        assert "Outlook creates the folder" in advice
+        assert times_asked(graph, "PATCH", "") == 0
+
+    async def test_a_folder_inside_a_folder_of_mia_is_renamed(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, _FIXTURE_RENAME)
+        ref = _a_folder(graph, "NESTED1", parentFolderId="USERFOLDER1", displayName="Alpha")
+        _ = graph.patch(f"{_FOLDERS}/NESTED1").mock(
+            return_value=httpx.Response(200, json={"id": "NESTED1", "displayName": "Beta"})
+        )
+
+        renamed = await call("outlook_rename_folder", folder_ref=ref, name="Beta")
+
+        assert renamed["display_name"] == "Beta"
+        assert routes
+
+    async def test_a_folder_that_is_already_in_deleted_items_is_not_moved_again(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, _FIXTURE_DELETE)
+        deleted_items = _well_known(_FIXTURE_DELETE, "deleteditems")
+        ref = _a_folder(graph, "OLD1", parentFolderId=deleted_items, displayName="Old")
+
+        advice = await advice_for("outlook_delete_folder", folder_ref=ref)
+
+        assert "already in Deleted Items" in advice
+        assert times_asked(graph, "POST", "/move") == 0
+
+    async def test_a_folder_with_no_counts_is_named_with_unknown_counts_in_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, _FIXTURE_DELETE)
+        root = _well_known(_FIXTURE_DELETE, "msgfolderroot")
+        ref = _a_folder(
+            graph, "BARE1", parentFolderId=root, totalItemCount=None, childFolderCount=None
+        )
+        _ = graph.post(f"{_FOLDERS}/BARE1/move").mock(
+            return_value=httpx.Response(201, json={"id": "BARE2", "displayName": "Projects"})
+        )
+        person = Person()
+
+        _ = await invoke_as("outlook_delete_folder", {"folder_ref": ref}, person=person)
+
+        assert "an unknown number of items and an unknown number of subfolders" in person.asked[0]
+
+
+_INBOX_RULES = "/me/mailFolders/inbox/messageRules"
+_FORWARDING_RULE: dict[str, object] = {
+    "actions": {"forwardTo": [{"emailAddress": {"name": "Anna", "address": "anna@example.com"}}]}
+}
+
+
+class TestARuleThatCannotBeMadeIsNotMade:
+    @pytest.mark.parametrize(
+        ("actions", "told"),
+        [
+            ({}, "gives the rule no action"),
+            ({"move_to_folder": "Archive folder"}, "take a well-known folder name"),
+        ],
+        ids=["no-action", "folder-name-not-handle"],
+    )
+    async def test_it_refuses_the_rule_before_it_asks_microsoft(
+        self, graph: respx.MockRouter, actions: dict[str, object], told: str
+    ) -> None:
+        advice = await advice_for(
+            "outlook_create_mail_rule", display_name="Receipts", sequence=10, actions=actions
+        )
+
+        assert told in advice
+        assert "No rule was created" in advice
+        assert graph.calls.call_count == 0
+
+    async def test_a_folder_that_is_hidden_from_mia_does_not_get_a_rule(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"{_FOLDERS}/HIDDEN1").mock(
+            return_value=httpx.Response(200, json={"id": "HIDDEN1", "isHidden": True})
+        )
+
+        advice = await advice_for(
+            "outlook_create_mail_rule",
+            display_name="Receipts",
+            sequence=10,
+            actions={"move_to_folder": "outlook:///folders/HIDDEN1"},
+        )
+
+        assert "hidden from the user in Outlook" in advice
+        assert times_asked(graph, "POST", "/messageRules") == 0
+
+    async def test_a_rule_with_a_folder_handle_and_a_size_range_is_made_as_asked(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"{_FOLDERS}/FINANCE1").mock(
+            return_value=httpx.Response(200, json={"id": "FINANCE1", "isHidden": False})
+        )
+        _ = graph.post(_INBOX_RULES).mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": "RULE2=",
+                    "displayName": "Big invoices",
+                    "sequence": 3,
+                    "isEnabled": True,
+                    "conditions": {"withinSizeRange": {"minimumSize": 500}},
+                    "actions": {"moveToFolder": "FINANCE1"},
+                },
+            )
+        )
+
+        made = await call(
+            "outlook_create_mail_rule",
+            display_name="Big invoices",
+            sequence=3,
+            conditions={"within_size_range": {"minimum_kb": 500}},
+            actions={"move_to_folder": "outlook:///folders/FINANCE1"},
+        )
+
+        sent = sent_json(graph, "POST", "/messageRules")
+        assert sent["conditions"] == {"withinSizeRange": {"minimumSize": 500}}
+        assert cast("dict[str, object]", sent["actions"])["moveToFolder"] == "FINANCE1"
+        conditions = cast("dict[str, object]", made["conditions"])
+        assert conditions["within_size_range"] == {"minimum_kb": 500}
+
+    async def test_a_question_about_three_addresses_names_all_of_them(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_create_mail_rule-basic")
+        person = Person()
+
+        _ = await invoke_as(
+            "outlook_create_mail_rule",
+            {
+                "display_name": "Everything to three",
+                "sequence": 10,
+                "actions": {"forward_to": ["a@example.com", "b@example.com", "c@example.com"]},
+            },
+            person=person,
+        )
+
+        assert "a@example.com, b@example.com, and c@example.com" in person.asked[0]
+
+
+class TestARuleChangeThatDoesNotFitChangesNothing:
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            ({}, "was given nothing to change"),
+            (
+                {"conditions": {"from_addresses": ["Ada <ada@example.com>"]}},
+                "are not one address",
+            ),
+            ({"conditions": {}}, "sets no predicate"),
+            (
+                {"actions": {"mark_as_read": True}, "remove_actions": ["mark_as_read"]},
+                "`actions` and `remove_actions` both name `mark_as_read`",
+            ),
+            ({"actions": {"move_to_folder": "Archive folder"}}, "take a well-known folder name"),
+        ],
+        ids=[
+            "nothing-to-change",
+            "name-with-address",
+            "empty-conditions",
+            "action-given-and-removed",
+            "folder-name-not-handle",
+        ],
+    )
+    async def test_it_refuses_the_change_before_it_asks_microsoft(
+        self, graph: respx.MockRouter, arguments: dict[str, object], told: str
+    ) -> None:
+        advice = await advice_for("outlook_update_mail_rule", rule_ref=_RULE_REF, **arguments)
+
+        assert told in advice
+        assert graph.calls.call_count == 0
+
+    async def test_a_folder_that_is_hidden_from_mia_gets_no_rule_action(
+        self, graph: respx.MockRouter
+    ) -> None:
+        patch = _a_rule(graph)
+        _ = graph.get(f"{_FOLDERS}/archive").mock(
+            return_value=httpx.Response(200, json={"id": "ARCH1", "isHidden": True})
+        )
+
+        advice = await advice_for(
+            "outlook_update_mail_rule", rule_ref=_RULE_REF, actions={"move_to_folder": "archive"}
+        )
+
+        assert "hidden from the user in Outlook" in advice
+        assert patch.call_count == 0
+
+    async def test_removing_the_only_action_of_a_rule_leaves_a_rule_that_does_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        patch = _a_rule(graph)
+
+        advice = await advice_for(
+            "outlook_update_mail_rule", rule_ref=_RULE_REF, remove_actions=["mark_as_read"]
+        )
+
+        assert "gives the rule no action" in advice
+        assert patch.call_count == 0
+
+    async def test_a_rule_that_outlook_locks_is_not_changed_or_erased(
+        self, graph: respx.MockRouter
+    ) -> None:
+        patch = _a_rule(graph, isReadOnly=True)
+
+        changed = await advice_for("outlook_update_mail_rule", rule_ref=_RULE_REF, sequence=2)
+        erased = await advice_for("outlook_delete_mail_rule", rule_ref=_RULE_REF)
+
+        assert "marks this rule as read-only" in changed
+        assert "marks this rule as read-only" in erased
+        assert times_asked(graph, "DELETE", "") == 0
+        assert patch.call_count == 0
+
+    async def test_a_rule_that_is_off_changes_without_a_question_even_when_it_forwards(
+        self, graph: respx.MockRouter
+    ) -> None:
+        patch = _a_rule(graph, isEnabled=False, **_FORWARDING_RULE)
+        person = Person()
+
+        changed = await invoke_as(
+            "outlook_update_mail_rule", {"rule_ref": _RULE_REF, "sequence": 4}, person=person
+        )
+
+        assert person.asked == []
+        assert changed.structured_content is not None
+        assert sent_json(graph, "PATCH", "") == {"sequence": 4}
+        assert patch.call_count == 1
+
+    async def test_a_rule_that_forwards_is_changed_only_after_mia_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        patch = _a_rule(graph, **_FORWARDING_RULE)
+        person = Person()
+
+        _ = await invoke_as(
+            "outlook_update_mail_rule", {"rule_ref": _RULE_REF, "sequence": 4}, person=person
+        )
+        declined = await refusal_of(
+            "outlook_update_mail_rule",
+            {"rule_ref": _RULE_REF, "sequence": 5},
+            person=Person(approval="no"),
+        )
+
+        assert "anna@example.com" in person.asked[0]
+        assert "was not confirmed" in declined
+        assert patch.call_count == 1
+
+    async def test_a_rule_that_holds_no_action_is_listed_changed_and_disabled(
+        self, graph: respx.MockRouter
+    ) -> None:
+        patch = _a_rule(graph, actions=None)
+
+        changed = await call(
+            "outlook_update_mail_rule", rule_ref=_RULE_REF, actions={"mark_as_read": True}
+        )
+        disabled = await call("outlook_disable_mail_rule", rule_ref=_RULE_REF, enabled=False)
+        moved = await call("outlook_update_mail_rule", rule_ref=_RULE_REF, sequence=2)
+
+        assert changed["actions"] is None
+        assert disabled["deleted"] is None
+        assert moved["actions"] is None
+        assert patch.call_count == 3
+
+    async def test_disabling_a_rule_that_forwards_names_the_address_it_stopped(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _a_rule(graph, **_FORWARDING_RULE)
+
+        disabled = await call("outlook_disable_mail_rule", rule_ref=_RULE_REF, enabled=False)
+
+        assert disabled["forwarded_to"] == ["anna@example.com"]

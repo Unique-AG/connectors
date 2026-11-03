@@ -266,3 +266,143 @@ Feature: Posting in Teams
       Then Mia is asked to approve the reaction first
       And the assistant tells Mia that the message asks for a post in "Sales"
       But it posts nothing in the channel "Sales"
+
+  Rule: A chat program of the newer kind gets the question inside the answer of the call
+
+    @happy @uc-09-30
+    Scenario Outline: An approved post or change happens once when the question comes inside the answer of the call
+      Given Mia's chat program takes the question inside the answer of the call
+      When Mia asks her assistant to <action>
+      Then Mia is asked to approve the change first
+      And after she approves, the change happens once
+
+      Examples:
+        | action                                                  |
+        | tell the chat with Anna and Tom that the build is green |
+        | post "v2 ships on Friday" in the channel "Releases"     |
+        | send "Q3 Plan.pptx" to Anna in a chat                   |
+        | post "Q3 Plan.pptx" in the channel "Sales"              |
+        | correct "Launch on 14 Jun" to "Launch on 14 June"       |
+        | delete "Launch on 14 Jun"                               |
+        | give the message of Anna a thumbs-up                    |
+
+    @unhappy @uc-09-31
+    Scenario Outline: A post or change does not happen unless the answer of Mia is the word for yes
+      Given Mia's chat program takes the question inside the answer of the call
+      And Mia declines, or her program sends the word for no, or sends a word that is not a choice
+      When Mia asks her assistant to <action>
+      Then nothing changes in Teams
+      And the assistant tells Mia that <told>
+
+      Examples:
+        | action                                                  | told                           |
+        | tell the chat with Anna and Tom that the build is green | nothing was sent               |
+        | post "v2 ships on Friday" in the channel "Releases"     | nothing was posted             |
+        | send "Q3 Plan.pptx" to Anna in a chat                   | nothing was sent               |
+        | post "Q3 Plan.pptx" in the channel "Sales"              | nothing was posted             |
+        | correct "Launch on 14 Jun" to "Launch on 14 June"       | no message was changed         |
+        | delete "Launch on 14 Jun"                               | no message was deleted         |
+        | give the message of Anna a thumbs-up                    | no reaction was changed        |
+
+
+  Rule: The assistant asks Teams only when the call makes sense
+
+    @unhappy @uc-09-32
+    Scenario Outline: A name that is not a reference to a message is refused
+      Given Mia wrote "Launch on 14 Jun" in a chat
+      When her assistant tries to <action> with the words "Launch on 14 Jun" in place of the reference of the message
+      Then the assistant tells Mia that it needs the reference that another Teams tool gives
+      And Mia is asked nothing
+      But the chat shows the message as it was
+
+      Examples:
+        | action                                    |
+        | correct the message to "Launch on 14 June" |
+        | delete the message                         |
+        | give the message a thumbs-up               |
+
+    @unhappy @uc-09-33
+    Scenario Outline: A message that another person sent is not changed
+      Given Anna wrote "The release notes are ready" in a chat with Mia
+      When Mia asks her assistant to <action>
+      Then the assistant tells Mia that she can change only a message that she sent
+      And Mia is asked nothing
+      But the message stays as it was
+
+      Examples:
+        | action                                                 |
+        | correct that message to "The release notes are final" |
+        | delete that message                                    |
+
+    @unhappy @uc-09-34
+    Scenario: A correction that mentions a person who is not in the chat is refused
+      Given Mia wrote "Launch on 14 Jun" in a chat with Anna and Tom
+      When Mia asks her assistant to correct that message to "Launch on 14 June" and to mention Priya
+      Then the assistant tells Mia that Priya is not a member of the chat
+      And Mia is asked nothing
+      But the message stays as it was
+
+    @unhappy @uc-09-35
+    Scenario Outline: A mention that Teams cannot tie to a named member is refused
+      Given Mia has a chat with Anna and Tom, and <problem>
+      When Mia asks her assistant to tell the chat that the build is green and to mention Priya
+      Then the assistant tells Mia that <told>
+      And Mia is asked nothing
+      But nothing is sent
+
+      Examples:
+        | problem                                                      | told                                                          |
+        | Microsoft shows Priya as a member with no user               | Priya is not a named member of the chat                       |
+        | the chat has 1000 members, and Priya is not among the first  | the assistant read only part of the members, and Priya is not in that part |
+
+
+  Rule: A change reaches the place where the message lives
+
+    @happy @uc-09-36
+    Scenario Outline: A correction replaces the text of a message in a chat or of a reply in a thread
+      Given Mia wrote "Launch on 14 Jun" <where>
+      When Mia asks her assistant to correct that message to "Launch on 14 June"
+      Then Mia is asked to approve the change first
+      And after she approves, the message reads "Launch on 14 June"
+
+      Examples:
+        | where                                  |
+        | in a chat with Anna and Tom            |
+        | as a reply in a thread of a channel    |
+
+    @happy @uc-09-37
+    Scenario Outline: A reaction is given to a message and taken back
+      Given Mia wrote a message <where>
+      When Mia asks her assistant to give the message a thumbs-up and then to take the thumbs-up back
+      Then Mia is asked to approve each change first
+      And after she approves, the message shows no thumbs-up of Mia
+
+      Examples:
+        | where                               |
+        | in a chat with Anna and Tom         |
+        | as a post in a channel              |
+        | as a reply in a thread of a channel |
+
+    @happy @uc-09-38
+    Scenario: A file that is in SharePoint is attached to a reply in a thread
+      Given the post "Release notes" is in the channel "Sales", and "Q3 Plan.pptx" is in SharePoint
+      When Mia asks her assistant to reply to that post with "The plan is attached" and to attach "Q3 Plan.pptx"
+      Then Mia is asked to approve the reply first
+      And after she approves, the reply is in the thread with the file attached
+
+    @happy @uc-09-39
+    Scenario: A person is mentioned in a post in a channel
+      Given Tom is a member of the team "Sales"
+      When Mia asks her assistant to post "Please review the offer" in the channel "Sales" and to mention Tom
+      Then Mia is asked to approve the post first
+      And the question names Tom as the person that the post mentions
+
+  Rule: Mia is told what happened when Microsoft cannot post the message
+
+    @unhappy @uc-09-40
+    Scenario: A message that Microsoft rejects without a reason is reported without one
+      Given Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes
+      And Microsoft rejects the message and states no reason
+      When Mia asks her assistant to tell the chat that the build is green
+      Then the assistant tells Mia that Microsoft rejected the message
+      But it does not invent a reason

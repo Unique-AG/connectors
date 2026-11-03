@@ -1,0 +1,11 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailboxSettings",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "body": "rec-tool-outlook_get_mailbox_settings-preferences.01.json"
+  }
+]

@@ -1,0 +1,48 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-before-day.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "0.gcoPUv1F1eGXXHVb8RpHcjGxm0LdlqPhXZRSjGV4puAXhHU5DnaMhBA0KfxlP6hvSX8ShSbFOmHuI9V3Kaa6WLR8CWIOX3NuRxRNkVTjSRuAtLr9LIHCJrgEBWBDCRFuFkLDE94aWZySsrF0QYqJNK7Fa2dOIA82RFHSo8gaQwFtW8s3KVxKz30cIKTEXZL3IFDKUM0KHQJUSE58WgNVxK02ZDPBebM2Q7dEw3mwVOXzhWz6XSaOtWA8GCDJIM24SEKOGEaEK2PRDNXZMnVIS5VFPGXdMBLRmEVsmHRQgJ8XG1pCJIP8QKExEsXDQBOQTMXrBJkqTFZLE1u9KgbNjoZGYXHYYVFyBhhrTolCTuioIl0iZqJirYZcKjoDljEnySGLpEO5C4cFMVdRLs9jkaAUCCy3CdvnuRWM9Gprk0yeZcQgYGthoC5qYUjApIW5PSBeq85uNJdTeb93VExbqp7aJXkMifXMDUI5TcWlu7daJiMjuhULY12YbDAwBKVAL6iiJNs1ijGSDqhaFeRqQ243ILMSWaHUmmLpY24VmBWLQL7vCYIkqBQnG2LWfEtwkpC4"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-before-day.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:1u8835a83333300vbu87x54815pg2pr7@thread.v2/messages",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$filter": "createdDateTime lt ~day+2",
+      "$orderby": "createdDateTime desc",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-before-day.03.json"
+  }
+]

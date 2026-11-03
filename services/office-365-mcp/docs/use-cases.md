@@ -532,6 +532,60 @@ What happens:
 - The assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that.
 - It does not tell Mia that no message matches.
 
+#### An attachment is given as Microsoft describes it
+
+**An attachment is given with the type that fits its bytes**
+
+Ask your assistant: "Read the attachment of the message from Anna."
+
+Tests: 1
+
+Cases:
+
+- Mia has a message with an attachment that Microsoft describes as a file with no type. The assistant gives the file as a file of unknown type. The bytes of the file are the bytes that Microsoft sent.
+- Mia has a message with an attachment that Microsoft describes as a file with a type that is not a type. The assistant gives the file as a file of unknown type. The bytes of the file are the bytes that Microsoft sent.
+- Mia has a message with an attachment that Microsoft describes as a text file that reads as text. The assistant gives the file as text. The bytes of the file are the bytes that Microsoft sent.
+- Mia has a message with an attachment that Microsoft describes as a text file that does not read as text. The assistant gives the file as a file of unknown type. The bytes of the file are the bytes that Microsoft sent.
+
+**An attachment that is larger than Microsoft announced is refused**
+
+Ask your assistant: "Read the attachment of the message from Anna."
+
+Tests: 1
+
+Situation: Microsoft announces an attachment of 100 bytes.
+
+What happens:
+
+- The assistant gives no part of the file.
+- The assistant tells Mia to open the message in Outlook.
+
+**An attachment of a kind that nobody knows is listed as unknown**
+
+Ask your assistant: "Which attachments does the message from Anna have?"
+
+Tests: 1
+
+Situation: Mia has a message with an attachment of a new kind.
+
+What happens:
+
+- The assistant lists the attachment with its name.
+- The assistant says that the kind is unknown.
+
+**A message with no follow-up flag is listed with no flag**
+
+Ask your assistant: "List my newest mail."
+
+Tests: 1
+
+Situation: Mia has a message in her inbox that carries no follow-up flag.
+
+What happens:
+
+- The message is listed.
+- The message shows no flag.
+
 #### Not supported yet in finding and reading mail
 
 - The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
@@ -1091,6 +1145,171 @@ What happens:
 - Mia's drafts hold a reply to everyone without the text "Friday works".
 - The assistant tells Mia that the text was not saved, and gives the reason that Microsoft gave.
 - The assistant does not say that the reply is ready.
+
+#### An address or a message name that does not fit stops the draft
+
+**An address that does not fit stops the draft**
+
+Ask your assistant: "Write to Anna and Tom and copy Anna."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to write to Anna. No draft is made or changed. The assistant is told what to correct.
+- Mia asks her assistant to write to Anna. No draft is made or changed. The assistant is told what to correct.
+- Mia asks her assistant to write to Anna. No draft is made or changed. The assistant is told what to correct.
+- Mia asks her assistant to write to Anna. No draft is made or changed. The assistant is told what to correct.
+- Mia asks her assistant to write to Anna. No draft is made or changed. The assistant is told what to correct.
+
+**A subject line in place of a message handle makes and changes no draft**
+
+Ask your assistant: "Reply to the message Q3 budget review."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to reply to a message. No draft is made or changed. The assistant is told to take the handle from the list.
+- Mia asks her assistant to reply to everyone on a message. No draft is made or changed. The assistant is told to take the handle from the list.
+- Mia asks her assistant to change a draft. No draft is made or changed. The assistant is told to take the handle from the list.
+
+**A copy to the person who gets the reply makes no draft**
+
+Ask your assistant: "Reply to Anna and copy Anna."
+
+Tests: 2
+
+Cases:
+
+- Anna wrote to Mia and asked that the answer goes to Anna. No draft is made. The assistant is told that the reply already goes to that address.
+- Anna wrote to Mia and asked that the answer goes to the reply-to address. No draft is made. The assistant is told that the reply already goes to that address.
+
+**A copy to someone else is added to a reply**
+
+Ask your assistant: "Reply to Anna and copy Tom."
+
+Tests: 1
+
+Situation: Anna wrote to Mia.
+
+What happens:
+
+- The draft is addressed to Anna.
+- The draft is copied to Tom.
+
+#### A reply or a change in a shared mailbox is asked first
+
+**A reply or a change in a shared mailbox is made after Mia agrees**
+
+Ask your assistant: "In the shared mailbox support, forward the message from Anna to Tom."
+
+Tests: 2
+
+Cases:
+
+- Mia asks her assistant to forward a message in the shared mailbox "support". The assistant asks Mia to approve the draft. The question names the draft and the shared mailbox. The draft appears after Mia agrees.
+- Mia asks her assistant to reply to everyone on a message in the shared mailbox "support". The assistant asks Mia to approve the draft. The question names the draft and the shared mailbox. The draft appears after Mia agrees.
+- Mia asks her assistant to change a draft in the shared mailbox "support". The assistant asks Mia to approve the draft. The question names the draft and the shared mailbox. The draft appears after Mia agrees.
+
+**A reply or a change in a shared mailbox is not made without Mia's agreement**
+
+Ask your assistant: "In the shared mailbox support, forward the message from Anna to Tom."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to forward a message in the shared mailbox "support". The shared mailbox holds no new draft and no change. The assistant tells Mia that nothing changed.
+- Mia asks her assistant to forward a message in the shared mailbox "support". The shared mailbox holds no new draft and no change. The assistant tells Mia that nothing changed.
+- Mia asks her assistant to reply to everyone on a message in the shared mailbox "support". The shared mailbox holds no new draft and no change. The assistant tells Mia that nothing changed.
+- Mia asks her assistant to reply to everyone on a message in the shared mailbox "support". The shared mailbox holds no new draft and no change. The assistant tells Mia that nothing changed.
+- Mia asks her assistant to change a draft in the shared mailbox "support". The shared mailbox holds no new draft and no change. The assistant tells Mia that nothing changed.
+- Mia asks her assistant to change a draft in the shared mailbox "support". The shared mailbox holds no new draft and no change. The assistant tells Mia that nothing changed.
+
+**A program of the newer kind shows Mia the question of a draft**
+
+Ask your assistant: "In the shared mailbox support, write a draft to Anna."
+
+Tests: 2
+
+Situation: Mia works in a program that shows questions in its own way.
+
+What happens:
+
+- Mia's program receives the question.
+- No draft appears before she answers.
+- The assistant asks Mia to approve first.
+
+**A message with no subject and no sender is named by the question**
+
+Ask your assistant: "In the shared mailbox support, reply to the message with no subject."
+
+Tests: 1
+
+Situation: Mia has a message with no subject and no sender in the shared mailbox "support".
+
+What happens:
+
+- The question says that the message has no subject.
+- The question says that Microsoft chooses the address.
+- The assistant asks Mia to approve first.
+
+#### A reply whose text cannot be saved is reported
+
+**A reply whose text Microsoft cannot save is reported as not saved**
+
+Ask your assistant: "Reply to Anna that Friday works."
+
+Tests: 1
+
+Situation: Mia asks her assistant to reply to Anna with a text that Microsoft refuses.
+
+What happens:
+
+- The draft exists without the text.
+- The assistant tells Mia that the text is not saved.
+
+#### A person is found in the mail of Mia when the directory does not list her
+
+**A query with no word in it is refused**
+
+Ask your assistant: "Find the address of ??."
+
+Tests: 1
+
+Situation: Mia asks her assistant to find a person.
+
+What happens:
+
+- Nobody is looked up.
+- The assistant is told to give a name, an alias, or an address.
+
+**A person who is not in the directory is found in past mail**
+
+Ask your assistant: "Find the address of Anna."
+
+Tests: 1
+
+Situation: Anna is not in the directory and she wrote to Mia.
+
+What happens:
+
+- The assistant finds the address of Anna in the mail of Mia.
+- The newest correspondent comes first.
+
+**People of the directory are told apart by kind**
+
+Ask your assistant: "Find the address of Anna."
+
+Tests: 1
+
+Situation: The directory lists a team, a room, and a person that are all called "Anna".
+
+What happens:
+
+- The assistant tells the team, the room, and the person apart.
+- A person with no address is left out.
 
 #### Not supported yet in drafting and sending mail
 
@@ -1885,6 +2104,253 @@ What happens:
 - Mia's drafts hold a note to Tom that says the invoice is filed.
 - Nothing is sent.
 
+#### A value that does not fit changes nothing
+
+**A name in place of a handle changes nothing**
+
+Ask your assistant: "Rename my Projects folder to Work."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to change a message. Nothing of Mia changes. The assistant is told to take the handle from the list.
+- Mia asks her assistant to change a folder. Nothing of Mia changes. The assistant is told to take the handle from the list.
+- Mia asks her assistant to change the parent of a folder. Nothing of Mia changes. The assistant is told to take the handle from the list.
+- Mia asks her assistant to change an inbox rule. Nothing of Mia changes. The assistant is told to take the handle from the list.
+
+**A marking whose values do not fit together changes nothing**
+
+Ask your assistant: "Flag this message and give it a due date."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+- Mia asks her assistant to mark a message. No message changes. The assistant is told what to correct.
+
+**A start date with a zone flags the message**
+
+Ask your assistant: "Flag this message from the 30th of October."
+
+Tests: 1
+
+Situation: Mia asks her assistant to flag a message from the 30th of October.
+
+What happens:
+
+- The message is flagged.
+- The flag has a start date and no due date.
+
+#### A change in a mailbox that is not Mia's is asked first
+
+**A marking in a shared mailbox lists every change**
+
+Ask your assistant: "In the shared mailbox support, mark the message from Anna as read and flag it."
+
+Tests: 2
+
+Situation: Mia asks her assistant to mark a message in the shared mailbox "support".
+
+What happens:
+
+- The assistant asks Mia to approve the marking.
+- The question lists every change.
+- The message changes after Mia agrees.
+
+**A folder in a shared mailbox is made or renamed after Mia agrees**
+
+Ask your assistant: "In the shared mailbox support, make a folder Alpha."
+
+Tests: 3
+
+Situation: Mia asks her assistant to make the folder "Alpha" in the shared mailbox "support".
+
+What happens:
+
+- The assistant asks Mia to approve each change.
+- Each folder changes after Mia agrees.
+
+**A folder or a marking in a shared mailbox is not changed without Mia's agreement**
+
+Ask your assistant: "In the shared mailbox support, make a folder Alpha."
+
+Tests: 2
+
+Cases:
+
+- Mia asks her assistant to change a folder or mark mail in the shared mailbox "support". Nothing in the shared mailbox changes. The assistant tells Mia that nothing changed.
+- Mia asks her assistant to change a folder or mark mail in the shared mailbox "support". Nothing in the shared mailbox changes. The assistant tells Mia that nothing changed.
+
+**A program of the newer kind shows Mia the question itself**
+
+Ask your assistant: "In the shared mailbox support, make a folder Alpha."
+
+Tests: 1
+
+Situation: Mia works in a program that shows questions in its own way.
+
+What happens:
+
+- Mia's program receives the question.
+- Nothing changes before she answers.
+- The assistant asks Mia to approve first.
+
+#### A folder that Outlook makes stays as it is
+
+**A folder that Outlook makes is neither renamed nor deleted**
+
+Ask your assistant: "Rename my Inbox folder to Work."
+
+Tests: 2
+
+Cases:
+
+- Mia asks her assistant to change the folder "Inbox". The folder keeps its name and its place. The assistant tells Mia that Outlook makes this folder.
+- Mia asks her assistant to change the folder "Inbox". The folder keeps its name and its place. The assistant tells Mia that Outlook makes this folder.
+- Mia asks her assistant to change the folder "Deleted Items". The folder keeps its name and its place. The assistant tells Mia that Outlook makes this folder.
+
+**A folder inside another folder is renamed**
+
+Ask your assistant: "Rename my folder Alpha inside Projects to Beta."
+
+Tests: 1
+
+Situation: Mia has the folder "Alpha" inside her folder "Projects".
+
+What happens:
+
+- The folder is named "Beta".
+- It stays inside "Projects".
+
+**A folder that is in Deleted Items is not deleted again**
+
+Ask your assistant: "Delete my folder Old."
+
+Tests: 1
+
+Situation: Mia has the folder "Old" in "Deleted Items".
+
+What happens:
+
+- The folder stays where it is.
+- The assistant tells Mia to erase it in Outlook.
+
+#### A rule that does not fit is not made and not changed
+
+**A rule that cannot be made is not made**
+
+Ask your assistant: "Make a rule that moves mail from billing to my Finance folder."
+
+Tests: 2
+
+Cases:
+
+- Mia asks her assistant to make an inbox rule. No rule is made. The assistant is told what to correct.
+- Mia asks her assistant to make an inbox rule. No rule is made. The assistant is told what to correct.
+- Mia asks her assistant to make an inbox rule. No rule is made. The assistant is told what to correct.
+
+**A rule files large mail in a folder of Mia**
+
+Ask your assistant: "Make a rule that moves all mail above 500 kilobytes to my Finance folder."
+
+Tests: 1
+
+Situation: Mia has the folder "Finance".
+
+What happens:
+
+- The rule is made with the size limit.
+- The rule moves matching mail to "Finance".
+
+**A rule change that does not fit changes nothing**
+
+Ask your assistant: "Change my Receipts rule."
+
+Tests: 3
+
+Cases:
+
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+- Mia has the rule "Receipts". The rule stays as it is. The assistant is told what to correct.
+
+**A rule that Outlook locks is not changed and not erased**
+
+Ask your assistant: "Change my rule Company policy and then erase it."
+
+Tests: 1
+
+Situation: Mia has the rule "Company policy" and Outlook locks it.
+
+What happens:
+
+- The rule stays as it is.
+- The assistant tells Mia that nobody can change this rule here.
+
+**A rule that is off changes without a question**
+
+Ask your assistant: "Move my rule Forward to Anna to place 4."
+
+Tests: 1
+
+Situation: Mia has the rule "Forward to Anna" and the rule is off.
+
+What happens:
+
+- The rule is in place 4.
+- Mia is not asked.
+
+**A rule that forwards mail is changed only after Mia agrees**
+
+Ask your assistant: "Move my rule Forward to Anna to place 4."
+
+Tests: 1
+
+Situation: Mia has the rule "Forward to Anna" and the rule is on.
+
+What happens:
+
+- The assistant asks Mia to approve the change.
+- The question names the address "anna@example.com".
+- The rule is in place 4 after Mia agrees.
+
+**A rule that holds no action is still shown and changed**
+
+Ask your assistant: "Make my rule mark mail as read."
+
+Tests: 1
+
+Situation: Mia has a rule that holds no action.
+
+What happens:
+
+- The rule marks mail as read.
+- Mia can turn the rule off.
+
+**A rule that forwards mail is turned off and the address is named**
+
+Ask your assistant: "Turn off my rule Forward to Anna."
+
+Tests: 1
+
+Situation: Mia has the rule "Forward to Anna" and the rule is on.
+
+What happens:
+
+- The rule is off.
+- The assistant tells Mia that mail no longer goes to "anna@example.com".
+
 ### Mailbox preferences
 
 Mia sets how her mailbox behaves while she is away and which senders reach her attention first.
@@ -2251,6 +2717,95 @@ What happens:
 
 - The assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that.
 - It does not tell Mia that the reply is off.
+
+#### The reply that Mia sees is the reply that Outlook holds
+
+**A reply with no end that goes to contacts only is read as it is**
+
+Ask your assistant: "Is my automatic reply on?"
+
+Tests: 1
+
+Situation: Mia set an automatic reply in Outlook that has no end and goes to her contacts only.
+
+What happens:
+
+- The assistant says that the reply runs with no end.
+- The assistant says that only contacts outside the organization get it.
+
+**A mailbox that holds no reply setting is read as a reply with no state**
+
+Ask your assistant: "Is my automatic reply on?"
+
+Tests: 2
+
+Situation: Microsoft sends no automatic reply setting for Mia.
+
+What happens:
+
+- The assistant says that it has no state for the reply.
+- The assistant does not say that the reply is off.
+
+**The state after a change is the state that Microsoft stored**
+
+Ask your assistant: "Turn my automatic reply off."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to turn her automatic reply off. The assistant tells Mia the state that Microsoft stored.
+- Mia asks her assistant to turn her automatic reply off. The assistant tells Mia the state that Microsoft stored.
+- Mia asks her assistant to turn her automatic reply off. The assistant tells Mia the state that Microsoft stored.
+
+**The question names the contacts who get the reply**
+
+Ask your assistant: "Turn on an automatic reply from Monday to Saturday for my contacts outside the company."
+
+Tests: 1
+
+Situation: Mia asks her assistant to turn on an automatic reply for her contacts outside the organization.
+
+What happens:
+
+- The assistant asks Mia to approve the reply.
+- The question says that contacts outside the organization get the reply.
+
+**The time zone, the hours, the language, and the archive folder are read**
+
+Ask your assistant: "What are my working hours, language and archive folder?"
+
+Tests: 1
+
+Situation: Mia works from Monday to Tuesday in the zone "W. Europe Standard Time".
+
+What happens:
+
+- The assistant gives the zone, the hours, the language, and the archive folder.
+
+**A mailbox that holds no language is read as no language**
+
+Ask your assistant: "What are my working hours, language and archive folder?"
+
+Tests: 1
+
+Situation: Microsoft sends no preferences for Mia.
+
+What happens:
+
+- The assistant says that it has no language and no archive folder.
+
+**The categories of the mailbox are listed**
+
+Ask your assistant: "Which categories do I have?"
+
+Tests: 1
+
+Situation: Mia has the categories "Reading" and "Follow-up".
+
+What happens:
+
+- The assistant lists "Reading" and "Follow-up".
 
 ### Reading the calendar
 
@@ -2644,6 +3199,92 @@ What happens:
 - The assistant names "Team sync" as her own meeting.
 - It does not name "Launch review" as her own meeting.
 
+#### A link or a time zone that the assistant made up is refused
+
+**A link that the assistant made up is not used**
+
+Ask your assistant: "Open the Launch review."
+
+Tests: 1
+
+Situation: Mia's assistant knows the subject "Launch review" and has no link of that meeting.
+
+What happens:
+
+- The assistant reads nothing.
+- It takes the link from a list of Mia's meetings before it tries again.
+
+**A time zone that does not exist is not guessed**
+
+Ask your assistant: "What is on my calendar tomorrow, in Atlantis time?"
+
+Tests: 1
+
+Situation: Mia asks for the times of a meeting in the zone "Atlantis/Nowhere".
+
+What happens:
+
+- The assistant reads nothing.
+- It asks Mia for a real zone, or it leaves the zone out.
+
+#### The assistant shows when a meeting repeats
+
+**The repeat rule of a weekly meeting is shown**
+
+Ask your assistant: "How often does the Weekly design sync take place?"
+
+Tests: 2
+
+Situation: Mia's "Weekly design sync" repeats every Monday for 6 weeks.
+
+What happens:
+
+- The assistant says that it repeats every Monday.
+- It says that it ends after 6 times.
+
+**One date of a series is sent back to the series**
+
+Ask your assistant: "On which dates does the Team sync take place?"
+
+Tests: 1
+
+Situation: Mia's "Team sync" on Thursday is one date of a series.
+
+What happens:
+
+- The assistant lists nothing.
+- It uses the link of the series itself.
+
+#### Cancelled meetings are left out or named on request
+
+**The cancelled meetings are left out of a list**
+
+Ask your assistant: "Which meetings do I have this week that are not cancelled?"
+
+Tests: 1
+
+Situation: Mia has a cancelled meeting and two other meetings this week.
+
+What happens:
+
+- The assistant lists the two other meetings.
+- It does not list the cancelled meeting.
+
+#### A time that Microsoft gives in a form nobody can read is shown as written
+
+**A meeting time that cannot be converted is shown as written**
+
+Ask your assistant: "Open the Team sync."
+
+Tests: 1
+
+Situation: Microsoft gives the start of a meeting in a form that no time zone explains.
+
+What happens:
+
+- The assistant shows the start as Microsoft wrote it.
+- It does not give a converted time.
+
 ### Scheduling and answering meetings
 
 Mia sets up meetings and answers the invitations that she receives. Mia asks her assistant to find a time that suits everyone, to book it, to move it, and to answer an invitation. A meeting that invites other people goes out only after Mia approves it.
@@ -2709,7 +3350,7 @@ What happens:
 
 Ask your assistant: "Which invitations still wait for my answer?"
 
-Tests: 1
+Tests: 2
 
 Situation: Anna invited Mia to "Launch review" and Tom invited Mia to "Budget review". Mia already accepted "Team sync".
 
@@ -2870,7 +3511,7 @@ What happens:
 
 Ask your assistant: "Cancel my Design review with Anna tomorrow and tell her that I am sick."
 
-Tests: 1
+Tests: 2
 
 Situation: Mia organizes "Design review" with Anna tomorrow.
 
@@ -2900,7 +3541,7 @@ What happens:
 
 Ask your assistant: "Forward the Launch review to Priya and add the note: please join."
 
-Tests: 1
+Tests: 2
 
 Situation: Anna invited Mia to "Launch review".
 
@@ -3033,7 +3674,7 @@ What happens:
 
 Ask your assistant: "Book the Launch review on Monday at 14:00 with Anna, with a Teams meeting."
 
-Tests: 1
+Tests: 2
 
 Situation: Mia's calendar takes no Teams meeting.
 
@@ -3098,6 +3739,7 @@ Cases:
 - Mia asked her assistant to cancel "Design review" with Anna. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
 - Mia asked her assistant to move "Team sync" to Friday. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
 - Mia asked her assistant to forward "Launch review" to Priya. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
+- Mia asked her assistant to delete "Design review" with Anna. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
 
 **An approval question that gets no answer changes nothing**
 
@@ -3112,6 +3754,7 @@ Cases:
 - Mia asked her assistant to cancel "Design review" with Anna. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
 - Mia asked her assistant to move "Team sync" to Friday. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
 - Mia asked her assistant to forward "Launch review" to Priya. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
+- Mia asked her assistant to delete "Design review" with Anna. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
 
 **An approval for another action does not cover this action**
 
@@ -3126,6 +3769,7 @@ Cases:
 - Mia approved cancelling "Design review". Mia is asked to approve cancelling "Budget review" first. Nothing is done until she approves it.
 - Mia approved moving "Team sync" to Friday. Mia is asked to approve moving "Team sync" to Saturday first. Nothing is done until she approves it.
 - Mia approved forwarding "Launch review" to Priya. Mia is asked to approve forwarding "Launch review" to Sam first. Nothing is done until she approves it.
+- Mia approved deleting "Design review". Mia is asked to approve deleting "Budget review" first. Nothing is done until she approves it.
 
 #### Text inside an invitation is read as data and never followed
 
@@ -3329,6 +3973,198 @@ What happens:
 
 - The assistant tells Mia that Microsoft found no room list at that address.
 - It asks Mia for the right address or offers to list every room of the company.
+
+#### A booking that cannot be read is refused before anyone is invited
+
+**A link that is not a link of a meeting changes nothing**
+
+Ask your assistant: "Cancel the Launch review."
+
+Tests: 1
+
+Situation: Mia's assistant has the subject "Launch review" and no link of that meeting.
+
+What happens:
+
+- Nothing is done and nobody is told anything.
+- Nobody asks Mia for an approval.
+
+**A booking with a wrong time, person, or repeat rule is refused**
+
+Ask your assistant: "Book the Launch review with Anna on Monday at 14:00."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to book "Launch review" with a time that carries its own offset. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a time in words. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a date that does not exist. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with an end before the start. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with an all-day meeting that does not start at midnight. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a name where an address is needed. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with Anna twice in the list of people. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with Anna as a needed and as an optional person. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a room that is also in the list of people. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a weekly rule with no weekday. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a daily rule with a weekday. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a count rule with no count. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with a rule with no end and an end date. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+- Mia asks her assistant to book "Launch review" with an end date before the first date. No meeting is created and nobody is invited. The assistant says what to correct before it tries again.
+
+**Mia is told every detail of a booking before she approves it**
+
+Ask your assistant: "Book the Launch review every second day until the 10th, at Room Pilatus."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to book "Launch review" with one whole day. The question names one whole day. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with three whole days. The question names three whole days. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a repeat every second day until a date. The question names a repeat every second day until a date. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a repeat on three weekdays of each week. The question names a repeat on three weekdays of each week. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a repeat on a day of each month. The question names a repeat on a day of each month. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a repeat on a weekday of each month. The question names a repeat on a weekday of each month. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a repeat on a day of each year. The question names a repeat on a day of each year. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a repeat on a weekday of each year. The question names a repeat on a weekday of each year. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a reminder time with no change to the reminder. The question names a reminder time with no change to the reminder. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with no reminder and a reminder time. The question names no reminder and a reminder time. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with settings for who sees the list of people. The question names settings for who sees the list of people. Nothing is created until she approves it.
+- Mia asks her assistant to book "Launch review" with a body. The question names a body. Nothing is created until she approves it.
+
+**A booking with no person says who is told**
+
+Ask your assistant: "Book room Pilatus for the Launch review on Monday at 14:00."
+
+Tests: 2
+
+Situation: Mia asks her assistant to book "Launch review" with a room or a place and no person.
+
+What happens:
+
+- The question says that no person is invited.
+- It says who Microsoft tells instead.
+- The assistant asks Mia to approve first.
+
+#### A search for a free time that cannot be read is refused before a calendar is read
+
+**A search for free time with a wrong time or person is refused**
+
+Ask your assistant: "When are Anna and I free on Monday?"
+
+Tests: 3
+
+Cases:
+
+- Mia asks her assistant to look for a free time with a time in words. No calendar is read. The assistant says what to correct before it tries again.
+- Mia asks her assistant to look for a free time with an end before the start. No calendar is read. The assistant says what to correct before it tries again.
+- Mia asks her assistant to look for a free time with a name where an address is needed. No calendar is read. The assistant says what to correct before it tries again.
+- Mia asks her assistant to look for a free time with Anna twice in the list of people. No calendar is read. The assistant says what to correct before it tries again.
+- Mia asks her assistant to look for a free time with Anna as a needed and as an optional person. No calendar is read. The assistant says what to correct before it tries again.
+- Mia asks her assistant to look for a free time with a room that is not an address. No calendar is read. The assistant says what to correct before it tries again.
+
+**A room is asked for together with the free times**
+
+Ask your assistant: "When are Anna and I free on Monday, with room Pilatus?"
+
+Tests: 1
+
+Situation: Mia needs room Pilatus in every free time.
+
+What happens:
+
+- The assistant lists the free times that have room Pilatus.
+- It names the room of each time.
+
+#### A change that cannot be read or that the meeting refuses changes nothing
+
+**A change with a wrong argument changes nothing**
+
+Ask your assistant: "Change the Launch review."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to change "Launch review" with no change. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with a place of only spaces. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with a start time without an end time and a zone. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with half of the list of people. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with a category in the lists to add and to remove. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with a body and a new Teams meeting in one change. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with a time in words. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with an end before the start. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with a name where an address is needed. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with Anna twice in the list of people. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+- Mia asks her assistant to change "Launch review" with Anna as a needed and as an optional person. Nothing is changed and nobody is told anything. The assistant says what to correct before it tries again.
+
+**A change that the stored meeting refuses changes nothing**
+
+Ask your assistant: "Add a Teams meeting to the Launch review."
+
+Tests: 2
+
+Cases:
+
+- "Launch review" is already a Teams meeting. Nothing is changed and Mia is not asked. The assistant says why the meeting refuses it.
+- "Launch review" has a joining text. Nothing is changed and Mia is not asked. The assistant says why the meeting refuses it.
+- "Launch review" has a very long body. Nothing is changed and Mia is not asked. The assistant says why the meeting refuses it.
+- "Launch review" has the category Blue. Nothing is changed and Mia is not asked. The assistant says why the meeting refuses it.
+- "Launch review" has no category. Nothing is changed and Mia is not asked. The assistant says why the meeting refuses it.
+- Mia's calendar takes no Teams meeting. Nothing is changed and Mia is not asked. The assistant says why the meeting refuses it.
+
+**Mia is told a change before it is made**
+
+Ask your assistant: "Remove all categories and change the place of the Launch review to Room Pilatus."
+
+Tests: 2
+
+Cases:
+
+- Mia asks her assistant to change "Launch review" with the removal of the last category. The question names the removal of the last category. Nothing is changed until she approves it.
+- Mia asks her assistant to change "Launch review" with new categories. The question names new categories. Nothing is changed until she approves it.
+- Mia asks her assistant to change "Launch review" with a list of people that holds nobody. The question names a list of people that holds nobody. Nothing is changed until she approves it.
+- Mia asks her assistant to change "Launch review" with an optional person. The question names an optional person. Nothing is changed until she approves it.
+- Mia asks her assistant to change "Launch review" with a place and nobody invited. The question names a place and nobody invited. Nothing is changed until she approves it.
+
+**A new body that keeps the joining text is sent after the approval**
+
+Ask your assistant: "Add a line to the body of the Launch review."
+
+Tests: 1
+
+Situation: "Launch review" is a Teams meeting with a joining text in its body.
+
+What happens:
+
+- Mia is asked to approve the change.
+- After she approves, the body keeps the joining text and holds the new line.
+
+#### A forward or an answer that cannot be read is refused
+
+**A forward to a wrong address is refused**
+
+Ask your assistant: "Forward the Launch review to Priya Rao."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to forward "Launch review" to a name where an address is needed. Nothing is forwarded and Mia is not asked. The assistant says what to correct before it tries again.
+- Mia asks her assistant to forward "Launch review" to Priya twice in the list. Nothing is forwarded and Mia is not asked. The assistant says what to correct before it tries again.
+
+**A new time that cannot be sent with the answer is refused**
+
+Ask your assistant: "Decline the Launch review and propose Friday at 10:00."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to decline "Launch review" with a new time and no answer to carry it. No answer is sent and Mia is not asked. The assistant says what to correct before it tries again.
+- Mia asks her assistant to decline "Launch review" with a new time in words. No answer is sent and Mia is not asked. The assistant says what to correct before it tries again.
+- Mia asks her assistant to decline "Launch review" with a new time that ends before it starts. No answer is sent and Mia is not asked. The assistant says what to correct before it tries again.
 
 ### Sharing and delegating calendars
 
@@ -3553,6 +4389,7 @@ Cases:
 - Mia asked her assistant to give Anna read access to her calendar. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
 - Mia asked her assistant to stop sharing her calendar with Anna. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
 - Mia asked her assistant to book "Budget review" with Anna on Lena's calendar. The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
+- Mia asked her assistant to delete the empty calendar "Spare". The assistant tells Mia that nothing was done because she did not confirm it. Nobody is told anything. The assistant does not ask again until Mia asks again.
 
 **An approval question that gets no answer changes nothing**
 
@@ -3565,6 +4402,7 @@ Cases:
 - Mia asked her assistant to give Anna read access to her calendar. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
 - Mia asked her assistant to stop sharing her calendar with Anna. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
 - Mia asked her assistant to book "Budget review" with Anna on Lena's calendar. The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
+- Mia asked her assistant to delete the empty calendar "Spare". The assistant tells Mia that it received no answer and that she can ask again. Nothing is done and nobody is told anything.
 
 **An approval for another action does not cover this action**
 
@@ -3577,6 +4415,7 @@ Cases:
 - Mia approved giving Anna read access to her calendar. Mia is asked to approve giving Anna write access to her calendar first. Nothing is done until she approves it.
 - Mia approved stopping the share with Anna. Mia is asked to approve stopping the share with Tom first. Nothing is done until she approves it.
 - Mia approved booking "Budget review" on Lena's calendar at 14:00. Mia is asked to approve booking "Budget review" on Lena's calendar at 15:00 first. Nothing is done until she approves it.
+- Mia approved deleting the empty calendar "Spare". Mia is asked to approve deleting the empty calendar "Spare two" first. Nothing is done until she approves it.
 
 #### Text inside a calendar entry is read as data and never followed
 
@@ -3620,6 +4459,65 @@ Cases:
 - The calendar belongs to Lena and Lena shared it with Mia. The assistant tells Mia that Mia can delete only a calendar that she owns. The calendar stays.
 - Microsoft marks the calendar as not removable. The assistant tells Mia that the calendar cannot be removed from the mailbox. The calendar stays.
 - The calendar holds a meeting. The assistant tells Mia to move or cancel the meetings of the calendar first. The calendar stays.
+
+#### A link that is not a link of a calendar or of a share changes nothing
+
+**A link that is not a link of a calendar changes nothing**
+
+Ask your assistant: "Delete the calendar Spare calendar."
+
+Tests: 1
+
+Situation: Mia's assistant knows the name "Spare calendar" and has no link of that calendar.
+
+What happens:
+
+- Nothing is read, shared, stopped, or deleted.
+- Nobody asks Mia for an approval.
+
+**A name in place of an address shares nothing**
+
+Ask your assistant: "Give Anna Meier read access to my calendar."
+
+Tests: 1
+
+Situation: Mia asks her assistant to give "Anna Meier" read access to her calendar.
+
+What happens:
+
+- Nothing is shared.
+- The assistant asks Mia for the address of Anna.
+
+#### A calendar that gets a meeting while Mia decides is not deleted
+
+**A meeting that arrives while Mia decides stops the delete**
+
+Ask your assistant: "Delete the calendar Spare."
+
+Tests: 1
+
+Situation: Mia's calendar "Spare" is empty when Mia is asked to approve the delete. A meeting is put on "Spare" while Mia decides.
+
+What happens:
+
+- The assistant tells Mia that nothing was deleted because the calendar holds a meeting.
+- It asks Mia to move or cancel the meeting first.
+- The assistant asks Mia to approve first.
+
+#### A Teams meeting is booked on the calendar of a manager only when that calendar takes one
+
+**A Teams meeting is booked on the calendar of a manager**
+
+Ask your assistant: "Book the Budget review with Anna on Lena's calendar as a Teams meeting."
+
+Tests: 1
+
+Situation: Lena shared her calendar with Mia and that calendar takes Teams meetings.
+
+What happens:
+
+- Mia is asked to approve the booking first.
+- After she approves, "Budget review" on Lena's calendar is a Teams meeting.
 
 ### Managing contacts
 
@@ -3867,6 +4765,75 @@ What happens:
 
 - The assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that.
 - It does not tell Mia that Anna Meier is not in her contacts.
+
+#### A change keeps the addresses that a contact holds
+
+**An address is added next to the addresses of a contact**
+
+Ask your assistant: "Add tom.berger@home.example to the contact Tom Berger."
+
+Tests: 1
+
+Situation: Mia has the contact "Tom Berger" with the address "tom@acme.example".
+
+What happens:
+
+- The contact holds both addresses.
+- An address that the contact holds already is not added a second time.
+
+**An address is removed and the others stay**
+
+Ask your assistant: "Remove tom@acme.example from the contact Tom Berger."
+
+Tests: 1
+
+Situation: Mia has the contact "Tom Berger" with two addresses.
+
+What happens:
+
+- The contact holds the other address.
+
+#### A value that does not fit changes nothing
+
+**A value that does not fit changes no contact**
+
+Ask your assistant: "Change the contact Tom Berger."
+
+Tests: 1
+
+Cases:
+
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+- Mia asks her assistant to work with a contact. Nothing of Mia changes. The assistant is told what to correct.
+
+**A contact that holds no postal address is read as having none**
+
+Ask your assistant: "What is the address of Tom Berger?"
+
+Tests: 1
+
+Situation: Mia has the contact "Tom Berger" with no postal address.
+
+What happens:
+
+- The assistant gives no postal address.
+
+**The contacts that hold one address are listed**
+
+Ask your assistant: "Which contact has the address tom@acme.example?"
+
+Tests: 1
+
+Situation: Mia has the contact "Tom Berger" with the address "tom@acme.example".
+
+What happens:
+
+- The assistant lists "Tom Berger".
 
 #### Not supported yet in managing contacts
 
@@ -4401,6 +5368,260 @@ What happens:
 - It tells Mia that the message asks for something.
 - It sends the chat to no one.
 
+#### The assistant finds a message by what it says
+
+**A search shows the full text and the reactions of each message that it finds**
+
+Ask your assistant: "Find the messages about the offer and show me what they say."
+
+Tests: 1
+
+Situation: Tom wrote "I send the offer to the customer" in a chat, and Anna reacted to the message.
+
+What happens:
+
+- The assistant shows the full text of the message of Tom.
+- It shows that Anna reacted to the message.
+
+**A search is narrowed by one more condition**
+
+Ask your assistant: "Find what Tom wrote about the offer before 9:00."
+
+Tests: 1
+
+Cases:
+
+- Mia, Anna, and Tom wrote about "offer" in Teams. The assistant gives only the messages that fit the condition.
+- Mia, Anna, and Tom wrote about "offer" in Teams. The assistant gives only the messages that fit the condition.
+- Mia, Anna, and Tom wrote about "offer" in Teams. The assistant gives only the messages that fit the condition.
+- Mia, Anna, and Tom wrote about "offer" in Teams. The assistant gives only the messages that fit the condition.
+
+**A message that Microsoft sends without a sender or without an address is shown as far as it can be**
+
+Ask your assistant: "Find the messages about the offer and show me what they say."
+
+Tests: 3
+
+Cases:
+
+- Microsoft finds a message for "offer" and names no sender or no id of the message. The assistant does not list the message.
+- Microsoft finds a message for "offer" and names no chat and no channel for it. The assistant lists the message without its text and without a way to open it.
+
+**A search that Microsoft answers with no list of results finds nothing**
+
+Ask your assistant: "Find the messages about the offer."
+
+Tests: 1
+
+Situation: Microsoft answers the search for "offer" with no list of results.
+
+What happens:
+
+- The assistant tells Mia that it found no message.
+
+#### The assistant reads only what a reference names
+
+**A name that is not a reference is refused**
+
+Ask your assistant: "Read the message Launch."
+
+Tests: 1
+
+Cases:
+
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+- Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams. The assistant tells Mia that it needs the reference that another Teams tool gives. Nothing is read.
+
+**A window of a transcript that cannot match a turn is refused**
+
+Ask your assistant: "Read the transcript of Design review from minute 2 to minute 1."
+
+Tests: 1
+
+Cases:
+
+- Mia has the transcript of "Design review". The assistant tells Mia that the window ends before it starts. Nothing is read.
+- Mia has the transcript of "Design review". The assistant tells Mia that a blank name is no filter. Nothing is read.
+
+#### The assistant says what it knows about the recordings of a meeting
+
+**A meeting that Microsoft does not show has no recordings listed**
+
+Ask your assistant: "Which recordings does Design review have?"
+
+Tests: 1
+
+Situation: Microsoft shows no online meeting "Design review" to Mia.
+
+What happens:
+
+- The assistant tells Mia that Microsoft shows no such meeting to her.
+- It does not say that the meeting has no recording.
+
+**A meeting without a recording is told apart from a meeting that may still get one**
+
+Ask your assistant: "Which recordings does Design review have?"
+
+Tests: 1
+
+Cases:
+
+- The online meeting "Design review" ended ten minutes ago and has no recording. The assistant tells Mia that the recording may not be ready yet.
+- The online meeting "Design review" ended two days ago and has no recording. The assistant tells Mia that nobody recorded the meeting.
+
+**A recording whose organizer and end Microsoft does not name is described with what is known**
+
+Ask your assistant: "Which recordings does Design review have?"
+
+Tests: 1
+
+Situation: Microsoft names no organizer and no end for the recording of "Design review".
+
+What happens:
+
+- The assistant describes the recording without a length.
+- It tells Mia that it does not know who may open the recording.
+
+#### The assistant reads a transcript in the form that the company allows
+
+**A transcript is read without speaker names when the company does not allow them**
+
+Ask your assistant: "What did Design review say?"
+
+Tests: 1
+
+Situation: The company does not allow speaker names in the transcript of "Design review".
+
+What happens:
+
+- The assistant gives the words of the meeting.
+- It tells Mia that it does not know who said them.
+
+**A turn that holds no words is left out of the transcript**
+
+Ask your assistant: "What did Design review say?"
+
+Tests: 1
+
+Situation: The transcript of "Design review" holds a turn of Anna with no words and a turn of Tom.
+
+What happens:
+
+- The assistant gives the words of Tom.
+- It gives no turn of Anna.
+
+**A transcript that Microsoft sends twice is listed once**
+
+Ask your assistant: "Which transcripts does Design review have?"
+
+Tests: 1
+
+Situation: Microsoft sends the same transcript of "Design review" twice.
+
+What happens:
+
+- The assistant lists the transcript once.
+
+#### The assistant keeps the kinds of a list apart
+
+**A channel of another kind that Microsoft adds to a list is not reported as the kind asked for**
+
+Ask your assistant: "Which standard channels does Sales have?"
+
+Tests: 1
+
+Situation: Microsoft answers the list of standard channels of the team "Sales" with a private channel.
+
+What happens:
+
+- The assistant tells Mia that Microsoft did not apply the kind that she asked for.
+- It lists no channel.
+
+**A system event and the post of a bot in a chat are described as such**
+
+Ask your assistant: "What is new in Design review?"
+
+Tests: 1
+
+Situation: The chat "Design review" holds a post of a bot and four system events.
+
+What happens:
+
+- The assistant gives the post of the bot with the name of the bot.
+- It describes each system event as an event and not as a message.
+
+**A meeting chat without a join address of the meeting is listed without a way to open the meeting**
+
+Ask your assistant: "Which meeting chats do I have?"
+
+Tests: 1
+
+Situation: Microsoft sends the chat "Design review" with no join address of the meeting.
+
+What happens:
+
+- The assistant lists the chat "Design review".
+- It cannot read the transcripts of that meeting.
+
+#### The assistant reads further back and deeper
+
+**The messages of a chat before a day or a moment are read**
+
+Ask your assistant: "Show me the messages of Launch up to the end of 4 November."
+
+Tests: 1
+
+Cases:
+
+- The chat "Launch" holds messages of three days. The assistant gives only the messages sent up to the end of 4 November.
+- The chat "Launch" holds messages of three days. The assistant gives only the messages sent up to 9:30 on 4 November.
+
+**One reply of a thread is read in full**
+
+Ask your assistant: "Read the reply of Tom to the post Hosting plan."
+
+Tests: 1
+
+Situation: The post "Hosting plan" in the channel "Posts" has a reply of Tom.
+
+What happens:
+
+- The assistant gives the full text of the reply.
+- It says which post the reply belongs to.
+
+**The reactions of a message are shown with the person and the time of each one**
+
+Ask your assistant: "Show me the message that I wrote in the chat Launch and who reacted."
+
+Tests: 1
+
+Situation: Mia wrote a message in a chat and gave it a thumbs-up.
+
+What happens:
+
+- The assistant shows the thumbs-up.
+- It shows who gave it and when.
+
+#### The assistant reports a refusal of a transcript as it is
+
+**A transcript that the company switched off is not read a second time in another form**
+
+Ask your assistant: "What did Design review say?"
+
+Tests: 1
+
+Situation: The company does not allow transcripts, and Mia has the transcript of "Design review".
+
+What happens:
+
+- The assistant tells Mia that an administrator has to allow transcripts.
+- It makes no second try.
+
 ### Posting in Teams
 
 Mia lets her assistant write in Teams for her. Everyone in a chat or a channel sees what the assistant posts, so the assistant posts only after Mia approves it.
@@ -4812,6 +6033,157 @@ What happens:
 - Mia is asked to approve the reaction first.
 - The assistant tells Mia that the message asks for a post in "Sales".
 - It posts nothing in the channel "Sales".
+
+#### A chat program of the newer kind gets the question inside the answer of the call
+
+**An approved post or change happens once when the question comes inside the answer of the call**
+
+Ask your assistant: "Tell the chat with Anna and Tom that the build is green."
+
+Tests: 1
+
+Cases:
+
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+
+**A post or change does not happen unless the answer of Mia is the word for yes**
+
+Ask your assistant: "Delete my message Launch on 14 Jun."
+
+Tests: 1
+
+Cases:
+
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nothing was sent.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nothing was posted.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nothing was sent.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nothing was posted.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no message was changed.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no message was deleted.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no reaction was changed.
+
+#### The assistant asks Teams only when the call makes sense
+
+**A name that is not a reference to a message is refused**
+
+Ask your assistant: "Correct my message Launch on 14 Jun to Launch on 14 June."
+
+Tests: 1
+
+Cases:
+
+- Mia wrote "Launch on 14 Jun" in a chat. The assistant tells Mia that it needs the reference that another Teams tool gives. Mia is asked nothing. The chat shows the message as it was.
+- Mia wrote "Launch on 14 Jun" in a chat. The assistant tells Mia that it needs the reference that another Teams tool gives. Mia is asked nothing. The chat shows the message as it was.
+- Mia wrote "Launch on 14 Jun" in a chat. The assistant tells Mia that it needs the reference that another Teams tool gives. Mia is asked nothing. The chat shows the message as it was.
+
+**A message that another person sent is not changed**
+
+Ask your assistant: "Correct the message of Anna to The release notes are final."
+
+Tests: 1
+
+Cases:
+
+- Anna wrote "The release notes are ready" in a chat with Mia. The assistant tells Mia that she can change only a message that she sent. Mia is asked nothing. The message stays as it was.
+- Anna wrote "The release notes are ready" in a chat with Mia. The assistant tells Mia that she can change only a message that she sent. Mia is asked nothing. The message stays as it was.
+
+**A correction that mentions a person who is not in the chat is refused**
+
+Ask your assistant: "Correct my message Launch on 14 Jun to Launch on 14 June and mention Priya."
+
+Tests: 1
+
+Situation: Mia wrote "Launch on 14 Jun" in a chat with Anna and Tom.
+
+What happens:
+
+- The assistant tells Mia that Priya is not a member of the chat.
+- Mia is asked nothing.
+- The message stays as it was.
+
+**A mention that Teams cannot tie to a named member is refused**
+
+Ask your assistant: "Tell the chat with Anna and Tom that the build is green, and mention Priya."
+
+Tests: 3
+
+Cases:
+
+- Mia has a chat with Anna and Tom, and Microsoft shows Priya as a member with no user. The assistant tells Mia that Priya is not a named member of the chat. Mia is asked nothing. Nothing is sent.
+- Mia has a chat with Anna and Tom, and the chat has 1000 members, and Priya is not among the first. The assistant tells Mia that the assistant read only part of the members, and Priya is not in that part. Mia is asked nothing. Nothing is sent.
+
+#### A change reaches the place where the message lives
+
+**A correction replaces the text of a message in a chat or of a reply in a thread**
+
+Ask your assistant: "Correct my message Launch on 14 Jun to Launch on 14 June."
+
+Tests: 2
+
+Cases:
+
+- Mia wrote "Launch on 14 Jun" in a chat with Anna and Tom. Mia is asked to approve the change first. After she approves, the message reads "Launch on 14 June".
+- Mia wrote "Launch on 14 Jun" as a reply in a thread of a channel. Mia is asked to approve the change first. After she approves, the message reads "Launch on 14 June".
+
+**A reaction is given to a message and taken back**
+
+Ask your assistant: "Give my message a thumbs-up, then take the thumbs-up back."
+
+Tests: 3
+
+Cases:
+
+- Mia wrote a message in a chat with Anna and Tom. Mia is asked to approve each change first. After she approves, the message shows no thumbs-up of Mia.
+- Mia wrote a message as a post in a channel. Mia is asked to approve each change first. After she approves, the message shows no thumbs-up of Mia.
+- Mia wrote a message as a reply in a thread of a channel. Mia is asked to approve each change first. After she approves, the message shows no thumbs-up of Mia.
+
+**A file that is in SharePoint is attached to a reply in a thread**
+
+Ask your assistant: "Reply to the post Release notes with The plan is attached and attach Q3 Plan.pptx."
+
+Tests: 1
+
+Situation: The post "Release notes" is in the channel "Sales", and "Q3 Plan.pptx" is in SharePoint.
+
+What happens:
+
+- Mia is asked to approve the reply first.
+- After she approves, the reply is in the thread with the file attached.
+
+**A person is mentioned in a post in a channel**
+
+Ask your assistant: "Post Please review the offer in the channel Sales and mention Tom."
+
+Tests: 1
+
+Situation: Tom is a member of the team "Sales".
+
+What happens:
+
+- Mia is asked to approve the post first.
+- The question names Tom as the person that the post mentions.
+
+#### Mia is told what happened when Microsoft cannot post the message
+
+**A message that Microsoft rejects without a reason is reported without one**
+
+Ask your assistant: "Tell the chat with Anna and Tom that the build is green."
+
+Tests: 1
+
+Situation: Mia has a chat with Anna and Tom, and she approves the message that her assistant proposes. Microsoft rejects the message and states no reason.
+
+What happens:
+
+- The assistant tells Mia that Microsoft rejected the message.
+- It does not invent a reason.
+- The assistant asks Mia to approve first.
 
 ### Running Teams chats and online meetings
 
@@ -5329,6 +6701,160 @@ What happens:
 - The assistant tells Mia that the message asks for a new member.
 - It adds nobody to "Launch".
 
+#### A chat program of the newer kind gets the question inside the answer of the call
+
+**An approved change happens once when the question comes inside the answer of the call**
+
+Ask your assistant: "Create an online meeting for tomorrow at 14:00 with Anna."
+
+Tests: 1
+
+Cases:
+
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+- Mia's chat program takes the question inside the answer of the call. Mia is asked to approve the change first. After she approves, the change happens once.
+
+**A change does not happen unless the answer of Mia is the word for yes**
+
+Ask your assistant: "Add Priya to the Launch chat."
+
+Tests: 1
+
+Cases:
+
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no chat was created.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nobody was added.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nobody was removed.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that nothing was renamed.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no meeting was created.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no meeting was changed.
+- Mia's chat program takes the question inside the answer of the call. Mia declines, or her program sends the word for no, or sends a word that is not a choice. Nothing changes in Teams. The assistant tells Mia that no meeting was deleted.
+
+#### The assistant asks Teams only when the call makes sense
+
+**A name that is not a reference to a meeting is refused**
+
+Ask your assistant: "Move the online meeting Design review to 15:00 for 30 minutes."
+
+Tests: 1
+
+Cases:
+
+- Mia organizes the online meeting "Design review". The assistant tells Mia that it needs the reference that her chats give. Mia is asked nothing. The meeting stays as it was.
+- Mia organizes the online meeting "Design review". The assistant tells Mia that it needs the reference that her chats give. Mia is asked nothing. The meeting stays as it was.
+- Mia organizes the online meeting "Design review". The assistant tells Mia that it needs the reference that her chats give. Mia is asked nothing. The meeting stays as it was.
+
+**A change that Teams cannot take is refused**
+
+Ask your assistant: "Change the online meeting Design review."
+
+Tests: 1
+
+Cases:
+
+- Mia organizes the online meeting "Design review". The assistant tells Mia that the call holds no change. Mia is asked nothing. The meeting stays as it was.
+- Mia organizes the online meeting "Design review". The assistant tells Mia that a new time needs a start and an end. Mia is asked nothing. The meeting stays as it was.
+- Mia organizes the online meeting "Design review". The assistant tells Mia that a new time needs a start and an end. Mia is asked nothing. The meeting stays as it was.
+- Mia organizes the online meeting "Design review". The assistant tells Mia that the start names no time zone. Mia is asked nothing. The meeting stays as it was.
+
+**A time that Teams cannot read is refused for a new meeting**
+
+Ask your assistant: "Create an online meeting for tomorrow at 14:00 with Anna."
+
+Tests: 1
+
+Cases:
+
+- Mia has a chat with Anna. The assistant tells Mia that the start is not a date and a time. It asks Mia for the correct time. No meeting is created.
+- Mia has a chat with Anna. The assistant tells Mia that the end names no time zone. It asks Mia for the correct time. No meeting is created.
+
+**A meeting that Microsoft does not show is not deleted and not read**
+
+Ask your assistant: "Delete the online meeting Design review."
+
+Tests: 1
+
+Cases:
+
+- Microsoft shows no online meeting "Design review" to Mia. The assistant tells Mia that Microsoft shows no such meeting to her. Mia is asked nothing.
+- Microsoft shows no online meeting "Design review" to Mia. The assistant tells Mia that Microsoft shows no such meeting to her. Mia is asked nothing.
+
+**A one-to-one chat with two other people is refused**
+
+Ask your assistant: "Start a one-to-one chat with Anna and Tom."
+
+Tests: 1
+
+Situation: Mia knows Anna and Tom from a group chat.
+
+What happens:
+
+- The assistant tells Mia that a one-to-one chat has exactly one other person.
+- It offers a group chat.
+- No chat is created.
+
+#### The question names what Microsoft shows
+
+**A member without a name is shown as such in the question**
+
+Ask your assistant: "Remove the member with no name from the Launch chat."
+
+Tests: 1
+
+Situation: The chat "Launch" has a member whom Microsoft shows with no name.
+
+What happens:
+
+- Mia is asked to approve the change first.
+- The question names the member as a member with no name.
+
+**A change that Microsoft answers without the list of attendees gives no list**
+
+Ask your assistant: "Rename the online meeting Design review to Design review 2."
+
+Tests: 1
+
+Situation: Mia organizes the online meeting "Design review", and she approves the new title. Microsoft answers the change with no list of attendees.
+
+What happens:
+
+- The assistant tells Mia that the title changed.
+- It does not say who the attendees are.
+- The assistant asks Mia to approve first.
+
+#### Mia sees the members of a chat without a title in the question
+
+**A chat without a title is named by its members in the question**
+
+Ask your assistant: "Add Priya to the chat with Anna and Tom."
+
+Tests: 1
+
+Situation: Mia has a group chat with no title, and Anna and Tom are its members.
+
+What happens:
+
+- Mia is asked to approve the change first.
+- The question names the chat by Anna and Tom.
+
+**A one-to-one chat is created after Mia approves it**
+
+Ask your assistant: "Start a one-to-one chat with Tom."
+
+Tests: 1
+
+Situation: Mia has no chat with Tom.
+
+What happens:
+
+- Mia is asked to approve the chat first.
+- After she approves, Mia has a one-to-one chat with Tom that has no title.
+
 #### Not supported yet in running teams chats and online meetings
 
 - The assistant cannot start a chat with a person it has never chatted with.
@@ -5818,6 +7344,161 @@ What happens:
 - It finds "Brightway Pricing.xlsx".
 - It answers from that workbook.
 
+#### The assistant stops a request that cannot succeed before it asks Microsoft
+
+**A handle of the wrong kind is refused before Microsoft is asked**
+
+Ask your assistant: "Read the folder Tenders."
+
+Tests: 1
+
+Cases:
+
+- The assistant holds the handle of a folder for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Microsoft is not asked.
+- The assistant holds the handle of a file for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Microsoft is not asked.
+
+**A time window that runs backwards is refused**
+
+Ask your assistant: "Find the Brightway files that changed between 30 October and 26 October."
+
+Tests: 1
+
+Situation: Mia wants the files that changed between 30 October and 26 October.
+
+What happens:
+
+- The assistant tells Mia that no window runs backwards.
+- It searches again with the earlier day first.
+
+**A search with no word in it is refused**
+
+Ask your assistant: "Search for files."
+
+Tests: 1
+
+Situation: Mia gives only spaces as the words to search for.
+
+What happens:
+
+- The assistant tells Mia that there is nothing to search for.
+- Microsoft is not asked.
+
+**An address that is not a web address is refused**
+
+Ask your assistant: "Open Plan.docx."
+
+Tests: 1
+
+Cases:
+
+- Mia gives the name "Plan.docx" as the address of a file. The assistant tells Mia that it needs the full secure web address, as the browser shows it. Microsoft is not asked.
+- Mia gives an address that is not a secure address as the address of a file. The assistant tells Mia that it needs the full secure web address, as the browser shows it. Microsoft is not asked.
+- Mia gives an address that has a broken host as the address of a file. The assistant tells Mia that it needs the full secure web address, as the browser shows it. Microsoft is not asked.
+
+#### A file is read in the form that Mia needs
+
+**A file that Microsoft converts comes back as a PDF with a PDF name**
+
+Ask your assistant: "What is the launch date in the Brightway launch plan?"
+
+Tests: 1
+
+Cases:
+
+- Mia has a file with the name "Plan.docx". The assistant gets a PDF with the name "Plan.pdf".
+- Mia has a file with the name "Plan". The assistant gets a PDF with the name "Plan.pdf".
+- Mia has a file with the name "Plan.v2.docx". The assistant gets a PDF with the name "Plan.v2.pdf".
+- Mia has a file with the name no name at all. The assistant gets a PDF with the name "resource.pdf".
+
+**A file with no usable type is read as plain bytes**
+
+Ask your assistant: "Read the file Notes.txt."
+
+Tests: 1
+
+Cases:
+
+- Mia has a file that Microsoft gives no type for. The assistant gets the bytes of the file as a file of the type "application/octet-stream".
+- Mia has a file that is a text file with bytes that are not valid text. The assistant gets the bytes of the file as a file of the type "application/octet-stream".
+
+**A file that is larger than Microsoft said is refused while it comes in**
+
+Ask your assistant: "Summarize the Brightway annual report PDF."
+
+Tests: 1
+
+Situation: Microsoft says that "Brightway Annual Report.pdf" holds 4 bytes. The file is larger than 10 MB when it arrives.
+
+What happens:
+
+- The assistant tells Mia that the file is more than 10 MB.
+- It gives Mia the web address that opens the file in a browser.
+
+#### A folder is listed in the order that Mia asks for
+
+**A folder is listed in the order of the names**
+
+Ask your assistant: "List the folder Ordered by name."
+
+Tests: 1
+
+Situation: The folder "Ordered" holds three files that Mia names "Order A", "Order B", and "Order C".
+
+What happens:
+
+- The assistant lists "Order A", "Order B", and "Order C" in this order.
+
+#### The assistant names the sites where the matches are
+
+**A search on a site names the site**
+
+Ask your assistant: "Find Team Charter."
+
+Tests: 1
+
+Situation: The Sales site holds the file "Team Charter.docx".
+
+What happens:
+
+- The assistant finds "Team Charter.docx".
+- It names the Sales site as the place of the match.
+
+**A search answer that holds no site list shows no site**
+
+Ask your assistant: "Find the Brightway files."
+
+Tests: 1
+
+Cases:
+
+- Microsoft answers the search with no group of results. The assistant shows no files and no site. It does not say that the file does not exist elsewhere.
+- Microsoft answers the search with a group of another kind only. The assistant shows no files and no site. It does not say that the file does not exist elsewhere.
+
+**A time window with exact times is searched to the moment**
+
+Ask your assistant: "Find the Brightway files that changed from 08:00 on 26 October to 17:45:30 on 30 October."
+
+Tests: 1
+
+Situation: Mia wants the files that changed from 08:00 on 26 October to 17:45:30 on 30 October.
+
+What happens:
+
+- The assistant gets the files of exactly that window.
+
+#### A drive or a site without an address is left out
+
+**A drive or a site that Microsoft gives without an address is left out**
+
+Ask your assistant: "Which drives and sites do I have?"
+
+Tests: 1
+
+Cases:
+
+- Microsoft lists two drives, and one of them has no id. The assistant lists only the drives that has a id.
+- Microsoft lists two sites, and one of them has no address. The assistant lists only the sites that has a address.
+
 ### Organizing and sharing files in OneDrive and SharePoint
 
 Mia files documents and shares them with colleagues. Mia asks her assistant to create, move, copy, and delete files, and to give other people access. Each change asks for Mia's approval first. A delete moves an item to the recycle bin and erases nothing for good.
@@ -6305,6 +7986,188 @@ Cases:
 - Microsoft fails with an internal error when the assistant creates the folder "2026 Signed" in "Contracts". The assistant tells Mia that it does not know if the folder was created. It looks in "Contracts" for the folder before it tries again. It does not create the folder a second time at once.
 - Microsoft does not answer in time when the assistant creates the folder "2026 Signed" in "Contracts". The assistant tells Mia that it does not know if the folder was created. It looks in "Contracts" for the folder before it tries again. It does not create the folder a second time at once.
 
+#### The assistant stops a request that cannot succeed before it asks Mia
+
+**A handle of the wrong kind is refused before Microsoft is asked**
+
+Ask your assistant: "Move Q3 Plan.pptx into the folder Archive."
+
+Tests: 1
+
+Cases:
+
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+- The assistant holds a web address or a handle of the wrong kind for the item that Mia means. The assistant gets a message that names the kind of handle that it needs. Mia is not asked and Microsoft is not asked. Nothing changes.
+
+**A name of blank spaces is refused**
+
+Ask your assistant: "Rename Q3 Plan.pptx to a name of spaces."
+
+Tests: 1
+
+Cases:
+
+- Mia has the file "Q3 Plan.pptx" and the folder "Archive". The assistant tells Mia that the name is empty. Nothing is created, renamed, or copied.
+- Mia has the file "Q3 Plan.pptx" and the folder "Archive". The assistant tells Mia that the name is empty. Nothing is created, renamed, or copied.
+- Mia has the file "Q3 Plan.pptx" and the folder "Archive". The assistant tells Mia that the name is empty. Nothing is created, renamed, or copied.
+- Mia has the file "Q3 Plan.pptx" and the folder "Archive". The assistant tells Mia that the name is empty. Nothing is created, renamed, or copied.
+
+**A file in the place of a folder is refused**
+
+Ask your assistant: "Create the folder 2026 in Plan v1.docx."
+
+Tests: 1
+
+Cases:
+
+- Mia has the file "Plan v1.docx" and the folder "Archive". The assistant names "Plan v1.docx" as the folder to use. The assistant tells Mia that the item is not a folder. Mia is not asked and nothing changes.
+- Mia has the file "Plan v1.docx" and the folder "Archive". The assistant names "Plan v1.docx" as the folder to use. The assistant tells Mia that the item is not a folder. Mia is not asked and nothing changes.
+- Mia has the file "Plan v1.docx" and the folder "Archive". The assistant names "Plan v1.docx" as the folder to use. The assistant tells Mia that the item is not a folder. Mia is not asked and nothing changes.
+- Mia has the file "Plan v1.docx" and the folder "Archive". The assistant names "Plan v1.docx" as the folder to use. The assistant tells Mia that the item is not a folder. Mia is not asked and nothing changes.
+
+**A folder is not moved into itself**
+
+Ask your assistant: "Move the folder Archive into the folder Archive."
+
+Tests: 1
+
+Situation: Mia has the folder "Archive".
+
+What happens:
+
+- The assistant tells Mia that an item cannot move into itself.
+- Nothing changes.
+
+**A person who is named twice is not invited**
+
+Ask your assistant: "Give Anna edit access to Q3 Plan.pptx."
+
+Tests: 1
+
+Situation: Mia has the file "Q3 Plan.pptx".
+
+What happens:
+
+- The assistant tells Mia that the address is named twice.
+- Nothing is shared and nobody is invited.
+
+**A person for whom Microsoft reports an error is named in the answer**
+
+Ask your assistant: "Give Anna and Ben edit access to Q3 Plan.pptx."
+
+Tests: 1
+
+Cases:
+
+- Mia has the file "Q3 Plan.pptx". Microsoft gives Ben access, and it reports an error for Anna with the reason "no such user". The assistant tells Mia that Ben has access. It tells Mia that Anna has none and gives the reason.
+- Mia has the file "Q3 Plan.pptx". Microsoft gives Ben access, and it reports an error for Anna and gives no reason. The assistant tells Mia that Ben has access. It tells Mia that Anna has none and that Microsoft gave none.
+
+**A sharing link that Microsoft gives without an address is not reported as made**
+
+Ask your assistant: "Give me a view-only link to Q3 Plan.pptx."
+
+Tests: 1
+
+Situation: Mia has the file "Q3 Plan.pptx". Microsoft accepts the order to make a link, and it sends no web address.
+
+What happens:
+
+- The assistant tells Mia that Microsoft sent no address for the link.
+- It asks again one time, because the link can exist.
+- The assistant asks Mia to approve first.
+
+**A move of an item with no known old folder gives no way back**
+
+Ask your assistant: "Move Plan v1.docx into Archive."
+
+Tests: 1
+
+Situation: Mia has the folder "Archive" and the file "Plan v1.docx", and Microsoft names no folder that holds the file.
+
+What happens:
+
+- Mia is asked to approve the move.
+- After she approves, the file is in "Archive".
+- The assistant has no old folder to name for a move back.
+
+#### The question to Mia names a place even when Microsoft sends no name for it
+
+**The question about a folder delete says how full the folder is**
+
+Ask your assistant: "Delete the folder Old drafts."
+
+Tests: 1
+
+Cases:
+
+- Mia has the folder "Old drafts", and the folder is empty. Mia is asked to approve that "Old drafts" and everything in it go to the recycle bin. The question says that the folder is empty.
+- Mia has the folder "Old drafts", and the folder holds 1 item. Mia is asked to approve that "Old drafts" and everything in it go to the recycle bin. The question says that it has 1 item inside it.
+- Mia has the folder "Old drafts", and the folder holds 5 items. Mia is asked to approve that "Old drafts" and everything in it go to the recycle bin. The question says that it has 5 items inside it.
+- Mia has the folder "Old drafts", and Microsoft gives no item count. Mia is asked to approve that "Old drafts" and everything in it go to the recycle bin. The question says nothing about the item count.
+
+**A place with no name from Microsoft is named in a general way**
+
+Ask your assistant: "Create the folder 2026 in the top folder of the Sales library."
+
+Tests: 1
+
+Cases:
+
+- Microsoft sends the top folder of a library. Mia is asked to approve the change, and the question names the top folder.
+- Microsoft sends a folder with no name. Mia is asked to approve the change, and the question names an unnamed folder.
+- Microsoft sends the top folder of a library. Mia is asked to approve the change, and the question names the top folder.
+- Microsoft sends a file whose folder has a name but no path. Mia is asked to approve the change, and the question names the name of that folder.
+- Microsoft sends a file whose folder has no name. Mia is asked to approve the change, and the question names an unnamed folder.
+
+**A change that Microsoft answers without the item is checked by a second read**
+
+Ask your assistant: "Rename Plan v1.docx to Plan v2.docx."
+
+Tests: 1
+
+Cases:
+
+- Mia has the file "Plan v1.docx". Microsoft renames the file and sends no item in its answer. The second read of the file shows the new name. The assistant tells Mia that the file has the name "Plan v2.docx".
+- Mia has the file "Plan v1.docx". Microsoft renames the file and sends no item in its answer. The second read of the file fails. The assistant tells Mia that the rename happened, and that the new name is not shown.
+
+**A OneNote notebook is not attached to a post in a Teams channel**
+
+Ask your assistant: "Post the OneNote notebook Customers in the channel Launch."
+
+Tests: 1
+
+Situation: Mia has the OneNote notebook "Customers" in her OneDrive.
+
+What happens:
+
+- The assistant tells Mia that a notebook is not a plain file and cannot be attached.
+- Nothing is posted.
+
+#### A chat program that carries the question back to Mia gets the question first
+
+**The approval question is passed back to Mia before anything changes**
+
+Ask your assistant: "Rename Plan v1.docx to Plan v2.docx."
+
+Tests: 1
+
+Cases:
+
+- Mia has the file "Plan v1.docx" and the folder "Archive". Mia's chat program takes the question back with the answer, and not while the call runs. The assistant passes the approval question to Mia. Nothing changes before she answers.
+- Mia has the file "Plan v1.docx" and the folder "Archive". Mia's chat program takes the question back with the answer, and not while the call runs. The assistant passes the approval question to Mia. Nothing changes before she answers.
+- Mia has the file "Plan v1.docx" and the folder "Archive". Mia's chat program takes the question back with the answer, and not while the call runs. The assistant passes the approval question to Mia. Nothing changes before she answers.
+- Mia has the file "Plan v1.docx" and the folder "Archive". Mia's chat program takes the question back with the answer, and not while the call runs. The assistant passes the approval question to Mia. Nothing changes before she answers.
+- Mia has the file "Plan v1.docx" and the folder "Archive". Mia's chat program takes the question back with the answer, and not while the call runs. The assistant passes the approval question to Mia. Nothing changes before she answers.
+- Mia has the file "Plan v1.docx" and the folder "Archive". Mia's chat program takes the question back with the answer, and not while the call runs. The assistant passes the approval question to Mia. Nothing changes before she answers.
+
 #### Not supported yet in organizing and sharing files in onedrive and sharepoint
 
 - The assistant cannot replace the content of an existing file.
@@ -6775,6 +8638,11 @@ Cases:
 - Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The team "Platform" holds no copy of "Customers".
 - Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The notebook of "Platform" holds no section "Work".
 - Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The section "Planning" of "Platform" holds no copy of "Retro".
+- Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The page "Platform plan" holds no new line.
+- Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The page "Platform plan" still has its old title.
+- Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The team "Platform" holds no notebook "Plans".
+- Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The notebook of "Platform" holds no section "Plans".
+- Mia has the notes that the change names. Mia is asked to approve the change, and she declines. The assistant tells Mia that the change was not approved, and does not ask again. The notebook of "Platform" holds no section group "Bin".
 
 **A change without an answer from Mia does not happen**
 
@@ -6792,7 +8660,7 @@ Cases:
 
 Ask your assistant: "Erase my Old draft page."
 
-Tests: 1
+Tests: 3
 
 Situation: Mia has the page "Old draft".
 
@@ -6971,7 +8839,7 @@ Cases:
 
 Ask your assistant: "Copy my Customers notebook as Customers 2026."
 
-Tests: 1
+Tests: 2
 
 Situation: Microsoft accepts the copy of "Customers" but gives no way to follow it.
 
@@ -7098,6 +8966,226 @@ What happens:
 
 - The assistant tells Mia that the picture was probably deleted with its page, or that it can no longer be reached.
 - It reads the page again to find the picture.
+
+#### The assistant uses only handles and choices that can work
+
+**A value that names no note is sent back to the assistant**
+
+Ask your assistant: "Read my Acme kickoff page."
+
+Tests: 1
+
+Cases:
+
+- The assistant gives the title of a page where a page is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+- The assistant gives the name of a section where a section is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+- The assistant gives the name of a notebook where a notebook is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+- The assistant gives the name of a notebook where a notebook or a section group is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+- The assistant gives the title of a copy where a copy that runs is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+- The assistant gives a web address that is no picture where the address of a picture is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+- The assistant gives a handle that the assistant already has where a web address is needed. The assistant is told what is needed and where it comes from. Nothing is sent to Microsoft.
+
+**Choices that cannot work together are refused**
+
+Ask your assistant: "List the pages of my Work section and of the Platform team."
+
+Tests: 1
+
+Cases:
+
+- Mia asks for the notebooks of a team and of a site in one ask. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for the pages of a section together with the pages of a team. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for the level and the order of pages without a section. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for the pages changed after 5 March and before 1 March. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for the pages created after 5 March and before 1 March. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for a page in a section and also in a section that is named. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for a copy of a section into a notebook and also into a section group. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+- Mia asks for a copy of a section into nothing. The assistant is told that the choices cannot work together. Nothing is sent to Microsoft.
+
+#### The assistant narrows a list of notes
+
+**Pages are found inside a time window or by the app that made them**
+
+Ask your assistant: "Show my notes that I changed since 1 March."
+
+Tests: 2
+
+Cases:
+
+- Mia has the page "Acme kickoff". Microsoft is told to give only the notes changed on 1 March or later. The assistant shows the page "Acme kickoff".
+- Mia has the page "Acme kickoff". Microsoft is told to give only the notes changed before the end of 4 March. The assistant shows the page "Acme kickoff".
+- Mia has the page "Acme kickoff". Microsoft is told to give only the notes changed at 10:30 on 4 March or before. The assistant shows the page "Acme kickoff".
+- Mia has the page "Acme kickoff". Microsoft is told to give only the notes created before the end of 4 March. The assistant shows the page "Acme kickoff".
+- Mia has the page "Acme kickoff". Microsoft is told to give only the notes created at that moment or before. The assistant shows the page "Acme kickoff".
+- Mia has the page "Acme kickoff". Microsoft is told to give only the notes made by that app. The assistant shows the page "Acme kickoff".
+
+**Notebooks are found by their sharing and by the role of Mia**
+
+Ask your assistant: "Show the notebooks that are shared with me."
+
+Tests: 2
+
+Cases:
+
+- Mia has the notebook "Customers". Microsoft is told to give only the notebooks that are shared. The assistant shows the notebook "Customers".
+- Mia has the notebook "Customers". Microsoft is told to give only the notebooks that are not shared and that she owns. The assistant shows the notebook "Customers".
+- Mia has the notebook "Customers". Microsoft is told to give only the notebooks where she is a reader. The assistant shows the notebook "Customers".
+
+**A change in the notes of a team is made once, after Mia approves**
+
+Ask your assistant: "Add the page Retro to the notebook of the Platform team."
+
+Tests: 1
+
+Cases:
+
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+- Mia belongs to the team "Platform". Mia is asked to approve the change, and she approves. The change is made once.
+
+**A sentence that was changed but cannot be shown is not changed twice**
+
+Ask your assistant: "Change the launch date on my Planning page to 21 June."
+
+Tests: 1
+
+Situation: Microsoft changes a sentence on "Planning" and then does not show the changed page to the assistant.
+
+What happens:
+
+- The assistant tells Mia that the page was changed.
+- It reads the page to show the new content.
+- It does not send the same change a second time.
+- The assistant asks Mia to approve first.
+
+**Mia is told why a notebook needs her approval**
+
+Ask your assistant: "Add a task list at the end of my Planning page."
+
+Tests: 1
+
+Cases:
+
+- The page "Planning" is in a notebook that Mia shares with other people. Mia is asked to approve the change, and the question says that the notebook is shared with other people.
+- The page "Planning" is in a notebook that belongs to somebody else. Mia is asked to approve the change, and the question says that the notebook belongs to somebody else.
+- The page "Planning" is in a notebook whose sharing Microsoft does not report. Mia is asked to approve the change, and the question says that the notebook has sharing that Microsoft did not report.
+- The page "Planning" is in a notebook that Microsoft does not name. Mia is asked to approve the change, and the question says that the notebook has sharing that Microsoft did not report.
+- The page "Planning" is in a notebook of a SharePoint site. Mia is asked to approve the change, and the question says that the notebook belongs to a SharePoint site.
+
+**A page with no section goes to the default notebook of Mia**
+
+Ask your assistant: "Add the page Retro to my notes."
+
+Tests: 1
+
+Cases:
+
+- Mia has a default notebook that she keeps to herself. Mia is not asked to approve it. The page "Retro" is added to the default section of the default notebook.
+- Mia has a default notebook that she shares. Mia is asked to approve it, and she approves. The page "Retro" is added to the default section of the default notebook.
+- Mia has no notebook. Mia is asked to approve it, and she approves. The page "Retro" is added to the default section of the default notebook.
+- Mia has two notebooks and Microsoft marks none as default. Mia is asked to approve it, and she approves. The page "Retro" is added to the default section of the default notebook.
+- Mia has one notebook that Microsoft does not mark. Mia is not asked to approve it. The page "Retro" is added to the default section of the default notebook.
+
+**A page is added to a section that the assistant names**
+
+Ask your assistant: "Add the page Retro to a section Work in my default notebook."
+
+Tests: 1
+
+Situation: Mia has a default notebook that she keeps to herself.
+
+What happens:
+
+- The page "Retro" is added to the section "Work".
+- Microsoft makes the section "Work" when it does not exist.
+
+#### The assistant copes with what Microsoft leaves out
+
+**Parts that Microsoft leaves out of a list are left out of the answer**
+
+Ask your assistant: "List my notebooks, sections and pages."
+
+Tests: 5
+
+Situation: Microsoft lists a notebook, a section, a page, and a preview that miss an address, a creator, or a link.
+
+What happens:
+
+- The assistant shows only the entries that Mia can open.
+- It shows no creator and no link that Microsoft did not give.
+
+**Notebooks and sections are narrowed by who made them**
+
+Ask your assistant: "Show the notebooks and the sections that Mia made."
+
+Tests: 2
+
+Situation: Mia has notebooks and sections that she and other people made.
+
+What happens:
+
+- The assistant shows only the notebooks and the sections that "Mia" made.
+
+**A page that is not text is explained**
+
+Ask your assistant: "Summarize my notes from the Acme kickoff."
+
+Tests: 1
+
+Cases:
+
+- The page "Acme kickoff" holds content that is not valid text and Microsoft gives an address for it. The assistant tells Mia that the page cannot be read as text. It sends Mia to the address in a browser.
+- The page "Acme kickoff" holds content that is not valid text and Microsoft gives no address for it. The assistant tells Mia that the page cannot be read as text. It sends Mia to OneNote itself.
+
+**A picture with no stated type is given as it is**
+
+Ask your assistant: "Show me the picture on my Acme kickoff page."
+
+Tests: 1
+
+Situation: The page "Acme kickoff" holds a picture and Microsoft does not state its type.
+
+What happens:
+
+- The assistant gives the picture as plain bytes.
+
+**A finished copy names what it made**
+
+Ask your assistant: "Has my copy of the page finished?"
+
+Tests: 1
+
+Cases:
+
+- Microsoft finished a copy and names a page as its result. The assistant tells Mia that the copy is done and shows the new page.
+- Microsoft finished a copy and names a section as its result. The assistant tells Mia that the copy is done and shows the new section.
+- Microsoft finished a copy and names a page of a blank owner as its result. The assistant tells Mia that the copy is done and shows the new page.
+- Microsoft finished a copy and names a place that is no note as its result. The assistant tells Mia that the copy is done and shows no new note.
+
+**A copy that Microsoft names only in a header is followed by that name**
+
+Ask your assistant: "Copy my page Weekly sync into the section Archive."
+
+Tests: 1
+
+Situation: Mia has the page "Weekly sync" and the section "Archive", and Microsoft names a copy only in a header.
+
+What happens:
+
+- The assistant gives Mia the name of the copy to follow.
 
 #### Not supported yet in working with notes in onenote
 

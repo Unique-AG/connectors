@@ -7,7 +7,7 @@ import pytest
 import respx
 from fastmcp.client.client import CallToolResult
 from fastmcp.exceptions import ToolError
-from mcp.types import BlobResourceContents, EmbeddedResource, TextContent
+from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, TextResourceContents
 
 from tests.conftest import RecordedSleeps
 from tests.graph_fixtures import response, serve
@@ -745,3 +745,97 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         assert "Mail.Read, User.Read and Mail.Read.Shared" in advice
         assert "have the user sign in to this connector again" in advice
         assert "retrying will not help" in advice
+
+
+def _file_answer(content: bytes, **fields: object) -> list[httpx.Response]:
+    listed = _attachment("fileAttachment", size=len(content)) | fields
+    listed = {key: value for key, value in listed.items() if value is not None}
+    return [
+        httpx.Response(200, json=listed),
+        httpx.Response(200, json=listed | {"contentBytes": base64.b64encode(content).decode()}),
+    ]
+
+
+class TestAnAttachmentIsGivenAsMicrosoftDescribesIt:
+    @pytest.mark.parametrize(
+        ("content_type", "content", "given_as"),
+        [
+            (None, b"hello", "application/octet-stream"),
+            ("pdf", b"%PDF-1.7", "application/octet-stream"),
+            ("text/plain; charset=utf-8", "Grüsse".encode(), "text/plain"),
+            ("text/plain", b"\xff\xfe\x00 not text", "application/octet-stream"),
+        ],
+        ids=["no-type", "type-without-slash", "text-that-reads", "text-that-does-not-read"],
+    )
+    async def test_it_gives_the_type_that_fits_the_bytes(
+        self, graph: respx.MockRouter, content_type: str | None, content: bytes, given_as: str
+    ) -> None:
+        _ = graph.get("/me/messages/MSG1/attachments/ATT1").mock(
+            side_effect=_file_answer(content, contentType=content_type)
+        )
+
+        answer = await invoke("outlook_read_attachment", uri=_attachment_uri())
+
+        (block,) = answer.content
+        assert isinstance(block, EmbeddedResource)
+        resource = block.resource
+        assert resource.mime_type == given_as
+        given = (
+            resource.text.encode()
+            if isinstance(resource, TextResourceContents)
+            else base64.b64decode(resource.blob)
+        )
+        assert given == content
+
+    async def test_an_attachment_that_is_larger_than_it_was_announced_is_refused(
+        self, graph: respx.MockRouter
+    ) -> None:
+        listed = _attachment("fileAttachment", size=100)
+        content = b"x" * (_TEN_MEBIBYTES + 1)
+        _ = graph.get("/me/messages/MSG1/attachments/ATT1").mock(
+            side_effect=[
+                httpx.Response(200, json=listed),
+                httpx.Response(
+                    200, json=listed | {"contentBytes": base64.b64encode(content).decode()}
+                ),
+            ]
+        )
+
+        advice = await advice_for("outlook_read_attachment", uri=_attachment_uri())
+
+        assert "never sends part of a file" in advice
+
+    async def test_an_attachment_of_a_kind_that_nobody_knows_is_listed_as_unknown(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/messages/MSG1/attachments").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "@odata.type": "#microsoft.graph.someNewAttachment",
+                            "id": "ATT1",
+                            "name": "Mystery",
+                            "size": 12,
+                        }
+                    ]
+                },
+            )
+        )
+
+        listed = await call("outlook_list_attachments", uri="outlook:///messages/MSG1")
+
+        (row,) = cast("list[dict[str, object]]", listed["attachments"])
+        assert (row["name"], row["kind"]) == ("Mystery", "unknown")
+
+    async def test_a_message_with_no_follow_up_flag_is_listed_with_no_flag(
+        self, graph: respx.MockRouter
+    ) -> None:
+        bare = mail_message("MSG1", "No flag here")
+        del bare["flag"]
+        _ = folder_listing(graph, _INBOX, bare, display_name="Inbox")
+
+        listed = await call("outlook_list_mail", limit=5)
+
+        assert _rows(listed, "flag")[0][0] is None

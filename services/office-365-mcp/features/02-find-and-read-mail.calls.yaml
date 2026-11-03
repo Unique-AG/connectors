@@ -778,3 +778,54 @@ uc-02-38:
     "me" is, and from tools/get_me.py:66-68, `email` is the address to match against the sender of a
     message. outlook_list_mail takes one address and not a name in `from_address`
     (tools/outlook_list_mail.py:100-106). Mail that Mia sent to herself arrives in her inbox.
+
+uc-02-40:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_it_gives_the_type_that_fits_the_bytes"
+  ask: "Read the attachment of the message from Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_list_attachments
+    - tool: outlook_read_attachment
+      uses: {uri: uri of the attachment from outlook_list_attachments}
+  note: "shared/attachments.py:217-226: a missing type, a type with no slash, and a text type with bytes that are not UTF-8 all give application/octet-stream."
+
+uc-02-41:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_an_attachment_that_is_larger_than_it_was_announced_is_refused"
+  ask: "Read the attachment of the message from Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_list_attachments
+    - tool: outlook_read_attachment
+      uses: {uri: uri of the attachment from outlook_list_attachments}
+  note: "expected behaviour from shared/attachments.py:204-213: the size check after the download uses the bytes that arrived, not the size that Microsoft announced."
+
+uc-02-42:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_an_attachment_of_a_kind_that_nobody_knows_is_listed_as_unknown"
+  ask: "Which attachments does the message from Anna have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_list_attachments
+  note: "shared/attachments.py:115-122: a type of attachment that the tool does not know is listed with the kind unknown."
+
+uc-02-43:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_a_message_with_no_follow_up_flag_is_listed_with_no_flag"
+  ask: "List my newest mail."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_mail
+  note: "shared/mail.py:176-179: a message with no flag object gives a null flag."

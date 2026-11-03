@@ -1,0 +1,49 @@
+{
+  "attachments": [
+    {
+      "content": null,
+      "contentType": "reference",
+      "contentUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt",
+      "id": "00000000-4897-4dbd-827c-66309915e60d",
+      "name": "seed-v1 Meeting Notes.txt",
+      "teamsAppId": null,
+      "thumbnailUrl": null
+    }
+  ],
+  "body": {
+    "content": "synthetic text 07",
+    "contentType": "html"
+  },
+  "channelIdentity": {
+    "channelId": "19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2",
+    "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+  },
+  "chatId": null,
+  "createdDateTime": "2026-11-03T13:22:29.068Z",
+  "deletedDateTime": null,
+  "etag": "2683088028333",
+  "eventDetail": null,
+  "from": {
+    "application": null,
+    "device": null,
+    "user": {
+      "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+      "displayName": "Mia Keller",
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "userIdentityType": "aadUser"
+    }
+  },
+  "id": "2683088028333",
+  "importance": "normal",
+  "lastEditedDateTime": null,
+  "lastModifiedDateTime": "2026-11-03T13:22:29.068Z",
+  "locale": "en-us",
+  "mentions": [],
+  "messageType": "message",
+  "reactions": [],
+  "replyToId": "3682680843887",
+  "subject": null,
+  "summary": null,
+  "webUrl": "https://teams.microsoft.com/synthetic%20text%2005/synthetic%20text%2006/19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2/2683088028333"
+}

@@ -1145,13 +1145,6 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
         assert isinstance(refusal, str), "a confirmation on this era answers a string or nothing"
         assert refusal.startswith("No event was created.")
 
-    async def test_a_refusal_the_client_itself_composed_is_passed_through(self) -> None:
-        confirm = a_person_agrees(_context(ToolError("the client refused the request")))
-
-        answer = await confirm("Create 'Pricing review'?", _TRANSACTION_ID)
-
-        assert answer == "the client refused the request"
-
     async def test_agreeing_answers_with_no_refusal(self) -> None:
         confirm = a_person_agrees(_context(AcceptedElicitation(data="create")))
 

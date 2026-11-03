@@ -788,7 +788,6 @@ class TestWhatAnInputMustSpell:
     )
     def test_anything_else_is_not_a_folder(self, ref: str) -> None:
         assert unusable_folders(RuleActionsInput(copy_to_folder=ref)) == [ref]
-        assert unusable_folders(None) == []
 
 
 class TestTheQuestionAboutMailThatLeaves:

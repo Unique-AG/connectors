@@ -87,8 +87,6 @@ GRAPH_NOT_FOUND = (
 
 type MailReplyMode = Literal["reply", "forward"]
 
-MODES: tuple[str, ...] = ("reply", "forward")
-
 _ORIGINAL_FIELDS: tuple[str, ...] = ("subject", "from", "replyTo")
 
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
@@ -124,14 +122,6 @@ _NOT_A_MESSAGE_HANDLE = (
     + "Neither is a folder or rule handle under the same scheme. Nothing was created, so "
     + "there is no half-written draft in the mailbox. Find the message again and pass the `uri` "
     + "verbatim."
-)
-
-_UNKNOWN_MODE = (
-    "outlook_draft_reply has exactly two modes, `reply` and `forward`, and this is neither. "
-    + "This tool has no reply-all mode. If this deployment exposes outlook_draft_reply_all, that "
-    + "tool drafts a reply-all. A reply-all goes to everyone on the original message, and the "
-    + "sender of that message chose that list. Reply to the sender with `reply`, or name the "
-    + "recipients yourself with `forward` and `to`. Nothing was created."
 )
 
 _TO_ON_A_REPLY = (
@@ -271,8 +261,6 @@ async def draft_reply(
     mailbox: str | None = None,
 ) -> MailReplyDraft | InputRequiredResult:
     named = merged_categories((), add=categories, remove=())
-    if mode not in MODES:
-        raise ToolError(_UNKNOWN_MODE)
     handle = mail_message_handle(message_ref)
     if handle is None:
         raise ToolError(_NOT_A_MESSAGE_HANDLE)

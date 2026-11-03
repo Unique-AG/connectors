@@ -648,3 +648,162 @@ uc-04-44:
       uses: {message_ref: uri of the message}
   must_not: [outlook_send_draft]
   note: "expected behaviour from tools/outlook_draft_reply_all.py:192-204 and 401-409 (body_written false, failure holds what Microsoft said) and :416-434: the tool writes the draft in two steps, and when the second write fails it still answers with the handle of the draft, with `body` null, with none of the added Cc recipients, and with `failure`. The source does not define the draft that createReplyAll made as empty, so the Then says only that the text is not in it. Telling Mia is the reading of those fields (model behaviour, no code guard). The source does not say what the assistant does next to repair the draft (OPEN)."
+
+uc-04-45:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitStopsTheDraft::test_it_refuses_the_draft_before_it_asks_microsoft"
+  ask: "Write to Anna and Tom and copy Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+    - tool: outlook_draft_mail
+      uses: {to: address of Anna from outlook_find_recipient}
+  note: "expected behaviour from the address checks before any Graph call: tools/outlook_draft_mail.py:92-102 and :164-167, tools/outlook_draft_reply.py:146-182 and :337-366, tools/outlook_draft_reply_all.py:117-135 and :290-296, tools/outlook_update_draft.py:121-147, :246-262 and :310-320. Each tool refuses before it makes a draft."
+
+uc-04-46:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitStopsTheDraft::test_a_subject_line_in_place_of_a_handle_creates_and_changes_nothing"
+  ask: "Reply to the message Q3 budget review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_draft_reply
+      args: {mode: reply}
+      uses: {message_ref: uri of the message from the previous listing}
+  note: "expected behaviour from the handle check at the start of each tool: tools/outlook_draft_reply.py:274-276, tools/outlook_draft_reply_all.py:230-232, tools/outlook_update_draft.py:303-306. The tool refuses before it makes or changes a draft."
+
+uc-04-47:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_the_sender_makes_no_draft"
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_the_reply_to_address_makes_no_draft"
+  ask: "Reply to Anna and copy Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_draft_reply
+      args: {mode: reply}
+      uses: {message_ref: uri of the message of Anna, cc: address of Anna}
+  note: "expected behaviour from tools/outlook_draft_reply.py:285-290 (_reply_already_goes_to) and :369-375: the tool reads the original, finds that the reply goes to the copied address, and makes no draft."
+
+uc-04-48:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_someone_else_is_read_back_from_the_stored_draft"
+  ask: "Reply to Anna and copy Tom."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_find_recipient
+      args: {query: Tom}
+    - tool: outlook_draft_reply
+      args: {mode: reply}
+      uses: {message_ref: uri of the message of Anna, cc: address of Tom}
+  note: "tools/outlook_draft_reply.py:285-290 reads the original when a reply has a copy, and :464-476 writes the copy in the second request."
+
+uc-04-49:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_it_asks_and_then_writes_after_a_yes"
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_the_question_of_a_change_says_what_happens_to_the_categories"
+  ask: "In the shared mailbox support, forward the message from Anna to Tom."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - any_of: [outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft]
+  note: "tools/outlook_draft_reply.py:274-312, tools/outlook_draft_reply_all.py:239-262 and tools/outlook_update_draft.py:276-285 read the message, ask Mia with the draft and the mailbox named, and write after a yes."
+
+uc-04-50:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_it_writes_nothing_without_a_yes"
+  ask: "In the shared mailbox support, forward the message from Anna to Tom."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - any_of: [outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft]
+  note: "expected behaviour from shared/seam.py:268-293: a decline gives _not_agreed and no answer gives _no_answer. The write comes after the answer (tools/outlook_draft_reply.py:316-326), so the shared mailbox is not touched."
+
+uc-04-51:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_program_of_the_newer_kind_gets_the_question_and_nothing_is_written"
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_mail_draft_in_a_shared_mailbox_goes_back_to_a_program_of_the_newer_kind"
+  ask: "In the shared mailbox support, write a draft to Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_draft_mail
+      uses: {to: address of Anna}
+  note: "shared/seam.py:208-293: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing (for example tools/outlook_draft_mail.py:191-192)."
+
+uc-04-52:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_message_with_no_subject_and_no_sender_is_named_by_the_question"
+  ask: "In the shared mailbox support, reply to the message with no subject."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_draft_reply
+      args: {mode: reply}
+      uses: {message_ref: uri of the message from the previous listing}
+  note: "tools/outlook_draft_reply.py:403-423: the question says with no subject, and says that Microsoft chooses the address when the original names no sender and no reply-to address."
+
+uc-04-53:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved"
+  ask: "Reply to Anna that Friday works."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [outlook_search_mail, outlook_list_mail]
+    - tool: outlook_draft_reply
+      args: {mode: reply}
+      uses: {message_ref: uri of the message of Anna}
+  note: "expected behaviour from tools/outlook_draft_reply.py:479-487 and :494-509 (the same shape as uc-04-44 for a reply to everyone): the draft exists, body_written is false, and failure holds what Microsoft said. The second request is not repeated."
+
+uc-04-54:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_query_with_no_word_in_it_is_refused_before_microsoft_is_asked"
+  ask: "Find the address of ??."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+  note: "expected behaviour from tools/outlook_find_recipient.py:152-153 (_NO_QUERY): an empty person search gives an arbitrary slice of the relevance list, so the tool refuses before it asks Graph."
+
+uc-04-55:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_person_who_is_not_in_the_directory_is_found_in_past_mail_by_recency"
+  ask: "Find the address of Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+  note: "tools/outlook_find_recipient.py:160-162 and :193-226: when the people index finds nobody, the tool reads the senders and recipients of past mail, drops Mia's own address, and lists the newest correspondent first."
+
+uc-04-56:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_person_of_the_directory_is_told_apart_by_kind_and_sign_in_name"
+  ask: "Find the address of Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+  note: "tools/outlook_find_recipient.py:232-251 and :296-307: the kind comes from the person type, a person with no address is dropped (:287-293), and the sign-in name counts for an exact match (:322-331)."

@@ -1,0 +1,81 @@
+{
+  "@odata.etag": "W/\"t0Vqpx09SfPYHq2N3bpwabQU6tZvKi==\"",
+  "allowNewTimeProposals": true,
+  "attendees": [
+    {
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      },
+      "status": {
+        "response": "none",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "type": "required"
+    }
+  ],
+  "body": {
+    "content": "Walk through the open design tasks.",
+    "contentType": "text"
+  },
+  "bodyPreview": "Walk through the open design tasks.",
+  "categories": ["seed-v1"],
+  "end": {
+    "dateTime": "2026-11-02T08:30:00.0000000",
+    "timeZone": "UTC"
+  },
+  "hasAttachments": false,
+  "hideAttendees": false,
+  "id": "EBuBXiIVAXLJNLLGTlvgLt5ebCNbKZ-SIn5Ob0Ladp24OcDMPh8Y8hqkbtER2qUK_DAF",
+  "importance": "normal",
+  "isAllDay": false,
+  "isCancelled": false,
+  "isOnlineMeeting": false,
+  "isOrganizer": true,
+  "location": {
+    "displayName": "Room Pilatus",
+    "locationType": "default"
+  },
+  "onlineMeeting": null,
+  "organizer": {
+    "emailAddress": {
+      "address": "mia@example.test",
+      "name": "Mia Keller"
+    }
+  },
+  "originalEndTimeZone": "W. Europe Standard Time",
+  "originalStartTimeZone": "W. Europe Standard Time",
+  "recurrence": {
+    "pattern": {
+      "dayOfMonth": 0,
+      "daysOfWeek": ["monday"],
+      "firstDayOfWeek": "monday",
+      "index": "first",
+      "interval": 1,
+      "month": 0,
+      "type": "weekly"
+    },
+    "range": {
+      "endDate": "0001-01-01",
+      "numberOfOccurrences": 6,
+      "recurrenceTimeZone": "W. Europe Standard Time",
+      "startDate": "2026-11-02",
+      "type": "numbered"
+    }
+  },
+  "responseRequested": true,
+  "responseStatus": {
+    "response": "organizer",
+    "time": "0001-01-01T00:00:00Z"
+  },
+  "sensitivity": "normal",
+  "seriesMasterId": null,
+  "showAs": "busy",
+  "start": {
+    "dateTime": "2026-11-02T08:00:00.0000000",
+    "timeZone": "UTC"
+  },
+  "subject": "Weekly design sync",
+  "type": "seriesMaster",
+  "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FHSt7Cq1Dnyx07VwEWDh6M6koirmIA9oIS%2BWVB&exvsurl=1"
+}

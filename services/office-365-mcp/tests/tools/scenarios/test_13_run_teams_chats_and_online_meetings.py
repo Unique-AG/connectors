@@ -1,6 +1,6 @@
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime, tzinfo
 from typing import Self, cast, override
 from urllib.parse import quote
@@ -25,6 +25,11 @@ from tests.tools.conftest import (
     meeting_payload,
 )
 from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.scenarios.teams_support import (
+    Says,
+    call_on_the_newer_protocol,
+    refused_on_the_newer_protocol,
+)
 
 type Row = Mapping[str, object]
 
@@ -159,12 +164,30 @@ def _the_meeting_is(graph: respx.MockRouter, meeting: Row) -> None:
     _signed_in(graph)
 
 
-def _everything_is_readable(graph: respx.MockRouter) -> respx.Route:
+def _the_writes_are_answered(graph: respx.MockRouter) -> respx.Route:
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.method == "DELETE":
+            return httpx.Response(204)
+        if "/onlineMeetings" in request.url.path:
+            return httpx.Response(200, json=_meeting(attendees=[ANNA["user_id"]]))
+        if request.url.path.endswith("/members"):
+            return httpx.Response(
+                201,
+                json={"@odata.type": "#microsoft.graph.aadUserConversationMember", "id": "NEW"},
+            )
+        return httpx.Response(200, json={"id": CHAT_ID, "chatType": "group", "topic": "Launch"})
+
+    return graph.route(method__in=["POST", "PATCH", "PUT", "DELETE"]).mock(side_effect=answer)
+
+
+def _everything_is_readable(
+    graph: respx.MockRouter, writes: Callable[[respx.MockRouter], respx.Route] = _writes
+) -> respx.Route:
     _signed_in(graph)
     _the_chat_is_called(graph)
     _tom_is_a_member(graph)
     _the_meeting_is(graph, _meeting(attendees=[ANNA["user_id"], TOM["user_id"]]))
-    return _writes(graph)
+    return writes(graph)
 
 
 def _members_of(body: Row) -> list[str]:
@@ -418,7 +441,7 @@ class TestAnOnlineMeetingBelongsToItsOrganizer:
     async def test_it_names_each_attendee_with_the_time_that_person_attended(
         self, graph: respx.MockRouter
     ) -> None:
-        _the_meeting_is(graph, _meeting())
+        _the_meeting_is(graph, _meeting(attendees=[ANNA["user_id"], TOM["user_id"]]))
         _ = graph.get(f"{MEETING_PATH}/attendanceReports").mock(
             return_value=httpx.Response(
                 200,
@@ -440,7 +463,13 @@ class TestAnOnlineMeetingBelongsToItsOrganizer:
                 "identity": {"displayName": name},
                 "role": "Attendee",
                 "totalAttendanceInSeconds": seconds,
-                "attendanceIntervals": [],
+                "attendanceIntervals": [
+                    {
+                        "joinDateTime": "2026-02-10T14:00:00Z",
+                        "leaveDateTime": "2026-02-10T14:25:00Z",
+                        "durationInSeconds": seconds,
+                    }
+                ],
             }
             for name, seconds in (("Anna", 25 * 60), ("Tom", 40 * 60))
         ]
@@ -455,6 +484,11 @@ class TestAnOnlineMeetingBelongsToItsOrganizer:
             (one["display_name"], one["total_attendance_seconds"])
             for one in _rows(result["newest_report_attendance"])
         ] == [("Anna", 1500), ("Tom", 2400)]
+        invitees = _rows(cast("Row", result["meeting"])["attendees"])
+        assert [one["user_id"] for one in invitees] == [ANNA["user_id"], TOM["user_id"]]
+        (span,) = _rows(_rows(result["newest_report_attendance"])[0]["intervals"])
+        assert str(span["joined_at"]).startswith("2026-02-10T14:00")
+        assert str(span["left_at"]).startswith("2026-02-10T14:25")
 
     async def test_it_moves_a_meeting_and_leaves_its_attendees_and_every_calendar_alone(
         self, graph: respx.MockRouter
@@ -911,3 +945,219 @@ class TestNothingChangesUnlessMiaClearlyAgrees:
         assert "their client cannot ask them to agree" in message
         assert "do this task in the Microsoft 365 app" in message
         assert writes.call_count == 0
+
+
+class TestAChatProgramOfTheNewerKind:
+    @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
+    async def test_it_makes_an_approved_change_once_when_the_question_comes_in_the_answer(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str
+    ) -> None:
+        _ = nothing
+        writes = _everything_is_readable(graph, _the_writes_are_answered)
+        mia = Person()
+
+        _ = await call_on_the_newer_protocol(tool, person=mia, **arguments)
+
+        assert len(mia.asked) == 1
+        assert writes.call_count == 1
+
+    @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
+    @pytest.mark.parametrize(
+        "reply",
+        [Person(approval="no"), Says(1), Says("maybe")],
+        ids=["declines", "the word for no", "a word that is no choice"],
+    )
+    async def test_it_changes_nothing_unless_the_answer_is_the_word_for_yes(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str, reply: Person | Says
+    ) -> None:
+        writes = _everything_is_readable(graph, _the_writes_are_answered)
+
+        message = await refused_on_the_newer_protocol(tool, person=reply, **arguments)
+
+        assert nothing in message and NOT_AGREED in message
+        assert writes.call_count == 0
+
+
+class TestAReferenceThatTheAssistantMadeUp:
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("teams_update_meeting", TOMORROW_AT_15),
+            ("teams_delete_meeting", {}),
+            ("teams_read_meeting", {}),
+        ],
+        ids=["move", "delete", "attendance"],
+    )
+    async def test_it_refuses_a_meeting_reference_that_is_not_one_and_asks_nobody(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        mia = Person()
+
+        message = await _refused_by(mia, tool, meeting_uri="Design review", **arguments)
+
+        assert "has exactly one shape" in message and "teams_list_chats" in message
+        assert mia.asked == [] and not graph.calls
+
+
+class TestWhatTeamsDoesNotTakeAsAChange:
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            ({}, "received no change"),
+            ({"starts_at": "2026-03-02T15:00:00Z"}, "without the other"),
+            ({"ends_at": "2026-03-02T15:30:00Z"}, "without the other"),
+            (
+                {"starts_at": "2026-03-02T15:00:00", "ends_at": "2026-03-02T15:30:00Z"},
+                "has no offset",
+            ),
+        ],
+        ids=["no change", "a start alone", "an end alone", "a start with no zone"],
+    )
+    async def test_it_refuses_a_change_that_teams_cannot_take_and_asks_nobody(
+        self, graph: respx.MockRouter, arguments: Row, told: str
+    ) -> None:
+        mia = Person()
+
+        message = await _refused_by(
+            mia, "teams_update_meeting", meeting_uri=MEETING_URI, **arguments
+        )
+
+        assert told in message and "No meeting was changed." in message
+        assert mia.asked == [] and not graph.calls
+
+    @pytest.mark.parametrize(
+        ("times", "told"),
+        [
+            ({"starts_at": "tomorrow at 14:00"}, "not an ISO-8601 date and time"),
+            ({"ends_at": "2026-03-02T14:30:00"}, "has no offset"),
+        ],
+        ids=["a start that is no time", "an end with no zone"],
+    )
+    async def test_it_refuses_a_new_meeting_whose_time_teams_cannot_read_and_asks_nobody(
+        self, graph: respx.MockRouter, times: Row, told: str
+    ) -> None:
+        mia = Person()
+
+        message = await _refused_by(mia, "teams_create_meeting", **{**NEW_MEETING, **times})
+
+        assert told in message and "No meeting was created." in message
+        assert mia.asked == [] and not graph.calls
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "told"),
+        [
+            ("teams_delete_meeting", DELETE_MEETING, "has no meeting with this handle"),
+            ("teams_read_meeting", {"meeting_uri": MEETING_URI}, None),
+        ],
+        ids=["delete", "attendance"],
+    )
+    async def test_it_does_not_delete_or_read_a_meeting_that_microsoft_does_not_show(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, told: str | None
+    ) -> None:
+        _ = graph.get("/me/onlineMeetings").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+        writes = _writes(graph)
+        mia = Person()
+
+        if told is None:
+            result = await call(tool, person=mia, **arguments)
+            assert result["status"] == "meeting_not_found"
+        else:
+            assert told in await _refused_by(mia, tool, **arguments)
+        assert mia.asked == [] and writes.call_count == 0
+
+    async def test_it_gives_no_attendee_list_when_microsoft_answers_the_change_without_one(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _the_meeting_is(graph, _meeting())
+        _ = graph.patch(MEETING_PATH).mock(return_value=httpx.Response(200, json=meeting_payload()))
+
+        result = await call(
+            "teams_update_meeting", meeting_uri=MEETING_URI, subject="Design review 2"
+        )
+
+        assert result["attendee_ids"] is None
+
+    async def test_it_names_a_member_without_a_name_as_such_in_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _the_chat_is_called(graph)
+        _ = graph.get(f"{CHAT_PATH}/members/{TOM_MEMBERSHIP}").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                    "id": TOM_MEMBERSHIP,
+                    "displayName": None,
+                    "userId": TOM["user_id"],
+                },
+            )
+        )
+        writes = _writes(graph)
+        mia = Person()
+
+        _ = await call("teams_remove_chat_member", person=mia, **REMOVE_TOM)
+
+        assert mia.asked[0].startswith("Remove a member with no name from the Teams chat 'Launch'")
+        assert writes.call_count == 1
+
+    async def test_it_names_a_chat_without_a_title_by_its_members_in_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _the_chat_is_called(graph, topic=None)
+        _ = graph.get(f"{CHAT_PATH}/members").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                            "id": f"member-{one['name']}",
+                            "displayName": one["name"],
+                            "userId": one["user_id"],
+                        }
+                        for one in (ANNA, TOM)
+                    ]
+                },
+            )
+        )
+        writes = _the_writes_are_answered(graph)
+        mia = Person()
+
+        _ = await call("teams_add_chat_member", person=mia, **ADD_PRIYA)
+
+        assert "the Teams chat with 'Anna Meier, Tom Berger'" in mia.asked[0]
+        assert writes.call_count == 1
+
+    async def test_it_creates_a_one_to_one_chat_after_mia_approves_it(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _signed_in(graph)
+        created = graph.post("/chats").mock(
+            return_value=httpx.Response(
+                201, json={"id": CHAT_ID, "chatType": "oneOnOne", "topic": None}
+            )
+        )
+        mia = Person()
+
+        result = await call("teams_create_chat", person=mia, chat_type="oneOnOne", members=[TOM])
+
+        assert mia.asked[0].startswith("Create a one-to-one Teams chat with")
+        assert TOM["user_id"] in mia.asked[0]
+        assert (result["chat_type"], result["topic"]) == ("oneOnOne", None)
+        assert _body(created)["chatType"] == "oneOnOne"
+        assert sorted(_members_of(_body(created))) == sorted([SIGNED_IN_USER_ID, TOM["user_id"]])
+
+    async def test_it_refuses_a_one_to_one_chat_with_two_people_and_asks_nobody(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _signed_in(graph)
+        mia = Person()
+
+        message = await _refused_by(
+            mia, "teams_create_chat", chat_type="oneOnOne", members=[ANNA, TOM]
+        )
+
+        assert "received 2 people for a one-to-one chat" in message
+        assert mia.asked == []

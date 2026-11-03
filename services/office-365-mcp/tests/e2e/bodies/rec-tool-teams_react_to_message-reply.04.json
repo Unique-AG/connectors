@@ -1,0 +1,39 @@
+{
+  "attachments": [],
+  "body": {
+    "content": "<p>seed-v1 case-teams_react_to_message-reply target</p>",
+    "contentType": "html"
+  },
+  "channelIdentity": {
+    "channelId": "19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2",
+    "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+  },
+  "chatId": null,
+  "createdDateTime": "2026-11-03T13:20:28.484Z",
+  "deletedDateTime": null,
+  "etag": "5886104473661",
+  "eventDetail": null,
+  "from": {
+    "application": null,
+    "device": null,
+    "user": {
+      "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+      "displayName": "synthetic text 05",
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "userIdentityType": "aadUser"
+    }
+  },
+  "id": "5886104473661",
+  "importance": "normal",
+  "lastEditedDateTime": null,
+  "lastModifiedDateTime": "2026-11-03T13:20:28.484Z",
+  "locale": "en-us",
+  "mentions": [],
+  "messageType": "message",
+  "reactions": [],
+  "replyToId": "8211224800759",
+  "subject": null,
+  "summary": null,
+  "webUrl": "https://teams.microsoft.com/synthetic%20text%2006/synthetic%20text%2007/19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2/5886104473661"
+}

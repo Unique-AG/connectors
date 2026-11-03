@@ -304,6 +304,7 @@ Feature: Scheduling and answering meetings
         | cancel "Design review" with Anna       |
         | move "Team sync" to Friday             |
         | forward "Launch review" to Priya       |
+        | delete "Design review" with Anna       |
 
     @unhappy @uc-07-29
     Scenario Outline: An approval question that gets no answer changes nothing
@@ -319,6 +320,7 @@ Feature: Scheduling and answering meetings
         | cancel "Design review" with Anna       |
         | move "Team sync" to Friday             |
         | forward "Launch review" to Priya       |
+        | delete "Design review" with Anna       |
 
     @unhappy @uc-07-30
     Scenario Outline: An approval for another action does not cover this action
@@ -334,6 +336,7 @@ Feature: Scheduling and answering meetings
         | cancelling "Design review"                 | cancelling "Budget review"                  |
         | moving "Team sync" to Friday               | moving "Team sync" to Saturday              |
         | forwarding "Launch review" to Priya        | forwarding "Launch review" to Sam           |
+        | deleting "Design review"                   | deleting "Budget review"                    |
 
   Rule: Text inside an invitation is read as data and never followed
 
@@ -453,3 +456,178 @@ Feature: Scheduling and answering meetings
       When Mia asks her assistant to find the rooms of the room list "building9@example.com"
       Then the assistant tells Mia that Microsoft found no room list at that address
       And it asks Mia for the right address or offers to list every room of the company
+
+  Rule: A booking that cannot be read is refused before anyone is invited
+
+    @unhappy @uc-07-49
+    Scenario: A link that is not a link of a meeting changes nothing
+      Given Mia's assistant has the subject "Launch review" and no link of that meeting
+      When the assistant uses the subject as the link to answer, cancel, delete, forward, or change the meeting
+      Then nothing is done and nobody is told anything
+      And nobody asks Mia for an approval
+
+    @unhappy @uc-07-50
+    Scenario Outline: A booking with a wrong time, person, or repeat rule is refused
+      Given Mia asks her assistant to book "Launch review" with <fault>
+      When the assistant sends the booking
+      Then no meeting is created and nobody is invited
+      And the assistant says what to correct before it tries again
+
+      Examples:
+        | fault                                         |
+        | a time that carries its own offset            |
+        | a time in words                               |
+        | a date that does not exist                    |
+        | an end before the start                       |
+        | an all-day meeting that does not start at midnight |
+        | a name where an address is needed             |
+        | Anna twice in the list of people              |
+        | Anna as a needed and as an optional person    |
+        | a room that is also in the list of people     |
+        | a weekly rule with no weekday                 |
+        | a daily rule with a weekday                   |
+        | a count rule with no count                    |
+        | a rule with no end and an end date            |
+        | an end date before the first date             |
+
+    @happy @uc-07-51
+    Scenario Outline: Mia is told every detail of a booking before she approves it
+      Given Mia asks her assistant to book "Launch review" with <detail>
+      When Mia is asked to approve the booking
+      Then the question names <detail>
+      And nothing is created until she approves it
+
+      Examples:
+        | detail                                        |
+        | one whole day                                 |
+        | three whole days                              |
+        | a repeat every second day until a date        |
+        | a repeat on three weekdays of each week       |
+        | a repeat on a day of each month               |
+        | a repeat on a weekday of each month           |
+        | a repeat on a day of each year                |
+        | a repeat on a weekday of each year            |
+        | a reminder time with no change to the reminder |
+        | no reminder and a reminder time               |
+        | settings for who sees the list of people      |
+        | a body                                        |
+
+    @happy @uc-07-52
+    Scenario: A booking with no person says who is told
+      Given Mia asks her assistant to book "Launch review" with a room or a place and no person
+      When Mia is asked to approve the booking
+      Then the question says that no person is invited
+      And it says who Microsoft tells instead
+
+  Rule: A search for a free time that cannot be read is refused before a calendar is read
+
+    @unhappy @uc-07-53
+    Scenario Outline: A search for free time with a wrong time or person is refused
+      Given Mia asks her assistant to look for a free time with <fault>
+      When the assistant sends the search
+      Then no calendar is read
+      And the assistant says what to correct before it tries again
+
+      Examples:
+        | fault                                  |
+        | a time in words                        |
+        | an end before the start                |
+        | a name where an address is needed      |
+        | Anna twice in the list of people       |
+        | Anna as a needed and as an optional person |
+        | a room that is not an address          |
+
+    @happy @uc-07-54
+    Scenario: A room is asked for together with the free times
+      Given Mia needs room Pilatus in every free time
+      When Mia asks her assistant for a free time with Anna and room Pilatus
+      Then the assistant lists the free times that have room Pilatus
+      And it names the room of each time
+
+  Rule: A change that cannot be read or that the meeting refuses changes nothing
+
+    @unhappy @uc-07-55
+    Scenario Outline: A change with a wrong argument changes nothing
+      Given Mia asks her assistant to change "Launch review" with <fault>
+      When the assistant sends the change
+      Then nothing is changed and nobody is told anything
+      And the assistant says what to correct before it tries again
+
+      Examples:
+        | fault                                           |
+        | no change                                       |
+        | a place of only spaces                          |
+        | a start time without an end time and a zone     |
+        | half of the list of people                      |
+        | a category in the lists to add and to remove    |
+        | a body and a new Teams meeting in one change    |
+        | a time in words                                 |
+        | an end before the start                         |
+        | a name where an address is needed               |
+        | Anna twice in the list of people                |
+        | Anna as a needed and as an optional person      |
+
+    @unhappy @uc-07-56
+    Scenario Outline: A change that the stored meeting refuses changes nothing
+      Given <meeting>
+      When the assistant sends <change>
+      Then nothing is changed and Mia is not asked
+      And the assistant says why the meeting refuses it
+
+      Examples:
+        | meeting                                    | change                                |
+        | "Launch review" is already a Teams meeting | a Teams meeting to add                |
+        | "Launch review" has a joining text         | a new body that drops the joining text |
+        | "Launch review" has a very long body       | a new body that drops the joining text |
+        | "Launch review" has the category Blue      | the category Blue to add              |
+        | "Launch review" has no category            | the category Blue to remove |
+        | Mia's calendar takes no Teams meeting      | a Teams meeting to add                |
+
+    @happy @uc-07-57
+    Scenario Outline: Mia is told a change before it is made
+      Given Mia asks her assistant to change "Launch review" with <change>
+      When Mia is asked to approve the change
+      Then the question names <change>
+      And nothing is changed until she approves it
+
+      Examples:
+        | change                                   |
+        | the removal of the last category         |
+        | new categories                           |
+        | a list of people that holds nobody       |
+        | an optional person                       |
+        | a place and nobody invited               |
+
+    @happy @uc-07-60
+    Scenario: A new body that keeps the joining text is sent after the approval
+      Given "Launch review" is a Teams meeting with a joining text in its body
+      When Mia asks her assistant to add a line to the body of "Launch review"
+      Then Mia is asked to approve the change
+      And after she approves, the body keeps the joining text and holds the new line
+
+  Rule: A forward or an answer that cannot be read is refused
+
+    @unhappy @uc-07-58
+    Scenario Outline: A forward to a wrong address is refused
+      Given Mia asks her assistant to forward "Launch review" to <fault>
+      When the assistant sends the forward
+      Then nothing is forwarded and Mia is not asked
+      And the assistant says what to correct before it tries again
+
+      Examples:
+        | fault                               |
+        | a name where an address is needed   |
+        | Priya twice in the list             |
+
+    @unhappy @uc-07-59
+    Scenario Outline: A new time that cannot be sent with the answer is refused
+      Given Mia asks her assistant to decline "Launch review" with <fault>
+      When the assistant sends the answer
+      Then no answer is sent and Mia is not asked
+      And the assistant says what to correct before it tries again
+
+      Examples:
+        | fault                                        |
+        | a new time and no answer to carry it         |
+        | a new time in words                          |
+        | a new time that ends before it starts        |

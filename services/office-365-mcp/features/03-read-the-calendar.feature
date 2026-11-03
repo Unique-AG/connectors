@@ -251,3 +251,53 @@ Feature: Reading the calendar
       When Mia asks her assistant which of tomorrow's meetings she organizes herself
       Then the assistant names "Team sync" as her own meeting
       But it does not name "Launch review" as her own meeting
+
+  Rule: A link or a time zone that the assistant made up is refused
+
+    @unhappy @uc-03-29
+    Scenario: A link that the assistant made up is not used
+      Given Mia's assistant knows the subject "Launch review" and has no link of that meeting
+      When the assistant uses the subject as the link
+      Then the assistant reads nothing
+      And it takes the link from a list of Mia's meetings before it tries again
+
+    @unhappy @uc-03-30
+    Scenario: A time zone that does not exist is not guessed
+      Given Mia asks for the times of a meeting in the zone "Atlantis/Nowhere"
+      When the assistant passes that zone on
+      Then the assistant reads nothing
+      And it asks Mia for a real zone, or it leaves the zone out
+
+  Rule: The assistant shows when a meeting repeats
+
+    @happy @uc-03-31
+    Scenario: The repeat rule of a weekly meeting is shown
+      Given Mia's "Weekly design sync" repeats every Monday for 6 weeks
+      When Mia asks her assistant how often "Weekly design sync" takes place
+      Then the assistant says that it repeats every Monday
+      And it says that it ends after 6 times
+
+    @unhappy @uc-03-32
+    Scenario: One date of a series is sent back to the series
+      Given Mia's "Team sync" on Thursday is one date of a series
+      When Mia's assistant lists the dates of the series with the link of that one date
+      Then the assistant lists nothing
+      And it uses the link of the series itself
+
+  Rule: Cancelled meetings are left out or named on request
+
+    @happy @uc-03-33
+    Scenario: The cancelled meetings are left out of a list
+      Given Mia has a cancelled meeting and two other meetings this week
+      When Mia asks her assistant for the meetings of this week that are not cancelled
+      Then the assistant lists the two other meetings
+      But it does not list the cancelled meeting
+
+  Rule: A time that Microsoft gives in a form nobody can read is shown as written
+
+    @unhappy @uc-03-34
+    Scenario: A meeting time that cannot be converted is shown as written
+      Given Microsoft gives the start of a meeting in a form that no time zone explains
+      When Mia asks her assistant to open the meeting
+      Then the assistant shows the start as Microsoft wrote it
+      But it does not give a converted time

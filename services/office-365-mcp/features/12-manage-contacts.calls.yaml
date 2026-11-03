@@ -330,3 +330,67 @@ uc-12-20:
     the organization, then to have the user sign in again, and that retrying will not help. The
     failed call is the only step, so it is optional. A failed lookup is never a person who is not in
     the contacts.
+
+uc-12-21:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeToTheAddressesOfAContactKeepsTheOthers::test_it_adds_an_address_next_to_the_ones_the_contact_has_and_skips_a_repeat"
+  ask: "Add tom.berger@home.example to the contact Tom Berger."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_update_contact
+      uses: {uri: uri of Tom Berger from outlook_list_contacts}
+  note: "tools/outlook_update_contact.py:242-253: the tool reads the list, adds the new addresses, and writes the list back. A repeat is skipped whatever its case."
+
+uc-12-22:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeToTheAddressesOfAContactKeepsTheOthers::test_it_removes_an_address_whatever_its_case_and_keeps_the_others"
+  ask: "Remove tom@acme.example from the contact Tom Berger."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_update_contact
+      uses: {uri: uri of Tom Berger from outlook_list_contacts}
+  note: "tools/outlook_update_contact.py:242-248: the tool keeps every entry except the removed address, and keeps an entry that has no address."
+
+uc-12-23:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactValueThatDoesNotFitChangesNothing::test_it_refuses_the_call_before_it_asks_microsoft"
+  ask: "Change the contact Tom Berger."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_update_contact
+      uses: {uri: uri of Tom Berger from outlook_list_contacts}
+  note: "expected behaviour from the checks before any Graph call: tools/outlook_list_contacts.py:70-72, tools/outlook_read_contact.py:241-243, and tools/outlook_update_contact.py:151-153, :171-179 and :182-198."
+
+uc-12-24:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactIsReadAsMicrosoftHoldsIt::test_it_reads_a_contact_that_holds_no_postal_address_as_having_none"
+  ask: "What is the address of Tom Berger?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_read_contact
+      uses: {uri: uri of Tom Berger from outlook_list_contacts}
+  note: "tools/outlook_read_contact.py:295-297: a missing address object, and an address with no part, are both null."
+
+uc-12-25:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactIsReadAsMicrosoftHoldsIt::test_it_lists_the_contacts_that_hold_one_address"
+  ask: "Which contact has the address tom@acme.example?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_contacts
+      args: {address: tom@acme.example}
+  note: "tools/outlook_list_contacts.py:93-96 filters on the address, and doubles a quote inside it."

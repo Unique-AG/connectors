@@ -714,3 +714,142 @@ class TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty:
 
         assert STOP_AND_REPORT in str(first.value)
         assert STOP_AND_REPORT in str(second.value)
+
+
+class TestTheReplyMiaSeesIsTheReplyThatOutlookHolds:
+    async def test_it_reads_a_reply_with_no_end_that_goes_to_contacts_only(
+        self, graph: MockRouter
+    ) -> None:
+        _ = Mailbox(
+            graph,
+            status="alwaysEnabled",
+            externalAudience="contactsOnly",
+            scheduledStartDateTime=None,
+            scheduledEndDateTime=None,
+        )
+
+        stored = await _stored_reply()
+
+        assert (stored["status"], stored["external_audience"]) == ("alwaysEnabled", "contactsOnly")
+        assert (stored["scheduled_start"], stored["scheduled_end"]) == (None, None)
+
+    async def test_it_reads_a_reply_setting_with_no_state_and_no_audience(
+        self, graph: MockRouter
+    ) -> None:
+        _ = graph.get(SETTINGS).mock(
+            return_value=httpx.Response(200, json={"automaticRepliesSetting": {}})
+        )
+
+        stored = await _stored_reply()
+
+        assert (stored["status"], stored["external_audience"]) == (None, None)
+
+    async def test_it_reads_a_mailbox_that_holds_no_reply_as_a_reply_with_no_state(
+        self, graph: MockRouter
+    ) -> None:
+        _ = graph.get(SETTINGS).mock(return_value=httpx.Response(200, json={}))
+
+        stored = await _stored_reply()
+
+        assert (stored["status"], stored["external_audience"]) == (None, None)
+
+    @pytest.mark.parametrize(
+        ("answer", "state"),
+        [
+            ({}, (None, None)),
+            ({"automaticRepliesSetting": {}}, (None, None)),
+            (
+                {
+                    "automaticRepliesSetting": {
+                        "status": "alwaysEnabled",
+                        "externalAudience": "contactsOnly",
+                    }
+                },
+                ("alwaysEnabled", "contactsOnly"),
+            ),
+        ],
+        ids=["no-setting", "empty-setting", "runs-for-contacts-only"],
+    )
+    async def test_it_reports_the_state_that_microsoft_stored_after_a_change(
+        self, graph: MockRouter, answer: dict[str, object], state: tuple[object, object]
+    ) -> None:
+        _ = graph.get(SETTINGS).mock(return_value=httpx.Response(200, json={}))
+        _ = graph.patch(SETTINGS).mock(return_value=httpx.Response(200, json=answer))
+
+        stored = await call("outlook_set_automatic_reply", status="disabled")
+
+        assert (stored["status"], stored["external_audience"]) == state
+
+    async def test_it_names_the_contacts_who_get_the_reply_in_the_question(
+        self, graph: MockRouter
+    ) -> None:
+        person = Person()
+        _ = Mailbox(graph, person)
+
+        _ = await call(
+            "outlook_set_automatic_reply",
+            person=person,
+            status="scheduled",
+            start=MONDAY,
+            end=SATURDAY,
+            time_zone=MIAS_ZONE,
+            internal_message="<p>I am away.</p>",
+            external_audience="contactsOnly",
+        )
+
+        assert "Contacts outside the organization get" in person.asked[0]
+
+    async def test_it_reads_the_time_zone_the_hours_the_language_and_the_archive_folder(
+        self, graph: MockRouter
+    ) -> None:
+        _ = graph.get(SETTINGS).mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "timeZone": "W. Europe Standard Time",
+                    "archiveFolder": "ARCHIVE1",
+                    "language": {"locale": "de-CH", "displayName": "German (Switzerland)"},
+                    "workingHours": {
+                        "daysOfWeek": ["monday", "tuesday"],
+                        "startTime": "08:00:00.0000000",
+                        "endTime": "17:00:00.0000000",
+                        "timeZone": {"name": "W. Europe Standard Time"},
+                    },
+                },
+            )
+        )
+
+        stored = await call("outlook_get_mailbox_settings", include="preferences")
+
+        assert stored["time_zone"] == "W. Europe Standard Time"
+        assert stored["language"] == {"locale": "de-CH", "display_name": "German (Switzerland)"}
+        assert stored["archive_folder_uri"] == "outlook:///folders/ARCHIVE1"
+        assert stored["automatic_reply"] is None
+
+    async def test_it_reads_a_mailbox_that_holds_no_language_as_no_language(
+        self, graph: MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_get_mailbox_settings-preferences")
+
+        stored = await call("outlook_get_mailbox_settings", include="preferences")
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert stored["time_zone"] == "W. Europe Standard Time"
+        assert (stored["language"], stored["archive_folder_uri"]) == (None, None)
+        assert _section(stored, "working_hours")["days"] == [
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+        ]
+
+    async def test_it_lists_the_category_names_of_the_mailbox(self, graph: MockRouter) -> None:
+        routes = serve(graph, "rec-tool-outlook_get_mailbox_settings-categories")
+
+        stored = await call("outlook_get_mailbox_settings", include="categories")
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert stored["categories"] == [f"synthetic text {number:02d}" for number in range(1, 7)]
+        assert stored["categories_capped"] is False
+        assert stored["rules"] is None

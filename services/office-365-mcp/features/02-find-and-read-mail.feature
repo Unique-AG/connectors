@@ -304,3 +304,40 @@ Feature: Finding and reading mail
       When Mia asks her assistant for the messages that Anna sent her
       Then the assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that
       But it does not tell Mia that no message matches
+
+  Rule: An attachment is given as Microsoft describes it
+
+    @happy @uc-02-40
+    Scenario Outline: An attachment is given with the type that fits its bytes
+      Given Mia has a message with an attachment that Microsoft describes as <description>
+      When Mia asks her assistant to read the attachment
+      Then the assistant gives the file as <type>
+      And the bytes of the file are the bytes that Microsoft sent
+
+      Examples:
+        | description                           | type                      |
+        | a file with no type                   | a file of unknown type    |
+        | a file with a type that is not a type | a file of unknown type    |
+        | a text file that reads as text        | text                      |
+        | a text file that does not read as text | a file of unknown type   |
+
+    @unhappy @uc-02-41
+    Scenario: An attachment that is larger than Microsoft announced is refused
+      Given Microsoft announces an attachment of 100 bytes
+      When the file that arrives is above 10 MB
+      Then the assistant gives no part of the file
+      And the assistant tells Mia to open the message in Outlook
+
+    @happy @uc-02-42
+    Scenario: An attachment of a kind that nobody knows is listed as unknown
+      Given Mia has a message with an attachment of a new kind
+      When Mia asks her assistant to list the attachments
+      Then the assistant lists the attachment with its name
+      And the assistant says that the kind is unknown
+
+    @happy @uc-02-43
+    Scenario: A message with no follow-up flag is listed with no flag
+      Given Mia has a message in her inbox that carries no follow-up flag
+      When Mia asks her assistant to list her newest mail
+      Then the message is listed
+      And the message shows no flag

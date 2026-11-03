@@ -1,8 +1,9 @@
 import base64
+import contextlib
 import functools
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from html import unescape
 from typing import Never, cast
 from urllib.parse import unquote
@@ -15,7 +16,15 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
-from mcp.types import BlobResourceContents, EmbeddedResource
+from mcp.types import (
+    BlobResourceContents,
+    CallToolResult,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    ElicitResult,
+    EmbeddedResource,
+    InputRequiredResult,
+)
 from respx.models import Call
 
 from office_365_mcp.shared.handles import (
@@ -761,8 +770,25 @@ _APPROVED_WRITES: list[tuple[str, Row]] = [
     ("onenote_copy_notebook", {"notebook": _NOTEBOOK, "to_group": _GROUP_ID}),
     ("onenote_copy_section", {"section": _SECTION, "to_notebook": _TEAM_NOTEBOOK}),
     ("onenote_copy_page", {"page": _PAGE, "to_section": _TEAM_SECTION}),
+    ("onenote_append_to_page", {"page": _TEAM_PAGE, "body_html": "<p>x</p>"}),
+    ("onenote_rename_page", {"page": _TEAM_PAGE, "title": "Retro"}),
+    ("onenote_create_notebook", {"name": "Plans", "group": _GROUP_ID}),
+    ("onenote_create_section", {"parent": _TEAM_NOTEBOOK, "name": "Plans"}),
+    ("onenote_create_section_group", {"parent": _TEAM_NOTEBOOK, "name": "Plans"}),
 ]
-_WRITE_IDS = ["erase", "replace", "team-page", "notebook-copy", "section-copy", "page-copy"]
+_WRITE_IDS = [
+    "erase",
+    "replace",
+    "team-page",
+    "notebook-copy",
+    "section-copy",
+    "page-copy",
+    "append",
+    "rename",
+    "notebook",
+    "section",
+    "section-group",
+]
 
 
 class TestAChangeThatIsNotApproved:
@@ -779,7 +805,7 @@ class TestAChangeThatIsNotApproved:
         assert "say that the request was not confirmed" in str(declined.value)
         assert "Do not call this tool again for the same request" in str(declined.value)
         assert len(person.asked) == 1
-        assert {method for method, _ in _sent(graph)} == {"GET"}
+        assert {method for method, _ in _sent(graph)} <= {"GET"}
 
     @pytest.mark.parametrize(("tool", "arguments"), _APPROVED_WRITES[:3], ids=_WRITE_IDS[:3])
     async def test_a_change_without_an_answer_does_not_happen_and_can_be_asked_again(
@@ -1139,8 +1165,13 @@ class TestARenameAHeadAndAPreview:
                 {"page": _PAGE, "title": "Decisions"},
                 "Use onenote_read_page to see the new title",
             ),
+            (
+                "onenote_edit_page",
+                {"page": _PAGE, "commands": [_EDIT]},
+                "Do not send the same commands to onenote_edit_page again",
+            ),
         ],
-        ids=["append", "rename"],
+        ids=["append", "rename", "edit"],
     )
     async def test_a_change_that_was_made_but_cannot_be_shown_is_not_made_twice(
         self, graph: respx.MockRouter, tool: str, arguments: Row, told: str
@@ -1179,3 +1210,749 @@ class TestARenameAHeadAndAPreview:
         assert patch.call_count == 1
         assert "does not know if Microsoft 365 made the change" in str(unknown.value)
         assert "onenote_read_page" in str(unknown.value)
+
+
+_NOT_A_HANDLE = "Acme kickoff"
+_BIN = OnenoteSectionGroupHandle("SG1").uri
+_TEAM_BIN = OnenoteSectionGroupHandle("SG1", owner=_TEAM).uri
+_BODY = "<p>x</p>"
+
+_UNUSABLE_VALUES: list[tuple[str, Row]] = [
+    ("onenote_read_page", {"page": _NOT_A_HANDLE}),
+    ("onenote_preview_page", {"page": _NOT_A_HANDLE}),
+    ("onenote_append_to_page", {"page": _NOT_A_HANDLE, "body_html": _BODY}),
+    ("onenote_edit_page", {"page": _NOT_A_HANDLE, "commands": [_EDIT]}),
+    ("onenote_rename_page", {"page": _NOT_A_HANDLE, "title": "Retro"}),
+    ("onenote_delete_page", {"page": _NOT_A_HANDLE}),
+    ("onenote_copy_page", {"page": _NOT_A_HANDLE, "to_section": _SECTION}),
+    ("onenote_copy_page", {"page": _PAGE, "to_section": _NOT_A_HANDLE}),
+    ("onenote_copy_section", {"section": _NOT_A_HANDLE, "to_notebook": _NOTEBOOK}),
+    ("onenote_copy_section", {"section": _SECTION, "to_notebook": _NOT_A_HANDLE}),
+    ("onenote_copy_section", {"section": _SECTION, "to_section_group": _NOT_A_HANDLE}),
+    ("onenote_copy_notebook", {"notebook": _NOT_A_HANDLE}),
+    ("onenote_create_page", {"title": "Retro", "body_html": _BODY, "section": _NOT_A_HANDLE}),
+    ("onenote_create_section", {"parent": _NOT_A_HANDLE, "name": "Plans"}),
+    ("onenote_create_section_group", {"parent": _NOT_A_HANDLE, "name": "Plans"}),
+    ("onenote_list_sections", {"parent": _NOT_A_HANDLE}),
+    ("onenote_list_pages", {"section": _NOT_A_HANDLE}),
+    ("onenote_get_operation", {"operation": _NOT_A_HANDLE}),
+    ("onenote_read_resource", {"resource": _NOT_A_HANDLE}),
+    ("onenote_find_notebook_from_url", {"web_url": _NOTEBOOK}),
+    ("onenote_find_notebook_from_url", {"web_url": _SECTION}),
+    ("onenote_find_notebook_from_url", {"web_url": _PAGE}),
+    ("onenote_find_notebook_from_url", {"web_url": _BIN}),
+]
+
+_CONTRADICTIONS: list[tuple[str, Row]] = [
+    ("onenote_list_notebooks", {"group": _GROUP_ID, "site": _SITE.owner_id}),
+    ("onenote_list_pages", {"group": _GROUP_ID, "site": _SITE.owner_id}),
+    ("onenote_find_notebook_from_url", {"web_url": _WEB_URL, "group": _GROUP_ID, "site": "s"}),
+    ("onenote_create_notebook", {"name": "Plans", "group": _GROUP_ID, "site": _SITE.owner_id}),
+    ("onenote_list_pages", {"section": _SECTION, "group": _GROUP_ID}),
+    ("onenote_list_pages", {"include_level_and_order": True}),
+    ("onenote_list_pages", {"modified_after": "2026-03-05", "modified_before": "2026-03-01"}),
+    ("onenote_list_pages", {"created_after": "2026-03-05", "created_before": "2026-03-01"}),
+    (
+        "onenote_create_page",
+        {"title": "Retro", "body_html": _BODY, "section": _SECTION, "section_name": "Work"},
+    ),
+    (
+        "onenote_copy_section",
+        {"section": _SECTION, "to_notebook": _NOTEBOOK, "to_section_group": _BIN},
+    ),
+    ("onenote_copy_section", {"section": _SECTION}),
+]
+
+
+class TestArgumentsThatCannotWork:
+    @pytest.mark.parametrize(("tool", "arguments"), _UNUSABLE_VALUES)
+    async def test_a_value_that_names_no_note_is_refused_before_microsoft_is_asked(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, arguments)
+
+        assert tool in str(refused.value)
+        assert not graph.calls
+
+    @pytest.mark.parametrize(("tool", "arguments"), _CONTRADICTIONS)
+    async def test_arguments_that_contradict_each_other_are_refused_before_microsoft_is_asked(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, arguments)
+
+        assert tool in str(refused.value)
+        assert not graph.calls
+
+
+class TestNarrowingAListing:
+    async def test_pages_in_a_window_are_given_by_microsoft_in_a_real_answer(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_list_pages-window")
+
+        found = await call(
+            "onenote_list_pages",
+            modified_after="2026-03-01",
+            modified_before="2026-03-04",
+            created_before="2026-03-04",
+            limit=5,
+        )
+
+        [listing] = routes.values()
+        assert listing.calls.last.request.url.params["$filter"] == (
+            "lastModifiedDateTime ge 2026-03-01T00:00:00Z"
+            + " and lastModifiedDateTime lt 2026-03-05T00:00:00Z"
+            + " and createdDateTime lt 2026-03-05T00:00:00Z"
+        )
+        assert _rows(found, "pages")
+
+    async def test_the_notebooks_that_a_person_owns_alone_are_given_by_microsoft_in_a_real_answer(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_list_notebooks-owned")
+
+        found = await call("onenote_list_notebooks", shared=False, role="Owner")
+
+        listing = routes[("GET", "/me/onenote/notebooks")]
+        assert listing.calls.last.request.url.params["$filter"] == (
+            "isShared eq false and userRole eq 'Owner'"
+        )
+        assert "seed-v1 Scratch" in {row["name"] for row in _rows(found, "notebooks")}
+
+    @pytest.mark.parametrize(
+        ("arguments", "clause"),
+        [
+            ({"modified_after": "2026-03-01"}, "lastModifiedDateTime ge 2026-03-01T00:00:00Z"),
+            ({"modified_before": "2026-03-04"}, "lastModifiedDateTime lt 2026-03-05T00:00:00Z"),
+            (
+                {"modified_before": "2026-03-04T10:30:00Z"},
+                "lastModifiedDateTime le 2026-03-04T10:30:00Z",
+            ),
+            ({"created_before": "2026-03-04"}, "createdDateTime lt 2026-03-05T00:00:00Z"),
+            (
+                {"created_before": "2026-03-04T10:30:00.250000Z"},
+                "createdDateTime le 2026-03-04T10:30:00.250000Z",
+            ),
+            ({"created_by_app_id": "app-1"}, "createdByAppId eq 'app-1'"),
+        ],
+        ids=[
+            "modified-after-day",
+            "modified-before-day",
+            "modified-before-moment",
+            "created-before-day",
+            "created-before-fraction",
+            "app",
+        ],
+    )
+    async def test_pages_are_asked_for_inside_the_window_that_was_given(
+        self, graph: respx.MockRouter, arguments: Row, clause: str
+    ) -> None:
+        listing = graph.get("/me/onenote/pages").mock(
+            return_value=httpx.Response(200, json={"value": [_page()]})
+        )
+
+        found = await call("onenote_list_pages", **cast("dict[str, Never]", arguments))
+
+        assert [row["title"] for row in _rows(found, "pages")] == ["Acme kickoff"]
+        assert listing.calls.last.request.url.params["$filter"] == clause
+
+    @pytest.mark.parametrize(
+        ("arguments", "clause"),
+        [
+            ({"shared": True}, "isShared eq true"),
+            ({"shared": False, "role": "Owner"}, "isShared eq false and userRole eq 'Owner'"),
+            ({"role": "Reader"}, "userRole eq 'Reader'"),
+        ],
+        ids=["shared", "owned", "read-only"],
+    )
+    async def test_notebooks_are_asked_for_by_their_sharing_and_the_role_of_the_person(
+        self, graph: respx.MockRouter, arguments: Row, clause: str
+    ) -> None:
+        listing = graph.get("/me/onenote/notebooks").mock(
+            return_value=httpx.Response(200, json={"value": [_notebook()]})
+        )
+        _ = graph.get("/me/onenote/sections").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+        _ = graph.get("/me/onenote/sectionGroups").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+
+        found = await call("onenote_list_notebooks", **cast("dict[str, Never]", arguments))
+
+        assert [row["name"] for row in _rows(found, "notebooks")] == ["Customers"]
+        assert listing.calls.last.request.url.params["$filter"] == clause
+
+
+def _made(request: httpx.Request) -> httpx.Response:
+    path, method = request.url.path, request.method
+    if method == "GET":
+        return _onenote_reads(request)
+    if method == "DELETE" or path.endswith("onenotePatchContent"):
+        return httpx.Response(204)
+    if "/copy" in path:
+        return httpx.Response(202, json=_operation())
+    leaf = path.rsplit("/", 1)[1]
+    created: Row = {
+        "pages": _page(),
+        "notebooks": _notebook(),
+        "sections": _section(),
+        "sectionGroups": {"id": "SG1", "displayName": "Bin"},
+    }
+    return httpx.Response(201, json=created[leaf])
+
+
+_TEAM_INSERT = {"target": "p:{b2}!2", "action": "insert", "position": "after", "content": _BODY}
+
+_TEAM_WRITES: list[tuple[str, Row, str, str, str]] = [
+    ("onenote_delete_page", {"page": _TEAM_PAGE}, "Delete the page", "DELETE", _PAGE_ID),
+    (
+        "onenote_edit_page",
+        {"page": _TEAM_PAGE, "commands": [_EDIT]},
+        "Change the page",
+        "POST",
+        "onenotePatchContent",
+    ),
+    (
+        "onenote_edit_page",
+        {"page": _TEAM_PAGE, "commands": [_TEAM_INSERT]},
+        "the first inserts",
+        "POST",
+        "onenotePatchContent",
+    ),
+    (
+        "onenote_append_to_page",
+        {"page": _TEAM_PAGE, "body_html": _BODY},
+        "Append to the page",
+        "POST",
+        "onenotePatchContent",
+    ),
+    (
+        "onenote_rename_page",
+        {"page": _TEAM_PAGE, "title": "Retro"},
+        "Rename the page",
+        "POST",
+        "onenotePatchContent",
+    ),
+    (
+        "onenote_create_page",
+        {"title": "Retro", "body_html": _BODY, "section": _TEAM_SECTION},
+        "Create the page",
+        "POST",
+        f"/sections/{_SECTION_ID}/pages",
+    ),
+    (
+        "onenote_create_notebook",
+        {"name": "Plans", "group": _GROUP_ID},
+        "Every member of the group",
+        "POST",
+        f"/groups/{_GROUP_ID}/onenote/notebooks",
+    ),
+    (
+        "onenote_create_notebook",
+        {"name": "Plans", "site": _SITE.owner_id},
+        "Other people with access to the site",
+        "POST",
+        f"/sites/{_SITE.owner_id}/onenote/notebooks",
+    ),
+    (
+        "onenote_create_section",
+        {"parent": _TEAM_NOTEBOOK, "name": "Plans"},
+        "Create the section",
+        "POST",
+        f"/notebooks/{_NOTEBOOK_ID}/sections",
+    ),
+    (
+        "onenote_create_section",
+        {"parent": _TEAM_BIN, "name": "Plans"},
+        "in the section group",
+        "POST",
+        "/sectionGroups/SG1/sections",
+    ),
+    (
+        "onenote_create_section_group",
+        {"parent": _TEAM_NOTEBOOK, "name": "Plans"},
+        "Create the section group",
+        "POST",
+        f"/notebooks/{_NOTEBOOK_ID}/sectionGroups",
+    ),
+    (
+        "onenote_create_section_group",
+        {"parent": _TEAM_BIN, "name": "Plans"},
+        "in the section group",
+        "POST",
+        "/sectionGroups/SG1/sectionGroups",
+    ),
+    (
+        "onenote_copy_notebook",
+        {"notebook": _NOTEBOOK, "to_group": _GROUP_ID, "new_name": "Plans"},
+        "renamed 'Plans'",
+        "POST",
+        "copyNotebook",
+    ),
+    (
+        "onenote_copy_section",
+        {"section": _SECTION, "to_notebook": _TEAM_NOTEBOOK},
+        "Copy the section",
+        "POST",
+        "copyToNotebook",
+    ),
+    (
+        "onenote_copy_section",
+        {"section": _SECTION, "to_section_group": _TEAM_BIN},
+        "into the section group",
+        "POST",
+        "copyToSectionGroup",
+    ),
+    (
+        "onenote_copy_page",
+        {"page": _PAGE, "to_section": _TEAM_SECTION},
+        "Copy the page",
+        "POST",
+        "copyToSection",
+    ),
+]
+_TEAM_WRITE_IDS = [
+    "erase",
+    "replace",
+    "insert",
+    "append",
+    "rename",
+    "team-page",
+    "group-notebook",
+    "site-notebook",
+    "section",
+    "section-in-group",
+    "section-group",
+    "section-group-in-group",
+    "notebook-copy",
+    "section-copy",
+    "section-copy-to-group",
+    "page-copy",
+]
+
+
+@contextlib.asynccontextmanager
+async def _modern_client(person: Person | None = None) -> AsyncGenerator[Client[FastMCPTransport]]:
+    with pytest.MonkeyPatch.context() as patch:
+        patch_obo(patch)
+        handler = person or Person()
+        async with Client(FastMCPTransport(_server()), elicitation_handler=handler) as client:
+            yield client
+
+
+def _the_word_for_yes(first: InputRequiredResult) -> tuple[str, str]:
+    requests = first.input_requests or {}
+    [key] = requests
+    request = requests[key]
+    assert isinstance(request, ElicitRequest)
+    assert isinstance(request.params, ElicitRequestFormParams)
+    properties = cast(
+        "Mapping[str, Mapping[str, Sequence[str]]]", request.params.requested_schema["properties"]
+    )
+    return key, properties["value"]["enum"][0]
+
+
+def _writes(graph: respx.MockRouter) -> list[tuple[str, str]]:
+    return [(method, path) for method, path in _sent(graph) if method in {"POST", "DELETE"}]
+
+
+class TestAnApprovalInEveryEra:
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "asked", "method", "path_end"), _TEAM_WRITES, ids=_TEAM_WRITE_IDS
+    )
+    async def test_a_change_in_the_notes_of_a_team_is_made_once_after_the_person_approves(
+        self,
+        graph: respx.MockRouter,
+        tool: str,
+        arguments: Row,
+        asked: str,
+        method: str,
+        path_end: str,
+    ) -> None:
+        _ = graph.route().mock(side_effect=_made)
+        person = Person()
+
+        async with _modern_client(person) as client:
+            answer = await client.call_tool(tool, arguments)
+
+        assert answer.structured_content is not None
+        [question] = person.asked
+        assert asked in question
+        [(sent, path)] = _writes(graph)
+        assert sent == method
+        assert path.endswith(path_end) or path_end in path
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("onenote_delete_page", {"page": _TEAM_PAGE}),
+            ("onenote_rename_page", {"page": _TEAM_PAGE, "title": "Retro"}),
+            ("onenote_create_notebook", {"name": "Plans", "group": _GROUP_ID}),
+            ("onenote_copy_notebook", {"notebook": _NOTEBOOK, "to_group": _GROUP_ID}),
+        ],
+        ids=["erase", "rename", "notebook", "notebook-copy"],
+    )
+    async def test_an_approval_that_is_bound_to_no_request_makes_no_change(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        _ = graph.route().mock(side_effect=_made)
+
+        async with _modern_client() as client:
+            first = await client.session.call_tool(tool, arguments, allow_input_required=True)
+            assert isinstance(first, InputRequiredResult), "the question was never put to anybody"
+            key, word = _the_word_for_yes(first)
+            second = await client.session.call_tool(
+                tool,
+                arguments,
+                input_responses={key: ElicitResult(action="accept", content={"value": word})},
+                allow_input_required=True,
+            )
+
+        assert isinstance(second, CallToolResult), "the unbound retry asked again instead"
+        assert second.is_error
+        assert "given for a different request" in str(second.content)
+        assert _writes(graph) == []
+
+    async def test_an_approval_that_came_with_no_question_makes_no_change(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.route().mock(side_effect=_made)
+
+        async with _modern_client() as client:
+            first = await client.session.call_tool(
+                "onenote_delete_page", {"page": _TEAM_PAGE}, allow_input_required=True
+            )
+            assert isinstance(first, InputRequiredResult)
+            key, word = _the_word_for_yes(first)
+            second = await client.session.call_tool(
+                "onenote_create_notebook",
+                {"name": "Plans"},
+                input_responses={key: ElicitResult(action="accept", content={"value": word})},
+                allow_input_required=True,
+            )
+
+        assert isinstance(second, CallToolResult)
+        assert second.is_error
+        assert "given for a different request" in str(second.content)
+        assert _writes(graph) == []
+
+
+def _page_without(*keys: str) -> Row:
+    return {key: value for key, value in _page().items() if key not in keys}
+
+
+def _reads_with(
+    notebook: Row, page: Row | None = None
+) -> Callable[[httpx.Request], httpx.Response]:
+    def reads(request: httpx.Request) -> httpx.Response:
+        if "/pages/" in request.url.path:
+            return httpx.Response(200, json=page or _page())
+        return httpx.Response(200, json=notebook)
+
+    return reads
+
+
+_WHY_ASKED: list[tuple[Row, Row | None, str, str]] = [
+    (
+        {"id": _NOTEBOOK_ID, "displayName": "Customers", "isShared": True, "userRole": "Owner"},
+        None,
+        _PAGE,
+        "shared with other people",
+    ),
+    (
+        {
+            "id": _NOTEBOOK_ID,
+            "displayName": "Customers",
+            "isShared": False,
+            "userRole": "Contributor",
+        },
+        None,
+        _PAGE,
+        "belongs to somebody else (you are Contributor)",
+    ),
+    (
+        {"id": _NOTEBOOK_ID, "displayName": "Customers"},
+        None,
+        _PAGE,
+        "whose sharing Microsoft did not report",
+    ),
+    (_notebook(), _page_without("parentNotebook"), _PAGE, "in the notebook 'an unnamed notebook'"),
+    (_notebook(), None, _SITE_PAGE, "which belongs to a SharePoint site"),
+]
+
+
+class TestTheQuestionTellsWhy:
+    @pytest.mark.parametrize(
+        ("notebook", "page", "handle", "why"),
+        _WHY_ASKED,
+        ids=["shared", "somebody-else", "unreported", "no-notebook-named", "site"],
+    )
+    async def test_the_question_says_why_the_notebook_needs_an_approval(
+        self, graph: respx.MockRouter, notebook: Row, page: Row | None, handle: str, why: str
+    ) -> None:
+        _ = graph.route(method="GET").mock(side_effect=_reads_with(notebook, page))
+        patch = graph.route(method="POST").mock(return_value=httpx.Response(204))
+        person = Person()
+
+        _ = await call("onenote_append_to_page", page=handle, body_html=_BODY, person=person)
+
+        [question] = person.asked
+        assert why in question
+        assert patch.call_count == 1
+
+
+class TestAPageWithNoSection:
+    @pytest.mark.parametrize(
+        ("notebooks", "asked"),
+        [
+            ([_notebook() | {"isDefault": True}], None),
+            ([_notebook(shared=True) | {"isDefault": True}], "shared with other people"),
+            ([], "whose sharing Microsoft did not report"),
+            ([_notebook(), _notebook() | {"id": "NB2"}], "whose sharing Microsoft did not report"),
+            ([_notebook()], None),
+        ],
+        ids=["default", "default-shared", "none", "two-none-default", "one-not-marked"],
+    )
+    async def test_a_page_with_no_section_goes_to_the_default_notebook(
+        self, graph: respx.MockRouter, notebooks: list[Row], asked: str | None
+    ) -> None:
+        _ = graph.get("/me/onenote/notebooks").mock(
+            return_value=httpx.Response(200, json={"value": notebooks})
+        )
+        create = graph.post("/me/onenote/pages").mock(
+            return_value=httpx.Response(201, json=_page_without("parentSection"))
+        )
+        person = Person()
+
+        created = await call("onenote_create_page", title="Retro", body_html=_BODY, person=person)
+
+        assert created["section_uri"] is None
+        assert create.call_count == 1
+        assert person.asked == [] if asked is None else asked in person.asked[0]
+
+    async def test_a_page_with_a_section_name_goes_to_a_section_of_that_name(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/onenote/notebooks").mock(
+            return_value=httpx.Response(200, json={"value": [_notebook() | {"isDefault": True}]})
+        )
+        create = graph.post("/me/onenote/pages").mock(
+            return_value=httpx.Response(201, json=_page())
+        )
+
+        _ = await call("onenote_create_page", title="Retro", body_html=_BODY, section_name="Work")
+
+        assert create.calls.last.request.url.params["sectionName"] == "Work"
+
+
+_MIA = {"createdBy": {"user": {"displayName": "Mia Keller"}}}
+_BY_AN_APP = {"createdBy": {"application": {"displayName": "Importer"}}}
+
+
+class TestWhatMicrosoftLeavesOut:
+    async def test_a_notebook_listing_leaves_out_what_has_no_address_and_names_no_creator_it_lacks(
+        self, graph: respx.MockRouter
+    ) -> None:
+        notebooks = [
+            {"displayName": "No address"},
+            _notebook() | _MIA,
+            _notebook() | {"id": "NB2", "displayName": "Imported"} | _BY_AN_APP,
+            _notebook() | {"id": "NB3", "displayName": "Orphan"},
+        ]
+        sections = [
+            {"displayName": "No address", "parentNotebook": {"id": _NOTEBOOK_ID}},
+            _section() | {"parentSectionGroup": {"id": "GONE"}},
+        ]
+        _ = graph.get("/me/onenote/notebooks").mock(
+            return_value=httpx.Response(200, json={"value": notebooks})
+        )
+        _ = graph.get("/me/onenote/sections").mock(
+            return_value=httpx.Response(200, json={"value": sections})
+        )
+        _ = graph.get("/me/onenote/sectionGroups").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+
+        everyone = await call("onenote_list_notebooks")
+        by_mia = await call("onenote_list_notebooks", created_by="mia")
+
+        assert [row["created_by"] for row in _rows(everyone, "notebooks")] == [
+            "Mia Keller",
+            None,
+            None,
+        ]
+        [mine] = _rows(by_mia, "notebooks")
+        [only_section] = _rows(mine, "sections")
+        assert only_section["group_path"] is None
+
+    async def test_a_section_listing_leaves_out_what_has_no_address_and_is_narrowed_by_creator(
+        self, graph: respx.MockRouter
+    ) -> None:
+        sections = [{"displayName": "No address"}, _section() | _MIA, _section() | {"id": "S2"}]
+        groups = [{"displayName": "No address"}, {"id": "SG1", "displayName": "Bin"} | _MIA]
+        _ = graph.get(f"/me/onenote/notebooks/{_NOTEBOOK_ID}/sections").mock(
+            return_value=httpx.Response(200, json={"value": sections})
+        )
+        _ = graph.get(f"/me/onenote/notebooks/{_NOTEBOOK_ID}/sectionGroups").mock(
+            return_value=httpx.Response(200, json={"value": groups})
+        )
+
+        everyone = await call("onenote_list_sections", parent=_NOTEBOOK)
+        by_mia = await call("onenote_list_sections", parent=_NOTEBOOK, created_by="MIA")
+
+        assert len(_rows(everyone, "sections")) == 2
+        assert len(_rows(everyone, "section_groups")) == 1
+        assert len(_rows(by_mia, "sections")) == 1
+        assert [row["created_by"] for row in _rows(by_mia, "section_groups")] == ["Mia Keller"]
+
+    async def test_a_page_listing_leaves_out_what_has_no_address_and_shows_no_link_it_lacks(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/onenote/pages").mock(
+            return_value=httpx.Response(
+                200, json={"value": [{"title": "No address"}, _page_without("links")]}
+            )
+        )
+
+        found = await call("onenote_list_pages")
+
+        [only] = _rows(found, "pages")
+        assert only["web_url"] is None
+
+    async def test_a_preview_with_no_picture_link_gives_only_its_words(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"{_PAGE_PATH}/preview()").mock(
+            return_value=httpx.Response(200, json={"previewText": "Decisions"})
+        )
+
+        shown = await call("onenote_preview_page", page=_PAGE)
+
+        assert (shown["preview_text"], shown["preview_image_url"]) == ("Decisions", None)
+
+    async def test_a_preview_with_a_picture_link_gives_the_link(
+        self, graph: respx.MockRouter
+    ) -> None:
+        address = "https://onenote.example.invalid/previews/acme-kickoff.png"
+        _ = graph.get(f"{_PAGE_PATH}/preview()").mock(
+            return_value=httpx.Response(
+                200,
+                json={"previewText": "Decisions", "links": {"previewImageUrl": {"href": address}}},
+            )
+        )
+
+        shown = await call("onenote_preview_page", page=_PAGE)
+
+        assert shown["preview_image_url"] == address
+
+    @pytest.mark.parametrize(
+        ("page", "told"),
+        [
+            (_page(), f"Open it in a browser instead, at {_WEB_URL}."),
+            (_page_without("links"), "Microsoft gave no web address for this page"),
+        ],
+        ids=["with-address", "no-address"],
+    )
+    async def test_a_page_that_is_not_text_is_explained_and_sent_to_the_browser_if_it_can_be(
+        self, graph: respx.MockRouter, page: Row, told: str
+    ) -> None:
+        _ = graph.get(_PAGE_PATH).mock(return_value=httpx.Response(200, json=page))
+        _ = graph.get(f"{_PAGE_PATH}/content").mock(return_value=_page_html(b"\xff\xfe\xfa"))
+
+        with pytest.raises(ToolError) as refused:
+            _ = await call("onenote_read_page", page=_PAGE)
+
+        assert told in str(refused.value)
+        assert "not valid UTF-8 text" in str(refused.value)
+
+    async def test_a_picture_with_no_type_is_given_as_plain_bytes(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/onenote/resources/RES1/content").mock(
+            return_value=httpx.Response(200, content=b"\x01\x02")
+        )
+
+        assert await _bytes_of("onenote_read_resource", resource=_PICTURE) == b"\x01\x02"
+
+
+class TestFollowingACopy:
+    @pytest.mark.parametrize(
+        ("location", "kind", "uri"),
+        [
+            ("/me/onenote/pages/NEWPG", "page", OnenotePageHandle("NEWPG").uri),
+            ("/me/onenote/sections/NEWSEC", "section", OnenoteSectionHandle("NEWSEC").uri),
+            ("/groups/%20/onenote/pages/NEWPG", "page", OnenotePageHandle("NEWPG").uri),
+            ("/me/drive/root", None, None),
+        ],
+        ids=["page", "section", "blank-owner", "unknown-place"],
+    )
+    async def test_a_finished_copy_names_what_it_made(
+        self, graph: respx.MockRouter, location: str, kind: str | None, uri: str | None
+    ) -> None:
+        finished = _operation(status="Completed") | {
+            "resourceLocation": f"https://graph.microsoft.com/v1.0{location}"
+        }
+        _ = graph.get(f"/me/onenote/operations/{_OPERATION_ID}").mock(
+            return_value=httpx.Response(200, json=finished)
+        )
+
+        state = await call(
+            "onenote_get_operation", operation=OnenoteOperationHandle(_OPERATION_ID).uri
+        )
+
+        assert (state["result_kind"], state["result_uri"]) == (kind, uri)
+
+    async def test_a_copy_that_microsoft_names_only_in_a_header_is_followed_by_that_name(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_PAGE_PATH).mock(return_value=httpx.Response(200, json=_page()))
+        _ = graph.post(f"{_PAGE_PATH}/copyToSection").mock(
+            return_value=httpx.Response(
+                202,
+                headers={
+                    "operation-location": f"https://graph.microsoft.com/v1.0/me/onenote/operations/{_OPERATION_ID}"
+                },
+            )
+        )
+        _ = graph.get(f"/me/onenote/sections/{_SECTION_ID}").mock(
+            return_value=httpx.Response(200, json=_section())
+        )
+        _ = graph.get(f"/me/onenote/notebooks/{_NOTEBOOK_ID}").mock(
+            return_value=httpx.Response(200, json=_notebook())
+        )
+
+        started = await call("onenote_copy_page", page=_PAGE, to_section=_SECTION)
+
+        assert started["uri"] == OnenoteOperationHandle(_OPERATION_ID).uri
+        assert started["status"] is None
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "path"),
+        [
+            (
+                "onenote_copy_page",
+                {"page": _PAGE, "to_section": _SECTION},
+                f"{_PAGE_PATH}/copyToSection",
+            ),
+            (
+                "onenote_copy_section",
+                {"section": _SECTION, "to_notebook": _NOTEBOOK},
+                f"/me/onenote/sections/{_SECTION_ID}/copyToNotebook",
+            ),
+        ],
+        ids=["page", "section"],
+    )
+    async def test_a_copy_that_nothing_can_follow_is_not_started_again_for_every_kind(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, path: str
+    ) -> None:
+        _ = graph.route(method="GET").mock(side_effect=_onenote_reads)
+        copy = graph.post(path).mock(return_value=httpx.Response(202, content=b""))
+
+        with pytest.raises(ToolError) as untracked:
+            _ = await _call(tool, arguments)
+
+        assert "may still be running" in str(untracked.value)
+        assert copy.call_count == 1

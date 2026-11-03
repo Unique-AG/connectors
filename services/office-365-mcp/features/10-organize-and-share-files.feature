@@ -368,3 +368,167 @@ Feature: Organizing and sharing files in OneDrive and SharePoint
         | problem                      |
         | fails with an internal error |
         | does not answer in time      |
+
+  Rule: The assistant stops a request that cannot succeed before it asks Mia
+
+    @unhappy @uc-10-39
+    Scenario Outline: A handle of the wrong kind is refused before Microsoft is asked
+      Given the assistant holds a web address or a handle of the wrong kind for the item that Mia means
+      When the assistant tries to <action> with that value
+      Then the assistant gets a message that names the kind of handle that it needs
+      But Mia is not asked and Microsoft is not asked
+      And nothing changes
+
+      Examples:
+        | action                               |
+        | move a file into a folder            |
+        | move a file into a file              |
+        | copy a file into a folder            |
+        | copy a file into a file              |
+        | rename a file                        |
+        | delete a file                        |
+        | give a person access to a file       |
+        | create a sharing link for a file     |
+        | create a folder inside a file        |
+        | save a text file inside a file       |
+
+    @unhappy @uc-10-40
+    Scenario Outline: A name of blank spaces is refused
+      Given Mia has the file "Q3 Plan.pptx" and the folder "Archive"
+      When Mia asks her assistant to <action> and the name has only spaces in it
+      Then the assistant tells Mia that the name is empty
+      But nothing is created, renamed, or copied
+
+      Examples:
+        | action                              |
+        | create a folder in "Archive"        |
+        | rename "Q3 Plan.pptx"               |
+        | copy "Q3 Plan.pptx" into "Archive"  |
+        | save a text file in "Archive"       |
+
+    @unhappy @uc-10-41
+    Scenario Outline: A file in the place of a folder is refused
+      Given Mia has the file "Plan v1.docx" and the folder "Archive"
+      And the assistant names "Plan v1.docx" as the folder to use
+      When the assistant tries to <action>
+      Then the assistant tells Mia that the item is not a folder
+      But Mia is not asked and nothing changes
+
+      Examples:
+        | action                       |
+        | create a folder in it        |
+        | save a text file in it       |
+        | copy a folder into it        |
+        | move a folder into it        |
+
+    @unhappy @uc-10-42
+    Scenario: A folder is not moved into itself
+      Given Mia has the folder "Archive"
+      When Mia asks her assistant to move "Archive" into "Archive"
+      Then the assistant tells Mia that an item cannot move into itself
+      But nothing changes
+
+    @unhappy @uc-10-43
+    Scenario: A person who is named twice is not invited
+      Given Mia has the file "Q3 Plan.pptx"
+      When Mia asks her assistant to give Anna edit access, and the assistant lists the address of Anna twice
+      Then the assistant tells Mia that the address is named twice
+      But nothing is shared and nobody is invited
+
+    @unhappy @uc-10-44
+    Scenario Outline: A person for whom Microsoft reports an error is named in the answer
+      Given Mia has the file "Q3 Plan.pptx"
+      And Microsoft gives Ben access, and it reports an error for Anna <reason>
+      When Mia asks her assistant to give Anna and Ben edit access to "Q3 Plan.pptx"
+      Then the assistant tells Mia that Ben has access
+      And it tells Mia that Anna has none <told>
+
+      Examples:
+        | reason                               | told                         |
+        | with the reason "no such user"       | and gives the reason         |
+        | and gives no reason                  | and that Microsoft gave none |
+
+    @unhappy @uc-10-47
+    Scenario: A sharing link that Microsoft gives without an address is not reported as made
+      Given Mia has the file "Q3 Plan.pptx"
+      And Microsoft accepts the order to make a link, and it sends no web address
+      When Mia asks her assistant for a view-only sharing link to "Q3 Plan.pptx"
+      Then the assistant tells Mia that Microsoft sent no address for the link
+      And it asks again one time, because the link can exist
+
+    @unhappy @uc-10-51
+    Scenario: A move of an item with no known old folder gives no way back
+      Given Mia has the folder "Archive" and the file "Plan v1.docx", and Microsoft names no folder that holds the file
+      When Mia asks her assistant to move "Plan v1.docx" into "Archive"
+      Then Mia is asked to approve the move
+      And after she approves, the file is in "Archive"
+      But the assistant has no old folder to name for a move back
+
+  Rule: The question to Mia names a place even when Microsoft sends no name for it
+
+    @happy @uc-10-45
+    Scenario Outline: The question about a folder delete says how full the folder is
+      Given Mia has the folder "Old drafts", and <state>
+      When Mia asks her assistant to delete "Old drafts"
+      Then Mia is asked to approve that "Old drafts" and everything in it go to the recycle bin
+      And the question says <told>
+
+      Examples:
+        | state                         | told                           |
+        | the folder is empty           | that the folder is empty       |
+        | the folder holds 1 item       | that it has 1 item inside it   |
+        | the folder holds 5 items      | that it has 5 items inside it  |
+        | Microsoft gives no item count | nothing about the item count   |
+
+    @unhappy @uc-10-48
+    Scenario Outline: A place with no name from Microsoft is named in a general way
+      Given Microsoft sends <what>
+      When Mia asks her assistant to <action>
+      Then Mia is asked to approve the change, and the question names <named>
+
+      Examples:
+        | what                                      | action                              | named                    |
+        | the top folder of a library               | create a folder in it               | the top folder           |
+        | a folder with no name                     | create a folder in it               | an unnamed folder        |
+        | the top folder of a library               | give a person access to it          | the top folder           |
+        | a file whose folder has a name but no path| rename the file                     | the name of that folder  |
+        | a file whose folder has no name           | rename the file                     | an unnamed folder        |
+
+    @unhappy @uc-10-49
+    Scenario Outline: A change that Microsoft answers without the item is checked by a second read
+      Given Mia has the file "Plan v1.docx"
+      And Microsoft renames the file and sends no item in its answer
+      And the second read of the file <second>
+      When Mia asks her assistant to rename "Plan v1.docx" to "Plan v2.docx"
+      Then the assistant tells Mia <told>
+
+      Examples:
+        | second                 | told                                                          |
+        | shows the new name     | that the file has the name "Plan v2.docx"                     |
+        | fails                  | that the rename happened, and that the new name is not shown  |
+
+    @unhappy @uc-10-50
+    Scenario: A OneNote notebook is not attached to a post in a Teams channel
+      Given Mia has the OneNote notebook "Customers" in her OneDrive
+      When Mia asks her assistant to post the notebook "Customers" in the channel "Launch"
+      Then the assistant tells Mia that a notebook is not a plain file and cannot be attached
+      But nothing is posted
+
+  Rule: A chat program that carries the question back to Mia gets the question first
+
+    @happy @uc-10-46
+    Scenario Outline: The approval question is passed back to Mia before anything changes
+      Given Mia has the file "Plan v1.docx" and the folder "Archive"
+      And Mia's chat program takes the question back with the answer, and not while the call runs
+      When Mia asks her assistant to <action>
+      Then the assistant passes the approval question to Mia
+      But nothing changes before she answers
+
+      Examples:
+        | action                                   |
+        | copy "Plan v1.docx" into "Archive"       |
+        | create a folder in "Archive"             |
+        | delete "Plan v1.docx"                    |
+        | give Anna access to "Plan v1.docx"       |
+        | move "Plan v1.docx" into "Archive"       |
+        | rename "Plan v1.docx" to "Plan v2.docx"  |

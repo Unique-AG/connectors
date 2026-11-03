@@ -92,7 +92,7 @@ def test_a_case_that_looks_up_a_seed_notebook_waits_until_the_list_shows_them() 
         if tool_of(plan.steps[0]) == "onenote_list_notebooks"
     }
     assert reading <= waiting
-    assert waiting - reading == {"onenote_list_pages-created-after"}
+    assert waiting - reading == {"onenote_list_pages-created-after", "onenote_list_pages-window"}
     assert (
         set(CASES) - waiting
         == {

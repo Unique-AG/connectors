@@ -1,0 +1,83 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_edit_message-chat.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "4.dxtGMy7V4vDBXDKk3z8PneWar8LgvcPjKTCGcOU9ukJJzUY1SceKxIH3JvtqW9guGO5DvQpDObNlR3R6Cqg3WLV7ORXGS6XtIbJMnCLpOIgBmHu0RBKLKwqJFIZYJKMpSpBOL95zOCaJxbZ4OOmRGC5Wj5wUUC58CVCTq5dcOaMjW0d4HWsBm87zJUUYQMT7FIQDGM2VVRPFIFq8AQIJxC85HXOIMVI4PQIDzDAEsXxLeu4nOGvWTMtek3qRRWifCYHyr18EMZzFFxNWHZPoKX8oJFCXFSKUkwY9BOKnGBBNCIDSJwEVYLYmAGW3CGuuCgStDI4abWKbDK6XPr9BUbfIs7DJDjmsqSNuNSXDysDFAyNfPC0eJ3u0vHWaxeF2FsyzaMjU7dFsOBvPGI69M9MmMO8SMBTOFIDIuGbPJerimVCF5HfEkHnXRDgNAGi1G9kXuz9lEANBqsSiAaSM4FeNHErXq5sfFmu0WNU5xZrZVkrBsb55XYJRnDLlLlGeZ1VcJ06RgJUptP5OIERzX44FdYEUBgsoATDolMQlI9SSvUibzqG7"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_edit_message-chat.02.json"
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages",
+    "json": {
+      "body": {
+        "content": "<p>seed-v1 case-teams_edit_message-chat before</p>",
+        "contentType": "html"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2011/chats('synthetic%20text%2012')/messages('5038465911595')"
+    },
+    "body": "rec-tool-teams_edit_message-chat.03.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/5038465911595",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_edit_message-chat.04.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_edit_message-chat.05.json"
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/chats/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/messages/5038465911595",
+    "json": {
+      "body": {
+        "content": "<p>seed-v1 case-teams_edit_message-chat after</p>",
+        "contentType": "html"
+      },
+      "mentions": []
+    },
+    "status": 204
+  }
+]

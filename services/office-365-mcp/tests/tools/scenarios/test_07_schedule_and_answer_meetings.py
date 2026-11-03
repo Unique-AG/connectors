@@ -411,6 +411,26 @@ class TestListingTheInvitationsThatWait:
         ]
 
 
+class TestAnEventWithNoAnswerOfMia:
+    async def test_it_is_not_listed_as_an_invitation_that_waits(
+        self, graph: respx.MockRouter
+    ) -> None:
+        unanswered = _event(_LAUNCH, "Launch review", organizer=_ANNA) | {"responseStatus": None}
+        _ = graph.get("/me/calendar").mock(return_value=httpx.Response(200, json=_calendar()))
+        _ = graph.get(f"/me/calendars/{_CALENDAR_ID}/calendarView").mock(
+            return_value=httpx.Response(200, json={"value": [unanswered]})
+        )
+
+        seen = await call(
+            "outlook_list_events",
+            starts_on="2026-11-06",
+            ends_on="2026-11-06",
+            owner_response="notResponded",
+        )
+
+        assert _list(seen, "events") == []
+
+
 def _schedule(address: str, view: str, **extra: object) -> dict[str, object]:
     return {"scheduleId": address, "availabilityView": view, "scheduleItems": [], **extra}
 
@@ -1168,6 +1188,9 @@ _APPROVAL_ROWS = [
         {"uri": _uri(_LAUNCH), "to": ["sam@example.test"]},
         id="forward",
     ),
+    pytest.param(
+        "outlook_delete_event", {"uri": _uri(_DESIGN)}, {"uri": _uri(_BUDGET)}, id="delete"
+    ),
 ]
 
 
@@ -1184,6 +1207,8 @@ def _writable(graph: respx.MockRouter) -> list[respx.Route]:
             return_value=httpx.Response(200, json=_event(_SYNC, "Team sync"))
         ),
         graph.post(f"{_path(_LAUNCH)}/forward").mock(return_value=httpx.Response(202)),
+        graph.delete(_path(_DESIGN)).mock(return_value=httpx.Response(204)),
+        graph.delete(_path(_BUDGET)).mock(return_value=httpx.Response(204)),
     ]
 
 
@@ -1253,3 +1278,809 @@ class TestNothingIsDoneWithoutAnApproval:
         assert without_state.is_error
         assert "given for a different request" in refusal
         assert [route for route in writes if route.called] == []
+
+
+_LENA_URI = "outlook:///calendars/AAMkSYNTHETIC-calendar-lena"
+_ROOM = "room-pilatus@example.test"
+_ONLINE = {
+    "isOnlineMeeting": True,
+    "onlineMeeting": {"joinUrl": "https://teams.example.test/join"},
+    "body": {
+        "contentType": "html",
+        "content": "<html><body><p>Join the meeting</p></body></html>",
+    },
+}
+_BOOKING_TOOLS = {
+    "outlook_create_event": {},
+    "outlook_create_event_on_behalf": {"calendar_ref": _LENA_URI},
+}
+_TAKES_NO_TEAMS = {"allowedOnlineMeetingProviders": ["unknown"]}
+
+
+def _weekly(**rule: object) -> Row:
+    return {"recurrence": {"pattern_type": "weekly", "days_of_week": ["monday"]} | rule}
+
+
+_BAD_BOOKINGS = [
+    pytest.param(
+        {"starts_at": "2026-11-02T14:00+01:00"},
+        ("carries a time zone of its own", "not a local wall-clock time"),
+        id="offset-in-the-time",
+    ),
+    pytest.param(
+        {"starts_at": "Monday at 2"},
+        ("not a time it can read", "not a local wall-clock time"),
+        id="words-for-the-time",
+    ),
+    pytest.param(
+        {"starts_at": "2026-02-30T14:00"},
+        ("not a time it can read", "not a local wall-clock time"),
+        id="a-date-that-does-not-exist",
+    ),
+    pytest.param(
+        {"ends_at": "2026-11-02T13:00"},
+        ("not after `starts_at`", "at or before `starts_at`"),
+        id="ends-before-it-starts",
+    ),
+    pytest.param(
+        {"all_day": True},
+        ("midnight on both ends", "midnight to midnight"),
+        id="all-day-not-at-midnight",
+    ),
+    pytest.param(
+        {"attendees": ["Anna Meier"]},
+        ("is not one email address", "is not one email address"),
+        id="a-name-for-an-address",
+    ),
+    pytest.param(
+        {"attendees": ["anna@example.test", "ANNA@example.test"]},
+        ("twice in `attendees`", "more than once in `attendees`"),
+        id="one-person-twice",
+    ),
+    pytest.param(
+        {"attendees": ["anna@example.test"], "optional_attendees": ["anna@example.test"]},
+        ("in both `attendees` and `optional_attendees`", "the same address in `attendees`"),
+        id="one-person-in-both-lists",
+    ),
+    pytest.param(
+        {"attendees": [_ROOM], "room_addresses": [_ROOM]},
+        ("in `room_addresses` and also in", "in `room_addresses` that is also in"),
+        id="a-room-as-a-person",
+    ),
+    pytest.param(
+        _weekly(range_type="noEnd", days_of_week=[]),
+        ("needs `days_of_week`", "needs `days_of_week`"),
+        id="weekly-with-no-day",
+    ),
+    pytest.param(
+        {
+            "recurrence": {
+                "pattern_type": "daily",
+                "days_of_week": ["monday"],
+                "range_type": "noEnd",
+            }
+        },
+        ("takes no `days_of_week`", "takes no `days_of_week`"),
+        id="daily-with-a-day",
+    ),
+    pytest.param(
+        _weekly(range_type="numbered"),
+        ("needs `number_of_occurrences`", "needs `number_of_occurrences`"),
+        id="a-count-with-no-number",
+    ),
+    pytest.param(
+        _weekly(range_type="noEnd", end_date="2026-12-01"),
+        ("takes no `end_date`", "takes no `end_date`"),
+        id="no-end-with-an-end-date",
+    ),
+    pytest.param(
+        _weekly(range_type="endDate", end_date="2026-10-01"),
+        ("is before 2026-11-02", "is before 2026-11-02"),
+        id="an-end-date-before-the-start",
+    ),
+]
+
+_BOOKING_QUESTIONS = [
+    pytest.param(
+        {"all_day": True, "starts_at": "2026-11-02T00:00", "ends_at": "2026-11-03T00:00"},
+        "as an all-day event on 2026-11-02",
+        id="one-whole-day",
+    ),
+    pytest.param(
+        {"all_day": True, "starts_at": "2026-11-02T00:00", "ends_at": "2026-11-05T00:00"},
+        "as an all-day event from 2026-11-02 to 2026-11-04",
+        id="three-whole-days",
+    ),
+    pytest.param(
+        {
+            "recurrence": {
+                "pattern_type": "daily",
+                "interval": 2,
+                "range_type": "endDate",
+                "end_date": "2026-11-10",
+            }
+        },
+        "repeating every 2 days until 2026-11-10",
+        id="every-second-day",
+    ),
+    pytest.param(
+        _weekly(
+            days_of_week=["monday", "wednesday", "friday"],
+            first_day_of_week="monday",
+            range_type="noEnd",
+        ),
+        "repeating every week on Monday, Wednesday, and Friday (weeks start on Monday) with no end",
+        id="three-days-a-week",
+    ),
+    pytest.param(
+        {
+            "recurrence": {
+                "pattern_type": "absoluteMonthly",
+                "day_of_month": 15,
+                "range_type": "numbered",
+                "number_of_occurrences": 1,
+            }
+        },
+        "repeating every month on day 15, 1 time",
+        id="a-day-of-the-month",
+    ),
+    pytest.param(
+        {
+            "recurrence": {
+                "pattern_type": "relativeMonthly",
+                "days_of_week": ["tuesday"],
+                "index": "second",
+                "range_type": "numbered",
+                "number_of_occurrences": 3,
+            }
+        },
+        "repeating every month on the second Tuesday, 3 times",
+        id="a-weekday-of-the-month",
+    ),
+    pytest.param(
+        {
+            "recurrence": {
+                "pattern_type": "absoluteYearly",
+                "day_of_month": 5,
+                "month": 3,
+                "range_type": "noEnd",
+            }
+        },
+        "repeating every year on March 5 with no end",
+        id="a-day-of-the-year",
+    ),
+    pytest.param(
+        {
+            "recurrence": {
+                "pattern_type": "relativeYearly",
+                "days_of_week": ["thursday", "friday"],
+                "index": "fourth",
+                "month": 11,
+                "range_type": "noEnd",
+            }
+        },
+        "repeating every year on the fourth Thursday or Friday of November with no end",
+        id="a-weekday-of-the-year",
+    ),
+    pytest.param(
+        {"reminder_minutes_before_start": 1},
+        "with a reminder 1 minute before the start",
+        id="a-reminder-time",
+    ),
+    pytest.param(
+        {"is_reminder_on": False, "reminder_minutes_before_start": 15},
+        "with no reminder, and a reminder time of 15 minutes before the start",
+        id="no-reminder-and-a-time",
+    ),
+    pytest.param(
+        {"hide_attendees": True, "response_requested": False, "allow_new_time_proposals": True},
+        "with the attendee list hidden, with no response requested, with new time proposals",
+        id="settings-for-the-attendees",
+    ),
+    pytest.param(
+        {"body": "Agenda"},
+        "with a body of",
+        id="a-body",
+    ),
+]
+
+
+class TestABookingThatCannotBeRead:
+    @pytest.mark.parametrize("tool", _BOOKING_TOOLS)
+    @pytest.mark.parametrize(("arguments", "told"), _BAD_BOOKINGS)
+    async def test_it_books_nothing_and_asks_nothing_and_says_what_to_correct(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, told: tuple[str, str]
+    ) -> None:
+        mia = Person()
+        booking: dict[str, object] = {
+            "subject": "Launch review",
+            "time_zone": _ZURICH,
+            "attendees": ["anna@example.test"],
+            **_MONDAY,
+            **_BOOKING_TOOLS[tool],
+            **arguments,
+        }
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, person=mia, **booking)
+
+        assert told[tool == "outlook_create_event_on_behalf"] in str(refused.value)
+        assert "NO EVENT WAS CREATED and nobody was invited" in str(refused.value)
+        assert (mia.asked, graph.calls.call_count) == ([], 0)
+
+    async def test_a_calendar_link_that_is_not_one_books_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_create_event_on_behalf",
+                calendar_ref="Lena Frei",
+                subject="Budget review",
+                time_zone=_ZURICH,
+                attendees=[],
+                **_MONDAY,
+            )
+
+        assert "takes the `calendar_ref` handle" in str(refused.value)
+        assert graph.calls.call_count == 0
+
+
+class TestWhatMiaIsToldBeforeABooking:
+    @pytest.mark.parametrize(("arguments", "told"), _BOOKING_QUESTIONS)
+    async def test_the_question_names_every_detail_of_the_booking(
+        self, graph: respx.MockRouter, arguments: Row, told: str
+    ) -> None:
+        _ = serve(graph, _RECORDED_CREATE)
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _book(mia, location="Room Pilatus", **arguments)
+
+        assert told in mia.asked[0]
+
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            pytest.param(
+                {"room_addresses": [_ROOM]}, "Microsoft sends the meeting request", id="a-room"
+            ),
+            pytest.param({}, "No person is invited", id="a-place"),
+        ],
+    )
+    async def test_a_booking_with_a_room_or_a_place_and_nobody_else_says_nobody_is_invited(
+        self, graph: respx.MockRouter, arguments: Row, told: str
+    ) -> None:
+        _ = serve(graph, _RECORDED_CREATE)
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _book(mia, attendees=[], location="Room Pilatus", **arguments)
+
+        assert told in mia.asked[0]
+
+
+class TestABookingForSomebodyElseWithNobodyInvited:
+    @pytest.fixture
+    def lena(self, graph: respx.MockRouter) -> None:
+        shown = {
+            "id": "AAMkSYNTHETIC-calendar-lena",
+            "name": "Lena Frei",
+            "owner": None,
+            "canEdit": True,
+            "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+        }
+        _ = graph.get("/me/calendars/AAMkSYNTHETIC-calendar-lena").mock(
+            return_value=httpx.Response(200, json=shown)
+        )
+
+    @pytest.mark.usefixtures("lena")
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            pytest.param({"room_addresses": [_ROOM]}, "mailbox of each room", id="a-room"),
+            pytest.param({"location": "Room Pilatus"}, "No person is invited", id="a-place"),
+            pytest.param({}, "There are no invitations", id="nothing"),
+        ],
+    )
+    async def test_the_question_says_who_is_told_and_names_no_owner_when_microsoft_gives_none(
+        self, arguments: Row, told: str
+    ) -> None:
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _call(
+                "outlook_create_event_on_behalf",
+                person=mia,
+                calendar_ref=_LENA_URI,
+                subject="Budget review",
+                time_zone=_ZURICH,
+                attendees=[],
+                **_MONDAY,
+                **arguments,
+            )
+
+        assert told in mia.asked[0]
+        assert "the person who owns that calendar" in mia.asked[0]
+
+    @pytest.mark.usefixtures("lena")
+    async def test_a_calendar_that_takes_no_teams_meeting_gets_none_and_the_way_on_is_named(
+        self, graph: respx.MockRouter
+    ) -> None:
+        shown = {
+            "id": "AAMkSYNTHETIC-calendar-lena",
+            "name": "Lena Frei",
+            "owner": {"name": "Lena Frei", "address": "lena@example.test"},
+            "canEdit": True,
+        } | _TAKES_NO_TEAMS
+        _ = graph.get("/me/calendars/AAMkSYNTHETIC-calendar-lena").mock(
+            return_value=httpx.Response(200, json=shown)
+        )
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_create_event_on_behalf",
+                calendar_ref=_LENA_URI,
+                subject="Budget review",
+                time_zone=_ZURICH,
+                attendees=["anna@example.test"],
+                online_meeting=True,
+                **_MONDAY,
+            )
+
+        assert "takes no Microsoft Teams meeting" in str(refused.value)
+        assert "unknown" in str(refused.value)
+
+
+_BAD_SEARCHES = [
+    pytest.param(
+        {"starts_at": "tomorrow"},
+        "is not a local wall-clock time",
+        "is not a local wall-clock time",
+        id="words-for-the-time",
+    ),
+    pytest.param(
+        {"ends_at": "2026-11-02T07:00"},
+        "is not after `starts_at`",
+        "is not after `starts_at`",
+        id="ends-before-it-starts",
+    ),
+    pytest.param(
+        {"attendees": ["Anna Meier"]},
+        "is not one email address",
+        "is not one email address",
+        id="a-name-for-an-address",
+    ),
+    pytest.param(
+        {"attendees": ["anna@example.test", "Anna@example.test"]},
+        "twice in `addresses`",
+        "twice in `attendees`",
+        id="one-person-twice",
+    ),
+]
+
+
+class TestASearchForFreeTimeThatCannotBeRead:
+    @pytest.mark.parametrize(("arguments", "checks", "suggests"), _BAD_SEARCHES)
+    @pytest.mark.parametrize(
+        "tool", ["outlook_check_availability", "outlook_suggest_meeting_times"]
+    )
+    async def test_it_reads_no_calendar_and_says_what_to_correct(
+        self,
+        graph: respx.MockRouter,
+        tool: str,
+        arguments: Row,
+        checks: str,
+        suggests: str,
+    ) -> None:
+        window = {"starts_at": "2026-11-02T08:00", "ends_at": "2026-11-02T18:00"}
+        people = "addresses" if tool == "outlook_check_availability" else "attendees"
+        base: dict[str, object] = {people: ["anna@example.test"], "time_zone": _ZURICH, **window}
+        given = base | {
+            people if key == "attendees" else key: value for key, value in arguments.items()
+        }
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, **given)
+
+        assert (checks if people == "addresses" else suggests) in str(refused.value)
+        assert graph.calls.call_count == 0
+
+    async def test_a_person_named_as_needed_and_as_optional_is_refused(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_suggest_meeting_times",
+                attendees=["anna@example.test"],
+                optional_attendees=["anna@example.test"],
+                starts_at="2026-11-02T08:00",
+                ends_at="2026-11-02T18:00",
+                time_zone=_ZURICH,
+            )
+
+        assert "in both `attendees` and `optional_attendees`" in str(refused.value)
+        assert graph.calls.call_count == 0
+
+    async def test_a_room_that_is_not_an_address_is_refused(self, graph: respx.MockRouter) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_suggest_meeting_times",
+                attendees=["anna@example.test"],
+                starts_at="2026-11-02T08:00",
+                ends_at="2026-11-02T18:00",
+                time_zone=_ZURICH,
+                location_constraint={
+                    "locations": [{"display_name": "Pilatus", "address": "Pilatus"}]
+                },
+            )
+
+        assert "location_constraint.locations[].address" in str(refused.value)
+        assert graph.calls.call_count == 0
+
+    async def test_a_room_asked_for_is_sent_and_the_rooms_that_microsoft_names_are_shown(
+        self, graph: respx.MockRouter
+    ) -> None:
+        found = graph.post("/me/findMeetingTimes").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "emptySuggestionsReason": "",
+                    "meetingTimeSuggestions": [
+                        {
+                            "confidence": 100,
+                            "meetingTimeSlot": _slot("2026-11-02T14:00:00", "2026-11-02T14:30:00"),
+                            "locations": [
+                                {"displayName": "Room Pilatus", "locationEmailAddress": _ROOM}
+                            ],
+                        },
+                    ],
+                },
+            )
+        )
+
+        seen = await call(
+            "outlook_suggest_meeting_times",
+            attendees=["anna@example.test"],
+            starts_at="2026-11-02T08:00",
+            ends_at="2026-11-02T18:00",
+            time_zone=_ZURICH,
+            location_constraint={
+                "is_required": True,
+                "suggest_location": True,
+                "locations": [
+                    {"display_name": "Room Pilatus", "address": f" {_ROOM} "},
+                    {"display_name": "Any room on floor 2"},
+                ],
+            },
+        )
+
+        sent = cast("Row", _posted(found)["locationConstraint"])
+        assert sent["isRequired"] is True
+        rooms = cast("list[Row]", sent["locations"])
+        assert rooms[0]["locationEmailAddress"] == _ROOM
+        assert rooms[1].get("locationEmailAddress") is None
+        (suggestion,) = _list(seen, "suggestions")
+        assert _list(suggestion, "locations") == [
+            {"display_name": "Room Pilatus", "address": _ROOM}
+        ]
+
+
+_LINKS = [
+    pytest.param("outlook_cancel_event", {}, "NOTHING WAS CANCELLED", id="cancel"),
+    pytest.param("outlook_delete_event", {}, "The event was not deleted", id="delete"),
+    pytest.param(
+        "outlook_forward_event",
+        {"to": ["priya@example.test"]},
+        "This tool forwarded nothing",
+        id="forward",
+    ),
+    pytest.param(
+        "outlook_respond_to_invite", {"response": "accept"}, "NO RESPONSE WAS SENT", id="answer"
+    ),
+    pytest.param("outlook_update_event", {"subject": "Moved"}, "NOTHING WAS CHANGED", id="change"),
+]
+
+
+class TestALinkThatIsNotAMeetingLink:
+    @pytest.mark.parametrize(("tool", "arguments", "told"), _LINKS)
+    async def test_it_changes_nothing_and_asks_nothing(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, told: str
+    ) -> None:
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, person=mia, uri="Launch review", **arguments)
+
+        assert told in str(refused.value)
+        assert (mia.asked, graph.calls.call_count) == ([], 0)
+
+
+class TestAForwardThatCannotBeRead:
+    @pytest.mark.parametrize(
+        ("to", "told"),
+        [
+            pytest.param(["Priya Rao"], "is not one email address", id="a-name-for-an-address"),
+            pytest.param(
+                ["priya@example.test", "PRIYA@example.test"], "twice in `to`", id="one-person-twice"
+            ),
+        ],
+    )
+    async def test_it_forwards_nothing_and_asks_nothing(
+        self, graph: respx.MockRouter, to: list[str], told: str
+    ) -> None:
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call("outlook_forward_event", person=mia, uri=_uri(_LAUNCH), to=to)
+
+        assert told in str(refused.value)
+        assert "forwarded nothing" in str(refused.value)
+        assert (mia.asked, graph.calls.call_count) == ([], 0)
+
+    async def test_a_meeting_with_no_recorded_start_is_named_in_the_question_without_a_time(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _stored(graph, _event(_LAUNCH, "Launch review", organizer=_ANNA) | {"start": None})
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _call(
+                "outlook_forward_event", person=mia, uri=_uri(_LAUNCH), to=["priya@example.test"]
+            )
+
+        assert "at a time that Microsoft did not record" in mia.asked[0]
+
+
+class TestACancelWhoseAttendeeHasNoAddress:
+    async def test_the_attendee_is_named_as_an_attendee_in_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        nameless = _event(_LAUNCH, "Launch review", attendees=[_ANNA])
+        nameless["attendees"] = [{"type": "required", "status": {"response": "none"}}]
+        _stored(graph, nameless)
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _call("outlook_cancel_event", person=mia, uri=_uri(_LAUNCH))
+
+        assert "an attendee" in mia.asked[0]
+
+
+_PROPOSAL = {"starts_at": "2026-11-09T10:00", "ends_at": "2026-11-09T10:30", "time_zone": _ZURICH}
+
+
+class TestAnAnswerWithANewTimeThatCannotBeSent:
+    @pytest.fixture
+    def invitation(self, graph: respx.MockRouter) -> None:
+        _stored(graph, _event(_LAUNCH, "Launch review", organizer=_ANNA, attendees=[_MIA]))
+
+    @pytest.mark.usefixtures("invitation")
+    @pytest.mark.parametrize(
+        ("arguments", "told"),
+        [
+            pytest.param(
+                {"send_response": False, "proposed_new_time": _PROPOSAL},
+                "needs `send_response` true",
+                id="no-answer-to-carry-it",
+            ),
+            pytest.param(
+                {"proposed_new_time": _PROPOSAL | {"starts_at": "Friday"}},
+                "is not a local wall-clock time",
+                id="words-for-the-time",
+            ),
+            pytest.param(
+                {"proposed_new_time": _PROPOSAL | {"starts_at": "2026-11-09T11:00"}},
+                "is not after its `starts_at`",
+                id="ends-before-it-starts",
+            ),
+        ],
+    )
+    async def test_it_sends_nothing_and_asks_nothing(self, arguments: Row, told: str) -> None:
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_respond_to_invite",
+                person=mia,
+                uri=_uri(_LAUNCH),
+                response="decline",
+                **arguments,
+            )
+
+        assert told in str(refused.value)
+        assert "NO RESPONSE WAS SENT" in str(refused.value)
+        assert mia.asked == []
+
+
+_UPDATES_THAT_CANNOT_BE_READ = [
+    pytest.param({}, "given no argument that changes anything", id="nothing-to-change"),
+    pytest.param({"location": "   "}, "only whitespace", id="a-blank-place"),
+    pytest.param({"starts_at": "2026-11-02T14:00"}, "without the other two", id="half-a-time"),
+    pytest.param(
+        {"attendees": ["anna@example.test"]}, "without the other", id="half-the-attendees"
+    ),
+    pytest.param(
+        {"add_categories": ["Blue"], "remove_categories": ["blue"]},
+        "in both `add_categories` and `remove_categories`",
+        id="a-category-in-both-lists",
+    ),
+    pytest.param(
+        {"body_html": "<p>Hello</p>", "online_meeting": True},
+        "`body_html` and `online_meeting` together",
+        id="a-body-and-a-teams-meeting",
+    ),
+    pytest.param(
+        _MONDAY | {"time_zone": _ZURICH, "starts_at": "Monday"},
+        "is not a local wall-clock time",
+        id="words-for-the-time",
+    ),
+    pytest.param(
+        _MONDAY | {"time_zone": _ZURICH, "ends_at": "2026-11-02T13:00"},
+        "is not after `starts_at`",
+        id="ends-before-it-starts",
+    ),
+    pytest.param(
+        {"attendees": ["Anna Meier"], "optional_attendees": []},
+        "is not one email address",
+        id="a-name-for-an-address",
+    ),
+    pytest.param(
+        {"attendees": ["anna@example.test", "ANNA@example.test"], "optional_attendees": []},
+        "twice in `attendees`",
+        id="one-person-twice",
+    ),
+    pytest.param(
+        {"attendees": ["anna@example.test"], "optional_attendees": ["anna@example.test"]},
+        "in both `attendees` and `optional_attendees`",
+        id="one-person-in-both-lists",
+    ),
+]
+
+
+class TestAChangeThatCannotBeRead:
+    @pytest.mark.parametrize(("arguments", "told"), _UPDATES_THAT_CANNOT_BE_READ)
+    async def test_it_changes_nothing_and_asks_nothing_and_says_what_to_correct(
+        self, graph: respx.MockRouter, arguments: Row, told: str
+    ) -> None:
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call("outlook_update_event", person=mia, uri=_uri(_LAUNCH), **arguments)
+
+        assert told in str(refused.value)
+        assert "NOTHING WAS CHANGED" in str(refused.value)
+        assert (mia.asked, graph.calls.call_count) == ([], 0)
+
+
+class TestAChangeThatTheStoredMeetingRefuses:
+    @pytest.mark.parametrize(
+        ("stored", "arguments", "told"),
+        [
+            pytest.param(
+                _ONLINE, {"online_meeting": True}, "already is an online meeting", id="teams-twice"
+            ),
+            pytest.param(
+                _ONLINE,
+                {"body_html": "<p>Other text</p>"},
+                "The stored HTML body of this event follows",
+                id="a-body-that-drops-the-joining-text",
+            ),
+            pytest.param(
+                _ONLINE
+                | {"body": {"contentType": "html", "content": f"<body>{'x' * 16001}</body>"}},
+                {"body_html": "<p>Other text</p>"},
+                "too long to quote",
+                id="a-stored-body-too-long-to-show",
+            ),
+            pytest.param(
+                {"categories": ["Blue"]},
+                {"add_categories": ["blue"]},
+                "already match `add_categories` and `remove_categories`",
+                id="categories-that-are-there",
+            ),
+            pytest.param(
+                {}, {"remove_categories": ["Blue"]}, "The event has no category", id="no-category"
+            ),
+        ],
+    )
+    async def test_it_changes_nothing_and_asks_nothing_and_says_why(
+        self, graph: respx.MockRouter, stored: Row, arguments: Row, told: str
+    ) -> None:
+        _stored(graph, {**_event(_LAUNCH, "Launch review", attendees=[_ANNA]), **stored})
+        patched = graph.patch(_path(_LAUNCH)).mock(return_value=httpx.Response(200, json={}))
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call("outlook_update_event", person=mia, uri=_uri(_LAUNCH), **arguments)
+
+        assert told in str(refused.value)
+        assert (patched.called, mia.asked) == (False, [])
+
+    async def test_a_calendar_that_takes_no_teams_meeting_gets_none(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _stored(graph, _event(_LAUNCH, "Launch review", attendees=[_ANNA]))
+        _ = graph.get(f"/me/calendars/{_CALENDAR_ID}").mock(
+            return_value=httpx.Response(200, json=_calendar() | _TAKES_NO_TEAMS)
+        )
+        mia = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "outlook_update_event", person=mia, uri=_uri(_LAUNCH), online_meeting=True
+            )
+
+        assert "NOTHING WAS CHANGED" in str(refused.value)
+        assert "unknown" in str(refused.value)
+        assert mia.asked == []
+
+    async def test_a_body_that_keeps_the_stored_body_is_sent_after_the_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _stored(graph, _event(_LAUNCH, "Launch review", attendees=[_ANNA]) | _ONLINE)
+        patched = graph.patch(_path(_LAUNCH)).mock(
+            return_value=httpx.Response(200, json=_event(_LAUNCH, "Launch review"))
+        )
+        mia = Person()
+
+        _ = await _call(
+            "outlook_update_event",
+            person=mia,
+            uri=_uri(_LAUNCH),
+            body_html="<p>Join   the meeting</p><p>Bring a laptop</p>",
+        )
+
+        assert len(mia.asked) == 1
+        assert "Bring a laptop" in str(_posted(patched)["body"])
+
+
+class TestWhatMiaIsToldBeforeAChange:
+    @pytest.mark.parametrize(
+        ("stored", "arguments", "told"),
+        [
+            pytest.param(
+                {"categories": ["Blue"]},
+                {"remove_categories": ["Blue"]},
+                "remove every category",
+                id="no-category-left",
+            ),
+            pytest.param(
+                {}, {"add_categories": ["Red", "Blue"]}, "set the categories to", id="categories"
+            ),
+            pytest.param(
+                {},
+                {"attendees": [], "optional_attendees": []},
+                "change the attendee list to nobody",
+                id="nobody-left",
+            ),
+            pytest.param(
+                {},
+                {"attendees": ["anna@example.test"], "optional_attendees": ["tom@example.test"]},
+                "tom@example.test (optional)",
+                id="an-optional-attendee",
+            ),
+        ],
+    )
+    async def test_the_question_names_the_change(
+        self, graph: respx.MockRouter, stored: Row, arguments: Row, told: str
+    ) -> None:
+        _stored(graph, {**_event(_LAUNCH, "Launch review", attendees=[_ANNA]), **stored})
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _call("outlook_update_event", person=mia, uri=_uri(_LAUNCH), **arguments)
+
+        assert told in mia.asked[0]
+
+    async def test_a_place_is_asked_about_also_when_nobody_is_invited(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _stored(graph, _event(_LAUNCH, "Launch review"))
+        mia = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _call(
+                "outlook_update_event", person=mia, uri=_uri(_LAUNCH), location="Room Pilatus"
+            )
+
+        assert "change the location to 'Room Pilatus'" in mia.asked[0]

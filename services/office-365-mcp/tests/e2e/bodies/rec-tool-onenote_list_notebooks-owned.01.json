@@ -1,0 +1,136 @@
+{
+  "value": [
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-29T15:03:26Z",
+      "displayName": "synthetic text 02",
+      "id": "0-00000000-68cd-4934-82c3-833271cebc6d",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-29T15:03:26Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 03"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/synthetic%20text%2002"
+        }
+      },
+      "userRole": "Owner"
+    },
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-30T08:14:22Z",
+      "displayName": "synthetic text 05",
+      "id": "6-00000000-295a-4608-8f33-4d6225babeb6",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-30T08:14:22Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 06"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/synthetic%20text%2005"
+        }
+      },
+      "userRole": "Owner"
+    },
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-30T10:02:44Z",
+      "displayName": "synthetic text 07",
+      "id": "8-00000000-9507-49ad-8546-c07b2c2daf7c",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-30T10:02:44Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 08"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/synthetic%20text%2007"
+        }
+      },
+      "userRole": "Owner"
+    },
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-29T14:27:10Z",
+      "displayName": "seed-v1 Dogfood Notes",
+      "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 09"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+        }
+      },
+      "userRole": "Owner"
+    },
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-29T14:52:06Z",
+      "displayName": "seed-v1 Scratch",
+      "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 10"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+        }
+      },
+      "userRole": "Owner"
+    },
+    {
+      "createdBy": {
+        "user": {
+          "displayName": "synthetic text 01"
+        }
+      },
+      "createdDateTime": "2026-10-29T14:52:17Z",
+      "displayName": "seed-v1 Spare",
+      "id": "4-00000000-bbfe-4ebd-87a1-958461e83610",
+      "isDefault": false,
+      "isShared": false,
+      "lastModifiedDateTime": "2026-10-29T14:52:17Z",
+      "links": {
+        "oneNoteClientUrl": {
+          "href": "synthetic text 11"
+        },
+        "oneNoteWebUrl": {
+          "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Spare"
+        }
+      },
+      "userRole": "Owner"
+    }
+  ]
+}

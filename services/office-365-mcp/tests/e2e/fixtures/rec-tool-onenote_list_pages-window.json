@@ -1,0 +1,18 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "lastModifiedDateTime ge ~yesterday and lastModifiedDateTime lt ~day+2 and createdDateTime lt ~day+2",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "5"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "body": "rec-tool-onenote_list_pages-window.01.json"
+  }
+]

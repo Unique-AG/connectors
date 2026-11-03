@@ -1,5 +1,5 @@
 import json
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from typing import cast
 from urllib.parse import quote
 
@@ -10,10 +10,16 @@ from fastmcp import Client
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS
 from office_365_mcp.shared.handles import DriveFolderHandle, MessageHandle
 from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.tools.conftest import ME, TEAMS_SENDER, message_payload
 from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.scenarios.teams_support import (
+    Says,
+    call_on_the_newer_protocol,
+    refused_on_the_newer_protocol,
+)
 from tests.tools.teams_recordings import new_group_chat
 
 type Row = Mapping[str, object]
@@ -168,15 +174,40 @@ def _the_deck_is(
     )
 
 
-def _everything_is_readable(graph: respx.MockRouter) -> respx.Route:
+def _the_writes_are_answered(graph: respx.MockRouter) -> respx.Route:
+    def answer(request: httpx.Request) -> httpx.Response:
+        if request.method == "PATCH" or request.url.path.endswith(
+            ("/softDelete", "/setReaction", "/unsetReaction")
+        ):
+            return httpx.Response(204)
+        return httpx.Response(201, json=message_payload(message_id=POST_ID))
+
+    return graph.route(method__in=["POST", "PATCH", "PUT", "DELETE"]).mock(side_effect=answer)
+
+
+def _everything_is_readable(
+    graph: respx.MockRouter, writes: Callable[[respx.MockRouter], respx.Route] = _writes
+) -> respx.Route:
     _the_message_is(graph)
     _the_deck_is(graph)
-    return _writes(graph)
+    return writes(graph)
 
 
 CHAT_MESSAGE = {"chat_id": CHAT_ID, "message": "The build is green"}
 CHANNEL_POST = {"team_id": TEAM_ID, "channel_id": CHANNEL_ID, "message": "v2 ships on Friday"}
 WITH_THE_DECK = {"attachments": [DECK_URI]}
+WITH_FILES = [
+    ("teams_send_channel_message_with_files", CHANNEL_POST),
+    ("teams_send_chat_message_with_files", CHAT_MESSAGE),
+]
+OTHER_SENDER = {
+    "user": {
+        "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+        "id": "00000000-0000-4000-8000-000000000002",
+        "displayName": "Grace Hopper",
+        "userIdentityType": "aadUser",
+    }
+}
 
 EVERY_PROPOSAL = [
     pytest.param("teams_send_chat_message", CHAT_MESSAGE, "Nothing was sent.", id="chat-message"),
@@ -381,16 +412,15 @@ class TestAMessageIsPostedAfterMiaApproves:
             "content": f'<p>The build is green</p> <attachment id="{NOTES_GUID}"></attachment>',
         }
 
+    @pytest.mark.parametrize(("tool", "target"), WITH_FILES, ids=["channel-post", "chat-message"])
     async def test_it_does_not_post_a_file_that_is_in_a_personal_onedrive(
-        self, graph: respx.MockRouter
+        self, graph: respx.MockRouter, tool: str, target: Row
     ) -> None:
         _the_deck_is(graph, drive_type="personal")
         writes = _writes(graph)
         mia = Person()
 
-        message = await _refused_by(
-            mia, "teams_send_channel_message_with_files", **CHANNEL_POST, **WITH_THE_DECK
-        )
+        message = await _refused_by(mia, tool, **target, **WITH_THE_DECK)
 
         assert (
             "Microsoft Teams can attach a file only when the file is already in SharePoint"
@@ -536,6 +566,19 @@ class TestWhenMicrosoftCannotPostTheMessage:
         assert "will fail the same way" in message
         assert post.call_count == 1
 
+    async def test_it_reports_a_rejection_that_comes_without_a_reason_as_one_without_a_reason(
+        self, graph: respx.MockRouter
+    ) -> None:
+        post = _the_chat_answers_the_post_with(
+            graph, httpx.Response(400, json={"error": {"code": "BadRequest"}})
+        )
+
+        message = await _refused("teams_send_chat_message", **CHAT_MESSAGE)
+
+        assert "it is a bad request" in message and "gave this reason" not in message
+        assert "will fail the same way" in message
+        assert post.call_count == 1
+
 
 class TestNothingChangesUnlessMiaClearlyAgrees:
     async def test_it_does_not_post_in_a_channel_when_mia_declines(
@@ -637,60 +680,429 @@ class TestWhatTeamsCannotTake:
         assert told in message
         assert mia.asked == [] and writes.call_count == 0
 
+    @pytest.mark.parametrize(
+        ("tool", "extra"),
+        [
+            ("teams_send_channel_message", {}),
+            ("teams_send_channel_message_with_files", WITH_THE_DECK),
+        ],
+        ids=["post", "post-with-file"],
+    )
     async def test_it_refuses_a_reply_with_a_subject_and_asks_nobody(
-        self, graph: respx.MockRouter
+        self, graph: respx.MockRouter, tool: str, extra: Row
     ) -> None:
         writes = _writes(graph)
         mia = Person()
 
         message = await _refused_by(
-            mia,
-            "teams_send_channel_message",
-            **CHANNEL_POST,
-            reply_to_id=POST_ID,
-            subject="Release news",
+            mia, tool, **CHANNEL_POST, **extra, reply_to_id=POST_ID, subject="Release news"
         )
 
         assert "sets a subject only on a new channel post, never on a reply" in message
         assert "omit `reply_to_id`" in message and "omit `subject`" in message
         assert mia.asked == [] and writes.call_count == 0
 
-    async def test_it_does_not_attach_a_folder_to_a_post(self, graph: respx.MockRouter) -> None:
+    @pytest.mark.parametrize(("tool", "target"), WITH_FILES, ids=["channel-post", "chat-message"])
+    async def test_it_does_not_attach_a_folder_to_a_post(
+        self, graph: respx.MockRouter, tool: str, target: Row
+    ) -> None:
         _the_deck_is(graph, facet={"folder": {"childCount": 3}})
         writes = _writes(graph)
         mia = Person()
 
-        message = await _refused_by(
-            mia, "teams_send_channel_message_with_files", **CHANNEL_POST, attachments=[DECK_URI]
-        )
+        message = await _refused_by(mia, tool, **target, attachments=[DECK_URI])
 
         assert "names a folder, and this tool attaches files only" in message
         assert mia.asked == [] and writes.call_count == 0
 
+    @pytest.mark.parametrize(("tool", "target"), WITH_FILES, ids=["channel-post", "chat-message"])
     async def test_it_does_not_attach_a_file_whose_details_microsoft_does_not_send(
-        self, graph: respx.MockRouter
+        self, graph: respx.MockRouter, tool: str, target: Row
     ) -> None:
         _the_deck_is(graph, etag=None)
         writes = _writes(graph)
         mia = Person()
 
-        message = await _refused_by(
-            mia, "teams_send_channel_message_with_files", **CHANNEL_POST, **WITH_THE_DECK
-        )
+        message = await _refused_by(mia, tool, **target, **WITH_THE_DECK)
 
         assert "Tell the user to attach the file in Microsoft Teams instead" in message
         assert mia.asked == [] and writes.call_count == 0
 
+    @pytest.mark.parametrize(("tool", "target"), WITH_FILES, ids=["channel-post", "chat-message"])
     async def test_it_does_not_take_a_folder_handle_for_a_file(
-        self, graph: respx.MockRouter
+        self, graph: respx.MockRouter, tool: str, target: Row
     ) -> None:
         writes = _writes(graph)
 
         message = await _refused(
-            "teams_send_channel_message_with_files",
-            **CHANNEL_POST,
-            attachments=[DriveFolderHandle(DRIVE_ID, "01SYNTHETICFOLDER0").uri],
+            tool, **target, attachments=[DriveFolderHandle(DRIVE_ID, "01SYNTHETICFOLDER0").uri]
         )
 
         assert "is not a file handle" in message
         assert writes.call_count == 0 and not graph.calls
+
+
+class TestAChatProgramOfTheNewerKind:
+    @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
+    async def test_it_makes_an_approved_change_once_when_the_question_comes_in_the_answer(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str
+    ) -> None:
+        _ = nothing
+        writes = _everything_is_readable(graph, _the_writes_are_answered)
+        mia = Person()
+
+        _ = await call_on_the_newer_protocol(tool, person=mia, **arguments)
+
+        assert len(mia.asked) == 1
+        assert writes.call_count == 1
+
+    @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
+    @pytest.mark.parametrize(
+        "reply",
+        [Person(approval="no"), Says(1), Says("maybe")],
+        ids=["declines", "the word for no", "a word that is no choice"],
+    )
+    async def test_it_changes_nothing_unless_the_answer_is_the_word_for_yes(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str, reply: Person | Says
+    ) -> None:
+        writes = _everything_is_readable(graph, _the_writes_are_answered)
+
+        message = await refused_on_the_newer_protocol(tool, person=reply, **arguments)
+
+        assert nothing in message and NOT_AGREED in message
+        assert writes.call_count == 0
+
+
+class TestAReferenceThatTheAssistantMadeUp:
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("teams_edit_message", {"message": "Launch on 14 June"}),
+            ("teams_delete_message", {}),
+            ("teams_react_to_message", {"reaction": THUMBS_UP}),
+        ],
+        ids=["correction", "deletion", "reaction"],
+    )
+    async def test_it_refuses_a_message_reference_that_is_not_one_and_asks_nobody(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        mia = Person()
+
+        message = await _refused_by(mia, tool, uri="the Launch message", **arguments)
+
+        assert "exactly three shapes" in message
+        assert mia.asked == [] and not graph.calls
+
+
+class TestWhatMiaMayChangeInAMessage:
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("teams_edit_message", {"uri": MESSAGE_URI, "message": "Launch on 14 June"}),
+            ("teams_delete_message", {"uri": MESSAGE_URI}),
+        ],
+        ids=["correction", "deletion"],
+    )
+    async def test_it_does_not_change_a_message_that_another_person_sent_and_asks_nobody(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        _the_message_is(graph, sender=OTHER_SENDER)
+        writes = _writes(graph)
+        mia = Person()
+
+        message = await _refused_by(mia, tool, **arguments)
+
+        assert "only a message that the signed-in user sent" in message
+        assert mia.asked == [] and writes.call_count == 0
+
+    async def test_it_does_not_correct_a_message_with_a_mention_of_a_person_who_is_not_in_the_chat(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _the_message_is(graph)
+        _ = graph.get(f"{CHAT_PATH}/members").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+        writes = _writes(graph)
+        mia = Person()
+
+        message = await _refused_by(
+            mia,
+            "teams_edit_message",
+            uri=MESSAGE_URI,
+            message="Launch on 14 June",
+            mentions=[{"user_id": PRIYA_ID, "name": "Priya Rao"}],
+        )
+
+        assert (
+            f"no named member of this chat for this Microsoft Entra object id: '{PRIYA_ID}'"
+            in message
+        )
+        assert "No message was changed." in message
+        assert mia.asked == [] and writes.call_count == 0
+
+
+class TestAMentionNeedsANamedMemberOfTheChat:
+    @staticmethod
+    def _the_members_are(graph: respx.MockRouter, *members: Row, more: bool = False) -> None:
+        answer: Row = {"value": list(members)}
+        if more:
+            answer = {**answer, "@odata.nextLink": "https://graph.microsoft.com/v1.0/next"}
+        _ = graph.get(f"{CHAT_PATH}/members").mock(return_value=httpx.Response(200, json=answer))
+
+    async def test_it_does_not_mention_a_member_whom_microsoft_names_by_no_user(
+        self, graph: respx.MockRouter
+    ) -> None:
+        self._the_members_are(
+            graph,
+            {
+                "@odata.type": "#microsoft.graph.conversationMember",
+                "id": "m1",
+                "displayName": "Guest",
+            },
+            {
+                "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                "id": "m2",
+                "displayName": "Priya Rao",
+            },
+        )
+        writes = _writes(graph)
+        mia = Person()
+
+        message = await _refused_by(
+            mia,
+            "teams_send_chat_message",
+            **CHAT_MESSAGE,
+            mentions=[{"user_id": PRIYA_ID, "name": "Priya Rao"}],
+        )
+
+        assert (
+            f"no named member of this chat for this Microsoft Entra object id: '{PRIYA_ID}'"
+            in message
+        )
+        assert mia.asked == [] and writes.call_count == 0
+
+    async def test_it_sends_no_file_with_a_mention_of_a_person_who_is_not_a_member(
+        self, graph: respx.MockRouter
+    ) -> None:
+        self._the_members_are(graph)
+        writes = _everything_is_readable(graph)
+        mia = Person()
+
+        message = await _refused_by(
+            mia,
+            "teams_send_chat_message_with_files",
+            **CHAT_MESSAGE,
+            **WITH_THE_DECK,
+            mentions=[{"user_id": PRIYA_ID, "name": "Priya Rao"}],
+        )
+
+        assert "no named member of this chat" in message and "Nothing was sent." in message
+        assert mia.asked == [] and writes.call_count == 0
+
+    async def test_it_says_when_it_read_only_part_of_a_very_large_chat_to_find_the_member(
+        self, graph: respx.MockRouter
+    ) -> None:
+        self._the_members_are(
+            graph,
+            *(
+                {
+                    "@odata.type": "#microsoft.graph.aadUserConversationMember",
+                    "id": f"m{n}",
+                    "displayName": f"Member {n}",
+                    "userId": f"{n:08d}-0000-4000-8000-000000000000",
+                }
+                for n in range(MAX_SCANNED_ITEMS)
+            ),
+            more=True,
+        )
+        writes = _writes(graph)
+        mia = Person()
+
+        message = await _refused_by(
+            mia,
+            "teams_send_chat_message",
+            **CHAT_MESSAGE,
+            mentions=[{"user_id": PRIYA_ID, "name": "Priya Rao"}],
+        )
+
+        assert f"shows more than {MAX_SCANNED_ITEMS} members of this chat" in message
+        assert mia.asked == [] and writes.call_count == 0
+
+
+async def _seed_chat() -> str:
+    chats = await call("teams_list_chats", topic_contains="seed-v1 case-teams-send")
+    return cast("str", _rows(chats["chats"])[0]["chat_id"])
+
+
+async def _post_and_reply(mia: Person, label: str) -> tuple[Row, Row]:
+    channel = await _seed_channel()
+    post = await call(
+        "teams_send_channel_message", person=mia, **channel, message=f"seed-v1 case-{label} post"
+    )
+    reply = await call(
+        "teams_send_channel_message",
+        person=mia,
+        **channel,
+        message=f"seed-v1 case-{label} target",
+        reply_to_id=post["message_id"],
+    )
+    return post, reply
+
+
+class TestACorrectionInTheChatOrInTheThread:
+    async def test_it_corrects_a_message_of_a_chat_in_place(self, graph: respx.MockRouter) -> None:
+        routes = serve(graph, "rec-tool-teams_edit_message-chat")
+        mia = Person()
+        chat_id = await _seed_chat()
+        sent = await call(
+            "teams_send_chat_message",
+            person=mia,
+            chat_id=chat_id,
+            message="seed-v1 case-teams_edit_message-chat before",
+        )
+
+        corrected = await call(
+            "teams_edit_message",
+            person=mia,
+            uri=sent["uri"],
+            message="seed-v1 case-teams_edit_message-chat after",
+        )
+
+        assert _uncalled(routes) == []
+        assert corrected["uri"] == sent["uri"]
+        patch = routes[("PATCH", f"/chats/{chat_id}/messages/{sent['message_id']}")]
+        assert "after" in cast("str", cast("Row", _request_body(patch)["body"])["content"])
+
+    async def test_it_corrects_a_reply_of_a_thread_in_place(self, graph: respx.MockRouter) -> None:
+        routes = serve(graph, "rec-tool-teams_edit_message-reply")
+        mia = Person()
+        _post, reply = await _post_and_reply(mia, "teams_edit_message-reply")
+
+        corrected = await call(
+            "teams_edit_message",
+            person=mia,
+            uri=reply["uri"],
+            message="seed-v1 case-teams_edit_message-reply after",
+        )
+
+        assert _uncalled(routes) == []
+        assert corrected["uri"] == reply["uri"]
+        assert any(
+            verb == "PATCH" and "/replies/" in path and route.called
+            for (verb, path), route in routes.items()
+        )
+
+
+class TestAReactionInAChatInAPostAndInAThread:
+    async def test_it_takes_a_reaction_back_from_a_chat_message(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_react_to_message-chat-remove")
+        mia = Person()
+        sent = await call(
+            "teams_send_chat_message",
+            person=mia,
+            chat_id=await _seed_chat(),
+            message="seed-v1 case-teams_react_to_message-chat-remove target",
+        )
+        _ = await call("teams_react_to_message", person=mia, uri=sent["uri"], reaction=THUMBS_UP)
+
+        taken = await call(
+            "teams_react_to_message",
+            person=mia,
+            uri=sent["uri"],
+            reaction=THUMBS_UP,
+            remove=True,
+        )
+
+        assert _uncalled(routes) == []
+        assert taken["removed"] is True
+        assert THUMBS_UP in mia.asked[-1]
+
+    async def test_it_takes_a_reaction_back_from_a_channel_post(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_react_to_message-post-remove")
+        mia = Person()
+        post = await call(
+            "teams_send_channel_message",
+            person=mia,
+            **await _seed_channel(),
+            message="seed-v1 case-teams_react_to_message-post-remove target",
+        )
+        _ = await call("teams_react_to_message", person=mia, uri=post["uri"], reaction=THUMBS_UP)
+
+        taken = await call(
+            "teams_react_to_message", person=mia, uri=post["uri"], reaction=THUMBS_UP, remove=True
+        )
+
+        assert _uncalled(routes) == []
+        assert taken["removed"] is True
+
+    async def test_it_gives_a_reply_of_a_thread_a_reaction_and_takes_it_back(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_react_to_message-reply")
+        mia = Person()
+        _post, reply = await _post_and_reply(mia, "teams_react_to_message-reply")
+
+        added = await call(
+            "teams_react_to_message", person=mia, uri=reply["uri"], reaction=THUMBS_UP
+        )
+        taken = await call(
+            "teams_react_to_message",
+            person=mia,
+            uri=reply["uri"],
+            reaction=THUMBS_UP,
+            remove=True,
+        )
+
+        assert _uncalled(routes) == []
+        assert (added["removed"], taken["removed"]) == (False, True)
+
+
+class TestAFileInAReplyAndAMentionInAPost:
+    async def test_it_attaches_a_file_that_is_in_sharepoint_to_a_reply(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_send_channel_message_with_files-reply")
+        notes = await _notes_uri()
+        channel = await _seed_channel()
+        mia = Person()
+        post = await call(
+            "teams_send_channel_message",
+            person=mia,
+            **channel,
+            message="seed-v1 case-teams_send_channel_message_with_files-reply post",
+        )
+
+        reply = await call(
+            "teams_send_channel_message_with_files",
+            person=mia,
+            **channel,
+            message="seed-v1 case-teams_send_channel_message_with_files-reply notes",
+            attachments=[notes],
+            reply_to_id=post["message_id"],
+        )
+
+        assert _uncalled(routes) == []
+        assert reply["reply_to_id"] == post["message_id"]
+        assert NOTES in mia.asked[-1]
+
+    async def test_it_mentions_a_person_in_a_channel_post_after_mia_approves(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_send_channel_message-mention")
+        mia = Person()
+
+        sent = await call(
+            "teams_send_channel_message",
+            person=mia,
+            **await _seed_channel(),
+            message="seed-v1 case-teams_send_channel_message-mention hello",
+            mentions=[{"user_id": TOM_ID, "name": "Tom Berger"}],
+        )
+
+        assert _uncalled(routes) == []
+        assert "It mentions" in mia.asked[0] and TOM_ID in mia.asked[0]
+        assert [one["user_id"] for one in _rows(sent["mentions"])] == [TOM_ID]

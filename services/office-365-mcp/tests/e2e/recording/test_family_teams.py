@@ -116,7 +116,7 @@ class TestCases:
             for case in CASES
             if resolve(case).external and "chat" not in case and "meeting" not in case
         ]
-        assert len(posting) == 6
+        assert len(posting) == 11
         for case in posting:
             given = json.dumps(resolve(case).steps)
             assert "teams[display_name=seed-v1 team].team_id" in given

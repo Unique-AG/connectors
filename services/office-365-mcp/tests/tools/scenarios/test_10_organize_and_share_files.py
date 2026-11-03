@@ -11,6 +11,7 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
+from mcp.types import InputRequiredResult
 from respx.models import Call
 
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
@@ -817,4 +818,397 @@ class TestAChangeThatIsNotApproved:
 
         assert "received no answer" in str(unanswered.value)
         assert "they can make the same request again" in str(unanswered.value)
+        assert _writes(graph) == []
+
+
+_WEB_ADDRESS = "https://contoso.sharepoint.invalid/Plan.docx"
+_ANNA = "anna@example.invalid"
+_ITEM_OR_FOLDER = "a file handle or a folder handle in `item`"
+_ANY_HANDLE = "a file handle or a folder handle"
+_WRONG_HANDLES: list[tuple[str, Row, str]] = [
+    ("sharepoint_move_item", {"item": _WEB_ADDRESS, "to_folder": _ARCHIVE}, _ITEM_OR_FOLDER),
+    ("sharepoint_move_item", {"item": _FILE, "to_folder": _FILE}, "a folder handle in `to_folder`"),
+    ("sharepoint_copy_item", {"item": _WEB_ADDRESS, "to_folder": _ARCHIVE}, _ITEM_OR_FOLDER),
+    ("sharepoint_copy_item", {"item": _FILE, "to_folder": _FILE}, "a folder handle in `to_folder`"),
+    ("sharepoint_rename_item", {"item": _WEB_ADDRESS, "name": "Other"}, f"takes {_ANY_HANDLE}"),
+    ("sharepoint_delete_item", {"item": _WEB_ADDRESS}, f"takes {_ANY_HANDLE}"),
+    (
+        "sharepoint_invite",
+        {"item": _WEB_ADDRESS, "recipients": [_ANNA], "role": "read"},
+        f"did not get {_ANY_HANDLE}",
+    ),
+    (
+        "sharepoint_create_share_link",
+        {"item": _WEB_ADDRESS, "access": "view", "audience": "organization"},
+        f"did not get {_ANY_HANDLE}",
+    ),
+    ("sharepoint_create_folder", {"parent": _FILE, "name": "2026"}, "a folder handle in `parent`"),
+    (
+        "sharepoint_create_text_file",
+        {"folder": _FILE, "name": "Sync.txt", "content": _NOTES},
+        "a folder handle in `folder`",
+    ),
+]
+_BLANK_NAMES: list[tuple[str, Row]] = [
+    ("sharepoint_create_folder", {"parent": _FOLDER, "name": "   "}),
+    ("sharepoint_rename_item", {"item": _FILE, "name": "   "}),
+    ("sharepoint_copy_item", {"item": _FILE, "to_folder": _ARCHIVE, "name": "   "}),
+    ("sharepoint_create_text_file", {"folder": _FOLDER, "name": "   ", "content": _NOTES}),
+]
+
+
+def _permission(email: str, *, error: Row | None = None) -> Row:
+    return {
+        "id": f"SYNTHETIC-PERMISSION-{email}",
+        "roles": ["write"],
+        "invitation": {"email": email, "signInRequired": True},
+        "grantedToV2": {"user": {"id": "SYNTHETIC-USER", "displayName": email.split("@")[0]}},
+        **({} if error is None else {"error": error}),
+    }
+
+
+class TestARequestThatCannotSucceed:
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "told"),
+        _WRONG_HANDLES,
+        ids=[
+            "move-item",
+            "move-folder",
+            "copy-item",
+            "copy-folder",
+            "rename",
+            "delete",
+            "invite",
+            "link",
+            "create-folder",
+            "save-text",
+        ],
+    )
+    async def test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, told: str
+    ) -> None:
+        person = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, arguments, person=person)
+
+        assert told in str(refused.value)
+        assert (len(graph.calls), person.asked) == (0, [])
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        _BLANK_NAMES,
+        ids=["create-folder", "rename", "copy", "save-text"],
+    )
+    async def test_a_name_of_blank_spaces_is_refused(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        person = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, arguments, person=person)
+
+        assert "has only spaces in it" in str(refused.value)
+        assert (len(graph.calls), person.asked) == (0, [])
+
+    @pytest.mark.parametrize(
+        ("tool", "fixture", "named_folder", "others", "told"),
+        [
+            (
+                "sharepoint_create_folder",
+                "rename_item-notes",
+                "parent",
+                {"name": "2026"},
+                "the item in `parent` is not a folder",
+            ),
+            (
+                "sharepoint_create_text_file",
+                "rename_item-notes",
+                "folder",
+                {"name": "A.txt", "content": "a"},
+                "the item in `folder` is not a folder",
+            ),
+            (
+                "sharepoint_copy_item",
+                "copy_item-brochure",
+                "to_folder",
+                {"item": "folder"},
+                "the item in `to_folder` is not a folder",
+            ),
+            (
+                "sharepoint_move_item",
+                "move_item-budget",
+                "to_folder",
+                {"item": "folder"},
+                "does not hold as a folder",
+            ),
+        ],
+        ids=["create-folder", "save-text", "copy", "move"],
+    )
+    async def test_a_file_in_the_place_of_a_folder_is_refused_and_nobody_is_asked(
+        self,
+        graph: respx.MockRouter,
+        tool: str,
+        fixture: str,
+        named_folder: str,
+        others: dict[str, str],
+        told: str,
+    ) -> None:
+        held = [
+            DriveFolderHandle(drive, item).uri
+            for drive, item in _handles(serve(graph, f"rec-tool-sharepoint_{fixture}"), "GET")
+        ]
+        arguments: Row = {
+            key: held[-1] if value == "folder" else value for key, value in others.items()
+        }
+        person = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(tool, arguments | {named_folder: held[-2:][0]}, person=person)
+
+        assert told in str(refused.value)
+        assert (_writes(graph), person.asked) == ([], [])
+
+    async def test_a_folder_is_not_moved_into_itself(self, graph: respx.MockRouter) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await call(
+                "sharepoint_move_item",
+                item=_ARCHIVE,
+                to_folder=DriveFolderHandle(_DRIVE, _ARCHIVE_ID).uri,
+            )
+
+        assert "name the same item" in str(refused.value)
+        assert not graph.calls
+
+    async def test_a_person_named_twice_is_not_invited(self, graph: respx.MockRouter) -> None:
+        person = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "sharepoint_invite",
+                {"item": _FILE, "recipients": [_ANNA, _ANNA.upper()], "role": "write"},
+                person=person,
+            )
+
+        assert "twice in `recipients`" in str(refused.value)
+        assert (len(graph.calls), person.asked) == (0, [])
+
+    @pytest.mark.parametrize(
+        ("error", "reported"),
+        [
+            ({"message": "no such user"}, "no such user"),
+            ({}, "Microsoft reported an error for this person and gave no reason."),
+        ],
+        ids=["with-reason", "no-reason"],
+    )
+    async def test_a_person_with_an_error_from_microsoft_is_named_with_the_reason(
+        self, graph: respx.MockRouter, error: Row, reported: str
+    ) -> None:
+        _items(graph, item=_entry())
+        rows = [
+            _permission("anna@example.invalid", error=error),
+            _permission("ben@example.invalid"),
+        ]
+        _ = graph.post(f"{_ITEM_PATH}/invite").mock(
+            return_value=httpx.Response(200, json={"value": rows})
+        )
+
+        invited = await call(
+            "sharepoint_invite",
+            item=_FILE,
+            recipients=[_ANNA, "ben@example.invalid"],
+            role="write",
+        )
+
+        recipients = cast("list[Row]", invited["recipients"])
+        assert [row["error"] for row in recipients] == [reported, None]
+
+    async def test_a_move_of_an_item_with_no_known_old_folder_gives_no_way_back(
+        self, graph: respx.MockRouter
+    ) -> None:
+        orphan: Row = {**_entry(), "parentReference": {"driveId": _DRIVE}}
+        _items(graph, item=orphan, archive=_entry(_ARCHIVE_ID, name="Archive", folder=True))
+        patch = graph.patch(_ITEM_PATH).mock(
+            return_value=httpx.Response(200, json=_entry(parent=_ARCHIVE_ID))
+        )
+
+        moved = await call("sharepoint_move_item", item=_FILE, to_folder=_ARCHIVE)
+
+        assert patch.call_count == 1
+        assert moved["previous_parent_uri"] is None
+
+    async def test_a_link_without_an_address_is_not_reported_as_made(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _items(graph, item=_entry())
+        _ = graph.post(f"{_ITEM_PATH}/createLink").mock(
+            return_value=httpx.Response(
+                201,
+                json={"id": "SYNTHETIC-LINK", "link": {"type": "view", "scope": "organization"}},
+            )
+        )
+
+        with pytest.raises(ToolError) as unlinked:
+            _ = await call(
+                "sharepoint_create_share_link", item=_FILE, access="view", audience="organization"
+            )
+
+        assert "has no web address for the link" in str(unlinked.value)
+        assert "call this tool again one time" in str(unlinked.value)
+
+
+def _folder_of(child_count: int | None) -> Row:
+    return {
+        **_entry(name="Old drafts", folder=True),
+        "folder": {} if child_count is None else {"childCount": child_count},
+    }
+
+
+class TestTheQuestionToMia:
+    @pytest.mark.parametrize(
+        ("child_count", "tail"),
+        [
+            (0, "everything inside it? The folder is empty."),
+            (1, "everything inside it? It has 1 item directly inside it."),
+            (5, "everything inside it? It has 5 items directly inside it."),
+            (None, "everything inside it?"),
+        ],
+        ids=["empty", "one-item", "five-items", "no-count"],
+    )
+    async def test_the_question_about_a_folder_delete_says_how_full_the_folder_is(
+        self, graph: respx.MockRouter, child_count: int | None, tail: str
+    ) -> None:
+        _items(graph, item=_folder_of(child_count))
+        _ = graph.delete(_ITEM_PATH).mock(return_value=httpx.Response(204))
+        person = Person()
+
+        _ = await call("sharepoint_delete_item", item=_FILE, person=person)
+
+        [question] = person.asked
+        assert question.startswith("Move the folder 'Old drafts' from the folder '/Projects'")
+        assert question.endswith(tail)
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments", "served", "named"),
+        [
+            (
+                "sharepoint_create_folder",
+                {"parent": _FOLDER, "name": "2026"},
+                {"folder": _TOP_OF_A_LIBRARY},
+                "inside the top folder of the drive?",
+            ),
+            (
+                "sharepoint_create_folder",
+                {"parent": _FOLDER, "name": "2026"},
+                {"folder": {"id": _FOLDER_ID, "folder": {"childCount": 0}}},
+                "inside an unnamed folder?",
+            ),
+            (
+                "sharepoint_invite",
+                {"item": _FILE, "recipients": [_ANNA], "role": "read"},
+                {"item": _TOP_OF_A_LIBRARY},
+                "access to the top folder of the drive and",
+            ),
+            (
+                "sharepoint_rename_item",
+                {"item": _FILE, "name": "Plan v2.docx"},
+                {"item": {**_entry(), "parentReference": {"driveId": _DRIVE, "name": "Reports"}}},
+                "in the folder 'Reports'?",
+            ),
+            (
+                "sharepoint_rename_item",
+                {"item": _FILE, "name": "Plan v2.docx"},
+                {"item": {**_entry(), "parentReference": {"driveId": _DRIVE}}},
+                "in an unnamed folder?",
+            ),
+        ],
+        ids=[
+            "top-folder",
+            "unnamed-folder",
+            "top-folder-item",
+            "parent-name-only",
+            "no-parent-name",
+        ],
+    )
+    async def test_a_place_with_no_name_is_named_in_a_general_way(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, served: dict[str, Row], named: str
+    ) -> None:
+        _items(graph, **served)
+        person = Person(approval="no")
+
+        with pytest.raises(ToolError):
+            _ = await _call(tool, arguments, person=person)
+
+        [question] = person.asked
+        assert named in question
+        assert _writes(graph) == []
+
+    @pytest.mark.parametrize("second_read", [200, 404], ids=["shows-the-new-name", "fails"])
+    async def test_a_change_that_microsoft_answers_without_the_item_is_checked_by_a_second_read(
+        self, graph: respx.MockRouter, second_read: int
+    ) -> None:
+        reads = [
+            httpx.Response(200, json=_entry()),
+            httpx.Response(
+                second_read, json=_entry(name="Plan v2.docx") if second_read == 200 else _TAKEN
+            ),
+        ]
+        get = graph.get(_ITEM_PATH).mock(side_effect=reads)
+        patch = graph.patch(_ITEM_PATH).mock(return_value=httpx.Response(204))
+
+        if second_read == 200:
+            renamed = await call("sharepoint_rename_item", item=_FILE, name="Plan v2.docx")
+            assert cast("Row", renamed["item"])["name"] == "Plan v2.docx"
+        else:
+            with pytest.raises(ToolError) as unread:
+                _ = await call("sharepoint_rename_item", item=_FILE, name="Plan v2.docx")
+            assert "did not receive the renamed item" in str(unread.value)
+
+        assert (get.call_count, patch.call_count) == (2, 1)
+
+    async def test_a_notebook_is_not_attached_to_a_post(self, graph: respx.MockRouter) -> None:
+        notebook = {"id": _ITEM, "name": "Customers", "package": {"type": "oneNote"}}
+        _ = graph.get(_ITEM_PATH).mock(return_value=httpx.Response(200, json=notebook))
+        person = Person()
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _call(
+                "teams_send_channel_message_with_files",
+                {
+                    "team_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
+                    "channel_id": "19:general@thread.tacv2",
+                    "message": "The customer notes.",
+                    "attachments": [_FILE],
+                },
+                person=person,
+            )
+
+        assert "is not a plain file in Microsoft 365" in str(refused.value)
+        assert (_writes(graph), person.asked) == ([], [])
+
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("sharepoint_copy_item", {"item": _FILE, "to_folder": _ARCHIVE}),
+            ("sharepoint_create_folder", {"parent": _FOLDER, "name": "2026"}),
+            ("sharepoint_delete_item", {"item": _FILE}),
+            ("sharepoint_invite", {"item": _FILE, "recipients": [_ANNA], "role": "read"}),
+            ("sharepoint_move_item", {"item": _FILE, "to_folder": _ARCHIVE}),
+            ("sharepoint_rename_item", {"item": _FILE, "name": "Plan v2.docx"}),
+        ],
+        ids=["copy", "create-folder", "delete", "invite", "move", "rename"],
+    )
+    async def test_the_approval_question_is_passed_back_before_anything_changes(
+        self, graph: respx.MockRouter, tool: str, arguments: Row
+    ) -> None:
+        _folders(graph)
+        _items(graph, item=_entry())
+        with pytest.MonkeyPatch.context() as patch:
+            patch_obo(patch)
+            async with Client(FastMCPTransport(_server())) as client:
+                first = await client.session.call_tool(
+                    tool, dict(arguments), allow_input_required=True
+                )
+
+        assert isinstance(first, InputRequiredResult)
         assert _writes(graph) == []

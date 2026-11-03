@@ -269,3 +269,56 @@ Feature: Mailbox preferences
       When Mia asks her assistant whether her out-of-office reply is on
       Then the assistant tells Mia that an administrator of Microsoft 365 must give the permission, and that she must sign in again after that
       But it does not tell Mia that the reply is off
+
+  Rule: The reply that Mia sees is the reply that Outlook holds
+
+    @happy @uc-11-29
+    Scenario: A reply with no end that goes to contacts only is read as it is
+      Given Mia set an automatic reply in Outlook that has no end and goes to her contacts only
+      When Mia asks her assistant for the state of her automatic reply
+      Then the assistant says that the reply runs with no end
+      And the assistant says that only contacts outside the organization get it
+
+    @unhappy @uc-11-30
+    Scenario: A mailbox that holds no reply setting is read as a reply with no state
+      Given Microsoft sends no automatic reply setting for Mia
+      When Mia asks her assistant for the state of her automatic reply
+      Then the assistant says that it has no state for the reply
+      And the assistant does not say that the reply is off
+
+    @happy @uc-11-31
+    Scenario Outline: The state after a change is the state that Microsoft stored
+      Given Mia asks her assistant to turn her automatic reply off
+      When Microsoft stores <stored state>
+      Then the assistant tells Mia the state that Microsoft stored
+
+      Examples:
+        | stored state                                   |
+        | no setting at all                              |
+        | a setting with no state                        |
+        | a reply that runs with no end for contacts     |
+
+    @happy @uc-11-32
+    Scenario: The question names the contacts who get the reply
+      Given Mia asks her assistant to turn on an automatic reply for her contacts outside the organization
+      When the assistant turns the reply on
+      Then the assistant asks Mia to approve the reply
+      And the question says that contacts outside the organization get the reply
+
+    @happy @uc-11-33
+    Scenario: The time zone, the hours, the language, and the archive folder are read
+      Given Mia works from Monday to Tuesday in the zone "W. Europe Standard Time"
+      When Mia asks her assistant for her mailbox preferences
+      Then the assistant gives the zone, the hours, the language, and the archive folder
+
+    @unhappy @uc-11-34
+    Scenario: A mailbox that holds no language is read as no language
+      Given Microsoft sends no preferences for Mia
+      When Mia asks her assistant for her mailbox preferences
+      Then the assistant says that it has no language and no archive folder
+
+    @happy @uc-11-35
+    Scenario: The categories of the mailbox are listed
+      Given Mia has the categories "Reading" and "Follow-up"
+      When Mia asks her assistant for her categories
+      Then the assistant lists "Reading" and "Follow-up"

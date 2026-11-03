@@ -32,7 +32,7 @@ WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
     "teams_read_meeting": (),
     "teams_send_channel_message": (f"POST {_POSTS}", f"POST {_REPLIES}"),
     "teams_send_channel_message_with_files": (f"POST {_POSTS}", f"POST {_REPLIES}"),
-    "teams_edit_message": (f"PATCH {_POSTS}/*", f"PATCH {_REPLIES}/*"),
+    "teams_edit_message": (f"PATCH {_POSTS}/*", f"PATCH {_REPLIES}/*", f"PATCH {_CHAT_MESSAGE}"),
     "teams_react_to_message": (
         f"POST {_POSTS}/*/setReaction",
         f"POST {_POSTS}/*/unsetReaction",

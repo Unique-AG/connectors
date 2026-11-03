@@ -318,3 +318,186 @@ Feature: Catching up on Teams
       Then the assistant gives the message of Tom as text that Tom wrote
       And it tells Mia that the message asks for something
       But it sends the chat to no one
+
+  Rule: The assistant finds a message by what it says
+
+    @happy @uc-06-42 @deferred
+    Scenario: A search shows the full text and the reactions of each message that it finds
+      Given Tom wrote "I send the offer to the customer" in a chat, and Anna reacted to the message
+      When Mia asks her assistant to find "offer" and to show the full text of each message
+      Then the assistant shows the full text of the message of Tom
+      And it shows that Anna reacted to the message
+
+    @happy @uc-06-43 @deferred
+    Scenario Outline: A search is narrowed by one more condition
+      Given Mia, Anna, and Tom wrote about "offer" in Teams
+      When Mia asks her assistant to find "offer" <condition>
+      Then the assistant gives only the messages that fit the condition
+
+      Examples:
+        | condition                                 |
+        | in the messages that Mia sent to Anna     |
+        | in the messages that mention Anna         |
+        | in the messages that have an attachment   |
+        | in the messages that Tom sent before 9:00 |
+
+    @unhappy @uc-06-44 @deferred
+    Scenario Outline: A message that Microsoft sends without a sender or without an address is shown as far as it can be
+      Given Microsoft finds a message for "offer" <problem>
+      When Mia asks her assistant to find "offer" and to show the full text of each message
+      Then the assistant <told>
+
+      Examples:
+        | problem                                       | told                                                              |
+        | and names no sender or no id of the message   | does not list the message                                         |
+        | and names no chat and no channel for it       | lists the message without its text and without a way to open it |
+
+    @unhappy @uc-06-45 @deferred
+    Scenario: A search that Microsoft answers with no list of results finds nothing
+      Given Microsoft answers the search for "offer" with no list of results
+      When Mia asks her assistant to find "offer"
+      Then the assistant tells Mia that it found no message
+
+
+  Rule: The assistant reads only what a reference names
+
+    @unhappy @uc-06-47
+    Scenario Outline: A name that is not a reference is refused
+      Given Mia has the chat "Launch", the post "Launch", and the meeting "Design review" in Teams
+      When her assistant tries to <action> with the name in place of the reference
+      Then the assistant tells Mia that it needs the reference that another Teams tool gives
+      But nothing is read
+
+      Examples:
+        | action                                              |
+        | read the message "Launch"                           |
+        | list the replies to the post "Launch"               |
+        | list the replies to a message of the chat "Launch"  |
+        | list the replies to a reply in a thread             |
+        | list the transcripts of "Design review"             |
+        | list the recordings of "Design review"              |
+        | read the transcript of "Design review"              |
+
+    @unhappy @uc-06-48
+    Scenario Outline: A window of a transcript that cannot match a turn is refused
+      Given Mia has the transcript of "Design review"
+      When Mia asks her assistant to read the transcript <window>
+      Then the assistant tells Mia that <told>
+      But nothing is read
+
+      Examples:
+        | window                          | told                         |
+        | from minute 2 to minute 1       | the window ends before it starts |
+        | for a speaker with a blank name | a blank name is no filter    |
+
+
+  Rule: The assistant says what it knows about the recordings of a meeting
+
+    @unhappy @uc-06-49
+    Scenario: A meeting that Microsoft does not show has no recordings listed
+      Given Microsoft shows no online meeting "Design review" to Mia
+      When Mia asks her assistant for the recordings of "Design review"
+      Then the assistant tells Mia that Microsoft shows no such meeting to her
+      But it does not say that the meeting has no recording
+
+    @unhappy @uc-06-50
+    Scenario Outline: A meeting without a recording is told apart from a meeting that may still get one
+      Given the online meeting "Design review" ended <ended> and has no recording
+      When Mia asks her assistant for the recordings of "Design review"
+      Then the assistant tells Mia that <told>
+
+      Examples:
+        | ended           | told                                  |
+        | ten minutes ago | the recording may not be ready yet    |
+        | two days ago    | nobody recorded the meeting           |
+
+    @unhappy @uc-06-51
+    Scenario: A recording whose organizer and end Microsoft does not name is described with what is known
+      Given Microsoft names no organizer and no end for the recording of "Design review"
+      When Mia asks her assistant for the recordings of "Design review"
+      Then the assistant describes the recording without a length
+      And it tells Mia that it does not know who may open the recording
+
+
+  Rule: The assistant reads a transcript in the form that the company allows
+
+    @happy @uc-06-52
+    Scenario: A transcript is read without speaker names when the company does not allow them
+      Given the company does not allow speaker names in the transcript of "Design review"
+      When Mia asks her assistant to read the transcript
+      Then the assistant gives the words of the meeting
+      But it tells Mia that it does not know who said them
+
+    @happy @uc-06-53
+    Scenario: A turn that holds no words is left out of the transcript
+      Given the transcript of "Design review" holds a turn of Anna with no words and a turn of Tom
+      When Mia asks her assistant to read the transcript
+      Then the assistant gives the words of Tom
+      And it gives no turn of Anna
+
+    @unhappy @uc-06-54
+    Scenario: A transcript that Microsoft sends twice is listed once
+      Given Microsoft sends the same transcript of "Design review" twice
+      When Mia asks her assistant for the transcripts of "Design review"
+      Then the assistant lists the transcript once
+
+
+  Rule: The assistant keeps the kinds of a list apart
+
+    @unhappy @uc-06-55
+    Scenario: A channel of another kind that Microsoft adds to a list is not reported as the kind asked for
+      Given Microsoft answers the list of standard channels of the team "Sales" with a private channel
+      When Mia asks her assistant for the standard channels of "Sales"
+      Then the assistant tells Mia that Microsoft did not apply the kind that she asked for
+      But it lists no channel
+
+    @happy @uc-06-56
+    Scenario: A system event and the post of a bot in a chat are described as such
+      Given the chat "Design review" holds a post of a bot and four system events
+      When Mia asks her assistant what is new in "Design review"
+      Then the assistant gives the post of the bot with the name of the bot
+      And it describes each system event as an event and not as a message
+
+    @unhappy @uc-06-57
+    Scenario: A meeting chat without a join address of the meeting is listed without a way to open the meeting
+      Given Microsoft sends the chat "Design review" with no join address of the meeting
+      When Mia asks her assistant for her meeting chats
+      Then the assistant lists the chat "Design review"
+      But it cannot read the transcripts of that meeting
+
+
+  Rule: The assistant reads further back and deeper
+
+    @happy @uc-06-58
+    Scenario Outline: The messages of a chat before a day or a moment are read
+      Given the chat "Launch" holds messages of three days
+      When Mia asks her assistant for the messages of "Launch" sent <limit>
+      Then the assistant gives only the messages sent <limit>
+
+      Examples:
+        | limit                          |
+        | up to the end of 4 November    |
+        | up to 9:30 on 4 November       |
+
+    @happy @uc-06-59
+    Scenario: One reply of a thread is read in full
+      Given the post "Hosting plan" in the channel "Posts" has a reply of Tom
+      When Mia asks her assistant to read the reply of Tom in full
+      Then the assistant gives the full text of the reply
+      And it says which post the reply belongs to
+
+    @happy @uc-06-60
+    Scenario: The reactions of a message are shown with the person and the time of each one
+      Given Mia wrote a message in a chat and gave it a thumbs-up
+      When Mia asks her assistant to read that message
+      Then the assistant shows the thumbs-up
+      And it shows who gave it and when
+
+  Rule: The assistant reports a refusal of a transcript as it is
+
+    @unhappy @uc-06-46
+    Scenario: A transcript that the company switched off is not read a second time in another form
+      Given the company does not allow transcripts, and Mia has the transcript of "Design review"
+      When Mia asks her assistant to read the transcript
+      Then the assistant tells Mia that an administrator has to allow transcripts
+      But it makes no second try

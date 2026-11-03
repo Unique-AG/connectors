@@ -1,0 +1,48 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-before-moment.01.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "25",
+      "$skiptoken": "4.xtoHTs9Q4hMTTEAw5QxKuaMrk7AtiwSmVOGQdMJ9jcQWcRL9WbmSdOI8SvzbF0khCL9SuHoGSkDfO0Q8Pnv2HVZ6GJCNV6FbLbNKfITxEJsZgXb3LKEYGnbEEFEVUFEoXyLTH94bLCtPxcK2ZNrDRJ8Sv6nYKT46TLGDp0ytIkPmX3h2QKoCt49ySSHKAYA5MRMNRJ8YWNJILQp2CERllB9BWOePkfV8G6wCu5cnJOWhwWn1NMdByKD7VNCOPY15NUOXMLsTN9EVPBHRQqXRJ8PVTEJrOLKUeETrcAIUtA3JW0nQFYT0QMHsYtKGORJLTVQbWHhaQNWCR3d9YcnZnoQMQOPCZGTjAldkNwxJNcvsSk1nMdHmdBRyFeeQtcLncDEUmLW0C2kCJIcLYn9njrRQQJa4SdizgDLY3Iibw8emLuSlPAdmqL8cANgAdUW3EGHpr17uIFgJaf34YFhszi3iGVsJysMTMVL2IrIwx8fsNwEalzXXX46FpIUxUSDUM0zxPFc8djJBDvjfQdNwL506TVBXNrEHdeSxT31TpDVBMA1wTNLxxGMeG7GUtGxiddC3"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-before-moment.02.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:1u8835a83333300vbu87x54815pg2pr7@thread.v2/messages",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$filter": "createdDateTime lt ~tomorrow",
+      "$orderby": "createdDateTime desc",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "body": "rec-tool-teams_list_chat_messages-before-moment.03.json"
+  }
+]

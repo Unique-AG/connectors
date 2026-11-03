@@ -304,3 +304,126 @@ Feature: Finding and reading files in OneDrive and SharePoint
       Then the assistant reads the launch plan
       And it finds "Brightway Pricing.xlsx"
       And it answers from that workbook
+
+  Rule: The assistant stops a request that cannot succeed before it asks Microsoft
+
+    @unhappy @uc-01-37
+    Scenario Outline: A handle of the wrong kind is refused before Microsoft is asked
+      Given the assistant holds <given> for the item that Mia means
+      When the assistant tries to <action> with that value
+      Then the assistant gets a message that names the kind of handle that it needs
+      But Microsoft is not asked
+
+      Examples:
+        | given                          | action                  |
+        | the handle of a folder         | read a file             |
+        | the handle of a file           | list the items of a folder |
+
+    @unhappy @uc-01-42
+    Scenario: A time window that runs backwards is refused
+      Given Mia wants the files that changed between 30 October and 26 October
+      When Mia asks her assistant to search for "Brightway" in that window
+      Then the assistant tells Mia that no window runs backwards
+      And it searches again with the earlier day first
+
+    @unhappy @uc-01-43
+    Scenario: A search with no word in it is refused
+      Given Mia gives only spaces as the words to search for
+      When Mia asks her assistant to search
+      Then the assistant tells Mia that there is nothing to search for
+      But Microsoft is not asked
+
+    @unhappy @uc-01-47
+    Scenario Outline: An address that is not a web address is refused
+      Given Mia gives <value> as the address of a file
+      When Mia asks her assistant to open that address
+      Then the assistant tells Mia that it needs the full secure web address, as the browser shows it
+      But Microsoft is not asked
+
+      Examples:
+        | value                                     |
+        | the name "Plan.docx"                      |
+        | an address that is not a secure address   |
+        | an address that has a broken host         |
+
+  Rule: A file is read in the form that Mia needs
+
+    @happy @uc-01-38
+    Scenario Outline: A file that Microsoft converts comes back as a PDF with a PDF name
+      Given Mia has a file with the name <name>
+      When Mia asks her assistant to summarize that file, and Microsoft converts it to a PDF
+      Then the assistant gets a PDF with the name <told>
+
+      Examples:
+        | name           | told          |
+        | "Plan.docx"    | "Plan.pdf"    |
+        | "Plan"         | "Plan.pdf"    |
+        | "Plan.v2.docx" | "Plan.v2.pdf" |
+        | no name at all | "resource.pdf" |
+
+    @unhappy @uc-01-40
+    Scenario Outline: A file with no usable type is read as plain bytes
+      Given Mia has a file that <state>
+      When Mia asks her assistant to read that file
+      Then the assistant gets the bytes of the file as a file of the type "application/octet-stream"
+
+      Examples:
+        | state                                                |
+        | Microsoft gives no type for                          |
+        | is a text file with bytes that are not valid text    |
+
+    @unhappy @uc-01-41
+    Scenario: A file that is larger than Microsoft said is refused while it comes in
+      Given Microsoft says that "Brightway Annual Report.pdf" holds 4 bytes
+      But the file is larger than 10 MB when it arrives
+      When Mia asks her assistant to summarize that report
+      Then the assistant tells Mia that the file is more than 10 MB
+      And it gives Mia the web address that opens the file in a browser
+
+  Rule: A folder is listed in the order that Mia asks for
+
+    @happy @uc-01-39
+    Scenario: A folder is listed in the order of the names
+      Given the folder "Ordered" holds three files that Mia names "Order A", "Order B", and "Order C"
+      When Mia asks her assistant to list "Ordered" by name
+      Then the assistant lists "Order A", "Order B", and "Order C" in this order
+
+  Rule: The assistant names the sites where the matches are
+
+    @happy @uc-01-44
+    Scenario: A search on a site names the site
+      Given the Sales site holds the file "Team Charter.docx"
+      When Mia asks her assistant to search for "Team Charter"
+      Then the assistant finds "Team Charter.docx"
+      And it names the Sales site as the place of the match
+
+    @unhappy @uc-01-45
+    Scenario Outline: A search answer that holds no site list shows no site
+      Given Microsoft answers the search <answer>
+      When Mia asks her assistant to search for "Brightway"
+      Then the assistant shows no files and no site
+      But it does not say that the file does not exist elsewhere
+
+      Examples:
+        | answer                                  |
+        | with no group of results                |
+        | with a group of another kind only       |
+
+    @happy @uc-01-46
+    Scenario: A time window with exact times is searched to the moment
+      Given Mia wants the files that changed from 08:00 on 26 October to 17:45:30 on 30 October
+      When Mia asks her assistant to search for "Brightway" in that window
+      Then the assistant gets the files of exactly that window
+
+  Rule: A drive or a site without an address is left out
+
+    @unhappy @uc-01-48
+    Scenario Outline: A drive or a site that Microsoft gives without an address is left out
+      Given Microsoft lists two <kind>, and one of them has no <missing>
+      When Mia asks her assistant for her <kind>
+      Then the assistant lists only the <kind> that has a <missing>
+
+      Examples:
+        | kind   | missing |
+        | drives | id      |
+        | sites  | address |

@@ -591,3 +591,145 @@ uc-13-39:
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
   note: "The organizer gets the report. Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:258 and :343-346: status available means that a report exists; newest_report_attendance holds each person of the newest report with the total time in seconds and the periods of attendance (:226-233); more_records is true when the list is not complete."
+
+uc-13-40:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatProgramOfTheNewerKind::test_it_makes_an_approved_change_once_when_the_question_comes_in_the_answer"
+  ask: "Create an online meeting for tomorrow at 14:00 with Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [teams_create_chat, teams_add_chat_member, teams_remove_chat_member, teams_rename_chat, teams_create_meeting, teams_update_meeting, teams_delete_meeting]
+  note: "Rows 1 to 7 name the tools in the order of uc-13-31. A client of the 2026-07-28 protocol has no back-channel, so the tool returns the question in its result, the client asks the person, and the client calls the tool again with the answer. Expected behaviour from src/office_365_mcp/shared/seam.py:266 to src/office_365_mcp/shared/seam.py:288: the tool changes Teams after the person gives the word for yes, and only then."
+
+uc-13-41:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatProgramOfTheNewerKind::test_it_changes_nothing_unless_the_answer_is_the_word_for_yes"
+  ask: "Add Priya to the Launch chat."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - any_of: [teams_create_chat, teams_add_chat_member, teams_remove_chat_member, teams_rename_chat, teams_create_meeting, teams_update_meeting, teams_delete_meeting]
+  note: "Rows 1 to 7 name the tools in the order of uc-13-31. The three answers are a refusal, the word for no, and a word that is no choice. Expected behaviour from src/office_365_mcp/shared/seam.py:279, src/office_365_mcp/shared/seam.py:285, and src/office_365_mcp/shared/seam.py:288: nothing was changed, and the assistant says that the request was not confirmed."
+
+uc-13-42:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_meeting_reference_that_is_not_one_and_asks_nobody"
+  ask: "Move the online meeting Design review to 15:00 for 30 minutes."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - any_of: [teams_update_meeting, teams_delete_meeting, teams_read_meeting]
+  note: "The tool refuses before it asks Mia and before it asks Microsoft. Rows 1 to 3 are teams_update_meeting, teams_delete_meeting, and teams_read_meeting. Expected behaviour from src/office_365_mcp/shared/meetings.py:159 and src/office_365_mcp/tools/teams_update_meeting.py:164: a meeting handle has exactly one shape, teams:///meetings/{join_web_url}; copy the meeting_uri of a tool result word for word."
+
+uc-13-43:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_change_that_teams_cannot_take_and_asks_nobody"
+  ask: "Change the online meeting Design review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_update_meeting
+      args: {}
+  note: "Rows 1 to 4 are a call with no change, a start with no end, an end with no start, and a start with no offset. Expected behaviour from src/office_365_mcp/tools/teams_update_meeting.py:207, src/office_365_mcp/tools/teams_update_meeting.py:209, and src/office_365_mcp/shared/meetings.py:230: the tool refuses before it asks Mia, and it changes nothing."
+
+uc-13-44:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_new_meeting_whose_time_teams_cannot_read_and_asks_nobody"
+  ask: "Create an online meeting for tomorrow at 14:00 with Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: oneOnOne}
+    - tool: teams_create_meeting
+      args: {subject: Design review}
+      uses: {attendees: user id and name of Anna from the member rows}
+  note: "Row 1 is a start that is no date and time, and row 2 is an end with no offset. Expected behaviour from src/office_365_mcp/shared/meetings.py:220: the value must be an ISO-8601 date and time with an offset; ask the user when the zone is not clear; the tool refuses before it asks Mia."
+
+uc-13-45:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_does_not_delete_or_read_a_meeting_that_microsoft_does_not_show"
+  ask: "Delete the online meeting Design review."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: meeting, topic_contains: Design review}
+    - any_of: [teams_delete_meeting, teams_read_meeting]
+  note: "Row 1 is teams_delete_meeting and row 2 is teams_read_meeting. Expected behaviour from src/office_365_mcp/tools/teams_delete_meeting.py:118 and src/office_365_mcp/tools/teams_read_meeting.py:303: Microsoft shows no meeting with this handle to the signed-in user; the tool asks nobody and deletes nothing."
+
+uc-13-48:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_one_to_one_chat_with_two_people_and_asks_nobody"
+  ask: "Start a one-to-one chat with Anna and Tom."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: teams_create_chat
+      args: {chat_type: oneOnOne}
+      uses: {members: user id and name of Anna and Tom from the member rows}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_create_chat.py:181: a one-to-one chat has exactly one other person; for more people set chat_type to group; no chat was created."
+
+uc-13-46:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_names_a_member_without_a_name_as_such_in_the_question"
+  ask: "Remove the member with no name from the Launch chat."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chat_members
+      uses: {chat_id: id of the chat}
+    - tool: teams_remove_chat_member
+      uses: {chat_id: id of the chat, membership_id: membership id of the member}
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_remove_chat_member.py:132: the question names a member with no name and no email as a member with no name."
+
+uc-13-49:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_gives_no_attendee_list_when_microsoft_answers_the_change_without_one"
+  ask: "Rename the online meeting Design review to Design review 2."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_update_meeting
+      args: {subject: Design review 2}
+      uses: {meeting_uri: uri of the meeting}
+  note: "Expected behaviour from src/office_365_mcp/shared/meetings.py:140: when Microsoft answers with no attendee list, the answer of the tool has no attendee ids."
+
+uc-13-50:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_names_a_chat_without_a_title_by_its_members_in_the_question"
+  ask: "Add Priya to the chat with Anna and Tom."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_list_chats
+      args: {chat_type: group}
+    - tool: teams_add_chat_member
+      uses: {chat_id: id of the chat, member: user id and name of Priya from her chat}
+  note: "Expected behaviour from src/office_365_mcp/shared/messages.py:613: a chat with no topic is named by the display names of its members."
+
+uc-13-47:
+  deferred:
+    - teams_create_chat-one-to-one
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_creates_a_one_to_one_chat_after_mia_approves_it"
+  ask: "Start a one-to-one chat with Tom."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: teams_create_chat
+      args: {chat_type: oneOnOne}
+      uses: {members: user id and name of Tom from the member rows}
+  note: "A one-to-one chat is a chat that Microsoft creates once for two people. The recorder cannot create it, because the recorder writes only to a chat that has a seed-v1 case- title."

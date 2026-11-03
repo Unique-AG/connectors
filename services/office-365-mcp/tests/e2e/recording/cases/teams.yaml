@@ -553,3 +553,171 @@ teams_read_transcript-lines:
           speaker_attribution: true
           "turns[speaker=Anna Meier].text": Anna sends the budget file by Friday.
       bind: {uri: "$prev.transcripts[0].uri"}
+
+teams_read_message-reply:
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - *posts_of_the_seed
+    - tool: teams_list_message_replies
+      bind: {uri: "$prev.messages[subject=seed-v1 post p02].uri"}
+    - tool: teams_read_message
+      expect: {result: {body: I bring the hosting costs.}}
+      bind: {uri: "$prev.messages[0].uri"}
+
+teams_list_chat_messages-before-day:
+  needs: [teams-seed-chats]
+  chain:
+    - *unread_chat
+    - tool: teams_list_chat_messages
+      args: {limit: 10, sent_before: "~tomorrow"}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+
+teams_list_chat_messages-before-moment:
+  needs: [teams-seed-chats]
+  chain:
+    - *unread_chat
+    - tool: teams_list_chat_messages
+      args: {limit: 10, sent_before: "~tomorrowT09:30:00Z"}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+
+teams_edit_message-chat:
+  external: true
+  needs: [teams-seed-chats]
+  chain:
+    - *send_chat
+    - tool: teams_send_chat_message
+      args: {message: seed-v1 case-teams_edit_message-chat before}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+    - tool: teams_edit_message
+      args: {message: seed-v1 case-teams_edit_message-chat after}
+      bind: {uri: "$prev.uri"}
+
+teams_edit_message-reply:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_edit_message-reply post"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_edit_message-reply before"}
+      bind:
+        team_id: "$1.teams[display_name=seed-v1 team].team_id"
+        channel_id: "$2.channels[0].channel_id"
+        reply_to_id: "$prev.message_id"
+    - tool: teams_edit_message
+      args: {message: "seed-v1 case-teams_edit_message-reply after"}
+      bind: {uri: "$prev.uri"}
+
+teams_react_to_message-chat-remove:
+  external: true
+  needs: [teams-seed-chats]
+  chain:
+    - *send_chat
+    - tool: teams_send_chat_message
+      args: {message: seed-v1 case-teams_react_to_message-chat-remove target}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d"}
+      bind: {uri: "$prev.uri"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d", remove: true}
+      bind: {uri: "$2.uri"}
+
+teams_react_to_message-post-remove:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_react_to_message-post-remove target"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d"}
+      bind: {uri: "$prev.uri"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d", remove: true}
+      bind: {uri: "$3.uri"}
+
+teams_react_to_message-reply:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_react_to_message-reply post"}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_react_to_message-reply target"}
+      bind:
+        team_id: "$1.teams[display_name=seed-v1 team].team_id"
+        channel_id: "$2.channels[0].channel_id"
+        reply_to_id: "$prev.message_id"
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d"}
+      bind: {uri: "$prev.uri"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d", remove: true}
+      bind: {uri: "$4.uri"}
+
+teams_send_channel_message_with_files-reply:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Meeting Notes, limit: 1}
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args: {message: "seed-v1 case-teams_send_channel_message_with_files-reply post"}
+      bind: {team_id: "$2.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+    - tool: teams_send_channel_message_with_files
+      args: {message: "seed-v1 case-teams_send_channel_message_with_files-reply notes"}
+      bind:
+        attachments: ["$1.files[0].uri"]
+        team_id: "$2.teams[display_name=seed-v1 team].team_id"
+        channel_id: "$3.channels[0].channel_id"
+        reply_to_id: "$prev.message_id"
+
+teams_create_chat-one-to-one:
+  deferred: "The recorder creates or writes only to a chat that has a seed-v1 case- title, and a one-to-one chat has no title."
+  external: true
+  chain:
+    - tool: teams_create_chat
+      args:
+        chat_type: oneOnOne
+        members:
+          - {user_id: persona:tom.id, name: persona:tom.name}
+
+teams_send_channel_message-mention:
+  external: true
+  needs: [teams-seed-team]
+  chain:
+    - *teams
+    - *seed_channels
+    - tool: teams_send_channel_message
+      args:
+        message: seed-v1 case-teams_send_channel_message-mention hello
+        mentions:
+          - {user_id: persona:tom.id, name: persona:tom.name}
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
+
+teams_read_message-chat-reacted:
+  external: true
+  needs: [teams-seed-chats]
+  chain:
+    - *send_chat
+    - tool: teams_send_chat_message
+      args: {message: seed-v1 case-teams_read_message-chat-reacted target}
+      bind: {chat_id: "$prev.chats[0].chat_id"}
+    - tool: teams_react_to_message
+      args: {reaction: "\U0001f44d"}
+      bind: {uri: "$prev.uri"}
+    - tool: teams_read_message
+      bind: {uri: "$2.uri"}

@@ -366,3 +366,139 @@ Feature: Running Teams chats and online meetings
       Then Mia is asked to approve the new title first
       And the assistant tells Mia that the message asks for a new member
       But it adds nobody to "Launch"
+
+  Rule: A chat program of the newer kind gets the question inside the answer of the call
+
+    @happy @uc-13-40
+    Scenario Outline: An approved change happens once when the question comes inside the answer of the call
+      Given Mia's chat program takes the question inside the answer of the call
+      When Mia asks her assistant to <action>
+      Then Mia is asked to approve the change first
+      And after she approves, the change happens once
+
+      Examples:
+        | action                                                   |
+        | start a group chat with Anna and Tom named "Launch"      |
+        | add Priya to "Launch"                                    |
+        | remove Tom from "Launch"                                 |
+        | rename "Launch" to "Launch 2.0"                          |
+        | create an online meeting for tomorrow at 14:00 with Anna |
+        | move the online meeting "Design review" to 15:00         |
+        | delete the online meeting "Design review"                |
+
+    @unhappy @uc-13-41
+    Scenario Outline: A change does not happen unless the answer of Mia is the word for yes
+      Given Mia's chat program takes the question inside the answer of the call
+      And Mia declines, or her program sends the word for no, or sends a word that is not a choice
+      When Mia asks her assistant to <action>
+      Then nothing changes in Teams
+      And the assistant tells Mia that <told>
+
+      Examples:
+        | action                                                   | told                   |
+        | start a group chat with Anna and Tom named "Launch"      | no chat was created    |
+        | add Priya to "Launch"                                    | nobody was added       |
+        | remove Tom from "Launch"                                 | nobody was removed     |
+        | rename "Launch" to "Launch 2.0"                          | nothing was renamed    |
+        | create an online meeting for tomorrow at 14:00 with Anna | no meeting was created |
+        | move the online meeting "Design review" to 15:00         | no meeting was changed |
+        | delete the online meeting "Design review"                | no meeting was deleted |
+
+
+  Rule: The assistant asks Teams only when the call makes sense
+
+    @unhappy @uc-13-42
+    Scenario Outline: A name that is not a reference to a meeting is refused
+      Given Mia organizes the online meeting "Design review"
+      When her assistant tries to <action> with the name "Design review" in place of the reference of the meeting
+      Then the assistant tells Mia that it needs the reference that her chats give
+      And Mia is asked nothing
+      But the meeting stays as it was
+
+      Examples:
+        | action                                                          |
+        | move the online meeting to 15:00 for 30 minutes                 |
+        | delete the online meeting                                       |
+        | read who attended the online meeting                            |
+
+    @unhappy @uc-13-43
+    Scenario Outline: A change that Teams cannot take is refused
+      Given Mia organizes the online meeting "Design review"
+      When Mia asks her assistant to <change>
+      Then the assistant tells Mia that <told>
+      And Mia is asked nothing
+      But the meeting stays as it was
+
+      Examples:
+        | change                                             | told                                        |
+        | change nothing about the online meeting            | the call holds no change                    |
+        | move the online meeting to a new start only        | a new time needs a start and an end         |
+        | move the online meeting to a new end only          | a new time needs a start and an end         |
+        | move the online meeting to a start with no time zone | the start names no time zone              |
+
+    @unhappy @uc-13-44
+    Scenario Outline: A time that Teams cannot read is refused for a new meeting
+      Given Mia has a chat with Anna
+      When Mia asks her assistant to create an online meeting with <time>
+      Then the assistant tells Mia that <told>
+      And it asks Mia for the correct time
+      But no meeting is created
+
+      Examples:
+        | time                      | told                                |
+        | a start that is no time   | the start is not a date and a time  |
+        | an end with no time zone  | the end names no time zone          |
+
+    @unhappy @uc-13-45
+    Scenario Outline: A meeting that Microsoft does not show is not deleted and not read
+      Given Microsoft shows no online meeting "Design review" to Mia
+      When Mia asks her assistant to <action>
+      Then the assistant tells Mia that Microsoft shows no such meeting to her
+      But Mia is asked nothing
+
+      Examples:
+        | action                                    |
+        | delete the online meeting "Design review" |
+        | read who attended "Design review"         |
+
+    @unhappy @uc-13-48
+    Scenario: A one-to-one chat with two other people is refused
+      Given Mia knows Anna and Tom from a group chat
+      When Mia asks her assistant to start a one-to-one chat with Anna and Tom
+      Then the assistant tells Mia that a one-to-one chat has exactly one other person
+      And it offers a group chat
+      But no chat is created
+
+
+  Rule: The question names what Microsoft shows
+
+    @happy @uc-13-46
+    Scenario: A member without a name is shown as such in the question
+      Given the chat "Launch" has a member whom Microsoft shows with no name
+      When Mia asks her assistant to remove that member from "Launch"
+      Then Mia is asked to approve the change first
+      And the question names the member as a member with no name
+
+    @unhappy @uc-13-49
+    Scenario: A change that Microsoft answers without the list of attendees gives no list
+      Given Mia organizes the online meeting "Design review", and she approves the new title
+      And Microsoft answers the change with no list of attendees
+      When Mia asks her assistant to rename the online meeting "Design review" to "Design review 2"
+      Then the assistant tells Mia that the title changed
+      But it does not say who the attendees are
+
+  Rule: Mia sees the members of a chat without a title in the question
+
+    @happy @uc-13-50
+    Scenario: A chat without a title is named by its members in the question
+      Given Mia has a group chat with no title, and Anna and Tom are its members
+      When Mia asks her assistant to add Priya to that chat
+      Then Mia is asked to approve the change first
+      And the question names the chat by Anna and Tom
+
+    @happy @uc-13-47 @deferred
+    Scenario: A one-to-one chat is created after Mia approves it
+      Given Mia has no chat with Tom
+      When Mia asks her assistant to start a one-to-one chat with Tom
+      Then Mia is asked to approve the chat first
+      And after she approves, Mia has a one-to-one chat with Tom that has no title

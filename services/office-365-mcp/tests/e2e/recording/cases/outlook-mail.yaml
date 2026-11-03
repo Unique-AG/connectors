@@ -216,6 +216,16 @@ outlook_get_mailbox_settings-replies:
     - tool: outlook_get_mailbox_settings
       args: {include: replies}
 
+outlook_get_mailbox_settings-preferences:
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: preferences}
+
+outlook_get_mailbox_settings-categories:
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: categories}
+
 outlook_set_automatic_reply-disabled:
   chain:
     - tool: outlook_set_automatic_reply

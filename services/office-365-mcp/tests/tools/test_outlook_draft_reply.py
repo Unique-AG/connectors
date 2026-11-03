@@ -416,18 +416,6 @@ class TestWhatItSendsToGraph:
 
 
 class TestTheModesAndAddressesItRefuses:
-    @pytest.mark.parametrize("mode", ["replyAll", "reply_all", "reply-all", "REPLY", ""])
-    async def test_a_mode_that_is_not_one_of_the_two_reaches_graph_at_all(
-        self, client: GraphServiceClient, graph: respx.MockRouter, mode: str
-    ) -> None:
-        _ = _creates(graph)
-
-        with pytest.raises(ToolError, match="reply-all") as raised:
-            _ = await _reply(client, mode=mode)
-
-        assert "outlook_draft_reply_all" in str(raised.value)
-        assert len(graph.calls) == 0
-
     async def test_to_on_a_reply_is_refused_and_the_refusal_names_the_mode(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -800,8 +788,7 @@ class TestTheSchemaItPublishes:
         mode = _properties(parameters)["mode"]
         assert mode["$ref"] == "#/$defs/MailReplyMode"
         published = cast("Mapping[str, Mapping[str, object]]", parameters["$defs"])
-        assert cast("Sequence[str]", published["MailReplyMode"]["enum"]) == list(replier.MODES)
-        assert list(replier.MODES) == ["reply", "forward"]
+        assert cast("Sequence[str]", published["MailReplyMode"]["enum"]) == ["reply", "forward"]
 
     @pytest.mark.parametrize("word", ["bcc", "blind", "all", "file", "upload", "drive"])
     async def test_no_argument_offers_a_blind_copy_a_reply_all_or_markup(

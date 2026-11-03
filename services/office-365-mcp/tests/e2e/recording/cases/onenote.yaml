@@ -276,3 +276,13 @@ onenote_get_operation-notebook:
     - tool: onenote_get_operation
       wait_seconds: 20
       bind: {operation: "$2.uri"}
+
+onenote_list_notebooks-owned:
+  needs: *seed
+  chain:
+    - {tool: onenote_list_notebooks, args: {shared: false, role: Owner}}
+
+onenote_list_pages-window:
+  needs: *seed
+  chain:
+    - {tool: onenote_list_pages, args: {modified_after: ~yesterday, modified_before: ~tomorrow, created_before: ~tomorrow, limit: 5}}

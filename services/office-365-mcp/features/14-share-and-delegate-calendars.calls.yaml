@@ -209,7 +209,7 @@ uc-14-14:
   chain:
     - tool: outlook_list_calendars
       optional: true
-    - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf]
+    - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf, outlook_delete_calendar]
   note: "expected behaviour from shared/seam.py:236-241 _not_agreed: nothing was changed, this is not a failure to report as one, say that the request was not confirmed, and do not call the tool again for the same request unless the user asks for it in a new message (:187-189). Each tool adds its own first sentence: The calendar was not shared (share), The share was not removed (unshare), No event was created (booking). The asks of the rows: give Anna read access to my calendar; stop sharing my calendar with Anna; book the Budget review with Anna on Lena's calendar."
 
 uc-14-15:
@@ -222,7 +222,7 @@ uc-14-15:
   chain:
     - tool: outlook_list_calendars
       optional: true
-    - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf]
+    - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf, outlook_delete_calendar]
   note: "expected behaviour from shared/seam.py:227-233 _no_answer, reached from :260-263 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:187-189). The asks of the rows are the asks of uc-14-14."
 
 uc-14-16:
@@ -235,7 +235,7 @@ uc-14-16:
   chain:
     - tool: outlook_list_calendars
       optional: true
-    - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf]
+    - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf, outlook_delete_calendar]
   note: "expected behaviour from shared/seam.py:244-249 _another_request, reached from :283-284 when the answer carries the state of another question: the agreement does not cover this request, nothing was changed, ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that hands the question back to the client (shared/seam.py:268-290). Each tool binds the answer to its own details: share to the calendar, address and role (tools/outlook_share_calendar.py:175), unshare to the share (tools/outlook_unshare_calendar.py:148), booking to its transaction id."
 
 uc-14-17:
@@ -308,3 +308,57 @@ uc-14-21:
       optional: true
       uses: {calendar_ref: handle of the calendar}
   note: "expected behaviour from tools/outlook_delete_calendar.py, one row each, and every refusal comes before the question to Mia (:142-147). The delete call is optional: for the main calendar and the calendar of Lena the listing already shows is_default and is_mine (shared/calendar.py:655-664), so the assistant can stop before the call and the call that Microsoft or the tool refuses is not made. Main calendar, :83-88 _THE_DEFAULT_CALENDAR: Microsoft Graph deletes only a calendar other than the default calendar, nothing was deleted. Calendar of Lena, :95-101 _NOT_THE_OWNER: another person owns it and shares it with the user, the tool deletes only a calendar that the user owns. Not removable, :89-94 _NOT_REMOVABLE: Microsoft 365 marks the calendar as not removable from the mailbox. Holds a meeting, :102-108 _HOLDS_AN_EVENT: the tool deletes only an empty calendar, tell the user to move or cancel the events of the calendar first, for example in Outlook."
+
+uc-14-22:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestALinkThatIsNotACalendarLink::test_it_reads_and_changes_nothing_and_asks_nothing"
+  provenance: drafted
+  ask: "Delete the calendar Spare calendar."
+  asks_user: false
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_delete_calendar
+      uses: {calendar_ref: handle of the calendar}
+  note: "expected behaviour from tools/outlook_list_calendar_shares.py:49, tools/outlook_share_calendar.py:98, tools/outlook_unshare_calendar.py:75 and tools/outlook_delete_calendar.py:75: a name is not a handle, so the tool does nothing, asks nobody, and names the tool that gives the handle."
+
+uc-14-23:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestALinkThatIsNotACalendarLink::test_a_name_in_place_of_an_address_shares_nothing"
+  provenance: drafted
+  ask: "Give Anna Meier read access to my calendar."
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      optional: true
+    - tool: outlook_share_calendar
+      args: {role: read}
+  note: "expected behaviour from tools/outlook_share_calendar.py:106 _NOT_ONE_ADDRESS: the tool takes one address and nothing else, so it shares nothing and tells the assistant to find the address or to ask the user."
+
+uc-14-24:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_gets_a_meeting_while_mia_decides_is_not_deleted"
+  provenance: drafted
+  ask: "Delete the calendar Spare."
+  asks_user: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_delete_calendar
+      uses: {calendar_ref: handle of the calendar}
+  note: "expected behaviour from tools/outlook_delete_calendar.py:149-153: the tool reads the events of the calendar again after Mia approves, and a meeting that arrived in the meantime stops the delete (_HOLDS_AN_EVENT at :102-108)."
+
+uc-14-25:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamsMeetingOnTheCalendarOfAManager"
+  provenance: drafted
+  ask: "Book the Budget review with Anna on Lena's calendar as a Teams meeting."
+  asks_user: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_create_event_on_behalf
+      args: {subject: Budget review, online_meeting: true}
+      uses: {calendar_ref: handle of the calendar of Lena}
+  note: "tools/outlook_create_event_on_behalf.py:556-560: when the calendar allows Teams meetings, the tool asks Mia and sends the event as a Teams meeting. When it takes none, the tool refuses (uc-07-24 shows the same rule for Mia's own calendar)."

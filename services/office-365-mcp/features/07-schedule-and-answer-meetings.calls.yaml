@@ -202,6 +202,7 @@ uc-07-13:
   status: untested
   tests:
     - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestListingTheInvitationsThatWait::test_it_lists_the_invitations_without_an_answer_and_not_the_accepted_ones"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnEventWithNoAnswerOfMia"
   provenance: drafted
   ask: "Which invitations still wait for my answer?"
   asks_user: false
@@ -213,6 +214,7 @@ uc-07-14:
   status: untested
   tests:
     - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestCancellingAMeetingWithANote::test_a_meeting_is_cancelled_with_a_note_for_the_attendee"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestACancelWhoseAttendeeHasNoAddress"
   provenance: drafted
   ask: "Cancel my Design review with Anna tomorrow and tell her that I am sick."
   asks_user: true
@@ -257,6 +259,7 @@ uc-07-17:
   status: untested
   tests:
     - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestForwardingAnInvitation::test_an_invitation_is_forwarded_with_the_note_and_the_organizer_is_told"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAForwardThatCannotBeRead::test_a_meeting_with_no_recorded_start_is_named_in_the_question_without_a_time"
   provenance: drafted
   ask: "Forward the Launch review to Priya and add the note: please join."
   asks_user: true
@@ -357,6 +360,7 @@ uc-07-24:
   status: untested
   tests:
     - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_teams_meeting_on_a_calendar_that_takes_none_is_refused_and_then_booked_without"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestABookingForSomebodyElseWithNobodyInvited::test_a_calendar_that_takes_no_teams_meeting_gets_none_and_the_way_on_is_named"
   provenance: drafted
   ask: "Book the Launch review on Monday at 14:00 with Anna, with a Teams meeting."
   asks_user: true
@@ -418,7 +422,7 @@ uc-07-28:
   chain:
     - tool: outlook_list_events
       optional: true
-    - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event]
+    - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
   note: "expected behaviour from shared/seam.py:236-241 _not_agreed: nothing was changed, this is not a failure to report as one, say that the request was not confirmed, and do not call the tool again for the same request unless the user asks for it in a new message (:187-189). Each tool adds its own first sentence: No event was created (create), No response was sent (respond), Nothing was cancelled (cancel), Nothing was changed (update), This tool forwarded nothing (forward). The asks of the rows: book the Launch review on Monday at 14:00 with Anna and Tom; decline the Launch review with the note I am on leave; cancel my Design review with Anna tomorrow; move next Thursday's Team sync to Friday; forward the Launch review to Priya."
 
 uc-07-29:
@@ -431,7 +435,7 @@ uc-07-29:
   chain:
     - tool: outlook_list_events
       optional: true
-    - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event]
+    - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
   note: "expected behaviour from shared/seam.py:227-233 _no_answer, reached from :260-263 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:187-189). The asks of the rows are the asks of uc-07-28."
 
 uc-07-30:
@@ -444,7 +448,7 @@ uc-07-30:
   chain:
     - tool: outlook_list_events
       optional: true
-    - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event]
+    - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
   note: "expected behaviour from shared/seam.py:244-249 _another_request, reached from :283-284 when the answer carries the state of another question: the agreement does not cover this request, nothing was changed, ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that hands the question back to the client (shared/seam.py:268-290). Each tool binds the answer to its own details: create_event to its transaction id (tools/outlook_create_event.py:418), the others through confirmation_id_for."
 
 uc-07-31:
@@ -702,3 +706,154 @@ uc-07-48:
     - tool: outlook_find_rooms
       args: {room_list: building9@example.com}
   note: "expected behaviour from tools/outlook_find_rooms.py:27-32 GRAPH_NOT_FOUND: Microsoft found no room list at that address, so no room is listed, ask the user for the address of the room list, or call the tool again without room_list."
+
+uc-07-49:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestALinkThatIsNotAMeetingLink"
+  provenance: drafted
+  ask: "Cancel the Launch review."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_cancel_event
+      uses: {uri: uri of the event from the listing}
+  note: "expected behaviour from tools/outlook_cancel_event.py:79, tools/outlook_delete_event.py:78, tools/outlook_forward_event.py:77, tools/outlook_respond_to_invite.py:91 and tools/outlook_update_event.py:120: a subject line is not a handle, so the tool does nothing, asks nobody, and names the tool that gives the link."
+
+uc-07-50:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestABookingThatCannotBeRead"
+  provenance: drafted
+  ask: "Book the Launch review with Anna on Monday at 14:00."
+  asks_user: false
+  chain:
+    - any_of: [outlook_create_event, outlook_create_event_on_behalf]
+  must_not: [outlook_forward_event]
+  note: "expected behaviour from tools/outlook_create_event.py:135-230, tools/outlook_create_event_on_behalf.py:160-240 and shared/calendar.py:953-989 recurrence_refusal: each fault is refused before Microsoft is asked, no meeting is created, nobody is invited, and the text names the argument to correct."
+
+uc-07-51:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeABooking::test_the_question_names_every_detail_of_the_booking"
+  provenance: drafted
+  ask: "Book the Launch review every second day until the 10th, at Room Pilatus."
+  asks_user: true
+  chain:
+    - tool: outlook_create_event
+      args: {subject: Launch review, location: Room Pilatus}
+  note: "shared/calendar.py:996-1122 draft_details: the question lists the whole days, the repeat rule and how it ends, the reminder, and the body, so that Mia approves what Microsoft will hold."
+
+uc-07-52:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeABooking::test_a_booking_with_a_room_or_a_place_and_nobody_else_says_nobody_is_invited"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestABookingForSomebodyElseWithNobodyInvited::test_the_question_says_who_is_told_and_names_no_owner_when_microsoft_gives_none"
+  provenance: drafted
+  ask: "Book room Pilatus for the Launch review on Monday at 14:00."
+  asks_user: true
+  chain:
+    - any_of: [outlook_create_event, outlook_create_event_on_behalf]
+  note: "tools/outlook_create_event.py:565-570 and tools/outlook_create_event_on_behalf.py:570-590: with no person the question says that no person is invited and that Microsoft sends the request to the mailbox of the room. The second test shows that a calendar with no named owner is called the person who owns that calendar."
+
+uc-07-53:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_it_reads_no_calendar_and_says_what_to_correct"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_person_named_as_needed_and_as_optional_is_refused"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_room_that_is_not_an_address_is_refused"
+  provenance: drafted
+  ask: "When are Anna and I free on Monday?"
+  asks_user: false
+  chain:
+    - any_of: [outlook_check_availability, outlook_suggest_meeting_times]
+  note: "expected behaviour from tools/outlook_check_availability.py:60-90 and tools/outlook_suggest_meeting_times.py:83-125 and :361-367: the tool reads no calendar and says which argument to correct."
+
+uc-07-54:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_room_asked_for_is_sent_and_the_rooms_that_microsoft_names_are_shown"
+  provenance: drafted
+  ask: "When are Anna and I free on Monday, with room Pilatus?"
+  asks_user: false
+  chain:
+    - tool: outlook_suggest_meeting_times
+      args: {attendees: anna@example.com, starts_at: Monday 08:00, ends_at: Monday 18:00}
+  note: "tools/outlook_suggest_meeting_times.py:345-358 _graph_constraint and :177-178 SuggestedRoom: the room goes to Microsoft as a constraint, and each suggestion lists the rooms that Microsoft names for it."
+
+uc-07-55:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatCannotBeRead"
+  provenance: drafted
+  ask: "Change the Launch review."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_update_event
+      uses: {uri: uri of the event from the listing}
+  note: "expected behaviour from tools/outlook_update_event.py:136-215 and :422-475: each fault is refused before Microsoft is asked, nothing is changed, and the text names the argument to correct."
+
+uc-07-56:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_it_changes_nothing_and_asks_nothing_and_says_why"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_a_calendar_that_takes_no_teams_meeting_gets_none"
+  provenance: drafted
+  ask: "Add a Teams meeting to the Launch review."
+  asks_user: false
+  chain:
+    - tool: outlook_read_event
+      optional: true
+    - tool: outlook_update_event
+      args: {online_meeting: true}
+  note: "expected behaviour from tools/outlook_update_event.py:226-266 and :489-502 _refusal: Microsoft can turn a Teams meeting off when a body drops its joining text, so the new body must keep the stored body, and the tool quotes the stored body when it is short enough."
+
+uc-07-57:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeAChange::test_the_question_names_the_change"
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeAChange::test_a_place_is_asked_about_also_when_nobody_is_invited"
+  provenance: drafted
+  ask: "Remove all categories and change the place of the Launch review to Room Pilatus."
+  asks_user: true
+  chain:
+    - tool: outlook_update_event
+      args: {location: Room Pilatus}
+  note: "shared/calendar.py:1223-1285 patch_changes: the question names each change, so that Mia approves what Microsoft will change."
+
+uc-07-58:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAForwardThatCannotBeRead::test_it_forwards_nothing_and_asks_nothing"
+  provenance: drafted
+  ask: "Forward the Launch review to Priya Rao."
+  asks_user: false
+  chain:
+    - tool: outlook_forward_event
+      args: {to: Priya Rao}
+  note: "expected behaviour from tools/outlook_forward_event.py:87-107: an entry that is not one address, or an address twice, forwards nothing, and the text says to correct the list."
+
+uc-07-59:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnAnswerWithANewTimeThatCannotBeSent"
+  provenance: drafted
+  ask: "Decline the Launch review and propose Friday at 10:00."
+  asks_user: false
+  chain:
+    - tool: outlook_respond_to_invite
+      args: {response: decline}
+  note: "expected behaviour from tools/outlook_respond_to_invite.py:107-130 and :255-270: Microsoft sends a new time only in an answer, and the time must be a wall-clock time that ends after it starts, so no answer is sent."
+
+uc-07-60:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_a_body_that_keeps_the_stored_body_is_sent_after_the_question"
+  provenance: drafted
+  ask: "Add a line to the body of the Launch review."
+  asks_user: true
+  chain:
+    - tool: outlook_update_event
+      args: {body_html: the stored body and a new line}
+  note: "tools/outlook_update_event.py:512-520 _kept: the new body is accepted when it holds all of the stored body, with spaces counted as one."

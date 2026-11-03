@@ -318,6 +318,11 @@ Feature: Working with notes in OneNote
         | copy the notebook "Customers" into the team "Platform"                   | the team "Platform" holds no copy of "Customers"              |
         | copy the section "Work" into the notebook of the team "Platform"         | the notebook of "Platform" holds no section "Work"            |
         | copy the page "Retro" into the section "Planning" of the team "Platform" | the section "Planning" of "Platform" holds no copy of "Retro" |
+        | add a line to the page "Platform plan" of the team "Platform"             | the page "Platform plan" holds no new line                    |
+        | rename the page "Platform plan" of the team "Platform" to "Plan"         | the page "Platform plan" still has its old title              |
+        | set up the notebook "Plans" in the team "Platform"                       | the team "Platform" holds no notebook "Plans"                 |
+        | add the section "Plans" to the notebook of the team "Platform"           | the notebook of "Platform" holds no section "Plans"           |
+        | add the section group "Bin" to the notebook of the team "Platform"       | the notebook of "Platform" holds no section group "Bin"       |
 
     @unhappy @uc-08-35
     Scenario Outline: A change without an answer from Mia does not happen
@@ -535,3 +540,194 @@ Feature: Working with notes in OneNote
       When Mia asks her assistant to show the picture on that page
       Then the assistant tells Mia that the picture was probably deleted with its page, or that it can no longer be reached
       And it reads the page again to find the picture
+
+  Rule: The assistant uses only handles and choices that can work
+
+    @unhappy @uc-08-61
+    Scenario Outline: A value that names no note is sent back to the assistant
+      Given the assistant gives <value> where <need> is needed
+      When Mia asks her assistant to <task>
+      Then the assistant is told what is needed and where it comes from
+      But nothing is sent to Microsoft
+
+      Examples:
+        | value                                | need                                        | task                                                |
+        | the title of a page                  | a page                                      | read the page "Acme kickoff"                        |
+        | the name of a section                | a section                                   | copy the page "Acme kickoff" into the section "Work" |
+        | the name of a notebook               | a notebook                                  | copy the section "Work" into the notebook "Archive" |
+        | the name of a notebook               | a notebook or a section group               | add the section "Plans" to the notebook "Customers" |
+        | the title of a copy                  | a copy that runs                            | follow the copy of "Customers"                      |
+        | a web address that is no picture     | the address of a picture                    | show a picture on "Acme kickoff"                    |
+        | a handle that the assistant already has | a web address                            | open the notebook at a web address                  |
+
+    @unhappy @uc-08-62
+    Scenario Outline: Choices that cannot work together are refused
+      Given Mia asks for <choice>
+      When Mia asks her assistant to carry it out
+      Then the assistant is told that the choices cannot work together
+      But nothing is sent to Microsoft
+
+      Examples:
+        | choice                                                                   |
+        | the notebooks of a team and of a site in one ask                         |
+        | the pages of a section together with the pages of a team                 |
+        | the level and the order of pages without a section                       |
+        | the pages changed after 5 March and before 1 March                       |
+        | the pages created after 5 March and before 1 March                       |
+        | a page in a section and also in a section that is named                  |
+        | a copy of a section into a notebook and also into a section group        |
+        | a copy of a section into nothing                                         |
+
+  Rule: The assistant narrows a list of notes
+
+    @happy @uc-08-63
+    Scenario Outline: Pages are found inside a time window or by the app that made them
+      Given Mia has the page "Acme kickoff"
+      When Mia asks her assistant for her notes <narrowing>
+      Then Microsoft is told to give only the notes <window>
+      And the assistant shows the page "Acme kickoff"
+
+      Examples:
+        | narrowing                                 | window                                  |
+        | changed since 1 March                     | changed on 1 March or later             |
+        | changed up to 4 March                     | changed before the end of 4 March       |
+        | changed up to 10:30 on 4 March            | changed at 10:30 on 4 March or before   |
+        | created up to 4 March                     | created before the end of 4 March       |
+        | created up to 10:30:00.25 on 4 March      | created at that moment or before        |
+        | made by one app                           | made by that app                        |
+
+    @happy @uc-08-64
+    Scenario Outline: Notebooks are found by their sharing and by the role of Mia
+      Given Mia has the notebook "Customers"
+      When Mia asks her assistant for her notebooks <narrowing>
+      Then Microsoft is told to give only the notebooks <window>
+      And the assistant shows the notebook "Customers"
+
+      Examples:
+        | narrowing                            | window                                      |
+        | that are shared                      | that are shared                             |
+        | that are not shared and are her own  | that are not shared and that she owns       |
+        | that she can only read               | where she is a reader                       |
+
+    @happy @uc-08-65
+    Scenario Outline: A change in the notes of a team is made once, after Mia approves
+      Given Mia belongs to the team "Platform"
+      When Mia asks her assistant to <change>
+      Then Mia is asked to approve the change, and she approves
+      And the change is made once
+
+      Examples:
+        | change                                                                 |
+        | erase the page "Platform plan" of the team                             |
+        | replace a sentence on the page "Platform plan" of the team             |
+        | insert a paragraph on the page "Platform plan" of the team             |
+        | add a line to the page "Platform plan" of the team                     |
+        | rename the page "Platform plan" of the team                            |
+        | add the page "Retro" to the notebook of the team                       |
+        | set up the notebook "Plans" in the team                                |
+        | set up the notebook "Plans" in the site of the team                    |
+        | add the section "Plans" to the notebook of the team                    |
+        | add the section "Plans" to a section group of the team                 |
+        | add the section group "Bin" to the notebook of the team                |
+        | add the section group "Bin" to a section group of the team             |
+        | copy the notebook "Customers" into the team                            |
+        | copy the section "Work" into the notebook of the team                  |
+        | copy the section "Work" into a section group of the team               |
+        | copy the page "Retro" into a section of the team                       |
+
+    @unhappy @uc-08-66
+    Scenario: A sentence that was changed but cannot be shown is not changed twice
+      Given Microsoft changes a sentence on "Planning" and then does not show the changed page to the assistant
+      When Mia asks her assistant to change the launch date on "Planning" to 21 June
+      Then the assistant tells Mia that the page was changed
+      And it reads the page to show the new content
+      But it does not send the same change a second time
+
+    @unhappy @uc-08-67
+    Scenario Outline: Mia is told why a notebook needs her approval
+      Given the page "Planning" is in a notebook <notebook>
+      When Mia asks her assistant to add a task list at the end of "Planning"
+      Then Mia is asked to approve the change, and the question says that the notebook <reason>
+
+      Examples:
+        | notebook                                  | reason                                       |
+        | that Mia shares with other people         | is shared with other people                  |
+        | that belongs to somebody else             | belongs to somebody else                     |
+        | whose sharing Microsoft does not report   | has sharing that Microsoft did not report    |
+        | that Microsoft does not name              | has sharing that Microsoft did not report    |
+        | of a SharePoint site                      | belongs to a SharePoint site                 |
+
+    @happy @uc-08-68
+    Scenario Outline: A page with no section goes to the default notebook of Mia
+      Given Mia has <notebooks>
+      When Mia asks her assistant to add the page "Retro" and names no section
+      Then <asked>
+      And the page "Retro" is added to the default section of the default notebook
+
+      Examples:
+        | notebooks                                          | asked                                              |
+        | a default notebook that she keeps to herself       | Mia is not asked to approve it                     |
+        | a default notebook that she shares                 | Mia is asked to approve it, and she approves       |
+        | no notebook                                        | Mia is asked to approve it, and she approves       |
+        | two notebooks and Microsoft marks none as default  | Mia is asked to approve it, and she approves       |
+        | one notebook that Microsoft does not mark          | Mia is not asked to approve it                     |
+
+    @happy @uc-08-69
+    Scenario: A page is added to a section that the assistant names
+      Given Mia has a default notebook that she keeps to herself
+      When Mia asks her assistant to add the page "Retro" to a section "Work" of that notebook
+      Then the page "Retro" is added to the section "Work"
+      And Microsoft makes the section "Work" when it does not exist
+
+  Rule: The assistant copes with what Microsoft leaves out
+
+    @unhappy @uc-08-70
+    Scenario: Parts that Microsoft leaves out of a list are left out of the answer
+      Given Microsoft lists a notebook, a section, a page, and a preview that miss an address, a creator, or a link
+      When Mia asks her assistant to list them
+      Then the assistant shows only the entries that Mia can open
+      And it shows no creator and no link that Microsoft did not give
+
+    @happy @uc-08-71
+    Scenario: Notebooks and sections are narrowed by who made them
+      Given Mia has notebooks and sections that she and other people made
+      When Mia asks her assistant for the notebooks and the sections that "Mia" made
+      Then the assistant shows only the notebooks and the sections that "Mia" made
+
+    @unhappy @uc-08-72
+    Scenario Outline: A page that is not text is explained
+      Given the page "Acme kickoff" holds content that is not valid text and <address>
+      When Mia asks her assistant to read the page
+      Then the assistant tells Mia that the page cannot be read as text
+      And it <advice>
+
+      Examples:
+        | address                           | advice                                    |
+        | Microsoft gives an address for it | sends Mia to the address in a browser     |
+        | Microsoft gives no address for it | sends Mia to OneNote itself               |
+
+    @happy @uc-08-73
+    Scenario: A picture with no stated type is given as it is
+      Given the page "Acme kickoff" holds a picture and Microsoft does not state its type
+      When Mia asks her assistant to show the picture on that page
+      Then the assistant gives the picture as plain bytes
+
+    @happy @uc-08-74
+    Scenario Outline: A finished copy names what it made
+      Given Microsoft finished a copy and names <made> as its result
+      When Mia asks her assistant how the copy goes
+      Then the assistant tells Mia that the copy is done and <shown>
+
+      Examples:
+        | made                         | shown                          |
+        | a page                       | shows the new page             |
+        | a section                    | shows the new section          |
+        | a page of a blank owner      | shows the new page             |
+        | a place that is no note      | shows no new note              |
+
+    @happy @uc-08-75
+    Scenario: A copy that Microsoft names only in a header is followed by that name
+      Given Mia has the page "Weekly sync" and the section "Archive", and Microsoft names a copy only in a header
+      When Mia asks her assistant to copy the page "Weekly sync" into "Archive"
+      Then the assistant gives Mia the name of the copy to follow
+

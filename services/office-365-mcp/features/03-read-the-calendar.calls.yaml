@@ -397,3 +397,81 @@ uc-03-28:
     - tool: outlook_list_events
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
   note: "expected behaviour from shared/calendar.py:773-775 and tools/outlook_list_events.py:411: a row says whether the calendar owner is the organizer (owner_is_organizer), so the listing alone answers, and get_me is optional. get_me holds no time zone, only preferred_language (tools/get_me.py:101-104), so it is not the source of time_zone."
+
+uc-03-29:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestALinkThatTheAssistantMadeUp::test_it_reads_nothing_and_says_which_link_to_use"
+  provenance: drafted
+  ask: "Open the Launch review."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_read_event
+      uses: {uri: uri of the event from the listing}
+  note: "expected behaviour from tools/outlook_read_event.py:96 and tools/outlook_list_event_attachments.py:49, tools/outlook_list_event_instances.py:71, tools/outlook_read_event_attachment.py:58, tools/outlook_list_events.py:103: each tool reads nothing and names the tool that gives the link, so the assistant lists first and then reads."
+
+uc-03-30:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestALinkThatTheAssistantMadeUp::test_a_time_zone_that_does_not_exist_is_not_guessed"
+  provenance: drafted
+  ask: "What is on my calendar tomorrow, in Atlantis time?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Atlantis/Nowhere}
+  note: "expected behaviour from tools/outlook_list_events.py:92, tools/outlook_read_event.py:110, tools/outlook_list_event_instances.py:81 and tools/outlook_list_group_events.py:85: a zone name that the time zone database does not know reads nothing and names the accepted forms."
+
+uc-03-31:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_it_shows_the_weekly_rule_and_how_it_ends"
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_a_meeting_that_does_not_repeat_shows_no_rule"
+  provenance: drafted
+  ask: "How often does the Weekly design sync take place?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_read_event
+      uses: {uri: series_master_uri of the event from the listing}
+  note: "shared/calendar.py:467-490: the event shows the pattern (kind, interval, days) and the range (how it ends). A meeting that does not repeat shows no rule."
+
+uc-03-32:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_one_date_of_a_series_is_sent_to_the_series_and_not_listed"
+  provenance: drafted
+  ask: "On which dates does the Team sync take place?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_list_event_instances
+      optional: true
+      uses: {uri: series_master_uri of the event from the listing}
+  note: "expected behaviour from tools/outlook_list_event_instances.py:105 _IS_ONE_DATE_OF_A_SERIES: the tool reads nothing and gives the series_master_uri of the same row."
+
+uc-03-33:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMeetingsThatWereCancelled"
+  provenance: drafted
+  ask: "Which meetings do I have this week that are not cancelled?"
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: Monday, ends_on: Friday, cancelled: false}
+  note: "tools/outlook_list_events.py:262-276 _filter_for: Microsoft evaluates the filter on isCancelled, so the list holds only the meetings that are not cancelled (or only the cancelled ones for cancelled true)."
+
+uc-03-34:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestATimeThatMicrosoftGivesInAStrangeForm"
+  provenance: drafted
+  ask: "Open the Team sync."
+  asks_user: false
+  chain:
+    - tool: outlook_list_events
+    - tool: outlook_read_event
+      uses: {uri: uri of the event from the listing}
+  note: "shared/calendar.py:605-623: when Microsoft gives a start that no zone explains, the tool keeps the local text and gives no converted time (iso is null)."

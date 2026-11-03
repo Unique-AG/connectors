@@ -36,6 +36,9 @@ _NEEDS_RE_RECORDING = frozenset(
         "outlook_unshare_calendar-anna",
         "teams_browse_channel-long",
         "teams_list_channels-private",
+        "teams_search_messages-alpine",
+        "teams_search_messages-lena",
+        "teams_search_messages-person-window",
     }
 )
 _RUNNABLE = {

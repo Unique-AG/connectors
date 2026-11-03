@@ -1,6 +1,7 @@
 import json
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast, final
@@ -13,7 +14,7 @@ from tests.e2e.recording.families import load
 from tests.e2e.recording.families.teams import vtt
 from tests.e2e.recording.guard import GRAPH_HOST, Guard, Refused
 from tests.e2e.recording.lint import lint_files
-from tests.e2e.recording.record import GRAPH, resolve
+from tests.e2e.recording.record import GRAPH, Plan, resolve
 from tests.e2e.recording.runbook import MeetingFailed, main
 from tests.e2e.recording.scrub import (
     Hop,
@@ -217,6 +218,14 @@ def state(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     monkeypatch.setattr(runbook, "FIXTURES", tmp_path / "fixtures")
     (tmp_path / "fixtures").mkdir()
     return tmp_path / "state"
+
+
+@pytest.fixture
+def undeferred(monkeypatch: pytest.MonkeyPatch) -> None:
+    def resolved(case: str, loaded: tuple[dict[str, Json], dict[str, Json]]) -> Plan:
+        return replace(resolve(case, loaded=loaded), deferred="")
+
+    monkeypatch.setattr(runbook, "resolve", resolved)
 
 
 def held(state: Path) -> None:
@@ -451,7 +460,7 @@ class TestCommandLine:
         )
         assert not state.exists()
 
-    @pytest.mark.usefixtures("state")
+    @pytest.mark.usefixtures("state", "undeferred")
     def test_all_prints_the_instruction_box_once_and_would_record_the_four_cases(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -476,6 +485,7 @@ class TestCommandLine:
         assert "meeting takes one step" in capsys.readouterr().err
 
 
+@pytest.mark.usefixtures("undeferred")
 class TestRecord:
     def run(
         self, state: Path, monkeypatch: pytest.MonkeyPatch, *, ready: bool

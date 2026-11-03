@@ -163,6 +163,7 @@ Feature: Sharing and delegating calendars
         | give Anna read access to her calendar             |
         | stop sharing her calendar with Anna               |
         | book "Budget review" with Anna on Lena's calendar |
+        | delete the empty calendar "Spare"                 |
 
     @unhappy @uc-14-15
     Scenario Outline: An approval question that gets no answer changes nothing
@@ -176,6 +177,7 @@ Feature: Sharing and delegating calendars
         | give Anna read access to her calendar             |
         | stop sharing her calendar with Anna               |
         | book "Budget review" with Anna on Lena's calendar |
+        | delete the empty calendar "Spare"                 |
 
     @unhappy @uc-14-16
     Scenario Outline: An approval for another action does not cover this action
@@ -189,6 +191,7 @@ Feature: Sharing and delegating calendars
         | giving Anna read access to her calendar             | giving Anna write access to her calendar            |
         | stopping the share with Anna                        | stopping the share with Tom                         |
         | booking "Budget review" on Lena's calendar at 14:00 | booking "Budget review" on Lena's calendar at 15:00 |
+        | deleting the empty calendar "Spare"                 | deleting the empty calendar "Spare two"             |
 
   Rule: Text inside a calendar entry is read as data and never followed
 
@@ -221,3 +224,38 @@ Feature: Sharing and delegating calendars
         | the calendar belongs to Lena and Lena shared it with Mia | that Mia can delete only a calendar that she owns              |
         | Microsoft marks the calendar as not removable            | that the calendar cannot be removed from the mailbox           |
         | the calendar holds a meeting                             | to move or cancel the meetings of the calendar first           |
+
+  Rule: A link that is not a link of a calendar or of a share changes nothing
+
+    @unhappy @uc-14-22
+    Scenario: A link that is not a link of a calendar changes nothing
+      Given Mia's assistant knows the name "Spare calendar" and has no link of that calendar
+      When the assistant uses the name as the link to read, share, or delete the calendar
+      Then nothing is read, shared, stopped, or deleted
+      And nobody asks Mia for an approval
+
+    @unhappy @uc-14-23
+    Scenario: A name in place of an address shares nothing
+      Given Mia asks her assistant to give "Anna Meier" read access to her calendar
+      When the assistant uses the name as the address
+      Then nothing is shared
+      And the assistant asks Mia for the address of Anna
+
+  Rule: A calendar that gets a meeting while Mia decides is not deleted
+
+    @unhappy @uc-14-24
+    Scenario: A meeting that arrives while Mia decides stops the delete
+      Given Mia's calendar "Spare" is empty when Mia is asked to approve the delete
+      And a meeting is put on "Spare" while Mia decides
+      When Mia approves the delete
+      Then the assistant tells Mia that nothing was deleted because the calendar holds a meeting
+      And it asks Mia to move or cancel the meeting first
+
+  Rule: A Teams meeting is booked on the calendar of a manager only when that calendar takes one
+
+    @happy @uc-14-25
+    Scenario: A Teams meeting is booked on the calendar of a manager
+      Given Lena shared her calendar with Mia and that calendar takes Teams meetings
+      When Mia asks her assistant to book "Budget review" with Anna on Lena's calendar as a Teams meeting
+      Then Mia is asked to approve the booking first
+      And after she approves, "Budget review" on Lena's calendar is a Teams meeting
