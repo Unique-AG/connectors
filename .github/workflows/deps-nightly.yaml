@@ -84,6 +84,23 @@ jobs:
           retention-days: 1
           if-no-files-found: ignore
 
+  credentials:
+    name: Credentials
+    if: ${{ !inputs.dry-run }}
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    timeout-minutes: 5
+    environment: workflow-automation # to read the credentials of the GitHub App
+    permissions: {}
+    steps:
+      - name: Create the App token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
   dashboard:
     name: Dashboard
     needs: plan
@@ -114,7 +131,7 @@ jobs:
 
   update:
     name: Update ${{ matrix.entry.slug }}
-    needs: plan
+    needs: [plan, credentials]
     if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.updates != '[]'
     runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
     environment: workflow-automation # to read the credentials of the GitHub App
@@ -152,7 +169,7 @@ jobs:
 
   bump:
     name: Bump ${{ matrix.entry.slug }}
-    needs: plan
+    needs: [plan, credentials]
     if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -208,8 +225,8 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.entry.slug }}
-    needs: [plan, bump]
-    if: always() && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
+    needs: [plan, bump, credentials]
+    if: always() && needs.credentials.result == 'success' && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
     runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
     environment: workflow-automation # to read the credentials of the GitHub App
     timeout-minutes: 10
