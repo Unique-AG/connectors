@@ -60,9 +60,13 @@ export class McpAuthJwtGuard implements CanActivate {
     return true;
   }
 
-  // Express routes case-insensitively and ignores the query string and a trailing slash, so the match must too
+  // Express routes an absolute-form target (POST http://host/mcp) to /mcp, ignores casing, the query string
+  // and a trailing slash, so the match must too. A url that does not parse requires a token.
   private isMcpPath(url: string): boolean {
-    const pathname = url.split(/[?#]/, 1)[0]?.toLowerCase() ?? '';
+    const pathname = URL.parse(url, 'http://localhost')?.pathname.toLowerCase();
+    if (pathname === undefined) {
+      return true;
+    }
     return pathname === '/mcp' || pathname.startsWith('/mcp/');
   }
 
