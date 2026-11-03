@@ -21,19 +21,30 @@ _PROBE_SECRET = "mcp-architecture-probe-secret"
 
 
 async def undescribed_tools(server: FastMCP) -> list[str]:
-    """Each tool without a description and each parameter without one, as `tool(parameter)`.
+    """Each tool without a description, each argument without one as `tool(argument)`, and each
+    field of its output without one as `tool -> field`.
 
-    The descriptions are all the model reads before it picks a tool and fills its arguments. A
-    tool served straight from an OpenAPI spec says what the spec says, so it is skipped.
+    The descriptions are all the model reads before it picks a tool, fills its arguments and reads
+    what it returns. A field is named by its path, `place_order(order.sku)` or
+    `get_case -> group.id`, and a field of a model FastMCP keeps in `$defs`, a recursive one, by
+    the model, `list_groups -> Group.id`. A field that holds one model, or none, is described by
+    that model's docstring. A tool served straight from an OpenAPI spec says what the spec says,
+    so it is skipped.
     """
     tools = [tool for tool in await server.list_tools() if not isinstance(tool, OpenAPITool)]
-    return [tool.name for tool in tools if not tool.description] + [
-        f"{tool.name}({parameter})"
-        for tool in tools
-        for parameter, schema in cast(
-            dict[str, dict[str, object]], tool.parameters.get("properties", {})
-        ).items()
-        if not schema.get("description")
+    return [
+        *(tool.name for tool in tools if not tool.description),
+        *(
+            f"{tool.name}({field})"
+            for tool in tools
+            for field in _undescribed_fields(tool.parameters)
+        ),
+        *(
+            f"{tool.name} -> {field}"
+            for tool in tools
+            if tool.output_schema
+            for field in _undescribed_fields(tool.output_schema)
+        ),
     ]
 
 
@@ -117,3 +128,59 @@ async def _list_tools(server: FastMCP) -> list[Tool]:
 def _tags(tool: Tool) -> list[str]:
     fastmcp = cast(dict[str, object], (tool.meta or {}).get("fastmcp", {}))
     return cast(list[str], fastmcp.get("tags", []))
+
+
+type _Schema = dict[str, object]
+
+
+def _undescribed_fields(root: _Schema) -> list[str]:
+    """Each field of `root` and of the models in its `$defs` without a description, each model's
+    fields named once, after the model."""
+    defs = cast(dict[str, _Schema], root.get("$defs", {}))
+    properties = cast(dict[str, _Schema], root.get("properties", {}))
+    # FastMCP wraps a result that is not an object as `result`, which the tool's description says.
+    wrapped = root.get("x-fastmcp-wrap-result") is True
+    return [
+        *(
+            _undescribed_within(properties["result"], defs=defs, path="result")
+            if wrapped
+            else _undescribed_within(root, defs=defs, path="")
+        ),
+        *(
+            field
+            for name, model in sorted(defs.items())
+            for field in _undescribed_within(model, defs=defs, path=name)
+        ),
+    ]
+
+
+def _undescribed_within(schema: _Schema, *, defs: dict[str, _Schema], path: str) -> list[str]:
+    """The fields under `schema` without a description, up to a `$ref`, which `_undescribed_fields`
+    walks on its own."""
+    found: list[str] = []
+    for name, field in cast(dict[str, _Schema], schema.get("properties", {})).items():
+        field_path = f"{path}.{name}" if path else name
+        if not _is_described(field, defs=defs):
+            found.append(field_path)
+        found.extend(_undescribed_within(field, defs=defs, path=field_path))
+    for key in ("items", "additionalProperties"):
+        if isinstance(inner := schema.get(key), dict):
+            found.extend(_undescribed_within(cast(_Schema, inner), defs=defs, path=f"{path}[]"))
+    for key in ("anyOf", "oneOf", "allOf"):
+        for member in cast(list[_Schema], schema.get(key, [])):
+            found.extend(_undescribed_within(member, defs=defs, path=path))
+    return found
+
+
+def _is_described(field: _Schema, *, defs: dict[str, _Schema]) -> bool:
+    """By its own description, or by the docstring of the one model it holds, optional or not."""
+    if field.get("description"):
+        return True
+    if isinstance(ref := field.get("$ref"), str):
+        return bool(defs.get(ref.removeprefix("#/$defs/"), {}).get("description"))
+    members = [
+        member
+        for member in cast(list[_Schema], field.get("anyOf", []))
+        if member.get("type") != "null"
+    ]
+    return len(members) == 1 and _is_described(members[0], defs=defs)
