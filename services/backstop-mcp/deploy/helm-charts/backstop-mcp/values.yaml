@@ -229,6 +229,15 @@ networkPolicy:
       namespace: system
     ephemeralPorts:
       enabled: false
+    # Each client's BACKSTOP_BASE_URL is its own <tenant>.backstopsolutions.com host.
+    egress:
+      backstop:
+        toFQDNs:
+          - matchPattern: "*.backstopsolutions.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
 
 # Alert when Backstop ignores a filter we sent (search_activities row check).
 prometheus:
