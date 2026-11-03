@@ -243,7 +243,7 @@ export function buildTopOffendersBlocks(images) {
   ];
 }
 
-const REPOSITORY_TITLE = 'Repository (main): lock files and configuration';
+const REPOSITORY_TITLE = 'Repository (main)';
 const REPOSITORY_SCANS = [
   { key: 'lockfiles', label: 'Lock files', icon: ICON.lockfiles },
   { key: 'config', label: 'Configuration', icon: ICON.config },

@@ -388,7 +388,7 @@ test('buildRepositoryBlocks always has the title and the headline, and a row onl
 
   assert.equal(
     section.text.text,
-    '*Repository (main): lock files and configuration*\n🟣 0 critical · 🔴 0 high · 🟠 5 medium across 2 scans ✅',
+    '*Repository (main)*\n🟣 0 critical · 🔴 0 high · 🟠 5 medium across 2 scans ✅',
   );
   assert.deepEqual(
     table.rows.map((row) => row.map((cell) => cell.text)),
