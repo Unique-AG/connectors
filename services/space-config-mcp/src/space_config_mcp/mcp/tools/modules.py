@@ -12,6 +12,7 @@ import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
+from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.shared import ClaudeEffort
 from space_config_mcp.shared import ClaudeSDKConfig
@@ -27,7 +28,10 @@ from space_config_mcp.shared import PiAgentThinkingLevel
 from space_config_mcp.shared import SpaceConfigError
 from space_config_mcp.upstream import Upstream
 
-_META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]))
+_META = merge_tool_meta(
+    {},
+    ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID, MetaKeys.ASSISTANT_ID]),
+)
 
 
 @tool(
@@ -37,11 +41,11 @@ _META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, Meta
 )
 async def list_modules(
     *,
-    space_id: Annotated[str, Field(description="ID of the space whose modules to list.")],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> list[unique_sdk.Module]:
-    """List all modules belonging to a space."""
+    """List all modules belonging to the current space."""
     user_id, company_id = caller
     return await contexts.list_modules(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
@@ -105,11 +109,11 @@ async def update_module_config(
 )
 async def get_conduct_config(
     *,
-    space_id: Annotated[str, Field(description="ID of the Conduct space.")],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> dict[str, object]:
-    """Return the SwappableIntelligence module ID and its typed ConductConfig for a Conduct space.
+    """Return the SwappableIntelligence module ID and its typed ConductConfig for the current space.
 
     The configuration dict uses camelCase keys matching the stored format. Use this before
     calling update_conduct_config to inspect the current state.
@@ -130,7 +134,6 @@ async def get_conduct_config(
 )
 async def update_conduct_config(  # noqa: PLR0913
     *,
-    space_id: Annotated[str, Field(description="ID of the Conduct space to update.")],
     strategy: Annotated[
         ConductStrategy | None,
         Field(
@@ -264,8 +267,9 @@ async def update_conduct_config(  # noqa: PLR0913
     ] = None,
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Module:
-    """Update a Conduct space's SwappableIntelligence harness configuration.
+    """Update the current space's SwappableIntelligence harness configuration.
 
     Each parameter targets a specific key in the stored configuration. Only provided
     (non-None) parameters are written; everything else in the existing config is preserved.

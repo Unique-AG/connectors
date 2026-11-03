@@ -11,10 +11,14 @@ import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
+from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.upstream import Upstream
 
-_META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]))
+_META = merge_tool_meta(
+    {},
+    ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID, MetaKeys.ASSISTANT_ID]),
+)
 
 
 @tool(
@@ -24,11 +28,11 @@ _META = merge_tool_meta({}, ContextRequirements(required=[MetaKeys.USER_ID, Meta
 )
 async def get_space_access(
     *,
-    space_id: Annotated[str, Field(description="ID of the space to read access for.")],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space.SpaceAccessResponse:
-    """List current access entries for a space."""
+    """List current access entries for the current space."""
     user_id, company_id = caller
     return await contexts.get_space_access(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
@@ -42,7 +46,6 @@ async def get_space_access(
 )
 async def add_space_access(
     *,
-    space_id: Annotated[str, Field(description="ID of the space to grant access on.")],
     access: Annotated[
         list[dict[str, object]],
         Field(
@@ -54,8 +57,9 @@ async def add_space_access(
     ],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space.SpaceAccessResponse:
-    """Grant access to a user or group on a space."""
+    """Grant access to a user or group on the current space."""
     user_id, company_id = caller
     return await contexts.add_space_access(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id, access=access
@@ -69,15 +73,15 @@ async def add_space_access(
 )
 async def delete_space_access(
     *,
-    space_id: Annotated[str, Field(description="ID of the space to revoke access on.")],
     access_ids: Annotated[
         list[str],
         Field(description="List of access entry IDs to remove."),
     ],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space.DeleteSpaceAccessResponse:
-    """Revoke access entries from a space."""
+    """Revoke access entries from the current space."""
     user_id, company_id = caller
     return await contexts.delete_space_access(
         upstream=upstream,

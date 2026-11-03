@@ -6,6 +6,7 @@ from space_config_mcp.contexts.modules import get_module
 from space_config_mcp.contexts.modules import list_modules
 from space_config_mcp.contexts.modules import update_conduct_config
 from space_config_mcp.contexts.modules import update_module_config
+from space_config_mcp.contexts.snapshots import delete_snapshots
 from space_config_mcp.contexts.snapshots import export_space_config
 from space_config_mcp.contexts.snapshots import get_snapshot
 from space_config_mcp.contexts.snapshots import import_space_config
@@ -18,6 +19,7 @@ from space_config_mcp.contexts.spaces import update_space
 
 __all__ = [
     "add_space_access",
+    "delete_snapshots",
     "delete_space_access",
     "export_space_config",
     "get_conduct_config",
