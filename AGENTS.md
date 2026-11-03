@@ -78,6 +78,17 @@ This applies to internal preconditions, postconditions, and unreachable-state gu
 ## Generated Files
 - Don't create README files for generated code
 
+## Base chart bumps
+
+- Every chart in `services/*/deploy/helm-charts/` and the scaffold's skeleton chart,
+  `packages/mcp-scaffold/src/mcp_scaffold/files/skeleton/deploy/helm-charts/mcp-skeleton/`, pin
+  the same `base` version. Bump them in one pull request, or the next MCP the scaffold makes starts
+  on the old `base`.
+- Run `helm dependency update` in each service chart, then `scripts/render-values-schema.sh`.
+- The script skips the skeleton. Copy a service chart's new `Chart.lock` over the skeleton's, since
+  the dependency is the same, and regenerate its `values.schema.json` with the script's `jq` merge
+  of the base schema and the skeleton's `values.additional.schema.json`.
+
 ## Agent Skills
 
 - A skill a service serves to its own clients lives in that service's package, at

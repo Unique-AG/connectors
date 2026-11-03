@@ -50,6 +50,7 @@ from backstop_mcp.server.tenant_guidance import (
     with_tool_guidance,
 )
 from backstop_mcp.server.tools import TOOLS
+from backstop_mcp.server_icons import SERVER_ICONS
 from backstop_mcp.teardown import close_singletons
 
 logger = logging.getLogger(__name__)
@@ -96,9 +97,11 @@ def create_app() -> Starlette:
     mcp = FastMCP(
         "Backstop MCP",
         version=config.version,
+        icons=SERVER_ICONS,
         auth=auth_provider,
         lifespan=lifespan,
         instructions=compose_instructions(INSTRUCTIONS, guidance),
+        mask_error_details=True,
         # Outermost MCP middleware. `setup_ops` appends metrics inside it.
         middleware=[ToolCallObservabilityMiddleware()],
     )

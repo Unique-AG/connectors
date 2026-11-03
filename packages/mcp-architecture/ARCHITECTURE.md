@@ -22,7 +22,7 @@ Before you change a layer, read its guide in `packages/mcp-architecture/guides/`
 | Postgres, Redis or a migration | [`persistence.md`](guides/persistence.md) |
 | sign-in | [`auth.md`](guides/auth.md) |
 | `shared/`, a contract between layers or a helper | [`shared.md`](guides/shared.md) |
-| settings, elicitation, logging or metrics | [`settings-and-telemetry.md`](guides/settings-and-telemetry.md) |
+| settings, elicitation, logging or metrics, or what a tool or context traces and logs | [`settings-and-telemetry.md`](guides/settings-and-telemetry.md) |
 | the Dockerfile, the chart or an env variable | [`deploy.md`](guides/deploy.md) |
 | tests or `tests/tool_surface.generated.json` | [`tests.md`](guides/tests.md) |
 | `[tool.ruff]`, `[tool.basedpyright]` or `[tool.importlinter]` | [`configuration.md`](guides/configuration.md) |
@@ -74,7 +74,7 @@ main.py ─▶ mcp ─▶ contexts ─▶ upstream ────┐
 |---|---|---|
 | `main.py` | Starts telemetry, builds the server, runs it | everything |
 | `mcp/` | The FastMCP server, its HTTP serving and middleware, auth, tools and their inputs and responses | `contexts`, `upstream`, `persistence`, `shared`, `telemetry` |
-| `contexts/` | The domain: one folder per feature | `upstream`, `persistence`, `shared`, `telemetry` |
+| `contexts/` | The domain: one folder per feature, and the modules several features share | `upstream`, `persistence`, `shared`, `telemetry` |
 | `upstream/` | The system the MCP fronts: its client, settings and, for OpenAPI, the spec and generated code | `shared`, `telemetry` |
 | `persistence/` | Storage the MCP owns: Postgres, Redis, a key-value store | `shared`, `telemetry` |
 | `shared/` | What more than one layer uses: `contracts/`, the types two layers agree on without importing each other, and `utils/`, helpers such as a formatter. [`guides/shared.md`](guides/shared.md) says what belongs there | `telemetry` |
@@ -101,12 +101,12 @@ unused `upstream`, `persistence` or `shared` stays as an `__init__.py` with an e
 | What a past fix replaced stays replaced: a pydantic model, not a `dataclass`; `httpx2.URL` or `HttpUrl`, not `urllib.parse`; `mcp_configs.PostgresSettings`, not `ssl.create_default_context`; a Jinja2 template, not `html.escape`; `cryptography.fernet`, not `cryptography.hazmat`. | ruff `TID251` |
 | The [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html), as far as ruff checks it, with four departures: lines run to 100 characters, a docstring is only for what the code cannot say, its summary may run onto a second line, and a TODO names a link rather than an author. Besides it: no `print`, `pathlib` over `os.path`, no `else` after `return`, a long string split by implicit concatenation rather than `+`, and an error logged in an `except` with its traceback. | ruff, with `code_style.toml` |
 | Every type is known: no `Any`, no unannotated attribute, `@override` on an override, `super().__init__()` in a subclass. A test may use a private name of the code it tests. | basedpyright `all`, with `type_check.json` |
-| Every tool has a description and every parameter a `Field(description=...)`. | `uv run poe architecture` |
+| Every tool has a description, and every field of what it takes and returns a `Field(description=...)`, nested ones too. A field that holds one model may rely on that model's docstring instead. | `uv run poe architecture` |
 | Every tool's input schema is a plain object, with no `anyOf`, `oneOf`, `allOf` or `not` at its root, which some clients reject. | `uv run poe architecture` |
 | An unexpected error inside a tool reaches the client without its message: `FastMCP(mask_error_details=True)`. | `uv run poe architecture` |
 | A settings error does not print the value it was given, which may be a secret: every settings class builds its `model_config` with `mcp_configs.shared_config`. | `uv run poe architecture` |
 | What every tool shows a client matches `tests/tool_surface.generated.json`. | `uv run poe architecture` |
-| `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A tool folder does not nest. A context module leads with its one public function. | review |
+| `contexts/` is flat: each folder in it is a feature named for its domain, and a feature never contains another. A module beside the features holds what several of them use and none owns, such as paging through a list, and imports no feature. A tool folder does not nest. A feature's module leads with its one public function. | review |
 | No file changes its own type check or turns a lint rule off beyond one line: no file-level `# pyright:` comment, and no `# ruff: noqa` or `# ruff: disable` outside `upstream/generated/`. | review |
 
 Never loosen a rule to make a change pass. CI runs each tool with the MCP's own configuration, so

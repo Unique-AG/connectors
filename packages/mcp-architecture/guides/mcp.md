@@ -44,6 +44,9 @@ The FastMCP server, its HTTP serving and middleware, auth, tools and their input
   and turns the context's errors into `ToolError`. It holds no business rule.
 - Every parameter is `Annotated[..., Field(description=...)]`. The description and the
   docstring are what the model reads, so say when to call the tool and what its ids feed into.
+- Every field of what a tool returns, and of a model a parameter takes, has a
+  `Field(description=...)` too: the model reads the result as well. Say what the name cannot,
+  such as a unit, which id it is, what null means or that a list was cut short.
 - Set `ToolAnnotations` honestly. A tool that orders, pays or deletes is not read-only, and one
   that deletes or overwrites is destructive: the MCP spec keeps `destructiveHint=false` for a
   tool that only adds. `record_position` replaces a holding's quantity and cost basis, so it is

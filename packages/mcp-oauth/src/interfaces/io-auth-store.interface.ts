@@ -44,6 +44,7 @@ export interface IOAuthStore {
   // OAuth session management
   storeOAuthSession(sessionId: string, session: OAuthSession): Promise<void>;
   getOAuthSession(sessionId: string): Promise<OAuthSession | undefined>;
+  updateOAuthSessionState(sessionId: string, state: string): Promise<void>;
   removeOAuthSession(sessionId: string): Promise<void>;
 
   // Token management (for opaque tokens)

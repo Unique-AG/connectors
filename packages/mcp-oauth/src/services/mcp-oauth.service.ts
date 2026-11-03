@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import {
   BadRequestException,
@@ -13,11 +14,13 @@ import {
 import { type RevokeRequestDto } from '../dtos/revoke-request.dto';
 import { TokenRequestDto } from '../dtos/token-request.dto';
 import type { IOAuthStore } from '../interfaces/io-auth-store.interface';
+import type { OAuthSession } from '../interfaces/oauth-provider.interface';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
   type McpOAuthModuleOptions,
   OAUTH_STORE_TOKEN,
 } from '../mcp-oauth.module-definition';
+import { encodeProviderState } from '../utils/provider-state';
 import { ClientService } from './client.service';
 import { PassportUser } from './oauth-strategy.service';
 import { OpaqueTokenService } from './opaque-token.service';
@@ -33,6 +36,32 @@ export class McpOAuthService {
     private readonly tokenService: OpaqueTokenService,
     private readonly clientService: ClientService,
   ) {}
+
+  /**
+   * Signs the provider state, derived from the session so a repeated approval yields the same one.
+   * Until approval the session holds a random state that no provider state can match.
+   */
+  public async approveConsent(session: OAuthSession): Promise<string> {
+    const sessionNonce = this.sign(`${session.sessionId}:consent-nonce`);
+    const sessionHmac = this.sign(`${session.sessionId}:${sessionNonce}`);
+
+    await this.store.updateOAuthSessionState(session.sessionId, sessionHmac);
+
+    return encodeProviderState({ sessionId: session.sessionId, sessionNonce, sessionHmac });
+  }
+
+  public async denyConsent(session: OAuthSession): Promise<string> {
+    assert.ok(session.redirectUri, 'An OAuth session awaiting consent has a redirect URI');
+    await this.store.removeOAuthSession(session.sessionId);
+
+    const redirectUrl = new URL(session.redirectUri);
+    redirectUrl.searchParams.set('error', 'access_denied');
+    redirectUrl.searchParams.set('error_description', 'The user denied the authorization request');
+    if (session.oauthState) {
+      redirectUrl.searchParams.set('state', session.oauthState);
+    }
+    return redirectUrl.toString();
+  }
 
   public async processAuthenticationSuccess({
     user,
@@ -74,10 +103,7 @@ export class McpOAuthService {
       throw new UnauthorizedException('Invalid state.');
     }
 
-    const expectedHmac = createHmac('sha256', this.options.hmacSecret)
-      .update(`${session.sessionId}:${sessionNonce}`)
-      .digest('base64url');
-    if (sessionHmac !== expectedHmac) {
+    if (sessionHmac !== this.sign(`${session.sessionId}:${sessionNonce}`)) {
       throw new UnauthorizedException('Invalid state validation.');
     }
 
@@ -506,6 +532,10 @@ export class McpOAuthService {
       msg: 'Token revocation attempted for non-existent or already revoked token',
       clientId: client_id,
     });
+  }
+
+  private sign(payload: string): string {
+    return createHmac('sha256', this.options.hmacSecret).update(payload).digest('base64url');
   }
 
   private validatePKCE(codeVerifier: string, codeChallenge: string, codeChallengeMethod: string) {

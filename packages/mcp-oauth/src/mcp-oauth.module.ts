@@ -21,6 +21,7 @@ import {
   OAUTH_STORE_TOKEN,
 } from './mcp-oauth.module-definition';
 import { ClientService } from './services/client.service';
+import { FlowBindingService } from './services/flow-binding.service';
 import { McpOAuthService } from './services/mcp-oauth.service';
 import { MetricService } from './services/metric.service';
 import { OAuthStrategyService } from './services/oauth-strategy.service';
@@ -73,6 +74,7 @@ export class McpOAuthModule extends ConfigurableModuleClass {
       },
       McpOAuthService,
       ClientService,
+      FlowBindingService,
       OpaqueTokenService,
       OAuthStrategyService,
       MetricService,
@@ -123,6 +125,12 @@ export class McpOAuthModule extends ConfigurableModuleClass {
         ThrottlerModule.forRoot({
           throttlers: [
             {
+              name: 'default',
+              ttl: seconds(60),
+              limit: 10,
+            },
+            {
+              name: 'auth',
               ttl: seconds(60),
               limit: 10,
             },

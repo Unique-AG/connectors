@@ -28,7 +28,7 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 | Does it call an upstream, a system of its own such as a vendor API? If so, does it publish an OpenAPI 3.0 spec we can use? | `--upstream openapi` with `--spec`, `--upstream custom`, or no `--upstream` at all |
 | What does it store? Nothing, or any of Postgres and Redis (multi-select) | no `--persistence`, or every store chosen: `--persistence postgres redis` |
 | Do users sign in with their own username and password for the upstream, so each call acts as them? | `--auth credentials`, which needs an upstream and Postgres; otherwise no `--auth`, and step 4 settles the auth |
-| Will it be released and deployed, or is it an example or experiment? | nothing, or `--no-release`, which skips release-please and the release re-run list |
+| Will it be released and deployed, or is it an example or experiment? | nothing, or `--no-release`, which skips release-please and the dev build and release re-run lists |
 
 Then ask the follow-ups for what they chose, again in one round:
 
@@ -245,7 +245,7 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
 - Add `services/<name>` to the `folders` of `connectors.code-workspace`, so VS Code and Cursor
   type-check it with its own config and `.venv`.
 - Tell the user what is registered and what is still theirs to do:
-  - Registered: the `<name>` commit scope, and release-please and release-rerun unless it ran
-    with `--no-release`. Commit with that scope, e.g. `feat(<name>): ...`.
+  - Registered: the `<name>` commit scope, and release-please, release-dev and release-rerun
+    unless it ran with `--no-release`. Commit with that scope, e.g. `feat(<name>): ...`.
   - Still to do: the Argo overlay with the hostname, `MCP_BASE_URL` and the secrets, and auth
     if it was left for later.

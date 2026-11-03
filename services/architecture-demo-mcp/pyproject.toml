@@ -94,6 +94,8 @@ operation-ids = ["getDailyMeta", "getDailyPrices"]
 operation-module = "mcp_openapi.upstream"
 models-module = "architecture_demo_mcp.upstream.generated.vendor_responses"
 models-output = "src/architecture_demo_mcp/upstream/generated/vendor_responses.py"
+requests-module = "architecture_demo_mcp.upstream.generated.vendor_requests"
+requests-output = "src/architecture_demo_mcp/upstream/generated/vendor_requests.py"
 operations-output = "src/architecture_demo_mcp/upstream/generated/operations.py"
 
 # The import contracts every MCP keeps, which packages/mcp-architecture/ARCHITECTURE.md explains.

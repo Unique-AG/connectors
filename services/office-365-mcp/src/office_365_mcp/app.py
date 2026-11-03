@@ -24,6 +24,7 @@ from office_365_mcp.logging import (
 )
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.server import admin_consent_url, ready_response, surface_manifest
+from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, register_tools, resolve
 from office_365_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRestoreMiddleware
@@ -119,7 +120,9 @@ def create_app(
     mcp = FastMCP(
         "Office 365 MCP",
         version=config.version,
+        icons=SERVER_ICONS,
         auth=auth,
+        mask_error_details=True,
         # Earlier in this list is further out: `add_middleware` appends and the chain is built over
         # `reversed(middleware)`. The first two are ordered for that, not for tidiness.
         #
