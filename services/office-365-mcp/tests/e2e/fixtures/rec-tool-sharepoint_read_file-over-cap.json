@@ -9,7 +9,9 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_read_file-over-cap.01.json"
+    "response_json": {
+      "id": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_"
+    }
   },
   {
     "method": "GET",
@@ -22,7 +24,262 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_read_file-over-cap.02.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "\"{00000000-A530-4BB1-88AD-41495A005FA3},0\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 01",
+              "id": "00000000-aa7d-4890-8d82-c4181005d0b7"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2025-11-24T13:34:59Z",
+          "folder": {
+            "childCount": 0
+          },
+          "id": "01RZNSR849EMMYXWHX0PKCYDNAYQNVH8HL",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 01",
+              "id": "00000000-aa7d-4890-8d82-c4181005d0b7"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2025-11-24T13:34:59Z",
+          "name": "synthetic text 02",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01CRIUK983O6BFYC8676VBE008JLYSTBJT",
+            "name": "synthetic text 03",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 0,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2002"
+        },
+        {
+          "@odata.etag": "\"{00000000-7D0F-405D-851B-4949D9DE9EE6},9\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-08-17T08:47:09Z",
+          "folder": {
+            "childCount": 0
+          },
+          "id": "01GOOZQ2DH5N1ZVHCEUPANFGPW3WP1UMN9",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-08-17T08:47:09Z",
+          "name": "Meetings",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01CRIUK983O6BFYC8676VBE008JLYSTBJT",
+            "name": "synthetic text 03",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 0,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2005"
+        },
+        {
+          "@odata.etag": "\"{00000000-8DA3-4FD2-8E2B-F9CE952A60AF},4\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 06",
+              "id": "00000000-741a-4516-8328-94e3b04294e5"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:27:10Z",
+          "folder": {
+            "childCount": 6
+          },
+          "id": "01OHEIS84HMUVAPXLY0JJGW78APP1AARIE",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 06",
+              "id": "00000000-741a-4516-8328-94e3b04294e5"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+          "name": "synthetic text 07",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01CRIUK983O6BFYC8676VBE008JLYSTBJT",
+            "name": "synthetic text 03",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 2924225,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2007"
+        },
+        {
+          "@odata.etag": "\"{00000000-F8FD-4738-8846-9DBD9295EC55},7\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-08-17T08:47:09Z",
+          "folder": {
+            "childCount": 0
+          },
+          "id": "01MDBBF76HYJOY1DNHMCUOJLQOCFTAQB3B",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-08-17T08:47:09Z",
+          "name": "synthetic text 08",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01CRIUK983O6BFYC8676VBE008JLYSTBJT",
+            "name": "synthetic text 03",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 0,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2008"
+        },
+        {
+          "@odata.etag": "\"{00000000-4158-490F-8809-77272FD7311F},6\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:31Z",
+          "folder": {
+            "childCount": 0
+          },
+          "id": "01DTHLY76P4ZTGRLFEEMAE2NIZN3VH9BAR",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-29T14:52:31Z",
+          "name": "seed-v1 Move Target",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01CRIUK983O6BFYC8676VBE008JLYSTBJT",
+            "name": "synthetic text 03",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 0,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Move%20Target"
+        },
+        {
+          "@odata.etag": "\"{00000000-DFAE-4960-8BC9-0928DFD22BBF},1\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-26T14:17:28Z",
+          "folder": {
+            "childCount": 12
+          },
+          "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-26T14:17:28Z",
+          "name": "seed-v1 Seed Files",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01CRIUK983O6BFYC8676VBE008JLYSTBJT",
+            "name": "synthetic text 03",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 20981079,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -35,7 +292,514 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_read_file-over-cap.03.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "\"{00000000-2B99-4F9F-8A74-573C2C93C726},5\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:13Z",
+          "folder": {
+            "childCount": 3
+          },
+          "id": "01LJOYT68TYZRIQWQFDLE52POMFIDY2WWG",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:13Z",
+          "name": "seed-v1 Contracts",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 99,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Contracts"
+        },
+        {
+          "@odata.etag": "\"{00000000-58DF-4FE7-82FE-5BA6A35AB8F5},1\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:15Z",
+          "folder": {
+            "childCount": 3
+          },
+          "id": "01NLBZD10762UA7URRTACIHGOSCZUD2MY5",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:16Z",
+          "name": "seed-v1 Ordered",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 27,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Ordered"
+        },
+        {
+          "@odata.etag": "\"{00000000-9440-45F2-86A7-9BA16AB5BC29},1\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:14Z",
+          "folder": {
+            "childCount": 3
+          },
+          "id": "01AJJQY18ZRSXENJOTWRNUQYAE4F9UKVN3",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:14Z",
+          "name": "seed-v1 Reports",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 1855,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Reports"
+        },
+        {
+          "@odata.etag": "\"{00000000-84FB-4952-82DB-1EC0C4B7D014},5\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-29T15:20:16Z",
+          "file": {
+            "mimeType": "application/pdf"
+          },
+          "id": "01UGOUK470BC6RXQRBYFFYNIZFXZ9CJ0AZ",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-29T15:20:16Z",
+          "name": "seed-v1 Brochure Proof.pdf",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 860,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Brochure%20Proof.pdf"
+        },
+        {
+          "@odata.etag": "\"{00000000-181B-4FC0-853D-2CAD9C3B06DC},5\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-30T10:49:39Z",
+          "file": {
+            "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          },
+          "id": "01GUMJV6HFBSYICXKUCXHJ8ITMBCBQHL2A",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-30T10:49:39Z",
+          "name": "seed-v1 Budget Overview.xlsx",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 2485,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/Doc.aspx"
+        },
+        {
+          "@odata.etag": "\"{00000000-CAB1-47AA-8B02-DE218BA9FF91},2\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:21Z",
+          "file": {
+            "mimeType": "image/png"
+          },
+          "id": "01ARHII91V946LPHJTIBMR86UOA9E3KS1W",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:21Z",
+          "name": "seed-v1 Gallery.png",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 179,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Gallery.png"
+        },
+        {
+          "@odata.etag": "\"{00000000-4897-4DBD-827C-66309915E60D},0\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-29T15:20:52Z",
+          "file": {
+            "mimeType": "text/plain"
+          },
+          "id": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-29T15:20:52Z",
+          "name": "seed-v1 Meeting Notes.txt",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 107,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt"
+        },
+        {
+          "@odata.etag": "\"{00000000-D6B2-4393-850A-3194603BCE2F},5\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-10-29T15:21:52Z",
+          "file": {
+            "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          },
+          "id": "01XUDGX03FKHEUSZJBGBSC3UECILUMAE7X",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-29T15:21:52Z",
+          "name": "seed-v1 Project Plan.docx",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 1902,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/Doc.aspx"
+        },
+        {
+          "@odata.etag": "\"{00000000-16EE-4E72-83BB-7B7B7D845616},7\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:20Z",
+          "file": {
+            "mimeType": "text/plain"
+          },
+          "id": "01FNRTR364RLIE2KSIDPOPXVDDFHVFM9FA",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:20Z",
+          "name": "seed-v1 Read me first.txt",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 44,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Read%20me%20first.txt"
+        },
+        {
+          "@odata.etag": "\"{00000000-AC8B-47F8-8FF5-B55CFFE1C9C2},0\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:21Z",
+          "file": {
+            "mimeType": "application/octet-stream"
+          },
+          "id": "01GVSBY4MJPTE3REZKORSOOPQGTTDRP2FE",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:24Z",
+          "name": "seed-v1 Scan 10MiB.bin",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 10485760,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Scan%2010MiB.bin"
+        },
+        {
+          "@odata.etag": "\"{00000000-073C-4E06-85DB-81193B948F55},5\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:23Z",
+          "file": {
+            "mimeType": "application/octet-stream"
+          },
+          "id": "01FPXFY2YLPTD3F8BFUGBSLLCDMOQTOBZP",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:25Z",
+          "name": "seed-v1 Scan over.bin",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 10485761,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Scan%20over.bin"
+        },
+        {
+          "@odata.etag": "\"{00000000-B9F2-4C59-84D6-6564A7063125},3\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:21Z",
+          "file": {
+            "mimeType": "text/plain"
+          },
+          "id": "01CEBXH27BEBXCWJYYWBTS9Q3FDHPFBKLQ",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:21Z",
+          "name": "seed-v1 Text 2000.txt",
+          "parentReference": {
+            "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+            "driveType": "business",
+            "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+            "name": "seed-v1 Seed Files",
+            "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+            "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+          },
+          "size": 2000,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Text%202000.txt"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -47,6 +811,47 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_read_file-over-cap.04.json"
+    "response_json": {
+      "@odata.etag": "\"{00000000-073C-4E06-85DB-81193B948F55},5\"",
+      "createdBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Mia Keller",
+          "email": "mia@example.test",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5"
+        }
+      },
+      "createdDateTime": "2026-11-02T20:45:23Z",
+      "file": {
+        "mimeType": "application/octet-stream"
+      },
+      "id": "01FPXFY2YLPTD3F8BFUGBSLLCDMOQTOBZP",
+      "lastModifiedBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Mia Keller",
+          "email": "mia@example.test",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5"
+        }
+      },
+      "lastModifiedDateTime": "2026-11-02T20:45:25Z",
+      "name": "seed-v1 Scan over.bin",
+      "parentReference": {
+        "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+        "driveType": "business",
+        "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+        "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+      },
+      "size": 10485761,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Scan%20over.bin"
+    }
   }
 ]

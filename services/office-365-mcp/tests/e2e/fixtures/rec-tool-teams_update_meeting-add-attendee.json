@@ -24,7 +24,48 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "location": "https://graph.microsoft.com"
     },
-    "body": "rec-tool-teams_update_meeting-add-attendee.01.json"
+    "response_json": {
+      "chatInfo": {
+        "messageId": "0",
+        "threadId": "19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2"
+      },
+      "creationDateTime": "2026-11-02T21:30:22.9898238Z",
+      "endDateTime": "2026-11-03T20:30:00Z",
+      "externalId": "00000000-19f0-4aee-8014-a14db83ee09c",
+      "id": "DHasRuEiYBBiEw6wQJZsTTBgHYWmHqIoXP3aQQx8YVLjC2BtAhTqGOrfPVc2uUVpuRciM63fCXNpRNInuR2SVUWToc8nN9YoJMstRUFTV0LpBRQvrHaUVXXrV1QmMdgrcSweTOkIwVrhDIVxVuJk",
+      "joinUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003",
+      "joinWebUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003",
+      "lobbyBypassSettings": {
+        "isDialInBypassEnabled": false,
+        "scope": "organization"
+      },
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            },
+            "role": "attendee"
+          }
+        ],
+        "organizer": {
+          "identity": {
+            "user": {
+              "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5",
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537"
+            }
+          },
+          "role": "presenter",
+          "upn": "mia@example.test"
+        }
+      },
+      "startDateTime": "2026-11-03T20:00:00Z",
+      "subject": "seed-v1 case-teams_update_meeting-add-attendee meeting"
+    }
   },
   {
     "method": "GET",
@@ -36,7 +77,52 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_update_meeting-add-attendee.02.json"
+    "response_json": {
+      "value": [
+        {
+          "chatInfo": {
+            "messageId": "0",
+            "threadId": "19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2"
+          },
+          "creationDateTime": "2026-11-02T21:30:22.9898238Z",
+          "endDateTime": "2026-11-03T20:30:00Z",
+          "externalId": "00000000-19f0-4aee-8014-a14db83ee09c",
+          "id": "DHasRuEiYBBiEw6wQJZsTTBgHYWmHqIoXP3aQQx8YVLjC2BtAhTqGOrfPVc2uUVpuRciM63fCXNpRNInuR2SVUWToc8nN9YoJMstRUFTV0LpBRQvrHaUVXXrV1QmMdgrcSweTOkIwVrhDIVxVuJk",
+          "joinUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003",
+          "joinWebUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003",
+          "lobbyBypassSettings": {
+            "isDialInBypassEnabled": false,
+            "scope": "organization"
+          },
+          "participants": {
+            "attendees": [
+              {
+                "identity": {
+                  "user": {
+                    "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                    "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+                  }
+                },
+                "role": "attendee"
+              }
+            ],
+            "organizer": {
+              "identity": {
+                "user": {
+                  "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537"
+                }
+              },
+              "role": "presenter",
+              "upn": "mia@example.test"
+            }
+          },
+          "startDateTime": "2026-11-03T20:00:00Z",
+          "subject": "seed-v1 case-teams_update_meeting-add-attendee meeting"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -48,7 +134,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_update_meeting-add-attendee.03.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 04",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 05",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "PATCH",
@@ -78,6 +176,56 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_update_meeting-add-attendee.04.json"
+    "response_json": {
+      "chatInfo": {
+        "messageId": "0",
+        "threadId": "19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2"
+      },
+      "creationDateTime": "2026-11-02T21:30:22.9898238Z",
+      "endDateTime": "2026-11-03T20:30:00Z",
+      "externalId": "00000000-19f0-4aee-8014-a14db83ee09c",
+      "id": "DHasRuEiYBBiEw6wQJZsTTBgHYWmHqIoXP3aQQx8YVLjC2BtAhTqGOrfPVc2uUVpuRciM63fCXNpRNInuR2SVUWToc8nN9YoJMstRUFTV0LpBRQvrHaUVXXrV1QmMdgrcSweTOkIwVrhDIVxVuJk",
+      "joinUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003",
+      "joinWebUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:szmowzz_MGPpNLlmRUSjOmKtEY58HeF1SLO5MGouEIU9BZUbPzasXvIo@thread.v2/synthetic%20text%2003",
+      "lobbyBypassSettings": {
+        "isDialInBypassEnabled": false,
+        "scope": "organization"
+      },
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            },
+            "role": "attendee"
+          },
+          {
+            "identity": {
+              "user": {
+                "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e"
+              }
+            },
+            "role": "attendee"
+          }
+        ],
+        "organizer": {
+          "identity": {
+            "user": {
+              "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5",
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537"
+            }
+          },
+          "role": "presenter",
+          "upn": "mia@example.test"
+        }
+      },
+      "startDateTime": "2026-11-03T20:00:00Z",
+      "subject": "seed-v1 case-teams_update_meeting-add-attendee meeting"
+    }
   }
 ]

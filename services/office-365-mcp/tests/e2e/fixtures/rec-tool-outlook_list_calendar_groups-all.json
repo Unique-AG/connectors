@@ -9,7 +9,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_groups-all.01.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "GET",
@@ -18,7 +30,28 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_groups-all.02.json"
+    "response_json": {
+      "value": [
+        {
+          "changeKey": "r3Cczi17RvGGLs2F4rumwhLHUhWBNT==",
+          "classId": "00000000-ff09-4593-8782-360bde47cc47",
+          "id": "AAMkETobHBE9ZPJ2OYBmLGyaNGM9MN42Csm6CFL8EUQvXDElA5ZxZWUMSGRGOBUgpboWJPhzIRsiU0o5OEH3PxRxaWucXgroQTXvZeLk-InoWMHPOLWJCJIbkPpuGhzyWZWrWsFh-DfzXHXInjNPXTM=",
+          "name": "synthetic text 03"
+        },
+        {
+          "changeKey": "g1Geme96EuSPAf2O0flshcRFRwYPVu==",
+          "classId": "00000000-8d15-4bd2-8516-1b607a24e204",
+          "id": "AAMkUIdvFVR2AVM4DSTeJBfeAOO0RN21Kbu7VTI1DOVuJSUuN7YhQJVMWUMLWZUvlykRMOnqQIvhI8y4CFY7NiDmkZhwGbacISNpPsTa-RnjVVCXUVKBMTDxlEpzJyrsRMVvDuTi-IhkFBGZjvWDEKZ=",
+          "name": "synthetic text 04"
+        },
+        {
+          "changeKey": "z8Nmrn05EqYLPu3F9knujrLZKjERXu==",
+          "classId": "00000000-881c-4ec2-894f-c69e25f10071",
+          "id": "AAMkAAlhNKH7MNK9YBXgKTgdNQS7BV36Bdv4FSE0SMQjPUMiL9SwFUVQWSEGUHTgoclRIHffXJhlP6t8TOH0CcWiuAlxEhffMHNvGyKr-OhfNIDPSHOVPCFalPkwQoxoIIPmEtPo-WboUMTQfqNXHQD=",
+          "name": "synthetic text 05"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -27,7 +60,67 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_groups-all.03.json"
+    "response_json": {
+      "value": [
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "changeKey": "l4Jbun60NxRDYz6I4ihfqzEJp+tkoI==",
+          "color": "auto",
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "hexColor": "",
+          "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+          "isDefaultCalendar": true,
+          "isRemovable": false,
+          "isTallyingResponses": true,
+          "name": "Calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "changeKey": "o6Ysru77XwABGc0S5jafjaFG9q5zut==",
+          "color": "auto",
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "hexColor": "",
+          "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+          "isDefaultCalendar": false,
+          "isRemovable": true,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Shared calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "changeKey": "l5Zqrp13AeFXWq1O8atnpyMG2t9cgz==",
+          "color": "auto",
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "hexColor": "",
+          "id": "AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+          "isDefaultCalendar": false,
+          "isRemovable": true,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Spare calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -36,7 +129,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_groups-all.04.json"
+    "response_json": {
+      "value": []
+    }
   },
   {
     "method": "GET",
@@ -45,6 +140,8 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_groups-all.05.json"
+    "response_json": {
+      "value": []
+    }
   }
 ]

@@ -1,5 +1,4 @@
 import functools
-import json
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from datetime import datetime
 from typing import cast
@@ -15,7 +14,7 @@ from mcp.types import EmbeddedResource, TextResourceContents
 
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import build_server, patch_obo
-from tests.graph_fixtures import E2E, Json
+from tests.graph_fixtures import Json, recorded_json
 from tests.tools.conftest import GRAPH_V1
 
 from .support import call, response, serve
@@ -137,10 +136,6 @@ def _view_of(graph: respx.MockRouter) -> respx.Route:
 
 def _route(routes: Mapping[tuple[str, str], respx.Route], tail: str) -> respx.Route:
     return next(route for (_method, path), route in routes.items() if path.endswith(tail))
-
-
-def _recorded(body: str) -> dict[str, object]:
-    return cast("dict[str, object]", json.loads((E2E / "bodies" / f"{body}.json").read_text()))
 
 
 def _list(seen: Row, key: str) -> list[Row]:
@@ -442,7 +437,7 @@ class TestAnAttachmentOfAMeeting:
         self, graph: respx.MockRouter, attachment: dict[str, object], told: str
     ) -> None:
         uri, route = await self._agenda(graph)
-        described = _recorded("rec-tool-outlook_read_event_attachment-agenda.04")
+        described = recorded_json("rec-tool-outlook_read_event_attachment-agenda.04")
         _ = route.mock(return_value=httpx.Response(200, json=described | attachment))
 
         with pytest.raises(ToolError) as refused:
@@ -455,8 +450,8 @@ class TestAnAttachmentOfAMeeting:
         self, graph: respx.MockRouter
     ) -> None:
         uri, route = await self._agenda(graph)
-        described = _recorded("rec-tool-outlook_read_event_attachment-agenda.04")
-        full = _recorded("rec-tool-outlook_read_event_attachment-agenda.05")
+        described = recorded_json("rec-tool-outlook_read_event_attachment-agenda.04")
+        full = recorded_json("rec-tool-outlook_read_event_attachment-agenda.05")
         _ = route.mock(
             side_effect=[
                 httpx.Response(200, json=described | {"size": 10_485_760}),
@@ -472,7 +467,7 @@ class TestAnAttachmentOfAMeeting:
         self, graph: respx.MockRouter
     ) -> None:
         uri, route = await self._agenda(graph)
-        described = _recorded("rec-tool-outlook_read_event_attachment-agenda.04")
+        described = recorded_json("rec-tool-outlook_read_event_attachment-agenda.04")
         _ = route.mock(
             side_effect=[httpx.Response(200, json=described), httpx.Response(200, json=described)]
         )
@@ -560,7 +555,12 @@ class TestMicrosoftCannotReadTheCalendar:
         _ = _route(routes, "/calendarView").mock(
             side_effect=[
                 response(_TOO_MANY),
-                response({"status": 200, "body": "rec-tool-outlook_list_events-today.02.json"}),
+                response(
+                    {
+                        "status": 200,
+                        "response_json": recorded_json("rec-tool-outlook_list_events-today.02"),
+                    }
+                ),
             ]
         )
 
@@ -673,7 +673,10 @@ class TestRemindersAndGroups:
     ) -> None:
         _ = graph.route(method="GET", path__startswith="/me/reminderView").mock(
             return_value=response(
-                {"status": 200, "body": "rec-tool-outlook_list_reminders-today.01.json"}
+                {
+                    "status": 200,
+                    "response_json": recorded_json("rec-tool-outlook_list_reminders-today.01"),
+                }
             )
         )
 

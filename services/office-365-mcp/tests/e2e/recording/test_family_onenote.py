@@ -11,6 +11,7 @@ import yaml
 from office_365_mcp.tools import TOOL_NAMES
 from tests.e2e.recording import stand_in
 from tests.e2e.recording.cases import case_entries
+from tests.e2e.recording.conftest import body_of
 from tests.e2e.recording.families import load
 from tests.e2e.recording.families import onenote as family
 from tests.e2e.recording.guard import DEFAULT_CAP, Guard
@@ -290,12 +291,12 @@ def test_the_onenote_shapes_scrub_and_pass_the_lint() -> None:
     assert set(fixture.dropped) == {"@odata.context"}
     files = files_of(fixture)
     assert lint_files(files, {stand_in.USER_ID, stand_in.UPN, stand_in.DOMAIN}) == []
-    done = cast("Json", json.loads(files["bodies/rec-tool-onenote-shapes.07.json"]))
+    done = cast("Json", json.loads(body_of(files, "rec-tool-onenote-shapes.07")))
     assert (done["status"], done["percentComplete"]) == ("completed", "100")
-    listed = cast("object", json.loads(files["bodies/rec-tool-onenote-shapes.05.json"]))
+    listed = cast("object", json.loads(body_of(files, "rec-tool-onenote-shapes.05")))
     web = str(select(listed, "value[0].links.oneNoteWebUrl.href"))
     assert web.startswith("https://contoso-my.sharepoint.com/personal/mia_")
-    books = cast("object", json.loads(files["bodies/rec-tool-onenote-shapes.01.json"]))
+    books = cast("object", json.loads(body_of(files, "rec-tool-onenote-shapes.01")))
     assert select(books, "value[0].isDefault") is False
     assert "northwind" not in b"".join(files.values()).decode().casefold()
 
@@ -402,7 +403,7 @@ def test_a_group_notebook_listing_scrubs_and_passes_the_lint() -> None:
     files = files_of(fixture)
     assert fixture.dropped == {}
     assert lint_files(files, {stand_in.USER_ID, stand_in.UPN, stand_in.DOMAIN}) == []
-    found = cast("Json", json.loads(files["bodies/rec-tool-group-notebook.01.json"]))
+    found = cast("Json", json.loads(body_of(files, "rec-tool-group-notebook.01")))
     assert select(found, "value[0].displayName") == "seed-v1 Shared Notes"
     assert select(found, "value[0].isShared") is True
     assert GROUP not in b"".join(files.values()).decode()

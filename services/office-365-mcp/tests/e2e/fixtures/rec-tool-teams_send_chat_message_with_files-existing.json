@@ -28,7 +28,55 @@
     "response_headers": {
       "content-type": "application/json; charset=utf-8"
     },
-    "body": "rec-tool-teams_send_chat_message_with_files-existing.01.json"
+    "response_json": {
+      "value": [
+        {
+          "hitsContainers": [
+            {
+              "hits": [
+                {
+                  "hitId": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+                  "rank": 1,
+                  "resource": {
+                    "@odata.type": "#microsoft.graph.driveItem",
+                    "createdBy": {
+                      "user": {
+                        "displayName": "Mia Keller",
+                        "email": "mia@example.test"
+                      }
+                    },
+                    "createdDateTime": "2026-10-29T15:20:52Z",
+                    "file": {
+                      "mimeType": "text/plain"
+                    },
+                    "id": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+                    "lastModifiedBy": {
+                      "user": {
+                        "displayName": "Mia Keller",
+                        "email": "mia@example.test"
+                      }
+                    },
+                    "lastModifiedDateTime": "2026-10-29T15:20:52Z",
+                    "name": "seed-v1 Meeting Notes.txt",
+                    "parentReference": {
+                      "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+                      "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+                      "siteId": "kiaqdpzfkcrfinyqw-ic.squsbkdinx.ifd,00000000-84a1-4040-8976-7aac948926e9,00000000-a564-4d8d-89c6-a011992bbd1c"
+                    },
+                    "size": 107,
+                    "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt"
+                  },
+                  "summary": "<c0>Meeting</c0> <c0>notes</c0>, weekly project sync. Redirect test done. Two press pages missing. Next: <ddd/>"
+                }
+              ],
+              "moreResultsAvailable": true,
+              "total": 2
+            }
+          ],
+          "searchTerms": ["seed-v1", "meeting", "notes"]
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -42,7 +90,1425 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_send_chat_message_with_files-existing.02.json"
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/chats?$expand=members,lastMessagePreview&$orderby=lastMessagePreview%2FcreatedDateTime%20desc&$top=25&$skiptoken=3.plrKIo6H2tJMCORm7KiGyaPlt8RzmdZcXWJYeBK8xwPKyZW6VutKkTG1ZdzpR1xnDM0UeGsJSoLeT4R0Oii1OKG6URYFQ2MiFuCEnCSsWXjDwTp5SSVDQucVAKUFLRBmAfCFC20iWXoJrnE2TUsFFP5Qb4vKXL18URYFn6gbWjGmJ7k5TOwUo68iTGDGQWJ4ZCTRFY3LIFXQrrb4AnZppN4IMHWArfD4Q2zZx3jdOUJggHn3VQgZtDZ4CKDHLS58RHQETTtLM3GOHNJLTsBAI8XLOIFgRGURkPUbiJGFuV5FU5cYALC5ZTHcUaWNBISHQWYkSDkmCUEEN3f9OmzLsoQLTERSNQPyRzjvWeuOSwjfFd1bGeNajACyIidXceIqiHFCaFK3H9bRTXbGBc1kXCTLSMP0FrrCuISC9Syyd8ngCvCxSGwraS3qFPgEjBS2JHWky26kYHtHgu58HUabve7vCBlQguVSPBB2CyRmi3rfEgWrdiKCO02FaIOhXDWYO5ixUGp1gvIRMfhtWqRjH684ANUWCkHBfuDmV48CcKEDCJ1iUSMgvQGgH3RLsVongtM4",
+      "value": [
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-11-03T10:06:06Z",
+          "id": "19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-11-03T10:26:57.157Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "0879429349756",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-11-03T10:06:06.967Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "GDEuZOQaYnv0MXVoZdteXJV0Wb49ACAuVTttHZTmNkG2XDS3TWKbBXOyCuLhRLw5IZWpAzOoCTLaV3K5JFB2MTP8OxCwZQcfXbjuIRQnEkU4tQRhSQMryaJdGsBfFYI2HDn7TFL2TOBaCEx0Nj36WVH9RMIaCoCxP4F6DEF6Ng==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-11-03T10:06:06.846Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "GQVlGVBeMvp3PJEbZvrgDGC6Sm31NBCqQOsjYHRnIzL3HIB5DNFhPPGpJqGzCNb6MARgElBbFCNzR0Q4FPH3EZH0NnOlUPsqSwhmBDTqPtB9kAHlUEFcmeIoG7RvRPHeCmSgVNTrApPvITWmUG3aFABiDBQfLOG6QNDyAwFgIS==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-11-03T10:06:06.846Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "seed-v1 case-teams-send chat",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-11-03T10:26:57.157Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-11-03T10:06:06Z",
+          "id": "19:1u8835a83333300vbu87x54815pg2pr7@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "Tell me if you need a second slot.",
+              "contentType": "text"
+            },
+            "createdDateTime": "2026-11-03T10:17:54.429Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 05",
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "5741747046240",
+            "isDeleted": false,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-11-03T10:06:06.268Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "LISqVMNoFxq7ANCqCqghMRG6Nk34VTAaRFchOKJqKpQ1YZE1XAZzQKNoSlQeMTboUoE4IpbbBhWmDCJ8ZlUmLsY4EnZ9ZGq2HiSaCLNeOtR7gFFrMKFrucJwF2Q6IOCkN7Z7QAfxAHEfVIVqXX64IzkfPJKuEwEzNQFxEdHeSL==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-11-03T10:06:06.102Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "KKYbFJDgBru2WRBpNdarLUD2Jr74QLSkXSamOOBsVfJ5XLE0HSFaXDIeOsXlEAuyApL3CjcyJvCcQEL8QzFqVyB7QiW2ISj0AgQzVMKfJxZ6gOAuCVQumqKkL4NvESIlBwXiRYRePyPvXUUtHW8qCNGaQEHxSHT0HJFtTtJnTN==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-11-03T10:06:06.102Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "HAJrZCUdQdq3MRNtRoggSSK1Iq22HEIiIYbhPIWwJuV5PLT3TFQmSTQaXqLgFOkgFsL4LpthGrOvZKD9PpCnXoI9UoD5QMx4TlWfJNLiGkH5oHRxEKNilxBiGgWqQRD1STk8HQT3BWLqHKo7Yv18LQT9VXVrLnKdN5L3LXJ6Ik==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-11-03T10:06:06.102Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "seed-v1 case-teams-unread chat",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:1u8835a83333300vbu87x54815pg2pr7@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-11-02T09:38:17Z",
+          "id": "19:49npe4j97h6r4pq24y89027518021510@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-11-02T09:38:18.324Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "1805800773417",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-11-02T09:38:17.59Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "PZBeSSSlWmk2PSYmHfsaIGL4Zw33OAWoSVnfGCBpWnV7WAK1BFBvAQGzRoEuFKo2GgSbDzMyUNFjGNX2DAZ6DYR9Dli7UlknKHE6XNJiNDL0lRNfROBuiqNmB1G6CJLnQ9N1FTleXOVmUKRbRL51ErvbMUSmZfGgCBUqLlHdXX==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-11-02T09:38:17.049Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "SRYvIZAlSto4VFSoLpsnBYW0Fk36QVGiMQgtCNTnApF3UPD8DIWqJKXkCjMyHHl4QxSpLxPuDFBwBYH4NOH7QRK6Nok5CsfzDQZ4DASkTTR5jTUhUZLvrqDmU3QvLICrEmWfQTNqJaNbUPEnBM9aPCLiWUVuJBJ3ZMSwVrJaGF==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-11-02T09:38:17.049Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "ZZSvFFWvUrn1YPApVbofQQJ5Dk97BHWpQLbhTXKzEeD1QJJ9BPDvOHBqQpCsBZr9DuTtLxRmMFKnMWQ3EYX2EOE2Jev8MiopDNB4BQMiZWY2kJQgGROnnvTuPgArWLR4BIm6IQY6PDBqVXy4Ky50SWG3ABSaQsCkZ0M7PZM5Gt==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-11-02T09:38:17.049Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-11-02T09:38:18.324Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:49npe4j97h6r4pq24y89027518021510@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-11-02T09:13:48Z",
+          "id": "19:5731013ext440ey713v1w2wtb30xn2hl@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-11-02T09:13:49.651Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "1977920376920",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-11-02T09:13:48.897Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "ZOMsXMSzLxy3XNUvLngaKNU7Cc07VLCiTPvvCJDqQvM2OHE4ANPkMPRuPxHdCXy1RfL1GTJ2YNKgFpR0K4J1GUlfUMX5VIMkGFTwVvLdJrX8pLGiUYYhxzYcZsJnUMG0HAn6XRP2OUMcWCw9Tp73MKO8HVRfJxMcD1J7BHO8Pe==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-11-02T09:13:48.707Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "PTZsQAPvKek9UTEsYzkzJLJ7Fj09SUQxSXkuGMVyYvK7BLC0GMTuUHHqKpCgQMh5KqB0IEU4ULUsOhY9H1G2DArdMJN6LOMqNSAsIfTuJjQ0cAJkKUIcwaKqT3BaPOLjJoFuZGZkQjIaJCGaKW5nCDBfCZItDKF8JFTvCzQcJL==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-11-02T09:13:48.707Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "RABhRNWzMcs1ROUnKsmfKAY1Vb89MDLnPSeyGZQyDsK7CMY9GISmMRVgRpBiZYh7TlF3XZB3ARFeCrN5F6R9OJrqJGK3SLXmHSQfEuUxNfG6rTYaBFBqvzXyB8K4VJKkD4P0IJtlKQFdFTBzKK45DlchZTDpVgMkIGVoMfYgQR==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-11-02T09:13:48.707Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-11-02T09:13:49.651Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:5731013ext440ey713v1w2wtb30xn2hl@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-11-02T08:50:41Z",
+          "id": "19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-11-02T08:50:42.444Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "4424366441638",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-11-02T08:50:41.607Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "TWZaHAAkTwx0QOPvCifaDKB7Dt89EJNjYNjcTKGbGqQ1PBW5KORyHWDcQoIoMNpfUvodDrCxKiZ8W7D2XgLfTxDkAUZbJVhfKTV9RENuEXJ9zSAjWTFillSeWqEeRVG8IEl5PPE6GWPwIOq5Rb10HHE1PSLsPrMtC1Y2WWO8Ho==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-11-02T08:50:41.49Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "ZMTdMXFcQeg7AUGyQbnrNFE5Sw09XIXyVXyxJYKeJzJ6IZG5CWCqKWNbDkGdLQahPgqeIvUqCtK7B2F3ToGqGpTwPMAdHEkcNIN1NMZeUFB2xUVqHEWvywYfH1W2KGYrZ9H4CUpkHBEvHZZdBO56KegkJDTbCoQeWSOiEpYpUO==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-11-02T08:50:41.49Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "BDSuTZSaUnt1GTKvYktuPTI6Ye66COEePFqkLSKdQjC6RWN7WTQrVBHdIuYwPNcyAihnMoZgYwH1L7O7BoUkSkBwOHEhXRzgNGD7AVIjZLK7cTBrQFOjtoIsH8PuNTZxAkIiEQNeRaCpIKErDS6dNTLjJREpFCB9PYRqNxDbIH==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-11-02T08:50:41.49Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-11-02T08:50:42.444Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:43:21Z",
+          "id": "19:775g85831k512747vb4vgl65x2258n72@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:43:22.813Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "3020852158320",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:43:21.978Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "ITGfVRPbSgs3QHOiFhexJOI0Ak69WAEfVUqfQJKmAcL6FJH7TOHgSWEoUbGzCQl0LtNiXJlcTmVoMHM5NwN9HnNoGUIwLOSlGts9XQEgKYM0mMLvEUVxbnEdJdIfFPG7LUk6FEG1IHJsBOg9Kl57GDW4KRWgIyXdM8A5ACX9Up==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:43:21.793Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "XGIaIZOuFiy5KPWhLsysICX3In80IBRiLZglISErAsB3WVD0OJLvROHkNaZcRKf2WdFqQXoiKmXhGIG6GgB4ShZgZEIuMVYmRad2KMVgIUU7cFHtBVYlnnDdS4D6OLKtW7Q9VZzvXKRyDBStOW74PfvaIQWnWoOcWQDfWxUsER==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:43:21.793Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "AUTwAJAbPai7TVXrDxlcTVH8Qi22PLPbTQhlCAXmTeZ9LVI2HGPwIVFgGdItJVb0GtUmXXkoSgPkMGC6AcE5XaZkLPVnSEFkFkg5MMFdTPT6jGXpTNAwddVxE3BpMCOyFqYsJSRaZqCsPIOvAZ8oCEQtQGMrBLR8LYPqMaQvZS==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:43:21.793Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-10-30T13:43:22.813Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:775g85831k512747vb4vgl65x2258n72@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:42:56Z",
+          "id": "19:6h01q0bj0v7905u9739f1y2t80665594@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "text"
+            },
+            "createdDateTime": "2026-10-30T13:42:56.945Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "6753299093220",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:42:56.104Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "MMPtRRUiCpj5ABZgVqxlFFI6Kh21SJKdIMuyZXMoJkA1UHA3SABlPKHiAyImRIr2PmO8STKbWSNvMWH6ZHDaEXD6BdOzNvI4PDMzWkj2QYH4fCJnBEZamqOrJ8QjGAPyUvZdPJMvQzLhPACxBT6sHUSdRGMcOWB6CNAvOsLdDC==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:55.959Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "DVAzRBViRbf4EMYjEukwYFU2Kd67TBWhCVqiYWIvGtA8XGD1ZJSgTZGcCgQjUNe8HqR2TDFxZXYfZCI1TUKbKCE1FwRgXpX6IIKeIsq6NPT4jVUvEXYlqjEnK1H6QINzE3I5SVdjCRBfIQLsPO69EfhpQMIyXoEsWWLwNfZuEE==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:55.959Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "GIRiJGGvEvn9WKHaEmatUPF3Uj34YBPnHQykERRaCyB0CAL7GYXnVKUeTgBqBTv0UlG1GDZpISCjTFB3ZHPhQZX5JkSjWjR2ZHJzHgq3LAT3jNRxPFJmhmIcXuOtPIC3XVj3LZQ6RHTbMBe5Vx78FYE4WTNoOzGwK0G3SWP5Go==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:55.959Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-10-30T13:42:56.945Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:6h01q0bj0v7905u9739f1y2t80665594@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:42:06Z",
+          "id": "19:555x9t5g40a570fkr6a15b6q905qf95m@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:42:07.049Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:06.893Z"
+            },
+            "from": null,
+            "id": "5337602622824",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:42:07.659Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "ZYKjZJOdBcu5HSCrRvdhLUN0Wf04LQCmJIrzJISiLbR1PZN4VYTfUGNzDsIiTJwgIHaxUQStOhS0ECR4K8AwJEdrDmXzBlIdDBUqOgmxSfX4wPXrOOIzybKdV9WgQVVtHsKtREDnLkWpHTAhWU4vKMTzKKXeCIZ4RCZqCxRbSH==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:06.697Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "LACvMMHoQfo0GKWvNuymXCR7Ok94SLGvVApiPFIwUaQ7RCT5REPtZDLiInWdIZraSAoiSIQhCzO3PBQ4V0LfNTvxYnIjFoLsYASvWrxuYyL2pTLjOMKlzpZxQ3L2IFItE8Y5ZFzmBMJnSXJbBQ81ZnfeVHJhYcIzRHJsToLaXC==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:06.697Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "GGEnXEPcBur8WPQkYfrhSME2Pk43WKXhTPwqQKEjFtO8RWI2KOMxTODaGbXcFPkhPPfiIYGoEqA5HRD9R4MyPQdqViQmPnQtCEBwNtaiAfS8eUHpUBRhthRaThGbRVF7XMu7TRJ4QJPlQZh2Qe32PXE1FYJzZaIoU2G0BTG2Ut==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:42:06.697Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 08",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:555x9t5g40a570fkr6a15b6q905qf95m@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:41:40Z",
+          "id": "19:vg130vncnmj27923eznee032u0m72827@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:41:40.756Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:41:40.624Z"
+            },
+            "from": null,
+            "id": "4836718104999",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:41:42.044Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "GWOrUUOuCox6XJLfKvdxHDG6Yy34WUXkJGphLVJxUdQ1OAJ0VWLsINUuZfLsIGwgZMZ7LiMzDmCqTAA7VKRgANQyUaBxKQLbYfAwAEH8JSA3aECcJSUgpgWbH7KcFDCwKrEhAXEcGcIeDXQyCW1aWDBlKZIeIDW5JVVhGrBdJB==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:41:40.457Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "RUQdVMDtOaz0ZWQpBvtiGMH4Rf58QZTvXEcrEGHpIhB3XGH1XTRcFFKyGcUbMMxgYGX7VbMaZjXjEHQ1VQFmWMAgRhJlXLTxIjWbLWW3YTL0fOBiUSNileDgGuDfQOW5DDk8YAD8KCNbESd6Ut88PDD2LANtQhKzX3B4XYI5Sq==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:41:40.457Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:vg130vncnmj27923eznee032u0m72827@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:40:51Z",
+          "id": "19:922f7pt174v290p606p2q0ll41b70812@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:40:51.786Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:51.616Z"
+            },
+            "from": null,
+            "id": "5592801582578",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:40:51.616Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "BJTeBHCkBct3UEOrVaciAUX4Qk95GCUjCSspHMFeXyU7AJK5WGRpRQQwXuWhHFt7PRFxPGTxKfP7Beq6S5LiGTEnTAP1DJAkTlV1RMW5ZyS3wWKgXDPkfyNvFoDsYSQ6XRj2FVJ5ZMQpTCm7Zo31KQQ1IKTtKjXnA2J2VPE2Bv==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:51.371Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "IGUyIGBuPli0EAGpUpbwPPR9El02YHMyYBevCPCqEaD5EXT9HBGiMLRrTqAuTKc4SGMoXZIuIsD9Fzr8L8FoLIByHST9WMZrVeT9WNE6RfU0bCCxTXFgwzIqW2PpSELbYbUhWCGmCbXhBIEpKA7oNPCiFPMyWSV0EIUaCfDaIJ==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:51.371Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "TKPzNJLpNvh7PIQxSyixJFV5Vi19XYZhKNnfTLIxBgT4YGU1VJMdWUIyYzQmFDm9KXTsSKIpIsR3Yic3F9DsWLKvEOB8XQIdKqX9ULG9EcP6fPKhBIXaitJsE4T1DBKbN3W4NJwuKUFbZFSrCI59BvjrQIOuObRgGPTgMqVcTB==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:51.371Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:922f7pt174v290p606p2q0ll41b70812@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:40:26Z",
+          "id": "19:f9zk317837tt96hso0x0855lt6359518@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:40:28.583Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:28.524Z"
+            },
+            "from": null,
+            "id": "0725710945553",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:40:28.524Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "EUPkKIIrVwg1GNPoLsidGIN1Dd19VCPjUOpjSSGiUgS8BJY4KVSmEEPnHkEiLGzzPLYcKRFwWgm7DAR7GETwEvFhPKO5A4IfNyQyInCwDhT2nQSdANXekbFmW2P9NVYeK9B2HAxgZCRsZMOsOR84YundDTStYpWeUFIuTuCuRH==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:28.301Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "VQHtVSUfIto8XYTrVlmfWKS3Im91YYEaFHqoVXPoMsP7WAG7PCUfQOCfAuXnDHcnQZCiOAOrRna5GZA3XFHxYgDgTAJ3F4CcAsPhPqWyPwL7lLQpNRMhcqFsY4WaCBXuKlFyUFFhGxVkUDVyJM6tSAUoPEHnJGV2TCPeWvDbBH==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:26.197Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "OAEySMVcDsa2QGBnZyvoLQY0Gk35BZUqXNkmISFtJzV4HTW0OOUeYJQxYlAwTFlpCFBmEPVhLob6UEA8NWCuRiHtMJU8M0NbMuRkWvJaVnW9aQLzRLAvhhBqEfKmDZI4RQu6FDP6SNXdSEz2Os72NFH4NFPaZrWsT6A9WVK4Ct==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:40:26.197Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:f9zk317837tt96hso0x0855lt6359518@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:20:46Z",
+          "id": "19:qahh069895ib35eka572w87450i92v67@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:20:46.842Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:46.663Z"
+            },
+            "from": null,
+            "id": "6509350692743",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:20:46.663Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "PYAdUFFaDdo2TMOiOsnwXOU7Zh89JPTqGCvkFCGhViF7HZV0DVNiZLGgQzQuZOviQFNqCOAxQpo9JsJ1UNLvIJVzAQP9QGUzKNF6FnCwZJI0nXXwECEdztNqF8H3LPZuW2E2VMdlIGCaALNcAG61TkjkCTOqTvRhZPYhWtAiAT==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:46.37Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "MAFsXDZsRgl8WFLyVihoWNF6Hs39QCHvUAvdLFHrGaT1QML6TRYwOERhSeAeLRakKQIxOVRfCaz5MsG3LUZkHBEgBJC8HGGjFQT3VsNqCGJ9cIEgMEJigzNsV9MuAYHhMpNyTZDwZrGhDXPwJR9kIYXoPYFnHGG9EAYtGwEkYX==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:46.37Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "RVWjLVJvUql8JJHzHnhgEQZ2Qe54IEHjEJusDAVzTsE0SZD7LXOoOSWhYyXkHYfpYHDfJADqNki3WsV5NNPnGMGrWRX4TBFlMQC0LaSfJMI1iXOwXAUkmnGxKtUgGTR2XIg9KER1JZYyCDa2Ii38MAI4OFAhCmTpE3Q6VPN7Wq==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:46.37Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:qahh069895ib35eka572w87450i92v67@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:20:22Z",
+          "id": "19:616430g04m3m871m584522542ky2bo3d@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "",
+              "contentType": "text"
+            },
+            "createdDateTime": "2026-10-30T13:20:23.011Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "6886429138131",
+            "isDeleted": true,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:20:22.169Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "BAJpPVTjFbl8YEIgJlumAQG0Dy99TLAyZBmbRLUpTiL1XIX8AVLvHBBpIaFiLVa4XdD0MXuhPmnlWLT3LDSbDVK3RBPvFRmaCNP0TKK3U2V9eQFlWOPsswDrC4OdYYYzZtWaLXAyVmLqVGGiUK0pHZEaEYXpBPF2JIMfZsChGX==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:21.985Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "QBMrTHDrWan8VOXmKcvrKHP0Dt54CIOhQCarHOMgZvU4QSM6AGLjTMOyCvAtNMa4KbK7AUlmGfayYUO2IZMaLCL2RHQtSKkzJEU8GBW7C0K4gHAsQZYlvwBpR0V5VVCsA0K1SAauACNvPEOsKV35QnzkBGTpOiUnLIEvMlErTP==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:21.985Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "EUVhCNHqWja0OVLwCvipTVS6Kw41YGZhSHvdRWJtAvS8VZO9CLIxEYZyCnRmFUw5MkA8XZwtYwxmBDV0HIRdPPB7UDOcZPbnPOE6GVM3V4W8rBQgMRBtjnVfXvNgYJK2TKt7WUH3RAZcMAi9Xr87CER9HUApFqZwT4F0VMY5Ye==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:20:21.985Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-10-30T13:20:23.011Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:616430g04m3m871m584522542ky2bo3d@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:19:09Z",
+          "id": "19:36z8q4d73q1o52lvhc8j72i771fq5586@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:19:10.196Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:19:09.896Z"
+            },
+            "from": null,
+            "id": "1841227808650",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:19:10.94Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "CPOiXCCkUns6DGNrRjdwPAC3Hj12VPNmQUomMNAjSxC7CAV2VDObGIVhSyNdPSg5A7O2MfwlHWXmCkS8KSGzQSLiCLNaARZpYQLnVVk9MPL5kAPhKCSurlKyQ0J7KQAiN8D9UKzbLQNfNDLsYQ99QsstPGMlWhAbPODxNmEhRO==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:19:09.695Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "PIQfFEVuSea8YEQvHjthGNX7Mf99CCWeMOkhPDWjFoY3OIS2RMWrBOKiUlHdCCd8W0V5WrhlKGGkBgW5QZZgEGSaATPvSLAiNLKuPGb9KAX6hPZlKIZeggUlWuTcEKV1NBn0HMT9LEKyNHq4Bj08THQ4PUYrGsDlA9F2OCM1Ox==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:19:09.695Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "AQOjSXAuUix0BRHsRwnyDWI6Qc90EMPwCJhdNAOtNrO1JMQ0CUXzBRHcPyFxTIj2M1D8HohgMLLbIxS1QIVgEWKkLFSwHIGtLCNzPKp5UJT4rZKbIZDzerEaP2AsDLHlHrOuXQLiIqLdNZIjAY4jJIJaCDSaHLQ0YKOdOqFgHQ==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:19:09.695Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 08",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:36z8q4d73q1o52lvhc8j72i771fq5586@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:18:46Z",
+          "id": "19:3z49ds2d69p22p073r672o5b0105dyqr@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:18:46.268Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:18:46.097Z"
+            },
+            "from": null,
+            "id": "3700802837744",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:18:47.268Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "VAEnYGPwMye4HCSpOrhmLGV7Ah28MAHbBDpmKPYeSoU5RVG2LNKoDDZuBaCkPUi0TEE5HgYlIec0ZtS5NbXpZKAnJMHlQ7K9FWZdOeHuSZS6fXTgBRYwviMpDwSsRGZ5CMj0MCO7QPFjMZq0Nf58RBF7MIFzXeXaK7I1KXU2Xq==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:18:45.917Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "XLLcVXQvHxc7GOSyHpgeAUL9Du14RLKjDUtaDYAlWmG3FRR6POHyGFSeOaMsYIq1CLE4HnEkRlf6KkV0HnAlKSYnUIJzX8U4AXLcIvBlSNC4iJIeMSNyddQpJ4JfZPOkYsAuCNHfGpXcTMZpDR6nDWOdXJCaNSD3GJNyIaPaJF==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:18:45.917Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:3z49ds2d69p22p073r672o5b0105dyqr@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:16:38Z",
+          "id": "19:38j1px7849j0182x7y5f7v1870398nzf@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:16:39.057Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                },
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:38.827Z"
+            },
+            "from": null,
+            "id": "8904529346061",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:16:38.827Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "AAXcZTEdFkz5FONqFoagGIX1Vg53GKLhUZfsPSInAyB4UQO0DFKtWHStNmRtFKj6AfRwC7PzSNy7UOH5SqKkJDGyZWMtCXI1JdB3IHAdBhL5oMKuPNLwgoYgCtHgFHO6IKm4BHT7BGHiSMv0Ls27QSZ4AKJuSmYcV6L5MXK2Sk==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:38.695Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "RXUnVXSwKzq0GIKwHmpaBGS8Rb14FTCyRXzeFMWiCbG0OKP6SOEoHHYnAvDbXSm7RhVlZ6ShJDq6OUI2ZlGvBCSuNIMtHIY7GcO4PFDxPvW5cWOmKUFdyfLuM4T5CYPlP8I7BTmiPVNmLBUnZP03ZarbVMKrZtXtXLGkSzSxGY==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:38.695Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "IIGqZUGfLim3GNVsTbzkZYB1Qg91DNRhALdtVKCyYzL1ANO9ZOBvQTIxOmRvYMh3QmVqV0AeSAp5LWN3JeFlBUPnFGAtCCT9EqX3TONjSrI7fYCnPJSocqTzO9XeVEAwUlZtRAFoLlDdSOZqDA4pPFNxLYIkUYN7VUPcBqIdZX==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:38.695Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:38j1px7849j0182x7y5f7v1870398nzf@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-10-30T13:16:13Z",
+          "id": "19:v092zg5ch7115p04wg11xxr9ot065h80@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-10-30T13:16:15.764Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:15.707Z"
+            },
+            "from": null,
+            "id": "4548993991140",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-10-30T13:16:15.707Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "DCEtCMMzKsn7SQNvIpccYIS9Ca23YVFxMXvzZQKeHfD3KYV5JMTjKNXoHdVqXWwmVKO0GOT6B4PbLZP8YvnyCCX0QaPiUThkLlZ7CAL0VYO7sIOcHCClqpMiH5KbLDCgMuGqLCQiLnQsEQZiJK3iUWOxASZsIHQ0HJKtQtVsEO==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:13.371Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "WFEoETCnUne6XUBvCquxEFQ1To17LGOpFQaxUEPePnO9SLW3KMVhPNGvWkZbXYnhSFK9ICN5U2PoOSC5KrwsNUG4DcHwSFrzYgE9EZL7RPN7wWRuZZMkpaVgG7O1PRBnI6H8WXzhLLBoRQLhAV23QelcJNEuCaEyKGYoUqZpPO==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:15.53Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "HVJfUAEhVup7UCLoNilwEGR2Rx44HYCsIZexKYEqAzJ1AGC7POJyCBAgQuNkIFlnFTM6NMA0W9HsFAS7WvmjRBH2TjRwAEzdKnX8HJO6JLT0nHSoHKLvjeFtVoOiHHK6XXb5NYA2MVQlIGf3Ru63GVD6MNZjAtOfH7U3NGS5Cz==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "visibleHistoryStartDateTime": "2026-10-30T13:16:13.371Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 06",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:v092zg5ch7115p04wg11xxr9ot065h80@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "group",
+          "createdDateTime": "2026-08-17T09:13:44.206Z",
+          "id": "19:1j94t52t92wo3a7601bw9d8vnxk1n7m8@thread.v2",
+          "lastMessagePreview": {
+            "body": {
+              "content": "synthetic text 07",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-08-17T09:17:25.24Z",
+            "eventDetail": {
+              "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+              "members": [
+                {
+                  "displayName": null,
+                  "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                  "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                  "userIdentityType": "aadUser"
+                }
+              ],
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            },
+            "from": null,
+            "id": "3259455535159",
+            "isDeleted": false,
+            "messageType": "unknownFutureValue"
+          },
+          "lastUpdatedDateTime": "2026-08-17T09:17:25.165Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "synthetic text 09",
+              "email": "user-01@example.test",
+              "id": "WDAnEOPgTTehIaMoBfVcOMLtIn28OqJjDDc0XVWiLjLvQhspUsD5JoF3HgHrNPs7TBg8MVWnLVN4O2J7BeggDWAoPpPkGdPiDWW1IVLoBXM7tTGxRUOjqcBqPsBrDQMdTRVbPNM8FZRqHDB3Gb57ALT0DIZvONg6EvF4WnRuJu==",
+              "roles": ["owner"],
+              "tenantId": "00000000-83f6-4572-857f-f81b2b2f5d2b",
+              "userId": "00000000-1391-4383-8792-1d247f77a86b",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "MCOrVGKkEno5PZQwMpxcZRO8Ka54QYSfVIhyRGUsDdY0BFY8FQIaMNBmToFfELt5YYp5SJBiGNE7B9S8MprnAYSlBgDzUqZeSTT5JGKaXMU4yLEmSIGcihWmA4OhUJGnFeKbGTHxNcQcCQQqSB1zWUHyPTWqQQP1IUThFmLjHB==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "synthetic text 10",
+              "email": "user-02@example.test",
+              "id": "ADBwWNXiLIlvNoKxKoSkZBSjVg45XsAeBGo2HKBbQpRwOzniYpT4ZdE4EuLoJNj3HEa3FCFoGPH5M4S6BmdqFOYdFwEdToWhJCU3DZNmPVL4bEGtVPUszsAsSkItN2EyXnS1EQDkMLYeGKGzFK03RtC1QVLqObhxGQCqAcMzPv==",
+              "roles": ["owner"],
+              "tenantId": "00000000-83f6-4572-857f-f81b2b2f5d2b",
+              "userId": "00000000-65bb-4898-8444-3de78fa7ae0b",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Tom Berger",
+              "email": "tom@example.test",
+              "id": "WGWiACYnZjp9EYIfBqufDLD2Zd85GABmUOdaVDVtDcU3VLQ2TJDuBICgUaHmSUp1LBo2KWAvQMU3A9D9NuwoPWSyJlCxIuBsBSX5YFJvLVZ4yKUcXEShlzVfC8O1YBXhH0L4FTmfTVXbOWSoQV77SfcaLPFwFkIkUEPoKiKlVB==",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": "synthetic text 11",
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-08-17T09:17:25.24Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:1j94t52t92wo3a7601bw9d8vnxk1n7m8@thread.v2/synthetic%20text%2004"
+        },
+        {
+          "chatType": "oneOnOne",
+          "createdDateTime": "2026-08-17T08:48:17.821Z",
+          "id": "19:00000000-1391-4383-8792-1d247f77a86b_00000000-aa0f-4286-8305-d989485e14b5@unq.gbl.spaces",
+          "lastMessagePreview": {
+            "body": {
+              "content": "<p>hello</p>",
+              "contentType": "html"
+            },
+            "createdDateTime": "2026-08-17T08:48:19.43Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "synthetic text 01",
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "9569652527623",
+            "isDeleted": false,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-08-17T08:48:17.821Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "CBOnOWBjTrb8JYBtSempTYQ1Il19NBDoEEigTPIdVnO3YIS9KBCfQKWdKuGdZMmsKrPdTVPhTB4aZETbBGJuMsXkWBReSg2pTLB1ODytBPX8IdPiQVUqNxPcHZLnViQwRI43GnWxLIUpUCFvEBT4SGCdNpPgTBJrTTRvrV0nTwozr0PmJ8PtJyKqFbOcTGVaBb8uPRTdQKWcDGUbTzXnGR9aULz9TIKhX7TnUeB=",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "synthetic text 09",
+              "email": "user-01@example.test",
+              "id": "RQNqRERrLUjnWsCzMeNeNMJjPs56IjLhQIr8SMBoFhLkIkpcIfB1WtI3WyBdEDgfPpIwVTVvHQ1wJKTvPWTjKeTdIYMhJi8iIMP3SOkpADO1MuJzNWTpLpAcETAoLbVhLW80ClMnCIFnQYJaIAR6UIWpYhDhBOAxCALujX5qEaahi9HlN3DlCbDpUeFbIBVjMO2jJMKhUCYvNtGiDUMtAs6mEPD5LZvtFYU9BfC=",
+              "roles": ["owner"],
+              "tenantId": "00000000-83f6-4572-857f-f81b2b2f5d2b",
+              "userId": "00000000-1391-4383-8792-1d247f77a86b",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": null,
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-08-17T08:48:19.43Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:00000000-1391-4383-8792-1d247f77a86b_00000000-aa0f-4286-8305-d989485e14b5@unq.gbl.spaces/synthetic%20text%2004"
+        },
+        {
+          "chatType": "oneOnOne",
+          "createdDateTime": "2026-08-17T07:52:10.075Z",
+          "id": "19:00000000-aa0f-4286-8305-d989485e14b5_00000000-1391-4383-8792-1d247f77a86b@fed.unq.gbl.spaces",
+          "lastMessagePreview": {
+            "body": {
+              "content": "Hello",
+              "contentType": "text"
+            },
+            "createdDateTime": "2026-08-17T07:52:10.584Z",
+            "eventDetail": null,
+            "from": {
+              "application": null,
+              "device": null,
+              "user": {
+                "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+                "displayName": "",
+                "id": "00000000-1391-4383-8792-1d247f77a86b",
+                "tenantId": "00000000-83f6-4572-857f-f81b2b2f5d2b",
+                "userIdentityType": "aadUser"
+              }
+            },
+            "id": "8581733001242",
+            "isDeleted": false,
+            "messageType": "message"
+          },
+          "lastUpdatedDateTime": "2026-08-17T08:47:58.274Z",
+          "members": [
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "KCAdYUGtQwx0ATDcZxznPDV8Bt12HMWvGIcjFNVnNmC1GNY1KKOtBVSxWbDhWZmgIrLaBOKfRl1bGXXcKQHmZADfIcAhPO7jAKf4GYLzT7QlGxIbVCNoHgRdAMLvPIp3Ob43NMkyZEzmJUZgTBIiSYp2FmutFxTcAMKhBY10taFpL4SjNwZdXMPevcUeOXHlTuWmNNSiUzXmXK00FhZhKKUlNOMyKBF1TIOsTwAiYQEm",
+              "roles": ["owner"],
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            },
+            {
+              "@odata.type": "#microsoft.graph.aadUserConversationMember",
+              "displayName": "synthetic text 09",
+              "email": "user-01@example.test",
+              "id": "TAVtYMPvHEgmCaAyQcTgBWLgAg72SbQjXVx3CLGeKnLrUgopPdJ2BvQ8GxIyKQeyKyHeFXCiOo5dHCFtIVPwNUEvOlQiUH7vUWd3VNUsE9CbKqWbRCCnGwAfZMXlPXn6Ar86QHvkSNmiHGFcVKNhALo6AhsrIxNzEFPiKK53deErW4QcFhPxHNPlclBqQENwNjCeXTFbUWm3Lc42VWgqXIzsIKOqYQOnUGj7PcknEqQf",
+              "roles": ["owner"],
+              "tenantId": "00000000-83f6-4572-857f-f81b2b2f5d2b",
+              "userId": "00000000-1391-4383-8792-1d247f77a86b",
+              "visibleHistoryStartDateTime": "0001-01-01T00:00:00Z"
+            }
+          ],
+          "onlineMeetingInfo": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "topic": null,
+          "viewpoint": {
+            "isHidden": false,
+            "lastMessageReadDateTime": "2026-08-17T07:52:10.584Z"
+          },
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2003/19:00000000-aa0f-4286-8305-d989485e14b5_00000000-1391-4383-8792-1d247f77a86b@fed.unq.gbl.spaces/synthetic%20text%2004"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -57,7 +1523,9 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_send_chat_message_with_files-existing.03.json"
+    "response_json": {
+      "value": []
+    }
   },
   {
     "method": "GET",
@@ -69,7 +1537,24 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-teams_send_chat_message_with_files-existing.04.json"
+    "response_json": {
+      "@odata.etag": "\"{00000000-4897-4DBD-827C-66309915E60D},0\"",
+      "eTag": "\"{00000000-4897-4DBD-827C-66309915E60D},0\"",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+      "name": "seed-v1 Meeting Notes.txt",
+      "parentReference": {
+        "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+        "driveType": "business",
+        "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+        "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+      },
+      "webDavUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt"
+    }
   },
   {
     "method": "POST",
@@ -93,6 +1578,51 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "location": "https://host-01.example.test/synthetic%20text%2012/chats('synthetic%20text%2013')/messages('6973447256982')"
     },
-    "body": "rec-tool-teams_send_chat_message_with_files-existing.05.json"
+    "response_json": {
+      "attachments": [
+        {
+          "content": null,
+          "contentType": "reference",
+          "contentUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt",
+          "id": "00000000-4897-4dbd-827c-66309915e60d",
+          "name": "seed-v1 Meeting Notes.txt",
+          "teamsAppId": null,
+          "thumbnailUrl": null
+        }
+      ],
+      "body": {
+        "content": "synthetic text 14",
+        "contentType": "html"
+      },
+      "channelIdentity": null,
+      "chatId": "19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2",
+      "createdDateTime": "2026-11-03T10:27:39.726Z",
+      "deletedDateTime": null,
+      "etag": "6973447256982",
+      "eventDetail": null,
+      "from": {
+        "application": null,
+        "device": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "displayName": "synthetic text 01",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5",
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userIdentityType": "aadUser"
+        }
+      },
+      "id": "6973447256982",
+      "importance": "normal",
+      "lastEditedDateTime": null,
+      "lastModifiedDateTime": "2026-11-03T10:27:39.726Z",
+      "locale": "en-us",
+      "mentions": [],
+      "messageType": "message",
+      "reactions": [],
+      "replyToId": null,
+      "subject": null,
+      "summary": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2002/synthetic%20text%2015/19:3q06inh1unxx5yp3w9234714zx0di3h1@thread.v2/6973447256982"
+    }
   }
 ]

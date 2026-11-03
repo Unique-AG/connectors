@@ -11,7 +11,142 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "preference-applied": "odata.include-annotations=*"
     },
-    "body": "rec-tool-onenote_list_notebooks-owned.01.json"
+    "response_json": {
+      "value": [
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T15:03:26Z",
+          "displayName": "synthetic text 02",
+          "id": "0-00000000-68cd-4934-82c3-833271cebc6d",
+          "isDefault": false,
+          "isShared": false,
+          "lastModifiedDateTime": "2026-10-29T15:03:26Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 03"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/synthetic%20text%2002"
+            }
+          },
+          "userRole": "Owner"
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-30T08:14:22Z",
+          "displayName": "synthetic text 05",
+          "id": "6-00000000-295a-4608-8f33-4d6225babeb6",
+          "isDefault": false,
+          "isShared": false,
+          "lastModifiedDateTime": "2026-10-30T08:14:22Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 06"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/synthetic%20text%2005"
+            }
+          },
+          "userRole": "Owner"
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-30T10:02:44Z",
+          "displayName": "synthetic text 07",
+          "id": "8-00000000-9507-49ad-8546-c07b2c2daf7c",
+          "isDefault": false,
+          "isShared": false,
+          "lastModifiedDateTime": "2026-10-30T10:02:44Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 08"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/synthetic%20text%2007"
+            }
+          },
+          "userRole": "Owner"
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:27:10Z",
+          "displayName": "seed-v1 Dogfood Notes",
+          "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+          "isDefault": false,
+          "isShared": false,
+          "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 09"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+            }
+          },
+          "userRole": "Owner"
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:06Z",
+          "displayName": "seed-v1 Scratch",
+          "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+          "isDefault": false,
+          "isShared": false,
+          "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 10"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+            }
+          },
+          "userRole": "Owner"
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:17Z",
+          "displayName": "seed-v1 Spare",
+          "id": "4-00000000-bbfe-4ebd-87a1-958461e83610",
+          "isDefault": false,
+          "isShared": false,
+          "lastModifiedDateTime": "2026-10-29T14:52:17Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 11"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Spare"
+            }
+          },
+          "userRole": "Owner"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -25,7 +160,487 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "preference-applied": "odata.include-annotations=*"
     },
-    "body": "rec-tool-onenote_list_notebooks-owned.02.json"
+    "response_json": {
+      "value": [
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T15:04:08Z",
+          "displayName": "synthetic text 12",
+          "id": "8-00000000-501d-460f-8abc-13ec4514f779",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-29T15:04:09Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 13"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-30T08:15:19Z",
+          "displayName": "synthetic text 14",
+          "id": "8-00000000-1e01-4146-8bb6-8fbd012080a7",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-30T08:15:21Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 15"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-30T10:04:06Z",
+          "displayName": "synthetic text 16",
+          "id": "7-00000000-736e-4d0d-8e6c-5266ec5f8142",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-30T10:04:07Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 17"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:12Z",
+          "displayName": "seed-v1 Copies",
+          "id": "3-00000000-eb48-4d62-8279-36b65ea83422",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-29T14:52:13Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 18"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:23Z",
+          "displayName": "seed-v1 Leftovers",
+          "id": "7-00000000-4ad9-4c84-8531-d938a7c81e0e",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-29T14:52:25Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 19"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Spare"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:17Z",
+            "displayName": "seed-v1 Spare",
+            "id": "4-00000000-bbfe-4ebd-87a1-958461e83610",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:17Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 11"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Spare"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-bbfe-4ebd-87a1-958461e83610/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-bbfe-4ebd-87a1-958461e83610/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-bbfe-4ebd-87a1-958461e83610",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:02Z",
+          "displayName": "seed-v1 Old plans",
+          "id": "4-00000000-fe77-4003-80ad-1f54bf2a91ff",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 20"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:10Z",
+            "displayName": "seed-v1 Dogfood Notes",
+            "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 09"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:27Z",
+            "displayName": "seed-v1 Archive",
+            "id": "5-00000000-f5c5-4009-8125-048411d22bb6",
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:27:27Z",
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/5-00000000-f5c5-4009-8125-048411d22bb6/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/5-00000000-f5c5-4009-8125-048411d22bb6/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/5-00000000-f5c5-4009-8125-048411d22bb6"
+          }
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:52:09Z",
+          "displayName": "seed-v1 Pad",
+          "id": "7-00000000-534c-4cdb-8c29-121f79453370",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-11-02T23:26:19Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 21"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:27:15Z",
+          "displayName": "seed-v1 Planning",
+          "id": "8-00000000-5d58-4d20-82c2-9abfd58e5c72",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-11-02T21:55:07Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 22"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:10Z",
+            "displayName": "seed-v1 Dogfood Notes",
+            "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 09"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "createdBy": {
+            "user": {
+              "displayName": "synthetic text 01"
+            }
+          },
+          "createdDateTime": "2026-10-29T14:27:22Z",
+          "displayName": "seed-v1 Reading",
+          "id": "0-00000000-8621-4abd-81ad-44105fbe9522",
+          "isDefault": false,
+          "lastModifiedDateTime": "2026-10-29T14:27:25Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 23"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:10Z",
+            "displayName": "seed-v1 Dogfood Notes",
+            "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 09"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -39,6 +654,304 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "preference-applied": "odata.include-annotations=*"
     },
-    "body": "rec-tool-onenote_list_notebooks-owned.03.json"
+    "response_json": {
+      "value": [
+        {
+          "displayName": "seed-v1 2026",
+          "id": "6-00000000-6bb1-4944-8f77-e91187ae6b0b",
+          "parentNotebook": null,
+          "parentSectionGroup": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-11-02T20:45:13Z",
+            "displayName": "seed-v1 Contracts",
+            "id": "6-00000000-2b99-4f9f-8a74-573c2c93c726",
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-11-02T20:45:13Z",
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/6-00000000-2b99-4f9f-8a74-573c2c93c726/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/6-00000000-2b99-4f9f-8a74-573c2c93c726/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/6-00000000-2b99-4f9f-8a74-573c2c93c726"
+          }
+        },
+        {
+          "displayName": "seed-v1 Archive",
+          "id": "5-00000000-f5c5-4009-8125-048411d22bb6",
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:10Z",
+            "displayName": "seed-v1 Dogfood Notes",
+            "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 09"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Dogfood%20Notes"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "displayName": "seed-v1 Archive",
+          "id": "6-00000000-3cc7-4233-8303-895f03fc5b46",
+          "parentNotebook": null,
+          "parentSectionGroup": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-11-02T20:45:13Z",
+            "displayName": "seed-v1 Contracts",
+            "id": "6-00000000-2b99-4f9f-8a74-573c2c93c726",
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-11-02T20:45:13Z",
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/6-00000000-2b99-4f9f-8a74-573c2c93c726/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/6-00000000-2b99-4f9f-8a74-573c2c93c726/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/6-00000000-2b99-4f9f-8a74-573c2c93c726"
+          }
+        },
+        {
+          "displayName": "seed-v1 Bin",
+          "id": "4-00000000-05ca-482c-8d4d-71cffd3768c3",
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "displayName": "synthetic text 24",
+          "id": "0-00000000-74c0-454d-8c20-3fe33ea423de",
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "displayName": "synthetic text 25",
+          "id": "6-00000000-b027-4ee4-85a9-9a8e437033dd",
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "displayName": "synthetic text 26",
+          "id": "7-00000000-07ac-4326-8ce9-aab09f3c8836",
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:52:06Z",
+            "displayName": "seed-v1 Scratch",
+            "id": "4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:52:06Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 10"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2004/seed-v1%20Scratch"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/4-00000000-519a-4c2f-814d-bcd0a03cd551",
+            "userRole": "Owner"
+          },
+          "parentSectionGroup": null
+        },
+        {
+          "displayName": "seed-v1 Contracts",
+          "id": "6-00000000-2b99-4f9f-8a74-573c2c93c726",
+          "parentNotebook": null,
+          "parentSectionGroup": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-26T14:17:28Z",
+            "displayName": "seed-v1 Seed Files",
+            "id": "3-00000000-dfae-4960-8bc9-0928dfd22bbf",
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-26T14:17:28Z",
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf"
+          }
+        },
+        {
+          "displayName": "seed-v1 Ordered",
+          "id": "0-00000000-58df-4fe7-82fe-5ba6a35ab8f5",
+          "parentNotebook": null,
+          "parentSectionGroup": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-26T14:17:28Z",
+            "displayName": "seed-v1 Seed Files",
+            "id": "3-00000000-dfae-4960-8bc9-0928dfd22bbf",
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-26T14:17:28Z",
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf"
+          }
+        },
+        {
+          "displayName": "seed-v1 Reports",
+          "id": "0-00000000-9440-45f2-86a7-9ba16ab5bc29",
+          "parentNotebook": null,
+          "parentSectionGroup": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "createdDateTime": "2026-10-26T14:17:28Z",
+            "displayName": "seed-v1 Seed Files",
+            "id": "3-00000000-dfae-4960-8bc9-0928dfd22bbf",
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 01"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-26T14:17:28Z",
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sectionGroups/3-00000000-dfae-4960-8bc9-0928dfd22bbf"
+          }
+        }
+      ]
+    }
   }
 ]

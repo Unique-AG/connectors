@@ -14,7 +14,7 @@ import pytest
 from office_365_mcp.shared.notes import owner_of_graph_url, resource_id_in
 from tests.e2e.recording import record as record_module
 from tests.e2e.recording import stand_in
-from tests.e2e.recording.conftest import record_on
+from tests.e2e.recording.conftest import body_of, record_on
 from tests.e2e.recording.guard import Guard, Refused
 from tests.e2e.recording.lint import lint_files
 from tests.e2e.recording.record import (
@@ -197,7 +197,7 @@ class TestAttachmentBytes:
         return scrubbed(hop(path, json.dumps(body).encode(), "application/json"))
 
     def kept(self, files: dict[str, bytes]) -> object:
-        body = cast("object", json.loads(files["bodies/rec-tool-page-scrub.01.json"]))
+        body = cast("object", json.loads(body_of(files, "rec-tool-page-scrub.01")))
         return select(body, "contentBytes")
 
     def test_bytes_of_a_seed_file_are_kept_and_pass_the_lint(self) -> None:
@@ -221,11 +221,11 @@ class TestAttachmentBytes:
 
     def test_the_lint_finds_bytes_that_are_not_in_the_corpus(self) -> None:
         files = self.attachment(base64.b64encode(KEPT).decode())
-        name = "bodies/rec-tool-page-scrub.01.json"
+        key = "fixtures/rec-tool-page-scrub.json"
         other = base64.b64encode(OTHER).decode()
         planted = {
             **files,
-            name: files[name].decode().replace(base64.b64encode(KEPT).decode(), other).encode(),
+            key: files[key].decode().replace(base64.b64encode(KEPT).decode(), other).encode(),
         }
         assert any("a contentBytes that is not corpus text" in one for one in lint(planted))
 

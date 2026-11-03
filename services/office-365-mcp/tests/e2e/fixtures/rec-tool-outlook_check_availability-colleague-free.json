@@ -18,6 +18,22 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_check_availability-colleague-free.01.json"
+    "response_json": {
+      "value": [
+        {
+          "availabilityView": "00000000000000000000",
+          "scheduleId": "tom@example.test",
+          "scheduleItems": [],
+          "workingHours": {
+            "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            "endTime": "15:30:00.0000000",
+            "startTime": "07:00:00.0000000",
+            "timeZone": {
+              "name": "W. Europe Standard Time"
+            }
+          }
+        }
+      ]
+    }
   }
 ]

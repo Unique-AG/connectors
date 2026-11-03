@@ -811,9 +811,10 @@ async def record(
         kind: sum(1 for k in kinds.values() if k == kind)
         for kind in ("replaced", "dropped", "mapped")
     }
+    answered = sum("response_json" in one or "body" in one for one in fixture.interactions)
     report = [
         f"{plan.scenario}: {len(recording.hops)} requests -> {len(fixture.interactions)} "
-        + f"interactions, {len(fixture.bodies)} bodies, lint clean, replay clean",
+        + f"interactions, {answered} bodies, lint clean, replay clean",
         "  scrub: " + ", ".join(f"{k} {v}" for k, v in fixture.counts.items()),
         "  tool output changed by the scrub: " + ", ".join(f"{k} {v}" for k, v in tally.items()),
     ]

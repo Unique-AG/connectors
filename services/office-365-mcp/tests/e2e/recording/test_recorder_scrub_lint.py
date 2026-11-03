@@ -14,7 +14,7 @@ import pytest
 
 import tests.e2e.test_scenarios as runner
 from tests.e2e.recording import stand_in
-from tests.e2e.recording.conftest import Recorded
+from tests.e2e.recording.conftest import Recorded, body_of
 from tests.e2e.recording.guard import GRAPH_HOST, Refused
 from tests.e2e.recording.lint import IDENTITIES_VARIABLE, lint_dir, lint_files, main
 from tests.e2e.recording.scrub import (
@@ -58,6 +58,13 @@ PREVIEW = "Your new laptop is ready."
 
 
 def loaded(path: Path) -> object:
+    if not path.exists() and path.parent.name == "bodies":
+        fixture, _, number = path.name.removesuffix(".json").rpartition(".")
+        rows = cast(
+            "list[dict[str, object]]",
+            json.loads((path.parent.parent / "fixtures" / f"{fixture}.json").read_text()),
+        )
+        return rows[int(number) - 1]["response_json"]
     return cast("object", json.loads(path.read_text()))
 
 
@@ -65,18 +72,36 @@ def files_in(out: Path) -> dict[str, bytes]:
     return {str(p.relative_to(out)): p.read_bytes() for p in sorted(out.glob("*/*"))}
 
 
+def read(files: Files, name: str) -> bytes:
+    return (
+        files[name]
+        if name in files
+        else body_of(files, name.removeprefix("bodies/")[: -len(".json")])
+    )
+
+
+def written(files: Files, name: str, data: bytes) -> Files:
+    if name in files:
+        return {**files, name: data}
+    fixture, _, number = name.removeprefix("bodies/")[: -len(".json")].rpartition(".")
+    key = f"fixtures/{fixture}.json"
+    rows = cast("list[dict[str, object]]", json.loads(files[key]))
+    rows[int(number) - 1]["response_json"] = json.loads(data)
+    return {**files, key: (json.dumps(rows, indent=2, ensure_ascii=False) + "\n").encode()}
+
+
 def swap(name: str, old: str, new: str) -> Plant:
     def plant(files: Files) -> Files:
-        if old.encode() not in files[name]:
+        if old.encode() not in read(files, name):
             raise LookupError(f"{old} is not in {name}")
-        return {**files, name: files[name].replace(old.encode(), new.encode())}
+        return written(files, name, read(files, name).replace(old.encode(), new.encode()))
 
     return plant
 
 
 def first_id(name: str) -> Callable[[Files], str]:
     def found(files: Files) -> str:
-        match = re.search(r'"id": "([^"]+)"', files[name].decode())
+        match = re.search(r'"id": "([^"]+)"', read(files, name).decode())
         if match is None:
             raise LookupError(f"no id in {name}")
         return match[1]
@@ -422,7 +447,7 @@ class TestQueryAndPath:
         link = f"https://outlook.office365.com/owa/?ItemID={item}&exvsurl=1"
         fixture = one_hop("/v1.0/me/reminders", answer={"webLink": link})
         assert lint_files(files_of(fixture)) == []
-        assert "AbCdEfGhIjKlMnOpQrSt" not in fixture.bodies["rec-one.01.json"].decode()
+        assert "AbCdEfGhIjKlMnOpQrSt" not in body_of(fixture, "rec-one.01").decode()
 
     @pytest.mark.parametrize(
         "path",
@@ -527,7 +552,7 @@ class TestRequestValues:
             method="POST",
             sent={"attachments": [{"contentUrl": address}]},
         )
-        answered = mapping(cast("object", json.loads(item.bodies["rec-one.01.json"])))["webDavUrl"]
+        answered = mapping(cast("object", json.loads(body_of(item, "rec-one.01"))))["webDavUrl"]
         sent = mapping(items(mapping(interaction_of(message)["json"])["attachments"])[0])[
             "contentUrl"
         ]
@@ -582,9 +607,9 @@ class TestRequestValues:
 
     def test_a_date_under_an_object_key_stays_and_other_text_does_not(self) -> None:
         fixture = one_hop("/v1.0/me/x", answer={"value": [{"start": "2026-10-29T14:00:00Z"}]})
-        assert '"start": "2026-10-29T14:00:00Z"' in fixture.bodies["rec-one.01.json"].decode()
+        assert '"start": "2026-10-29T14:00:00Z"' in body_of(fixture, "rec-one.01").decode()
         other = one_hop("/v1.0/me/x", answer={"start": "late afternoon"})
-        assert "late afternoon" not in other.bodies["rec-one.01.json"].decode()
+        assert "late afternoon" not in body_of(other, "rec-one.01").decode()
 
     def test_a_join_link_in_a_filter_is_scrubbed_like_the_link_in_the_answer(self) -> None:
         link = (
@@ -595,7 +620,7 @@ class TestRequestValues:
             query={"$filter": f"JoinWebUrl eq '{link}'"},
             answer={"value": [{"joinWebUrl": link}]},
         )
-        body = mapping(cast("object", json.loads(fixture.bodies["rec-one.01.json"])))
+        body = mapping(cast("object", json.loads(body_of(fixture, "rec-one.01"))))
         joined = mapping(items(body["value"])[0])["joinWebUrl"]
         wanted = f"JoinWebUrl eq '{joined}'"
         assert mapping(interaction_of(fixture)["query"])["$filter"] == wanted

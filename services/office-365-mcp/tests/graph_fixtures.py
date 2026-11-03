@@ -46,9 +46,19 @@ def generated(stub: Path) -> bytes:
     return raw
 
 
+def recorded_json(stem: str) -> Json:
+    """The JSON body of interaction N of a recorded fixture, named `<fixture>.<N>`."""
+    fixture, _, number = stem.rpartition(".")
+    spec = cast("list[Json]", json.loads((E2E / "fixtures" / f"{fixture}.json").read_text()))
+    return cast("Json", spec[int(number) - 1]["response_json"])
+
+
 def response(spec: Mapping[str, object], bodies: Path = E2E / "bodies") -> httpx.Response:
     named = bodies / str(spec.get("body", ""))
     content = named.read_bytes() if named.is_file() else b""
+    if "response_json" in spec:
+        named = Path("inline.json")
+        content = json.dumps(spec["response_json"], ensure_ascii=False).encode()
     if named.suffix == ".gen":
         content = generated(named)
     elif named.suffix == ".json":

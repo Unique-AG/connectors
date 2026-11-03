@@ -142,8 +142,9 @@ interaction has a request part and an answer part:
 
 - The request part: `method`, `path`, and optionally `host`, `query`, `json` (the body), and
   `headers`. The headers are only `prefer` and `consistencylevel`, and they must be equal.
-- The answer part: `status`, and optionally `body`, the name of a file in `../tests/e2e/bodies/`,
-  and `response_headers`, the headers of the answer (for example `location` of a redirect).
+- The answer part: `status`, and optionally `response_json` (a JSON answer, held in the fixture) or
+  `body` (the name of a file in `../tests/e2e/bodies/`, for a page, a binary or a stub), and
+  `response_headers`, the headers of the answer (for example `location` of a redirect).
 
 The run is strict. A request that matches no unused interaction fails the step, and the message
 shows the request and the interactions that no request reached yet. An interaction that no request
@@ -188,7 +189,8 @@ no `$` and reads the result of the same step.
 To add a run:
 
 1. Find the scenario that states the behaviour.
-2. Write the fixture. Put each answer body in `bodies/`, or use a body that is there.
+2. Write the fixture. Put each JSON answer in `response_json`. Put a page or a binary in `bodies/`,
+   or use a body that is there.
 3. Add `fixture` or a variant to the entry, and add `bind`, `fault`, `approval`, and `expect` to the
    steps.
 4. Run `uv run pytest tests/e2e`. A request that does not match shows the request. Copy its values
@@ -289,6 +291,7 @@ does not wait.
 | `Person` | The user who answers the approval question. `Person(approval="no")` declines. The values are the `approval` values of the runner. `person.asked` holds the questions that the user got. |
 | `serve(graph, name)` | Makes Graph answer from the fixture `name`. It returns a dictionary of routes, one for each method and path. |
 | `response(spec)` | Makes one answer, for example `response({"status": 500, "body": "error.generalException.json"})`. The body is a file in `../tests/e2e/bodies/`. |
+| `recorded_json("fixture.NN")` | The JSON answer of interaction `NN` of a recorded fixture, as a mapping. |
 
 The helper uses `build_server`, `Person`, and `patch_obo` of `../tests/e2e/test_scenarios.py`.
 

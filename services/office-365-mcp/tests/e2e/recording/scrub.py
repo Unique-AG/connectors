@@ -842,11 +842,8 @@ def scrub(recording: Recording, corpus: Corpus | None = None) -> Fixture:
         if body is not None:
             if isinstance(body, Mapping) and "@odata.nextLink" in body:
                 followed.append(_target(str(cast("Json", body)["@odata.nextLink"])))
-            name = f"{recording.fixture}.{n:02d}.json"
             scrubbed = mapper.response(cast("object", body))
-            text = json.dumps(scrubbed, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
-            bodies[name] = text.encode()
-            interaction["body"] = name
+            interaction["response_json"] = json.loads(json.dumps(scrubbed, sort_keys=True))
         elif is_page_content(hop):
             name = f"{recording.fixture}.{n:02d}.html"
             page = rewritten_page(

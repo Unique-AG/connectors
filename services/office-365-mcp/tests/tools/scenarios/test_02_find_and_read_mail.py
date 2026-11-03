@@ -10,7 +10,7 @@ from fastmcp.exceptions import ToolError
 from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, TextResourceContents
 
 from tests.conftest import RecordedSleeps
-from tests.graph_fixtures import response, serve
+from tests.graph_fixtures import recorded_json, response, serve
 from tests.tools.conftest import GRAPH_V1
 from tests.tools.scenarios.mail_support import (
     advice_for,
@@ -655,7 +655,12 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         self, graph: respx.MockRouter, retry_sleeps: RecordedSleeps
     ) -> None:
         routes = serve(graph, "rec-tool-outlook_search_mail-budget")
-        recorded = response({"status": 200, "body": "rec-tool-outlook_search_mail-budget.01.json"})
+        recorded = response(
+            {
+                "status": 200,
+                "response_json": recorded_json("rec-tool-outlook_search_mail-budget.01"),
+            }
+        )
         _ = routes[("GET", "/me/messages")].mock(
             side_effect=[
                 response(

@@ -1,9 +1,0 @@
-{
-  "@odata.type": "#microsoft.graph.fileAttachment",
-  "contentType": "application/pdf",
-  "id": "TBvFYyXPNCCXESPESfftNt8otYBeEY-CBf2Ch4Vdpm62KaPYVw9E6misakKQ4oOaSpWHKSKVUWObp0tGwW9nVWelqnpngBhW",
-  "isInline": false,
-  "lastModifiedDateTime": "2026-11-02T21:38:08Z",
-  "name": "alpine-print-offer.pdf",
-  "size": 1114
-}

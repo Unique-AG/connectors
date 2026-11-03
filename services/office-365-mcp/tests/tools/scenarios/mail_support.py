@@ -154,8 +154,7 @@ def answer_of(fixture: str, method: str, path_start: str, *, nth: int = 0) -> di
         for one in interactions
         if one["method"] == method and str(one["path"]).startswith(f"{V1}{path_start}")
     ]
-    body = (E2E / "bodies" / str(matching[nth]["body"])).read_text(encoding="utf-8")
-    return cast("dict[str, object]", json.loads(body))
+    return cast("dict[str, object]", matching[nth]["response_json"])
 
 
 def serve_as(

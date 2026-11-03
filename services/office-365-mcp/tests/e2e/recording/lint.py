@@ -499,15 +499,25 @@ def lint_files(
         findings += _headers(name, interactions)
         if name in recorded:
             findings += _ids(name, interactions)
+            held = {
+                f"bodies/{Path(name).stem}.{n:02d}.json": json.dumps(
+                    i["response_json"], indent=2, ensure_ascii=False
+                ).encode()
+                for n, i in enumerate(interactions, 1)
+                if "response_json" in i
+            }
             for body_name in (str(i["body"]) for i in interactions if "body" in i):
                 key = f"bodies/{body_name}"
                 if key not in files:
                     findings.append(f"{name}: the body {body_name} is missing")
                     continue
-                findings += _corpus(key, files[key], corpus or load_corpus(), recorded[name])
+                held[key] = files[key]
+            for key, content in held.items():
+                findings += _corpus(key, content, corpus or load_corpus(), recorded[name])
                 findings += [
-                    f"{name}: the stub bodies/{leaf[1]}.gen of {body_name} is missing"
-                    for leaf in _LEAF.finditer(files[key].decode(errors="replace"))
+                    f"{name}: the stub bodies/{leaf[1]}.gen of {key.removeprefix('bodies/')} "
+                    + "is missing"
+                    for leaf in _LEAF.finditer(content.decode(errors="replace"))
                     if f"bodies/{leaf[1]}.gen" not in files
                 ]
     first: dict[str, str] = {}

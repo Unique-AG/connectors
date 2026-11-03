@@ -1,4 +1,5 @@
 import asyncio
+import json
 import os
 import subprocess
 import sys
@@ -104,7 +105,8 @@ def test_a_lint_refusal_keeps_the_scrubbed_candidate_for_inspection(
     kept = tmp_path / "uc-02-01"
     assert kept.stat().st_mode & 0o777 == 0o700
     assert sorted(p.name for p in (kept / "fixtures").glob("*.json"))[0] == "rec-uc-02-01.json"
-    assert len(list((kept / "bodies").glob("*.json"))) == 4
+    held = cast("list[Json]", json.loads((kept / "fixtures" / "rec-uc-02-01.json").read_text()))
+    assert sum("response_json" in one for one in held) == 4
     assert stand_in.TOKEN not in "".join(p.read_text() for p in kept.rglob("*.json"))
 
 
@@ -269,7 +271,7 @@ def test_drift_exits_1_on_a_changed_field_type(
     arguments = ["uc-02-01", "--target", "stand-in", "--out", str(recorded.out)]
     assert drift_main(arguments) == 0
     assert drift_main([*arguments, "--stand-in-variant", "drift"]) == 1
-    assert '+  "totalItemCount": "29",' in capsys.readouterr().out
+    assert '+      "totalItemCount": "29",' in capsys.readouterr().out
 
 
 def test_the_cli_records_and_refuses_under_python_o(tmp_path: Path) -> None:

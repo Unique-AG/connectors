@@ -11,7 +11,125 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_read_attachment-pdf.01.json"
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$search=%22subject:%5C%22Invoice%20Alpine%20Print%5C%22%22&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=3&$skiptoken=RBJPGrS0DSCsYYffVRRPFJusEVjBzOQbkIrJWLsOXdMIiRJhuZGkRyiwKOOdOeC0DBsFa0YMHiJ6tBTwMJ0mn7RsPSunvfAGXgQGDP51",
+      "value": [
+        {
+          "@odata.etag": "W/\"HWVMZNALVSLslFlqWgruNLXwJqDx/BghDMGoiSW9\"",
+          "bodyPreview": "The invoice of Alpine Print for the month 03 is due in 30 days.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": false,
+          "id": "AAMkXCccILV4VNL7LSToGQbpPNG4ZT83Dio7TQQ9GZPxKYOeW5HpRSGSEMZAZNPgcnaIGMweKXidM6q7FVF4IlAmwGmrJsbrSRJeJzQc-UpjIKGZGFSYYTGtxRpuFmdaEGRbBpPk-YqrMITuayRKEZS=",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-23T10:00:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "Invoice Alpine Print 2026-03",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkGPseILS9WKG5QFQnMStuARJ0PQ24Kim4QZG0TOOyJHTeA5BwMLMXKHJGPIClwewHLChuZWioP6a3NSX9CqZfhVhpAobmAHYbLyXw%2FRjmBHFGRCABCTFadRccSnqiPFGdIgDl%2FQtyODBkitOEJJX%3D&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"RFEKRQQTBHLkvHvnBcbxEKQbKnRy/YbdUMKjwGGj\"",
+          "bodyPreview": "The invoice of Alpine Print for the month 02 is due in 30 days.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": true,
+          "id": "AAMkXRaeAEO8RYQ2TAKaJUxaJHU0FU58Qcf7CVK1RFJuPYLhN0MfMENJRKUTCRAjpxhGQBewEQikE1s0KYT4UwMlbFdtOoutXOMdSiZr-OppCHPCWSSVHRPkkKjmDajoHMBvWtYi-GgrGSOzbqMZABZ=",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-22T10:00:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "Invoice Alpine Print 2026-02",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkGPseILS9WKG5QFQnMStuARJ0PQ24Kim4QZG0TOOyJHTeA5BwMLMXKHJGPIClwewHLChuZWioP6a3NSX9CqZfhVhpAobmAHYbLyXw%2FRjmBHFGRCABCTFadRccSnqiPFGdIgDl%2FZqgSQGuefMSOBQ%3D&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"MUHHLOSBVBKshDouJqjePDGeGqHt/EwgKJGgtLEr\"",
+          "bodyPreview": "The invoice of Alpine Print for the month 01 is due in 30 days.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": true,
+          "id": "AAMkXAyvPUG5CLK0FRFvCJefVTN2VF13Eka5WCA6MWKqDPCsD1UtNETKGTQBEGQsesaNVNdpLZkyL9k9NAQ8ZuGxnPfdRgpkMHIfInBy-BadCJJGWPJWCAMssGffVlwgOXSwIyUa-XoxFAThyaXNVNO=",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-21T10:00:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "Invoice Alpine Print 2026-01",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkGPseILS9WKG5QFQnMStuARJ0PQ24Kim4QZG0TOOyJHTeA5BwMLMXKHJGPIClwewHLChuZWioP6a3NSX9CqZfhVhpAobmAHYbLyXw%2FRjmBHFGRCABCTFadRccSnqiPFGdIgDl%2FZpoHUPhhlGIKNM%3D&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
   },
   {
     "method": "POST",
@@ -28,7 +146,18 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_read_attachment-pdf.02.json"
+    "response_json": {
+      "value": [
+        {
+          "sourceId": "AAMkXRaeAEO8RYQ2TAKaJUxaJHU0FU58Qcf7CVK1RFJuPYLhN0MfMENJRKUTCRAjpxhGQBewEQikE1s0KYT4UwMlbFdtOoutXOMdSiZr-OppCHPCWSSVHRPkkKjmDajoHMBvWtYi-GgrGSOzbqMZABZ=",
+          "targetId": "TSeASdRBLWIVNCRDTghoJv3bcLQeHS-NSl6Iq2Qbsj64WcEMBz4X1qpjbiWK3bApBfRY"
+        },
+        {
+          "sourceId": "AAMkXAyvPUG5CLK0FRFvCJefVTN2VF13Eka5WCA6MWKqDPCsD1UtNETKGTQBEGQsesaNVNdpLZkyL9k9NAQ8ZuGxnPfdRgpkMHIfInBy-BadCJJGWPJWCAMssGffVlwgOXSwIyUa-XoxFAThyaXNVNO=",
+          "targetId": "XCmPFbQHPNXMYYAHPkjkYz6ytEMnZJ-HCz9Vc5Bwnr29OkFJIw9W3ngbbzPN1nAqLqEU"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -44,7 +173,19 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_attachment-pdf.03.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          "contentType": "application/pdf",
+          "id": "TBvFYyXPNCCXESPESfftNt8otYBeEY-CBf2Ch4Vdpm62KaPYVw9E6misakKQ4oOaSpWHKSKVUWObp0tGwW9nVWelqnpngBhW",
+          "isInline": false,
+          "lastModifiedDateTime": "2026-11-02T21:38:08Z",
+          "name": "alpine-print-offer.pdf",
+          "size": 1114
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -60,7 +201,15 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_attachment-pdf.04.json"
+    "response_json": {
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      "contentType": "application/pdf",
+      "id": "TBvFYyXPNCCXESPESfftNt8otYBeEY-CBf2Ch4Vdpm62KaPYVw9E6misakKQ4oOaSpWHKSKVUWObp0tGwW9nVWelqnpngBhW",
+      "isInline": false,
+      "lastModifiedDateTime": "2026-11-02T21:38:08Z",
+      "name": "alpine-print-offer.pdf",
+      "size": 1114
+    }
   },
   {
     "method": "GET",
@@ -73,6 +222,15 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_attachment-pdf.05.json"
+    "response_json": {
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      "contentBytes": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCA1OTUgODQyXSAvQ29udGVudHMgNCAwIFIgL1Jlc291cmNlcyA8PCAvRm9udCA8PCAvRjEgNSAwIFIgPj4gPj4gPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCAxMTQgPj4Kc3RyZWFtCkJUIC9GMSAxNCBUZiA3MiA3NzAgVGQgKEFscGluZSBQcmludCBvZmZlcikgVGogMCAtMjIgVGQgKDIwMDAgYnJvY2h1cmVzLCAzMiBwYWdlcywgZGVsaXZlcnkgaW4gdGhyZWUgd2Vla3MuKSBUaiBFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmoKPDwgL1R5cGUgL0ZvbnQgL1N1YnR5cGUgL1R5cGUxIC9CYXNlRm9udCAvSGVsdmV0aWNhID4+CmVuZG9iago2IDAgb2JqCjw8IC9UaXRsZSAoQWxwaW5lIFByaW50IE9mZmVyKSAvQXV0aG9yIChBbm5hIE1laWVyKSAvQ29tcGFueSAoTGFrZXNpZGUgRGVtbyBBRykgL0NyZWF0b3IgKHNlZWQtdjEgZ2VuZXJhdG9yKSAvUHJvZHVjZXIgKHNlZWQtdjEgZ2VuZXJhdG9yKSAvQ3JlYXRpb25EYXRlIChEOjIwMjYwMTA1MDkwMDAwWikgPj4KZW5kb2JqCnhyZWYKMCA3CjAwMDAwMDAwMDAgNjU1MzUgZiAKMDAwMDAwMDAwOSAwMDAwMCBuIAowMDAwMDAwMDU4IDAwMDAwIG4gCjAwMDAwMDAxMTUgMDAwMDAgbiAKMDAwMDAwMDI0MSAwMDAwMCBuIAowMDAwMDAwNDA2IDAwMDAwIG4gCjAwMDAwMDA0NzYgMDAwMDAgbiAKdHJhaWxlcgo8PCAvU2l6ZSA3IC9Sb290IDEgMCBSIC9JbmZvIDYgMCBSID4+CnN0YXJ0eHJlZgo2NjcKJSVFT0YK",
+      "contentType": "application/pdf",
+      "id": "TBvFYyXPNCCXESPESfftNt8otYBeEY-CBf2Ch4Vdpm62KaPYVw9E6misakKQ4oOaSpWHKSKVUWObp0tGwW9nVWelqnpngBhW",
+      "isInline": false,
+      "lastModifiedDateTime": "2026-11-02T21:38:08Z",
+      "name": "alpine-print-offer.pdf",
+      "size": 1114
+    }
   }
 ]

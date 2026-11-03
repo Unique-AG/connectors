@@ -15,7 +15,7 @@ from fastmcp.exceptions import ToolError
 from office_365_mcp.shared import meetings
 from office_365_mcp.shared.handles import meeting_uri_for
 from tests.e2e.test_scenarios import build_server, patch_obo
-from tests.graph_fixtures import E2E
+from tests.graph_fixtures import recorded_json
 from tests.tools.conftest import (
     JOIN_WEB_URL,
     ME,
@@ -196,10 +196,7 @@ def _members_of(body: Row) -> list[str]:
 
 
 def _recorded_join_url() -> str:
-    page = cast(
-        "Row",
-        json.loads((E2E / "bodies" / "rec-tool-teams_delete_meeting-created.02.json").read_text()),
-    )
+    page = cast("Row", recorded_json("rec-tool-teams_delete_meeting-created.02"))
     return cast("str", _rows(page["value"])[0]["joinWebUrl"])
 
 
@@ -390,10 +387,7 @@ class TestAnOnlineMeetingBelongsToItsOrganizer:
         self, graph: respx.MockRouter
     ) -> None:
         routes = serve(graph, "rec-tool-teams_create_meeting-solo")
-        recorded = cast(
-            "Row",
-            json.loads((E2E / "bodies" / "rec-tool-teams_create_meeting-solo.01.json").read_text()),
-        )
+        recorded = cast("Row", recorded_json("rec-tool-teams_create_meeting-solo.01"))
         mia = Person()
 
         created = await call("teams_create_meeting", person=mia, **NEW_MEETING)

@@ -10,7 +10,15 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=')"
     },
-    "body": "rec-tool-outlook_delete_folder-created.01.json"
+    "response_json": {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 case-outlook_delete_folder-created",
+      "id": "AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=",
+      "isHidden": false,
+      "parentFolderId": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW=",
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    }
   },
   {
     "method": "GET",
@@ -22,7 +30,13 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.02.json"
+    "response_json": {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 case-outlook_delete_folder-created",
+      "id": "AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=",
+      "parentFolderId": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW=",
+      "totalItemCount": 0
+    }
   },
   {
     "method": "GET",
@@ -34,7 +48,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.03.json"
+    "response_json": {
+      "id": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN="
+    }
   },
   {
     "method": "GET",
@@ -46,7 +62,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.04.json"
+    "response_json": {
+      "id": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW="
+    }
   },
   {
     "method": "GET",
@@ -58,7 +76,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.05.json"
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
   },
   {
     "method": "GET",
@@ -70,7 +93,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.06.json"
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
   },
   {
     "method": "GET",
@@ -82,7 +110,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.07.json"
+    "response_json": {
+      "id": "AAMkTTozVMU4EDU4VAMsUTaoLFS4JI21Hof2PYA2EVBdJVYvE3JiWPRjTNUBYMUzanrHBAzhVHenQ1o7YGX0JWWudOtkNaavTIBvZsHu-MvtSTRCow7LIPL="
+    }
   },
   {
     "method": "GET",
@@ -94,7 +124,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.08.json"
+    "response_json": {
+      "id": "AAMkDHnsSGO4ADK6CWNlRHclTSD2DN48Fmt1DSN6SKUaHEMfM4UjYWBpHYTDZFYwtjsNPJoiBIrtJ5g2HTW5CRNquHbjNezvCKCcTbXn-PvnFAXGXV-lFEK="
+    }
   },
   {
     "method": "GET",
@@ -106,7 +138,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.09.json"
+    "response_json": {
+      "id": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN="
+    }
   },
   {
     "method": "GET",
@@ -118,7 +152,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.10.json"
+    "response_json": {
+      "id": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ="
+    }
   },
   {
     "method": "GET",
@@ -130,7 +166,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.11.json"
+    "response_json": {
+      "id": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW="
+    }
   },
   {
     "method": "GET",
@@ -142,7 +180,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.12.json"
+    "response_json": {
+      "id": "AAMkVCnfIJB4XOU7GZKvYGvfCOC1FB85Wye1MQA7FKElDSJfE1YnMPUsBHWERAGboieSKPkpUHfkD9s2ZPH8OATmdXypXbsgXNVlDzHj-KnwNMUy5MWfCSY="
+    }
   },
   {
     "method": "GET",
@@ -154,7 +194,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.13.json"
+    "response_json": {
+      "id": "AAMkOAvsWPG6CEY9TIKgQQtfOTR2QN39Cby5MFY0MQYcBFAdJ1UjOPQoJNJULZRujxvXJIafTZfxV2e2FVX4JQNvbTzrSaphAGLrYgRq-CohTBSYtj9MEGY="
+    }
   },
   {
     "method": "GET",
@@ -166,7 +208,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.14.json"
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
   },
   {
     "method": "GET",
@@ -178,7 +225,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.15.json"
+    "response_json": {
+      "id": "AAMkGOxxLNI4THM3OLOeXShgLEE4SD01Vmp6YYS3ERHfOFHoK6VkVLPaTNXTUQNgtrgJZTgfZWdlG4n8QOW7YDDidHarQcxaLPFsKoTe-KvdFVJHBIWERAD="
+    }
   },
   {
     "method": "GET",
@@ -190,7 +239,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.16.json"
+    "response_json": {
+      "id": "AAMkDNnlZRE5YDK8FDRqZBctSUY1SN02Rmz6ORC5JVXwVBWqZ0GgCNVvPILGSNOfrbtBYIpjRLczU6q3WYM5KEFsxVovQuzoHNDeCuPn-IirGVZSkx4wXKY="
+    }
   },
   {
     "method": "GET",
@@ -202,7 +253,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.17.json"
+    "response_json": {
+      "id": "AAMkHDakLUN0JWM2KHKzCScmSOT7LW13Xfm1WGP8ITYnJRUgY3IvSYEbBTBEUGDibnfXTWaaQKoaO2y8KRK5UIXgmWofEsybJRClMsJt-EcuSOZjKtfvFFF="
+    }
   },
   {
     "method": "GET",
@@ -214,7 +267,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.18.json"
+    "response_json": {
+      "id": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG="
+    }
   },
   {
     "method": "GET",
@@ -226,7 +281,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.19.json"
+    "response_json": {
+      "id": "AAMkMRxpGUM5MXS2LBNrWMfeICH7XK85Pdr4XKF7VXYlMVArK6CfPUPxHCFGPNYefedRMEbxFLenO6u3AGY5FZUpeIntQeufHPGhJaKg-TqqWKVNPECBIGT="
+    }
   },
   {
     "method": "GET",
@@ -238,7 +295,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_folder-created.20.json"
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
   },
   {
     "method": "POST",
@@ -251,6 +313,14 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=')"
     },
-    "body": "rec-tool-outlook_delete_folder-created.21.json"
+    "response_json": {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 case-outlook_delete_folder-created",
+      "id": "AAMkALuuRSZ5ELH7QQAhJNtmPRL5JW76Jlo6NCO2IVKiJZOuA6EyISVkJSYNSWIzypwEPMkbWMseW0x5SOQ1MZMxpTbzKukoTSOzCqRg-SyvGOWo7SGhUOC=",
+      "isHidden": false,
+      "parentFolderId": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN=",
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    }
   }
 ]

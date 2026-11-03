@@ -1,9 +1,0 @@
-{
-  "@odata.type": "#microsoft.graph.fileAttachment",
-  "contentType": "text/plain",
-  "id": "IHjOPkGKKAILMSFJZfwoZg8lrQVwUU-ICt9Em1Rcay66GoSNQp6G6vmondUD45o9MqLTKXJAXUIy66GNJOJBWVD67rX-GtSl",
-  "isInline": false,
-  "lastModifiedDateTime": "2026-10-29T14:52:28Z",
-  "name": "calendar-agenda.txt",
-  "size": 264
-}

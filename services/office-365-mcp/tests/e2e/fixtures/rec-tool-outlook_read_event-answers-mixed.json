@@ -9,7 +9,21 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_read_event-answers-mixed.01.json"
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
   },
   {
     "method": "GET",
@@ -30,7 +44,74 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_event-answers-mixed.02.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"l9Zzps94KmHCZx6K9tvdxfFS2gTiWT==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "accepted",
+                "time": "2026-11-02T20:46:06.9731193Z"
+              },
+              "type": "required"
+            },
+            {
+              "emailAddress": {
+                "address": "tom@example.test",
+                "name": "Tom Berger"
+              },
+              "status": {
+                "response": "declined",
+                "time": "2026-11-02T20:46:15.6088582Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "Sketch the pages of the relaunch together.",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-03T10:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "UHmJNyCZAUKJGZGDPjixNo5qsJGlYS-LVi3Pq3Lfym46VpBWJd2A1mrlghIK8wHVsPOG",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "Room Titlis",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": null,
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-11-03T09:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "Design workshop",
+          "type": "singleInstance",
+          "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FTLk6Nz8Totp75SzCWDq2Q3brwmhLO0eJJjCDL&exvsurl=1"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -46,6 +127,80 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId,outlook.body-content-type=\"text\""
     },
-    "body": "rec-tool-outlook_read_event-answers-mixed.03.json"
+    "response_json": {
+      "@odata.etag": "W/\"l9Zzps94KmHCZx6K9tvdxfFS2gTiWT==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "accepted",
+            "time": "2026-11-02T20:46:06.9731193Z"
+          },
+          "type": "required"
+        },
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          },
+          "status": {
+            "response": "declined",
+            "time": "2026-11-02T20:46:15.6088582Z"
+          },
+          "type": "required"
+        }
+      ],
+      "body": {
+        "content": "Sketch the pages of the relaunch together.",
+        "contentType": "text"
+      },
+      "bodyPreview": "Sketch the pages of the relaunch together.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-03T10:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "id": "UHmJNyCZAUKJGZGDPjixNo5qsJGlYS-LVi3Pq3Lfym46VpBWJd2A1mrlghIK8wHVsPOG",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "Room Titlis",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "W. Europe Standard Time",
+      "originalStartTimeZone": "W. Europe Standard Time",
+      "recurrence": null,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-03T09:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Design workshop",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FTLk6Nz8Totp75SzCWDq2Q3brwmhLO0eJJjCDL&exvsurl=1"
+    }
   }
 ]

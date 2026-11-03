@@ -21,6 +21,7 @@ from fastmcp.client.transports import FastMCPTransport
 
 from office_365_mcp.tools import TOOL_NAMES
 from tests.e2e.recording import stand_in
+from tests.e2e.recording.conftest import body_of
 from tests.e2e.recording.families import load, merge
 from tests.e2e.recording.families import outlook_calendar as family
 from tests.e2e.recording.guard import DEFAULT_CAP, Guard
@@ -588,7 +589,7 @@ def test_the_calendar_shapes_scrub_and_pass_the_lint() -> None:
     files = files_of(fixture)
     assert lint_files(files, {stand_in.USER_ID, stand_in.UPN, stand_in.DOMAIN}) == []
     kept = {
-        n: cast("object", json.loads(files[f"bodies/{fixture.name}.{n:02d}.json"]))
+        n: cast("object", json.loads(body_of(files, f"{fixture.name}.{n:02d}")))
         for n in range(1, 14)
     }
     expected: dict[tuple[int, str], object] = {
@@ -866,7 +867,7 @@ def test_the_display_names_of_the_time_zones_are_corpus_text_and_an_unknown_one_
     )
     fixture = scrub(recording)
     files = files_of(fixture)
-    body = cast("Json", json.loads(files[f"bodies/{fixture.name}.02.json"]))
+    body = cast("Json", json.loads(body_of(files, f"{fixture.name}.02")))
     listed = cast("list[Json]", body["value"])
     assert [one["alias"] for one in listed] == ["India Standard Time", "Nepal Standard Time"]
     assert listed[0]["displayName"] == kept
@@ -912,7 +913,7 @@ def test_a_series_exception_and_a_cancelled_occurrence_scrub_and_pass_the_lint()
     )
     files = files_of(scrub(recording))
     assert lint_files(files, {stand_in.USER_ID, stand_in.UPN, stand_in.DOMAIN}) == []
-    kept = cast("Json", json.loads(next(v for k, v in files.items() if k.endswith(".02.json"))))
+    kept = cast("Json", json.loads(body_of(files, "rec-tool-outlook-calendar-series.02")))
     row = cast("list[Json]", kept["value"])[0]
     assert (row["type"], row["isCancelled"], row["subject"]) == (
         "exception",
@@ -948,5 +949,5 @@ def test_an_attendee_answer_is_kept_by_the_scrub() -> None:
         frozenset(),
     )
     files = files_of(scrub(recording))
-    kept = cast("Json", json.loads(next(v for k, v in files.items() if k.endswith(".02.json"))))
+    kept = cast("Json", json.loads(body_of(files, "rec-tool-outlook-calendar-answers.02")))
     assert select(kept, "attendees[0].status.response") == "accepted"

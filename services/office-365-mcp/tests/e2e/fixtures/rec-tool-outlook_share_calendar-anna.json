@@ -9,7 +9,21 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_share_calendar-anna.01.json"
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
   },
   {
     "method": "GET",
@@ -30,7 +44,59 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_share_calendar-anna.02.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"z0Tngp92PrWMDk5X3jkdpiRI86gBtN==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "Check the hosting plan for the relaunch.",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-10-29T13:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "WPmXEfSCXMWHMVBEUosoZn6ghFFbSI-UBx1Yw0Supv79IqSIGq3V7trpcyJW19tMqQWB",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": null,
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-10-29T13:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "Hosting review",
+          "type": "singleInstance",
+          "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIAn1Wc0Vhin35OlUDIb9M3ssfpjTN48dNaWVA&exvsurl=1"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -46,7 +112,66 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId,outlook.body-content-type=\"text\""
     },
-    "body": "rec-tool-outlook_share_calendar-anna.03.json"
+    "response_json": {
+      "@odata.etag": "W/\"z0Tngp92PrWMDk5X3jkdpiRI86gBtN==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "type": "required"
+        }
+      ],
+      "body": {
+        "content": "Check the hosting plan for the relaunch.",
+        "contentType": "text"
+      },
+      "bodyPreview": "Check the hosting plan for the relaunch.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-10-29T13:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "id": "WPmXEfSCXMWHMVBEUosoZn6ghFFbSI-UBx1Yw0Supv79IqSIGq3V7trpcyJW19tMqQWB",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "W. Europe Standard Time",
+      "originalStartTimeZone": "W. Europe Standard Time",
+      "recurrence": null,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-10-29T13:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Hosting review",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIAn1Wc0Vhin35OlUDIb9M3ssfpjTN48dNaWVA&exvsurl=1"
+    }
   },
   {
     "method": "GET",
@@ -58,7 +183,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-outlook_share_calendar-anna.04.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "GET",
@@ -70,7 +207,55 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_share_calendar-anna.05.json"
+    "response_json": {
+      "value": [
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+          "isDefaultCalendar": true,
+          "isTallyingResponses": true,
+          "name": "Calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Shared calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Spare calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -82,7 +267,11 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_share_calendar-anna.06.json"
+    "response_json": {
+      "canShare": true,
+      "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+      "name": "seed-v1 Shared calendar"
+    }
   },
   {
     "method": "POST",
@@ -98,6 +287,16 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/calendars('AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=')/calendarPermissions('Z827GOdtlVNwD3TVYGVlM762KEY8A6fghiaaXXXwePmctKJ7aqX4jEQwAFynv4WuTRpYJUYMBj5DCrJgR2OSSYLeN6KjZYEmD0epwQXwlGUuW944IPb9PUMlDCdsL1BkLDCzFEGmUERfK1N2NBgkHHB1SHVjO4BbZlp8PAnbAuV=')"
     },
-    "body": "rec-tool-outlook_share_calendar-anna.07.json"
+    "response_json": {
+      "allowedRoles": ["freeBusyRead", "limitedRead", "read", "write"],
+      "emailAddress": {
+        "address": "anna@example.test",
+        "name": "Anna Meier"
+      },
+      "id": "Z827GOdtlVNwD3TVYGVlM762KEY8A6fghiaaXXXwePmctKJ7aqX4jEQwAFynv4WuTRpYJUYMBj5DCrJgR2OSSYLeN6KjZYEmD0epwQXwlGUuW944IPb9PUMlDCdsL1BkLDCzFEGmUERfK1N2NBgkHHB1SHVjO4BbZlp8PAnbAuV=",
+      "isInsideOrganization": true,
+      "isRemovable": true,
+      "role": "freeBusyRead"
+    }
   }
 ]

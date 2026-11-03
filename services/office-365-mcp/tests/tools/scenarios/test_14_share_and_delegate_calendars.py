@@ -22,7 +22,7 @@ from mcp.types import ElicitResult as CarriedAnswer
 
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import build_server, patch_obo
-from tests.graph_fixtures import E2E, Json
+from tests.graph_fixtures import Json, recorded_json
 from tests.tools.conftest import GRAPH_V1
 
 from .support import Person, call, response, serve
@@ -190,10 +190,6 @@ def _share_uri(permission_id: str) -> str:
     return f"outlook:///calendarpermissions/{_MIA_CALENDAR}/{permission_id}"
 
 
-def _recorded(body: str) -> dict[str, object]:
-    return cast("dict[str, object]", json.loads((E2E / "bodies" / f"{body}.json").read_text()))
-
-
 def _posted(route: respx.Route) -> dict[str, object]:
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
 
@@ -243,7 +239,7 @@ class TestSharingOneOfMiasCalendars:
         routes = serve(graph, "rec-tool-outlook_share_calendar-anna")
         calendars = await call("outlook_list_calendars")
         shared = next(one for one in _list(calendars, "calendars") if "Shared" in str(one["name"]))
-        granted = _recorded("rec-tool-outlook_share_calendar-anna.07") | {"role": "read"}
+        granted = recorded_json("rec-tool-outlook_share_calendar-anna.07") | {"role": "read"}
         post = next(route for (method, _path), route in routes.items() if method == "POST")
         _ = post.mock(return_value=httpx.Response(201, json=granted))
         _ = graph.get(
@@ -308,7 +304,7 @@ class TestSharingOneOfMiasCalendars:
         self, graph: respx.MockRouter
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_list_calendar_shares-default")
-        (row,) = _list(_recorded("rec-tool-outlook_list_calendar_shares-default.03"), "value")
+        (row,) = _list(recorded_json("rec-tool-outlook_list_calendar_shares-default.03"), "value")
         listing = await call(
             "outlook_list_events", starts_on="2026-10-30", ends_on="2026-10-30", limit=1
         )
@@ -748,7 +744,7 @@ class TestDeletingACalendar:
     ) -> None:
         routes, spare = await self._spare(graph)
         calendar_id = unquote(str(spare["uri"]).rsplit("/", 1)[1])
-        stored = _recorded("rec-tool-outlook_delete_calendar-spare.03") | dict(change)
+        stored = recorded_json("rec-tool-outlook_delete_calendar-spare.03") | dict(change)
         _ = routes[("GET", f"/me/calendars/{calendar_id}")].mock(
             return_value=httpx.Response(200, json=stored)
         )

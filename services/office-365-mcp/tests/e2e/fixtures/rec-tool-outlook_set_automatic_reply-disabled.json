@@ -9,7 +9,23 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-disabled.01.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-10-30T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-10-29T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      },
+      "timeZone": "W. Europe Standard Time"
+    }
   },
   {
     "method": "PATCH",
@@ -34,6 +50,21 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-disabled.02.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-10-30T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-10-29T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      }
+    }
   }
 ]

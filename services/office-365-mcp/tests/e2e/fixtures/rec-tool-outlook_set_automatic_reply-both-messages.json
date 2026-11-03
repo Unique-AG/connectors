@@ -9,7 +9,31 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-both-messages.01.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-11-03T21:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-11-02T21:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      },
+      "timeZone": "W. Europe Standard Time",
+      "workingHours": {
+        "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "endTime": "17:00:00.0000000",
+        "startTime": "08:00:00.0000000",
+        "timeZone": {
+          "name": "W. Europe Standard Time"
+        }
+      }
+    }
   },
   {
     "method": "PATCH",
@@ -34,7 +58,22 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-both-messages.02.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "none",
+        "externalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside.",
+        "internalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside.",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-11-03T18:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-11-02T00:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "scheduled"
+      }
+    }
   },
   {
     "method": "GET",
@@ -46,7 +85,31 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-both-messages.03.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "none",
+        "externalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside.",
+        "internalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside.",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-11-03T18:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-11-02T00:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "scheduled"
+      },
+      "timeZone": "W. Europe Standard Time",
+      "workingHours": {
+        "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "endTime": "17:00:00.0000000",
+        "startTime": "08:00:00.0000000",
+        "timeZone": {
+          "name": "W. Europe Standard Time"
+        }
+      }
+    }
   },
   {
     "method": "GET",
@@ -58,7 +121,31 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-both-messages.04.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "none",
+        "externalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside.",
+        "internalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside.",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-11-03T18:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-11-02T00:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "scheduled"
+      },
+      "timeZone": "W. Europe Standard Time",
+      "workingHours": {
+        "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        "endTime": "17:00:00.0000000",
+        "startTime": "08:00:00.0000000",
+        "timeZone": {
+          "name": "W. Europe Standard Time"
+        }
+      }
+    }
   },
   {
     "method": "PATCH",
@@ -83,6 +170,21 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_set_automatic_reply-both-messages.05.json"
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "none",
+        "externalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside.",
+        "internalReplyMessage": "seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside.",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-11-03T18:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-11-02T00:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "scheduled"
+      }
+    }
   }
 ]

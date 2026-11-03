@@ -36,6 +36,9 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "location": "https://graph.microsoft.com"
     },
-    "body": "rec-tool-outlook_suggest_meeting_times-nobody-free.01.json"
+    "response_json": {
+      "emptySuggestionsReason": "AttendeesUnavailable",
+      "meetingTimeSuggestions": []
+    }
   }
 ]

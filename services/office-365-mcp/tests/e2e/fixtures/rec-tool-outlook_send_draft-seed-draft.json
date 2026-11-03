@@ -9,7 +9,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_send_draft-seed-draft.01.json"
+    "response_json": {
+      "displayName": "Drafts",
+      "id": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "totalItemCount": 1,
+      "unreadItemCount": 0
+    }
   },
   {
     "method": "GET",
@@ -27,7 +32,37 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_send_draft-seed-draft.02.json"
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('drafts')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=1",
+      "value": [
+        {
+          "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+          "bodyPreview": "Hi Anna, can we spend 60 per person for the offsite dinner?",
+          "categories": ["seed-v1"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "hasAttachments": false,
+          "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+          "importance": "normal",
+          "isDraft": true,
+          "isRead": true,
+          "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+          "receivedDateTime": "2026-11-02T21:32:11Z",
+          "replyTo": [],
+          "subject": "Offsite: budget for the dinner",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIOq4Cp1Tpwt40ZoJHDd8I9ovqbzCY3fAtOLKR&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -43,7 +78,23 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_send_draft-seed-draft.03.json"
+    "response_json": {
+      "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+      "bccRecipients": [],
+      "ccRecipients": [],
+      "changeKey": "ATYKHRBPGKBqkNxcBjroETWvYmYh/JmwARUpu/iT",
+      "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+      "isDraft": true,
+      "subject": "Offsite: budget for the dinner",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -59,7 +110,23 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_send_draft-seed-draft.04.json"
+    "response_json": {
+      "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+      "bccRecipients": [],
+      "ccRecipients": [],
+      "changeKey": "ATYKHRBPGKBqkNxcBjroETWvYmYh/JmwARUpu/iT",
+      "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+      "isDraft": true,
+      "subject": "Offsite: budget for the dinner",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "POST",

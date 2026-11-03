@@ -9,7 +9,21 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_read_event_attachment-agenda.01.json"
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
   },
   {
     "method": "GET",
@@ -30,7 +44,51 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_event_attachment-agenda.02.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"f8Cbho13ZqURUf1H0ijmpkQB9k6pAK==\"",
+          "attendees": [],
+          "bodyPreview": "Read the agenda before the call.",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-10-29T10:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "HXfOKvHQCTFYEUEQPotpBa1hbJXqPF-AEs1Dr5Lbcy03MoNEPv9M6yezdrAK09d3UtTO",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": null,
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-10-29T10:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "Offsite agenda review",
+          "type": "singleInstance",
+          "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FGLd1Gj3Qcso91KtGSBu3D8hlejwYI37o4KqPB&exvsurl=1"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -46,7 +104,19 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_event_attachment-agenda.03.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.type": "#microsoft.graph.fileAttachment",
+          "contentType": "text/plain",
+          "id": "IHjOPkGKKAILMSFJZfwoZg8lrQVwUU-ICt9Em1Rcay66GoSNQp6G6vmondUD45o9MqLTKXJAXUIy66GNJOJBWVD67rX-GtSl",
+          "isInline": false,
+          "lastModifiedDateTime": "2026-10-29T14:52:28Z",
+          "name": "calendar-agenda.txt",
+          "size": 264
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -62,7 +132,15 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_event_attachment-agenda.04.json"
+    "response_json": {
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      "contentType": "text/plain",
+      "id": "IHjOPkGKKAILMSFJZfwoZg8lrQVwUU-ICt9Em1Rcay66GoSNQp6G6vmondUD45o9MqLTKXJAXUIy66GNJOJBWVD67rX-GtSl",
+      "isInline": false,
+      "lastModifiedDateTime": "2026-10-29T14:52:28Z",
+      "name": "calendar-agenda.txt",
+      "size": 264
+    }
   },
   {
     "method": "GET",
@@ -75,6 +153,15 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_read_event_attachment-agenda.05.json"
+    "response_json": {
+      "@odata.type": "#microsoft.graph.fileAttachment",
+      "contentBytes": "T2Zmc2l0ZSBhZ2VuZGEuCk1vcm5pbmc6IHdvcmtzaG9wLiBBZnRlcm5vb246IHJldmlldy4K",
+      "contentType": "text/plain",
+      "id": "IHjOPkGKKAILMSFJZfwoZg8lrQVwUU-ICt9Em1Rcay66GoSNQp6G6vmondUD45o9MqLTKXJAXUIy66GNJOJBWVD67rX-GtSl",
+      "isInline": false,
+      "lastModifiedDateTime": "2026-10-29T14:52:28Z",
+      "name": "calendar-agenda.txt",
+      "size": 264
+    }
   }
 ]

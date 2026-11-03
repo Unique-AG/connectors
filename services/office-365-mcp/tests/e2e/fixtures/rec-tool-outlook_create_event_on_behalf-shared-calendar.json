@@ -9,7 +9,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.01.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "GET",
@@ -21,7 +33,55 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.02.json"
+    "response_json": {
+      "value": [
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+          "isDefaultCalendar": true,
+          "isTallyingResponses": true,
+          "name": "Calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Shared calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Spare calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -33,7 +93,21 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.03.json"
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+      "isDefaultCalendar": false,
+      "isTallyingResponses": false,
+      "name": "seed-v1 Shared calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
   },
   {
     "method": "POST",
@@ -61,6 +135,69 @@
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('ODbDRfSNOUZHTTRVClkjYy6igSScRK-JZd6Br4Egdk48SgDUDc1U3uazjnPT6_sEPDSP')",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_create_event_on_behalf-shared-calendar.04.json"
+    "response_json": {
+      "@odata.etag": "W/\"t6Ljey85LkYPDa9D6ypixiXR76oCYd==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [],
+      "body": {
+        "content": "synthetic text 03",
+        "contentType": "html"
+      },
+      "bodyPreview": "",
+      "categories": [],
+      "changeKey": "e0Uwnb36GeUIWv5Y7uumoiYY97bCDg==",
+      "createdDateTime": "2026-10-30T10:09:50.3690035Z",
+      "end": {
+        "dateTime": "2026-10-31T11:30:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "iCalUId": "411835451858J00997A9E3983D00R39003893558324VH0ZV1850DH115020394023765448389753866Z722EC2SQZ608630A1IL2V1R7A2A52V",
+      "id": "ODbDRfSNOUZHTTRVClkjYy6igSScRK-JZd6Br4Egdk48SgDUDc1U3uazjnPT6_sEPDSP",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isDraft": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "isReminderOn": true,
+      "lastModifiedDateTime": "2026-10-30T10:09:50.5043377Z",
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "locations": [],
+      "occurrenceId": null,
+      "onlineMeeting": null,
+      "onlineMeetingProvider": "unknown",
+      "onlineMeetingUrl": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "Europe/Zurich",
+      "originalStartTimeZone": "Europe/Zurich",
+      "recurrence": null,
+      "reminderMinutesBeforeStart": 15,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-10-31T11:00:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_create_event_on_behalf-shared-calendar",
+      "transactionId": "00000000-1387-47ff-8ff0-5b7314b40b8c",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FXJh6Yx3Ttdu48ZiQVCr8C4xbdmhPJ5%2BlAJKXX&exvsurl=1"
+    }
   }
 ]

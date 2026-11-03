@@ -12,6 +12,7 @@ import yaml
 from office_365_mcp.tools import TOOL_NAMES
 from tests.e2e.recording import stand_in
 from tests.e2e.recording.cases import case_entries
+from tests.e2e.recording.conftest import body_of
 from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import DEFAULT_CAP, GRAPH_HOST, Guard, foreign_address
 from tests.e2e.recording.lint import lint_files
@@ -680,18 +681,18 @@ class TestScrubShapes:
     def test_a_short_message_id_does_not_rewrite_a_filter(self) -> None:
         fixture = scrub(recorded(*MEETING_LOOKUP))
         assert "%49thread" not in str(fixture.interactions[1]["query"])
-        assert '"messageId": "0"' in fixture.bodies["rec-tool-teams.01.json"].decode()
+        assert '"messageId": "0"' in body_of(fixture, "rec-tool-teams.01").decode()
 
     def test_a_join_url_in_a_filter_matches_the_join_url_of_the_answer(self) -> None:
         fixture = scrub(recorded(*MEETING_LOOKUP))
-        created = cast("dict[str, str]", json.loads(fixture.bodies["rec-tool-teams.01.json"]))
+        created = cast("dict[str, str]", json.loads(body_of(fixture, "rec-tool-teams.01")))
         joined = created["joinWebUrl"]
         query = cast("dict[str, str]", fixture.interactions[1]["query"])
         assert query["$filter"] == f"JoinWebUrl eq '{joined}'"
 
     def test_a_meeting_keeps_its_start_time(self) -> None:
         fixture = scrub(recorded(("/me/onlineMeetings", SHAPES["/me/onlineMeetings"])))
-        assert "2026-10-29T14:00:00Z" in next(iter(fixture.bodies.values())).decode()
+        assert "2026-10-29T14:00:00Z" in body_of(fixture, "rec-tool-teams.01").decode()
 
 
 CREATED_CHAT = "19:Y2hhdGNyZWF0ZWRieXRoZXJ1bm5pbmc@thread.v2"

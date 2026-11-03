@@ -16,6 +16,7 @@ from fastmcp.client.transports import FastMCPTransport
 from office_365_mcp.tools import TOOL_NAMES
 from tests.e2e.recording import stand_in
 from tests.e2e.recording.cases import case_entries
+from tests.e2e.recording.conftest import body_of
 from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import GRAPH_HOST, SEED_CASE, Guard
 from tests.e2e.recording.lint import lint_files
@@ -979,7 +980,7 @@ class TestTheSchema:
         body = SHAPES[shape]
         made = recorded(body, TRANSLATE if shape == "id translation" else None)
         fixture = scrub(made)
-        text = fixture.bodies["rec-shape.01.json"].decode()
+        text = body_of(fixture, "rec-shape.01").decode()
         kept = keys_of(cast("object", json.loads(text)))
         assert keys_of(body) - {"@odata.context"} <= kept
         assert set(fixture.dropped) <= {"@odata.context"}
@@ -990,9 +991,7 @@ class TestTheSchema:
         fixture = scrub(recorded(SHAPES["id translation"], TRANSLATE))
         asked = mapping(fixture.interactions[0]["json"])
         answer = mapping(
-            items(
-                mapping(cast("object", json.loads(fixture.bodies["rec-shape.01.json"])))["value"]
-            )[0]
+            items(mapping(cast("object", json.loads(body_of(fixture, "rec-shape.01"))))["value"])[0]
         )
         assert asked["inputIds"] == [answer["sourceId"]]
         assert asked["inputIds"] != TRANSLATE["inputIds"]
@@ -1000,4 +999,4 @@ class TestTheSchema:
     def test_a_free_text_of_a_rule_that_is_not_corpus_text_is_replaced(self) -> None:
         body = {"value": [{"id": ID[4], "displayName": "Invoices of Brightway"}]}
         fixture = scrub(recorded(body))
-        assert "synthetic text" in fixture.bodies["rec-shape.01.json"].decode()
+        assert "synthetic text" in body_of(fixture, "rec-shape.01").decode()

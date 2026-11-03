@@ -19,6 +19,7 @@ import respx
 
 from tests.e2e.recording import guard as guard_module
 from tests.e2e.recording import scrub as scrub_module
+from tests.e2e.recording.conftest import body_of
 from tests.e2e.recording.families import load, merge
 from tests.e2e.recording.guard import GRAPH_HOST, Guard, Refused
 from tests.e2e.recording.lint import lint_files
@@ -492,7 +493,7 @@ class TestPlaceholders:
             {ROOM: "room"},
             frozenset(),
         )
-        kept = files_of(scrub(recording))["bodies/rec-one.01.json"].decode()
+        kept = body_of(files_of(scrub(recording)), "rec-one.01").decode()
         assert "room@example.test" in kept and ROOM not in kept
 
 
@@ -587,7 +588,7 @@ class TestWorkingHours:
             frozenset(),
         )
         kept = mapping(
-            cast("object", json.loads(files_of(scrub(recording))["bodies/rec-one.01.json"]))
+            cast("object", json.loads(body_of(files_of(scrub(recording)), "rec-one.01")))
         )
         hours = mapping(mapping(cast("list[object]", kept["value"])[0])["workingHours"])
         assert hours["startTime"] == "08:00:00.0000000"
@@ -701,8 +702,8 @@ class TestGeneratedBodies:
             "size": len(recording.hops[0].body),
         }
         assert fixture.interactions[0]["body"] == f"{sha}.gen"
-        assert fixture.interactions[1]["body"] == "rec-one.02.json"
-        leaf = cast("Json", json.loads(fixture.bodies["rec-one.02.json"]))
+        assert "body" not in fixture.interactions[1]
+        leaf = cast("Json", json.loads(body_of(fixture, "rec-one.02")))
         assert leaf == {"contentBytes": f"<generated:{sha}>"}
         assert sum(len(one) for one in fixture.bodies.values()) < 2000
 

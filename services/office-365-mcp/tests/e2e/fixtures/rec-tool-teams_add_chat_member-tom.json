@@ -9,7 +9,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_add_chat_member-tom.01.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "POST",
@@ -40,7 +52,17 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "location": "https://graph.microsoft.com"
     },
-    "body": "rec-tool-teams_add_chat_member-tom.02.json"
+    "response_json": {
+      "chatType": "group",
+      "createdDateTime": "2026-10-30T13:40:26.374Z",
+      "id": "19:f9zk317837tt96hso0x0855lt6359518@thread.v2",
+      "lastUpdatedDateTime": "2026-10-30T13:40:26.374Z",
+      "onlineMeetingInfo": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "topic": "seed-v1 case-teams-chat",
+      "viewpoint": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2004/19:f9zk317837tt96hso0x0855lt6359518@thread.v2/synthetic%20text%2005"
+    }
   },
   {
     "method": "GET",
@@ -49,7 +71,40 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_add_chat_member-tom.03.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "displayName": "Mia Keller",
+          "email": "mia@example.test",
+          "id": "VQHtVSUfIto8XYTrVlmfWKS3Im91YYEaFHqoVXPoMsP7WAG7PCUfQOCfAuXnDHcnQZCiOAOrRna5GZA3XFHxYgDgTAJ3F4CcAsPhPqWyPwL7lLQpNRMhcqFsY4WaCBXuKlFyUFFhGxVkUDVyJM6tSAUoPEHnJGV2TCPeWvDbBH==",
+          "roles": ["owner"],
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userId": "00000000-aa0f-4286-8305-d989485e14b5",
+          "visibleHistoryStartDateTime": "2026-10-30T13:40:26.197Z"
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "OAEySMVcDsa2QGBnZyvoLQY0Gk35BZUqXNkmISFtJzV4HTW0OOUeYJQxYlAwTFlpCFBmEPVhLob6UEA8NWCuRiHtMJU8M0NbMuRkWvJaVnW9aQLzRLAvhhBqEfKmDZI4RQu6FDP6SNXdSEz2Os72NFH4NFPaZrWsT6A9WVK4Ct==",
+          "roles": ["owner"],
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userId": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+          "visibleHistoryStartDateTime": "2026-10-30T13:40:26.197Z"
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "displayName": "Tom Berger",
+          "email": "tom@example.test",
+          "id": "EUPkKIIrVwg1GNPoLsidGIN1Dd19VCPjUOpjSSGiUgS8BJY4KVSmEEPnHkEiLGzzPLYcKRFwWgm7DAR7GETwEvFhPKO5A4IfNyQyInCwDhT2nQSdANXekbFmW2P9NVYeK9B2HAxgZCRsZMOsOR84YundDTStYpWeUFIuTuCuRH==",
+          "roles": ["owner"],
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+          "visibleHistoryStartDateTime": "2026-10-30T13:40:26.197Z"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -58,7 +113,16 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_add_chat_member-tom.04.json"
+    "response_json": {
+      "@odata.type": "#microsoft.graph.aadUserConversationMember",
+      "displayName": "Tom Berger",
+      "email": "tom@example.test",
+      "id": "EUPkKIIrVwg1GNPoLsidGIN1Dd19VCPjUOpjSSGiUgS8BJY4KVSmEEPnHkEiLGzzPLYcKRFwWgm7DAR7GETwEvFhPKO5A4IfNyQyInCwDhT2nQSdANXekbFmW2P9NVYeK9B2HAxgZCRsZMOsOR84YundDTStYpWeUFIuTuCuRH==",
+      "roles": ["owner"],
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "userId": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+      "visibleHistoryStartDateTime": "2026-10-30T13:40:26.197Z"
+    }
   },
   {
     "method": "GET",
@@ -67,7 +131,20 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_add_chat_member-tom.05.json"
+    "response_json": {
+      "chatType": "group",
+      "createdDateTime": "2026-10-30T13:40:26Z",
+      "id": "19:f9zk317837tt96hso0x0855lt6359518@thread.v2",
+      "lastUpdatedDateTime": "2026-10-30T13:40:26.374Z",
+      "onlineMeetingInfo": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "topic": "seed-v1 case-teams-chat",
+      "viewpoint": {
+        "isHidden": false,
+        "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+      },
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2004/19:f9zk317837tt96hso0x0855lt6359518@thread.v2/synthetic%20text%2005"
+    }
   },
   {
     "method": "DELETE",
@@ -81,7 +158,20 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_add_chat_member-tom.07.json"
+    "response_json": {
+      "chatType": "group",
+      "createdDateTime": "2026-10-30T13:40:26Z",
+      "id": "19:f9zk317837tt96hso0x0855lt6359518@thread.v2",
+      "lastUpdatedDateTime": "2026-10-30T13:40:27.776Z",
+      "onlineMeetingInfo": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "topic": "seed-v1 case-teams-chat",
+      "viewpoint": {
+        "isHidden": false,
+        "lastMessageReadDateTime": "0001-01-01T00:00:00Z"
+      },
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2004/19:f9zk317837tt96hso0x0855lt6359518@thread.v2/synthetic%20text%2005"
+    }
   },
   {
     "method": "POST",

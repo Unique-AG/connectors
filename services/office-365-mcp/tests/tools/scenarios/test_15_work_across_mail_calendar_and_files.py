@@ -22,6 +22,7 @@ from respx.models import Call
 
 from office_365_mcp.shared.handles import meeting_uri_for
 from tests.e2e.test_scenarios import build_server, patch_obo
+from tests.graph_fixtures import recorded_json
 from tests.tools.conftest import (
     JOIN_WEB_URL,
     MEETING_ID,
@@ -681,7 +682,10 @@ class TestASearchAcrossThreePlacesSaysWhichPlaceItCouldNotSearch:
                     ),
                 )
             return files or response(
-                {"status": 200, "body": "rec-tool-sharepoint_search_files-plan.01.json"}
+                {
+                    "status": 200,
+                    "response_json": recorded_json("rec-tool-sharepoint_search_files-plan.01"),
+                }
             )
 
         _ = graph.post(SEARCH).mock(side_effect=search)

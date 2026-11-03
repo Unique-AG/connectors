@@ -6,6 +6,31 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_reminders-today.01.json"
+    "response_json": {
+      "value": [
+        {
+          "changeKey": "x5Hzng52SzAVUp0R6pqjrvFZ3v1sUd==",
+          "eventEndTime": {
+            "dateTime": "2026-10-29T15:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "eventId": "AAMkAFjlBFG7YXN9WPAjMPxpDDN3IN69Nvo8DZB8TEGlUNCoV0EnURXFAWHFGGSoplzKOAagWTmzR3v2HPE8UvOpcKcrBnljWTDmFrSj-HrdKLV73_cYKCFbsEnyNoydYWQhFcXe-FmtMCOjEeEuDBO=",
+          "eventLocation": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "eventStartTime": {
+            "dateTime": "2026-10-29T15:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "eventSubject": "Submit the expense report",
+          "eventWebLink": "synthetic text 01",
+          "reminderFireTime": {
+            "dateTime": "2026-10-29T14:45:00.0000000",
+            "timeZone": "UTC"
+          }
+        }
+      ]
+    }
   }
 ]

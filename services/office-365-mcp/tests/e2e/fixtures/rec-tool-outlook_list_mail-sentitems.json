@@ -9,7 +9,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_mail-sentitems.01.json"
+    "response_json": {
+      "displayName": "Sent Items",
+      "id": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+      "totalItemCount": 9,
+      "unreadItemCount": 0
+    }
   },
   {
     "method": "GET",
@@ -27,6 +32,208 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_list_mail-sentitems.02.json"
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('sentitems')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=5&$skip=5",
+      "value": [
+        {
+          "@odata.etag": "W/\"DlHJOLMBJMEraPcoZttbWDQvTmHd/QftBMPdHmxP\"",
+          "@odata.type": "#microsoft.graph.eventMessageRequest",
+          "bodyPreview": "Check the hosting plan for the relaunch.",
+          "categories": ["seed-v1"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "hasAttachments": false,
+          "id": "ARdNBfZATYJEMYIORttiZc6azBRhIL-TUo8Qr8Yoqh70PmPNEj5K1kjdjjJH10wRRMOA",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+          "receivedDateTime": "2026-10-29T14:52:30Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "subject": "Hosting review",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=DXjEWiOVPCINLFDZCjajDp7bvZSqEB%2FSLf2Zi1Sjic11FhLXBp4H3iaeltSJ31uYATEH&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"OwPGVRGSBFTjgTuzRmjqHUNoYvPj/QkwRKTdSmuO\"",
+          "@odata.type": "#microsoft.graph.eventMessageRequest",
+          "bodyPreview": "Agree the numbers before the review.",
+          "categories": ["seed-v1"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "hasAttachments": false,
+          "id": "KQqDByEGEZEWFOROQkusJh3nkGFiZH-FDd0Ei3Catq67DoKENf7T2haeweWK45bAepOH",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+          "receivedDateTime": "2026-10-29T14:52:30Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "subject": "Budget alignment",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=EPlRVnBUTKJVMQXVVeprCn4brHIwDU%2FBDm2Qn7Ymjy69XqWIKy8P8levjsSP91iLojQN&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"NRRIGZMOABJkaWzjYbjcJCSuDcKw/VhgXXDhohWv\"",
+          "bodyPreview": "We go live next Tuesday at 07:00. Tom, please confirm the DNS window.",
+          "categories": ["seed-v1", "Website"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "hasAttachments": false,
+          "id": "WQxNEbMVWKXCALBULqsuFn7ybZZkIO-WAa4Gg8Tzth12CiPAVb6X3hdlgiER3B44eTKI",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+          "receivedDateTime": "2026-10-23T16:10:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "subject": "RE: Website relaunch: launch checklist",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "tom@example.test",
+                "name": "Tom Berger"
+              }
+            },
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=WVsVFhFZULGBFGTHKotvVp1hiTOfBP%2FNCs2Ge2Alui78MeJHFk5D5glxkmOP1B12iRXH&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"JXOCDOWEGTPyuJriDziqUUVrAzTo/HseNABbpvTV\"",
+          "bodyPreview": "Forecast for Q4: no more agency costs, hosting stays the same.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "hasAttachments": false,
+          "id": "NPgELqSRITMZICXQDedlEp3hcHOiEZ-TWk9Vk9Vaxj40JvVRVl4R2ctffmUY8H41rKHC",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+          "receivedDateTime": "2026-10-22T17:20:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "subject": "RE: Q3 budget review",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=LEfNHbKAJXRSWPWWCqvkKd1hgIPxSA%2FPTy3Ak3Caup50FcBSAr3F5eecvyYI6A44gOCI&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"BHJRSIXVDETypUocGicjFJZxKaIn/TleOEGrfoFU\"",
+          "bodyPreview": "The agency work for the press pages was not planned. I will write a short explanation.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "hasAttachments": false,
+          "id": "EGmGScSOLBFZBELEKwdxAu7mrVUgAR-NGw1Ev5Yxsp67XaIHSn1V1niaumYY1X70uYMX",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG=",
+          "receivedDateTime": "2026-10-20T11:30:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "subject": "RE: Q3 budget review",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=FQoXIfIHFDOPELFEPjinSs4vvNVvNE%2FTHg0Hs0Vsfz03IxNHVb5B9ebortBX3D77qGHR&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
   }
 ]

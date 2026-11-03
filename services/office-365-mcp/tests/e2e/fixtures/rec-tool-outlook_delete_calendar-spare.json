@@ -9,7 +9,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_calendar-spare.01.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "GET",
@@ -21,7 +33,55 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_calendar-spare.02.json"
+    "response_json": {
+      "value": [
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+          "isDefaultCalendar": true,
+          "isTallyingResponses": true,
+          "name": "Calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Shared calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Spare calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -33,7 +93,16 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_calendar-spare.03.json"
+    "response_json": {
+      "id": "AAMkLCheDDQ0GFM3YKImHXopKES6FO62Ycs9EZJ1TRKnIAGjV2MnLFCPEGFGBNIzjaaPRYgeCKmcW9j8BBX5IqRyoXavCtooBBHvUhXg-KhvTDGWAUYXGPJpaEsfRkqwNDOsEcCv-RneNMEcAq0iMJW=",
+      "isDefaultCalendar": false,
+      "isRemovable": true,
+      "name": "seed-v1 Spare calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
   },
   {
     "method": "GET",
@@ -45,7 +114,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_calendar-spare.04.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "GET",
@@ -58,7 +139,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_calendar-spare.05.json"
+    "response_json": {
+      "value": []
+    }
   },
   {
     "method": "GET",
@@ -71,7 +154,9 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_delete_calendar-spare.06.json"
+    "response_json": {
+      "value": []
+    }
   },
   {
     "method": "DELETE",

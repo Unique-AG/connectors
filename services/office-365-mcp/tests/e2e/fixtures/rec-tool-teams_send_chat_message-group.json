@@ -9,7 +9,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-teams_send_chat_message-group.01.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "POST",
@@ -40,7 +52,17 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "location": "https://graph.microsoft.com"
     },
-    "body": "rec-tool-teams_send_chat_message-group.02.json"
+    "response_json": {
+      "chatType": "group",
+      "createdDateTime": "2026-11-02T08:50:41.607Z",
+      "id": "19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2",
+      "lastUpdatedDateTime": "2026-11-02T08:50:41.607Z",
+      "onlineMeetingInfo": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "topic": "seed-v1 case-teams-chat",
+      "viewpoint": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2004/19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2/synthetic%20text%2005"
+    }
   },
   {
     "method": "POST",
@@ -56,6 +78,41 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
       "location": "https://host-01.example.test/synthetic%20text%2006/chats('synthetic%20text%2007')/messages('4424366441638')"
     },
-    "body": "rec-tool-teams_send_chat_message-group.03.json"
+    "response_json": {
+      "attachments": [],
+      "body": {
+        "content": "<p>seed-v1 case-teams_send_chat_message-group hello</p>",
+        "contentType": "html"
+      },
+      "channelIdentity": null,
+      "chatId": "19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2",
+      "createdDateTime": "2026-11-02T08:50:42.444Z",
+      "deletedDateTime": null,
+      "etag": "4424366441638",
+      "eventDetail": null,
+      "from": {
+        "application": null,
+        "device": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "displayName": "synthetic text 01",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5",
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userIdentityType": "aadUser"
+        }
+      },
+      "id": "4424366441638",
+      "importance": "normal",
+      "lastEditedDateTime": null,
+      "lastModifiedDateTime": "2026-11-02T08:50:42.444Z",
+      "locale": "en-us",
+      "mentions": [],
+      "messageType": "message",
+      "reactions": [],
+      "replyToId": null,
+      "subject": null,
+      "summary": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2008/19:qw1fl7ms031c66t3l9w0h994uld773o6@thread.v2/4424366441638"
+    }
   }
 ]

@@ -6,7 +6,30 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_browse_folder-channel-files.01.json"
+    "response_json": {
+      "value": [
+        {
+          "createdDateTime": null,
+          "description": "synthetic text 01",
+          "displayName": "synthetic text 01",
+          "id": "00000000-d034-4a82-8630-01e372765b48",
+          "isArchived": false,
+          "summary": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "webUrl": null
+        },
+        {
+          "createdDateTime": null,
+          "description": "The team of the recorder cases.",
+          "displayName": "seed-v1 team",
+          "id": "00000000-e7a0-41c6-863d-0548ee2dacdd",
+          "isArchived": false,
+          "summary": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "webUrl": null
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -22,7 +45,31 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_browse_folder-channel-files.02.json"
+    "response_json": {
+      "value": [
+        {
+          "createdDateTime": "2026-11-02T20:43:08.887Z",
+          "description": null,
+          "displayName": "seed-v1 Long channel",
+          "id": "19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2",
+          "membershipType": "standard"
+        },
+        {
+          "createdDateTime": "2026-11-02T20:43:06.2Z",
+          "description": null,
+          "displayName": "seed-v1 Posts",
+          "id": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+          "membershipType": "standard"
+        },
+        {
+          "createdDateTime": "2026-10-30T13:12:50.729Z",
+          "description": "The team of the recorder cases.",
+          "displayName": "synthetic text 02",
+          "id": "19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2",
+          "membershipType": "standard"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -31,7 +78,25 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_browse_folder-channel-files.03.json"
+    "response_json": {
+      "createdDateTime": "0001-01-01T00:00:00Z",
+      "folder": {
+        "childCount": 1
+      },
+      "id": "01DATL9FYRRNGD3FMPGDOFA8GO2GHSTU9J",
+      "lastModifiedDateTime": "2026-11-02T20:43:11Z",
+      "name": "seed-v1 Long channel",
+      "parentReference": {
+        "driveId": "b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx",
+        "driveType": "documentLibrary",
+        "id": null,
+        "name": null,
+        "path": null,
+        "siteId": null
+      },
+      "size": 52,
+      "webUrl": "https://contoso.sharepoint.com/teams/synthetic%20text%2003/Shared%20Documents/seed-v1%20Long%20channel"
+    }
   },
   {
     "method": "GET",
@@ -44,6 +109,51 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-sharepoint_browse_folder-channel-files.04.json"
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "\"{00000000-A956-4BF8-8F40-B8642E3C8E67},4\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "createdDateTime": "2026-11-02T20:45:44Z",
+          "file": {
+            "mimeType": "text/plain"
+          },
+          "id": "01LHDU8FHOUYA0DNN5EEP8F8BG7XVSTID0",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-02T20:45:44Z",
+          "name": "seed-v1 Channel Notes.txt",
+          "parentReference": {
+            "driveId": "b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx",
+            "driveType": "documentLibrary",
+            "id": "01DATL9FYRRNGD3FMPGDOFA8GO2GHSTU9J",
+            "name": "seed-v1 Long channel",
+            "path": "/drives/b!ByvlmCWDY5wm4cTuGrtNzCcUj1-xEZ5Sv6eaIv3lC5b3DuWw652JTmOGkbrP7Njx/root:/seed-v1 Long channel",
+            "siteId": "00000000-e263-472b-8fb7-39fbafc89342"
+          },
+          "size": 52,
+          "webUrl": "https://contoso.sharepoint.com/teams/synthetic%20text%2003/Shared%20Documents/seed-v1%20Long%20channel/seed-v1%20Channel%20Notes.txt"
+        }
+      ]
+    }
   }
 ]

@@ -18,6 +18,145 @@
     "response_headers": {
       "content-type": "application/json; charset=utf-8"
     },
-    "body": "rec-tool-teams_search_messages-person-window.01.json"
+    "response_json": {
+      "value": [
+        {
+          "hitsContainers": [
+            {
+              "hits": [
+                {
+                  "hitId": "AAMkSRdaPQLxWMFeNTR8QCreFFZ2RB32LMM1TQBfUMv8FymbV3BbLxAEGALHMWGOI0JI5FqwGifqH+Qn2CalMkZeNuyfogb0DWiJveQGzju7HYNMUMFVTQFqTdnhjcy5UObUkoACwpa1VVXOGj/OHXZ=",
+                  "rank": 1,
+                  "resource": {
+                    "@odata.type": "microsoft.graph.chatMessage",
+                    "channelIdentity": {
+                      "channelId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                      "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+                    },
+                    "chatId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                    "createdDateTime": "2026-11-03T11:48:43Z",
+                    "etag": "7869599923526",
+                    "from": {
+                      "emailAddress": {
+                        "address": "tom@example.test",
+                        "name": "Tom Berger"
+                      }
+                    },
+                    "id": "7869599923526",
+                    "importance": "normal",
+                    "lastModifiedDateTime": "2026-11-03T11:53:43Z",
+                    "webLink": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2/7869599923526"
+                  },
+                  "summary": "Note 51 of the long thread."
+                },
+                {
+                  "hitId": "AAMkBPypAADvJNTxRUL3SUryUON8QL69XFY4EZLuQWq5PyzvF0SyQbJBRSCFAELGK8PJ6SesZmqfR+Aq8UekYxVdXyfiera9ZMkHwgXWbzx4YRERNIBLRNGnSilxxbd5YCdLuaNDhii0WFSWXt/ULPM=",
+                  "rank": 2,
+                  "resource": {
+                    "@odata.type": "microsoft.graph.chatMessage",
+                    "channelIdentity": {
+                      "channelId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                      "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+                    },
+                    "chatId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                    "createdDateTime": "2026-11-03T11:48:42Z",
+                    "etag": "3635867635065",
+                    "from": {
+                      "emailAddress": {
+                        "address": "tom@example.test",
+                        "name": "Tom Berger"
+                      }
+                    },
+                    "id": "3635867635065",
+                    "importance": "normal",
+                    "lastModifiedDateTime": "2026-11-03T11:53:43Z",
+                    "webLink": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2/3635867635065"
+                  },
+                  "summary": "Note 50 of the long thread."
+                },
+                {
+                  "hitId": "AAMkAYvrKIAyFVMoYPI8DNnsUKT5YQ72SGE9NGKcINn8AgkrO2HaIkCHTDREUCIKI3RL4HnpWvmqH+Rv2QqkJnAkFynmjqh1TLrVpmVYnrj3DFHWZFOJZSNzFqsvawi3NPdObyAJhnh7EEFOYg/FHOL=",
+                  "rank": 3,
+                  "resource": {
+                    "@odata.type": "microsoft.graph.chatMessage",
+                    "channelIdentity": {
+                      "channelId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                      "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+                    },
+                    "chatId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                    "createdDateTime": "2026-11-03T11:48:42Z",
+                    "etag": "2499952411683",
+                    "from": {
+                      "emailAddress": {
+                        "address": "tom@example.test",
+                        "name": "Tom Berger"
+                      }
+                    },
+                    "id": "2499952411683",
+                    "importance": "normal",
+                    "lastModifiedDateTime": "2026-11-03T11:53:43Z",
+                    "webLink": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2/2499952411683"
+                  },
+                  "summary": "Note 49 of the long thread."
+                },
+                {
+                  "hitId": "AAMkLIloAAItGRGuRHR8APmfOAF3IU73EUT1OUCtRBg7LecrV7BbPwRJWOOYVPTHC6DS2OrcBvgzJ+Sv9CziFsUfHklsauy4PJbHalLBuad0JJUTLITITIQhJgdjkev7DLhYhuQWkey1ZBYRUv/AIFD=",
+                  "rank": 4,
+                  "resource": {
+                    "@odata.type": "microsoft.graph.chatMessage",
+                    "channelIdentity": {
+                      "channelId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                      "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+                    },
+                    "chatId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                    "createdDateTime": "2026-11-03T11:48:40Z",
+                    "etag": "3926826952450",
+                    "from": {
+                      "emailAddress": {
+                        "address": "tom@example.test",
+                        "name": "Tom Berger"
+                      }
+                    },
+                    "id": "3926826952450",
+                    "importance": "normal",
+                    "lastModifiedDateTime": "2026-11-03T11:48:42Z",
+                    "webLink": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2/3926826952450"
+                  },
+                  "summary": "Note 48 of the long thread."
+                },
+                {
+                  "hitId": "AAMkFVvxFMFcZVGoAGU6HKbgKON8XI77RJI8DIGhDKj1NfmjC5TcSpVODHNFEERTF0NA0EpiHosrY+Qm2BqgXlXjFuxeuji1KLeZfyTTtqy2JINFQKCCKPXdJtsgasc1MQmXygGLknw2ILDGMg/FIZK=",
+                  "rank": 5,
+                  "resource": {
+                    "@odata.type": "microsoft.graph.chatMessage",
+                    "channelIdentity": {
+                      "channelId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                      "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+                    },
+                    "chatId": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+                    "createdDateTime": "2026-11-03T11:48:40Z",
+                    "etag": "5878563145459",
+                    "from": {
+                      "emailAddress": {
+                        "address": "tom@example.test",
+                        "name": "Tom Berger"
+                      }
+                    },
+                    "id": "5878563145459",
+                    "importance": "normal",
+                    "lastModifiedDateTime": "2026-11-03T11:48:42Z",
+                    "webLink": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2/5878563145459"
+                  },
+                  "summary": "Note 47 of the long thread."
+                }
+              ],
+              "moreResultsAvailable": true,
+              "total": 109
+            }
+          ],
+          "searchTerms": ["synthetic text 03"]
+        }
+      ]
+    }
   }
 ]

@@ -10,7 +10,7 @@ import yaml
 
 from tests.e2e.recording import cases as cases_module
 from tests.e2e.recording import stand_in
-from tests.e2e.recording.conftest import record_on
+from tests.e2e.recording.conftest import body_of, record_on
 from tests.e2e.recording.families import load
 from tests.e2e.recording.guard import GRAPH_HOST, READ_TOOLS, WRITE_TOOLS, Guard
 from tests.e2e.recording.lint import lint_files
@@ -377,7 +377,7 @@ def scrubbed(path: str, answer: object, *, method: str = "GET", status: int = 20
 
 
 def kept(fixture: Fixture) -> Json:
-    return mapping(cast("object", json.loads(fixture.bodies["rec-synthetic.01.json"])))
+    return mapping(cast("object", json.loads(body_of(fixture, "rec-synthetic.01"))))
 
 
 class TestScrubShapes:

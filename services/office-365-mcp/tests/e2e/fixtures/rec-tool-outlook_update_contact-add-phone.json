@@ -18,7 +18,40 @@
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/contacts('SQsJSbUTVTCRECCQMzwlSo4pxWXrCD-JWr4Og4Cfmx48BaBYUx5R7imcgwCC6oNVWyOB')",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_update_contact-add-phone.01.json"
+    "response_json": {
+      "@odata.etag": "W/\"BGFPRQDVMLOdmUkqSguiOCJkUzUo/PuqJNQhy/Uc\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 03"],
+      "categories": [],
+      "changeKey": "SFNIHSGKRVHkxBizJlraKCXpBaDd/FeiEQFoj/Wm",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:18:26Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-add-phone",
+      "emailAddresses": [],
+      "givenName": "Nina",
+      "homeAddress": {},
+      "homePhones": [],
+      "id": "SQsJSbUTVTCRECCQMzwlSo4pxWXrCD-JWr4Og4Cfmx48BaBYUx5R7imcgwCC6oNVWyOB",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:18:26Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": null,
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Frei",
+      "title": null
+    }
   },
   {
     "method": "GET",
@@ -34,7 +67,13 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_update_contact-add-phone.02.json"
+    "response_json": {
+      "@odata.etag": "W/\"BGFPRQDVMLOdmUkqSguiOCJkUzUo/PuqJNQhy/Uc\"",
+      "businessPhones": ["+41 44 555 01 03"],
+      "emailAddresses": [],
+      "homePhones": [],
+      "id": "SQsJSbUTVTCRECCQMzwlSo4pxWXrCD-JWr4Og4Cfmx48BaBYUx5R7imcgwCC6oNVWyOB"
+    }
   },
   {
     "method": "PATCH",
@@ -51,6 +90,39 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_update_contact-add-phone.03.json"
+    "response_json": {
+      "@odata.etag": "W/\"UZQYHCCQKFSfrMiwUfgyPZEzNjPh/KocLANri/Kj\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 03", "+41 44 555 01 06"],
+      "categories": [],
+      "changeKey": "VWUSVRVPWLGslQhqYemnVQZzCeYv/CmtRQEcq/Ju",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:18:26Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-add-phone",
+      "emailAddresses": [],
+      "givenName": "Nina",
+      "homeAddress": {},
+      "homePhones": [],
+      "id": "SQsJSbUTVTCRECCQMzwlSo4pxWXrCD-JWr4Og4Cfmx48BaBYUx5R7imcgwCC6oNVWyOB",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:18:26Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": null,
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Frei",
+      "title": null
+    }
   }
 ]

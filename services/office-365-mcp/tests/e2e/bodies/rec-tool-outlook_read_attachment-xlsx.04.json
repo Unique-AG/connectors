@@ -1,9 +1,0 @@
-{
-  "@odata.type": "#microsoft.graph.fileAttachment",
-  "contentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "id": "FWuPTeYPJPQRGLKEHoewBd7acSMaAP-VWo3Ab8Tgdk52KzWYTm2N0rinmnKV9iWprsSZZFXWSNSZUf0FdHe2YfRlXPsvynTl",
-  "isInline": false,
-  "lastModifiedDateTime": "2026-11-02T20:45:09Z",
-  "name": "budget.xlsx",
-  "size": 2744
-}

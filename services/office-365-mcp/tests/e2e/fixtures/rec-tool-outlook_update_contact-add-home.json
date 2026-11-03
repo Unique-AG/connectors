@@ -17,7 +17,40 @@
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/contacts('NKjGFkGRNZSDWFDEFjjcYd3vhFRxGJ-DFt0Sk2Dykr97AiNWEk4Z8anhmiWD2eY1SVGI')",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_update_contact-add-home.01.json"
+    "response_json": {
+      "@odata.etag": "W/\"JLTMZIHRUISztUjqTrygHIYyYyZu/FivSSPfj/Ul\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": [],
+      "categories": [],
+      "changeKey": "NDDCZGBFAPNzzFvpTbdbEQPuZcAn/DbjCGNbm/Az",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:18:05Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-add-home",
+      "emailAddresses": [],
+      "givenName": "Sven",
+      "homeAddress": {},
+      "homePhones": [],
+      "id": "NKjGFkGRNZSDWFDEFjjcYd3vhFRxGJ-DFt0Sk2Dykr97AiNWEk4Z8anhmiWD2eY1SVGI",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:18:05Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": null,
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Keller",
+      "title": null
+    }
   },
   {
     "method": "GET",
@@ -33,7 +66,13 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_update_contact-add-home.02.json"
+    "response_json": {
+      "@odata.etag": "W/\"JLTMZIHRUISztUjqTrygHIYyYyZu/FivSSPfj/Ul\"",
+      "businessPhones": [],
+      "emailAddresses": [],
+      "homePhones": [],
+      "id": "NKjGFkGRNZSDWFDEFjjcYd3vhFRxGJ-DFt0Sk2Dykr97AiNWEk4Z8anhmiWD2eY1SVGI"
+    }
   },
   {
     "method": "PATCH",
@@ -51,6 +90,39 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_update_contact-add-home.03.json"
+    "response_json": {
+      "@odata.etag": "W/\"UVLJYOONEISekGmpHlnsYKKdDlVo/JkpDICqx/Hb\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": [],
+      "categories": [],
+      "changeKey": "VMGKELHZRNBfzOojVsbeGGFpYyTo/IqyDAWfa/Pt",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:18:05Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-add-home",
+      "emailAddresses": [],
+      "givenName": "Sven",
+      "homeAddress": {},
+      "homePhones": ["+41 44 555 01 04"],
+      "id": "NKjGFkGRNZSDWFDEFjjcYd3vhFRxGJ-DFt0Sk2Dykr97AiNWEk4Z8anhmiWD2eY1SVGI",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:18:05Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": "+41 79 555 01 05",
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Keller",
+      "title": null
+    }
   }
 ]

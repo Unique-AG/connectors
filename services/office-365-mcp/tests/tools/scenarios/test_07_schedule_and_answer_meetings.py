@@ -22,7 +22,7 @@ from mcp.types import ElicitResult as CarriedAnswer
 
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import build_server, patch_obo
-from tests.graph_fixtures import E2E, Json
+from tests.graph_fixtures import Json, recorded_json
 
 from .support import Person, call, response, serve
 
@@ -167,10 +167,6 @@ def _posted(route: respx.Route) -> dict[str, object]:
     return cast("dict[str, object]", json.loads(route.calls.last.request.content))
 
 
-def _recorded(body: str) -> dict[str, object]:
-    return cast("dict[str, object]", json.loads((E2E / "bodies" / f"{body}.json").read_text()))
-
-
 def _list(seen: Row, key: str) -> list[Row]:
     return cast("list[Row]", seen[key])
 
@@ -188,7 +184,7 @@ async def _meeting(subject: str, day: str) -> Row:
 
 
 def _create_route(graph: respx.MockRouter) -> respx.Route:
-    created = _recorded("rec-tool-outlook_create_event-simple.02")
+    created = recorded_json("rec-tool-outlook_create_event-simple.02")
     return graph.post("/me/events").mock(return_value=httpx.Response(201, json=created))
 
 
@@ -592,7 +588,12 @@ class TestFindingATime:
             side_effect=[
                 response(_TOO_MANY),
                 response(
-                    {"status": 200, "body": "rec-tool-outlook_check_availability-tomorrow.04.json"}
+                    {
+                        "status": 200,
+                        "response_json": recorded_json(
+                            "rec-tool-outlook_check_availability-tomorrow.04"
+                        ),
+                    }
                 ),
             ]
         )
@@ -776,7 +777,7 @@ class TestBookingAMeeting:
         self, graph: respx.MockRouter
     ) -> None:
         routes = serve(graph, _RECORDED_CREATE)
-        takes_none = _recorded("rec-tool-outlook_create_event-simple.01") | {
+        takes_none = recorded_json("rec-tool-outlook_create_event-simple.01") | {
             "allowedOnlineMeetingProviders": ["unknown"],
             "defaultOnlineMeetingProvider": "unknown",
         }
@@ -1230,7 +1231,7 @@ _APPROVAL_ROWS = [
 
 def _writable(graph: respx.MockRouter) -> list[respx.Route]:
     _stored_changeable(graph)
-    created = _recorded("rec-tool-outlook_create_event-simple.02")
+    created = recorded_json("rec-tool-outlook_create_event-simple.02")
     return [
         graph.post("/me/events").mock(return_value=httpx.Response(201, json=created)),
         graph.post(f"{_path(_LAUNCH)}/decline").mock(return_value=httpx.Response(202)),

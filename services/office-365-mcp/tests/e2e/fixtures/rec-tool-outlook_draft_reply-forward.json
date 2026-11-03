@@ -9,7 +9,12 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_draft_reply-forward.01.json"
+    "response_json": {
+      "displayName": "Inbox",
+      "id": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "totalItemCount": 35,
+      "unreadItemCount": 23
+    }
   },
   {
     "method": "GET",
@@ -27,7 +32,88 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_draft_reply-forward.02.json"
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=2&$skip=2",
+      "value": [
+        {
+          "@odata.etag": "W/\"RjVPCLQKEVUncYikYaqxFUHmViKj/BqxGBVyIfqz\"",
+          "@odata.type": "#microsoft.graph.eventMessageRequest",
+          "bodyPreview": "Walk through the roadmap for the next quarter.",
+          "categories": [],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": false,
+          "id": "CBnBCfOGAGOZRQCSTkipVr6veQLdGJ-TDz9Vq4Fkjn96HmKGNv4K8dpmdxLJ42xw9jUX",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": false,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-29T14:52:38Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "Roadmap check",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=GXgFZzIQGCGJTSCEGydcJd6wbFMpJS%2FKZo5Oc4Yfpu80DaLWVq6O1ipkxpMQ55hm0nIH&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"BZLGZBRPEOSzbOxoRshjUFAjUoKf/PbiPIArroyQ\"",
+          "bodyPreview": "Accepted. I attach the final numbers. Please check line 7 before Thursday.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "flagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": true,
+          "id": "UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW",
+          "importance": "high",
+          "isDraft": false,
+          "isRead": false,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-25T10:05:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "RE: Q3 budget review",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=BTnWQrMHCJDYPWKARukpDr6phUDsUP%2FMPn7Uf7Mnyt80McKQHp0A5wxhfjRU3H03iLJO&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -46,7 +132,87 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_draft_reply-forward.03.json"
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=2&$skip=4",
+      "value": [
+        {
+          "@odata.etag": "W/\"QAPBBNRGRYAohKsfXslhZMZiUnTo/SsnLZBnjsKg\"",
+          "bodyPreview": "Your new laptop is ready. You can collect it at the IT desk from 10:00.",
+          "categories": ["seed-v1"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "tom@example.test",
+              "name": "Tom Berger"
+            }
+          },
+          "hasAttachments": false,
+          "id": "UXtGYgVMPMGYMAGHQxyaIn2rkXOeWG-KOh0Jx8Bmkq79KzCJYf9T6susmhWR1E33jAZP",
+          "importance": "high",
+          "isDraft": false,
+          "isRead": false,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-25T09:25:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "tom@example.test",
+              "name": "Tom Berger"
+            }
+          },
+          "subject": "Laptop rollout: your new device",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=TPhHAhHTWXRHZUKUIvaqXc4geXQbMD%2FEGy3Tt6Wjhh73IyWWDj6I2wjnyqUW0U03oBOL&exvsurl=1&viewmodel=ReadMessageItem"
+        },
+        {
+          "@odata.etag": "W/\"QKSFJGBBISQrwWfyTrlhBQGsOvUj/FifQHGjwvN6\"",
+          "bodyPreview": "Who signs the go-live protocol? I need the name for the invoice.",
+          "categories": ["seed-v1", "Website", "Finance"],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": false,
+          "id": "SSoGKoBZAATULRIYHnhqIk4roAYsSX-DDp6Se0Rfvi15OdWUSj2Z4ccckbVP7G38eiMD",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": false,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-25T08:30:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "RE: Website relaunch: launch checklist",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=MTzPKvQKCTRYEDKYScnrUb7iqFBuWX%2FMGr6Iy1Seef71TeRBKy7A2uiuojYS0A23crSR&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
   },
   {
     "method": "POST",
@@ -69,7 +235,55 @@
       "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('WJdTYhMQTTGSFAPCAeujPj2wrCPiKS-CFt2Zu0Gzwy06JnQFVz7V2dfjkqOH84kKSxRA')",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_draft_reply-forward.04.json"
+    "response_json": {
+      "@odata.etag": "W/\"NEFCUVSMFGTsyGpaJzhbUBUcGcRx/KujMASsEb+s\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "synthetic text 01",
+        "contentType": "text"
+      },
+      "bodyPreview": "synthetic text 02",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "ZTHJRDXVUTXqxQluQvokXTGgBpJy/FxmHMFeTr+q",
+      "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
+      "createdDateTime": "2026-10-29T15:10:12Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "hasAttachments": true,
+      "id": "WJdTYhMQTTGSFAPCAeujPj2wrCPiKS-CFt2Zu0Gzwy06JnQFVz7V2dfjkqOH84kKSxRA",
+      "importance": "high",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-10-29T15:10:12Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-10-29T15:10:12Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "sentDateTime": "2026-10-29T15:10:12Z",
+      "subject": "synthetic text 03",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=TUdVMqBQIGUNDJPTUiqcMb6yeKBtOX%2FWBy8Kp8Bdor83YtLZEq1W7tnuadGS91iCWuVG&exvsurl=1&viewmodel=ReadMessageItem"
+    }
   },
   {
     "method": "PATCH",
@@ -90,6 +304,54 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
       "preference-applied": "IdType=ImmutableId"
     },
-    "body": "rec-tool-outlook_draft_reply-forward.05.json"
+    "response_json": {
+      "@odata.etag": "W/\"KPPSXTSUGTTfmWdxUihgRGOoJwBv/IrmHBOyVv+i\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Please read this.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "Please read this.",
+      "categories": ["seed-v1 case-outlook_draft_reply-forward"],
+      "ccRecipients": [],
+      "changeKey": "BAHEONROFRUxuSfuAhfoQUZiCwHb/WlpGECrOl+y",
+      "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
+      "createdDateTime": "2026-10-29T15:10:12Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "from": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "hasAttachments": true,
+      "id": "WJdTYhMQTTGSFAPCAeujPj2wrCPiKS-CFt2Zu0Gzwy06JnQFVz7V2dfjkqOH84kKSxRA",
+      "importance": "high",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-10-29T15:10:12Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-10-29T15:10:12Z",
+      "replyTo": [],
+      "sender": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "sentDateTime": "2026-10-29T15:10:12Z",
+      "subject": "synthetic text 03",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=TUdVMqBQIGUNDJPTUiqcMb6yeKBtOX%2FWBy8Kp8Bdor83YtLZEq1W7tnuadGS91iCWuVG&exvsurl=1&viewmodel=ReadMessageItem"
+    }
   }
 ]

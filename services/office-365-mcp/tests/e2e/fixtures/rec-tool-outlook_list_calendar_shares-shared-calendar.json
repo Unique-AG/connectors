@@ -9,7 +9,19 @@
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_shares-shared-calendar.01.json"
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
   },
   {
     "method": "GET",
@@ -21,7 +33,55 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_shares-shared-calendar.02.json"
+    "response_json": {
+      "value": [
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+          "isDefaultCalendar": true,
+          "isTallyingResponses": true,
+          "name": "Calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkDEecQMU9UVM3FJCoJYlmLSA9MD39Mva6VHE1KTKfONZrU6JvUOBETTEILXDghorTFAmnYJitY6p6YMX6LkUscKftTxgzLYSjKhGi-SzgAKSBRGWFZZVckUvvModaQCPxLfSe-KfnEAKgJy0hSFP=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Shared calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        },
+        {
+          "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+          "canEdit": true,
+          "canShare": true,
+          "canViewPrivateItems": true,
+          "defaultOnlineMeetingProvider": "teamsForBusiness",
+          "id": "AAMkSMbdAZF4JQI3MNJbQMzbKRC1MG18Puz1EYU8DUJeWICiT3RyEWZPSDNITWDebkjBGNrwUWytV5m5EDW9XtRdcHuqJhryQRJpZiXq-YirDMXUWNKDEIVyoEjqVuwsMUTbRhWr-ZdgHEIf2MA2LYS=",
+          "isDefaultCalendar": false,
+          "isTallyingResponses": false,
+          "name": "seed-v1 Spare calendar",
+          "owner": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          }
+        }
+      ]
+    }
   },
   {
     "method": "GET",
@@ -30,6 +90,8 @@
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
-    "body": "rec-tool-outlook_list_calendar_shares-shared-calendar.03.json"
+    "response_json": {
+      "value": []
+    }
   }
 ]

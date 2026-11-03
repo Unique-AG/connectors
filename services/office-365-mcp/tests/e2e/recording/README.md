@@ -336,8 +336,8 @@ export RECORD_LINT_IDENTITIES="<tenant id>,<tenant name>,<tenant domain>,$SEED_U
 Exit codes of `record`: 0 written; 1 written, but the variant's `expect` does not hold (the
 recorder shows the values; update `recorded.calls.yaml` and replay); 2 refused, nothing written.
 
-The files go to `tests/e2e/fixtures/rec-<id>.json`, `rec-<id>.meta.yaml` and
-`tests/e2e/bodies/rec-<id>.NN.*`. To land them, add `--link` to the command. It copies the
+The files go to `tests/e2e/fixtures/rec-<id>.json` (a JSON answer is held in its `response_json`) and
+`rec-<id>.meta.yaml`. A page, a binary or a transcript goes to `tests/e2e/bodies/rec-<id>.NN.*`. To land them, add `--link` to the command. It copies the
 scenario's block from `recorded.calls.yaml` into its sidecar entry as `variants: recorded:`, and
 only after a recording whose `expect` holds. It prints the number of runs. Set `_MINIMUM_EXECUTABLE`
 to that number, run `pnpm exec biome check --write services/office-365-mcp/tests/e2e` from the

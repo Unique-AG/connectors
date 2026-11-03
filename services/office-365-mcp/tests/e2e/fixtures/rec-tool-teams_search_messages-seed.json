@@ -18,6 +18,18 @@
     "response_headers": {
       "content-type": "application/json; charset=utf-8"
     },
-    "body": "rec-tool-teams_search_messages-seed.01.json"
+    "response_json": {
+      "value": [
+        {
+          "hitsContainers": [
+            {
+              "moreResultsAvailable": false,
+              "total": 0
+            }
+          ],
+          "searchTerms": ["seed-v1", "case"]
+        }
+      ]
+    }
   }
 ]
