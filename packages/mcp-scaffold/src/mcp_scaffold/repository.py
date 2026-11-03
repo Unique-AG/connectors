@@ -99,14 +99,21 @@ def _register_release(name: str, repo: Path) -> None:
     versions[f"services/{name}"] = "0.0.0"
     manifest.write_text(json.dumps(versions, indent=2) + "\n")
 
-    rerun = repo / ".github" / "workflows" / "release-rerun.yaml"
-    text = rerun.read_text()
+    for workflow in _RELEASE_WORKFLOWS:
+        _add_service_option(name, repo / ".github" / "workflows" / workflow)
+
+
+def _add_service_option(name: str, workflow: Path) -> None:
+    """Lists `name` among the services the workflow's form offers, kept sorted."""
+    text = workflow.read_text()
     block = re.search(r"(        options:\n)((?:          - .+\n)+)", text)
-    assert block, "release-rerun.yaml has no service options list"
+    assert block, f"{workflow.name} has no service options list"
     services = sorted({*re.findall(r"- (.+)", block.group(2)), name})
     listed = "".join(f"          - {service}\n" for service in services)
-    rerun.write_text(text[: block.start(2)] + listed + text[block.end(2) :])
+    workflow.write_text(text[: block.start(2)] + listed + text[block.end(2) :])
 
 
 _RELEASE_CONFIG = "release-please-config.json"
 _RELEASE_MANIFEST = ".release-please-manifest.json"
+# The workflows a service is started from by hand: a dev build, and re-running a release.
+_RELEASE_WORKFLOWS = ("release-dev.yaml", "release-rerun.yaml")

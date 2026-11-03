@@ -15,6 +15,7 @@ REGISTRIES = [
     ".gitcommitizen",
     "release-please-config.json",
     ".release-please-manifest.json",
+    ".github/workflows/release-dev.yaml",
     ".github/workflows/release-rerun.yaml",
     "pnpm-workspace.yaml",
 ]
