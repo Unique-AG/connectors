@@ -20,15 +20,23 @@ two ways:
   (`getDailyPrices` becomes `get_daily_prices`), with no context and no code. It says what the
   spec says, so the description check skips it, and retries do not apply to it.
 - **A tool of our own.** List the operationId under `operation-ids` in `[tool.mcp-openapi]`
-  and run `uv run poe codegen`. It writes `vendor_responses.py` and `operations.py`
-  in `upstream/generated/`; never edit that package by hand. The models name each field in
-  snake_case, with the vendor's name as its alias, so they validate the vendor's JSON and read
-  as Python; `snake-case-fields = false` in `[tool.mcp-openapi]` keeps the vendor's names. Export the operation's constant
-  from `upstream/__init__.py`, then write a context that calls `upstream.call(GET_X, ...)` and a
-  tool over it. `Upstream` is mcp-openapi's `OperationClient`, which validates arguments
-  against the spec and parses each response into its generated model. On an error status it
-  raises `UpstreamError` with the status, method and URL, followed by the first 200 characters
-  of the error body, which reach the client.
+  and run `uv run poe codegen`. It writes `vendor_responses.py`, `vendor_requests.py` and
+  `operations.py` in `upstream/generated/`; never edit that package by hand. Every model names
+  its fields in snake_case: a response validates the vendor's JSON into them, and a request is
+  built with them and sent with the vendor's names. Keep that default rather than
+  `snake-case-fields = false`. A component schema a request sends is named `<Name>Input`, so it
+  does not clash with the response model of the same schema. Export the operation's constant and
+  its request models from `upstream/__init__.py`, then write a context that calls it and a tool
+  over it. `Upstream` is mcp-openapi's `OperationClient`, which parses each response into its
+  generated model. On an error status it raises `UpstreamError` with the status, method and URL,
+  followed by the first 200 characters of the error body, which reach the client.
+
+  Call an operation with `upstream.call(GET_X, GetXRequest(path=..., query=..., body=...))`.
+  The type check verifies every path and query parameter and the body against the spec, so a
+  missing or misspelt one fails before the code runs. Two fallbacks, each checked less:
+  `upstream.call_untyped(GET_X, **arguments)` where the spec gets the operation's arguments
+  wrong, with a comment saying what it gets wrong, and `upstream.call_raw(...)` for an endpoint
+  the spec does not have.
 
 Generate before you write. Before writing an `Operation` or a response model by hand, list the
 operationId under `operation-ids` and run `uv run poe codegen`. `codegen --check` sees only what

@@ -37,7 +37,7 @@ async def _document(
     api: OperationClient, order_id: str
 ) -> tuple[dict[str, object] | None, str | None]:
     try:
-        body = await api.call(DOWNLOAD_ORDER, orderId=order_id, format="json")
+        body = await api.call_untyped(DOWNLOAD_ORDER, orderId=order_id, format="json")
     except UpstreamError as error:
         unreadable = isinstance(error.__cause__, ValidationError)
         return None, _PDF_NOT_SUPPORTED_DETAIL if unreadable else _DOCUMENT_NOT_FETCHED_DETAIL

@@ -19,6 +19,6 @@ async def recent_daily_prices(
     calendar days (default 30). Returns open, high, low, close, volume and
     adjusted close per day.
     """
-    return await api.call(
+    return await api.call_untyped(
         operations.GET_DAILY_PRICES, ticker=ticker, startDate=since(lookback_days)
     )

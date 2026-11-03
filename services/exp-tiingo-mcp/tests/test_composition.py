@@ -52,13 +52,13 @@ def with_client[T](settings: Settings, use: Callable[[Client], Awaitable[T]]) ->
 
 
 class FakeApi:
-    """Answers `call` from canned rows, recording the arguments it got."""
+    """Answers `call_untyped` from canned rows, recording the arguments it got."""
 
     def __init__(self, rows: list[dict[str, object]]) -> None:
         self.rows = rows
         self.calls: list[tuple[str, dict[str, str]]] = []
 
-    async def call[T](self, operation: Operation[T], **arguments: str) -> T:
+    async def call_untyped[T](self, operation: Operation[T], **arguments: str) -> T:
         self.calls.append((operation.operation_id, arguments))
         return operation.adapter.validate_python(self.rows)
 

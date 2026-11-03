@@ -43,7 +43,7 @@ async def create_document_order(
     "Pending"`, poll `get_order(data.orderId)` until `data.documentJson` is populated or
     `status` is `Failed`. Never mention download URLs.
     """
-    response = await api.call(
+    response = await api.call_untyped(
         operations.POST_ORDERS,
         kyckrId=kyckr_id,
         productId=product_id,
@@ -74,7 +74,7 @@ async def get_order(order_id: OrderId, api: OperationClient = Depends(get_api)) 
     delivery is not yet supported; relay that message. Treat `statusCode: 410` as terminal:
     the order is no longer retrievable, do not retry. Never mention download URLs.
     """
-    response = await api.call(operations.GET_ORDERS_ORDER_ID, orderId=str(order_id))
+    response = await api.call_untyped(operations.GET_ORDERS_ORDER_ID, orderId=str(order_id))
     order = as_order(response.data)
     return await order_reply(api, response, order, finished_id(order, str(order_id)))
 
@@ -100,7 +100,7 @@ async def list_orders(
     paging in `data.pageNumber`, `data.pageSize` and `data.totalCount`. Each entry has the same
     shape as `get_order.data`. Use to reconcile when an order id is not in context.
     """
-    response = await api.call(
+    response = await api.call_untyped(
         operations.GET_ORDER, startDate=start_date, endDate=end_date, isoCode=iso_code
     )
     body = response.model_dump()

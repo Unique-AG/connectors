@@ -46,7 +46,7 @@ async def search_companies(
     """
     if not name and not company_number:
         raise ToolError("Provide either `name` or `company_number`.")
-    response = await api.call(
+    response = await api.call_untyped(
         operations.GET_COMPANIES, name=name, companyNumber=company_number, isoCode=iso_code
     )
     return answer(SearchCompaniesReply, response)
@@ -75,7 +75,7 @@ async def get_lite_profile(
     Consumes credits. Does not return directors, shareholders, or beneficial owners; use
     `get_enhanced_profile` for those. For orderable filings, see `list_company_documents`.
     """
-    response = await api.call(
+    response = await api.call_untyped(
         operations.GET_COMPANIES_KYCKR_ID,
         kyckrId=kyckr_id,
         customerReference=settings.kyckr_default_customer_reference,
@@ -112,7 +112,7 @@ async def get_enhanced_profile(
     data. When `data.status` is `Pending` the profile is not ready yet: poll `get_order` with
     `data.orderId` until it resolves.
     """
-    response = await api.call(
+    response = await api.call_untyped(
         operations.GET_COMPANIES_KYCKR_ID_ENHANCED,
         kyckrId=kyckr_id,
         customerReference=settings.kyckr_default_customer_reference,
@@ -144,7 +144,7 @@ async def list_company_documents(
     `deliveryTimeMinutes`, and the credit `cost` of ordering. Paginate with `continuation_key`
     when the response includes one.
     """
-    response = await api.call(
+    response = await api.call_untyped(
         operations.GET_COMPANIES_KYCKR_ID_DOCUMENTS,
         kyckrId=kyckr_id,
         continuationKey=continuation_key,

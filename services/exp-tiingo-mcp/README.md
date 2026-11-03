@@ -57,9 +57,9 @@ CI also runs `pnpm exec biome check . --no-errors-on-unmatched` from this folder
 
 - As-is: add its operationId to the `MCPType.TOOL` group in `EXPOSED`.
 - As a resource: add it to the `MCPType.RESOURCE` group (GETs without query params only; path params become a template).
-- Through the API caller: add its operationId to `CLIENT_BACKED`, regenerate the models, then add a file in `tools/` with a standalone `@tool` that takes `api: OperationClient = Depends(get_api)` and calls `api.call(operations.GET_X, **arguments)`, where `GET_X` is the constant generated into `models/operations.py` (the operationId in UPPER_SNAKE_CASE). `tools/prices.py` is the template. Annotate it with `TOOL_HINTS`. The function's name and docstring become the tool's name and description.
+- Through the API caller: add its operationId to `CLIENT_BACKED`, regenerate the models, then add a file in `tools/` with a standalone `@tool` that takes `api: OperationClient = Depends(get_api)` and calls `api.call_untyped(operations.GET_X, **arguments)`, where `GET_X` is the constant generated into `models/operations.py` (the operationId in UPPER_SNAKE_CASE). `tools/prices.py` is the template. Annotate it with `TOOL_HINTS`. The function's name and docstring become the tool's name and description.
 - Names: a generated tool is named after its operationId in snake_case without a leading `get_` (`mcp_name(..., remove_prefix="get_")`), and `tests/test_routes.py` checks that the names are unique. A tool you write is named after its function.
-- Composite (uses several operations): call `api.call` more than once, or call another tool's function and pass `api` yourself, because a direct call does not resolve `Depends`. Combine the results. `tools/returns.py` is the template.
+- Composite (uses several operations): call `api.call_untyped` more than once, or call another tool's function and pass `api` yourself, because a direct call does not resolve `Depends`. Combine the results. `tools/returns.py` is the template.
 
 Not exposed: news, splits, distributions and fund fees returned 403 on the current plan, and `getDistributionYield` returns ~780 KB (11k rows) with no trimming. The fundamentals tools only work for Dow 30 tickers on the current plan (other tickers return a 400 from Tiingo).
 

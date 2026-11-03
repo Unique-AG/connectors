@@ -134,6 +134,7 @@ STAMP = re.compile(
 NOT_THE_SCAFFOLDS = {
     "uv.lock",
     "operations.py",
+    "vendor_requests.py",
     "vendor_responses.py",
     "tool_surface.generated.json",
     "values.schema.json",
@@ -265,8 +266,10 @@ def test_an_openapi_mcp_starts_from_the_first_json_get_of_its_spec(
 
     assert 'EXPOSED: list[str] = ["getForecast"]' in (upstream / "routes.py").read_text()
     operations = upstream / "generated" / "operations.py"
-    assert "GET_FORECAST = Operation[Forecast]" in operations.read_text()
-    assert "GET_FORECAST" in (upstream / "__init__.py").read_text()
+    assert "GET_FORECAST = Operation[Forecast, GetForecastRequest]" in operations.read_text()
+    exports = (upstream / "__init__.py").read_text()
+    assert "GET_FORECAST" in exports
+    assert "GetForecastRequest" in exports
     assert 'AnyHttpUrl("https://weather.example.com/v1")' in (upstream / "settings.py").read_text()
     offline_server = (service / "tests" / "offline_server.py").read_text()
     assert 'AnyHttpUrl("https://weather.example.com/v1")' in offline_server
@@ -323,13 +326,14 @@ def test_a_spec_newer_than_openapi_3_0_is_rejected(tmp_path: Path) -> None:
 
 
 def scaffold_offline(repo: Path, options: Options) -> Path:
-    """Scaffold `options` without uv: the codegen leaves an empty `operations.py`, and nothing is
-    checked."""
+    """Scaffold `options` without uv: the codegen leaves an empty `operations.py` and
+    `vendor_requests.py`, and nothing is checked."""
 
     def codegen_only(commands: list[list[str]], service: Path) -> None:
         if ["uv", "run", "mcp-openapi-codegen"] in commands:
             generated = service / "src" / options.package / "upstream" / "generated"
             (generated / "operations.py").write_text("")
+            (generated / "vendor_requests.py").write_text("")
 
     copy_registries(repo)
     (repo / "packages").symlink_to((REPO / "packages").resolve())
@@ -535,6 +539,7 @@ def test_tool_output_is_not_stamped(scaffolded: Scaffolded) -> None:
     for path in [
         target / "uv.lock",
         generated / "operations.py",
+        generated / "vendor_requests.py",
         generated / "vendor_responses.py",
     ]:
         assert not STAMP.search(path.read_text()), path.name

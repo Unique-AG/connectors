@@ -22,7 +22,7 @@ async def record_position(
     Only a ticker Tiingo has prices for is held, since no other could ever be valued.
     """
     try:
-        meta = await upstream.call(GET_DAILY_META, ticker=position.ticker)
+        meta = await upstream.call_untyped(GET_DAILY_META, ticker=position.ticker)
     except UpstreamError as error:
         if error.status_code != HTTPStatus.NOT_FOUND:
             raise
