@@ -15,9 +15,9 @@ from world_check_mcp.upstream import Upstream
 
 async def get_group_settings(*, upstream: Upstream, group_id: str) -> GroupSettings:
     """The group's template and the resolution choices its matches accept."""
-    group = await upstream.call(GET_GROUP_BY_ID, groupId=group_id)
-    template = await upstream.call(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
-    toolkits = await upstream.call(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=group_id)
+    group = await upstream.call_untyped(GET_GROUP_BY_ID, groupId=group_id)
+    template = await upstream.call_untyped(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
+    toolkits = await upstream.call_untyped(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=group_id)
     return GroupSettings(
         group=group_from_summary(summary=group),
         screening_type=template.group_screening_type,

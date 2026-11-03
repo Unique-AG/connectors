@@ -12,7 +12,7 @@ async def generate_passport_mrz(*, upstream: Upstream, passport: Passport) -> Mr
     """MRZ lines for a document. This does not create a case or record a verification."""
     if passport.date_of_birth > date.today():
         raise PassportError("Date of birth cannot be in the future.")
-    nationalities = (await upstream.call(GET_NATIONALITIES)).root
+    nationalities = (await upstream.call_untyped(GET_NATIONALITIES)).root
     issuing_state = passport.issuing_state.upper()
     nationality = passport.nationality.upper()
     if issuing_state not in nationalities or nationality not in nationalities:
@@ -20,7 +20,7 @@ async def generate_passport_mrz(*, upstream: Upstream, passport: Passport) -> Mr
             "Use issuing-state and nationality codes from get_reference_data nationalities, "
             "not the WATCHLIST country list."
         )
-    generated = await upstream.call(
+    generated = await upstream.call_untyped(
         GET_MRZ,
         givenName=passport.given_name,
         lastName=passport.last_name,

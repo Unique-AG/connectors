@@ -28,7 +28,7 @@ async def search_cases(
     }
     if query is not None:
         arguments["query"] = query
-    found = await upstream.call(SEARCH_CASES, **arguments)
+    found = await upstream.call_untyped(SEARCH_CASES, **arguments)
     return CasePage(
         cases=[
             CaseSummary(

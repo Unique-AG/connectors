@@ -26,10 +26,10 @@ async def passport_check(
 ) -> PassportCheck:
     """Create a Passport Check case and screen it. This does not record a verification decision."""
     await refuse_existing_case(upstream=upstream, case_id=case_id)
-    template = await upstream.call(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
-    countries = await upstream.call(GET_COUNTRIES)
-    nationalities = await upstream.call(GET_NATIONALITIES)
-    saved = await upstream.call(
+    template = await upstream.call_untyped(GET_CASE_TEMPLATE_FOR_GROUP, groupId=group_id)
+    countries = await upstream.call_untyped(GET_COUNTRIES)
+    nationalities = await upstream.call_untyped(GET_NATIONALITIES)
+    saved = await upstream.call_untyped(
         SAVE_AND_SCREEN,
         **passport_arguments(
             passport=passport,

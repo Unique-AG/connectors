@@ -25,7 +25,7 @@ async def get_case_results(
     }
     if expression is not None:
         arguments["filter"] = expression
-    found = await upstream.call(GET_RESULTS, **arguments)
+    found = await upstream.call_untyped(GET_RESULTS, **arguments)
     return CaseResults(
         case_system_id=resolved.case_system_id,
         matches=[

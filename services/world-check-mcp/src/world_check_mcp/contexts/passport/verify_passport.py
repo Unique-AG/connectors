@@ -73,7 +73,7 @@ async def apply_passport_verification(
         raise PassportError(
             "Case or passport results changed during approval. Review and request fresh approval."
         )
-    await upstream.call(
+    await upstream.call_untyped(
         VERIFY_PASSPORT,
         caseSystemId=request.case_system_id,
         mrzMatched=plan.mrz_matched,

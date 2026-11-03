@@ -39,7 +39,7 @@ async def get_ogs_updates(
     if page_reference is not None:
         pagination["pageReference"] = page_reference
     try:
-        found = await upstream.call(
+        found = await upstream.call_untyped(
             GET_OGS_UPDATES,
             filter=_filter(start=start, end=end, group_id=group_id, case_system_id=case_system_id),
             sort=[{"columnName": "updateDate", "order": "ASCENDING"}],

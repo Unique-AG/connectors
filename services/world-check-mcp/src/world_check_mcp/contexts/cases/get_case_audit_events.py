@@ -26,7 +26,7 @@ async def get_case_audit_events(
     }
     if query is not None:
         arguments["query"] = query
-    found = await upstream.call(GET_CASE_AUDIT_EVENTS, **arguments)
+    found = await upstream.call_untyped(GET_CASE_AUDIT_EVENTS, **arguments)
     return AuditPage(
         case_system_id=resolved.case_system_id,
         events=[

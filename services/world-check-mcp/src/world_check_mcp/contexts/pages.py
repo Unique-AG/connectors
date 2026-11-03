@@ -17,7 +17,9 @@ async def all_case_results(*, upstream: Upstream, case_system_id: str) -> list[R
         pagination: dict[str, object] = {"itemsPerPage": 1000}
         if page_reference is not None:
             pagination["pageReference"] = page_reference
-        page = await upstream.call(GET_RESULTS, caseSystemId=case_system_id, pagination=pagination)
+        page = await upstream.call_untyped(
+            GET_RESULTS, caseSystemId=case_system_id, pagination=pagination
+        )
         found.extend(page.results)
         following = next_page(page.pagination)
         if following is None:

@@ -123,7 +123,7 @@ async def test_a_rejected_token_is_refreshed_once() -> None:
         upstream_http(settings, httpx2.MockTransport(respond), now=lambda: _WHEN) as http,
         open_upstream(http, settings) as upstream,
     ):
-        info = await upstream.call(GET_API_INFO)
+        info = await upstream.call_untyped(GET_API_INFO)
 
     assert info.version == "3.9.0"
     assert tokens == ["access-1", "access-2"]
@@ -177,7 +177,7 @@ async def test_a_retry_reuses_the_token() -> None:
         upstream_http(settings, httpx2.MockTransport(respond), now=lambda: _WHEN) as http,
         open_upstream(http, settings) as upstream,
     ):
-        info = await upstream.call(GET_API_INFO)
+        info = await upstream.call_untyped(GET_API_INFO)
 
     assert info.version == "3.9.0"
     assert tokens == 1

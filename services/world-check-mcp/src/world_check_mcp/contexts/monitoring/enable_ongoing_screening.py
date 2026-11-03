@@ -7,7 +7,7 @@ from world_check_mcp.upstream import Upstream
 async def enable_ongoing_screening(*, upstream: Upstream, case: str) -> OngoingScreening:
     """Turn on WATCHLIST monitoring. An HTTP 200 body lists the cases LSEG did not update."""
     found = await get_case(upstream=upstream, case=case)
-    result = await upstream.call(
+    result = await upstream.call_untyped(
         TOGGLE_ONGOING_SCREENING,
         caseSystemIds=[found.case_system_id],
         caseScreeningState={"WATCHLIST": "ONGOING"},

@@ -29,7 +29,7 @@ async def prepare_resolution(
     except ResultPageError as error:
         raise ResolutionError(f"{error} No resolution was saved.") from error
     match = _match(results=results, result_id=request.result_id)
-    toolkits = await upstream.call(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=case.group_id)
+    toolkits = await upstream.call_untyped(GET_RESOLUTION_TOOLKITS_FOR_GROUP, groupId=case.group_id)
     toolkit = toolkits.root.get("WATCHLIST")
     if (
         toolkit is None
@@ -99,7 +99,7 @@ async def apply_resolution(
     }
     if plan.reason is not None:
         arguments["reasonId"] = plan.reason.id
-    await upstream.call(RESOLVE_RESULTS, **arguments)
+    await upstream.call_untyped(RESOLVE_RESULTS, **arguments)
     return ResolutionOutcome(
         resolved=True,
         case_system_id=request.case_system_id,

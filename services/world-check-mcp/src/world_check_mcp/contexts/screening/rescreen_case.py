@@ -18,7 +18,7 @@ async def rescreen_case(
         raise ScreeningError(
             "Rescreening is restricted to WATCHLIST and PASSPORT_CHECK. Media Check is unsupported."
         )
-    screened = await upstream.call(
+    screened = await upstream.call_untyped(
         PARTIAL_UPDATE_CASE,
         caseSystemId=found.case_system_id,
         screen="DELTA_SYNC" if delta else "SYNC",

@@ -8,7 +8,7 @@ from world_check_mcp.upstream import Upstream
 async def get_screening_status(*, upstream: Upstream, case: str) -> ScreeningStatus:
     """WATCHLIST and Passport Check progress, without screening the case again."""
     resolved = await get_case(upstream=upstream, case=case)
-    found = await upstream.call(
+    found = await upstream.call_untyped(
         GET_SCREENING_STATUS,
         screeningStatusRequests=[{"caseSystemId": resolved.case_system_id}],
         providerTypes=["WATCHLIST", "PASSPORT_CHECK"],
