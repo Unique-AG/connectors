@@ -11,6 +11,8 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 |---|---|
 | Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, Docker base images, and Terraform providers |
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*`. A major bump of a group member gets its own PR. |
+| Only that package | A PR changes only the packages that it names, and the packages that they need. For an indirect dependency, the job pins the version with a temporary pnpm override. It removes the override before the PR. If another package changes, the job fails and opens no PR. Put packages that must move together in one group in `.github/deps-groups.json`. |
+| Title | The title names each version change, for example `bump @babel/parser from 7.29.11 to 7.29.12 and from 8.0.8 to 8.0.10`. |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
@@ -101,7 +103,7 @@ flowchart TD
   same -->|no| replace[Label the old PR superseded, close it, and open a new PR]
   same -->|yes| behind{Is the branch behind main?}
   behind -->|no| keep[Do nothing]
-  behind -->|yes| touched{"Agent label, or a commit from a person?"}
+  behind -->|yes| touched{"A commit from a person or the agent?"}
   touched -->|yes| merge[Merge main into the branch and keep the commits]
   touched -->|no| rebuild[Rebuild the branch from main and update the PR body]
 ```
@@ -109,13 +111,24 @@ flowchart TD
 | Case | What the job does |
 |---|---|
 | The target versions are the same, and the branch has all of `main` | Nothing. |
-| The target versions are the same and the branch is behind `main`. Nobody touched the PR. | It rebuilds the branch from `main` and updates the PR body. |
-| The target versions are the same, and the PR has an agent label or a commit from a person | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
+| The target versions are the same and the branch is behind `main`. The PR has only the commit of the job. | It rebuilds the branch from `main` and updates the PR body. A rebuild removes every conflict with `main`. |
+| The target versions are the same, and the PR has a commit from a person or the agent | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
 | A target version changed | It labels the old PR `superseded`, closes it with a comment, and opens a new PR. The new PR starts a new agent run. |
 | A person closed the PR without a merge | It skips those target versions. A newer version opens a new PR. For a group, a close skips only that set of versions. |
 | A person merged the PR | Nothing. The plan finds no update. |
 
-Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A touched PR keeps its commits, because a rebuild from `main` deletes the fixes of the agent.
+Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A PR with a commit keeps it, because a rebuild from `main` deletes the fixes of the agent. The label `ai-assisted` does not change this.
+
+## Ask for a rebase or a rebuild
+
+Write one of these commands as the first line of a comment on a dependency PR.
+
+| Comment | What happens |
+|---|---|
+| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. |
+| `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. |
+
+The command works only in a comment from an owner, a member, or a collaborator. It works only on a PR that has the label `dependencies` and a branch that starts with `deps/`. The workflow `[Deps] Rebase` reacts with an eyes emoji and starts the nightly workflow with the number of the PR. This run handles that PR only. It opens no other PR and does not change the dashboard issue. A person can start the same run with the inputs `pr` and `recreate` of the nightly workflow.
 
 ## Ignore a dependency
 

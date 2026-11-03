@@ -48,6 +48,7 @@ flowchart LR
 | Part | What it is | It starts when |
 |---|---|---|
 | Nightly dependency job | The workflow `deps-nightly.yaml` | 02:00 UTC |
+| Rebase request | The workflow `deps-rebase.yaml` | A comment `/rebase` or `/recreate` on a dependency PR |
 | Nightly Trivy scan | The workflow `security-trivy-nightly.yaml` | 03:00 UTC |
 | CI | The test, lint, and build workflows, the dependency review, and CodeQL | A PR opens or changes |
 | Gatekeeper | The check that waits for all other checks | A PR opens or changes |
@@ -66,8 +67,8 @@ flowchart LR
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
 | `superseded` | Nightly job | Nightly job | The job closed this PR for a newer version. A person did not reject it. |
 | `dependency-dashboard` | Nightly job | Person | The one issue that lists the plan and the open dependency PRs. |
-| `ai-assisted` | Agent | Agent, nightly job | An agent run owns the PR and posted its report. |
-| `human-required` | Agent | Agent, nightly job, person | The agent cannot finish the PR. It removes `ai-assisted` first, so a PR never has both labels. A person finishes the PR. |
+| `ai-assisted` | Agent | Agent | An agent run owns the PR and posted its report. |
+| `human-required` | Agent | Agent, person | The agent cannot finish the PR. It removes `ai-assisted` first, so a PR never has both labels. A person finishes the PR. |
 | `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |
 | `title-exception` | Person | Gatekeeper title check | Skip the PR title check. |
 
