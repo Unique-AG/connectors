@@ -11,8 +11,10 @@ import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
+from space_config_mcp.mcp.dependencies import get_persistence
 from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
+from space_config_mcp.persistence import Persistence
 from space_config_mcp.upstream import Upstream
 
 _META = merge_tool_meta(
@@ -56,13 +58,19 @@ async def add_space_access(
         ),
     ],
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space.SpaceAccessResponse:
     """Grant access to a user or group on the current space."""
     user_id, company_id = caller
     return await contexts.add_space_access(
-        upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id, access=access
+        upstream=upstream,
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        access=access,
     )
 
 
@@ -78,6 +86,7 @@ async def delete_space_access(
         Field(description="List of access entry IDs to remove."),
     ],
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space.DeleteSpaceAccessResponse:
@@ -85,6 +94,7 @@ async def delete_space_access(
     user_id, company_id = caller
     return await contexts.delete_space_access(
         upstream=upstream,
+        persistence=persistence,
         user_id=user_id,
         company_id=company_id,
         space_id=space_id,
