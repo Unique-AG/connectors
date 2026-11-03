@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Annotated, assert_never, cast
+from typing import Annotated, cast
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -193,8 +193,6 @@ def _question(name: str, owner: OnenoteOwner | None) -> str:
                 f"Create the notebook {name!r} in the SharePoint site with the id "
                 + f"{owner.owner_id!r}? Other people with access to the site can open it."
             )
-        case _:
-            assert_never(owner.kind)
 
 
 def _answer(notebook: Notebook, owner: OnenoteOwner | None) -> CreatedNotebook:
