@@ -323,3 +323,27 @@ jobs:
             url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr/pr-body.md" --label dependencies --label "$ecosystem_label")
           fi
           echo "- $url" >> "$GITHUB_STEP_SUMMARY"
+
+  finish:
+    name: Finish
+    needs: [plan, update, bump, publish]
+    if: always() && !inputs.dry-run && inputs.pr != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # to remove the rebuild note and to comment on a failure
+    steps:
+      - name: Remove the rebuild note
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ inputs.pr }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh pr view "$NUMBER" --json body --jq .body \
+            | perl -0pe 's/<!-- deps-rebuilding -->.*?<!-- \/deps-rebuilding -->\r?\n(\r?\n)?//s' \
+            | gh pr edit "$NUMBER" --body-file -
+          if [ "$FAILED" = true ]; then
+            gh pr comment "$NUMBER" --body "The rebuild failed. Read the log of the run: $RUN_URL"
+          fi

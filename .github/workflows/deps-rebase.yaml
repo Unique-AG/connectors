@@ -46,3 +46,8 @@ jobs:
           esac
           gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes > /dev/null
           gh workflow run deps-nightly.yaml -f dry-run=false -f pr="$NUMBER" -f recreate="$recreate"
+          body=$(gh pr view "$NUMBER" --json body --jq .body)
+          case "$body" in
+            *deps-rebuilding*) exit 0 ;;
+          esac
+          printf '<!-- deps-rebuilding -->\n> [!NOTE]\n> Rebuilding this pull request. This note goes away when the run ends.\n<!-- /deps-rebuilding -->\n\n%s\n' "$body" | gh pr edit "$NUMBER" --body-file -
