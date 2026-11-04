@@ -154,9 +154,7 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
-            # The first of ours, so the bearer token is redacted from every line they log. FastMCP
-            # runs its auth middleware ahead of these, so verifying the token happens outside
-            # this scope; it only handles the token's hash.
+            # First of ours. FastMCP's auth runs ahead of this list and only hashes the token.
             Middleware(RedactRequestSecretsMiddleware),
             # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
             # avoids two limits that can drift. Also bounds the unauthenticated login POST.
