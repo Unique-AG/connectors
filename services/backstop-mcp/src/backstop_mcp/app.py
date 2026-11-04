@@ -37,7 +37,6 @@ from backstop_mcp.dependencies import (
     get_auth_provider,
     get_backstop_client_factory,
     get_database_config,
-    get_encryption_config,
     get_encryption_key,
     get_engine,
     get_logging_settings,
@@ -46,7 +45,7 @@ from backstop_mcp.dependencies import (
 )
 from backstop_mcp.features.auth import cleanup_lifespan
 from backstop_mcp.features.system_users import find_system_user_by_user_name
-from backstop_mcp.logging import configure_logging, deployment_secrets
+from backstop_mcp.logging import configure_logging
 from backstop_mcp.metrics import configure_metrics
 from backstop_mcp.server.instructions import INSTRUCTIONS
 from backstop_mcp.server.session_revoked import SessionRevokedToUnauthorizedMiddleware
@@ -76,7 +75,7 @@ def create_app() -> Starlette:
     configure_logging(
         logging_settings,
         encryption_key=get_encryption_key(),
-        secrets=deployment_secrets(get_encryption_config(), get_database_config()),
+        database_url=get_database_config().connection_url,
     )
     configure_metrics(config)
     # Before FastMCP is built. Tracing is off unless an OTEL_* variable turns it on.

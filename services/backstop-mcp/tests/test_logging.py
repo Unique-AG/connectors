@@ -2,17 +2,17 @@ import hashlib
 import hmac
 import json
 import logging
+from collections.abc import Iterator
 
 import pytest
 from mcp_configs import LoggingSettings, LogLevel
 from mcp_observability import identifiable_value
-from pydantic import PostgresDsn, SecretStr
 
-from backstop_mcp.config import DatabaseConfig, EncryptionConfig
-from backstop_mcp.logging import configure_logging, deployment_secrets
+from backstop_mcp.logging import configure_logging
 
 _ENCRYPTION_KEY = b"encryption-key-material"
 _LOGIN = "jdoe"
+_DATABASE_URL = "postgresql+asyncpg://app:db-password-1@db:5432/backstop"
 
 
 def _keyed(value: str, key: bytes) -> str:
@@ -25,46 +25,59 @@ class TestPseudonymSecret:
             _ENCRYPTION_KEY, b"backstop-mcp/log-pseudonyms/v1", hashlib.sha256
         ).digest()
 
-        configure_logging(LoggingSettings(log_level=LogLevel.INFO), encryption_key=_ENCRYPTION_KEY)
+        configure_logging(
+            LoggingSettings(log_level=LogLevel.INFO),
+            encryption_key=_ENCRYPTION_KEY,
+            database_url=_DATABASE_URL,
+        )
 
         assert str(identifiable_value(_LOGIN)) == _keyed(_LOGIN, derived)
 
     def test_never_keys_pseudonyms_with_the_encryption_key_itself(self) -> None:
-        configure_logging(LoggingSettings(log_level=LogLevel.INFO), encryption_key=_ENCRYPTION_KEY)
+        configure_logging(
+            LoggingSettings(log_level=LogLevel.INFO),
+            encryption_key=_ENCRYPTION_KEY,
+            database_url=_DATABASE_URL,
+        )
 
         assert str(identifiable_value(_LOGIN)) != _keyed(_LOGIN, _ENCRYPTION_KEY)
 
 
-class TestDeploymentSecrets:
-    def test_reads_the_encryption_key_and_the_password_of_a_database_url(self) -> None:
-        secrets = deployment_secrets(
-            EncryptionConfig(encryption_key=SecretStr("encryption-key-value")),
-            DatabaseConfig(url=PostgresDsn("postgresql://app:db%2Fpassword-1@db:5432/backstop")),
-        )
-
-        assert secrets == ("encryption-key-value", "db/password-1")
-
-    def test_reads_the_password_of_discrete_database_fields(self) -> None:
-        secrets = deployment_secrets(
-            EncryptionConfig(encryption_key=SecretStr("encryption-key-value")),
-            DatabaseConfig(host="db", name="backstop", user="app", password="db-password-1"),
-        )
-
-        assert secrets == ("encryption-key-value", "db-password-1")
-
-    def test_redacts_them_from_every_line(self, capsys: pytest.CaptureFixture[str]) -> None:
+class TestRedaction:
+    @pytest.fixture(autouse=True)
+    def root_handlers(self) -> Iterator[None]:
         root = logging.getLogger()
         handlers = list(root.handlers)
         root.handlers = []
-        try:
-            configure_logging(
-                LoggingSettings(log_level=LogLevel.INFO),
-                encryption_key=_ENCRYPTION_KEY,
-                secrets=("db-password-1",),
-            )
-            logging.getLogger("backstop_mcp.tests").warning("connect failed with db-password-1")
-        finally:
-            root.handlers = handlers
+        yield
+        root.handlers = handlers
+
+    def test_redacts_the_encryption_key_and_the_decoded_database_password(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        configure_logging(
+            LoggingSettings(log_level=LogLevel.INFO),
+            encryption_key=_ENCRYPTION_KEY,
+            database_url="postgresql+asyncpg://app:db%2Fpassword-1@db:5432/backstop",
+        )
+
+        logging.getLogger("backstop_mcp.tests").warning(
+            "connect failed with db/password-1 and %s", _ENCRYPTION_KEY.decode()
+        )
 
         (line,) = capsys.readouterr().err.splitlines()
-        assert json.loads(line)["msg"] == "connect failed with [Redacted]"
+        assert json.loads(line)["msg"] == "connect failed with [Redacted] and [Redacted]"
+
+    def test_accepts_a_database_url_without_a_password(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        configure_logging(
+            LoggingSettings(log_level=LogLevel.INFO),
+            encryption_key=_ENCRYPTION_KEY,
+            database_url="postgresql+asyncpg://app@db:5432/backstop",
+        )
+
+        logging.getLogger("backstop_mcp.tests").warning("connected as app")
+
+        (line,) = capsys.readouterr().err.splitlines()
+        assert json.loads(line)["msg"] == "connected as app"

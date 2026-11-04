@@ -5,6 +5,7 @@ import hashlib
 import io
 import json
 import logging
+import os
 import re
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping
@@ -535,3 +536,51 @@ class TestSecretsStayOutOfLogs:
             logged = json.dumps(session.lines())
             assert api_token not in logged
             assert access_token not in logged
+
+    @respx.mock
+    async def test_an_error_quoting_the_tokens_stays_out_of_logs_and_spans(
+        self,
+        db: DatabaseFixture,
+        postgres_container: PostgresContainer,
+        monkeypatch: pytest.MonkeyPatch,
+        exporter: InMemorySpanExporter,
+    ) -> None:
+        api_token = "backstop-api-token-0123"
+        access_token = _HEADERS["authorization"].removeprefix("Bearer ")
+        respx.get(url__regex=rf"{_API}/organizations/org-1").mock(
+            return_value=httpx.Response(200, json=_ORGANIZATION)
+        )
+        respx.get(url__regex=rf"{_API}/tasks").mock(
+            side_effect=RuntimeError(f"rejected {api_token} for {access_token}")
+        )
+
+        async with _connected(db, postgres_container, monkeypatch, api_token=api_token) as session:
+            exporter.clear()
+            session.call(
+                "get_tasks_for_party",
+                {"search_type": "organizations", "party_id": "org-1"},
+                expect_error=True,
+            )
+
+            telemetry = [json.dumps(session.lines())]
+            telemetry += [_span_text(span) for span in exporter.get_finished_spans()]
+            assert _tool_span(exporter, "get_tasks_for_party").events
+            for text in telemetry:
+                assert api_token not in text
+                assert access_token not in text
+
+    async def test_the_deployment_secrets_are_redacted_from_what_the_app_logs(
+        self,
+        db: DatabaseFixture,
+        postgres_container: PostgresContainer,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async with _connected(db, postgres_container, monkeypatch) as session:
+            encryption_key = os.environ["BACKSTOP_MCP_ENCRYPTION_KEY"]
+            database_password = postgres_container.password
+            logging.getLogger("backstop_mcp.tests").warning(
+                "secrets %s %s", encryption_key, database_password
+            )
+
+            (line,) = [line for line in session.lines() if line["context"] == "backstop_mcp.tests"]
+            assert line["msg"] == "secrets [Redacted] [Redacted]"
