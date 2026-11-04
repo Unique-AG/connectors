@@ -109,6 +109,7 @@ describe('deploymentSecrets', () => {
     expect(deploymentSecrets(mockNoProxyConfig, mockTenants)).toEqual([
       'confluence-client-secret',
       'zitadel-client-secret',
+      Buffer.from('zitadel-client-id:zitadel-client-secret').toString('base64'),
       'confluence-personal-token',
       'confluence-password-1',
       Buffer.from('confluence-user:confluence-password-1').toString('base64'),
@@ -143,10 +144,14 @@ describe('createAppLoggerOptions', () => {
     const { logger, lines } = createCapturingLogger(mockBasicProxyConfig);
 
     logger.error('rejected confluence-client-secret and zitadel-client-secret');
+    logger.error(
+      `rejected ${Buffer.from('zitadel-client-id:zitadel-client-secret').toString('base64')}`,
+    );
     logger.error('rejected proxy-password-1');
 
     expect(lines.map((line) => JSON.parse(line).msg)).toEqual([
       'rejected [Redacted] and [Redacted]',
+      'rejected [Redacted]',
       'rejected [Redacted]',
     ]);
   });

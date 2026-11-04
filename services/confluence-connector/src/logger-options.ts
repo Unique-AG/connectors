@@ -84,7 +84,10 @@ function confluenceSecrets(auth: ConfluenceConfig['auth']): string[] {
 
 function uniqueSecrets(unique: UniqueConfig): string[] {
   return unique.serviceAuthMode === UniqueAuthMode.External
-    ? [unique.zitadelClientSecret.value]
+    ? [
+        unique.zitadelClientSecret.value,
+        basicCredentials(unique.zitadelClientId, unique.zitadelClientSecret.value),
+      ]
     : [];
 }
 
