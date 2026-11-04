@@ -360,6 +360,11 @@ describe('createSecretRedactor', () => {
       expect(bearerToken(requestWith('bearer mcp-access-token'))).toEqual(['mcp-access-token']);
     });
 
+    it('returns the token when whitespace after Bearer is more than one space', () => {
+      expect(bearerToken(requestWith('Bearer  mcp-access-token'))).toEqual(['mcp-access-token']);
+      expect(bearerToken(requestWith('Bearer\tmcp-access-token'))).toEqual(['mcp-access-token']);
+    });
+
     it.each([
       ['no authorization header', undefined],
       ['another scheme', 'Basic dXNlcjpwYXNz'],

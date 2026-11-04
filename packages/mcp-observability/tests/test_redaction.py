@@ -19,6 +19,7 @@ from mcp_observability import DEFAULT_SECRET_PATTERNS
 from mcp_observability import RedactRequestSecretsMiddleware
 from mcp_observability import SecretRedaction
 from mcp_observability import add_log_secrets
+from mcp_observability import bearer_token
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
 from mcp_observability.redaction import MIN_SECRET_LENGTH
@@ -326,6 +327,16 @@ class TestRequestSecrets:
             "upstream rejected [Redacted]",
             "after the request tenant-token-1234",
         ]
+
+    def test_bearer_token_allows_whitespace_after_the_scheme(self) -> None:
+        def request(authorization: str) -> Request:
+            return Request(
+                {"type": "http", "headers": [(b"authorization", authorization.encode())]}
+            )
+
+        assert bearer_token(request("Bearer  opaque-token-1234")) == ("opaque-token-1234",)
+        assert bearer_token(request("bearer\topaque-token-1234")) == ("opaque-token-1234",)
+        assert bearer_token(request("Bearer")) == ()
 
     def test_the_bearer_token_of_an_http_request_is_redacted_by_default(
         self, capsys: pytest.CaptureFixture[str]

@@ -176,7 +176,7 @@ export function addLogSecrets(secrets: readonly string[]): void {
 
 /** The token of a request's `Authorization: Bearer` header, the default for `redactRequestSecrets`. */
 export function bearerToken(request: IncomingMessage): string[] {
-  const [scheme, token] = (request.headers.authorization ?? '').split(' ');
+  const [scheme, token] = (request.headers.authorization ?? '').trim().split(/\s+/);
   return scheme?.toLowerCase() === 'bearer' && token ? [token] : [];
 }
 
@@ -260,17 +260,17 @@ const STACK_FRAME = /^\s+at (.+:\d+:\d+\)?)$/;
 const ORIGINAL_FIELDS: ReadonlyArray<readonly [string, RegExp]> = [
   ['original_level', /"level":(\d+)/],
   ['original_time', /"time":(\d+)/],
-  ['context', /"context":("[A-Za-z0-9_.$-]{1,100}")/],
   ['trace_id', /"trace_id":("[0-9a-f]{32}")/],
   ['span_id', /"span_id":("[0-9a-f]{16}")/],
   ['req_id', /"req":\{"id":(\d+|"[0-9a-f]{32}"|"[a-z_]+_[0-9a-z]{26}")/],
 ];
+const CONTEXT_KEY = '"context":';
+const CONTEXT_LITERAL = /^"[A-Za-z0-9_.$-]{1,100}"$/;
 
 // Read from the raw line, which may be what broke, in formats narrow enough to hold no logged text.
-// The first match can still be a nested logged value, such as a secret under a `context` key, so
-// each string is salvaged like the message.
+// `context` is only the top-level field. A nested `"context"` is a logged value and can be a secret.
 function originalFields(line: string, salvage: (text: string) => string): Record<string, unknown> {
-  return Object.fromEntries(
+  const fields: Record<string, unknown> = Object.fromEntries(
     ORIGINAL_FIELDS.flatMap(([name, pattern]) => {
       const literal = pattern.exec(line)?.[1];
       if (literal === undefined) {
@@ -280,6 +280,59 @@ function originalFields(line: string, salvage: (text: string) => string): Record
       return [[name, typeof value === 'string' ? salvage(value) : value]];
     }),
   );
+  const context = topLevelContext(line);
+  if (context !== undefined) {
+    fields.context = salvage(context);
+  }
+  return fields;
+}
+
+function topLevelContext(line: string): string | undefined {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < line.length; index++) {
+    const char = line[index];
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === '\\') {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (char === '"') {
+      if (depth === 1 && line.startsWith(CONTEXT_KEY, index)) {
+        const literal = contextLiteralAt(line, index + CONTEXT_KEY.length);
+        if (literal !== undefined) {
+          const value: unknown = JSON.parse(literal);
+          return typeof value === 'string' ? value : undefined;
+        }
+      }
+      inString = true;
+      continue;
+    }
+    if (char === '{' || char === '[') {
+      depth += 1;
+    } else if ((char === '}' || char === ']') && depth > 0) {
+      depth -= 1;
+    }
+  }
+  return undefined;
+}
+
+function contextLiteralAt(line: string, from: number): string | undefined {
+  let index = from;
+  while (index < line.length && JSON_WHITESPACE.has(line[index] ?? '')) {
+    index += 1;
+  }
+  if (line[index] !== '"') {
+    return undefined;
+  }
+  const literal = line.slice(index, jsonStringEnd(line, index));
+  return CONTEXT_LITERAL.test(literal) ? literal : undefined;
 }
 
 function originalMsg(line: string, salvage: (text: string) => string): { original_msg?: string } {

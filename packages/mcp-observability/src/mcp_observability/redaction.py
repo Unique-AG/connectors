@@ -112,14 +112,9 @@ class SecretRedaction(BaseModel):
     narrows what is replaced."""
 
 
-# A JSON string literal, and the colon after it when it is an object key. An unterminated literal
-# runs to the end of the line, so a match never fails partway and retries inside it.
 _JSON_STRING = re.compile(r'("(?:[^"\\]|\\[\s\S])*(?:"|\\?\Z))(\s*:)?')
-# `PinoJsonFormatter` writes `msg` before any logged value that could nest one.
 _MSG = re.compile(r'"msg":\s*("(?:[^"\\]|\\[\s\S])*(?:"|\\?\Z))')
 
-# Describes a log call from fields that hold no logged value: its logger, level, code location and
-# trace ids.
 type Source = Callable[[], dict[str, object]]
 
 
@@ -256,9 +251,10 @@ def _scope(secrets: tuple[str, ...], failure: str | None = None) -> Generator[No
 
 
 def bearer_token(request: Request) -> tuple[str, ...]:
-    """The token of a request's `Authorization: Bearer` header."""
-    scheme, _, token = request.headers.get("authorization", "").partition(" ")
-    return (token,) if scheme.lower() == "bearer" and token else ()
+    """The token of a request's `Authorization: Bearer` header. RFC 6750 allows any whitespace after
+    the scheme."""
+    parts = request.headers.get("authorization", "").split()
+    return (parts[1],) if len(parts) >= 2 and parts[0].lower() == "bearer" and parts[1] else ()
 
 
 def caller_access_token(_context: MiddlewareContext[mt.CallToolRequestParams]) -> tuple[str, ...]:

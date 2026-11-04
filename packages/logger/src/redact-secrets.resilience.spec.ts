@@ -275,16 +275,18 @@ describe('createSecretRedactor resilience', () => {
       expect(JSON.parse(lines[0] ?? '').original_msg).toBe('login with password=[Redacted] failed');
     });
 
-    it('replaces a known secret found where the logger context is read from', () => {
+    it('leaves a nested context value off the replacement line', () => {
       const { logger, lines } = createCapturingLogger({
         secrets: [mockSecret],
         patterns: [explodingPattern('matching exploded')],
       });
+      const nestedSecret = 'nested-context-secret';
 
-      logger.info({ upstream: { context: mockSecret } }, 'syncing');
+      logger.info({ upstream: { context: nestedSecret } }, 'syncing');
 
+      expect(lines[0]).not.toContain(nestedSecret);
       expect(lines[0]).not.toContain(mockSecret);
-      expect(JSON.parse(lines[0] ?? '').context).toBe('[Redacted]');
+      expect(JSON.parse(lines[0] ?? '')).not.toHaveProperty('context');
     });
 
     it('keeps the logger context of the original line', () => {
