@@ -10,6 +10,7 @@
     options.opens_persistence and "open_persistence",
     options.opens_upstream and "upstream_transport",
     options.auth and "auth=fake_auth_settings()",
+    options.auth and "rate_limit=None",
     options.auth and "base_url=BASE_URL",
 ] | select | join(", ") %}
 {% set offline = [
@@ -134,6 +135,9 @@ def build_server({{ parameters }}) -> FastMCP:
     async def open_persistence() -> AsyncGenerator[Persistence]:
         yield persistence
 
+{% endif %}
+{% if options.auth %}
+    # The calls made here carry no token for the rate limit to count them under.
 {% endif %}
     return create_server({{ arguments }})
 

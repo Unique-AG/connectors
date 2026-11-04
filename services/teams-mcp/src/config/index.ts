@@ -6,6 +6,7 @@ import type { DatabaseConfigNamespaced } from './database.config';
 import type { EncryptionConfigNamespaced } from './encryption.config';
 import type { HealthConfigNamespaced } from './health.config';
 import type { MicrosoftConfigNamespaced } from './microsoft.config';
+import type { RateLimitConfigNamespaced } from './rate-limit.config';
 import type { UniqueConfigNamespaced } from './unique.config';
 
 export * from './amqp.config';
@@ -16,6 +17,7 @@ export * from './database.config';
 export * from './encryption.config';
 export * from './health.config';
 export * from './microsoft.config';
+export * from './rate-limit.config';
 export * from './unique.config';
 
 export type ConfigNamespaced = AMQPConfigNamespaced &
@@ -26,4 +28,5 @@ export type ConfigNamespaced = AMQPConfigNamespaced &
   EncryptionConfigNamespaced &
   HealthConfigNamespaced &
   MicrosoftConfigNamespaced &
+  RateLimitConfigNamespaced &
   UniqueConfigNamespaced;

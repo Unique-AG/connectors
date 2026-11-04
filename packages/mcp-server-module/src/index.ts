@@ -1,3 +1,4 @@
+export { type McpRateLimitConfig, mcpRateLimitConfigSchema } from './config/rate-limit.config';
 export * from './decorators';
 export * from './errors/tool.error';
 export * from './interfaces';

@@ -7,6 +7,7 @@ import { DelegatedAccessConfigNamespaced } from './delegated-access.config';
 import type { EncryptionConfigNamespaced } from './encryption.config';
 import { IngestionConfigNamespaced } from './ingestion.config';
 import type { MicrosoftConfigNamespaced } from './microsoft.config';
+import type { RateLimitConfigNamespaced } from './rate-limit.config';
 import type { UniqueConfigNamespaced } from './unique.config';
 
 export * from './amqp.config';
@@ -18,6 +19,7 @@ export * from './encryption.config';
 export * from './ingestion.config';
 export * from './mcp-backend-type.config';
 export * from './microsoft.config';
+export * from './rate-limit.config';
 export * from './unique.config';
 
 export type ConfigNamespaced = AMQPConfigNamespaced &
@@ -26,6 +28,7 @@ export type ConfigNamespaced = AMQPConfigNamespaced &
   DatabaseConfigNamespaced &
   EncryptionConfigNamespaced &
   MicrosoftConfigNamespaced &
+  RateLimitConfigNamespaced &
   UniqueConfigNamespaced &
   DelegatedAccessConfigNamespaced &
   IngestionConfigNamespaced &

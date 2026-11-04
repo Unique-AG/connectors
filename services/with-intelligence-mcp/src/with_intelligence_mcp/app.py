@@ -3,7 +3,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
-from mcp_observability import ToolCallObservabilityMiddleware
+from mcp_configs import RateLimitSettings
+from mcp_observability import (
+    RateLimitMiddleware,
+    ToolCallObservabilityMiddleware,
+    access_token_subject,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -60,7 +65,10 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
-        middleware=[ToolCallObservabilityMiddleware()],
+        middleware=[
+            ToolCallObservabilityMiddleware(),
+            RateLimitMiddleware(RateLimitSettings(), get_request_key=access_token_subject),
+        ],
         mask_error_details=True,
     )
     for fn in TOOLS:

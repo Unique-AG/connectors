@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { AesGcmEncryptionModule, AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
 import { defaultLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
@@ -34,6 +35,7 @@ import {
   healthConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  rateLimitConfig,
   type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
@@ -60,6 +62,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         encryptionConfig,
         healthConfig,
         microsoftConfig,
+        rateLimitConfig,
         uniqueConfig,
       ],
     }),
@@ -168,6 +171,15 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         statelessMode: false,
       },
       mcpEndpoint: 'mcp',
+      rateLimit: {
+        config: rateLimitConfig.KEY,
+        getRequestKey: (request) => {
+          const userProfileId = (request.raw as { user?: { userProfileId?: string } }).user
+            ?.userProfileId;
+          assert.ok(userProfileId, 'McpAuthJwtGuard sets the user profile on every MCP request');
+          return userProfileId;
+        },
+      },
     }),
     MsGraphModule,
     AMQPModule,
