@@ -547,7 +547,7 @@ uc-13-33:
     - "tests/tools/test_teams_add_chat_member.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_user_another_chat_and_another_history"
     - "tests/tools/test_teams_add_chat_member.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_addition_adds_nobody"
     - "tests/tools/test_teams_remove_chat_member.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_membership_removes_nobody"
-    - "tests/tools/test_teams_rename_chat.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_topic_renames_nothing"
+    - "tests/e2e/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
     - "tests/tools/test_teams_create_meeting.py::TestThePersonBeforeTheCreate::test_the_question_is_bound_to_the_external_id_that_graph_receives"
     - "tests/tools/test_teams_create_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_meeting_creates_nothing"
     - "tests/tools/test_teams_update_meeting.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_every_change"

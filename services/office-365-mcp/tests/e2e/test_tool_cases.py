@@ -41,7 +41,7 @@ _NEEDS_RE_RECORDING = frozenset(
         "teams_search_messages-person-window",
     }
 )
-_RUNNABLE = {
+RUNNABLE = {
     case: entry
     for case, entry in case_entries()
     if case not in _NEEDS_RE_RECORDING and (HERE / "fixtures" / f"rec-tool-{case}.json").is_file()
@@ -58,7 +58,7 @@ def obo(monkeypatch: pytest.MonkeyPatch) -> None:
     patch_obo(monkeypatch)
 
 
-def _freeze_the_clock(monkeypatch: pytest.MonkeyPatch, moment: datetime) -> None:
+def freeze_the_clock(monkeypatch: pytest.MonkeyPatch, moment: datetime) -> None:
     class Frozen(datetime):
         @classmethod
         @override
@@ -70,12 +70,12 @@ def _freeze_the_clock(monkeypatch: pytest.MonkeyPatch, moment: datetime) -> None
 
 
 @pytest.mark.usefixtures("obo")
-@pytest.mark.parametrize("case", _RUNNABLE)
+@pytest.mark.parametrize("case", RUNNABLE)
 async def test_the_case_runs_against_its_recording(
     case: str, server: FastMCP[None], retry_sleeps: RecordedSleeps, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     stored = (HERE / "fixtures" / f"rec-tool-{case}.meta.yaml").read_text()
     meta = mapping(cast("object", yaml.safe_load(stored)))
-    _freeze_the_clock(monkeypatch, datetime.fromisoformat(str(meta["recorded_at"])).astimezone(UTC))
-    steps = [mapping(with_personas(step, _PERSONAS)) for step in items(_RUNNABLE[case]["chain"])]
+    freeze_the_clock(monkeypatch, datetime.fromisoformat(str(meta["recorded_at"])).astimezone(UTC))
+    steps = [mapping(with_personas(step, _PERSONAS)) for step in items(RUNNABLE[case]["chain"])]
     _ = await run_chain(steps, f"rec-tool-{case}", server, retry_sleeps)

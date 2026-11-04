@@ -6206,7 +6206,7 @@ What happens:
 
 Ask your assistant: "Tell the chat with Anna and Tom that the build is green."
 
-Tests: 9
+Tests: 4
 
 Cases:
 

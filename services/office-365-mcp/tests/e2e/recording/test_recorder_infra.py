@@ -45,7 +45,7 @@ from tests.e2e.recording.scrub import (
     scrub,
 )
 from tests.e2e.recording.stand_in import DOMAIN, UPN, UPNS, USER_ID
-from tests.e2e.test_scenarios import Json, Replay, _given, day_named, generated, mapping, same
+from tests.e2e.test_scenarios import Json, Replay, day_named, generated, mapping, resolved, same
 from tests.graph_fixtures import generate, response, serve
 
 ROOM = f"room@{DOMAIN}"
@@ -504,7 +504,7 @@ class TestGeneratedArguments:
             "a": ["xx"],
             "b": 1,
         }
-        assert _given({"repeat": {"text": "x", "count": 1_000_000}}, ()) == "x" * 1_000_000
+        assert resolved({"repeat": {"text": "x", "count": 1_000_000}}, ()) == "x" * 1_000_000
 
     @pytest.mark.parametrize(
         "spec",
@@ -617,8 +617,8 @@ class TestDayTokens:
         assert day_named(word, today) == expected
 
     def test_a_token_in_an_argument_becomes_that_day(self) -> None:
-        assert _given("~nextMonday", ()) == day_named("nextMonday").isoformat()
-        assert _given("a~nextTuesday+1T09:00:00", ()) == (
+        assert resolved("~nextMonday", ()) == day_named("nextMonday").isoformat()
+        assert resolved("a~nextTuesday+1T09:00:00", ()) == (
             f"a{day_named('nextTuesday+1').isoformat()}T09:00:00"
         )
         assert same("~nextMonday", f"{day_named('nextMonday').isoformat()}T10:00:00Z")
@@ -639,7 +639,7 @@ class TestDayTokens:
         assert scrub_module._symbols(SUNDAY)("2026-10-20") == "~day-12"
         assert day_named("day+19", SUNDAY) == date(2026, 11, 20)
         assert day_named("day-12", MONDAY) == date(2026, 10, 21)
-        assert _given("a~day+19T09:00:00", ()) == f"a{day_named('day+19').isoformat()}T09:00:00"
+        assert resolved("a~day+19T09:00:00", ()) == f"a{day_named('day+19').isoformat()}T09:00:00"
         assert same("~day+19", f"{day_named('day+19').isoformat()}T10:00:00Z")
 
     def test_the_plan_names_the_tokens_of_its_steps(self) -> None:

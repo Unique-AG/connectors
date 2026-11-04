@@ -342,14 +342,9 @@ uc-09-23:
   status: untested
   tests:
     - "tests/tools/test_teams_send_chat_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_message_sends_nothing"
-    - "tests/tools/test_teams_send_channel_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_message_posts_nothing"
+    - "tests/e2e/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
     - "tests/tools/test_teams_send_chat_message_with_files.py::TestTheEraWithNoBackChannel::test_an_accept_for_one_file_set_cannot_send_another"
-    - "tests/tools/test_teams_send_channel_message_with_files.py::TestTheEraWithNoBackChannel::test_an_accept_for_one_file_set_cannot_post_another"
-    - "tests/tools/test_teams_edit_message.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_text_another_mention_and_another_message"
-    - "tests/tools/test_teams_edit_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_edit_changes_nothing"
-    - "tests/tools/test_teams_delete_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_message_deletes_nothing"
-    - "tests/tools/test_teams_react_to_message.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_reaction_another_action_and_another_message"
-    - "tests/tools/test_teams_react_to_message.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_reaction_changes_nothing"
+    - "tests/e2e/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
   ask: "Tell the chat with Anna and Tom that the build is green."
   provenance: drafted
   asks_user: true

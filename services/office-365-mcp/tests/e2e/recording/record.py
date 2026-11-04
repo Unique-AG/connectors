@@ -72,7 +72,6 @@ from tests.e2e.test_scenarios import (
     Person,
     Replay,
     _asked,
-    _given,
     _step,
     build_server,
     entries,
@@ -80,6 +79,7 @@ from tests.e2e.test_scenarios import (
     items,
     mapping,
     patch_obo,
+    resolved,
     select,
 )
 
@@ -124,7 +124,7 @@ class Plan:
         found = [
             v for _, v in strings(given) if not v.startswith("$") and 4 <= len(v) <= LARGE_BODY
         ]
-        return frozenset(one for v in found for one in (v, str(_given(v, ()))))
+        return frozenset(one for v in found for one in (v, str(resolved(v, ()))))
 
     @property
     def tokens(self) -> frozenset[str]:
@@ -527,7 +527,7 @@ async def capture(
                 recorder.tool = tool_of(step)
                 given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
                 try:
-                    bound = {key: _given(value, results) for key, value in given.items()}
+                    bound = {key: resolved(value, results) for key, value in given.items()}
                 except (AssertionError, IndexError, KeyError) as missing:
                     raise Refused(
                         f"{plan.scenario}: step {number} binds a value that the earlier answer"
@@ -609,7 +609,7 @@ def unbound(given: Json, results: Sequence[object]) -> str:
             continue
         root, _, path = text[1:].partition(".")
         try:
-            _ = _given(text, results)
+            _ = resolved(text, results)
         except AssertionError, IndexError, KeyError:
             try:
                 answer = results[-1] if root == "prev" else results[int(root) - 1]

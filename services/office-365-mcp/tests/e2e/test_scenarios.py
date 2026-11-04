@@ -1,6 +1,7 @@
 """Runs the sidecar entries that name a fixture through the real app, middleware and tools, with
 Graph answered from `fixtures/`. `features/README.md`, "Running the scenarios", has the keys."""
 
+import functools
 import importlib
 import json
 import re
@@ -102,9 +103,14 @@ def items(value: object) -> Sequence[object]:
     return cast("list[object]", value)
 
 
+@functools.cache
+def parsed(sidecar: Path, _modified: int) -> Json:
+    return mapping(cast("object", yaml.safe_load(sidecar.read_text())))
+
+
 def entries() -> Iterator[tuple[str, Json]]:
     for sidecar in sorted(FEATURES.glob("*.calls.yaml")):
-        loaded = mapping(cast("object", yaml.safe_load(sidecar.read_text())))
+        loaded = parsed(sidecar, sidecar.stat().st_mtime_ns)
         yield from ((scenario_id, mapping(entry)) for scenario_id, entry in loaded.items())
 
 
@@ -160,14 +166,14 @@ def attribute_in(markup: object, query: str) -> str:
     return parser.found[0]
 
 
-def _given(value: object, results: Sequence[object]) -> object:
+def resolved(value: object, results: Sequence[object]) -> object:
     if isinstance(value, list):
-        return [_given(item, results) for item in cast("list[object]", value)]
+        return [resolved(item, results) for item in cast("list[object]", value)]
     if isinstance(value, Mapping):
         found = cast("Json", value)
         if set(found) == {"repeat"}:
             return generated(found)
-        return {key: _given(one, results) for key, one in found.items()}
+        return {key: resolved(one, results) for key, one in found.items()}
     if not isinstance(value, str):
         return value
     if value.startswith("$"):
@@ -270,6 +276,7 @@ class Replay:
     faults_left: int = 0
     seen: set[int] = field(default_factory=set)
     served: set[int] = field(default_factory=set)
+    reusable: set[int] = field(default_factory=set)
     calls: list[tuple[int, str]] = field(default_factory=list)
     unmatched: list[str] = field(default_factory=list)
 
@@ -282,7 +289,9 @@ class Replay:
             self.unmatched.append(f"{call} on {request.url.host}: the OBO token is {carries_token}")
             return httpx.Response(418)
         asked = _asked(request)
-        open_ = [n for n in range(len(self.interactions)) if n not in self.served]
+        open_ = [
+            n for n in range(len(self.interactions)) if n not in self.served or n in self.reusable
+        ]
         index = next((n for n in open_ if _matches(self.interactions[n], asked)), None)
         if index is None:
             waiting = [json.dumps(i) for n, i in enumerate(self.interactions) if n not in self.seen]
@@ -414,7 +423,7 @@ async def _step(
     asked_before, slept = len(person.asked), len(sleeps.delays)
     where, error, outcome = f"step {number} ({tool})", None, None
     try:
-        answer = await client.call_tool(tool, {k: _given(v, results) for k, v in given.items()})
+        answer = await client.call_tool(tool, {k: resolved(v, results) for k, v in given.items()})
         outcome = answer.structured_content or {
             "content": [block.model_dump(mode="json", by_alias=True) for block in answer.content]
         }
@@ -536,16 +545,16 @@ def test_a_selector_picks_an_item_by_the_value_of_a_field() -> None:
 
 def test_a_bind_reads_an_attribute_of_the_markup_a_step_returned() -> None:
     answer = {"html": '<html><body><p src="no">x</p><img alt="a" src="https://g/x"/></body></html>'}
-    assert _given("$prev.html~img[src]", [answer]) == "https://g/x"
-    assert _given("$1.html~img[alt]", [answer]) == "a"
+    assert resolved("$prev.html~img[src]", [answer]) == "https://g/x"
+    assert resolved("$1.html~img[alt]", [answer]) == "a"
     with pytest.raises(AssertionError, match="no <object> with data"):
-        _ = _given("$prev.html~object[data]", [answer])
+        _ = resolved("$prev.html~object[data]", [answer])
     with pytest.raises(AssertionError, match="is not tag"):
-        _ = _given("$prev.html~img", [answer])
+        _ = resolved("$prev.html~img", [answer])
 
 
 def test_a_bind_builds_a_person_object_from_earlier_answers() -> None:
     answer = {"people": [{"id": "1", "name": "Anna"}]}
     spec = {"user_id": "$prev.people[0].id", "name": "$prev.people[0].name"}
-    assert _given([spec], [answer]) == [{"user_id": "1", "name": "Anna"}]
-    assert _given({"x": ["plain", "$prev.people[0].id"]}, [answer]) == {"x": ["plain", "1"]}
+    assert resolved([spec], [answer]) == [{"user_id": "1", "name": "Anna"}]
+    assert resolved({"x": ["plain", "$prev.people[0].id"]}, [answer]) == {"x": ["plain", "1"]}

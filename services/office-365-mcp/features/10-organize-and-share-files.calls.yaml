@@ -444,7 +444,7 @@ uc-10-31:
 uc-10-32:
   status: untested
   tests:
-    - "tests/tools/test_sharepoint_rename_item.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_name_renames_nothing"
+    - "tests/e2e/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
   ask: "Rename Plan v1.docx to Plan v2.docx."
   provenance: drafted
   asks_user: true
