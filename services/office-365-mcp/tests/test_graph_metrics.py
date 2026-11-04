@@ -39,10 +39,11 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.shared.handles import TranscriptHandle
+from office_365_mcp.shared.transcripts import STEP_ATTRIBUTED
 from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
-from office_365_mcp.tools.teams_read_transcript import STEP_ATTRIBUTED, teams_read_transcript
 from office_365_mcp.tools.teams_read_transcript import TOOL_NAME as TRANSCRIPT_TOOL
+from office_365_mcp.tools.teams_read_transcript import teams_read_transcript
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
