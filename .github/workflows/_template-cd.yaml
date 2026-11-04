@@ -261,9 +261,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          sparse-checkout: |
-            .github/trivy-templates
-            .github/actions/setup-trivy
+          sparse-checkout: .github/trivy-templates
           persist-credentials: false
 
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -272,11 +270,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: ./.github/actions/setup-trivy
-
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}@${{ needs.containerize.outputs.digest }}
           format: json
@@ -326,22 +321,14 @@ jobs:
       GHCR_REPO: unique-ag/connectors/services/${{ inputs.service-name }}
       TRIVY_DISABLE_VEX_NOTICE: "true"
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          sparse-checkout: .github/actions/setup-trivy
-          persist-credentials: false
-
       - uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.GHCR_REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: ./.github/actions/setup-trivy
-
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          skip-setup-trivy: true
           scan-type: image
           image-ref: ${{ env.GHCR_REGISTRY }}/${{ env.GHCR_REPO }}@${{ needs.containerize.outputs.digest }}
           scanners: license

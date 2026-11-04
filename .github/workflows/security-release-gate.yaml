@@ -73,13 +73,9 @@ jobs:
             type=registry,ref=ghcr.io/unique-ag/connectors/services/${{ steps.service.outputs.name }}:cache
           outputs: type=docker,dest=${{ steps.service.outputs.image_tar }}
 
-      - uses: ./.github/actions/setup-trivy
-        if: steps.service.outputs.has_image == 'true'
-
       - uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         if: steps.service.outputs.has_image == 'true'
         with:
-          skip-setup-trivy: true
           scan-type: image
           input: ${{ steps.service.outputs.image_tar }}
           format: json
