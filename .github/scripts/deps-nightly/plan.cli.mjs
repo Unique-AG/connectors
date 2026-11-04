@@ -248,7 +248,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `entries=${JSON.stringify(plan.entries)}\nupdates=${JSON.stringify(plan.updates)}\n`,
+    `entries=${JSON.stringify(plan.entries)}\nupdates=${JSON.stringify(plan.updates)}\ncloses=${JSON.stringify(plan.closes)}\n`,
   );
 }
 console.log(summary);

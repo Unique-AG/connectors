@@ -422,6 +422,36 @@ describe('buildPlan', () => {
         ...extra,
       });
 
+    describe('with a pull request that no entry targets', () => {
+      const gone = (overrides) => pull({ number: 8, branch: 'deps/npm-gone', ...overrides });
+
+      it('closes it', () => {
+        const { closes } = plan([pull(), gone()]);
+        assert.deepStrictEqual(closes, [{ number: 8, branch: 'deps/npm-gone' }]);
+      });
+
+      it('keeps it and lists it as skipped when a person or the agent changed it', () => {
+        const { closes, skipped } = plan([gone({ humanCommits: true })]);
+        assert.deepStrictEqual(closes, []);
+        assert.deepStrictEqual(
+          skipped.filter(({ name }) => name === '#8').map(({ ecosystem }) => ecosystem),
+          ['npm'],
+        );
+      });
+
+      it('keeps it when its ecosystem needs a person', () => {
+        const needsPerson = [{ ecosystem: 'npm', name: 'zod', reason: 'Too young.' }];
+        assert.deepStrictEqual(plan([gone()], { needsPerson }).closes, []);
+        const other = plan([gone({ branch: 'deps/uv-gone' })], { needsPerson });
+        assert.deepStrictEqual(other.closes, [{ number: 8, branch: 'deps/uv-gone' }]);
+      });
+
+      it('closes nothing in a run for one pull request', () => {
+        const request = { number: 7, recreate: false };
+        assert.deepStrictEqual(plan([pull(), gone()], { request }).closes, []);
+      });
+    });
+
     it('skips a pull request that is up to date with main', () => {
       const { entries, skipped } = plan([pull({ behindBy: 0 })]);
       assert.deepStrictEqual(
@@ -609,5 +639,13 @@ describe('renderSummary', () => {
     );
     const none = renderSummary({ entries: [], skipped: [], needsPerson: [] }, '');
     assert.doesNotMatch(none, /next night/);
+  });
+
+  it('lists the pull requests to close', () => {
+    const closes = [{ number: 8, branch: 'deps/npm-gone' }];
+    const summary = renderSummary({ entries: [], skipped: [], needsPerson: [], closes }, '');
+    assert.match(summary, /### Pull requests to close \(1\)\n\n- #8 \(deps\/npm-gone\)/);
+    const none = renderSummary({ entries: [], skipped: [], needsPerson: [] }, '');
+    assert.doesNotMatch(none, /to close/);
   });
 });
