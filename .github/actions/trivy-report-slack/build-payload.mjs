@@ -175,10 +175,6 @@ export function buildMainSectionText(summary) {
   const lines = [];
   if (summary.status === 'empty') {
     lines.push(`${ICON.warn} No published image to scan.`);
-  } else if (summary.status === 'failed') {
-    lines.push(
-      `${ICON.warn} Scan failed for all ${summary.scanned} images. Vulnerability totals are unavailable.`,
-    );
   } else {
     if (summary.status === 'partial') {
       lines.push(`${ICON.warn} ${summary.failed} of ${summary.scanned} image(s) failed to scan.`);
@@ -293,7 +289,7 @@ export function buildContextFooterText({
   workflowName,
 }) {
   const parts = [scanLink];
-  if (summary.status !== 'failed' && summary.status !== 'empty') {
+  if (summary.status !== 'empty') {
     parts.push(formatSummedPerImageLine(summary));
   }
   parts.push(
@@ -323,6 +319,9 @@ export function buildPayload(env) {
   const repositoryAlerts = REPOSITORY_ALERTS.trim() === '' ? null : JSON.parse(REPOSITORY_ALERTS);
 
   const summary = summarize(expected.map((entry) => readImage(REPORTS_PATH, entry)));
+  if (summary.status === 'failed') {
+    return null;
+  }
   const headerTitle = truncate(formatHeaderTitle(TITLE, VERSION_LABEL), HEADER_TEXT_LIMIT);
   const footer = buildContextFooterText({
     summary,
@@ -353,5 +352,6 @@ const isMainModule =
   process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href;
 
 if (isMainModule) {
-  process.stdout.write(JSON.stringify(buildPayload(process.env)));
+  const payload = buildPayload(process.env);
+  process.stdout.write(payload ? JSON.stringify(payload) : '');
 }
