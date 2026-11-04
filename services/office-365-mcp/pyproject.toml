@@ -21,7 +21,7 @@ dependencies = [
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
     "starlette==1.10.0",
     "pydantic==2.14.2",
-    "pydantic-settings==2.16.1",
+    "pydantic-settings==2.16.2",
     "python-dotenv==1.2.4",
     # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
     # SDK's own default client; the SDK pulls the same extra, but we ask for it directly because
