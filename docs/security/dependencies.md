@@ -128,7 +128,7 @@ Write one of these commands as the first line of a comment on a dependency PR.
 | `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. |
 | `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. |
 
-The command works only in a comment from an owner, a member, or a collaborator. It works only on a PR that has the label `dependencies` and a branch that starts with `deps/`. The workflow `[Deps] Rebase` reacts with an eyes emoji and starts the nightly workflow with the number of the PR. This run handles that PR only. It opens no other PR and does not change the dashboard issue. A person can start the same run with the inputs `pr` and `recreate` of the nightly workflow.
+The command works only in a comment from an owner, a member, or a collaborator. It works only on a PR that has the label `dependencies` and a branch that starts with `deps/`. The workflow `[Deps] Rebase` reacts with an eyes emoji and starts the nightly workflow with the number of the PR. It also puts a note at the top of the PR description. The job `Finish` removes the note when the run ends. If a job failed, `Finish` also adds a comment with the link to the run. The run handles that PR only. It opens no other PR and does not change the dashboard issue. A person can start the same run with the inputs `pr` and `recreate` of the nightly workflow.
 
 ## Ignore a dependency
 
