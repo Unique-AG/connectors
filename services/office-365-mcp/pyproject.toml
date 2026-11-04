@@ -27,10 +27,10 @@ dependencies = [
     # SDK's own default client; the SDK pulls the same extra, but we ask for it directly because
     # we are the ones passing `http2=True`.
     "httpx[http2]==0.28.1",
-    "opentelemetry-api==1.45.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
     "opentelemetry-exporter-prometheus==0.66b1",
-    "opentelemetry-instrumentation-asgi==0.66b1",
+    "opentelemetry-instrumentation-asgi==0.66b2",
     "asyncpg==0.32.0",
     "cryptography==50.0.2",
     "unique-mcp==2026.44.2",
