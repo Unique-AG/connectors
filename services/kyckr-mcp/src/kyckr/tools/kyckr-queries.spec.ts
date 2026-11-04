@@ -77,6 +77,7 @@ describe('Kyckr query schemas', () => {
       CreateDocumentOrderInputSchema.parse({
         kyckrId: 'GB|123',
         productId: '  PROD-1  ',
+        confirm: true,
       }).productId,
     ).toBe('PROD-1');
   });
@@ -336,6 +337,17 @@ describe('CreateDocumentOrderQuery', () => {
     );
   });
 
+  it('returns a confirmation prompt without placing an order when confirm is false', async () => {
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: false });
+
+    expect(mockKyckrClient.post).not.toHaveBeenCalled();
+    expect(result).toMatchObject({
+      success: false,
+      message: expect.stringContaining('confirm: true'),
+    });
+    expect(mockMetrics.recordToolDuration).not.toHaveBeenCalled();
+  });
+
   it('creates an order with the configured customer reference and contact email and does not fetch the document body when status is Pending', async () => {
     const response = {
       correlationId: 'corr-order-create',
@@ -347,7 +359,7 @@ describe('CreateDocumentOrderQuery', () => {
     };
     mockKyckrClient.post.mockResolvedValueOnce(response);
 
-    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true });
 
     expect(mockKyckrClient.post).toHaveBeenCalledWith('/orders', {
       kyckrId: 'GB|123',
@@ -385,7 +397,7 @@ describe('CreateDocumentOrderQuery', () => {
     mockKyckrClient.post.mockResolvedValueOnce(createResponse);
     mockKyckrClient.get.mockResolvedValueOnce(downloadEnvelope);
 
-    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true });
 
     expect(mockKyckrClient.get).toHaveBeenCalledWith('/orders/12345/download', {
       format: 'json',
@@ -411,7 +423,7 @@ describe('CreateDocumentOrderQuery', () => {
     mockKyckrClient.post.mockResolvedValueOnce(createResponse);
     mockKyckrClient.get.mockResolvedValueOnce(downloadEnvelope);
 
-    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true });
 
     expect(result).toEqual({
       success: true,
@@ -432,7 +444,7 @@ describe('CreateDocumentOrderQuery', () => {
       makeKyckrApiError(404, '/orders/ORD-1/download', 'No JSON form', 'corr-download-404'),
     );
 
-    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true });
 
     expect(result).toEqual({
       success: true,
@@ -452,7 +464,7 @@ describe('CreateDocumentOrderQuery', () => {
     mockKyckrClient.post.mockResolvedValueOnce(createResponse);
     mockKyckrClient.get.mockResolvedValueOnce(undefined);
 
-    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' });
+    const result = await unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true });
 
     expect(result).toEqual({
       success: true,
@@ -467,7 +479,9 @@ describe('CreateDocumentOrderQuery', () => {
       makeKyckrApiError(400, '/orders', 'Product id is invalid', 'corr-order-create-fail'),
     );
 
-    await expect(unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' })).resolves.toEqual({
+    await expect(
+      unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true }),
+    ).resolves.toEqual({
       success: false,
       statusCode: 400,
       message: 'Product id is invalid',
@@ -480,9 +494,9 @@ describe('CreateDocumentOrderQuery', () => {
     const error = new Error('socket hang up');
     mockKyckrClient.post.mockRejectedValueOnce(error);
 
-    await expect(unit.run({ kyckrId: 'GB|123', productId: 'DOC-1' })).rejects.toThrow(
-      'socket hang up',
-    );
+    await expect(
+      unit.run({ kyckrId: 'GB|123', productId: 'DOC-1', confirm: true }),
+    ).rejects.toThrow('socket hang up');
   });
 });
 
