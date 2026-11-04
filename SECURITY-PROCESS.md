@@ -81,6 +81,21 @@ flowchart LR
 | Who skipped the release gate | The bot comment on the release PR |
 | Which dependencies stay fixed | The pins: `override-dependencies` and `pnpm.overrides` |
 
+## Where alerts show
+
+| Alert | Source | Where you see it | Updates |
+|---|---|---|---|
+| Code | CodeQL | Security tab, Code scanning, tool CodeQL. A PR that adds an alert cannot merge. | On each PR and each push to `main` |
+| A new vulnerable dependency in a PR | Dependency review | The check `dependency-review` on the PR | On each PR |
+| Lock files | Trivy, category `trivy-lockfiles` | Security tab, Code scanning. The Slack report, in the line "Repository (main)". | Every night |
+| Images | Trivy, categories `trivy-image/<service>` | Security tab, Code scanning. Each message starts with the image and the tag. The Slack report. | Every night, and at each release build |
+| Dockerfiles and configuration | Trivy, category `trivy-config` | Security tab, Code scanning | Every night |
+| A release | The release gate | The check `release-gate` on the release PR. Its job summary names each blocking finding. | On each release PR |
+| The result of an agent run | The skill `vulna-squash` | The report comment on the PR, the labels, and for the patch run the Slack message | When the agent runs |
+| GitHub Dependabot alerts | The dependency graph of GitHub | Security tab, Dependabot. This process does not read them. | When GitHub scans |
+
+If every image scan fails, the nightly scan posts no Slack report. The run shows the warning "Slack report not posted". A missing report means: read the scan jobs of the last run.
+
 ## Required configuration
 
 | What | Why |
