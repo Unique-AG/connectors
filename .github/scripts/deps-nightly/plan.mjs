@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from './locks.mjs';
-import { classifyOpenPull, entryKey } from './state.mjs';
+import { classifyOpenPull, entryKey, markerKeyOf } from './state.mjs';
 import {
   compareVersions,
   formatChange,
@@ -268,6 +268,19 @@ export function buildPlan({
       Number(b.members.some(({ direct }) => direct)) -
         Number(a.members.some(({ direct }) => direct)) || a.slug.localeCompare(b.slug),
   );
+  const slugs = new Set(ordered.map(({ slug }) => slug));
+  const blocked = new Set(needsPerson.map(({ ecosystem }) => ecosystem));
+  const ecosystemOfBranch = (branch) => branch.slice('deps/'.length).split('-')[0];
+  const unplanned = openPulls.filter(
+    ({ branch, body }) => markerKeyOf(body) && !slugs.has(branch.slice('deps/'.length)),
+  );
+  const requested = unplanned.filter(
+    ({ number }) => request?.recreate && number === request.number,
+  );
+  const orphans = request
+    ? requested
+    : unplanned.filter(({ branch }) => !blocked.has(ecosystemOfBranch(branch)));
+  const changed = request ? [] : orphans.filter(({ humanCommits }) => humanCommits);
   const openByBranch = new Map(openPulls.map((pull) => [pull.branch, pull]));
   const decisions = ordered.map((entry) => {
     const pull = openByBranch.get(`deps/${entry.slug}`);
@@ -293,7 +306,17 @@ export function buildPlan({
     entries: allEntries.slice(0, MATRIX_LIMIT),
     updates: allUpdates.slice(0, MATRIX_LIMIT),
     deferred: [...allEntries.slice(MATRIX_LIMIT), ...allUpdates.slice(MATRIX_LIMIT)],
-    skipped: decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
+    closes: orphans
+      .filter((pull) => !changed.includes(pull))
+      .map(({ number, branch, head }) => ({ number, branch, head })),
+    skipped: [
+      ...decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
+      ...changed.map(({ number, branch }) => ({
+        ecosystem: ecosystemOfBranch(branch),
+        name: `#${number}`,
+        reason: 'no update targets this pull request, but a person or the agent changed it',
+      })),
+    ],
     ignored,
     needsPerson,
   };
@@ -309,7 +332,7 @@ function describe({ name, isGroup, members }) {
 const ACTION_LABELS = { rebuild: 'rebuild', replace: 'replace the old PR', update: 'merge main' };
 
 export function renderSummary(
-  { entries, updates = [], deferred = [], skipped, ignored = [], needsPerson },
+  { entries, updates = [], closes = [], deferred = [], skipped, ignored = [], needsPerson },
   modeNote,
 ) {
   const section = (title, items) =>
@@ -327,6 +350,10 @@ export function renderSummary(
     ...section(
       'Branches that get main merged in',
       updates.map((entry) => `${entry.ecosystem} ${entry.name} (#${entry.number})`),
+    ),
+    ...section(
+      'Pull requests to close',
+      closes.map(({ number, branch }) => `#${number} (${branch})`),
     ),
     ...section('Left for the next night (GitHub allows 256 jobs in a matrix)', deferred.map(line)),
     ...section(
