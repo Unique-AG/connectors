@@ -16,17 +16,17 @@ export const markerKeyOf = (body) => MARKER.exec(body ?? '')?.[1] ?? null;
 
 export const closedKeysOf = (bodies) => new Set(bodies.map(markerKeyOf).filter(Boolean));
 
-const AGENT_LABELS = ['ai-assisted', 'human-required'];
-
-export function classifyOpenPull({ key, pull }) {
+export function classifyOpenPull({ key, pull, recreate = false }) {
   if (markerKeyOf(pull.body) !== key) {
     return 'replace';
+  }
+  if (recreate) {
+    return 'rebuild';
   }
   if (pull.behindBy === 0) {
     return 'keep';
   }
-  const touched = pull.humanCommits || pull.labels.some((label) => AGENT_LABELS.includes(label));
-  return touched ? 'update' : 'rebuild';
+  return pull.humanCommits ? 'update' : 'rebuild';
 }
 
 export const closedBodiesOf = (pages) =>

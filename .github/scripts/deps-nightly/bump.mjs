@@ -1,27 +1,55 @@
+import assert from 'node:assert';
 import { markerOf } from './state.mjs';
+import { formatChange, pairVersions, versionLine } from './versions.mjs';
 
 const MAX_LISTED = 100;
 
 export function pnpmCommands(entry, releaseAge) {
-  const names = (direct) =>
-    entry.members.filter((member) => member.direct === direct).map(({ name }) => name);
-  const update = (flags, direct) =>
-    names(direct).length > 0
-      ? [
-          [
-            'pnpm',
-            'update',
-            '-r',
-            ...flags,
-            '--lockfile-only',
-            '--loglevel',
-            'error',
-            releaseAge,
-            ...names(direct),
-          ],
-        ]
-      : [];
-  return [...update(['--latest'], true), ...update([], false)];
+  const names = entry.members.filter(({ direct }) => direct).map(({ name }) => name);
+  return names.length > 0
+    ? [
+        [
+          'pnpm',
+          'update',
+          '-r',
+          '--latest',
+          '--lockfile-only',
+          '--loglevel',
+          'error',
+          releaseAge,
+          ...names,
+        ],
+      ]
+    : [];
+}
+
+export const pnpmInstallArgs = (releaseAge) => [
+  'install',
+  '--lockfile-only',
+  '--ignore-scripts',
+  '--loglevel',
+  'error',
+  releaseAge,
+];
+
+export function withOverrides(packageJson, members, locked) {
+  const parsed = JSON.parse(packageJson);
+  const pins = Object.fromEntries(
+    members.flatMap(({ name, from, to }) =>
+      to.split(', ').map((target) => {
+        if (locked.get(name)?.length === 1) {
+          return [name, target];
+        }
+        const old = from
+          .split(', ')
+          .find((version) => versionLine(version) === versionLine(target));
+        assert.ok(old, `${name} ${target} has no old version on the same line`);
+        return [`${name}@${versionLine(old)}`, target];
+      }),
+    ),
+  );
+  parsed.pnpm = { ...parsed.pnpm, overrides: { ...parsed.pnpm?.overrides, ...pins } };
+  return `${JSON.stringify(parsed, null, 2)}\n`;
 }
 
 export function uvLockArgs(members, cooldownFlag) {
@@ -32,10 +60,15 @@ export function uvLockArgs(members, cooldownFlag) {
   ];
 }
 
+const fromTo = ({ from, to }) =>
+  pairVersions(from, to)
+    .map(([old, target]) => `from ${old} to ${target}`)
+    .join(' and ');
+
 export function renderTitle(entry, scope) {
   const subject = entry.isGroup
     ? `bump ${entry.name} packages`
-    : `bump ${entry.name} from ${entry.members[0].from} to ${entry.members[0].to}`;
+    : `bump ${entry.name} ${fromTo(entry.members[0])}`;
   return `build(${scope}): ${subject}`;
 }
 
@@ -49,12 +82,12 @@ export function renderBody({ entry, changes, projects, cooldownDays }) {
     ? `This pull request bumps the \`${entry.name}\` group. It holds ${entry.members.length} packages that move together.`
     : entry.ecosystem === 'terraform'
       ? `This pull request changes the version constraint of the provider \`${entry.name}\` from \`${entry.members[0].from}\`, so that the release \`${entry.members[0].to}\` fits.`
-      : `This pull request bumps \`${entry.name}\` from ${entry.members[0].from} to ${entry.members[0].to}.`;
+      : `This pull request bumps \`${entry.name}\` ${fromTo(entry.members[0])}.`;
   const changeLines = [
     ...new Set(
       changes.map(
         ({ name, from, to }) =>
-          `\`${name}\`: ${from.join(', ') || 'new'} -> ${to.join(', ') || 'removed'}`,
+          `\`${name}\`: ${from.length && to.length ? formatChange(from, to) : `${from.join(', ') || 'new'} -> ${to.join(', ') || 'removed'}`}`,
       ),
     ),
   ];

@@ -5,6 +5,7 @@ import {
   cooldownBlocksUv,
   findDowngrades,
   findMissing,
+  findUnplanned,
   hasUvCooldown,
   movedPnpmImporters,
   normalizeName,
@@ -238,6 +239,43 @@ describe('hasUvCooldown', () => {
 describe('normalizeName', () => {
   it('lowercases and joins separators with a dash', () => {
     assert.strictEqual(normalizeName('Typing_Extensions.Core'), 'typing-extensions-core');
+  });
+});
+
+describe('findUnplanned', () => {
+  const before = new Map([
+    ['qs', ['6.17.0']],
+    ['confbox', ['0.3.1']],
+  ]);
+  const members = [{ name: 'qs', to: '6.17.1' }];
+
+  it('accepts a lock where only the member moved to its target', () => {
+    const after = new Map([
+      ['qs', ['6.17.1']],
+      ['confbox', ['0.3.1']],
+    ]);
+    assert.deepStrictEqual(findUnplanned(before, after, members), []);
+  });
+
+  it('reports a package that moved and is not a member', () => {
+    const after = new Map([
+      ['qs', ['6.17.1']],
+      ['confbox', ['0.3.2']],
+    ]);
+    assert.deepStrictEqual(findUnplanned(before, after, members), [
+      'confbox changed but is not in the entry',
+    ]);
+  });
+
+  it('reports a member that is not at its target', () => {
+    assert.deepStrictEqual(findUnplanned(before, before, members), ['qs is not at 6.17.1']);
+  });
+
+  it('checks every target version of a member with several versions', () => {
+    const several = [{ name: 'parser', to: '7.1.1, 8.0.1' }];
+    const held = new Map([['parser', ['7.1.0', '8.0.0']]]);
+    const after = new Map([['parser', ['7.1.1', '8.0.0']]]);
+    assert.deepStrictEqual(findUnplanned(held, after, several), ['parser is not at 8.0.1']);
   });
 });
 

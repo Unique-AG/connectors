@@ -226,6 +226,9 @@ const plan = buildPlan({
   config,
   openPulls,
   closedKeys: closedKeysOf(closedBodies),
+  request: process.env.PR_NUMBER
+    ? { number: Number(process.env.PR_NUMBER), recreate: process.env.RECREATE === 'true' }
+    : undefined,
 });
 
 const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');

@@ -3,13 +3,16 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { applyActions } from './actions.mjs';
-import { pnpmCommands, uvLockArgs } from './bump.mjs';
+import { reportUncaughtFailure } from './annotate.mjs';
+import { pnpmCommands, pnpmInstallArgs, uvLockArgs, withOverrides } from './bump.mjs';
 import { applyDocker } from './docker.mjs';
 import {
   findDowngrades,
   findMissing,
+  findUnplanned,
   hasUvCooldown,
   normalizeName,
+  parsePnpmPackages,
   parseUvPackages,
   pinEdit,
   restoreUvLockHeader,
@@ -32,14 +35,46 @@ import { generateLock, LOCK_FILE, mergeLockBlock } from './terraform-lock.mjs';
 import { compareVersions, newestVersion } from './versions.mjs';
 
 const entry = JSON.parse(process.env.ENTRY);
+reportUncaughtFailure(`Bump ${entry.slug} failed`);
+
+function installLock() {
+  runOrThrow('pnpm', pnpmInstallArgs(releaseAge));
+}
 
 function bumpNpm() {
+  const lock = readFileSync('pnpm-lock.yaml', 'utf8');
   for (const [command, ...args] of pnpmCommands(entry, releaseAge)) {
     runOrThrow(command, args);
+  }
+  writeFileSync('pnpm-lock.yaml', lock);
+  const transitive = entry.members.filter(({ direct }) => !direct);
+  const manifest = readFileSync('package.json', 'utf8');
+  if (transitive.length > 0) {
+    writeFileSync('package.json', withOverrides(manifest, transitive, parsePnpmPackages(lock)));
+  }
+  try {
+    installLock();
+  } finally {
+    writeFileSync('package.json', manifest);
+  }
+  if (transitive.length > 0) {
+    installLock();
   }
   const dedupe = run('pnpm', ['dedupe', '--ignore-scripts', '--loglevel', 'error', releaseAge]);
   const output = `${dedupe.stdout}${dedupe.stderr}`;
   assert.ok(dedupe.status === 0 || youngVersionOf(output), `pnpm dedupe failed:\n${output}`);
+  if (transitive.length === entry.members.length) {
+    const problems = findUnplanned(
+      parsePnpmPackages(lock),
+      parsePnpmPackages(readFileSync('pnpm-lock.yaml', 'utf8')),
+      transitive,
+    );
+    assert.deepStrictEqual(
+      problems,
+      [],
+      `The bump does not match the entry. Put packages that must move together in one group in .github/deps-groups.json.\n${problems.join('\n')}`,
+    );
+  }
 }
 
 function bumpUv() {

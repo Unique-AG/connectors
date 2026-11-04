@@ -53,13 +53,18 @@ describe('classifyOpenPull', () => {
   });
 
   for (const label of ['ai-assisted', 'human-required']) {
-    it(`only merges main into a pull request that carries the label ${label}`, () => {
+    it(`rebuilds a pull request that carries the label ${label} and has no other commit`, () => {
       assert.strictEqual(
         classifyOpenPull({ key, pull: { ...pull, labels: ['dependencies', label] } }),
-        'update',
+        'rebuild',
       );
     });
   }
+
+  it('rebuilds a pull request on request, even one with a commit from a person', () => {
+    const touched = { ...pull, behindBy: 0, humanCommits: true };
+    assert.strictEqual(classifyOpenPull({ key, pull: touched, recreate: true }), 'rebuild');
+  });
 
   it('replaces a pull request for other versions, and one with no marker', () => {
     assert.strictEqual(classifyOpenPull({ key: entryKey(entry('11.3.0')), pull }), 'replace');
