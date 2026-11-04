@@ -79,10 +79,10 @@ function listed(lines) {
 
 export function renderBody({ entry, changes, projects, cooldownDays }) {
   const intro = entry.isGroup
-    ? `This pull request bumps the \`${entry.name}\` group. It holds ${entry.members.length} packages that move together.`
+    ? `Bump the \`${entry.name}\` group. It holds ${entry.members.length} packages that move together.`
     : entry.ecosystem === 'terraform'
-      ? `This pull request changes the version constraint of the provider \`${entry.name}\` from \`${entry.members[0].from}\`, so that the release \`${entry.members[0].to}\` fits.`
-      : `This pull request bumps \`${entry.name}\` ${fromTo(entry.members[0])}.`;
+      ? `Change the version constraint of the provider \`${entry.name}\` from \`${entry.members[0].from}\`, so that the release \`${entry.members[0].to}\` fits.`
+      : `Bump \`${entry.name}\` ${fromTo(entry.members[0])}.`;
   const changeLines = [
     ...new Set(
       changes.map(
@@ -96,15 +96,17 @@ export function renderBody({ entry, changes, projects, cooldownDays }) {
   return [
     intro,
     '',
-    ...(major
-      ? ['This is a major bump. A person must read the release notes before the merge.', '']
-      : []),
-    `The nightly dependency job made this change. It only uses versions that are at least ${cooldownDays} days old.`,
-    '',
-    `### ${locked ? 'Packages that changed in the lock files' : 'Versions that changed'} (${changeLines.length})`,
+    `${locked ? 'Packages that changed in the lock files' : 'Versions that changed'} (${changeLines.length}):`,
     '',
     ...listed(changeLines),
     '',
+    '---',
+    '',
+    `The nightly dependency job made this change. It only uses versions that are at least ${cooldownDays} days old.`,
+    '',
+    ...(major
+      ? ['This is a major bump. A person must read the release notes before the merge.', '']
+      : []),
     `### ${locked ? 'Projects that moved' : 'Files that changed'}`,
     '',
     ...(projects.length > 0
