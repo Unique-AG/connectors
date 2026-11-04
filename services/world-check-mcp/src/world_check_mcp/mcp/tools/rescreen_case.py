@@ -3,6 +3,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
 
@@ -20,6 +21,7 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="Matches to return.")]
         read_only_hint=False, idempotent_hint=True, destructive_hint=False, open_world_hint=True
     ),
 )
+@trace_arguments("case", "delta", "limit")
 async def rescreen_case(
     case: CaseArgument,
     delta: Annotated[

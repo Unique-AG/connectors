@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
 
@@ -14,6 +15,7 @@ from world_check_mcp.upstream import Upstream
     title="Get Reference Data",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
+@trace_arguments("kind")
 async def get_reference_data(
     kind: Annotated[
         contexts.ReferenceKind,

@@ -1,5 +1,6 @@
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 
 from world_check_mcp import contexts
@@ -11,6 +12,7 @@ from world_check_mcp.upstream import Upstream
     title="List Groups",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
+@trace_arguments()
 async def list_groups(upstream: Upstream = Depends(get_upstream)) -> list[contexts.Group]:
     """List the LSEG groups this service account can screen in, including descendant groups.
 

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
 
@@ -15,6 +16,7 @@ from world_check_mcp.upstream import Upstream
     title="Generate Passport MRZ",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
+@trace_arguments("passport.document_type")
 async def generate_passport_mrz(
     passport: Annotated[contexts.Passport, Field(description="Document details as printed.")],
     upstream: Upstream = Depends(get_upstream),

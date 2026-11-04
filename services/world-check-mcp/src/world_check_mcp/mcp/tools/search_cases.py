@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
 
@@ -24,6 +25,7 @@ PageReference = Annotated[
     title="Search Cases",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
+@trace_arguments("group_id", "search_mode", "limit")
 async def search_cases(
     group_id: GroupId,
     query: Annotated[

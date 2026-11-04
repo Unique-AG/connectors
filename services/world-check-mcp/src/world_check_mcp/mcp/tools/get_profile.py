@@ -1,5 +1,6 @@
 from fastmcp.dependencies import Depends
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 
 from world_check_mcp import contexts
@@ -12,6 +13,7 @@ from world_check_mcp.upstream import Upstream
     title="Get Profile",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
+@trace_arguments("reference_id")
 async def get_profile(
     reference_id: ReferenceId, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.Profile:

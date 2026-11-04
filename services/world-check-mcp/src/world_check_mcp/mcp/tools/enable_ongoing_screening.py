@@ -1,6 +1,7 @@
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 
 from world_check_mcp import contexts
@@ -15,6 +16,7 @@ from world_check_mcp.upstream import Upstream
         read_only_hint=False, idempotent_hint=True, destructive_hint=False, open_world_hint=True
     ),
 )
+@trace_arguments("case")
 async def enable_ongoing_screening(
     case: CaseArgument, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.OngoingScreening:

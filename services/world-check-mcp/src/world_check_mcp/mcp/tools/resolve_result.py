@@ -4,6 +4,7 @@ from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import InputRequiredResult
 from mcp_types import ToolAnnotations
 from pydantic import Field
@@ -33,6 +34,7 @@ Note = Annotated[
         read_only_hint=False, idempotent_hint=False, destructive_hint=True, open_world_hint=True
     ),
 )
+@trace_arguments("case", "result_id", "status", "risk")
 async def resolve_result(
     case: CaseArgument,
     result_id: Annotated[str, Field(min_length=1, description="resultId of one WATCHLIST match.")],

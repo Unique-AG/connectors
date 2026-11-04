@@ -3,6 +3,7 @@ from typing import Annotated
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
+from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
 
@@ -23,6 +24,7 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="WATCHLIST matches to 
         read_only_hint=False, idempotent_hint=False, destructive_hint=False, open_world_hint=True
     ),
 )
+@trace_arguments("group_id", "include_watchlist", "limit")
 async def passport_check(
     passport: Annotated[contexts.Passport, Field(description="Document details as printed.")],
     group_id: GroupId,
