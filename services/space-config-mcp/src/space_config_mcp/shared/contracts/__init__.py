@@ -11,6 +11,10 @@ from space_config_mcp.shared.contracts.conduct import McpIntegrationMode
 from space_config_mcp.shared.contracts.conduct import PermissionMode
 from space_config_mcp.shared.contracts.conduct import PiAgentSDKConfig
 from space_config_mcp.shared.contracts.conduct import PiAgentThinkingLevel
+from space_config_mcp.shared.contracts.space import AssistantPrompt
+from space_config_mcp.shared.contracts.space import McpServerParam
+from space_config_mcp.shared.contracts.space import McpServerTool
+from space_config_mcp.shared.contracts.space import SwitchableLanguageModel
 
 
 class SpaceConfigError(Exception):
@@ -18,6 +22,7 @@ class SpaceConfigError(Exception):
 
 
 __all__ = [
+    "AssistantPrompt",
     "ClaudeEffort",
     "ClaudeSDKConfig",
     "CodexReasoningEffort",
@@ -28,8 +33,11 @@ __all__ = [
     "ConductStrategy",
     "ConductToolConfig",
     "McpIntegrationMode",
+    "McpServerParam",
+    "McpServerTool",
     "PermissionMode",
     "PiAgentSDKConfig",
     "PiAgentThinkingLevel",
     "SpaceConfigError",
+    "SwitchableLanguageModel",
 ]

@@ -23,3 +23,13 @@ async def get_space(
     space_id: str,
 ) -> unique_sdk.Space:
     return await upstream.get_space(user_id, company_id, space_id)
+
+
+async def get_mcp_server_status(
+    *,
+    upstream: Upstream,
+    user_id: str,
+    company_id: str,
+    space_id: str,
+) -> unique_sdk.Space.McpServerStatusResponse:
+    return await upstream.get_mcp_server_status(user_id, company_id, space_id)
