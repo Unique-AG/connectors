@@ -97,13 +97,29 @@ is loopback `http`/`https` (`localhost`, `127.0.0.1`, `[::1]`, any port), `https
 and `javascript:`, `data:`, `file:` and similar schemes are always refused. The login form names the
 host the user is sent to after signing in.
 
+Unique chat and admin are not in the default. They register
+`https://<chat-host>/chat/mcp/oauth/callback` and `https://<chat-host>/admin/mcp/oauth/callback`.
+`<chat-host>` is the Unique app, not this server: unique prod is `next.unique.app`, qa is
+`next.qa.unique.app`, uat01 is `uat1.unique.app`. Set `AUTH_ALLOWED_REDIRECT_HOSTS` to the default
+hosts plus that host before upgrading. Setting the variable replaces the default.
+
 | Variable | Default | Why |
 |---|---|---|
-| `AUTH_ALLOWED_REDIRECT_HOSTS` | `claude.ai,claude.com,chatgpt.com,cursor.com,www.cursor.com,vscode.dev,insiders.vscode.dev` | Callback hosts of Claude, ChatGPT, Cursor and VS Code. Sources in `mcp_credential_auth/redirect_policy.py` |
+| `AUTH_ALLOWED_REDIRECT_HOSTS` | The hosts below | Hosted MCP clients. Sources are in backstop-mcp `docs/operator/authentication.md` |
 | `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Cursor registers `cursor://anysphere.cursor-mcp/oauth/callback` |
 
-Both are comma-separated, replace their default when set, and are set under `env` in the Helm chart.
-A client registered before the check keeps only the redirect URIs the lists still accept.
+Default hosts: `claude.ai`, `claude.com`, `chatgpt.com`, `cursor.com`, `www.cursor.com`,
+`vscode.dev`, `insiders.vscode.dev`, `grok.com`, `www.perplexity.ai`, `enterprise.perplexity.ai`,
+`app.dust.tt`, `dust.tt`, `eu.dust.tt`, `console.mistral.ai`, `api.devin.ai`, `teams.microsoft.com`,
+`global.consent.azure-apim.net`, `replit.com`, `lovable.app`, `lovable.dev`, `api.v0.dev`,
+`app.langdock.com`, `cloud.arcade.dev`, `oauth.n8n.cloud`.
+
+Loopback already covers Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Cursor, Windsurf, Zed
+and MCP Inspector. Mistral Le Chat, Glean and self-hosted clients (Open WebUI, LibreChat, n8n on
+the customer's own domain) have no shared host; add the host the registration log rejects.
+
+Both variables are comma-separated, replace their default when set, and are set under `env` in the
+Helm chart. A client registered before the check keeps only the redirect URIs the lists still accept.
 
 ## Migrations
 

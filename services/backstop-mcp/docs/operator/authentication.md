@@ -103,25 +103,71 @@ on this server's genuine login page. The registration is refused with `400` and
 
 | Redirect URI | Accepted | Used by |
 |---|---|---|
-| `http` or `https` on `localhost`, `127.0.0.1` or `[::1]`, any port | Always | Claude Code, VS Code, Cursor, MCP Inspector |
-| `https` on a host in `AUTH_ALLOWED_REDIRECT_HOSTS` | Default list below | Hosted clients |
+| `http` or `https` on `localhost`, `127.0.0.1` or `[::1]`, any port | Always | Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Cursor, Windsurf, Zed, MCP Inspector |
+| `https` on a host in `AUTH_ALLOWED_REDIRECT_HOSTS` | Default list below, plus the tenant's chat host | Hosted clients, and Unique chat and admin |
 | A scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES` | Default `cursor` | Cursor (`cursor://anysphere.cursor-mcp/oauth/callback`) |
 
-The default hosts, and where each comes from:
+### Unique chat and admin
+
+Unique chat and admin are the clients that sign in on this server today. They register
+`https://<chat-host>/chat/mcp/oauth/callback` and `https://<chat-host>/admin/mcp/oauth/callback`.
+`<chat-host>` is the Unique app the user is signed into, not this server's host:
+`with-intelligence.mcp.unique.app` is the server users reach from `next.unique.app`, so the host
+cannot be taken from `PUBLIC_BASE_URL`.
+
+That host is not in the default list. Each deployment adds it, together with every default host,
+in `AUTH_ALLOWED_REDIRECT_HOSTS` (Helm: `mcpConfig.auth.allowedRedirectHosts` on backstop,
+`env.AUTH_ALLOWED_REDIRECT_HOSTS` on with-intelligence). Setting the variable replaces the
+default, so a value that names only the chat host drops every client below.
+
+Hosts seen on `/authorize` in the 30 days before this restriction:
+
+| Deployment | Chat host |
+|---|---|
+| backstop-mcp, burger prod | `capstone.unique.app` |
+| with-intelligence-mcp, unique prod | `next.unique.app` |
+| with-intelligence-mcp, qa | `next.qa.unique.app` |
+| both, uat01 | `uat1.unique.app` |
+
+A tenant that is not in that window, including one that registered and has not signed in since,
+needs its own host added the same way. Set this before upgrading. A client whose only redirect
+URI is dropped cannot start a new login. Tokens already issued stay valid until they expire or
+are revoked.
+
+### Default hosts
+
+A host is matched exactly. There is no wildcard, so `www` and the apex are separate rows when a
+client uses both.
 
 | Host | Client | Source |
 |---|---|---|
 | `claude.ai`, `claude.com` | Claude on the web, Desktop, mobile and Cowork (`/api/mcp/auth_callback`) | [Claude: Callback URLs](https://claude.com/docs/connectors/building/authentication#callback-urls), which announces the move to `claude.com` |
 | `chatgpt.com` | ChatGPT connectors (`/connector_platform_oauth_redirect`, `/connector/oauth/{callback_id}`) | [OpenAI Apps SDK: Authentication](https://developers.openai.com/apps-sdk/build/auth) |
 | `cursor.com`, `www.cursor.com` | Cursor's cloud callback (`/agents/mcp/oauth/callback`) | Cursor registers it in the same request as its loopback and `cursor://` URIs ([Cursor forum](https://forum.cursor.com/t/oauth-redirect-uri-changed-from-cursor-to-http-localhost-for-streamable-http-mcp/165019)) |
-| `vscode.dev`, `insiders.vscode.dev` | VS Code (`/redirect`) | VS Code registers both with its loopback URI ([microsoft/vscode#278512](https://github.com/microsoft/vscode/issues/278512)) |
+| `vscode.dev`, `insiders.vscode.dev` | VS Code and GitHub Copilot in VS Code (`/redirect`) | VS Code registers both with its loopback URI ([microsoft/vscode#278512](https://github.com/microsoft/vscode/issues/278512)) |
+| `grok.com` | Grok on the web (`/connectors-oauth-exchange-code/`) | [X Ads API: MCP](https://docs.x.com/x-ads-api/mcp) |
+| `www.perplexity.ai`, `enterprise.perplexity.ai` | Perplexity custom connectors (`/rest/connections/oauth_callback`) | [Perplexity: custom remote connectors](https://www.perplexity.ai/help-center/en/articles/13915507-adding-custom-remote-connectors) |
+| `app.dust.tt`, `dust.tt`, `eu.dust.tt` | Dust (`/oauth/mcp/finalize`, `/oauth/mcp_static/finalize`) | [Dust: adding an MCP server](https://docs.dust.tt/docs/user-documentation/admins/tools-management/adding-an-mcp-server) |
+| `console.mistral.ai` | Mistral Studio connector debugger (`/build/connectors/debugger/oauth-callback`) | [Mistral: debug connectors](https://docs.mistral.ai/studio/connectors/debugger) |
+| `api.devin.ai` | Devin (`/mcp/oauth/callback`). Devin Desktop, formerly Windsurf, uses loopback | [AWS Sign-In: supported redirect URIs](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html) |
+| `teams.microsoft.com` | Microsoft 365 Copilot plugins (`/api/platform/v1.0/oAuthRedirect`) | [Microsoft Learn: OAuth for Copilot plugins](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/plugin-authentication-oauth) |
+| `global.consent.azure-apim.net` | Copilot Studio (`/redirect/<connector-id>`) | [AWS Sign-In](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html), [Aprimo: Copilot Studio redirect URLs](https://developers.aprimo.com/docs/agentic-orchestration/aprimo-mcp-server/) |
+| `replit.com` | Replit | [AWS Sign-In: supported redirect URIs](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html) |
+| `lovable.app`, `lovable.dev` | Lovable | [AWS Sign-In: supported redirect URIs](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html) |
+| `api.v0.dev` | v0 (`/v1/mcp-servers/oauth/callback`) | [AWS Sign-In: supported redirect URIs](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html) |
+| `app.langdock.com` | Langdock (`/api/integrations/`) | [AWS Sign-In: supported redirect URIs](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html) |
+| `cloud.arcade.dev` | Arcade (`/api/v1/oauth/`) | [AWS Sign-In: supported redirect URIs](https://docs.aws.amazon.com/signin/latest/userguide/aws-mcp-server.html) |
+| `oauth.n8n.cloud` | n8n Cloud (`/oauth2/callback`). A self-hosted n8n uses its own host | [Zuora: redirect URIs by MCP client](https://docs.zuora.com/en-us/zuora-ai/zuora-mcp-server/zuora-mcp-server/configure-zuora-remote-mcp-server/redirect-uris-by-mcp-client) |
+
+Not on the list, because there is no single host to allow: Mistral Le Chat (its callback is not
+published; the Studio debugger above is), Glean (a new redirect per connection), and self-hosted
+clients such as Open WebUI, LibreChat and n8n. Add the host from the rejected registration when a
+tenant uses one.
 
 - A redirect URI with a fragment, with userinfo (`https://user@host`), with `http` on any other
   host, or with `javascript:`, `data:`, `file:` or a similar scheme is always refused.
 - One refused URI refuses the whole registration, so a client that registers several (Cursor
   registers three) needs all of them allowed.
-- Add a host when a customer uses another hosted MCP client. A host is matched exactly, so list
-  each subdomain.
 - A client registered before this check keeps working only through redirect URIs the current list
   still accepts. `/authorize` answers any other with a `400` error page and never redirects there.
   Tokens already issued stay valid until they expire or are revoked.

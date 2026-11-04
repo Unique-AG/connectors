@@ -28,7 +28,7 @@ mcpConfig:
   # redirect URI must be on one of these hosts, any other scheme must be listed. Loopback http on
   # any port is always accepted. A list replaces the app default; null keeps it.
   auth:
-    # AUTH_ALLOWED_REDIRECT_HOSTS. Claude (web, desktop, mobile), ChatGPT, Cursor, VS Code.
+    # AUTH_ALLOWED_REDIRECT_HOSTS. Same hosts as DEFAULT_ALLOWED_REDIRECT_HOSTS.
     allowedRedirectHosts:
       - claude.ai
       - claude.com
@@ -37,6 +37,23 @@ mcpConfig:
       - www.cursor.com
       - vscode.dev
       - insiders.vscode.dev
+      - grok.com
+      - www.perplexity.ai
+      - enterprise.perplexity.ai
+      - app.dust.tt
+      - dust.tt
+      - eu.dust.tt
+      - console.mistral.ai
+      - api.devin.ai
+      - teams.microsoft.com
+      - global.consent.azure-apim.net
+      - replit.com
+      - lovable.app
+      - lovable.dev
+      - api.v0.dev
+      - app.langdock.com
+      - cloud.arcade.dev
+      - oauth.n8n.cloud
     # AUTH_ALLOWED_REDIRECT_SCHEMES. Cursor registers cursor://anysphere.cursor-mcp/oauth/callback.
     allowedRedirectSchemes:
       - cursor

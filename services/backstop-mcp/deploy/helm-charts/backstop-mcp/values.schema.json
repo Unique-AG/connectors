@@ -2328,7 +2328,7 @@
                 "minLength": 1,
                 "pattern": "^[A-Za-z0-9.-]+$"
               },
-              "description": "AUTH_ALLOWED_REDIRECT_HOSTS. Exact hosts an https redirect URI may point at. Chart and app default: claude.ai, claude.com, chatgpt.com, cursor.com, www.cursor.com, vscode.dev, insiders.vscode.dev."
+              "description": "AUTH_ALLOWED_REDIRECT_HOSTS. Exact hosts an https redirect URI may point at. The chart default matches the app default, the hosted clients in the operator authentication doc. A list here replaces that default. The Unique chat host is not in the default."
             },
             "allowedRedirectSchemes": {
               "type": [

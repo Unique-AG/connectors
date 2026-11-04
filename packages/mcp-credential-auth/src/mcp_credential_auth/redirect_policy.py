@@ -4,8 +4,8 @@ from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict
 
-# Callback hosts of the hosted MCP clients we support; sources are in
-# services/backstop-mcp/docs/operator/authentication.md ("Which Clients Can Connect").
+# Callback hosts of the hosted MCP clients we support. The Unique chat host is not here: it
+# differs per tenant. Sources are in services/backstop-mcp/docs/operator/authentication.md.
 DEFAULT_ALLOWED_REDIRECT_HOSTS: tuple[str, ...] = (
     "claude.ai",
     "claude.com",
@@ -14,6 +14,23 @@ DEFAULT_ALLOWED_REDIRECT_HOSTS: tuple[str, ...] = (
     "www.cursor.com",
     "vscode.dev",
     "insiders.vscode.dev",
+    "grok.com",
+    "www.perplexity.ai",
+    "enterprise.perplexity.ai",
+    "app.dust.tt",
+    "dust.tt",
+    "eu.dust.tt",
+    "console.mistral.ai",
+    "api.devin.ai",
+    "teams.microsoft.com",
+    "global.consent.azure-apim.net",
+    "replit.com",
+    "lovable.app",
+    "lovable.dev",
+    "api.v0.dev",
+    "app.langdock.com",
+    "cloud.arcade.dev",
+    "oauth.n8n.cloud",
 )
 
 # Cursor registers its `cursor://` callback together with its loopback one, so the whole

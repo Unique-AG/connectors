@@ -296,7 +296,7 @@ Migrations (`alembic upgrade head`) read the same variables as the server.
 | `AUTH_TOKEN_RETENTION_DAYS` | `30` | How long fully expired OAuth token families are kept as an audit trail before the sweep deletes them |
 | `AUTH_UNUSED_CLIENT_RETENTION_HOURS` | `24` | How long a registered OAuth client that nothing references is kept |
 | `AUTH_CLEANUP_INTERVAL_HOURS` | `6` | How often the cleanup sweep runs |
-| `AUTH_ALLOWED_REDIRECT_HOSTS` | `claude.ai,claude.com,chatgpt.com,cursor.com,www.cursor.com,vscode.dev,insiders.vscode.dev` | Hosts an `https` redirect URI may point at when a client registers. Exact match, comma-separated. Setting it replaces the default. In Helm, set `mcpConfig.auth.allowedRedirectHosts`. See [Authentication: Which clients can connect](./authentication.md#Which-Clients-Can-Connect) |
+| `AUTH_ALLOWED_REDIRECT_HOSTS` | Hosted clients in [Which clients can connect](./authentication.md#Which-Clients-Can-Connect) | Hosts an `https` redirect URI may point at when a client registers. Exact match, comma-separated. Setting it replaces the default, so include the tenant chat host and every default host. In Helm, set `mcpConfig.auth.allowedRedirectHosts` |
 | `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Schemes other than `http` and `https` a redirect URI may use, such as a desktop app's own scheme. `http`, `https`, `javascript`, `data`, `file`, `vbscript`, `blob` and `about` stop startup. In Helm, set `mcpConfig.auth.allowedRedirectSchemes` |
 
 Token lifetimes (15-minute access, 30-day refresh) are fixed in code. See
