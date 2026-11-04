@@ -13,6 +13,7 @@ from space_config_mcp.contexts.snapshots import import_space_config
 from space_config_mcp.contexts.snapshots import list_snapshots
 from space_config_mcp.contexts.snapshots import revert_space
 from space_config_mcp.contexts.snapshots import snapshot_space
+from space_config_mcp.contexts.spaces import get_mcp_server_status
 from space_config_mcp.contexts.spaces import get_space
 from space_config_mcp.contexts.spaces import list_spaces
 from space_config_mcp.contexts.spaces import update_space
@@ -23,6 +24,7 @@ __all__ = [
     "delete_space_access",
     "export_space_config",
     "get_conduct_config",
+    "get_mcp_server_status",
     "get_module",
     "get_snapshot",
     "get_space",

@@ -46,6 +46,14 @@ class Upstream:
     ) -> unique_sdk.Space:
         return await unique_sdk.Space.update_space_async(user_id, company_id, space_id, **patch)
 
+    async def get_mcp_server_status(
+        self,
+        user_id: str,
+        company_id: str,
+        space_id: str,
+    ) -> unique_sdk.Space.McpServerStatusResponse:
+        return await unique_sdk.Space.get_mcp_server_status_async(user_id, company_id, space_id)
+
     async def get_space_access(
         self,
         user_id: str,

@@ -159,6 +159,81 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "List MCP servers (connectors) enabled on the current space with their tool selection and OAuth state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_mcp_server_status",
+    "outputSchema": {
+      "properties": {
+        "mcpServers": {
+          "items": {
+            "description": "The calling user's own state for an MCP server enabled on a space.",
+            "properties": {
+              "enabledToolNames": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "isEnabled": {
+                "type": "boolean"
+              },
+              "isOAuth2Connected": {
+                "type": "boolean"
+              },
+              "mcpServerId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "oauth2Url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requiresOAuth": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mcpServerId",
+              "name",
+              "isEnabled",
+              "requiresOAuth",
+              "isOAuth2Connected",
+              "oauth2Url",
+              "enabledToolNames"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "spaceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "spaceId",
+        "mcpServers"
+      ],
+      "type": "object"
+    },
+    "title": "Get MCP Server Status"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "Get a single module with its full configuration dict.",
     "inputSchema": {
       "additionalProperties": false,
@@ -716,7 +791,7 @@
     "annotations": {
       "idempotentHint": true
     },
-    "description": "Update metadata of the current space. Only the fields you provide are changed.",
+    "description": "Update metadata and configuration of the current space. Only the fields you provide are changed.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -742,7 +817,72 @@
             }
           ],
           "default": null,
-          "description": "Whether users may switch models."
+          "description": "Whether users may switch between models."
+        },
+        "assistant_prompts": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "order": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "prompt"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Preset prompt suggestions shown to users. Each entry needs a title and a prompt. Providing this list replaces all existing prompts."
+        },
+        "chat_upload": {
+          "anyOf": [
+            {
+              "enum": [
+                "ENABLED",
+                "DISABLED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether users can upload files in the chat input."
         },
         "explanation": {
           "anyOf": [
@@ -778,7 +918,56 @@
             }
           ],
           "default": null,
-          "description": "Language model identifier, e.g. 'gpt-4o'."
+          "description": "Default language model identifier, e.g. 'gpt-4o'."
+        },
+        "mcp_servers": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "mcpServerId": {
+                    "type": "string"
+                  },
+                  "tools": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "properties": {
+                            "isEnabled": {
+                              "type": "boolean"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "isEnabled"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "mcpServerId"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "MCP servers (connectors) to configure on the space. Each entry needs an mcpServerId. Optionally supply a tools list \u2014 each tool entry needs a name and isEnabled. An empty tools list disables the server. Omitting tools enables all callable tools for that server. Use get_mcp_server_status to find server IDs and current tool names."
         },
         "name": {
           "anyOf": [
@@ -804,6 +993,33 @@
           ],
           "default": null,
           "description": "Arbitrary settings dict merged at space level."
+        },
+        "switchable_language_models": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "languageModel": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "languageModel"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "List of models users can pick from when allow_model_switching is true. Each entry needs a displayName (shown in the UI) and a languageModel (model ID)."
         }
       },
       "type": "object"
