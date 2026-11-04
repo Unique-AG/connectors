@@ -369,6 +369,35 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "List all language model IDs available to the company.\n\nUse this before calling update_space or update_conduct_config to get the exact\nmodel identifier strings accepted by language_model and switchable_language_models.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_language_models",
+    "outputSchema": {
+      "description": "Response for getting available LLM models.",
+      "properties": {
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "models"
+      ],
+      "type": "object"
+    },
+    "title": "List Language Models"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "List all MCP servers (connectors) available to the company.\n\nReturns each server's id, name, description, requiresOAuth flag, and the full\nlist of tool names and descriptions. Use this to find server IDs and tool names\nbefore calling update_space with mcp_servers.",
     "inputSchema": {
       "additionalProperties": false,

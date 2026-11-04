@@ -1,7 +1,18 @@
 import unique_sdk
+from unique_sdk.api_resources._llm_models import LLMModels
 from unique_sdk.api_resources._mcp import McpServersResponse
 
 from space_config_mcp.upstream import Upstream
+
+
+async def list_language_models(
+    *,
+    upstream: Upstream,
+    user_id: str,
+    company_id: str,
+) -> LLMModels.LLMModelsResponse:
+    """Return all language model IDs available to the company."""
+    return await upstream.list_language_models(user_id, company_id)
 
 
 async def list_spaces(

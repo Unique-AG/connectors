@@ -15,6 +15,7 @@ from space_config_mcp.contexts.snapshots import revert_space
 from space_config_mcp.contexts.snapshots import snapshot_space
 from space_config_mcp.contexts.spaces import get_mcp_server_status
 from space_config_mcp.contexts.spaces import get_space
+from space_config_mcp.contexts.spaces import list_language_models
 from space_config_mcp.contexts.spaces import list_mcp_servers
 from space_config_mcp.contexts.spaces import list_spaces
 from space_config_mcp.contexts.spaces import update_space
@@ -27,6 +28,7 @@ __all__ = [
     "get_conduct_config",
     "get_mcp_server_status",
     "get_module",
+    "list_language_models",
     "list_mcp_servers",
     "get_snapshot",
     "get_space",
