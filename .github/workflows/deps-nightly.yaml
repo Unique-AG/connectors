@@ -171,7 +171,14 @@ jobs:
           CLOSES: ${{ needs.plan.outputs.closes }}
         run: |
           gh label create superseded --color ededed --description "The nightly job closed this pull request for a newer version" || true
-          jq -r '.[].number' <<< "$CLOSES" | while read -r number; do
+          jq -c '.[]' <<< "$CLOSES" | while read -r entry; do
+            number=$(jq -r .number <<< "$entry")
+            planned=$(jq -r .head <<< "$entry")
+            current=$(gh pr view "$number" --json headRefOid --jq .headRefOid)
+            if [ "$current" != "$planned" ]; then
+              echo "- #$number: kept. A commit came after the plan." >> "$GITHUB_STEP_SUMMARY"
+              continue
+            fi
             gh pr edit "$number" --add-label superseded
             gh pr close "$number" --delete-branch --comment "No update targets this pull request any more. If a new version is due, the job opens a new PR."
             echo "- #$number: closed. No update targets it any more." >> "$GITHUB_STEP_SUMMARY"

@@ -175,11 +175,11 @@ const repository = process.env.GITHUB_REPOSITORY;
 const baseBranch = process.env.BASE_BRANCH ?? 'main';
 const gh = (...args) => runOrThrow('gh', args);
 const openPullRequests = JSON.parse(
-  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,body,labels'),
+  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,headRefOid,body,labels'),
 );
 const openPulls = openPullRequests
   .filter(({ headRefName }) => headRefName.startsWith('deps/'))
-  .flatMap(({ number, headRefName, body, labels }) => {
+  .flatMap(({ number, headRefName, headRefOid, body, labels }) => {
     const compare = run('gh', [
       'api',
       `repos/${repository}/compare/${baseBranch}...${headRefName}`,
@@ -193,6 +193,7 @@ const openPulls = openPullRequests
     return {
       number,
       branch: headRefName,
+      head: headRefOid,
       body,
       labels: labels.map(({ name }) => name),
       behindBy: Number(compare.stdout),

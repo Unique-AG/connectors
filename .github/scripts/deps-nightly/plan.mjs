@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { normalizeName, parseRequirements, parseUvPackages, pinnedVersion } from './locks.mjs';
-import { classifyOpenPull, entryKey } from './state.mjs';
+import { classifyOpenPull, entryKey, markerKeyOf } from './state.mjs';
 import {
   compareVersions,
   formatChange,
@@ -271,7 +271,9 @@ export function buildPlan({
   const slugs = new Set(ordered.map(({ slug }) => slug));
   const blocked = new Set(needsPerson.map(({ ecosystem }) => ecosystem));
   const ecosystemOfBranch = (branch) => branch.slice('deps/'.length).split('-')[0];
-  const unplanned = openPulls.filter(({ branch }) => !slugs.has(branch.slice('deps/'.length)));
+  const unplanned = openPulls.filter(
+    ({ branch, body }) => markerKeyOf(body) && !slugs.has(branch.slice('deps/'.length)),
+  );
   const requested = unplanned.filter(
     ({ number }) => request?.recreate && number === request.number,
   );
@@ -306,7 +308,7 @@ export function buildPlan({
     deferred: [...allEntries.slice(MATRIX_LIMIT), ...allUpdates.slice(MATRIX_LIMIT)],
     closes: orphans
       .filter((pull) => !changed.includes(pull))
-      .map(({ number, branch }) => ({ number, branch })),
+      .map(({ number, branch, head }) => ({ number, branch, head })),
     skipped: [
       ...decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
       ...changed.map(({ number, branch }) => ({

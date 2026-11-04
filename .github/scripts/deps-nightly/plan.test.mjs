@@ -408,6 +408,7 @@ describe('buildPlan', () => {
       number: 7,
       branch: 'deps/npm-zod',
       body: markerOf(zod.key),
+      head: 'a1',
       behindBy: 2,
       humanCommits: false,
       labels: [],
@@ -427,7 +428,7 @@ describe('buildPlan', () => {
 
       it('closes it', () => {
         const { closes } = plan([pull(), gone()]);
-        assert.deepStrictEqual(closes, [{ number: 8, branch: 'deps/npm-gone' }]);
+        assert.deepStrictEqual(closes, [{ number: 8, branch: 'deps/npm-gone', head: 'a1' }]);
       });
 
       it('keeps it and lists it as skipped when a person or the agent changed it', () => {
@@ -439,11 +440,16 @@ describe('buildPlan', () => {
         );
       });
 
+      it('keeps it when the job did not open it', () => {
+        const { closes } = plan([gone({ body: 'A branch of a person.' })]);
+        assert.deepStrictEqual(closes, []);
+      });
+
       it('keeps it when its ecosystem needs a person', () => {
         const needsPerson = [{ ecosystem: 'npm', name: 'zod', reason: 'Too young.' }];
         assert.deepStrictEqual(plan([gone()], { needsPerson }).closes, []);
         const other = plan([gone({ branch: 'deps/uv-gone' })], { needsPerson });
-        assert.deepStrictEqual(other.closes, [{ number: 8, branch: 'deps/uv-gone' }]);
+        assert.deepStrictEqual(other.closes, [{ number: 8, branch: 'deps/uv-gone', head: 'a1' }]);
       });
 
       it('closes nothing when a run for one pull request is for another pull request', () => {
@@ -460,7 +466,7 @@ describe('buildPlan', () => {
         const request = { number: 8, recreate: true };
         const needsPerson = [{ ecosystem: 'npm', name: 'zod', reason: 'Too young.' }];
         const { closes, skipped } = plan([gone({ humanCommits: true })], { request, needsPerson });
-        assert.deepStrictEqual(closes, [{ number: 8, branch: 'deps/npm-gone' }]);
+        assert.deepStrictEqual(closes, [{ number: 8, branch: 'deps/npm-gone', head: 'a1' }]);
         assert.ok(skipped.every(({ name }) => name !== '#8'));
       });
     });
