@@ -115,7 +115,11 @@ describe('deploymentSecrets', () => {
         unique: mockExternalUniqueConfig,
         proxy: mockNoProxyConfig,
       }),
-    ).toEqual(['microsoft-client-secret', 'zitadel-client-secret']);
+    ).toEqual([
+      'microsoft-client-secret',
+      'zitadel-client-secret',
+      Buffer.from('zitadel-client-id:zitadel-client-secret').toString('base64'),
+    ]);
   });
 
   it('lists the whole certificate private key', () => {
@@ -183,10 +187,14 @@ describe('createAppLoggerOptions', () => {
     const { logger, lines } = createCapturingLogger(mockClientSecretSharepointConfig);
 
     logger.error('rejected microsoft-client-secret and zitadel-client-secret');
+    logger.error(
+      `rejected ${Buffer.from('zitadel-client-id:zitadel-client-secret').toString('base64')}`,
+    );
     logger.error('rejected proxy-password-1');
 
     expect(lines.map((line) => JSON.parse(line).msg)).toEqual([
       'rejected [Redacted] and [Redacted]',
+      'rejected [Redacted]',
       'rejected [Redacted]',
     ]);
   });

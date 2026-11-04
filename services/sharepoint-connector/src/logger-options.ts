@@ -39,7 +39,12 @@ export function createAppLoggerOptions(app: AppConfig, configs: DeploymentConfig
 export function deploymentSecrets({ sharepoint, unique, proxy }: DeploymentConfigs): string[] {
   return [
     ...microsoftSecrets(sharepoint.auth),
-    ...(unique.serviceAuthMode === 'external' ? [unique.zitadelClientSecret.value] : []),
+    ...(unique.serviceAuthMode === 'external'
+      ? [
+          unique.zitadelClientSecret.value,
+          basicCredentials(unique.zitadelClientId, unique.zitadelClientSecret.value),
+        ]
+      : []),
     ...proxySecrets(proxy),
   ];
 }
