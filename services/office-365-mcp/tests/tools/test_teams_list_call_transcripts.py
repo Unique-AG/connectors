@@ -441,7 +441,7 @@ class TestUnmatchedCalls:
 
         query = parse_qs(urlsplit(str(chat.calls.last.request.url)).query)
         assert query["$filter"] == [
-            "lastModifiedDateTime gt 2026-03-02T00:00:00Z "
+            "lastModifiedDateTime gt 2026-03-01T23:59:59Z "
             + "and lastModifiedDateTime lt 2026-03-09T23:59:59Z"
         ]
         assert query["$orderby"] == ["lastModifiedDateTime desc"]

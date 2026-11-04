@@ -1,11 +1,5 @@
-"""`teams_list_call_transcripts`: transcripts of the 1:1 and group calls the signed-in user was on.
-
-`adhocCalls/getAllTranscripts` answers delegated callers although Microsoft documents it as
-application-only. It wants the user's object id (the literal `me` answers 400), unquoted datetimes,
-and both bounds (`endDateTime` alone answers 404).
-
-TRAP: a user with no call transcripts at all gets 404 `NotFound` "UnknownError", not an empty list.
-"""
+"""Graph's delegated getAllTranscripts route requires the user's object ID and unquoted start and
+end bounds, and returns 404 UnknownError when no transcripts exist."""
 
 from collections.abc import Mapping
 from datetime import UTC, date, datetime, timedelta
@@ -71,6 +65,8 @@ _WIRE_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 _CHAT_PAGE_SIZE = 50
 _CHAT_SLACK = timedelta(days=1)
+# Graph takes no `ge` here, and the wire format drops sub-seconds: step back one second.
+_WIRE_SECOND = timedelta(seconds=1)
 
 _NOT_FOUND = 404
 
@@ -306,7 +302,8 @@ async def _call_events(
             orderby=["lastModifiedDateTime desc"],
             # Ending transcription modifies the event: a call running past `closes` needs slack.
             filter=(
-                f"lastModifiedDateTime gt {opens.astimezone(UTC):{_WIRE_FORMAT}} and "
+                f"lastModifiedDateTime gt {(opens - _WIRE_SECOND).astimezone(UTC):{_WIRE_FORMAT}} "
+                + "and "
                 + f"lastModifiedDateTime lt {(closes + _CHAT_SLACK).astimezone(UTC):{_WIRE_FORMAT}}"
             ),
         ),

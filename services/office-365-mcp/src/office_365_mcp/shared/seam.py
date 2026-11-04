@@ -531,7 +531,7 @@ def _remedy(
             )
         if failure.inner_code == _TRANSCRIPT_ACCESS_DISABLED:
             return _TRANSCRIPTS_SWITCHED_OFF
-        if _LICENSE_INFORMATION_MISSING in str(failure):
+        if failure.reason is not None and _LICENSE_INFORMATION_MISSING in failure.reason:
             return _NEEDS_A_TEAMS_LICENSE
         if forbidden is not None:
             return forbidden

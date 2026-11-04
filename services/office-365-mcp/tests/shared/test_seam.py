@@ -29,6 +29,8 @@ from mcp.types import (
     TextContent,
 )
 from mcp.types.version import LATEST_HANDSHAKE_VERSION, LATEST_MODERN_VERSION
+from msgraph.generated.models.o_data_errors.main_error import MainError
+from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from pydantic import BaseModel
 
 from office_365_mcp.graph_client import (
@@ -40,6 +42,7 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
+from office_365_mcp.graph_client.errors import _classify
 from office_365_mcp.shared.seam import (
     READ_ONLY,
     Advised,
@@ -65,6 +68,20 @@ _UNCONSENTED = (
     + "'1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061'. Send an interactive authorization request for "
     + "this user and resource."
 )
+
+_LICENSE_MESSAGE = (
+    "Failed to get license information for the user. Ensure user has a valid "
+    + "Office365 license assigned to them."
+)
+
+
+def _unlicensed_failure() -> GraphFailure:
+    return _classify(
+        ODataError(
+            response_status_code=403,
+            error=MainError(code="Forbidden", message=_LICENSE_MESSAGE),
+        )
+    )
 
 
 _FALLTHROUGH = "because it is a bad request, not an outage or a permission problem"
@@ -351,13 +368,7 @@ class TestRetryAdvice:
         self,
     ) -> None:
         message = await _message(
-            GraphForbidden(
-                "Failed to get license information for the user. Ensure user has a valid "
-                + "Office365 license assigned to them.",
-                status=403,
-                code="Forbidden",
-                request_id=None,
-            ),
+            _unlicensed_failure(),
             forbidden="Refused.",
         )
 
