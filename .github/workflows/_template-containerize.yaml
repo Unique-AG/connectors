@@ -63,4 +63,3 @@ jobs:
           cache-from: |
             type=gha,scope=${{ env.GHA_CACHE_SCOPE }}
             type=registry,ref=${{ env.GHCR_REPO }}:cache
-          cache-to: type=gha,scope=${{ env.GHA_CACHE_SCOPE }},mode=max,ignore-error=true
