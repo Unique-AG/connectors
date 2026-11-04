@@ -10,9 +10,9 @@ export const mcpRateLimitConfigSchema = z.object({
   toolCallsPerWindow: z.coerce
     .number()
     .int()
-    .min(0)
+    .min(1)
     .prefault(60)
-    .describe('Tool calls one key may make within the window. 0 turns the limit off.'),
+    .describe('Tool calls one key may make within the window.'),
   windowSeconds: z.coerce
     .number()
     .positive()

@@ -65,7 +65,7 @@ async function startApp(
 
 async function callEcho(
   url: URL,
-  key: string | undefined,
+  key: string,
   id: number,
 ): Promise<{ error?: { message: string }; result?: { content: Array<{ text: string }> } }> {
   const res = await fetch(url, {
@@ -74,7 +74,7 @@ async function callEcho(
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       'mcp-protocol-version': '2025-06-18',
-      ...(key === undefined ? {} : { 'x-test-key': key }),
+      'x-test-key': key,
     },
     body: JSON.stringify({
       jsonrpc: '2.0',
@@ -89,7 +89,7 @@ async function callEcho(
   };
 }
 
-async function callTimes(url: URL, key: string | undefined, times: number) {
+async function callTimes(url: URL, key: string, times: number) {
   const responses = [];
   for (let id = 1; id <= times; id++) {
     responses.push(await callEcho(url, key, id));
@@ -134,14 +134,11 @@ describe('per-key rate limiting', () => {
     expect(other.result?.content[0]?.text).toBe('"call 4"');
   });
 
-  it.each([
-    ['no rate limit is configured', undefined, undefined, 'key-a'],
-    ['the limit is 0', limitedByHeader, { toolCallsPerWindow: 0, windowSeconds: 60 }, 'key-a'],
-  ] as const)('does not limit calls when %s', async (_case, rateLimit, config, key) => {
-    const started = await startApp(rateLimit, config);
+  it('does not limit calls when no rate limit is configured', async () => {
+    const started = await startApp(undefined);
     app = started.app;
 
-    const responses = await callTimes(started.url, key, 3);
+    const responses = await callTimes(started.url, 'key-a', 3);
 
     expect(responses.map((response) => response.error)).toEqual([undefined, undefined, undefined]);
   });
@@ -157,11 +154,12 @@ describe('mcpRateLimitConfigSchema', () => {
 
   it('reads the values from environment strings', () => {
     expect(
-      mcpRateLimitConfigSchema.parse({ toolCallsPerWindow: '0', windowSeconds: '30' }),
-    ).toEqual({ toolCallsPerWindow: 0, windowSeconds: 30 });
+      mcpRateLimitConfigSchema.parse({ toolCallsPerWindow: '120', windowSeconds: '30' }),
+    ).toEqual({ toolCallsPerWindow: 120, windowSeconds: 30 });
   });
 
   it.each([
+    ['a limit of 0', { toolCallsPerWindow: '0' }],
     ['a negative limit', { toolCallsPerWindow: '-1' }],
     ['a fractional limit', { toolCallsPerWindow: '1.5' }],
     ['a limit that is not a number', { toolCallsPerWindow: 'sixty' }],

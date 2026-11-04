@@ -5,7 +5,7 @@
     options.opens_upstream and "transport: httpx2.AsyncBaseTransport | None = None",
     options.auth and "*",
     options.auth and "auth: AuthSettings",
-    options.auth and "rate_limit: RateLimitSettings",
+    options.auth and "rate_limit: RateLimitSettings | None",
     options.auth and "base_url: str",
 ] | select | join(", ") %}
 {% set resources = [
@@ -129,7 +129,11 @@ def create_server({{ parameters }}) -> FastMCP:
 {% if options.auth %}
         middleware=[
             ToolCallObservabilityMiddleware(),
-            RateLimitMiddleware(rate_limit, get_request_key=access_token_subject),
+            *(
+                [RateLimitMiddleware(rate_limit, get_request_key=access_token_subject)]
+                if rate_limit is not None
+                else []
+            ),
         ],
 {% else %}
         middleware=[ToolCallObservabilityMiddleware()],

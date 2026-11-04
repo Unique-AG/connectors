@@ -29,8 +29,8 @@ async def _done(context: MiddlewareContext[mt.CallToolRequestParams]) -> ToolRes
     return ToolResult(content=[])
 
 
-def _limiter(tool_calls_per_window: int = 2) -> RateLimitMiddleware:
-    settings = RateLimitSettings(tool_calls_per_window=tool_calls_per_window, window_seconds=60)
+def _limiter() -> RateLimitMiddleware:
+    settings = RateLimitSettings(tool_calls_per_window=2, window_seconds=60)
     return RateLimitMiddleware(settings, get_request_key=_key_from_arguments)
 
 
@@ -61,13 +61,6 @@ async def test_each_key_has_its_own_limit() -> None:
 
     await _call(middleware, "subject-b")
     await _call(middleware, "subject-b")
-
-
-async def test_a_limit_of_0_turns_the_limit_off() -> None:
-    middleware = _limiter(tool_calls_per_window=0)
-
-    for _ in range(3):
-        await _call(middleware, "alice")
 
 
 def test_access_token_subject_is_the_verified_token_subject() -> None:

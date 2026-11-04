@@ -6,7 +6,7 @@ import { McpPromptsHandler } from './handlers/mcp-prompts.handler';
 import { McpResourcesHandler } from './handlers/mcp-resources.handler';
 import { McpToolsHandler } from './handlers/mcp-tools.handler';
 import { McpRegistryService } from './mcp-registry.service';
-import { RateLimiterService } from './rate-limiter.service';
+import { MCP_RATE_LIMITER, type RateLimiterService } from './rate-limiter.service';
 
 /**
  * Request-scoped service for executing MCP tools
@@ -21,7 +21,7 @@ export class McpExecutorService {
     moduleRef: ModuleRef,
     registry: McpRegistryService,
     @Inject('MCP_MODULE_ID') mcpModuleId: string,
-    rateLimiter: RateLimiterService,
+    @Inject(MCP_RATE_LIMITER) rateLimiter: RateLimiterService | null,
   ) {
     this.toolsHandler = new McpToolsHandler(moduleRef, registry, mcpModuleId, rateLimiter);
     this.resourcesHandler = new McpResourcesHandler(moduleRef, registry, mcpModuleId);

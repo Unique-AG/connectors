@@ -10,7 +10,7 @@
     options.opens_persistence and "open_persistence",
     options.opens_upstream and "upstream_transport",
     options.auth and "auth=fake_auth_settings()",
-    options.auth and "rate_limit=RateLimitSettings(tool_calls_per_window=0)",
+    options.auth and "rate_limit=None",
     options.auth and "base_url=BASE_URL",
 ] | select | join(", ") %}
 {% set offline = [
@@ -34,10 +34,8 @@ from fastmcp import FastMCP
 {% if redis %}
 from key_value.aio.stores.memory import MemoryStore
 {% endif %}
-{% if options.auth or options.opens_upstream %}
-from mcp_configs import {{ [options.auth and "RateLimitSettings", options.opens_upstream and "RetrySettings"] | select | join(", ") }}
-{% endif %}
 {% if options.opens_upstream %}
+from mcp_configs import RetrySettings
 {% if options.auth %}
 from pydantic import AnyHttpUrl
 {% else %}

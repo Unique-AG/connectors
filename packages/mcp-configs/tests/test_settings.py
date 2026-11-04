@@ -338,17 +338,18 @@ def test_rate_limit_defaults_to_60_tool_calls_a_minute() -> None:
 def test_rate_limit_reads_the_limit_and_window_from_the_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "0")
+    monkeypatch.setenv("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "120")
     monkeypatch.setenv("MCP_RATE_LIMIT_WINDOW_SECONDS", "30")
 
     settings = RateLimitSettings()
 
-    assert (settings.tool_calls_per_window, settings.window_seconds) == (0, 30)
+    assert (settings.tool_calls_per_window, settings.window_seconds) == (120, 30)
 
 
 @pytest.mark.parametrize(
     ("name", "value"),
     [
+        ("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "0"),
         ("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "-1"),
         ("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "sixty"),
         ("MCP_RATE_LIMIT_WINDOW_SECONDS", "0"),

@@ -49,8 +49,7 @@ class RateLimitMiddleware(Middleware):
         context: MiddlewareContext[mt.CallToolRequestParams],
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
-        if self._settings.tool_calls_per_window > 0:
-            await self._check(self._get_request_key(context))
+        await self._check(self._get_request_key(context))
         return await call_next(context)
 
     async def _check(self, key: str) -> None:

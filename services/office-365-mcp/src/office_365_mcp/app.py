@@ -79,7 +79,6 @@ def create_app(
     database_config = database_config or DatabaseConfig()
     entra_config = entra_config or EntraConfig()  # pyright: ignore[reportCallIssue]
     surface_config = surface_config or SurfaceConfig()
-    rate_limit = rate_limit or RateLimitSettings()
 
     configure_logging(config)
     configure_metrics(config)
@@ -145,7 +144,11 @@ def create_app(
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, or its line carries the session task's stale trace.
             MessageLogMiddleware(),
-            RateLimitMiddleware(rate_limit, get_request_key=access_token_subject),
+            *(
+                [RateLimitMiddleware(rate_limit, get_request_key=access_token_subject)]
+                if rate_limit is not None
+                else []
+            ),
         ],
         lifespan=lifespan,
     )
