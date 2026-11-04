@@ -18,11 +18,11 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import GraphResponseTooLarge, graph_errors
 from office_365_mcp.shared.handles import CallTranscriptHandle, call_transcript_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.transcripts import TranscriptTurn, read_turns
+from office_365_mcp.shared.transcripts import CALL_TRANSCRIPT_PERMISSION, TranscriptTurn, read_turns
 
 TOOL_NAME = "teams_read_call_transcript"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("CallTranscripts.Read.All",)
+GRAPH_PERMISSIONS: tuple[str, ...] = (CALL_TRANSCRIPT_PERMISSION,)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///calltranscripts/SYNTHETIC-CALL-0001" + "/MSMjMCMjSYNTHETIC0002"
@@ -34,7 +34,7 @@ _DESCRIPTION = f"""\
 Returns the spoken turns of one Teams call transcript. Use this tool to read what a \
 call said or decided. Each turn has a start time and an end time in seconds. Each turn can \
 have a speaker name. Use the `uri` that teams_list_call_transcripts reports. \
-teams_read_transcript is the other reader, and it takes a different handle. A meeting \
+A meeting \
 transcript handle is not valid here.
 
 Notes:

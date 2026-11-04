@@ -86,6 +86,7 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "ChannelMessage.Send",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
+        "CallTranscripts.Read.All",
         "OnlineMeetingRecording.Read.All",
         "ChannelMessage.ReadWrite",
         "Chat.ReadWrite",

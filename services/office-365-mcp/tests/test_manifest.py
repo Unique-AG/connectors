@@ -230,6 +230,16 @@ class TestTheDescriptionScanWarnsAboutStalePromises:
         if preset is not ToolsPreset.ONENOTE_READ:
             assert "does not expose" not in _flat(manifest)
 
+    async def test_a_call_transcript_deployment_is_told_no_stale_promise(self) -> None:
+        selection = resolve(presets=[ToolsPreset.TEAMS_CALL_TRANSCRIPTS], enabled=None)
+        mcp: FastMCP = FastMCP("manifest-under-test", version=_VERSION)
+
+        async with httpx.AsyncClient() as transport:
+            register_tools(mcp, transport, selection)
+            manifest = await surface_manifest(mcp, selection, version=_VERSION)
+
+        assert "does not expose" not in _flat(manifest)
+
     @pytest.mark.usefixtures("registry_of_three")
     async def test_prose_that_merely_contains_a_tool_name_is_not_a_reference_to_it(self) -> None:
         selection = Selection(
