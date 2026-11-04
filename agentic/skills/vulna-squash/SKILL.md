@@ -93,7 +93,10 @@ To make a fix:
 2. Change only what the bump broke. If the fix needs a change outside the PR scope, stop and go to Part E.
 3. Run the command that the failed job ran.
 4. Commit with `fix(<scope>): adapt to <pkg> <version>`. Push to the same branch.
-5. Make sure that the PR title still passes `cz` for the new files. If it does not, change its scope.
+5. Set the scope of the PR title from the files of the PR. Keep the type and the subject of the title. Do this after every push.
+   - Get the scope: `scope=$(gh pr view <n> --repo Unique-AG/connectors --json files -q '.files[].path' | node .github/scripts/deps-nightly/scope.cli.mjs)`
+   - Set the title: `gh pr edit <n> --repo Unique-AG/connectors --title "build($scope): <subject>"`
+   - If a command fails, put its error in the report. Do not skip this step without a reason.
 
 After attempt 2, go to Part E.
 
