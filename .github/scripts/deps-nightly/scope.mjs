@@ -2,7 +2,14 @@ const DEPS = 'deps';
 const FALLBACK = 'main';
 
 function globToRegExp(glob) {
-  return new RegExp(`^${glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*+/g, '.*')}$`);
+  const source = glob
+    .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+    .replace(/\*\*\//g, '<ANY_DIRECTORIES>')
+    .replace(/\*\*/g, '<ANY_PATH>')
+    .replace(/\*/g, '[^/]*')
+    .replaceAll('<ANY_DIRECTORIES>', '(?:.*/)?')
+    .replaceAll('<ANY_PATH>', '.*');
+  return new RegExp(`^${source}$`);
 }
 
 function parseScopes(gitcommitizen) {
@@ -20,17 +27,11 @@ function parseScopes(gitcommitizen) {
 
 export function commitScope(files, gitcommitizen) {
   const scopes = parseScopes(gitcommitizen);
-  const matchesOf = (file) =>
+  const perFile = files.map((file) =>
     scopes
       .filter(({ patterns }) => patterns.some((pattern) => pattern.test(file)))
-      .map(({ name }) => name);
-  const perFile = files.map(matchesOf);
-  if (perFile.length === 0 || perFile.some((names) => names.length === 0)) {
-    return FALLBACK;
-  }
-  if (perFile.every((names) => names.includes(DEPS))) {
-    return DEPS;
-  }
-  const single = perFile.map((names) => (names.length === 1 ? names[0] : undefined));
-  return single[0] && single.every((name) => name === single[0]) ? single[0] : FALLBACK;
+      .map(({ name }) => name),
+  );
+  const common = (perFile[0] ?? []).filter((name) => perFile.every((names) => names.includes(name)));
+  return common.includes(DEPS) ? DEPS : (common[0] ?? FALLBACK);
 }
