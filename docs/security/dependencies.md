@@ -49,7 +49,7 @@ flowchart TD
   handoff --> finish[A person finishes the PR]
 ```
 
-The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, and never edits a lockfile by hand. The PR run posts no Slack message. To run the agent again, remove the agent label. Then start an agent session in this repository and say: "Run the skill `vulna-squash` in mode `pr` for PR <number>". Do not close the PR, because a closed PR skips that version.
+The report comment starts with `<!-- vulna-squash-report -->`. A second run updates the same comment. The agent never merges, never approves, and never edits a lockfile by hand. The PR run posts no Slack message. To run the agent again, comment `/recreate` on the PR. This rebuilds the PR and starts a new run. To run the agent by hand, remove the agent label. Then start an agent session in this repository and say: "Run the skill `vulna-squash` in mode `pr` for PR <number>". Do not close the PR, because a closed PR skips that version.
 
 ## The daily findings run
 
@@ -137,7 +137,7 @@ The nightly job keeps a PR that has a commit from a person or the agent. It list
 
 The job closes only a PR that carries its hidden marker, so a branch `deps/*` of a person stays open. The job also compares the head commit of the PR with the head commit of the plan before it closes the PR. If a commit came after the plan, the job keeps the PR. A run for one PR then ends red.
 
-Only the event "Label added" starts a run. The nightly job opens a new PR with the label `dependencies`. A rebuilt or updated PR keeps its label and starts no new run. To start a run again, remove the label and add it again. A PR with a commit keeps it, because a rebuild from `main` deletes the fixes of the agent. The label `ai-assisted` does not change this.
+Only the event "Label added" starts a run. The nightly job opens a new PR with the label `dependencies`. When the job rebuilds a PR, it removes the labels `ai-assisted`, `human-required`, and `dependencies`. Then it adds `dependencies` again, so a new run starts. This applies to the nightly rebuild, to `/recreate`, and to `/rebase` when the PR has only job commits. The job only merges `main` into a PR that has a commit from a person or the agent. That PR keeps its labels and starts no new run. To start a run for it, comment `/recreate`.
 
 ## Ask for a rebase or a rebuild
 
@@ -145,8 +145,8 @@ Write one of these commands as the first line of a comment on a dependency PR.
 
 | Comment | What happens |
 |---|---|
-| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. It does nothing for a PR that no update targets. |
-| `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. If the target versions changed, it closes the PR and opens a new PR. If no update targets the PR, it closes the PR. |
+| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. It does nothing for a PR that no update targets. A rebuild starts a new agent run. |
+| `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. If the target versions changed, it closes the PR and opens a new PR. If no update targets the PR, it closes the PR. Otherwise, it starts a new agent run. |
 
 | Rule | Value |
 |---|---|
