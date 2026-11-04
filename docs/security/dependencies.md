@@ -18,7 +18,7 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
 | Limit | 250 PRs in one night, because GitHub allows only 256 jobs in a matrix. The job opens a PR for every update it finds, up to this number. The other updates wait for the next night. The job summary lists them under "Left for the next night". |
 | Ignore | The list `ignore` in `.github/deps-groups.json`. See [Ignore a dependency](#ignore-a-dependency). |
-| Merge | A person merges. The agent never merges. See [One agent run for every PR](#one-agent-run-for-every-pr). |
+| Merge | A person merges. The agent never merges. See [One agent run for every PR](#one-agent-run-for-every-pr). Trim the description at the merge. See [Merge a dependency PR](#merge-a-dependency-pr). |
 
 Our policy pins every GitHub Action to a commit, so a moved tag cannot change a workflow. But the job reads the commit from a tag when it opens a PR. A publisher can move a tag after the release is old enough. So the job records the commit of each new tag. It opens a PR only after the same commit has been there for 3 days. A tag that moves goes to "Needs a person". The record is in the Actions cache. If GitHub deletes the cache, the wait starts again.
 
@@ -128,7 +128,65 @@ Write one of these commands as the first line of a comment on a dependency PR.
 | `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. |
 | `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. |
 
-The command works only in a comment from an owner, a member, or a collaborator. It works only on a PR that has the label `dependencies` and a branch that starts with `deps/`. The workflow `[Deps] Rebase` reacts with an eyes emoji and starts the nightly workflow with the number of the PR. It also puts a note at the top of the PR description. The job `Finish` removes the note when the run ends. If a job failed, `Finish` also adds a comment with the link to the run. The run handles that PR only. It opens no other PR and does not change the dashboard issue. A person can start the same run with the inputs `pr` and `recreate` of the nightly workflow.
+| Rule | Value |
+|---|---|
+| Who | An owner, a member, or a collaborator |
+| Where | A PR with the label `dependencies` and a branch that starts with `deps/` |
+| Scope | The run handles that PR only. It opens no other PR and does not change the dashboard issue. |
+| By hand | Start the nightly workflow with the inputs `pr` and `recreate`. |
+
+The workflow `[Deps] Rebase` and the job `Finish` show the state of the run.
+
+```mermaid
+sequenceDiagram
+  actor Person
+  participant PR as Pull request
+  participant Rebase as Workflow Rebase
+  participant Nightly as Nightly run
+  Person->>PR: Comment /rebase or /recreate
+  Rebase->>PR: Add the eyes emoji and the rebuild note
+  Rebase->>Nightly: Start the run for this PR
+  Nightly->>PR: Rebuild the branch and write the description
+  alt The run succeeded
+    Nightly->>PR: Show the rocket emoji and remove the note
+  else The run failed
+    Nightly->>PR: Show the confused-face emoji and a failure note
+  end
+```
+
+| Where | While the run works | The run succeeded | The run failed |
+|---|---|---|---|
+| Your comment | Eyes emoji | Rocket emoji | Confused-face emoji |
+| PR description | Note "Rebuilding this pull request" at the top | The note is gone | Note with the link to the run at the top. The next good rebuild removes it. |
+
+## Merge a dependency PR
+
+The repository uses the PR description as the squash commit message. The nightly job writes the description in two parts.
+
+```text
+Bump `@grpc/grpc-js` from 1.14.6 to 1.14.7.
+
+Packages that changed in the lock files (1):
+
+- `@grpc/grpc-js`: 1.14.6 -> 1.14.7
+
+---
+
+The nightly dependency job made this change. It only uses versions that are at least 3 days old.
+
+### Projects that moved
+
+- `services/teams-mcp`
+
+<!-- deps-nightly:npm-grpc-grpc-js:fe18525b04da -->
+```
+
+| Part | At the merge |
+|---|---|
+| Above the line `---` | Keep it. It is the commit text. |
+| The line `---` and everything below it | Delete it in one step. It is only for the review. |
+
+The marker stays in the PR description. The planner needs it while the PR is open.
 
 ## Ignore a dependency
 
