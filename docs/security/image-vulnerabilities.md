@@ -75,6 +75,12 @@ The skip covers one release PR. The finding stays visible in the nightly scan, a
 
 Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has the counts of critical, high, and medium findings, and a table with one row for each image that has findings. A second part has the title "Repository (main)". It has the counts for the lock files and the configuration of `main`. Its table has a row only for a scan that has a finding. If the job cannot read the open alerts, this part says so.
 
+| Result of the image scans | What you see |
+|---|---|
+| All scans work | The Slack report posts |
+| Some scans fail | The report posts. Each failed image is marked "scan failed". |
+| Every scan fails | No Slack report. The run shows the warning "Slack report not posted". Read the scan jobs of that run. |
+
 The scan also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
 
 The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
