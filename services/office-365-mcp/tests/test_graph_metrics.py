@@ -42,6 +42,11 @@ from office_365_mcp.shared.handles import TranscriptHandle
 from office_365_mcp.shared.transcripts import STEP_ATTRIBUTED
 from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
+from office_365_mcp.tools.teams_list_call_transcripts import (
+    STEP_TRANSCRIPTS as STEP_CALL_TRANSCRIPTS,
+)
+from office_365_mcp.tools.teams_list_call_transcripts import TOOL_NAME as CALL_TRANSCRIPTS_TOOL
+from office_365_mcp.tools.teams_list_call_transcripts import teams_list_call_transcripts
 from office_365_mcp.tools.teams_read_transcript import TOOL_NAME as TRANSCRIPT_TOOL
 from office_365_mcp.tools.teams_read_transcript import teams_read_transcript
 
@@ -360,6 +365,25 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
             )
             == timed + 1
         )
+
+    async def test_a_user_with_no_call_transcripts_is_an_answered_listing_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        _ = graph.route(method="GET", url__regex=r".*/getAllTranscripts\(.*").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "UnknownError"}}
+            )
+        )
+        labels = {"operation": CALL_TRANSCRIPTS_TOOL, "step": STEP_CALL_TRANSCRIPTS}
+        answered = _value(GRAPH_STEPS_TOTAL, **labels, status="ok")
+        missing = _value(GRAPH_STEPS_TOTAL, **labels, status="not_found")
+
+        found = await teams_list_call_transcripts(client, limit=20)
+
+        assert found.status == "none_found"
+        assert _value(GRAPH_STEPS_TOTAL, **labels, status="ok") == answered + 1
+        assert _value(GRAPH_STEPS_TOTAL, **labels, status="not_found") == missing
 
     async def test_a_refused_step_a_tool_recovers_from_leaves_the_operation_counted_as_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -707,6 +731,9 @@ GRAPH_STEPS = frozenset(
         "chats",
         "chat",
         "chat_messages",
+        "chat_call_events",
+        "call_transcripts",
+        "home_tenant",
         "chat_members",
         "joined_teams",
         "team",

@@ -15,6 +15,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphForbidden, download_to_file, graph_step
 
+CALL_TRANSCRIPT_PERMISSION = "CallTranscripts.Read.All"
+
 STEP_ATTRIBUTED = "transcript_attributed"
 STEP_UNATTRIBUTED = "transcript_unattributed"
 
