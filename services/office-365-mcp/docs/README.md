@@ -306,7 +306,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 
 **Note:** Adding this preset leaves `teams`, `teams-meetings`, and `teams-transcripts` unchanged. Name `teams-transcripts` as well to read meeting transcripts. Each reader needs an Office 365 license. A user reads only calls they were on. As observed in one test tenant against one external tenant, a transcript is readable only when our side started the transcription (1:1) or the call (group). Otherwise Teams shows the user the transcript but Unique cannot read it. Only transcribed calls are listed, from 1 to 2 minutes after the call ends. PSTN calls and calls with guests are not tested yet.
 
-Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PSTN calls, `AllowTranscription` for group calls, Graph transcript access, and speaker attribution. A policy change can take hours to reach users. A calling policy with Copilot on and transcription off keeps no transcript.
+Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PSTN calls, `AllowTranscription` for group calls, and Graph transcript access. Speaker attribution is optional; when it is unavailable, `teams_read_call_transcript` returns turns with null speaker names. A policy change can take hours to reach users. A calling policy with Copilot on and transcription off keeps no transcript.
 
 **Tools**
 
@@ -314,12 +314,12 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | --- | --- | --- | --- |
 | `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
 | `teams_list_call_transcripts` | 🟢 Read | — | Lists call transcripts, newest first. The optional argument is `chat_id`, the id `teams_list_chats` reports, not `chat_uri`. |
-| `teams_read_call_transcript` | 🟢 Read | — | Reads one page of a call transcript, as timestamped turns with the speaker named. |
+| `teams_read_call_transcript` | 🟢 Read | — | Reads one page of a call transcript, as timestamped turns with speaker names when available. |
 
 **What it needs**
 
 - **Graph permissions (3):** `CallTranscripts.Read.All`, `Chat.Read`, `User.Read`
-- **Admin consent:** ⚠️ Required for `CallTranscripts.Read.All`. Register it before anyone signs in to a deployment that uses this preset. `terraform apply` with the preset adds the permission and grants it. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
+- **Admin consent:** ⚠️ Required for `CallTranscripts.Read.All`. Register it before anyone signs in to a deployment that uses this preset. `terraform apply` with the preset adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
 - **User approval:** None. No tool of this preset asks the user.
 
 ### `teams-recordings`
