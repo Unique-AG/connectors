@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastmcp.exceptions import ToolError
 import unique_sdk
+from unique_sdk.api_resources._mcp import McpServersResponse
 
 from space_config_mcp.upstream.settings import UpstreamSettings
 
@@ -45,6 +46,13 @@ class Upstream:
         patch: unique_sdk.Space.UpdateParams,
     ) -> unique_sdk.Space:
         return await unique_sdk.Space.update_space_async(user_id, company_id, space_id, **patch)
+
+    async def list_mcp_servers(
+        self,
+        user_id: str,
+        company_id: str,
+    ) -> McpServersResponse:
+        return await unique_sdk.MCP.list_servers_async(user_id, company_id)
 
     async def get_mcp_server_status(
         self,

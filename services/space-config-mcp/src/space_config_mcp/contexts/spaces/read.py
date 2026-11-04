@@ -1,4 +1,5 @@
 import unique_sdk
+from unique_sdk.api_resources._mcp import McpServersResponse
 
 from space_config_mcp.upstream import Upstream
 
@@ -23,6 +24,16 @@ async def get_space(
     space_id: str,
 ) -> unique_sdk.Space:
     return await upstream.get_space(user_id, company_id, space_id)
+
+
+async def list_mcp_servers(
+    *,
+    upstream: Upstream,
+    user_id: str,
+    company_id: str,
+) -> McpServersResponse:
+    """List all MCP servers available to the company with their tools and metadata."""
+    return await upstream.list_mcp_servers(user_id, company_id)
 
 
 async def get_mcp_server_status(

@@ -369,6 +369,100 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
+    "description": "List all MCP servers (connectors) available to the company.\n\nReturns each server's id, name, description, requiresOAuth flag, and the full\nlist of tool names and descriptions. Use this to find server IDs and tool names\nbefore calling update_space with mcp_servers.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_mcp_servers",
+    "outputSchema": {
+      "properties": {
+        "mcpServers": {
+          "items": {
+            "description": "An MCP server (connector) of the company that can be attached to a space.",
+            "properties": {
+              "allowedSpaceIds": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "isSpaceRestricted": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "requiresOAuth": {
+                "type": "boolean"
+              },
+              "tools": {
+                "items": {
+                  "description": "A tool of an MCP server that the company has enabled.",
+                  "properties": {
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "description"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description",
+              "requiresOAuth",
+              "isSpaceRestricted",
+              "allowedSpaceIds",
+              "tools"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "mcpServers"
+      ],
+      "type": "object"
+    },
+    "title": "List MCP Servers"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
     "description": "List all modules belonging to the current space.",
     "inputSchema": {
       "additionalProperties": false,
