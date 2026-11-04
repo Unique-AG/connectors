@@ -16,7 +16,7 @@ flowchart LR
   codeql -->|new alert| prStop[PR cannot merge]
   review -->|new vulnerable dependency| prStop
   nightlyUpdate[Nightly dependency update] -->|one PR per dependency| pr
-  pr -->|PR opened| agent[Agent: assess, fix, report]
+  pr -->|label added| agent[Agent: assess, fix, report]
   pr -->|merge| main[main branch]
   main --> releasePr[Release PR]
   releasePr --> gate[Release gate]
@@ -53,7 +53,7 @@ flowchart LR
 | CI | The test, lint, and build workflows, the dependency review, and CodeQL | A PR opens or changes |
 | Gatekeeper | The check that waits for all other checks | A PR opens or changes |
 | Release gate | The workflow `security-release-gate.yaml` | A release PR opens or changes |
-| PR automation | The Cursor automation `connectors-dependency-pr-assess` | A PR opens |
+| PR automation | The Cursor automation `connectors-dependency-pr-assess` | The label `dependencies` is added to a PR |
 | Cron automation | The Cursor automation `connectors-vulna-patchy` | 05:00 UTC |
 | The skill | `vulna-squash`: the instructions that both automations run | An automation starts |
 | Review | The skill `dependency-pr-review` | The skill `vulna-squash` runs it, or a person runs it on a dependency PR |
@@ -98,7 +98,7 @@ The monorepo defines the two automations in `.cursor/automations/workflows/*.yam
 | Name | Trigger | Prompt |
 |---|---|---|
 | `connectors-vulna-patchy` | Cron `0 5 * * *` (05:00 UTC) | Run the skill `vulna-squash` in mode `findings`. |
-| `connectors-dependency-pr-assess` | "Pull request opened" | Run the skill `vulna-squash` in mode `pr` for the PR of this event. |
+| `connectors-dependency-pr-assess` | "Label added" with the label `dependencies` on a PR | Run the skill `vulna-squash` in mode `pr` for the PR of this event. |
 
 The prompt names the skill only. All steps live in the skill. Cursor loads the skill from the repository that it checks out, so the skill lives here, in `agentic/skills/vulna-squash/`.
 

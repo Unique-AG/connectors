@@ -28,11 +28,11 @@ A manual run of the nightly job is a dry run by default. It writes the plan to t
 
 ## One agent run for every PR
 
-The skill `vulna-squash` does the whole job for a dependency PR in one run. The Cursor automation `connectors-dependency-pr-assess` starts it in mode `pr`. Its trigger is "Pull request opened". See [Cursor automations](../../SECURITY-PROCESS.md#cursor-automations).
+The skill `vulna-squash` does the whole job for a dependency PR in one run. The Cursor automation `connectors-dependency-pr-assess` starts it in mode `pr`. Its trigger is "Label added", for the label `dependencies` on a PR. See [Cursor automations](../../SECURITY-PROCESS.md#cursor-automations).
 
 ```mermaid
 flowchart TD
-  opened[Event: Pull request opened] --> labels{"Label dependencies, and no agent label?"}
+  opened[Event: label dependencies added] --> labels{"Label dependencies, and no agent label?"}
   labels -->|no| stop[Stop with no change]
   labels -->|yes| assess[Assess the bump with the skill dependency-pr-review]
   assess --> ci{State of the checks}
@@ -117,7 +117,7 @@ flowchart TD
 | A person closed the PR without a merge | It skips those target versions. A newer version opens a new PR. For a group, a close skips only that set of versions. |
 | A person merged the PR | Nothing. The plan finds no update. |
 
-Only a new PR fires the event "Pull request opened". A rebuilt or updated PR starts no new run. A PR with a commit keeps it, because a rebuild from `main` deletes the fixes of the agent. The label `ai-assisted` does not change this.
+Only the event "Label added" starts a run. The nightly job opens a new PR with the label `dependencies`. A rebuilt or updated PR keeps its label and starts no new run. To start a run again, remove the label and add it again. A PR with a commit keeps it, because a rebuild from `main` deletes the fixes of the agent. The label `ai-assisted` does not change this.
 
 ## Ask for a rebase or a rebuild
 
