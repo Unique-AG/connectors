@@ -4,6 +4,7 @@ import pinoHttp from 'pino-http';
 import { describe, expect, it } from 'vitest';
 import {
   addLogSecrets,
+  bearerToken,
   createSecretRedactor,
   DEFAULT_SECRET_PATTERNS,
   MIN_SECRET_LENGTH,
@@ -343,6 +344,28 @@ describe('createSecretRedactor', () => {
       const line = parsedLines(lines)[0];
       expect(line?.msg).toBe('handled');
       expect(line?.log_secrets_failed).toMatchObject({ name: 'TypeError' });
+    });
+  });
+
+  describe('bearerToken', () => {
+    function requestWith(authorization: string | undefined): IncomingMessage {
+      const request = new IncomingMessage(new Socket());
+      if (authorization !== undefined) {
+        request.headers.authorization = authorization;
+      }
+      return request;
+    }
+
+    it('returns the token of a bearer authorization header in any case', () => {
+      expect(bearerToken(requestWith('bearer mcp-access-token'))).toEqual(['mcp-access-token']);
+    });
+
+    it.each([
+      ['no authorization header', undefined],
+      ['another scheme', 'Basic dXNlcjpwYXNz'],
+      ['a scheme without a token', 'Bearer'],
+    ])('returns nothing for %s', (_case, authorization) => {
+      expect(bearerToken(requestWith(authorization))).toEqual([]);
     });
   });
 
