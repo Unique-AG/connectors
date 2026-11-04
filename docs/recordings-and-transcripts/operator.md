@@ -94,12 +94,14 @@ Register `CallTranscripts.Read.All` before the preset is in use. `terraform appl
 
 These Teams policies have to allow a transcript:
 
-| Policy | What it covers |
-| --- | --- |
-| `AllowTranscriptionForCalling` | 1:1 and PSTN calls. Set on the calling policy |
-| `AllowTranscription` | Group calls and meetings. Set on the meeting policy |
-| Graph transcript access (`EnableGraphTranscriptAccess`) | Any transcript read through Graph. See [Teams Graph transcript API access](#Teams-Graph-transcript-API-access) |
-| Speaker attribution (`EnableAttributedTranscripts`) | Named speakers on the transcript. In the Teams admin center this is **Include speaker attribution** |
+| Policy | What it covers | How to turn it on |
+| --- | --- | --- |
+| `AllowTranscriptionForCalling` | 1:1 and PSTN calls. Off by default | Teams admin center → **Voice → Calling policies** → **Transcription**, or `Set-CsTeamsCallingPolicy -Identity Global -AllowTranscriptionForCalling $true` |
+| `AllowTranscription` | Group calls and meetings | `Set-CsTeamsMeetingPolicy -Identity Global -AllowTranscription $true` |
+| Graph transcript access (`EnableGraphTranscriptAccess`) | Any transcript read through Graph | See [Teams Graph transcript API access](#Teams-Graph-transcript-API-access) |
+| Speaker attribution (`EnableAttributedTranscripts`) | Named speakers on the transcript | In the Teams admin center this is **Include speaker attribution**. See [Teams Graph transcript API access](#Teams-Graph-transcript-API-access) |
+
+Use the policy assigned to the users if it is not `Global`.
 
 A policy change can take hours to reach users. A call that starts before the change applies may not be transcribed. A calling policy with Copilot on and transcription off keeps no transcript.
 
