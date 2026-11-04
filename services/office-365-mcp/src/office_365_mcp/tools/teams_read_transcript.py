@@ -19,7 +19,13 @@ from office_365_mcp.graph_client import GraphResponseTooLarge, graph_errors
 from office_365_mcp.shared.handles import TranscriptHandle, transcript_handle
 from office_365_mcp.shared.meetings import TRANSCRIPT_PERMISSION
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.transcripts import TranscriptTurn, read_turns
+from office_365_mcp.shared.transcripts import (
+    BLANK_SPEAKER,
+    INVERTED_TIME_WINDOW,
+    MAX_TRANSCRIPT_BYTES,
+    TranscriptTurn,
+    read_turns,
+)
 
 TOOL_NAME = "teams_read_transcript"
 
@@ -30,7 +36,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     + "/MSMjMCMjSYNTHETIC0002"
 }
 
-MAX_TRANSCRIPT_BYTES = 100 * 1024 * 1024
 
 _DESCRIPTION = f"""\
 Returns the spoken turns of one Teams meeting transcript. Use this tool to read what a \
@@ -53,18 +58,6 @@ _NOT_A_TRANSCRIPT_HANDLE = (
     + "teams_list_meeting_transcripts reports that handle. This value has a different shape. "
     + "Call teams_list_meeting_transcripts and use its `uri`. Do not use the meeting "
     + "`meeting_uri`, and do not use a Teams message handle. A retry will fail identically."
-)
-
-_INVERTED_TIME_WINDOW = (
-    "from_seconds is later than to_seconds. No turn matches both bounds. Swap the two values, "
-    + "or drop one value. Both values are offsets in seconds from transcription start, and both "
-    + "values increase with time."
-)
-
-_BLANK_SPEAKER = (
-    "A blank speaker filter is not the same as no filter. To read every turn, omit the speaker "
-    + "parameter. To filter, give any part of the speaker name. The match is case-insensitive, "
-    + "and it matches anywhere in the name."
 )
 
 GRAPH_NOT_FOUND = (
@@ -256,9 +249,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         if handle is None:
             raise ToolError(_NOT_A_TRANSCRIPT_HANDLE)
         if from_seconds is not None and to_seconds is not None and from_seconds > to_seconds:
-            raise ToolError(_INVERTED_TIME_WINDOW)
+            raise ToolError(INVERTED_TIME_WINDOW)
         if speaker is not None and not speaker.strip():
-            raise ToolError(_BLANK_SPEAKER)
+            raise ToolError(BLANK_SPEAKER)
         return await teams_read_transcript(
             client,
             transport,

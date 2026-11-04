@@ -17,6 +17,20 @@ from office_365_mcp.graph_client import GraphForbidden, download_to_file, graph_
 
 CALL_TRANSCRIPT_PERMISSION = "CallTranscripts.Read.All"
 
+MAX_TRANSCRIPT_BYTES = 100 * 1024 * 1024
+
+INVERTED_TIME_WINDOW = (
+    "from_seconds is later than to_seconds. No turn matches both bounds. Swap the two values, "
+    + "or drop one value. Both values are offsets in seconds from transcription start, and both "
+    + "values increase with time."
+)
+
+BLANK_SPEAKER = (
+    "A blank speaker filter is not the same as no filter. To read every turn, omit the speaker "
+    + "parameter. To filter, give any part of the speaker name. The match is case-insensitive, "
+    + "and it matches anywhere in the name."
+)
+
 STEP_ATTRIBUTED = "transcript_attributed"
 STEP_UNATTRIBUTED = "transcript_unattributed"
 
