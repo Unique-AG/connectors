@@ -13,7 +13,7 @@ A nightly job updates our dependencies, direct and indirect. It opens one PR for
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*`. A major bump of a group member gets its own PR. |
 | Only that package | A PR changes only the packages that it names, and the packages that they need. For an indirect dependency, the job pins the version with a temporary pnpm override. It removes the override before the PR. If another package changes, the job fails and opens no PR. Put packages that must move together in one group in `.github/deps-groups.json`. |
 | Title | The title names each version change, for example `bump @babel/parser from 7.29.11 to 7.29.12 and from 8.0.8 to 8.0.10`. |
-| Title scope | `deps` when the PR changes only dependency files. A bump that also needs a code fix in one service takes the name of that service. Any other mix uses `main`. |
+| Title scope | `deps` when the PR changes only dependency files. A bump that also needs a code fix in one service takes the name of that service. Any other mix uses `main`. After the agent pushes a code fix, it sets the scope again from the files of the PR with `.github/scripts/deps-nightly/scope.cli.mjs`. |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | CI | The full CI runs on every PR. A red CI blocks the merge. |
