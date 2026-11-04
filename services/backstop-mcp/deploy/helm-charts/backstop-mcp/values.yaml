@@ -26,7 +26,8 @@ mcpConfig:
     formerRelationshipTypeMarkers: null
   # Where a dynamically registered OAuth client may send the browser after login: an https
   # redirect URI must be on one of these hosts, any other scheme must be listed. Loopback http on
-  # any port is always accepted. A list replaces the app default; null keeps it.
+  # any port is always accepted. allowedRedirectHosts replaces the app default; null keeps it.
+  # extraRedirectHosts is appended.
   auth:
     # AUTH_ALLOWED_REDIRECT_HOSTS. Same hosts as DEFAULT_ALLOWED_REDIRECT_HOSTS.
     allowedRedirectHosts:
@@ -57,6 +58,9 @@ mcpConfig:
     # AUTH_ALLOWED_REDIRECT_SCHEMES. Cursor registers cursor://anysphere.cursor-mcp/oauth/callback.
     allowedRedirectSchemes:
       - cursor
+    # AUTH_EXTRA_REDIRECT_HOSTS. Appended to the list above. A single tenant adds its chat
+    # host here. Replacing allowedRedirectHosts still overrides the whole default list.
+    extraRedirectHosts: []
   # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. The chart ships tenant-neutral.
   tenantGuidance: {}
   logging:

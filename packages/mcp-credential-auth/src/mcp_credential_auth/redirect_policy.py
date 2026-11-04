@@ -49,6 +49,17 @@ def _normalize_host(host: str) -> str:
     return host.strip().lower().removesuffix(".")
 
 
+def extend_redirect_allowlist(base: Iterable[str], extra: Iterable[str]) -> tuple[str, ...]:
+    """Append `extra` to `base`. A repeated value is kept once, in the first spelling."""
+    seen: dict[str, str] = {}
+    for item in (*base, *extra):
+        text = item.strip()
+        key = _normalize_host(text)
+        if key and key not in seen:
+            seen[key] = text
+    return tuple(seen.values())
+
+
 class RedirectTarget(BaseModel):
     """Where a redirect URI sends the browser, in the words the login page shows."""
 

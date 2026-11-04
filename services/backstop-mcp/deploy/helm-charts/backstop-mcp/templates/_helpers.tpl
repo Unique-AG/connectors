@@ -45,6 +45,11 @@ redirect-allowlist variable replaces the app default; null leaves it unset.
   value: {{ join "," $items | quote }}
 {{- end }}
 {{- end }}
+{{- $extraHosts := index $auth "extraRedirectHosts" }}
+{{- if $extraHosts }}
+- name: AUTH_EXTRA_REDIRECT_HOSTS
+  value: {{ join "," $extraHosts | quote }}
+{{- end }}
 {{- if .Values.mcpConfig.tenantGuidance }}
 - name: BACKSTOP_MCP_TENANT_GUIDANCE
   value: {{ toJson .Values.mcpConfig.tenantGuidance | quote }}

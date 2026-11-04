@@ -11,7 +11,8 @@ env:
   PORT: "8000"
   WITH_INTELLIGENCE_ASSET_CLASS_GROUPS: '["hfm"]'
   # Where a dynamically registered OAuth client may send the browser after login, comma-separated.
-  # Same hosts as DEFAULT_ALLOWED_REDIRECT_HOSTS. The Unique chat host is not included.
+  # Same hosts as DEFAULT_ALLOWED_REDIRECT_HOSTS. A single tenant adds its chat host with
+  # AUTH_EXTRA_REDIRECT_HOSTS, which is appended. Setting this list replaces the default.
   # cursor://anysphere.cursor-mcp/oauth/callback needs the scheme below. Loopback http on any
   # port is always accepted.
   AUTH_ALLOWED_REDIRECT_HOSTS: claude.ai,claude.com,chatgpt.com,cursor.com,www.cursor.com,vscode.dev,insiders.vscode.dev,grok.com,www.perplexity.ai,enterprise.perplexity.ai,app.dust.tt,dust.tt,eu.dust.tt,console.mistral.ai,api.devin.ai,teams.microsoft.com,global.consent.azure-apim.net,replit.com,lovable.app,lovable.dev,api.v0.dev,app.langdock.com,cloud.arcade.dev,oauth.n8n.cloud

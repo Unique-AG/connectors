@@ -16,6 +16,7 @@ from mcp_credential_auth.redirect_policy import (
     DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     RedirectTarget,
     describe_redirect_target,
+    extend_redirect_allowlist,
 )
 from mcp_credential_auth.throttle import (
     MAX_USERNAME_LENGTH,
@@ -46,6 +47,7 @@ __all__ = [
     "record_login_success",
     "count_recent_login_failures",
     "describe_redirect_target",
+    "extend_redirect_allowlist",
     "discard_login_attempt",
     "finalize_login_failure",
     "load_fernet_key",

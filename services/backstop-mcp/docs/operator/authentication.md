@@ -104,7 +104,7 @@ on this server's genuine login page. The registration is refused with `400` and
 | Redirect URI | Accepted | Used by |
 |---|---|---|
 | `http` or `https` on `localhost`, `127.0.0.1` or `[::1]`, any port | Always | Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Cursor, Windsurf, Zed, MCP Inspector |
-| `https` on a host in `AUTH_ALLOWED_REDIRECT_HOSTS` | Default list below, plus the tenant's chat host | Hosted clients, and Unique chat and admin |
+| `https` on a host in `AUTH_ALLOWED_REDIRECT_HOSTS` or `AUTH_EXTRA_REDIRECT_HOSTS` | Default list below. Extra hosts are appended | Hosted clients, and a deployment's own chat host |
 | A scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES` | Default `cursor` | Cursor (`cursor://anysphere.cursor-mcp/oauth/callback`) |
 
 ### Unique chat and admin
@@ -115,10 +115,12 @@ Unique chat and admin are the clients that sign in on this server today. They re
 `with-intelligence.mcp.unique.app` is the server users reach from `next.unique.app`, so the host
 cannot be taken from `PUBLIC_BASE_URL`.
 
-That host is not in the default list. Each deployment adds it, together with every default host,
-in `AUTH_ALLOWED_REDIRECT_HOSTS` (Helm: `mcpConfig.auth.allowedRedirectHosts` on backstop,
-`env.AUTH_ALLOWED_REDIRECT_HOSTS` on with-intelligence). Setting the variable replaces the
-default, so a value that names only the chat host drops every client below.
+That host is not in the default list. Add it without copying the list:
+`AUTH_EXTRA_REDIRECT_HOSTS` (Helm: `mcpConfig.auth.extraRedirectHosts` on backstop,
+`env.AUTH_EXTRA_REDIRECT_HOSTS` on with-intelligence). Those hosts are appended to the default.
+`AUTH_ALLOWED_REDIRECT_HOSTS` still replaces the whole list, and extra hosts are appended after
+that replacement too. A value that names only the chat host in `AUTH_ALLOWED_REDIRECT_HOSTS`
+drops every client below.
 
 Hosts seen on `/authorize` in the 30 days before this restriction:
 

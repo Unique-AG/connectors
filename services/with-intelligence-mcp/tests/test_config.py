@@ -173,19 +173,45 @@ class TestAuthConfig:
     ) -> None:
         monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_HOSTS", raising=False)
         monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_SCHEMES", raising=False)
+        monkeypatch.delenv("AUTH_EXTRA_REDIRECT_HOSTS", raising=False)
 
         config = AuthConfig()
 
         assert config.allowed_redirect_hosts == DEFAULT_ALLOWED_REDIRECT_HOSTS
         assert config.allowed_redirect_schemes == ("cursor",)
+        assert config.extra_redirect_hosts == ()
 
     def test_redirect_allowlist_env_vars_replace_the_defaults(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "claude.ai, mcp.example.com")
         monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_SCHEMES", "")
+        monkeypatch.delenv("AUTH_EXTRA_REDIRECT_HOSTS", raising=False)
 
         config = AuthConfig()
 
         assert config.allowed_redirect_hosts == ("claude.ai", "mcp.example.com")
         assert config.allowed_redirect_schemes == ()
+
+    def test_extra_redirect_hosts_are_added_to_the_default(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_HOSTS", raising=False)
+        monkeypatch.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "chat.customer.example, claude.ai")
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts == (
+            *DEFAULT_ALLOWED_REDIRECT_HOSTS,
+            "chat.customer.example",
+        )
+
+    def test_extra_redirect_hosts_are_added_after_a_replacement(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "only.example")
+        monkeypatch.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "chat.customer.example")
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts == ("only.example", "chat.customer.example")

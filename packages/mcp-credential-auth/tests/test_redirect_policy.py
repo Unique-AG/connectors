@@ -4,6 +4,7 @@ from mcp_credential_auth.redirect_policy import (
     RedirectTarget,
     RedirectUriPolicy,
     describe_redirect_target,
+    extend_redirect_allowlist,
 )
 
 _POLICY = RedirectUriPolicy()
@@ -107,6 +108,13 @@ def test_rejects_unsafe_schemes(redirect_uri: str, scheme: str) -> None:
 )
 def test_rejects_fragments(redirect_uri: str) -> None:
     assert _POLICY.rejection_reason(redirect_uri) == "has a fragment"
+
+
+def test_extra_entries_extend_an_allowlist_without_duplicates() -> None:
+    assert extend_redirect_allowlist(
+        ["claude.ai", "chatgpt.com"],
+        [" chat.customer.example ", "Claude.ai.", "chat.customer.example"],
+    ) == ("claude.ai", "chatgpt.com", "chat.customer.example")
 
 
 def test_custom_allowlist_replaces_the_default() -> None:

@@ -100,12 +100,14 @@ host the user is sent to after signing in.
 Unique chat and admin are not in the default. They register
 `https://<chat-host>/chat/mcp/oauth/callback` and `https://<chat-host>/admin/mcp/oauth/callback`.
 `<chat-host>` is the Unique app, not this server: unique prod is `next.unique.app`, qa is
-`next.qa.unique.app`, uat01 is `uat1.unique.app`. Set `AUTH_ALLOWED_REDIRECT_HOSTS` to the default
-hosts plus that host before upgrading. Setting the variable replaces the default.
+`next.qa.unique.app`, uat01 is `uat1.unique.app`. A single tenant's own host is added the same
+way. Set `AUTH_EXTRA_REDIRECT_HOSTS` to that host. It is appended to the default.
+`AUTH_ALLOWED_REDIRECT_HOSTS` replaces the whole list; extra hosts are still appended.
 
 | Variable | Default | Why |
 |---|---|---|
-| `AUTH_ALLOWED_REDIRECT_HOSTS` | The hosts below | Hosted MCP clients. Sources are in backstop-mcp `docs/operator/authentication.md` |
+| `AUTH_ALLOWED_REDIRECT_HOSTS` | The hosts below | Hosted MCP clients. Setting it replaces the default. Sources are in backstop-mcp `docs/operator/authentication.md` |
+| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the list, such as a single tenant's chat host |
 | `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Cursor registers `cursor://anysphere.cursor-mcp/oauth/callback` |
 
 Default hosts: `claude.ai`, `claude.com`, `chatgpt.com`, `cursor.com`, `www.cursor.com`,
@@ -118,8 +120,10 @@ Loopback already covers Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Curs
 and MCP Inspector. Mistral Le Chat, Glean and self-hosted clients (Open WebUI, LibreChat, n8n on
 the customer's own domain) have no shared host; add the host the registration log rejects.
 
-Both variables are comma-separated, replace their default when set, and are set under `env` in the
-Helm chart. A client registered before the check keeps only the redirect URIs the lists still accept.
+The host and scheme lists are comma-separated and set under `env` in the Helm chart. Setting
+`AUTH_ALLOWED_REDIRECT_HOSTS` or `AUTH_ALLOWED_REDIRECT_SCHEMES` replaces that default.
+`AUTH_EXTRA_REDIRECT_HOSTS` is appended. A client registered before the check keeps only the
+redirect URIs the lists still accept.
 
 ## Migrations
 
