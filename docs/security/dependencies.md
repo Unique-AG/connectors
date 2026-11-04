@@ -115,8 +115,25 @@ flowchart TD
 | The target versions are the same and the branch is behind `main`. The PR has only the commit of the job. | It rebuilds the branch from `main` and updates the PR body. A rebuild removes every conflict with `main`. |
 | The target versions are the same, and the PR has a commit from a person or the agent | It keeps the commits and merges `main` into the branch. If this fails, the job warns and a person resolves the conflict. |
 | A target version changed | It labels the old PR `superseded`, closes it with a comment, and opens a new PR. The new PR starts a new agent run. |
-| A person closed the PR without a merge | It skips those target versions. A newer version opens a new PR. For a group, a close skips only that set of versions. |
+| A person closed the PR without a merge, and the PR has no label `superseded` | It skips those target versions. A newer version opens a new PR. For a group, a close skips only that set of versions. |
+| No update targets the PR any more | See [A PR that no update targets](#a-pr-that-no-update-targets). |
 | A person merged the PR | Nothing. The plan finds no update. |
+
+### A PR that no update targets
+
+A dependency leaves the plan when a person merges a newer version, or when the cooldown or an ignore rule changes. The open PR of that dependency has no entry in the plan then.
+
+```mermaid
+flowchart TD
+  orphan[An open PR has no entry in the plan] --> who{What starts the run?}
+  who -->|The nightly run| safe{"Only job commits, and the ecosystem is not in Needs a person?"}
+  safe -->|yes| close[Label the PR superseded, close it with a comment, and delete the branch]
+  safe -->|no| keep[Keep the PR open]
+  who -->|"/recreate"| close
+  who -->|"/rebase"| nothing[Do nothing]
+```
+
+The nightly job keeps a PR that has a commit from a person or the agent. It lists that PR under "Skipped". The job also keeps a PR when its ecosystem is in "Needs a person". A blocked folder or a failed lookup can hide candidates, so the job does not close on that evidence. The ecosystems `actions` and `docker` have such an item at the moment, so only `/recreate` closes their PRs. A one-PR run closes nothing for another PR.
 
 Only the event "Label added" starts a run. The nightly job opens a new PR with the label `dependencies`. A rebuilt or updated PR keeps its label and starts no new run. To start a run again, remove the label and add it again. A PR with a commit keeps it, because a rebuild from `main` deletes the fixes of the agent. The label `ai-assisted` does not change this.
 
@@ -126,8 +143,8 @@ Write one of these commands as the first line of a comment on a dependency PR.
 
 | Comment | What happens |
 |---|---|
-| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. |
-| `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. |
+| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`. It does nothing for a PR that no update targets. |
+| `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. If the target versions changed, it closes the PR and opens a new PR. If no update targets the PR, it closes the PR. |
 
 | Rule | Value |
 |---|---|
@@ -189,13 +206,22 @@ The nightly dependency job made this change. It only uses versions that are at l
 
 The marker stays in the PR description. The planner needs it while the PR is open.
 
+## Close a dependency PR
+
+| What you want | What to do | Result |
+|---|---|---|
+| Skip these target versions | Close the PR without a merge. Add no label. | The job skips these versions. A newer version opens a new PR. |
+| Remove an obsolete PR | Wait for the nightly run, or comment `/recreate` on the PR. | The job labels the PR `superseded` and closes it. |
+
+The job reads the hidden marker of each closed PR. A closed PR without the label `superseded` counts as rejected, and the job skips its versions. A closed PR with this label does not count, so a new PR can follow. The job sets the label only when it closes a PR. Do not add it by hand, because the job then opens the same update again.
+
 ## Ignore a dependency
 
 Use one of these ways.
 
 | What you want | What to do |
 |---|---|
-| Skip one version | Close the PR without a merge. |
+| Skip one version | Close the PR without a merge. See [Close a dependency PR](#close-a-dependency-pr). |
 | Never update a dependency, or never take a major version | Add a rule to the list `ignore` in `.github/deps-groups.json`. |
 | Hold a dependency at one version | Add a pin. The job lists a pinned dependency in "Needs a person" and does not move it. |
 
@@ -238,6 +264,7 @@ Pins are `override-dependencies` in `pyproject.toml` and `pnpm.overrides` in the
 |---|---|---|
 | The agent run crashes. | The PR has no agent label. | Run the agent again, as in [One agent run for every PR](#one-agent-run-for-every-pr). |
 | A fix PR from the agent and a nightly PR change the same package. | Both PRs conflict, or one has a conflict after the other merges. | Merge the PR that has the fix. Then close the other PR. A closed PR skips only its own target versions. |
+| A PR stays open after the nightly run, and no update targets it. | The PR has a commit from a person or the agent, or its ecosystem is in "Needs a person". | Close the PR. Or comment `/recreate`, which closes it and drops its commits. |
 | A handled PR has a conflict with `main`. | The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
 | A bump job is red. | The job `Bump <slug>` shows the cause as an error annotation and in its job summary. No PR opens for that update. | Read the cause. If a package pins the new version, wait for a release of that package. If other packages move too, put them in one group in `.github/deps-groups.json`. |
 | The report says "safe with a gap". | The report names one check. | Run that check, for example one real request in QA. Then merge. |

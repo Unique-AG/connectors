@@ -65,7 +65,7 @@ flowchart LR
 |---|---|---|---|
 | `dependencies` | Nightly job | PR automation, person | The PR comes from the nightly job. |
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
-| `superseded` | Nightly job | Nightly job | The job closed this PR for a newer version. A person did not reject it. |
+| `superseded` | Nightly job | Nightly job | The job closed this PR. A newer version replaced it, or no update targets it any more. A person did not reject it. Do not add it by hand. |
 | `ai-assisted` | Agent | Agent | An agent run owns the PR and posted its report. |
 | `human-required` | Agent | Agent, person | The agent cannot finish the PR. It removes `ai-assisted` first, so a PR never has both labels. A person finishes the PR. |
 | `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |
@@ -77,7 +77,7 @@ flowchart LR
 |---|---|
 | The result of an agent run | The report comment on the PR, and the labels |
 | What needs an image release | The Slack report and the Security tab |
-| Which version a person rejected | A closed PR |
+| Which version a person rejected | A closed PR without the label `superseded` |
 | Who skipped the release gate | The bot comment on the release PR |
 | Which dependencies stay fixed | The pins: `override-dependencies` and `pnpm.overrides` |
 
