@@ -19,6 +19,7 @@ vi.mock('passport-microsoft', () => {
 });
 
 import {
+  authorizeTenant,
   createMicrosoftOAuthProvider,
   getScopes,
   microsoftOAuthTokenUrl,
@@ -84,41 +85,39 @@ describe(microsoftOAuthTokenUrl.name, () => {
   });
 });
 
-describe('tenant allowlist via validateCallback', () => {
-  const LISTED_TENANT = 'aaaaaaaa-0000-0000-0000-000000000001';
-  const OTHER_TENANT = 'bbbbbbbb-0000-0000-0000-000000000002';
+describe(authorizeTenant.name, () => {
+  const LISTED_TENANT = 'd050ee55-f842-4802-8263-d802dc017162';
+  const OTHER_TENANT = '79a9ddfe-a4f3-4307-8086-471132901889';
 
-  it('sets no validateCallback when allowedTenantIds is empty', () => {
-    const provider = createMicrosoftOAuthProvider(undefined, 'common', []);
-
-    expect(provider.validateCallback).toBeUndefined();
+  it('allows any tenant when the allowlist is empty', () => {
+    expect(authorizeTenant(makeJwt({ tid: OTHER_TENANT }), [])).toEqual({ allowed: true });
   });
 
-  it('sets validateCallback when allowedTenantIds is non-empty', () => {
-    const provider = createMicrosoftOAuthProvider(undefined, 'common', [LISTED_TENANT]);
-
-    expect(provider.validateCallback).toBeDefined();
+  it('allows a tenant on the allowlist', () => {
+    expect(authorizeTenant(makeJwt({ tid: LISTED_TENANT }), [LISTED_TENANT])).toEqual({
+      allowed: true,
+    });
   });
 
-  it('validateCallback passes for a listed tenant', () => {
-    const provider = createMicrosoftOAuthProvider(undefined, 'common', [LISTED_TENANT]);
-    const token = makeJwt({ tid: LISTED_TENANT });
-
-    expect(() => provider.validateCallback?.(token, 'refresh', {})).not.toThrow();
+  it('rejects a tenant not on the allowlist and names it in the reason', () => {
+    expect(authorizeTenant(makeJwt({ tid: OTHER_TENANT }), [LISTED_TENANT])).toEqual({
+      allowed: false,
+      reason: `Entra tenant ${OTHER_TENANT} is not on the allowlist`,
+    });
   });
 
-  it('validateCallback rejects a token from an unlisted tenant', () => {
-    const provider = createMicrosoftOAuthProvider(undefined, 'common', [LISTED_TENANT]);
-    const token = makeJwt({ tid: OTHER_TENANT });
-
-    expect(() => provider.validateCallback?.(token, 'refresh', {})).toThrow(OTHER_TENANT);
+  it('throws for a token without a tid claim', () => {
+    expect(() => authorizeTenant(makeJwt({ sub: 'user' }), [LISTED_TENANT])).toThrow(
+      'Access token has no tid claim',
+    );
   });
 
-  it('validateCallback rejects a token with no tid claim', () => {
+  it('rejects the sign-in of a user from a tenant not on the allowlist', () => {
     const provider = createMicrosoftOAuthProvider(undefined, 'common', [LISTED_TENANT]);
-    const token = makeJwt({ sub: 'no-tid-here' });
 
-    expect(() => provider.validateCallback?.(token, 'refresh', {})).toThrow();
+    expect(
+      provider.authorizeSignIn?.({ accessToken: makeJwt({ tid: OTHER_TENANT }), profile: {} }),
+    ).toEqual({ allowed: false, reason: `Entra tenant ${OTHER_TENANT} is not on the allowlist` });
   });
 });
 

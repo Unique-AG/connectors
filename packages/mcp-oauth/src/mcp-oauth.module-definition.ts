@@ -26,14 +26,17 @@ export const mcpOAuthModuleOptionsSchema = z.object({
         output: oauthUserProfileSchema,
       })
       .describe('A function that maps the profile from the strategy to the user profile.'),
-    validateCallback: z
+    authorizeSignIn: z
       .function({
-        input: [z.string(), z.string(), z.unknown()],
-        output: z.any(),
+        input: [z.object({ accessToken: z.string(), profile: z.unknown() })],
+        output: z.discriminatedUnion('allowed', [
+          z.object({ allowed: z.literal(true) }),
+          z.object({ allowed: z.literal(false), reason: z.string() }),
+        ]),
       })
       .optional()
       .describe(
-        'Called with (accessToken, refreshToken, profile) after passport authenticates. Throw to reject the sign-in.',
+        'Decides whether a user the provider authenticated may sign in. A rejection fails the sign-in with its reason.',
       ),
   }),
 

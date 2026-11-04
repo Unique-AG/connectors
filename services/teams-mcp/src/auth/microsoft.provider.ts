@@ -77,6 +77,19 @@ function extractTid(accessToken: string): string {
   return tid;
 }
 
+export function authorizeTenant(
+  accessToken: string,
+  allowedTenantIds: string[],
+): { allowed: true } | { allowed: false; reason: string } {
+  if (allowedTenantIds.length === 0) {
+    return { allowed: true };
+  }
+  const tid = extractTid(accessToken);
+  return allowedTenantIds.includes(tid)
+    ? { allowed: true }
+    : { allowed: false, reason: `Entra tenant ${tid} is not on the allowlist` };
+}
+
 export function createMicrosoftOAuthProvider(toggles: {
   chat: 'enabled' | 'disabled';
   ingestion: 'enabled' | 'disabled';
@@ -103,14 +116,6 @@ export function createMicrosoftOAuthProvider(toggles: {
       displayName: profile.displayName,
       raw: profile,
     }),
-    validateCallback:
-      allowedTenantIds.length > 0
-        ? (accessToken: string) => {
-            const tid = extractTid(accessToken);
-            if (!allowedTenantIds.includes(tid)) {
-              throw new Error(`Sign-in rejected: Entra tenant ${tid} is not on the allowlist`);
-            }
-          }
-        : undefined,
+    authorizeSignIn: ({ accessToken }) => authorizeTenant(accessToken, allowedTenantIds),
   };
 }

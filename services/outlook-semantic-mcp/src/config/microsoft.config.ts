@@ -43,11 +43,12 @@ const ConfigSchema = z.object({
     .transform((val) =>
       (val ?? '')
         .split(',')
-        .map((s) => s.trim())
+        .map((s) => s.trim().toLowerCase())
         .filter(Boolean),
     )
+    .pipe(z.array(z.guid()))
     .describe(
-      'Comma-separated list of Entra tenant GUIDs allowed to sign in (MICROSOFT_ALLOWED_TENANT_IDS). When set and non-empty, tokens from unlisted tenants are rejected. Leave unset to allow any tenant.',
+      'Comma-separated list of Entra tenant GUIDs allowed to use the MCP server (MICROSOFT_ALLOWED_TENANT_IDS). When set, sign-ins from unlisted tenants are rejected, and a user whose tenant is removed loses access at their next Microsoft token refresh. Leave unset to allow any tenant.',
     ),
 });
 

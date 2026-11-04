@@ -48,15 +48,16 @@ export class OAuthStrategyService implements OnModuleInit {
 
     const strategy = new provider.strategy(
       strategyOptions,
-      async (
+      (
         accessToken: string,
         refreshToken: string,
         profile: unknown,
-        done: (error: unknown, user: unknown) => void,
+        done: (error: unknown, user: unknown, info?: { message: string }) => void,
       ) => {
         try {
-          if (provider.validateCallback) {
-            await provider.validateCallback(accessToken, refreshToken, profile);
+          const decision = provider.authorizeSignIn?.({ accessToken, profile });
+          if (decision && !decision.allowed) {
+            return done(null, false, { message: decision.reason });
           }
           const mappedProfile = provider.profileMapper(profile);
           const result: PassportUser = {
@@ -66,9 +67,9 @@ export class OAuthStrategyService implements OnModuleInit {
             provider: provider.name,
           };
 
-          done(null, result);
+          return done(null, result);
         } catch (error) {
-          done(error, null);
+          return done(error, null);
         }
       },
     );
