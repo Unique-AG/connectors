@@ -432,16 +432,25 @@ _TRANSCRIPT_ACCESS_DISABLED = "GraphAccessToTranscriptsDisabled"
 
 _TRANSCRIPTS_SWITCHED_OFF = (
     "Microsoft 365 refused this request because this organization has Microsoft Graph access to "
-    + "Teams meeting transcripts switched OFF. This is a tenant-wide Teams setting, off by "
+    + "Teams transcripts switched OFF. This is a tenant-wide Teams setting, off by "
     + "default, and it blocks every transcript read regardless of which permissions this connector "
     + "holds — so it is NOT a consent problem and asking the user to sign in again will not change "
     + "it. A Microsoft Teams administrator has to turn it on: Teams admin center → Meetings → "
     + "Meeting settings → Transcript API access → Microsoft Graph access, or "
     + "`Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`. "
+    + "A switch-on in the last few hours may still be applying. "
     + "Microsoft documents no request-side workaround: until an administrator acts, every "
     + "transcript call from this connector fails identically, so do not retry this one and do not "
     + "try another meeting or another transcript. Everything else this connector does — chats, "
     + "channels, message search — is unaffected."
+)
+
+
+_LICENSE_INFORMATION_MISSING = "Failed to get license information for the user"
+
+_NEEDS_A_TEAMS_LICENSE = (
+    "Microsoft 365 refused this request because this user needs an Office 365 license that "
+    + "includes Teams. Retrying will not help, and no other arguments will succeed either."
 )
 
 
@@ -522,6 +531,8 @@ def _remedy(
             )
         if failure.inner_code == _TRANSCRIPT_ACCESS_DISABLED:
             return _TRANSCRIPTS_SWITCHED_OFF
+        if _LICENSE_INFORMATION_MISSING in str(failure):
+            return _NEEDS_A_TEAMS_LICENSE
         if forbidden is not None:
             return forbidden
         named = _named(permissions)

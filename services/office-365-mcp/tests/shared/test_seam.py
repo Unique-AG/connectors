@@ -154,7 +154,7 @@ class TestTheTwoRemediesGraphCannotTellApart:
 
     async def test_the_transcript_tenant_switch_is_neither_of_those_and_says_so(self) -> None:
         """A third remedy behind the same status and outer code, and not a permission at all:
-        Graph access to Teams meeting transcripts is a tenant-wide Teams setting, off by default,
+        Graph access to Teams transcripts is a tenant-wide Teams setting, off by default,
         that no app can turn on."""
         message = await _message(
             GraphForbidden(
@@ -166,6 +166,10 @@ class TestTheTwoRemediesGraphCannotTellApart:
             )
         )
 
+        assert "Teams transcripts" in message
+        assert "Teams meeting transcripts" not in message
+        assert "last few hours" in message
+        assert "do not retry" in message
         assert "Teams administrator" in message
         assert "Set-CsTeamsMeetingConfiguration" in message
         assert "sign in again will not change it" in message
@@ -342,6 +346,24 @@ class TestRetryAdvice:
 
         assert "Teams administrator" in message
         assert "Refused." not in message
+
+    async def test_an_unlicensed_reader_is_told_to_get_teams_before_the_tools_own_words(
+        self,
+    ) -> None:
+        message = await _message(
+            GraphForbidden(
+                "Failed to get license information for the user. Ensure user has a valid "
+                + "Office365 license assigned to them.",
+                status=403,
+                code="Forbidden",
+                request_id=None,
+            ),
+            forbidden="Refused.",
+        )
+
+        assert "Office 365 license that includes Teams" in message
+        assert "Refused." not in message
+        assert "Retrying will not help" in message
 
     async def test_the_403_wording_does_not_replace_the_404_advice(self) -> None:
         message = await _message(
