@@ -121,13 +121,16 @@ describe('KyckrHttpClient', () => {
     });
 
     it('throws KyckrRateLimitError with retryAfterSeconds from the Retry-After header', async () => {
-      mockedRequest.mockResolvedValueOnce(mockResponse(429, '', { 'retry-after': '60' }));
+      mockedRequest.mockResolvedValueOnce(
+        mockResponse(429, JSON.stringify({ correlationId: 'corr-429' }), { 'retry-after': '60' }),
+      );
 
       await expect(unit.get('/companies')).rejects.toMatchObject({
         name: 'KyckrRateLimitError',
         status: 429,
         path: '/companies',
         retryAfterSeconds: 60,
+        correlationId: 'corr-429',
         message: 'Rate limit exceeded. Retry after 60s.',
       } satisfies Partial<KyckrRateLimitError>);
       expect(mockRecorder.recordApiRequest).toHaveBeenCalledWith({

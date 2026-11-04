@@ -20,9 +20,10 @@ export class KyckrRateLimitError extends KyckrApiError {
   public constructor(
     path: string,
     public readonly retryAfterSeconds: number | undefined,
+    correlationId?: string,
   ) {
     const hint = retryAfterSeconds !== undefined ? ` Retry after ${retryAfterSeconds}s.` : '';
-    super(429, path, `Rate limit exceeded.${hint}`);
+    super(429, path, `Rate limit exceeded.${hint}`, correlationId);
     this.name = 'KyckrRateLimitError';
   }
 }
@@ -77,16 +78,19 @@ export class KyckrHttpClient {
 
       status = response.statusCode;
 
-      if (status === 429) {
-        response.body.destroy();
-        throw new KyckrRateLimitError(path, this.parseRetryAfter(response.headers['retry-after']));
-      }
-
       const rawBody = await this.readBodyWithLimit(
         response.body,
         KyckrHttpClient.MAX_RESPONSE_BYTES,
       );
       const responseBody = this.tryParseJson(rawBody);
+
+      if (status === 429) {
+        throw new KyckrRateLimitError(
+          path,
+          this.parseRetryAfter(response.headers['retry-after']),
+          this.getStringField(responseBody, 'correlationId'),
+        );
+      }
 
       if (status >= 400) {
         const correlationId = this.getStringField(responseBody, 'correlationId');
