@@ -3,8 +3,8 @@ Chart-specific helpers. Generic identity/label helpers are provided by the base 
 */}}
 
 {{/*
-mcpConfig as container env vars. A list renders even when [], since an empty markers variable
-replaces the app default; null leaves it unset.
+mcpConfig as container env vars. A list renders even when [], since an empty markers or
+redirect-allowlist variable replaces the app default; null leaves it unset.
 */}}
 {{- define "chart.config.mcpEnv" -}}
 {{- if .Values.mcpConfig.app.publicBaseUrl }}
@@ -32,6 +32,23 @@ replaces the app default; null leaves it unset.
 - name: {{ last $pair }}
   value: {{ join "," $items | quote }}
 {{- end }}
+{{- end }}
+{{- $auth := .Values.mcpConfig.auth | default dict }}
+{{- $authEnv := list
+  (list "allowedRedirectHosts" "AUTH_ALLOWED_REDIRECT_HOSTS")
+  (list "allowedRedirectSchemes" "AUTH_ALLOWED_REDIRECT_SCHEMES")
+}}
+{{- range $pair := $authEnv }}
+{{- $items := index $auth (first $pair) }}
+{{- if not (kindIs "invalid" $items) }}
+- name: {{ last $pair }}
+  value: {{ join "," $items | quote }}
+{{- end }}
+{{- end }}
+{{- $extraHosts := index $auth "extraRedirectHosts" }}
+{{- if $extraHosts }}
+- name: AUTH_EXTRA_REDIRECT_HOSTS
+  value: {{ join "," $extraHosts | quote }}
 {{- end }}
 {{- if .Values.mcpConfig.tenantGuidance }}
 - name: BACKSTOP_MCP_TENANT_GUIDANCE
