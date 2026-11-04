@@ -132,7 +132,7 @@ Write one of these commands as the first line of a comment on a dependency PR.
 |---|---|
 | Who | An owner, a member, or a collaborator |
 | Where | A PR with the label `dependencies` and a branch that starts with `deps/` |
-| Scope | The run handles that PR only. It opens no other PR and does not change the dashboard issue. |
+| Scope | The run handles that PR only. It opens no other PR. |
 | By hand | Start the nightly workflow with the inputs `pr` and `recreate`. |
 
 The workflow `[Deps] Rebase` and the job `Finish` show the state of the run.
@@ -221,7 +221,7 @@ Do not close a PR to get a rebuild. A closed PR skips that version. Use one of t
 
 ## Each day
 
-1. Read the issue with the label `dependency-dashboard`. The nightly job updates it. It lists the plan and the open dependency PRs. You can also run `gh pr list --label dependencies --state open`.
+1. List the open dependency PRs: `gh pr list --label dependencies --state open`.
 2. If a PR has the label `ai-assisted`, read the report in its comment. Then merge the PR.
 3. If a PR has the label `human-required`, read the report. If it has the section "Hand-off: log a Jira ticket", log the Jira ticket from the draft. Then finish the work.
 4. If a PR has no agent label and a green CI, run the review by hand. See [Review a dependency PR](#review-a-dependency-pr).
