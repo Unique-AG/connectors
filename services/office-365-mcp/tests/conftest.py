@@ -22,6 +22,13 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
             item.add_marker("docker")
 
 
+@pytest.fixture(autouse=True)
+def tool_calls_are_not_rate_limited(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The tests call tools in memory, without the verified token the rate limit counts calls
+    under."""
+    monkeypatch.setenv("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "0")
+
+
 @pytest.fixture(scope="session")
 def postgres_container() -> Generator[PostgresContainer]:
     """No schema is applied: this service owns none, and the OAuth state store creates its one

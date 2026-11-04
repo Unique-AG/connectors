@@ -1,8 +1,9 @@
-"""Per-user tool call rate limiter for FastMCP servers."""
+"""Per-key tool call rate limiter for FastMCP servers."""
 
 import asyncio
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from typing import override
 
 import mcp_types as mt
@@ -12,30 +13,33 @@ from fastmcp.server.middleware import CallNext
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import ToolResult
+from mcp_configs import RateLimitSettings
+
+type RequestKey = Callable[[MiddlewareContext[mt.CallToolRequestParams]], str]
+
+
+def access_token_subject(context: MiddlewareContext[mt.CallToolRequestParams]) -> str:
+    """The `subject` of the access token FastMCP's auth provider verified for this call."""
+    del context
+    token = get_access_token()
+    subject = token.subject if token is not None else None
+    if subject is None:
+        raise RuntimeError("A rate-limited tool call reached the server without a verified token")
+    return subject
 
 
 class RateLimitMiddleware(Middleware):
-    """Sliding-window per-user tool call rate limiter.
+    """Sliding-window limit on the tool calls made under one key, held in this process."""
 
-    Keyed on the access token's ``subject`` claim. Calls without an access
-    token (e.g. a dev server running without auth) are passed through
-    unthrottled so local development is not affected.
-    """
-
-    _calls_per_window: int
-    _window_seconds: float
+    _settings: RateLimitSettings
+    _get_request_key: RequestKey
     _buckets: dict[str, list[float]]
     _lock: asyncio.Lock
 
-    def __init__(
-        self,
-        *,
-        calls_per_window: int = 60,
-        window_seconds: float = 60.0,
-    ) -> None:
+    def __init__(self, settings: RateLimitSettings, *, get_request_key: RequestKey) -> None:
         super().__init__()
-        self._calls_per_window = calls_per_window
-        self._window_seconds = window_seconds
+        self._settings = settings
+        self._get_request_key = get_request_key
         self._buckets = defaultdict(list)
         self._lock = asyncio.Lock()
 
@@ -45,28 +49,19 @@ class RateLimitMiddleware(Middleware):
         context: MiddlewareContext[mt.CallToolRequestParams],
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
-        subject = _subject()
-        if subject is not None:
-            await self._check(subject)
+        if self._settings.tool_calls_per_window > 0:
+            await self._check(self._get_request_key(context))
         return await call_next(context)
 
-    async def _check(self, subject: str) -> None:
+    async def _check(self, key: str) -> None:
+        limit = self._settings.tool_calls_per_window
+        window = self._settings.window_seconds
         now = time.monotonic()
-        window_start = now - self._window_seconds
         async with self._lock:
-            recent = [t for t in self._buckets[subject] if t > window_start]
-            if len(recent) >= self._calls_per_window:
+            recent = [t for t in self._buckets[key] if t > now - window]
+            if len(recent) >= limit:
                 raise ToolError(
-                    f"Rate limit exceeded: {self._calls_per_window} tool calls per "
-                    f"{int(self._window_seconds)} seconds"
+                    f"Rate limit exceeded: {limit} tool calls per {int(window)} seconds"
                 )
             recent.append(now)
-            self._buckets[subject] = recent
-
-
-def _subject() -> str | None:
-    try:
-        token = get_access_token()
-    except RuntimeError:
-        return None
-    return token.subject if token is not None else None
+            self._buckets[key] = recent

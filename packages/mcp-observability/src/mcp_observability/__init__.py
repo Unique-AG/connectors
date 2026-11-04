@@ -13,6 +13,7 @@ from mcp_observability.metrics import metrics_text
 from mcp_observability.ops import OPS_PATHS
 from mcp_observability.ops import setup_ops
 from mcp_observability.rate_limit import RateLimitMiddleware
+from mcp_observability.rate_limit import access_token_subject
 from mcp_observability.tool_calls import ToolCallObservabilityMiddleware
 from mcp_observability.trace_declarations import trace_arguments
 from mcp_observability.trace_declarations import traced
@@ -28,6 +29,7 @@ __all__ = [
     "MetricNamespace",
     "PinoJsonFormatter",
     "ToolCallObservabilityMiddleware",
+    "access_token_subject",
     "configure_identifiable_values",
     "configure_logging",
     "configure_tracing",

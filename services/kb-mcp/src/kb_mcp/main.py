@@ -10,10 +10,11 @@ from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
-from mcp_configs import LoggingSettings
+from mcp_configs import LoggingSettings, RateLimitSettings
 from mcp_observability import (
     RateLimitMiddleware,
     ToolCallObservabilityMiddleware,
+    access_token_subject,
     configure_logging,
 )
 from starlette.middleware import Middleware
@@ -125,7 +126,12 @@ def main() -> None:
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
-        middleware=[ToolCallObservabilityMiddleware(), RateLimitMiddleware()],
+        middleware=[
+            ToolCallObservabilityMiddleware(),
+            RateLimitMiddleware(
+                RateLimitSettings(), get_request_key=access_token_subject
+            ),
+        ],
         mask_error_details=True,
     )
     apply_enabled_tools(mcp, settings)

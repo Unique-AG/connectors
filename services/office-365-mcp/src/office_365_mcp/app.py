@@ -3,7 +3,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
-from mcp_observability import RateLimitMiddleware, ToolCallObservabilityMiddleware
+from mcp_configs import RateLimitSettings
+from mcp_observability import (
+    RateLimitMiddleware,
+    ToolCallObservabilityMiddleware,
+    access_token_subject,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
@@ -67,12 +72,14 @@ def create_app(
     database_config: DatabaseConfig | None = None,
     entra_config: EntraConfig | None = None,
     surface_config: SurfaceConfig | None = None,
+    rate_limit: RateLimitSettings | None = None,
 ) -> Starlette:
     """Compose the app. Every long-lived object is built once and injected."""
     config = config or AppConfig()
     database_config = database_config or DatabaseConfig()
     entra_config = entra_config or EntraConfig()  # pyright: ignore[reportCallIssue]
     surface_config = surface_config or SurfaceConfig()
+    rate_limit = rate_limit or RateLimitSettings()
 
     configure_logging(config)
     configure_metrics(config)
@@ -138,7 +145,7 @@ def create_app(
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, or its line carries the session task's stale trace.
             MessageLogMiddleware(),
-            RateLimitMiddleware(),
+            RateLimitMiddleware(rate_limit, get_request_key=access_token_subject),
         ],
         lifespan=lifespan,
     )
