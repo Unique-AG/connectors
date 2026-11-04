@@ -29,7 +29,7 @@ If your organisation cannot store meeting content in Unique, deploy Teams MCP in
 
 This is **not** fixed by re-consent, reconnecting with a different app, or changing subscription IDs. Entra admin consent grants `OnlineMeetingTranscript.Read.All`; `EnableGraphTranscriptAccess` is a separate Teams control. Unique cannot enable it via OAuth or Graph. The same switch blocks call transcript reads.
 
-For a few hours after the switch is turned on, Graph can still return 403 on some requests and succeed on others. In one tenant the counts were 2 of about 9, then 1 of 47, then 0 of 156. Wait and try again. Granting admin consent again does not help.
+For a few hours after the switch is turned on, Graph can still return 403 on some requests and succeed on others. Wait and try again. Granting admin consent again does not help.
 
 **What to do (Teams / Global admin):**
 

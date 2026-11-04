@@ -62,7 +62,7 @@ By default, Graph access to transcripts is **off**, regardless of app-level perm
 
 Until this toggle is on, creating or renewing transcript subscriptions and fetching transcripts returns **403** (`GraphAccessToTranscriptsDisabled`). The same switch blocks call transcript reads. This is easy to misdiagnose as a consent, wrong-app, or bad-id problem — re-consent will not fix it.
 
-For a few hours after the switch is turned on, Graph can still return that 403 on some requests and succeed on others. In one tenant the counts were 2 of about 9, then 1 of 47, then 0 of 156. Wait and try again. Re-consent does not help.
+For a few hours after the switch is turned on, Graph can still return that 403 on some requests and succeed on others. Wait and try again. Re-consent does not help.
 
 ### Teams admin center
 
