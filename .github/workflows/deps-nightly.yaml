@@ -327,6 +327,8 @@ jobs:
 
           if [ "$ACTION" = rebuild ]; then
             gh pr edit "$NUMBER" --title "$title" --body-file "$RUNNER_TEMP/pr/pr-body.md"
+            gh pr edit "$NUMBER" --remove-label ai-assisted --remove-label human-required --remove-label dependencies
+            gh pr edit "$NUMBER" --add-label dependencies
             url=$(gh pr view "$NUMBER" --json url --jq .url)
           else
             if [ "$ACTION" = replace ]; then
