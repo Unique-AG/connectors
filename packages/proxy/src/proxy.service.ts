@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import type * as http from 'node:http';
 import { Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+// https-proxy-agent 9 is ESM-only; moduleResolution "node" cannot read its exports map.
+// @ts-expect-error TS2307
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { Agent, type Dispatcher, ProxyAgent } from 'undici';
 import {
