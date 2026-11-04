@@ -5929,8 +5929,8 @@ packages:
     resolution: {integrity: sha512-pN/yOAvcC+5rQ5nERGuwrjLlYvLTbCibnZ1I7B1LaiAz9BRBlE9GMgE/eqV30P7aJQUf7Ddimy/RsbYO/GrVGg==}
     engines: {node: '>= 10.13.0'}
 
-  schema-utils@4.8.1:
-    resolution: {integrity: sha512-x39pYlJPyH7Uge5QO64B9XGP9zLDc9WNmiQZc+CE3IzZPvMu3lHOuAMGpYNoPixEL7MSWlGhYTg5UlLSL8G6iw==}
+  schema-utils@4.8.2:
+    resolution: {integrity: sha512-iKlak3OFHF0dgD1nZRvgWQzG+P1TiEcMnLSBtIVBg937z5Jd6WE1c3SyZkXIyCfPHowL35yMsVvIjotm1c1qiw==}
     engines: {node: '>= 10.13.0'}
     hasBin: true
     peerDependencies:
@@ -11022,7 +11022,7 @@ snapshots:
       ajv: 6.15.0
       ajv-keywords: 3.5.2(ajv@6.15.0)
 
-  schema-utils@4.8.1(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2)):
+  schema-utils@4.8.2(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2)):
     dependencies:
       '@types/json-schema': 7.0.15
       ajv: 8.20.0
@@ -11373,7 +11373,7 @@ snapshots:
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       jest-worker: 27.5.1
-      schema-utils: 4.8.1(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2))
+      schema-utils: 4.8.2(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2))
       terser: 5.51.2
       webpack: 5.106.2(@swc/core@1.16.20)(esbuild@0.28.2)
     optionalDependencies:
@@ -11668,7 +11668,7 @@ snapshots:
       loader-runner: 4.3.2
       mime-db: 1.54.0
       neo-async: 2.6.2
-      schema-utils: 4.8.1(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2))
+      schema-utils: 4.8.2(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2))
       tapable: 2.3.3
       terser-webpack-plugin: 5.6.1(@swc/core@1.16.20)(esbuild@0.28.2)(webpack@5.106.2(@swc/core@1.16.20)(esbuild@0.28.2))
       watchpack: 2.6.3
