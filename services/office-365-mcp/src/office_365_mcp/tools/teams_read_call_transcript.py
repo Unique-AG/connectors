@@ -38,6 +38,10 @@ A meeting \
 transcript handle is not valid here.
 
 Notes:
+- Only a call the signed-in user was on. Readable only when someone in that user's organization \
+started the transcription (a 1:1 call) or started the call (a group call).
+- The transcript appears 1 to 2 minutes after the call. teams_list_call_transcripts, with \
+`chat_id`, can name group calls that ended without a transcription.
 - If `speaker_attribution` is false, every `speaker` is null. A `speaker` filter then matches \
 nothing.
 - `from_seconds` must not be later than `to_seconds`. If `from_seconds` is later than \

@@ -86,8 +86,13 @@ on, newest first, inside a creation window that defaults to the last 7 days. Pas
 to teams_read_call_transcript to get the words.
 
 Notes:
+- A transcript is readable only when someone in the signed-in user's organization started the \
+transcription (a 1:1 call) or started the call (a group call). Otherwise Teams can show the user \
+the transcript and this tool does not list it.
+- Transcripts appear 1 to 2 minutes after the call.
 - Pass the `chat_id` of the call's chat from teams_list_chats to learn why a call in that chat \
-has no transcript here, in `unmatched_calls`.\
+has no transcript here, in `unmatched_calls`. On a group chat that can name calls that ended \
+without a transcription.\
 """
 
 _RUNS_BACKWARDS = (
