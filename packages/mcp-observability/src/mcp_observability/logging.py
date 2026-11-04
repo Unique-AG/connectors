@@ -6,7 +6,6 @@ import logging
 import re
 import sys
 import traceback
-from collections.abc import Iterable
 from collections.abc import Sequence
 from functools import partial
 from types import TracebackType
@@ -21,6 +20,7 @@ from opentelemetry import trace
 from mcp_observability.failed_fields import FAILED_FIELDS_SHOWN
 from mcp_observability.failed_fields import failed_fields
 from mcp_observability.ops import OPS_PATHS
+from mcp_observability.redaction import SecretRedaction
 from mcp_observability.redaction import SecretRedactor
 from mcp_observability.redaction import failed_line
 from mcp_observability.stacktrace import scrub_stacktrace
@@ -53,17 +53,13 @@ def configure_logging(
     settings: LoggingSettings,
     *,
     own_loggers: Sequence[str],
-    secrets: Iterable[str] = (),
-    secret_patterns: Iterable[re.Pattern[str]] = (),
-    default_secret_patterns: bool = True,
+    redaction: SecretRedaction | None = None,
 ) -> None:
     """Send every log record to stderr as Pino JSON, with the trace and span of the call, and
     without exception text unless `ERROR_DETAILS_POLICY=disclose`. Safe to call more than once: the
-    last call's secrets and patterns replace the earlier ones.
+    last call's `redaction` replaces the earlier one.
 
-    `secrets`, such as API keys from the settings, and `secret_patterns` are replaced with
-    `[Redacted]` in every line, on top of the default patterns unless `default_secret_patterns` is
-    false.
+    The secrets and patterns of `redaction` are replaced with `[Redacted]` in every line.
 
     `own_loggers` (the MCP's package, such as `("backstop_mcp",)`) and this package log at
     `LOG_LEVEL`; a library at its `LIBRARY_LOG_LEVELS` entry, else its default, else INFO. The app
@@ -78,11 +74,8 @@ def configure_logging(
     if output is None:
         output = logging.StreamHandler(sys.stderr)
         root.addHandler(output)
-    output.setFormatter(
-        PinoJsonFormatter(
-            SecretRedactor(secrets, secret_patterns, default_patterns=default_secret_patterns)
-        )
-    )
+    redaction = redaction or SecretRedaction()
+    output.setFormatter(PinoJsonFormatter(SecretRedactor(redaction.secrets, redaction.patterns)))
     output.setLevel(logging.NOTSET)
     for stale in [kept for kept in output.filters if isinstance(kept, _ErrorDetails)]:
         output.removeFilter(stale)

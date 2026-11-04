@@ -2,6 +2,7 @@
 
 import json
 import re
+import string
 import threading
 import time
 import traceback
@@ -11,15 +12,18 @@ from collections.abc import Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
+from typing import ClassVar
 from typing import cast
 from typing import override
-from urllib.parse import quote
 
 import mcp_types as mt
+from fastmcp.server.dependencies import get_access_token
 from fastmcp.server.middleware import CallNext
 from fastmcp.server.middleware import Middleware
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import ToolResult
+from pydantic import BaseModel
+from pydantic import ConfigDict
 from starlette.requests import Request
 from starlette.types import ASGIApp
 from starlette.types import Receive
@@ -32,49 +36,80 @@ from mcp_observability.stacktrace import scrub_stacktrace
 MIN_SECRET_LENGTH = 8
 _REDACTED = "[Redacted]"
 
-# Exported one by one so a consumer that opts out of the defaults can pick its own. A `secret`
-# group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in step with
-# `packages/logger`.
+# A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
+# step with `packages/logger`.
 
 # The scheme in any case. The credential needs a digit, an inner capital or a symbol, or 20
 # characters, so prose such as "Basic authentication failed" keeps its words.
-AUTHORIZATION_SCHEME_PATTERN = re.compile(
+_AUTHORIZATION_SCHEME_PATTERN = re.compile(
     r"\b(?i:Bearer|Basic)\s+(?P<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})"
     r"[A-Za-z0-9\-._~+/]{8,}=*)"
 )
-JWT_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
-API_KEY_PATTERN = re.compile(
-    r"\b(?:x-)?api[-_]?key\s*[=:]\s*(?P<secret>[^\s&,;\"']+)", re.IGNORECASE
-)
-CREDENTIAL_PARAMETER_PATTERN = re.compile(
-    r"\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd"
-    r"|secret|token)=(?P<secret>[^\s&,;\"']+)",
+_JWT_PATTERN = re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+# No letter or digit before the name, unlike `\b`, so `x_api_key=` and `csrf_token=` match too. The
+# divider is `=` or `:` as in a header, and the name and value may be quoted as in JSON, so an
+# upstream error body quoting `{"client_secret":"…"}` is caught.
+_API_KEY_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:x-)?api[-_]?key[\"']?\s*[=:]\s*[\"']?(?P<secret>[^\s&,;\"']+)",
     re.IGNORECASE,
 )
-URL_CREDENTIALS_PATTERN = re.compile(
+# A bare `token:` stays readable, as in "refresh token: invalid_grant". Only `=` or a quoted name
+# before the colon marks a credential.
+_CREDENTIAL_PARAMETER_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret"
+    r"|password|passwd|secret|token)(?:\s*=\s*|[\"']\s*:\s*)[\"']?(?P<secret>[^\s&,;\"']+)",
+    re.IGNORECASE,
+)
+_URL_CREDENTIALS_PATTERN = re.compile(
     r"(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*://[^/\s:@]+:(?P<secret>[^/\s@]+)@", re.IGNORECASE
 )
-PRIVATE_KEY_PATTERN = re.compile(
+_PRIVATE_KEY_PATTERN = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?"
     r"-----END [A-Z ]*PRIVATE KEY-----"
 )
-SK_PREFIXED_KEY_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{20,}")
-GITHUB_TOKEN_PATTERN = re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}")
-SLACK_TOKEN_PATTERN = re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}")
-AWS_ACCESS_KEY_ID_PATTERN = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
+_SK_PREFIXED_KEY_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{20,}")
+_GITHUB_TOKEN_PATTERN = re.compile(r"\bgh[pousr]_[A-Za-z0-9]{36,}")
+_SLACK_TOKEN_PATTERN = re.compile(r"\bxox[abprs]-[A-Za-z0-9-]{10,}")
+_AWS_ACCESS_KEY_ID_PATTERN = re.compile(r"\bAKIA[0-9A-Z]{16}\b")
 
+# Secret-shaped text: authorization credentials, JWTs, `key=value` credentials, URL userinfo, PEM
+# private keys, and `sk-`, GitHub, Slack and AWS keys. Off unless passed as `patterns`, since they
+# can also replace text that is not a secret.
 DEFAULT_SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
-    AUTHORIZATION_SCHEME_PATTERN,
-    JWT_PATTERN,
-    API_KEY_PATTERN,
-    CREDENTIAL_PARAMETER_PATTERN,
-    URL_CREDENTIALS_PATTERN,
-    PRIVATE_KEY_PATTERN,
-    SK_PREFIXED_KEY_PATTERN,
-    GITHUB_TOKEN_PATTERN,
-    SLACK_TOKEN_PATTERN,
-    AWS_ACCESS_KEY_ID_PATTERN,
+    _AUTHORIZATION_SCHEME_PATTERN,
+    _JWT_PATTERN,
+    _API_KEY_PATTERN,
+    _CREDENTIAL_PARAMETER_PATTERN,
+    _URL_CREDENTIALS_PATTERN,
+    _PRIVATE_KEY_PATTERN,
+    _SK_PREFIXED_KEY_PATTERN,
+    _GITHUB_TOKEN_PATTERN,
+    _SLACK_TOKEN_PATTERN,
+    _AWS_ACCESS_KEY_ID_PATTERN,
 )
+
+# The characters each encoder leaves as they are besides letters and digits, and how it writes a
+# space. Kept in step with `packages/logger`.
+_URL_ENCODINGS: tuple[tuple[str, str], ...] = (
+    ("-_.!~*'()", "%20"),  # JavaScript's `encodeURIComponent`
+    ("-_.~", "%20"),  # RFC 3986, as `quote(safe="")`
+    ("-_.~", "+"),  # `quote_plus`
+    ("-_.*", "+"),  # `URLSearchParams` and HTML forms
+)
+_ALPHANUMERIC = frozenset(string.ascii_letters + string.digits)
+
+
+class SecretRedaction(BaseModel):
+    """What `configure_logging` replaces with `[Redacted]` in every line."""
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    secrets: tuple[str, ...] = ()
+    """Known secret values, such as API keys from the settings. Shorter than `MIN_SECRET_LENGTH`
+    are skipped."""
+    patterns: tuple[re.Pattern[str], ...] = ()
+    """Secret-shaped text to replace, such as `DEFAULT_SECRET_PATTERNS`. A `secret` named group
+    narrows what is replaced."""
 
 
 # A JSON string literal, and the colon after it when it is an object key. An unterminated literal
@@ -86,8 +121,6 @@ _MSG = re.compile(r'"msg":\s*("(?:[^"\\]|\\[\s\S])*(?:"|\\?\Z))')
 # Describes a log call from fields that hold no logged value: its logger, level, code location and
 # trace ids.
 type Source = Callable[[], dict[str, object]]
-
-# The variants to replace, longest first, already expanded by `_secret_variants`.
 
 
 class _LogScope:
@@ -131,17 +164,10 @@ class SecretRedactor:
     and every changed string is re-encoded, so the line always stays valid JSON."""
 
     def __init__(
-        self,
-        secrets: Iterable[str] = (),
-        patterns: Iterable[re.Pattern[str]] = (),
-        *,
-        default_patterns: bool = True,
+        self, secrets: Iterable[str] = (), patterns: Iterable[re.Pattern[str]] = ()
     ) -> None:
-        """`default_patterns=False` drops `DEFAULT_SECRET_PATTERNS`, leaving only `patterns`, which
-        can pick from them."""
         self._secrets: tuple[str, ...] = _secret_variants(secrets)
-        defaults = DEFAULT_SECRET_PATTERNS if default_patterns else ()
-        self._patterns: tuple[re.Pattern[str], ...] = (*defaults, *patterns)
+        self._patterns: tuple[re.Pattern[str], ...] = tuple(patterns)
 
     def redact_line(self, line: str, *, source: Source | None = None) -> str:
         """Never raises: `logging` would print the unredacted record to stderr. `source` describes
@@ -160,12 +186,14 @@ class SecretRedactor:
 
     def salvage(self, text: str) -> str:
         """`text` for a line that could not be redacted: the secrets are replaced, which cannot
-        fail, and the patterns too unless they are what failed."""
-        without_secrets = _replace_secrets(text, self._current_secrets())
-        try:
-            return self._replace_patterns(without_secrets)
-        except Exception:  # noqa: BLE001 - the secrets are replaced, which is what can still be shown
-            return without_secrets
+        fail, and every pattern that does not fail."""
+        redacted = _replace_secrets(text, self._current_secrets())
+        for pattern in self._patterns:
+            try:
+                redacted = pattern.sub(_redact_match, redacted)
+            except Exception:  # noqa: BLE001 - one failing pattern must not skip the rest
+                continue
+        return redacted
 
     def _current_secrets(self) -> tuple[str, ...]:
         scope = _log_scope.get()
@@ -227,11 +255,25 @@ def _scope(secrets: tuple[str, ...], failure: str | None = None) -> Generator[No
         _log_scope.reset(token)
 
 
-class RedactRequestSecretsMiddleware:
-    """ASGI middleware that redacts what `secrets_of` returns for an HTTP request, such as its
-    bearer token or API key, from every line logged while the request is handled."""
+def bearer_token(request: Request) -> tuple[str, ...]:
+    """The token of a request's `Authorization: Bearer` header."""
+    scheme, _, token = request.headers.get("authorization", "").partition(" ")
+    return (token,) if scheme.lower() == "bearer" and token else ()
 
-    def __init__(self, app: ASGIApp, secrets_of: Callable[[Request], Iterable[str]]) -> None:
+
+def caller_access_token(_context: MiddlewareContext[mt.CallToolRequestParams]) -> tuple[str, ...]:
+    """The MCP access token of a tool call, which may not run in its HTTP request's context."""
+    access_token = get_access_token()
+    return (access_token.token,) if access_token is not None else ()
+
+
+class RedactRequestSecretsMiddleware:
+    """ASGI middleware that redacts what `secrets_of` returns for an HTTP request, its bearer token
+    unless given, from every line logged while the request is handled."""
+
+    def __init__(
+        self, app: ASGIApp, secrets_of: Callable[[Request], Iterable[str]] = bearer_token
+    ) -> None:
         self._app: ASGIApp = app
         self._secrets_of: Callable[[Request], Iterable[str]] = secrets_of
 
@@ -244,13 +286,15 @@ class RedactRequestSecretsMiddleware:
 
 
 class RedactToolCallSecretsMiddleware(Middleware):
-    """FastMCP middleware that redacts what `secrets_of` returns for a tool call, such as the
-    caller's token from `get_access_token()`, from every line logged while the tool runs. List it
-    before `ToolCallObservabilityMiddleware`, so the lines that one writes are redacted too."""
+    """FastMCP middleware that redacts what `secrets_of` returns for a tool call, the caller's
+    access token unless given, from every line logged while the tool runs. List it before
+    `ToolCallObservabilityMiddleware`, so the lines that one writes are redacted too."""
 
     def __init__(
         self,
-        secrets_of: Callable[[MiddlewareContext[mt.CallToolRequestParams]], Iterable[str]],
+        secrets_of: Callable[
+            [MiddlewareContext[mt.CallToolRequestParams]], Iterable[str]
+        ] = caller_access_token,
     ) -> None:
         super().__init__()
         self._secrets_of: Callable[[MiddlewareContext[mt.CallToolRequestParams]], Iterable[str]] = (
@@ -311,7 +355,7 @@ def _redact_match(match: re.Match[str]) -> str:
 
 
 def _secret_variants(secrets: Iterable[str]) -> tuple[str, ...]:
-    """Each secret as written and URL-encoded, as a query string carries it. A lone `str` is one
+    """Each secret as written and in each way a URL or form body encodes it. A lone `str` is one
     secret, not the characters it is made of."""
     return _longest_first(
         variant
@@ -323,12 +367,23 @@ def _secret_variants(secrets: Iterable[str]) -> tuple[str, ...]:
 
 
 def _url_encoded(secret: str) -> tuple[str, ...]:
-    """`quote` raises on a lone surrogate, which no URL can carry anyway."""
+    """A lone surrogate has no UTF-8 encoding, so no URL can carry it."""
     try:
-        # The same characters `encodeURIComponent` leaves as they are.
-        return (quote(secret, safe="!'()*"),)
+        data = secret.encode()
     except UnicodeEncodeError:
         return ()
+    return tuple(_percent_encoded(data, safe, space) for safe, space in _URL_ENCODINGS)
+
+
+def _percent_encoded(data: bytes, safe: str, space: str) -> str:
+    return "".join(
+        chr(byte)
+        if chr(byte) in _ALPHANUMERIC or chr(byte) in safe
+        else space
+        if byte == 0x20
+        else f"%{byte:02X}"
+        for byte in data
+    )
 
 
 def failed_line(

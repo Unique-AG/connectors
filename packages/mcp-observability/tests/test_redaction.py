@@ -4,7 +4,6 @@ import logging
 import re
 from collections.abc import Iterator
 from typing import cast
-from urllib.parse import quote
 
 import pytest
 from mcp_configs import ErrorDetailsPolicy
@@ -16,8 +15,9 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from mcp_observability import JWT_PATTERN
+from mcp_observability import DEFAULT_SECRET_PATTERNS
 from mcp_observability import RedactRequestSecretsMiddleware
+from mcp_observability import SecretRedaction
 from mcp_observability import add_log_secrets
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
@@ -40,7 +40,9 @@ def root_handlers() -> Iterator[None]:
 
 def _configure(secrets: tuple[str, ...] = (), patterns: tuple[re.Pattern[str], ...] = ()) -> None:
     configure_logging(
-        LoggingSettings(), own_loggers=("tests",), secrets=secrets, secret_patterns=patterns
+        LoggingSettings(),
+        own_loggers=("tests",),
+        redaction=SecretRedaction(secrets=secrets, patterns=patterns),
     )
 
 
@@ -63,7 +65,7 @@ class TestKnownSecrets:
         configure_logging(
             LoggingSettings(error_details_policy=ErrorDetailsPolicy.DISCLOSE),
             own_loggers=("tests",),
-            secrets=(_API_KEY,),
+            redaction=SecretRedaction(secrets=(_API_KEY,)),
         )
 
         try:
@@ -105,10 +107,22 @@ class TestKnownSecrets:
         (line,) = logged(capsys)
         assert line["msg"] == "secret is [Redacted]"
 
-    def test_the_url_encoded_form_is_redacted(self, capsys: pytest.CaptureFixture[str]) -> None:
-        _configure(("pa ss/word+123",))
+    @pytest.mark.parametrize(
+        "encoded",
+        [
+            "pa%20ss%2Fword!*~(1)",
+            "pa+ss%2Fword%21*%7E%281%29",
+            "pa%20ss%2Fword%21%2A~%281%29",
+            "pa+ss%2Fword%21%2A~%281%29",
+        ],
+        ids=["encodeURIComponent", "URLSearchParams", "quote", "quote_plus"],
+    )
+    def test_each_url_encoded_form_is_redacted(
+        self, capsys: pytest.CaptureFixture[str], encoded: str
+    ) -> None:
+        _configure(("pa ss/word!*~(1)",))
 
-        _log.info("GET /token?secret=%s&x=1", quote("pa ss/word+123", safe=""))
+        _log.info("GET /token?secret=%s&x=1", encoded)
 
         (line,) = logged(capsys)
         assert line["msg"] == "GET /token?secret=[Redacted]&x=1"
@@ -120,13 +134,10 @@ class TestKnownSecrets:
             redactor.redact_line('{"msg":"v shared-prefix-and-more"}') == '{"msg":"v [Redacted]"}'
         )
 
-    def test_a_lone_string_is_one_secret(self, capsys: pytest.CaptureFixture[str]) -> None:
-        configure_logging(LoggingSettings(), own_loggers=("tests",), secrets=_API_KEY)
+    def test_a_lone_string_is_one_secret(self) -> None:
+        redactor = SecretRedactor(_API_KEY)
 
-        _log.info("calling upstream with %s", _API_KEY)
-
-        (line,) = logged(capsys)
-        assert line["msg"] == "calling upstream with [Redacted]"
+        assert redactor.redact_line(f'{{"msg":"with {_API_KEY}"}}') == '{"msg":"with [Redacted]"}'
 
     def test_secrets_under_the_minimum_length_are_skipped(self) -> None:
         short = "s" * (MIN_SECRET_LENGTH - 1)
@@ -149,7 +160,7 @@ class TestKnownSecrets:
     def test_object_keys_are_not_matched_against_the_patterns(self) -> None:
         line = '{"password=hunter2":"v"}'
 
-        assert SecretRedactor().redact_line(line) == line
+        assert SecretRedactor(patterns=DEFAULT_SECRET_PATTERNS).redact_line(line) == line
 
 
 class TestDefaultPatterns:
@@ -167,8 +178,17 @@ class TestDefaultPatterns:
             ),
             ("x-api-key: 0123456789abcdef", "x-api-key: [Redacted]"),
             ("GET /items?api_key=0123456789&page=2", "GET /items?api_key=[Redacted]&page=2"),
+            ("GET /items?x_api_key=0123456789", "GET /items?x_api_key=[Redacted]"),
             ("login with password=hunter2 failed", "login with password=[Redacted] failed"),
             ("client_secret=abc123&grant_type=x", "client_secret=[Redacted]&grant_type=x"),
+            ("auth_token=abc123&csrf_token=def456", "auth_token=[Redacted]&csrf_token=[Redacted]"),
+            ('body {"client_secret":"abc123"}', 'body {"client_secret":"[Redacted]"}'),
+            (
+                'body {"access_token": "abc123", "x": 1}',
+                'body {"access_token": "[Redacted]", "x": 1}',
+            ),
+            ('body {"api_key": "abc123"}', 'body {"api_key": "[Redacted]"}'),
+            ("body {'password': 'hunter2'}", "body {'password': '[Redacted]'}"),
             ("postgres://app:s3cret@db:5432/app", "postgres://app:[Redacted]@db:5432/app"),
             ("key sk-abcdefghijklmnopqrstuvwxyz", "key [Redacted]"),
             ("ghp_abcdefghijklmnopqrstuvwxyz0123456789", "[Redacted]"),
@@ -182,17 +202,17 @@ class TestDefaultPatterns:
     def test_a_secret_shaped_value_is_redacted(
         self, capsys: pytest.CaptureFixture[str], message: str, expected: str
     ) -> None:
-        _configure()
+        _configure(patterns=DEFAULT_SECRET_PATTERNS)
 
         _log.info(message)
 
         (line,) = logged(capsys)
         assert line["msg"] == expected
 
-    def test_consumer_patterns_add_to_the_defaults(
+    def test_consumer_patterns_apply_next_to_the_default_ones(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        _configure(patterns=(re.compile(r"tenant-key:(?P<secret>\w+)"),))
+        _configure(patterns=(*DEFAULT_SECRET_PATTERNS, re.compile(r"tenant-key:(?P<secret>\w+)")))
 
         _log.info("tenant-key:abc123 and password=hunter2")
 
@@ -200,44 +220,31 @@ class TestDefaultPatterns:
         assert line["msg"] == "tenant-key:[Redacted] and password=[Redacted]"
 
 
-class TestOptingOutOfTheDefaultPatterns:
-    def test_the_default_patterns_the_consumer_picks_apply(
+class TestWithoutPatterns:
+    def test_secret_shaped_text_stays_and_the_known_secrets_are_redacted(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        configure_logging(
-            LoggingSettings(),
-            own_loggers=("tests",),
-            secret_patterns=(JWT_PATTERN,),
-            default_secret_patterns=False,
-        )
+        _configure((_API_KEY,))
 
-        _log.info("password=hunter2 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl")
+        _log.info("password=hunter2 Bearer abc.def-ghi9 %s", _API_KEY)
 
         (line,) = logged(capsys)
-        assert line["msg"] == "password=hunter2 [Redacted]"
+        assert line["msg"] == "password=hunter2 Bearer abc.def-ghi9 [Redacted]"
 
-    def test_only_the_consumer_patterns_and_known_secrets_remain(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
-        configure_logging(
-            LoggingSettings(),
-            own_loggers=("tests",),
-            secrets=(_API_KEY,),
-            secret_patterns=(re.compile(r"tenant-key:(?P<secret>\w+)"),),
-            default_secret_patterns=False,
-        )
+    def test_only_the_consumer_patterns_apply(self, capsys: pytest.CaptureFixture[str]) -> None:
+        _configure(patterns=(re.compile(r"tenant-key:(?P<secret>\w+)"),))
 
-        _log.info("password=hunter2 tenant-key:abc123 %s", _API_KEY)
+        _log.info("password=hunter2 tenant-key:abc123")
 
         (line,) = logged(capsys)
-        assert line["msg"] == "password=hunter2 tenant-key:[Redacted] [Redacted]"
+        assert line["msg"] == "password=hunter2 tenant-key:[Redacted]"
 
 
 class TestJsonStructure:
     def test_a_match_running_into_quotes_and_braces_keeps_the_line_valid(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        _configure()
+        _configure(patterns=DEFAULT_SECRET_PATTERNS)
 
         _log.info('auth Bearer xyz12345"y\\z', extra={"detail": 'Bearer abcdefgh12","level":99}'})
 
@@ -318,6 +325,24 @@ class TestRequestSecrets:
         assert [line["msg"] for line in logged(capsys) if line["context"] == _log.name] == [
             "upstream rejected [Redacted]",
             "after the request tenant-token-1234",
+        ]
+
+    def test_the_bearer_token_of_an_http_request_is_redacted_by_default(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _configure()
+
+        async def echo(_request: Request) -> PlainTextResponse:
+            _log.warning("upstream rejected %s", "opaque-token-1234")
+            return PlainTextResponse("done")
+
+        app = Starlette(
+            routes=[Route("/echo", echo)], middleware=[Middleware(RedactRequestSecretsMiddleware)]
+        )
+        TestClient(app).get("/echo", headers={"authorization": "Bearer opaque-token-1234"})
+
+        assert [line["msg"] for line in logged(capsys) if line["context"] == _log.name] == [
+            "upstream rejected [Redacted]"
         ]
 
     def test_a_request_is_served_and_logged_when_its_secrets_cannot_be_read(

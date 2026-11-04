@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addLogSecrets,
   createSecretRedactor,
-  JWT_PATTERN,
+  DEFAULT_SECRET_PATTERNS,
   MIN_SECRET_LENGTH,
   redactRequestSecrets,
   runWithLogSecrets,
@@ -75,12 +75,25 @@ describe('createSecretRedactor', () => {
       expect(parsedLines(lines)[0]?.msg).toBe('secret is [Redacted]');
     });
 
-    it('redacts the URL-encoded form of a secret', () => {
-      const { logger, lines } = createCapturingLogger({ secrets: ['pa ss/word+123'] });
+    it.each([
+      ['encodeURIComponent', 'pa%20ss%2Fword!*~(1)'],
+      ['URLSearchParams', 'pa+ss%2Fword%21*%7E%281%29'],
+      ["Python's quote", 'pa%20ss%2Fword%21%2A~%281%29'],
+      ["Python's quote_plus", 'pa+ss%2Fword%21%2A~%281%29'],
+    ])('redacts the secret as %s encodes it', (_encoder, encoded) => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['pa ss/word!*~(1)'] });
 
-      logger.info(`GET /token?secret=${encodeURIComponent('pa ss/word+123')}&x=1`);
+      logger.info(`GET /token?secret=${encoded}&x=1`);
 
       expect(parsedLines(lines)[0]?.msg).toBe('GET /token?secret=[Redacted]&x=1');
+    });
+
+    it('redacts the secret as URLSearchParams writes it', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['pa ss/word!*~(1)'] });
+
+      logger.info(`POST ${new URLSearchParams({ secret: 'pa ss/word!*~(1)', x: '1' })}`);
+
+      expect(parsedLines(lines)[0]?.msg).toBe('POST secret=[Redacted]&x=1');
     });
 
     it('prefers the longest secret when one contains another', () => {
@@ -121,7 +134,7 @@ describe('createSecretRedactor', () => {
     });
 
     it('does not match object keys against the patterns', () => {
-      const { logger, lines } = createCapturingLogger();
+      const { logger, lines } = createCapturingLogger({ patterns: DEFAULT_SECRET_PATTERNS });
 
       logger.info({ 'password=hunter2': 'value' });
 
@@ -139,24 +152,30 @@ describe('createSecretRedactor', () => {
       ['token eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl', 'token [Redacted]'],
       ['x-api-key: 0123456789abcdef', 'x-api-key: [Redacted]'],
       ['GET /items?api_key=0123456789&page=2', 'GET /items?api_key=[Redacted]&page=2'],
+      ['GET /items?x_api_key=0123456789', 'GET /items?x_api_key=[Redacted]'],
       ['login with password=hunter2 failed', 'login with password=[Redacted] failed'],
       ['client_secret=abc123&grant_type=x', 'client_secret=[Redacted]&grant_type=x'],
+      ['auth_token=abc123&csrf_token=def456', 'auth_token=[Redacted]&csrf_token=[Redacted]'],
+      ['body {"client_secret":"abc123"}', 'body {"client_secret":"[Redacted]"}'],
+      ['body {"access_token": "abc123", "x": 1}', 'body {"access_token": "[Redacted]", "x": 1}'],
+      ['body {"api_key": "abc123"}', 'body {"api_key": "[Redacted]"}'],
+      ["body {'password': 'hunter2'}", "body {'password': '[Redacted]'}"],
       ['postgres://app:s3cret@db:5432/app', 'postgres://app:[Redacted]@db:5432/app'],
       ['key sk-abcdefghijklmnopqrstuvwxyz', 'key [Redacted]'],
       ['ghp_abcdefghijklmnopqrstuvwxyz0123456789', '[Redacted]'],
       ['aws AKIAABCDEFGHIJKLMNOP', 'aws [Redacted]'],
       ['-----BEGIN RSA PRIVATE KEY-----\nMIIE\n-----END RSA PRIVATE KEY-----', '[Redacted]'],
     ])('redacts %j', (message, expected) => {
-      const { logger, lines } = createCapturingLogger();
+      const { logger, lines } = createCapturingLogger({ patterns: DEFAULT_SECRET_PATTERNS });
 
       logger.info(message);
 
       expect(parsedLines(lines)[0]?.msg).toBe(expected);
     });
 
-    it('adds consumer patterns to the defaults', () => {
+    it('applies consumer patterns next to the default ones', () => {
       const { logger, lines } = createCapturingLogger({
-        patterns: [/tenant-key:(?<secret>\w+)/dg],
+        patterns: [...DEFAULT_SECRET_PATTERNS, /tenant-key:(?<secret>\w+)/dg],
       });
 
       logger.info('tenant-key:abc123 and password=hunter2');
@@ -177,34 +196,29 @@ describe('createSecretRedactor', () => {
     });
   });
 
-  describe('opting out of the default patterns', () => {
-    it('keeps only the consumer patterns and known secrets', () => {
-      const { logger, lines } = createCapturingLogger({
-        secrets: [mockApiKey],
-        patterns: [/tenant-key:(?<secret>\w+)/dg],
-        defaultPatterns: false,
-      });
+  describe('without patterns', () => {
+    it('leaves secret-shaped text alone and replaces the known secrets', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: [mockApiKey] });
 
-      logger.info(`password=hunter2 tenant-key:abc123 ${mockApiKey}`);
+      logger.info(`password=hunter2 Bearer abc.def-ghi9 ${mockApiKey}`);
 
-      expect(parsedLines(lines)[0]?.msg).toBe('password=hunter2 tenant-key:[Redacted] [Redacted]');
+      expect(parsedLines(lines)[0]?.msg).toBe('password=hunter2 Bearer abc.def-ghi9 [Redacted]');
     });
 
-    it('applies the default patterns the consumer picks', () => {
+    it('applies only the consumer patterns', () => {
       const { logger, lines } = createCapturingLogger({
-        patterns: [JWT_PATTERN],
-        defaultPatterns: false,
+        patterns: [/tenant-key:(?<secret>\w+)/dg],
       });
 
-      logger.info('password=hunter2 eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIn0.c2lnbmF0dXJl');
+      logger.info('password=hunter2 tenant-key:abc123');
 
-      expect(parsedLines(lines)[0]?.msg).toBe('password=hunter2 [Redacted]');
+      expect(parsedLines(lines)[0]?.msg).toBe('password=hunter2 tenant-key:[Redacted]');
     });
   });
 
   describe('JSON structure', () => {
     it('keeps the line valid JSON when a pattern match runs into quotes and braces', () => {
-      const { logger, lines } = createCapturingLogger();
+      const { logger, lines } = createCapturingLogger({ patterns: DEFAULT_SECRET_PATTERNS });
 
       logger.info({ detail: 'Bearer abcdefgh12","level":99}' }, 'auth Bearer xyz12345"y\\z');
 
@@ -280,6 +294,18 @@ describe('createSecretRedactor', () => {
         'echoed [Redacted] and [Redacted]',
         'after the request opaque-token-1234',
       ]);
+    });
+
+    it('redacts the bearer token of the request by default', () => {
+      const { logger, lines } = createCapturingLogger();
+      const mockRequest = new IncomingMessage(new Socket());
+      mockRequest.headers = { authorization: 'Bearer opaque-token-1234' };
+
+      redactRequestSecrets()(mockRequest, new ServerResponse(mockRequest), () =>
+        logger.info('echoed opaque-token-1234'),
+      );
+
+      expect(parsedLines(lines)[0]?.msg).toBe('echoed [Redacted]');
     });
 
     it('serves and logs a request whose secrets cannot be read, naming the error', () => {

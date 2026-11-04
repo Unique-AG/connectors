@@ -3,6 +3,7 @@ import pinoHttp from 'pino-http';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   createSecretRedactor,
+  DEFAULT_SECRET_PATTERNS,
   runWithLogSecrets,
   type SecretRedactionOptions,
 } from './redact-secrets';
@@ -109,7 +110,10 @@ describe('createSecretRedactor resilience', () => {
         const knownSecrets = Array.from({ length: 3 }, () =>
           randomString(random, SECRET_ALPHABET, 8 + Math.floor(random() * 8)),
         );
-        const { logger, lines } = createCapturingLogger({ secrets: knownSecrets });
+        const { logger, lines } = createCapturingLogger({
+          secrets: knownSecrets,
+          patterns: DEFAULT_SECRET_PATTERNS,
+        });
         const contextSecrets = Array.from({ length: 2 }, () =>
           randomString(random, SECRET_ALPHABET, 8 + Math.floor(random() * 8)),
         );
@@ -261,6 +265,28 @@ describe('createSecretRedactor resilience', () => {
       expect(line.req_id).toBe('trace_01h455vb4pex5vsknk084sn02q');
     });
 
+    it('still applies the patterns that do not fail to the message', () => {
+      const { logger, lines } = createCapturingLogger({
+        patterns: [explodingPattern('matching exploded'), ...DEFAULT_SECRET_PATTERNS],
+      });
+
+      logger.info('login with password=hunter2 failed');
+
+      expect(JSON.parse(lines[0] ?? '').original_msg).toBe('login with password=[Redacted] failed');
+    });
+
+    it('replaces a known secret found where the logger context is read from', () => {
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: [explodingPattern('matching exploded')],
+      });
+
+      logger.info({ upstream: { context: mockSecret } }, 'syncing');
+
+      expect(lines[0]).not.toContain(mockSecret);
+      expect(JSON.parse(lines[0] ?? '').context).toBe('[Redacted]');
+    });
+
     it('keeps the logger context of the original line', () => {
       const { logger, lines } = createCapturingLogger({
         secrets: [mockSecret],
@@ -335,10 +361,7 @@ describe('createSecretRedactor resilience', () => {
       ['an empty secret group', /tenant(?<secret>)/dg, 'tenant value xyz'],
       ['an optional match', /z*/dg, 'tenant value xy[Redacted]'],
     ])('does not throw or loop on %s', (_name, pattern, expected) => {
-      const { logger, lines } = createCapturingLogger({
-        patterns: [pattern],
-        defaultPatterns: false,
-      });
+      const { logger, lines } = createCapturingLogger({ patterns: [pattern] });
 
       logger.info('tenant value xyz');
 
@@ -371,8 +394,10 @@ describe('createSecretRedactor resilience', () => {
       'Bearer authorization header missing',
       'Basic configuration loaded.',
       'Bearer Authentication expired',
+      'Failed to refresh token: invalid_grant',
+      'secret: rotated',
     ])('leaves ordinary text alone: %j', (message) => {
-      const { logger, lines } = createCapturingLogger();
+      const { logger, lines } = createCapturingLogger({ patterns: DEFAULT_SECRET_PATTERNS });
 
       logger.info(message);
 
@@ -388,7 +413,10 @@ describe('createSecretRedactor resilience', () => {
       ['userinfo', `x://${'y:'.repeat(500_000)}`],
       ['schemes', 'a://b:'.repeat(170_000)],
     ])('redacts a 1 MB %s value within a second', (_name, value) => {
-      const { logger, lines } = createCapturingLogger({ secrets: [mockSecret] });
+      const { logger, lines } = createCapturingLogger({
+        secrets: [mockSecret],
+        patterns: DEFAULT_SECRET_PATTERNS,
+      });
       const started = performance.now();
 
       logger.info(`${value} ${mockSecret}`);
@@ -401,7 +429,10 @@ describe('createSecretRedactor resilience', () => {
       ['escaped quotes', `"${'\\"'.repeat(500_000)}`],
       ['escaped quotes and a dangling backslash', `"${'\\"'.repeat(500_000)}\\`],
     ])('redacts an unterminated 1 MB line of %s within a second', (_name, value) => {
-      const redact = createSecretRedactor({ secrets: [mockSecret] });
+      const redact = createSecretRedactor({
+        secrets: [mockSecret],
+        patterns: DEFAULT_SECRET_PATTERNS,
+      });
       const started = performance.now();
 
       const line = redact(`{"msg":${value} ${mockSecret}`);

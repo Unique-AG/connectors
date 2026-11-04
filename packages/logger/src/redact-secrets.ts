@@ -7,27 +7,37 @@ export const MIN_SECRET_LENGTH = 8;
 
 const REDACTED = '[Redacted]';
 
-// Exported one by one so a consumer that opts out of the defaults can pick its own. A `secret`
-// group narrows what is replaced, so `Bearer ` or `password=` stays readable.
+// A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
+// step with `packages/mcp-observability`.
 
 // The scheme in any case. The credential needs a digit, an inner capital or a symbol, or 20
 // characters, so prose such as "Basic authentication failed" keeps its words.
-export const AUTHORIZATION_SCHEME_PATTERN =
+const AUTHORIZATION_SCHEME_PATTERN =
   /\b(?:[Bb][Ee][Aa][Rr][Ee][Rr]|[Bb][Aa][Ss][Ii][Cc])\s+(?<secret>(?=[A-Za-z0-9\-._~+/]+[0-9A-Z_~+/=]|[A-Za-z0-9\-._~+/]{20})[A-Za-z0-9\-._~+/]{8,}=*)/dg;
-export const JWT_PATTERN =
-  /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg;
-export const API_KEY_PATTERN = /\b(?:x-)?api[-_]?key\s*[=:]\s*(?<secret>[^\s&,;"']+)/dgi;
-export const CREDENTIAL_PARAMETER_PATTERN =
-  /\b(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd|secret|token)=(?<secret>[^\s&,;"']+)/dgi;
-export const URL_CREDENTIALS_PATTERN =
+const JWT_PATTERN = /(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/dg;
+// No letter or digit before the name, unlike `\b`, so `x_api_key=` and `csrf_token=` match too.
+// The divider is `=` or `:` as in a header, and the name and value may be quoted as in JSON, so an
+// upstream error body quoting `{"client_secret":"…"}` is caught.
+const API_KEY_PATTERN =
+  /(?<![A-Za-z0-9])(?:x-)?api[-_]?key["']?\s*[=:]\s*["']?(?<secret>[^\s&,;"']+)/dgi;
+// A bare `token:` stays readable, as in "refresh token: invalid_grant". Only `=` or a quoted name
+// before the colon marks a credential.
+const CREDENTIAL_PARAMETER_PATTERN =
+  /(?<![A-Za-z0-9])(?:access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|password|passwd|secret|token)(?:\s*=\s*|["']\s*:\s*)["']?(?<secret>[^\s&,;"']+)/dgi;
+const URL_CREDENTIALS_PATTERN =
   /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^/\s:@]+:(?<secret>[^/\s@]+)@/dgi;
-export const PRIVATE_KEY_PATTERN =
+const PRIVATE_KEY_PATTERN =
   /-----BEGIN [A-Z ]*PRIVATE KEY-----(?:(?!-----BEGIN )[\s\S])*?-----END [A-Z ]*PRIVATE KEY-----/dg;
-export const SK_PREFIXED_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{20,}/dg;
-export const GITHUB_TOKEN_PATTERN = /\bgh[pousr]_[A-Za-z0-9]{36,}/dg;
-export const SLACK_TOKEN_PATTERN = /\bxox[abprs]-[A-Za-z0-9-]{10,}/dg;
-export const AWS_ACCESS_KEY_ID_PATTERN = /\bAKIA[0-9A-Z]{16}\b/dg;
+const SK_PREFIXED_KEY_PATTERN = /\bsk-[A-Za-z0-9_-]{20,}/dg;
+const GITHUB_TOKEN_PATTERN = /\bgh[pousr]_[A-Za-z0-9]{36,}/dg;
+const SLACK_TOKEN_PATTERN = /\bxox[abprs]-[A-Za-z0-9-]{10,}/dg;
+const AWS_ACCESS_KEY_ID_PATTERN = /\bAKIA[0-9A-Z]{16}\b/dg;
 
+/**
+ * Secret-shaped text: authorization credentials, JWTs, `key=value` credentials, URL userinfo, PEM
+ * private keys, and `sk-`, GitHub, Slack and AWS keys. Off unless passed as `patterns`, since they
+ * can also replace text that is not a secret.
+ */
 export const DEFAULT_SECRET_PATTERNS: readonly RegExp[] = [
   AUTHORIZATION_SCHEME_PATTERN,
   JWT_PATTERN,
@@ -63,12 +73,10 @@ export interface SecretRedactionOptions {
   /** Known secret values, such as API keys from env. Values under `MIN_SECRET_LENGTH` are skipped. */
   secrets?: readonly string[];
   /**
-   * Added to `DEFAULT_SECRET_PATTERNS`. Each needs the `g` and `d` flags. A `secret` named group
-   * narrows what is replaced.
+   * Secret-shaped text to replace, such as `DEFAULT_SECRET_PATTERNS`. Each needs the `g` and `d`
+   * flags. A `secret` named group narrows what is replaced.
    */
   patterns?: readonly RegExp[];
-  /** `false` drops `DEFAULT_SECRET_PATTERNS`, leaving only `patterns`, which can pick from them. */
-  defaultPatterns?: boolean;
 }
 
 /**
@@ -81,25 +89,22 @@ export interface SecretRedactionOptions {
 export function createSecretRedactor({
   secrets = [],
   patterns = [],
-  defaultPatterns = true,
 }: SecretRedactionOptions = {}): (line: string) => string {
   const knownSecrets = secretVariants(secrets);
   patterns.forEach(assertPatternFlags);
   // Copies, so a `lastIndex` left on the caller's regex never shifts where matching starts. Each
   // keeps the class of its original, and with it any matching that class overrides.
-  const allPatterns = [...(defaultPatterns ? DEFAULT_SECRET_PATTERNS : []), ...patterns].map(
-    (pattern) => {
-      const copy = new RegExp(pattern);
-      Object.setPrototypeOf(copy, Object.getPrototypeOf(pattern));
-      return copy;
-    },
-  );
+  const ownPatterns = patterns.map((pattern) => {
+    const copy = new RegExp(pattern);
+    Object.setPrototypeOf(copy, Object.getPrototypeOf(pattern));
+    return copy;
+  });
 
   const secretsIn = (scope: LogScope | undefined): readonly string[] => {
     const scoped = scopeSecrets(scope);
     return scoped.length === 0 ? knownSecrets : longestFirst([...knownSecrets, ...scoped]);
   };
-  const replacePatterns = (text: string): string => allPatterns.reduce(redactPattern, text);
+  const replacePatterns = (text: string): string => ownPatterns.reduce(redactPattern, text);
 
   const redactLine = (line: string, secrets: readonly string[]): string =>
     replaceJsonStrings(line, (token, literal, keyColon) => {
@@ -115,16 +120,19 @@ export function createSecretRedactor({
       return redacted === text ? token : JSON.stringify(redacted);
     });
 
-  // What can still be shown of a message when redacting its line failed. Replacing the secrets
-  // cannot fail, the patterns are what may have.
-  const salvage = (text: string, scope: LogScope | undefined): string => {
-    const withoutSecrets = replaceSecrets(text, secretsIn(scope));
-    try {
-      return replacePatterns(withoutSecrets);
-    } catch {
-      return withoutSecrets;
-    }
-  };
+  // What can still be shown of a text when redacting its line failed. Replacing the secrets
+  // cannot fail. A pattern may have, so each that does is skipped and the rest still apply.
+  const salvage = (text: string, scope: LogScope | undefined): string =>
+    ownPatterns.reduce(
+      (redacted, pattern) => {
+        try {
+          return redactPattern(redacted, pattern);
+        } catch {
+          return redacted;
+        }
+      },
+      replaceSecrets(text, secretsIn(scope)),
+    );
 
   // The hook runs inside the log call, so a throw would fail the caller's request, and writing
   // the line as it is could leak the secret.
@@ -166,14 +174,20 @@ export function addLogSecrets(secrets: readonly string[]): void {
   }
 }
 
+/** The token of a request's `Authorization: Bearer` header, the default for `redactRequestSecrets`. */
+export function bearerToken(request: IncomingMessage): string[] {
+  const [scheme, token] = (request.headers.authorization ?? '').split(' ');
+  return scheme?.toLowerCase() === 'bearer' && token ? [token] : [];
+}
+
 /**
- * Middleware that redacts what `secretsOf` returns for a request, such as its bearer token or API
- * key, from every line logged while the request is handled. An MCP tool call arrives as a request,
- * so this covers tool calls too. When `secretsOf` throws, the request still runs and every line it
+ * Middleware that redacts what `secretsOf` returns for a request, its bearer token unless given,
+ * from every line logged while the request is handled. An MCP tool call arrives as a request, so
+ * this covers tool calls too. When `secretsOf` throws, the request still runs and every line it
  * logs names the error in `log_secrets_failed`.
  */
 export function redactRequestSecrets<Request extends IncomingMessage>(
-  secretsOf: (request: Request) => readonly string[],
+  secretsOf: (request: Request) => readonly string[] = bearerToken,
 ): (request: Request, response: ServerResponse, next: () => void) => void {
   return (request, _response, next) =>
     logScope.run(
@@ -230,7 +244,7 @@ function redactionFailedLine(
   try {
     return `${JSON.stringify({
       ...failed,
-      ...originalFields(line),
+      ...originalFields(line, salvage),
       ...originalMsg(line, salvage),
       logged_from: callerFrames(hook),
       err: errorFields(error),
@@ -252,12 +266,18 @@ const ORIGINAL_FIELDS: ReadonlyArray<readonly [string, RegExp]> = [
   ['req_id', /"req":\{"id":(\d+|"[0-9a-f]{32}"|"[a-z_]+_[0-9a-z]{26}")/],
 ];
 
-// Read from the raw line, which may be what broke, and only in formats that cannot hold a secret.
-function originalFields(line: string): Record<string, unknown> {
+// Read from the raw line, which may be what broke, in formats narrow enough to hold no logged text.
+// The first match can still be a nested logged value, such as a secret under a `context` key, so
+// each string is salvaged like the message.
+function originalFields(line: string, salvage: (text: string) => string): Record<string, unknown> {
   return Object.fromEntries(
     ORIGINAL_FIELDS.flatMap(([name, pattern]) => {
-      const value = pattern.exec(line)?.[1];
-      return value === undefined ? [] : [[name, JSON.parse(value)]];
+      const literal = pattern.exec(line)?.[1];
+      if (literal === undefined) {
+        return [];
+      }
+      const value: unknown = JSON.parse(literal);
+      return [[name, typeof value === 'string' ? salvage(value) : value]];
     }),
   );
 }
@@ -372,7 +392,7 @@ function decodeJsonString(literal: string): string | undefined {
   }
 }
 
-// Each secret as written and URL-encoded, as a query string carries it.
+// Each secret as written and in each way a URL or form body encodes it.
 function secretVariants(secrets: readonly string[]): string[] {
   return longestFirst(
     secrets
@@ -382,13 +402,38 @@ function secretVariants(secrets: readonly string[]): string[] {
   );
 }
 
+// The characters each encoder leaves as they are besides letters and digits, and how it writes a
+// space. Kept in step with `packages/mcp-observability`.
+const URL_ENCODINGS: ReadonlyArray<readonly [safe: string, space: string]> = [
+  // `encodeURIComponent`
+  ["-_.!~*'()", '%20'],
+  // RFC 3986, as Python's `quote(safe="")`
+  ['-_.~', '%20'],
+  // Python's `quote_plus`
+  ['-_.~', '+'],
+  // `URLSearchParams` and HTML forms
+  ['-_.*', '+'],
+];
+
 // `encodeURIComponent` throws on a lone surrogate, which no URL can carry anyway.
 function urlEncoded(secret: string): string[] {
   try {
-    return [encodeURIComponent(secret)];
+    encodeURIComponent(secret);
   } catch {
     return [];
   }
+  const bytes = new TextEncoder().encode(secret);
+  return URL_ENCODINGS.map(([safe, space]) => percentEncoded(bytes, safe, space));
+}
+
+function percentEncoded(bytes: Uint8Array, safe: string, space: string): string {
+  return Array.from(bytes, (byte) => {
+    const char = String.fromCharCode(byte);
+    if (/^[A-Za-z0-9]$/.test(char) || safe.includes(char)) {
+      return char;
+    }
+    return byte === 0x20 ? space : `%${byte.toString(16).toUpperCase().padStart(2, '0')}`;
+  }).join('');
 }
 
 function replaceSecrets(text: string, secrets: readonly string[]): string {

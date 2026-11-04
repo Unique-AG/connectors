@@ -24,6 +24,25 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
     holds. At most ten are listed, and `failed_field_count` gives the total, since one broken
     field fails once per record. `ERROR_DETAILS_POLICY=disclose` keeps the message and full stack at
     ERROR.
+  - `redaction=SecretRedaction(secrets=(...), patterns=(...))` replaces each secret, such as an
+    API key from the settings, with `[Redacted]` in every JSON string of the line: the message,
+    the error's message and stack, and nested `extra`. Secrets shorter than 8 characters are
+    skipped. Each is also matched as `encodeURIComponent`, `quote`, `quote_plus` and
+    `URLSearchParams` encode it. `patterns` replace secret-shaped text. Pass
+    `DEFAULT_SECRET_PATTERNS` for Bearer/Basic credentials, JWTs, `password=` and other
+    `key=value` or quoted JSON credentials, URL userinfo, PEM private keys, and `sk-`, GitHub,
+    Slack and AWS keys. They are off by default, since they can also replace text that is not a
+    secret. A pattern's `secret` group narrows what is replaced.
+  - `RedactRequestSecretsMiddleware` (ASGI, the request's bearer token unless `secrets_of` is
+    given) and `RedactToolCallSecretsMiddleware` (FastMCP, the caller's access token unless given,
+    listed before `ToolCallObservabilityMiddleware`) redact a request's secrets while it is
+    handled. `with log_secrets(...)` does it for a block. `add_log_secrets(...)` adds a secret
+    read partway through, such as a user's token loaded from the database, to the innermost of
+    these scopes until it ends.
+  - Logging never fails on redaction. A line that cannot be redacted is replaced by one that says
+    so, keeping its level, logger, code location, trace ids and the message with its secrets
+    replaced. Secrets that cannot be read name the error in `log_secrets_failed` on every line of
+    their scope.
 - `configure_identifiable_values(settings, secret=...)` and `identifiable_value(value)`: a login,
   email or search term logged as `hmac-sha256:<hex>` keyed with `secret`, as plain `sha256:<hex>`
   at DEBUG, or as itself with `LOGS_DIAGNOSTICS_DATA_POLICY=disclose`. Derive `secret` from a key

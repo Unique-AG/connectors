@@ -17,7 +17,9 @@ from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan
 from opentelemetry.trace import SpanContext
 
+from mcp_observability import DEFAULT_SECRET_PATTERNS
 from mcp_observability import PinoJsonFormatter
+from mcp_observability import SecretRedaction
 from mcp_observability import add_log_secrets
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
@@ -71,7 +73,7 @@ def test_random_lines_never_raise_stay_valid_json_and_never_leak(seed: int) -> N
     known = [_random_string(rng, _SECRET_ALPHABET, rng.randint(8, 15)) for _ in range(3)]
     in_context = [_random_string(rng, _SECRET_ALPHABET, rng.randint(8, 15)) for _ in range(2)]
     every_secret = [*known, *in_context]
-    redactor = SecretRedactor(known)
+    redactor = SecretRedactor(known, DEFAULT_SECRET_PATTERNS)
 
     def with_secrets() -> str:
         text = _random_string(rng, _TEXT_ALPHABET, rng.randint(0, 20))
@@ -135,13 +137,17 @@ class _ExplodingPattern:
         raise RuntimeError(self._message)
 
 
-def _configure_exploding(message: str, *, times: int = 1_000) -> None:
-    exploding = cast(object, _ExplodingPattern(message, times=times))
+def _configure_exploding(
+    message: str, *, times: int = 1_000, patterns: tuple[re.Pattern[str], ...] = ()
+) -> None:
+    exploding = cast("re.Pattern[str]", cast(object, _ExplodingPattern(message, times=times)))
     configure_logging(
         LoggingSettings(),
         own_loggers=("tests",),
-        secrets=(_SECRET,),
-        secret_patterns=(cast("re.Pattern[str]", exploding),),
+        # Unvalidated, since the exploding pattern only acts like one.
+        redaction=SecretRedaction.model_construct(
+            secrets=(_SECRET,), patterns=(exploding, *patterns)
+        ),
     )
 
 
@@ -175,6 +181,17 @@ def test_a_redaction_failure_keeps_the_message_with_its_secrets_replaced(
 
     (failed,) = _written(capsys)
     assert failed["original_msg"] == "leaking [Redacted] and [Redacted]"
+
+
+def test_a_redaction_failure_keeps_the_patterns_that_do_not_fail_on_the_message(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _configure_exploding("matching exploded", patterns=DEFAULT_SECRET_PATTERNS)
+
+    _log.info("login with password=hunter2 failed")
+
+    (failed,) = _written(capsys)
+    assert failed["original_msg"] == "login with password=[Redacted] failed"
 
 
 def test_a_redaction_failure_points_at_the_log_call_and_its_trace(
@@ -255,7 +272,7 @@ def test_a_formatting_failure_writes_a_line_instead_of_printing_the_record(
     configure_logging(
         LoggingSettings(error_details_policy=ErrorDetailsPolicy.DISCLOSE),
         own_loggers=("tests",),
-        secrets=(_SECRET,),
+        redaction=SecretRedaction(secrets=(_SECRET,)),
     )
     # pytest's own capturing handler formats the record too, and raises where ours does not.
     root = logging.getLogger()
@@ -305,7 +322,7 @@ def test_a_megabyte_value_shaped_to_backtrack_is_redacted_within_a_second(value:
     line = json.dumps({"msg": f"{value} {_SECRET}"})
     started = time.perf_counter()
 
-    redacted = SecretRedactor((_SECRET,)).redact_line(line)
+    redacted = SecretRedactor((_SECRET,), DEFAULT_SECRET_PATTERNS).redact_line(line)
 
     assert time.perf_counter() - started < 1
     assert _SECRET not in redacted
@@ -319,7 +336,9 @@ def test_a_megabyte_value_shaped_to_backtrack_is_redacted_within_a_second(value:
 def test_an_unterminated_megabyte_line_is_redacted_within_a_second(value: str) -> None:
     started = time.perf_counter()
 
-    redacted = SecretRedactor((_SECRET,)).redact_line(f'{{"msg": {value} {_SECRET}')
+    redacted = SecretRedactor((_SECRET,), DEFAULT_SECRET_PATTERNS).redact_line(
+        f'{{"msg": {value} {_SECRET}'
+    )
 
     assert time.perf_counter() - started < 1
     assert _SECRET not in redacted
@@ -361,12 +380,14 @@ def test_a_secret_with_unusual_characters_is_redacted(secret: str) -> None:
         "Bearer authorization header missing",
         "Basic configuration loaded.",
         "Bearer Authentication expired",
+        "Failed to refresh token: invalid_grant",
+        "secret: rotated",
     ],
 )
 def test_ordinary_text_is_left_alone(message: str) -> None:
     line = json.dumps({"msg": message})
 
-    assert SecretRedactor().redact_line(line) == line
+    assert SecretRedactor(patterns=DEFAULT_SECRET_PATTERNS).redact_line(line) == line
 
 
 async def test_concurrent_contexts_stay_apart() -> None:
