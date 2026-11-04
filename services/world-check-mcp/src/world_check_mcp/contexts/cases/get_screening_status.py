@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases.get_case import get_case
 from world_check_mcp.contexts.cases.models import ProviderSummary
 from world_check_mcp.contexts.cases.models import ScreeningStatus
@@ -5,6 +7,7 @@ from world_check_mcp.upstream import GET_SCREENING_STATUS
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("case",))
 async def get_screening_status(*, upstream: Upstream, case: str) -> ScreeningStatus:
     """WATCHLIST and Passport Check progress, without screening the case again."""
     resolved = await get_case(upstream=upstream, case=case)

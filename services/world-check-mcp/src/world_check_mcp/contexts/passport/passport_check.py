@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Passport
 from world_check_mcp.contexts.passport.models import PassportCheck
@@ -16,6 +18,13 @@ from world_check_mcp.upstream import SAVE_AND_SCREEN
 from world_check_mcp.upstream import Upstream
 
 
+@traced(
+    arguments=("group_id", "include_watchlist", "limit"),
+    result=lambda r: {
+        "passport_matches": len(r.passport_matches),
+        "watchlist_matches": len(r.watchlist_matches),
+    },
+)
 async def passport_check(
     *,
     upstream: Upstream,

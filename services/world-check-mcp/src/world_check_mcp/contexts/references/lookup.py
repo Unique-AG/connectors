@@ -1,5 +1,7 @@
 from typing import Literal
 
+from mcp_observability import traced
+
 from world_check_mcp.contexts.references.models import Profile
 from world_check_mcp.contexts.references.models import ProviderSummary
 from world_check_mcp.contexts.references.models import ReferenceData
@@ -25,12 +27,14 @@ from world_check_mcp.upstream import Upstream
 ReferenceKind = Literal["countries", "nationalities", "providers", "search_filters", "api_info"]
 
 
+@traced(arguments=("reference_id",))
 async def get_profile(*, upstream: Upstream, reference_id: str) -> Profile:
     """The World-Check record for a match referenceId, not a resultId."""
     record = await upstream.call(GET_RECORD, GetRecordRequest(path=GetRecordPath(id=reference_id)))
     return _profile(record=record)
 
 
+@traced(arguments=("kind",))
 async def get_reference_data(*, upstream: Upstream, kind: ReferenceKind) -> ReferenceData:
     """Countries, nationalities, providers, search filters, or the API version."""
     if kind == "countries":

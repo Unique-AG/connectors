@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases.errors import CaseNotFoundError
 from world_check_mcp.contexts.cases.models import CaseReferenceDetails
 from world_check_mcp.upstream import GET_CASE_REFERENCE
@@ -7,6 +9,7 @@ from world_check_mcp.upstream import Upstream
 from world_check_mcp.upstream import UpstreamError
 
 
+@traced(arguments=("case_id",))
 async def get_case_reference(*, upstream: Upstream, case_id: str) -> CaseReferenceDetails:
     """The internal caseSystemId for an external caseId."""
     try:

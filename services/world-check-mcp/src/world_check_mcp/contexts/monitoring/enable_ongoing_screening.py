@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.monitoring.models import OngoingScreening
 from world_check_mcp.upstream import CaseBulkOngoingScreeningRequestInput
@@ -7,6 +9,7 @@ from world_check_mcp.upstream import ToggleOngoingScreeningByProviderTypesReques
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("case",), result=lambda r: {"enabled": r.enabled})
 async def enable_ongoing_screening(*, upstream: Upstream, case: str) -> OngoingScreening:
     """Turn on WATCHLIST monitoring. An HTTP 200 body lists the cases LSEG did not update."""
     found = await get_case(upstream=upstream, case=case)

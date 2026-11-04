@@ -1,5 +1,7 @@
 from datetime import date
 
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases import CaseNotFoundError
 from world_check_mcp.contexts.cases import get_case_reference
 from world_check_mcp.contexts.screening.errors import ScreeningError
@@ -21,6 +23,10 @@ from world_check_mcp.upstream import SAVE_AND_SCREEN
 from world_check_mcp.upstream import Upstream
 
 
+@traced(
+    arguments=("entity_type", "group_id", "limit"),
+    result=lambda r: {"matches_returned": r.matches_returned},
+)
 async def screen_entity(
     *,
     upstream: Upstream,

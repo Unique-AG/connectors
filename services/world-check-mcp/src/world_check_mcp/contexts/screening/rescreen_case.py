@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.screening.errors import ScreeningError
 from world_check_mcp.contexts.screening.models import ScreeningOutcome
@@ -8,6 +10,9 @@ from world_check_mcp.upstream import Upstream
 _ALLOWED = frozenset({"WATCHLIST", "PASSPORT_CHECK"})
 
 
+@traced(
+    arguments=("case", "delta", "limit"), result=lambda r: {"matches_returned": r.matches_returned}
+)
 async def rescreen_case(
     *, upstream: Upstream, case: str, delta: bool = False, limit: int = 20
 ) -> ScreeningOutcome:

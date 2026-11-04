@@ -3,6 +3,8 @@ from datetime import timedelta
 from datetime import UTC
 import json
 
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.monitoring.errors import MonitoringError
 from world_check_mcp.contexts.monitoring.models import OgsPage
@@ -22,6 +24,10 @@ from world_check_mcp.upstream import WatchlistResults
 _EMPTY = "NO_OGS_CASE_UPDATES_FOUND_WITHIN_DATE_RANGE"
 
 
+@traced(
+    arguments=("group_id", "case", "mode", "limit", "page_reference"),
+    result=lambda r: {"updates": len(r.updates)},
+)
 async def get_ogs_updates(
     *,
     upstream: Upstream,

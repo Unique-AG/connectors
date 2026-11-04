@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases.get_case import get_case
 from world_check_mcp.contexts.cases.models import AuditEvent
 from world_check_mcp.contexts.cases.models import AuditPage
@@ -11,6 +13,7 @@ from world_check_mcp.upstream import SortCriterionInput
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("case", "limit", "page_reference"), result=lambda r: {"events": len(r.events)})
 async def get_case_audit_events(
     *,
     upstream: Upstream,

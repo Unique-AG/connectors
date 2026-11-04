@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.attribution import AttributionError
 from world_check_mcp.contexts.attribution import reviewer_note
 from world_check_mcp.contexts.cases import get_case
@@ -18,6 +20,7 @@ from world_check_mcp.upstream import StatusResolutionField
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("request.case_system_id", "request.result_id", "request.status", "request.risk"))
 async def prepare_resolution(
     *,
     upstream: Upstream,
@@ -84,6 +87,10 @@ async def prepare_resolution(
     )
 
 
+@traced(
+    arguments=("request.case_system_id", "request.result_id", "request.status", "request.risk"),
+    result=lambda r: {"resolved": r.resolved},
+)
 async def apply_resolution(
     *,
     upstream: Upstream,

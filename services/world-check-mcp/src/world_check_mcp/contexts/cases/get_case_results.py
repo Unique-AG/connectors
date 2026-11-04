@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases.get_case import get_case
 from world_check_mcp.contexts.cases.models import CaseResults
 from world_check_mcp.contexts.cases.models import Match
@@ -10,6 +12,7 @@ from world_check_mcp.upstream import ResultsFilterRequestInput
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("case", "limit", "page_reference"), result=lambda r: {"matches": len(r.matches)})
 async def get_case_results(
     *,
     upstream: Upstream,

@@ -1,5 +1,7 @@
 import json
 
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases.models import CasePage
 from world_check_mcp.contexts.cases.models import CaseSummary
 from world_check_mcp.contexts.cases.models import SearchMode
@@ -12,6 +14,10 @@ from world_check_mcp.upstream import SortCriterionInput
 from world_check_mcp.upstream import Upstream
 
 
+@traced(
+    arguments=("group_id", "search_mode", "limit", "page_reference"),
+    result=lambda r: {"cases": len(r.cases)},
+)
 async def search_cases(
     *,
     upstream: Upstream,

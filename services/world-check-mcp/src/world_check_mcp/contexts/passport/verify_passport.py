@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.attribution import AttributionError
 from world_check_mcp.contexts.attribution import reviewer_note
 from world_check_mcp.contexts.cases import get_case
@@ -18,6 +20,7 @@ _GUIDANCE = (
 )
 
 
+@traced(arguments=("request.case_system_id", "request.mrz_matched"))
 async def prepare_passport_verification(
     *,
     upstream: Upstream,
@@ -60,6 +63,10 @@ async def prepare_passport_verification(
     )
 
 
+@traced(
+    arguments=("request.case_system_id", "request.mrz_matched"),
+    result=lambda r: {"recorded": r.recorded},
+)
 async def apply_passport_verification(
     *,
     upstream: Upstream,

@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.cases.errors import CaseNotFoundError
 from world_check_mcp.contexts.cases.get_case_reference import get_case_reference
 from world_check_mcp.contexts.cases.models import CaseDetails
@@ -7,6 +9,7 @@ from world_check_mcp.upstream import Upstream
 from world_check_mcp.upstream import UpstreamError
 
 
+@traced(arguments=("case",), result=lambda d: {"entity_type": d.entity_type})
 async def get_case(*, upstream: Upstream, case: str) -> CaseDetails:
     """Case details for an internal caseSystemId, or an external caseId when that misses."""
     try:

@@ -1,5 +1,7 @@
 from datetime import date
 
+from mcp_observability import traced
+
 from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Mrz
 from world_check_mcp.contexts.passport.models import Passport
@@ -9,6 +11,7 @@ from world_check_mcp.upstream import GetNationalitiesRequest
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("passport.document_type",))
 async def generate_passport_mrz(*, upstream: Upstream, passport: Passport) -> Mrz:
     """MRZ lines for a document. This does not create a case or record a verification."""
     if passport.date_of_birth > date.today():

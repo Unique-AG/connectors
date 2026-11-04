@@ -1,3 +1,5 @@
+from mcp_observability import traced
+
 from world_check_mcp.contexts.groups.models import GroupSettings
 from world_check_mcp.contexts.groups.models import ResolutionOption
 from world_check_mcp.contexts.groups.models import ResolutionToolkit
@@ -19,6 +21,7 @@ from world_check_mcp.upstream import StatusResolutionField
 from world_check_mcp.upstream import Upstream
 
 
+@traced(arguments=("group_id",))
 async def get_group_settings(*, upstream: Upstream, group_id: str) -> GroupSettings:
     """The group's template and the resolution choices its matches accept."""
     group = await upstream.call(
