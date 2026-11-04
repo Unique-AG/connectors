@@ -1,7 +1,8 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@unique-ag/mcp-server-module', () => ({
+vi.mock('@unique-ag/mcp-server-module', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@unique-ag/mcp-server-module')>()),
   Tool: () => (_target: any, _key: string, _descriptor: PropertyDescriptor) => _descriptor,
   createMeta: () => ({}),
 }));

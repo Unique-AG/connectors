@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 import { Implementation, ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
-import { CanActivate, ModuleMetadata, Type } from '@nestjs/common';
+import { CanActivate, InjectionToken, ModuleMetadata, Type } from '@nestjs/common';
+import { HttpRequest } from './http-adapter.interface';
 
 export enum McpTransportType {
   SSE = 'sse',
@@ -9,10 +10,14 @@ export enum McpTransportType {
 }
 
 export interface McpRateLimitOptions {
-  /** Maximum number of tool calls per window per user. Set to 0 to disable. Default: 60 */
-  toolCallsPerWindow?: number;
-  /** Window duration in milliseconds. Default: 60000 */
-  windowMs?: number;
+  /**
+   * Injection token of the server's `McpRateLimitConfig`, such as the `KEY` of
+   * `registerConfig('mcpRateLimit', mcpRateLimitConfigSchema)`. It must be provided globally, as a
+   * `ConfigModule` with `isGlobal: true` provides it.
+   */
+  config: InjectionToken;
+  /** The key a tool call is counted under, such as the id of the signed-in user. */
+  getRequestKey: (request: HttpRequest) => string;
 }
 
 export interface McpOptions {

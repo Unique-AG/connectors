@@ -3,7 +3,7 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: Fork of @rekog-labs/MCP-Nest */
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common';
-import { DiscoveryModule } from '@nestjs/core';
+import { DiscoveryModule, ModuleRef } from '@nestjs/core';
 import type {
   McpAsyncOptions,
   McpModuleAsyncOptions,
@@ -15,7 +15,7 @@ import { McpExecutorService } from './services/mcp-executor.service';
 import { McpRegistryService } from './services/mcp-registry.service';
 import { McpSseService } from './services/mcp-sse.service';
 import { McpStreamableHttpService } from './services/mcp-streamable-http.service';
-import { RateLimiterService } from './services/rate-limiter.service';
+import { MCP_RATE_LIMIT_CONFIG, RateLimiterService } from './services/rate-limiter.service';
 import { SsePingService } from './services/sse-ping.service';
 import { createSseController } from './transport/sse.controller.factory';
 import { StdioService } from './transport/stdio.service';
@@ -90,6 +90,12 @@ export class McpModule {
       },
       McpRegistryService,
       McpExecutorService,
+      {
+        provide: MCP_RATE_LIMIT_CONFIG,
+        useFactory: (resolved: McpOptions, moduleRef: ModuleRef) =>
+          resolved.rateLimit ? moduleRef.get(resolved.rateLimit.config, { strict: false }) : null,
+        inject: ['MCP_OPTIONS', ModuleRef],
+      },
       RateLimiterService,
       SsePingService,
       McpSseService,
@@ -228,6 +234,9 @@ export class McpModule {
       },
       McpRegistryService,
       McpExecutorService,
+      options.rateLimit
+        ? { provide: MCP_RATE_LIMIT_CONFIG, useExisting: options.rateLimit.config }
+        : { provide: MCP_RATE_LIMIT_CONFIG, useValue: null },
       RateLimiterService,
       SsePingService,
       McpSseService,

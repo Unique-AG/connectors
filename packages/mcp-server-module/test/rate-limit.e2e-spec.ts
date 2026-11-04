@@ -1,24 +1,19 @@
-import type { CanActivate, ExecutionContext, INestApplication } from '@nestjs/common';
+import type { DynamicModule, INestApplication } from '@nestjs/common';
 import { Injectable } from '@nestjs/common';
-import { Test, type TestingModule } from '@nestjs/testing';
+import { Test } from '@nestjs/testing';
 import { OpenTelemetryModule } from 'nestjs-otel';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import * as z from 'zod';
-import { McpModule, Tool } from '../src';
+import {
+  type HttpRequest,
+  McpModule,
+  type McpRateLimitConfig,
+  type McpRateLimitOptions,
+  mcpRateLimitConfigSchema,
+  Tool,
+} from '../src';
 
-@Injectable()
-class UserIdGuard implements CanActivate {
-  public canActivate(context: ExecutionContext): boolean {
-    const req = context
-      .switchToHttp()
-      .getRequest<{ headers: Record<string, string>; user?: { userProfileId: string } }>();
-    const userId = req.headers['x-test-user-id'];
-    if (userId) {
-      req.user = { userProfileId: userId };
-    }
-    return true;
-  }
-}
+const RATE_LIMIT_CONFIG = 'TEST_RATE_LIMIT_CONFIG';
 
 @Injectable()
 class EchoTool {
@@ -32,101 +27,146 @@ class EchoTool {
   }
 }
 
-async function postMcp(
+const keyFromHeader = (request: HttpRequest) => String(request.headers['x-test-key']);
+
+// Registered globally, as a service's ConfigModule registers its configs.
+function globalRateLimitConfig(config: McpRateLimitConfig): DynamicModule {
+  return {
+    module: class RateLimitConfigModule {},
+    global: true,
+    providers: [{ provide: RATE_LIMIT_CONFIG, useValue: config }],
+    exports: [RATE_LIMIT_CONFIG],
+  };
+}
+
+async function startApp(
+  rateLimit: McpRateLimitOptions | undefined,
+  config: McpRateLimitConfig = { toolCallsPerWindow: 2, windowSeconds: 60 },
+): Promise<{ app: INestApplication; url: URL }> {
+  const module = await Test.createTestingModule({
+    imports: [
+      OpenTelemetryModule.forRoot(),
+      globalRateLimitConfig(config),
+      McpModule.forRoot({
+        name: 'rate-limit-test',
+        version: '1.0.0',
+        rateLimit,
+        streamableHttp: { enableJsonResponse: true, statelessMode: true },
+      }),
+    ],
+    providers: [EchoTool],
+  }).compile();
+
+  const app = module.createNestApplication();
+  await app.listen(0);
+  const address = app.getHttpServer().address() as { port: number };
+  return { app, url: new URL(`http://localhost:${address.port}/mcp`) };
+}
+
+async function callEcho(
   url: URL,
-  userId: string,
-  message: object,
-): Promise<{ status: number; body: Record<string, unknown> }> {
+  key: string | undefined,
+  id: number,
+): Promise<{ error?: { message: string }; result?: { content: Array<{ text: string }> } }> {
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       accept: 'application/json, text/event-stream',
       'mcp-protocol-version': '2025-06-18',
-      'x-test-user-id': userId,
+      ...(key === undefined ? {} : { 'x-test-key': key }),
     },
-    body: JSON.stringify(message),
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id,
+      method: 'tools/call',
+      params: { name: 'echo', arguments: { msg: `call ${id}` } },
+    }),
   });
-  const text = await res.text();
-  const body = text.startsWith('data:')
-    ? (JSON.parse(
-        text
-          .slice(text.indexOf('\n') + 1)
-          .split('data:')[1]
-          .trim(),
-      ) as Record<string, unknown>)
-    : (JSON.parse(text) as Record<string, unknown>);
-  return { status: res.status, body };
+  return (await res.json()) as {
+    error?: { message: string };
+    result?: { content: Array<{ text: string }> };
+  };
 }
 
-function callEcho(url: URL, userId: string, id: number, msg: string) {
-  return postMcp(url, userId, {
-    jsonrpc: '2.0',
-    id,
-    method: 'tools/call',
-    params: { name: 'echo', arguments: { msg } },
-  });
+async function callTimes(url: URL, key: string | undefined, times: number) {
+  const responses = [];
+  for (let id = 1; id <= times; id++) {
+    responses.push(await callEcho(url, key, id));
+  }
+  return responses;
 }
 
-describe('per-user rate limiting', () => {
-  let app: INestApplication;
-  let url: URL;
-
-  beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
-      imports: [
-        OpenTelemetryModule.forRoot(),
-        McpModule.forRoot({
-          name: 'rate-limit-test',
-          version: '1.0.0',
-          rateLimit: { toolCallsPerWindow: 2, windowMs: 60_000 },
-          guards: [UserIdGuard],
-          streamableHttp: { enableJsonResponse: true, statelessMode: true },
-        }),
-      ],
-      providers: [UserIdGuard, EchoTool],
-    }).compile();
-
-    app = module.createNestApplication();
-    await app.listen(0);
-    const address = app.getHttpServer().address() as { port: number };
-    url = new URL(`http://localhost:${address.port}/mcp`);
-  });
+describe('per-key rate limiting', () => {
+  const limitedByHeader = { config: RATE_LIMIT_CONFIG, getRequestKey: keyFromHeader };
+  let app: INestApplication | undefined;
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
+    app = undefined;
   });
 
-  it('allows calls within the limit', async () => {
-    const first = await callEcho(url, 'user-a', 1, 'hello');
-    const second = await callEcho(url, 'user-a', 2, 'world');
+  it('serves calls within the limit', async () => {
+    const started = await startApp(limitedByHeader);
+    app = started.app;
 
-    expect(first.status).toBe(200);
-    expect(second.status).toBe(200);
-    expect(first.body.error).toBeUndefined();
-    expect(second.body.error).toBeUndefined();
+    const responses = await callTimes(started.url, 'key-a', 2);
+
+    expect(responses.map((response) => response.error)).toEqual([undefined, undefined]);
   });
 
-  it('rejects the call that exceeds the per-user limit', async () => {
-    await callEcho(url, 'user-b', 1, 'a');
-    await callEcho(url, 'user-b', 2, 'b');
-    const limited = await callEcho(url, 'user-b', 3, 'c');
+  it('rejects the call that exceeds the limit of its key', async () => {
+    const started = await startApp(limitedByHeader);
+    app = started.app;
 
-    expect(limited.status).toBe(200);
-    const error = limited.body.error as { message: string } | undefined;
-    expect(error?.message).toContain('Rate limit exceeded');
+    const [, , third] = await callTimes(started.url, 'key-a', 3);
+
+    expect(third?.error?.message).toContain('Rate limit exceeded: 2 tool calls per 60 seconds');
   });
 
-  it('serves a different user while another is rate-limited', async () => {
-    await callEcho(url, 'user-c', 1, 'a');
-    await callEcho(url, 'user-c', 2, 'b');
-    await callEcho(url, 'user-c', 3, 'c'); // user-c now rate-limited
+  it('serves another key while one is limited', async () => {
+    const started = await startApp(limitedByHeader);
+    app = started.app;
+    await callTimes(started.url, 'key-a', 3);
 
-    const userDCall = await callEcho(url, 'user-d', 4, 'hello');
+    const other = await callEcho(started.url, 'key-b', 4);
 
-    expect(userDCall.status).toBe(200);
-    expect(userDCall.body.error).toBeUndefined();
-    const result = userDCall.body.result as { content: Array<{ text: string }> } | undefined;
-    expect(result?.content[0]?.text).toBe('"hello"');
+    expect(other.result?.content[0]?.text).toBe('"call 4"');
+  });
+
+  it.each([
+    ['no rate limit is configured', undefined, undefined, 'key-a'],
+    ['the limit is 0', limitedByHeader, { toolCallsPerWindow: 0, windowSeconds: 60 }, 'key-a'],
+  ] as const)('does not limit calls when %s', async (_case, rateLimit, config, key) => {
+    const started = await startApp(rateLimit, config);
+    app = started.app;
+
+    const responses = await callTimes(started.url, key, 3);
+
+    expect(responses.map((response) => response.error)).toEqual([undefined, undefined, undefined]);
+  });
+});
+
+describe('mcpRateLimitConfigSchema', () => {
+  it('defaults to 60 tool calls a minute', () => {
+    expect(mcpRateLimitConfigSchema.parse({})).toEqual({
+      toolCallsPerWindow: 60,
+      windowSeconds: 60,
+    });
+  });
+
+  it('reads the values from environment strings', () => {
+    expect(
+      mcpRateLimitConfigSchema.parse({ toolCallsPerWindow: '0', windowSeconds: '30' }),
+    ).toEqual({ toolCallsPerWindow: 0, windowSeconds: 30 });
+  });
+
+  it.each([
+    ['a negative limit', { toolCallsPerWindow: '-1' }],
+    ['a fractional limit', { toolCallsPerWindow: '1.5' }],
+    ['a limit that is not a number', { toolCallsPerWindow: 'sixty' }],
+    ['a zero window', { windowSeconds: '0' }],
+  ])('rejects %s', (_case, input) => {
+    expect(mcpRateLimitConfigSchema.safeParse(input).success).toBe(false);
   });
 });

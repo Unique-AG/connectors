@@ -118,9 +118,7 @@ export class McpToolsHandler extends McpHandlerBase {
       const callerId: string | undefined = (httpRequest.raw as any)?.user?.userProfileId;
       const startedAt = Date.now();
 
-      if (callerId !== undefined) {
-        this.rateLimiter.check(callerId);
-      }
+      this.rateLimiter.check(httpRequest);
 
       try {
         // Validate input parameters against the tool's schema
