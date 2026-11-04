@@ -27,6 +27,10 @@ All mcpConfig environment variables, shared by deployment and hook job container
 - name: MICROSOFT_SIGN_IN_TENANT_ID
   value: {{ .Values.mcpConfig.microsoft.signInTenantId | quote }}
 {{- end }}
+{{- with .Values.mcpConfig.microsoft.allowedTenantIds }}
+- name: MICROSOFT_ALLOWED_TENANT_IDS
+  value: {{ join "," . | quote }}
+{{- end }}
 {{- if .Values.mcpConfig.microsoft.publicWebhookUrl }}
 - name: MICROSOFT_PUBLIC_WEBHOOK_URL
   value: {{ .Values.mcpConfig.microsoft.publicWebhookUrl | quote }}
