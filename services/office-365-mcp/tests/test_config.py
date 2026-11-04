@@ -24,6 +24,7 @@ from office_365_mcp.config import (
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
 
 _TENANT_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
+_ANOTHER_TENANT_ID = "0f1e2d3c-4b5a-4697-8899-aabbccddeeff"
 _CLIENT_ID = "1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061"
 
 
@@ -185,6 +186,12 @@ class TestAsyncpgItselfAcceptsWhatWeProduce:
         assert not rewritten.server_settings
 
 
+def _set_a_multi_tenant_app(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENTRA_TENANT_ID", ORGANIZATIONS)
+    monkeypatch.setenv("ENTRA_CLIENT_ID", _CLIENT_ID)
+    monkeypatch.setenv("ENTRA_CLIENT_SECRET", "s3cr3t")
+
+
 class TestEntraConfig:
     def test_reads_the_app_registration_from_the_environment(
         self, monkeypatch: pytest.MonkeyPatch
@@ -199,6 +206,45 @@ class TestEntraConfig:
         assert config.tenant_id == _TENANT_ID
         assert config.client_id == _CLIENT_ID
         assert config.client_secret.get_secret_value() == "s3cr3t"
+        assert config.allowed_tenant_ids == frozenset()
+
+    @pytest.mark.parametrize(
+        ("written", "allowed"),
+        [
+            pytest.param("", frozenset[str](), id="empty"),
+            pytest.param(_TENANT_ID, frozenset({_TENANT_ID}), id="one"),
+            pytest.param(
+                f"{_TENANT_ID},{_ANOTHER_TENANT_ID}",
+                frozenset({_TENANT_ID, _ANOTHER_TENANT_ID}),
+                id="several",
+            ),
+            pytest.param(
+                f"  {_TENANT_ID} , {_ANOTHER_TENANT_ID}  ",
+                frozenset({_TENANT_ID, _ANOTHER_TENANT_ID}),
+                id="padded",
+            ),
+            pytest.param(_TENANT_ID.upper(), frozenset({_TENANT_ID}), id="upper-case"),
+            pytest.param(f"{{{_TENANT_ID}}}", frozenset({_TENANT_ID}), id="braced"),
+        ],
+    )
+    def test_an_operator_lists_the_allowed_tenants_separated_by_commas(
+        self, monkeypatch: pytest.MonkeyPatch, written: str, allowed: frozenset[str]
+    ) -> None:
+        _set_a_multi_tenant_app(monkeypatch)
+        monkeypatch.setenv("ENTRA_ALLOWED_TENANT_IDS", written)
+
+        config = EntraConfig()  # pyright: ignore[reportCallIssue]
+
+        assert config.allowed_tenant_ids == allowed
+
+    def test_an_entry_that_is_not_a_guid_stops_startup(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _set_a_multi_tenant_app(monkeypatch)
+        monkeypatch.setenv("ENTRA_ALLOWED_TENANT_IDS", f"{_TENANT_ID},contoso.onmicrosoft.com")
+
+        with pytest.raises(ValidationError, match="'contoso.onmicrosoft.com', which is not a"):
+            EntraConfig()  # pyright: ignore[reportCallIssue]
 
     def test_the_secret_is_not_in_the_repr(self) -> None:
         config = EntraConfig.model_validate(

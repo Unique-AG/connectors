@@ -3,6 +3,7 @@ from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, cast
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from uuid import UUID
 
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from pydantic import (
@@ -232,6 +233,16 @@ _PERSONAL_ACCOUNT_AUTHORITIES = frozenset({"common", "consumers"})
 _NAMED_AUTHORITIES = _PERSONAL_ACCOUNT_AUTHORITIES | {ORGANIZATIONS}
 
 
+def _tenant_guid(entry: str) -> str:
+    """Entra writes `tid` as a lowercase, dashed GUID, and the allowlist is compared exactly."""
+    try:
+        return str(UUID(entry))
+    except ValueError:
+        raise ValueError(
+            f"ENTRA_ALLOWED_TENANT_IDS lists {entry!r}, which is not a tenant GUID"
+        ) from None
+
+
 class EntraConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="ENTRA_", hide_input_in_errors=True
@@ -240,7 +251,7 @@ class EntraConfig(BaseSettings):
     tenant_id: str = Field(min_length=1)
     client_id: str = Field(min_length=1)
     client_secret: SecretStr = Field(min_length=1)
-    allowed_tenant_ids: frozenset[str] = Field(default_factory=frozenset)
+    allowed_tenant_ids: Annotated[frozenset[str], NoDecode] = Field(default_factory=frozenset)
 
     @field_validator("tenant_id", mode="before")
     @classmethod
@@ -251,10 +262,10 @@ class EntraConfig(BaseSettings):
 
     @field_validator("allowed_tenant_ids", mode="before")
     @classmethod
-    def _parse_allowed_tenant_ids(cls, value: object) -> object:
-        if isinstance(value, str):
-            return frozenset(t.strip() for t in value.split(",") if t.strip())
-        return value
+    def _split_the_tenants_an_operator_writes(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        return frozenset(_tenant_guid(entry) for entry in _split_comma_list(value))
 
     @model_validator(mode="after")
     def _reject_personal_account_authorities(self) -> Self:
