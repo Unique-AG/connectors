@@ -3,8 +3,6 @@ import uuid
 from collections.abc import Awaitable, Callable, Iterable
 
 from mcp_credential_auth import (
-    DEFAULT_ALLOWED_REDIRECT_HOSTS,
-    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     MAX_USERNAME_LENGTH,
     CredentialOAuthProvider,
     LoginCsrf,
@@ -95,8 +93,8 @@ class BackstopOAuthProvider(CredentialOAuthProvider):
         throttle: LoginThrottleConfig,
         resolve_system_user: ResolveSystemUser | None = None,
         login_path: str = "/backstop/login",
-        allowed_redirect_hosts: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_HOSTS,
-        allowed_redirect_schemes: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_SCHEMES,
+        allowed_redirect_hosts: Iterable[str],
+        allowed_redirect_schemes: Iterable[str],
     ) -> None:
         super().__init__(
             base_url=base_url,

@@ -8,11 +8,7 @@ from pathlib import Path
 from typing import Annotated, ClassVar, Literal, Self, TypedDict, cast
 from urllib.parse import urlparse
 
-from mcp_credential_auth import (
-    DEFAULT_ALLOWED_REDIRECT_HOSTS,
-    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
-    extend_redirect_allowlist,
-)
+from mcp_credential_auth import RedirectAllowlistSettings
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -549,7 +545,7 @@ class DatabaseConfig(BaseSettings):
         return self._connect_args
 
 
-class AuthConfig(BaseSettings):
+class AuthConfig(RedirectAllowlistSettings):
     """Retention and sweep cadence for the OAuth rows this service issues.
 
     See `auth/cleanup.py`: without a periodic sweep, `pending_authorizations`,
@@ -580,38 +576,6 @@ class AuthConfig(BaseSettings):
     # makes it a credential-testing oracle for anyone who can start an OAuth flow.
     login_max_attempts: int = Field(default=10, ge=1)
     login_attempt_window_minutes: int = Field(default=15, ge=1)
-
-    # Where a dynamically registered client may send the browser after login. An https redirect
-    # URI must be on one of these hosts, and a non-web one must use one of these schemes; loopback
-    # http on any port is always accepted. Setting either *replaces* its default. `extra` hosts
-    # are appended, including after a replacement. Comma-separated; `NoDecode` keeps
-    # pydantic-settings from JSON-decoding the CSV before the validator runs.
-    allowed_redirect_hosts: Annotated[tuple[str, ...], NoDecode] = Field(
-        default=DEFAULT_ALLOWED_REDIRECT_HOSTS
-    )
-    allowed_redirect_schemes: Annotated[tuple[str, ...], NoDecode] = Field(
-        default=DEFAULT_ALLOWED_REDIRECT_SCHEMES
-    )
-    extra_redirect_hosts: Annotated[tuple[str, ...], NoDecode] = Field(default=())
-
-    @field_validator(
-        "allowed_redirect_hosts",
-        "allowed_redirect_schemes",
-        "extra_redirect_hosts",
-        mode="before",
-    )
-    @classmethod
-    def _split_csv(cls, value: object) -> object:
-        if isinstance(value, str):
-            return tuple(part.strip() for part in value.split(",") if part.strip())
-        return value
-
-    @model_validator(mode="after")
-    def _append_extra_redirect_hosts(self) -> Self:
-        self.allowed_redirect_hosts = extend_redirect_allowlist(
-            self.allowed_redirect_hosts, self.extra_redirect_hosts
-        )
-        return self
 
     @property
     def token_retention(self) -> timedelta:

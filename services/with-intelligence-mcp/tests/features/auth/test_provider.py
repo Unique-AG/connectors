@@ -54,6 +54,8 @@ def _make_provider(
         # logins its neighbours happened to make.
         throttle=throttle
         or LoginThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
+        allowed_redirect_hosts=["claude.ai"],
+        allowed_redirect_schemes=[],
     )
     return provider
 

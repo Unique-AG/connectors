@@ -73,6 +73,8 @@ def _make_provider(
         throttle=throttle
         if throttle is not None
         else LoginThrottleConfig(max_attempts=1_000_000, window=timedelta(minutes=15)),
+        allowed_redirect_hosts=["claude.ai"],
+        allowed_redirect_schemes=[],
     )
 
 

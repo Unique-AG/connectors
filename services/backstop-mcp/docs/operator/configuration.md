@@ -45,9 +45,9 @@ The settings that differ per firm, and logging, have typed values under `mcpConf
 | `mcpConfig.employment.relationshipTypeMarkers` | `BACKSTOP_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | List |
 | `mcpConfig.employment.formerRelationshipTypeIds` | `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_IDS` | List |
 | `mcpConfig.employment.formerRelationshipTypeMarkers` | `BACKSTOP_FORMER_EMPLOYMENT_RELATIONSHIP_TYPE_MARKERS` | List |
-| `mcpConfig.auth.allowedRedirectHosts` | `AUTH_ALLOWED_REDIRECT_HOSTS` | List of hosts. Chart default: the app default. Replaces that default. See [Authentication: Which clients can connect](./authentication.md#Which-Clients-Can-Connect) |
-| `mcpConfig.auth.extraRedirectHosts` | `AUTH_EXTRA_REDIRECT_HOSTS` | Hosts appended to the allowlist, such as a single tenant's chat host. Empty adds nothing |
-| `mcpConfig.auth.allowedRedirectSchemes` | `AUTH_ALLOWED_REDIRECT_SCHEMES` | List of URI schemes. Chart default `[cursor]` |
+| `mcpConfig.auth.allowedRedirectHosts` | `AUTH_ALLOWED_REDIRECT_HOSTS` | List of hosts. Chart default `null`, the app default. A list is the whole allowlist. See [Authentication: Which clients can connect](./authentication.md#Which-Clients-Can-Connect) |
+| `mcpConfig.auth.extraRedirectHosts` | `AUTH_EXTRA_REDIRECT_HOSTS` | Hosts appended to the app default, such as a single tenant's chat host. Cannot be combined with `allowedRedirectHosts`. Empty adds nothing |
+| `mcpConfig.auth.allowedRedirectSchemes` | `AUTH_ALLOWED_REDIRECT_SCHEMES` | List of URI schemes. Chart default `null`, the app default `[cursor]` |
 | `mcpConfig.tenantGuidance` | `BACKSTOP_MCP_TENANT_GUIDANCE` | Object, rendered as JSON. See [Tenant guidance](#Tenant-Guidance) |
 | `mcpConfig.logging.level` | `LOG_LEVEL` | Level. Chart default `info` |
 | `mcpConfig.logging.libraryLevels` | `LIBRARY_LOG_LEVELS` | Map of logger name to level, rendered as JSON |
@@ -82,9 +82,8 @@ mcpConfig:
   empty value. The chart default `null` leaves the variable unset. This matters for the markers
   lists: `[]` replaces their defaults, `null` keeps them. See
   [Departed-contact detection](#Departed-Contact-Detection). The redirect allowlists work the same
-  way, except that the chart sets them to the app default rather than `null`, so the list is visible
-  in the values an overlay starts from. A host or scheme an overlay adds must repeat the defaults it
-  keeps.
+  way. To add a tenant's chat host, set `mcpConfig.auth.extraRedirectHosts` rather than copying the
+  default list into `allowedRedirectHosts`.
 - `mcpConfig.tenantGuidance` and every `mcpConfig.logging` value are rendered only when they are
   not empty, so an empty value keeps the app default.
 - `mcpConfig.enabled: false` renders none of these variables, tenant guidance and logging
@@ -298,7 +297,7 @@ Migrations (`alembic upgrade head`) read the same variables as the server.
 | `AUTH_UNUSED_CLIENT_RETENTION_HOURS` | `24` | How long a registered OAuth client that nothing references is kept |
 | `AUTH_CLEANUP_INTERVAL_HOURS` | `6` | How often the cleanup sweep runs |
 | `AUTH_ALLOWED_REDIRECT_HOSTS` | Hosted clients in [Which clients can connect](./authentication.md#Which-Clients-Can-Connect) | Hosts an `https` redirect URI may point at when a client registers. Exact match, comma-separated. Setting it replaces the default. In Helm, set `mcpConfig.auth.allowedRedirectHosts` |
-| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the allowlist. A single tenant sets its chat host here and keeps the default clients. Also appended when `AUTH_ALLOWED_REDIRECT_HOSTS` replaces the default. In Helm, set `mcpConfig.auth.extraRedirectHosts` |
+| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the default. A single tenant sets its chat host here and keeps the default clients. Setting it together with `AUTH_ALLOWED_REDIRECT_HOSTS` stops startup. In Helm, set `mcpConfig.auth.extraRedirectHosts` |
 | `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Schemes other than `http` and `https` a redirect URI may use, such as a desktop app's own scheme. `http`, `https`, `javascript`, `data`, `file`, `vbscript`, `blob` and `about` stop startup. In Helm, set `mcpConfig.auth.allowedRedirectSchemes` |
 
 Token lifetimes (15-minute access, 30-day refresh) are fixed in code. See

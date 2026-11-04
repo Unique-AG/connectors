@@ -1,8 +1,9 @@
 from collections.abc import Iterable
-from typing import ClassVar
+from typing import Annotated, ClassVar, Self
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic_settings import BaseSettings, NoDecode
 
 # Callback hosts of the hosted MCP clients we support. The Unique chat host is not here: it
 # differs per tenant. Sources are in services/backstop-mcp/docs/operator/authentication.md.
@@ -49,7 +50,7 @@ def _normalize_host(host: str) -> str:
     return host.strip().lower().removesuffix(".")
 
 
-def extend_redirect_allowlist(base: Iterable[str], extra: Iterable[str]) -> tuple[str, ...]:
+def _extend_allowlist(base: Iterable[str], extra: Iterable[str]) -> tuple[str, ...]:
     """Append `extra` to `base`. A repeated value is kept once, in the first spelling."""
     seen: dict[str, str] = {}
     for item in (*base, *extra):
@@ -58,6 +59,47 @@ def extend_redirect_allowlist(base: Iterable[str], extra: Iterable[str]) -> tupl
         if key and key not in seen:
             seen[key] = text
     return tuple(seen.values())
+
+
+class RedirectAllowlistSettings(BaseSettings):
+    """The redirect allowlist fields of a service's `AuthConfig`, read from its environment.
+
+    Left unset, `allowed_redirect_hosts` is the default plus `extra_redirect_hosts`, which is how a
+    single tenant adds its chat host. Set, it is the whole list, so setting both is refused.
+    Values are comma-separated; `NoDecode` keeps pydantic-settings from JSON-decoding them.
+    """
+
+    allowed_redirect_hosts: Annotated[tuple[str, ...], NoDecode] = DEFAULT_ALLOWED_REDIRECT_HOSTS
+    allowed_redirect_schemes: Annotated[tuple[str, ...], NoDecode] = (
+        DEFAULT_ALLOWED_REDIRECT_SCHEMES
+    )
+    extra_redirect_hosts: Annotated[tuple[str, ...], NoDecode] = ()
+
+    @field_validator(
+        "allowed_redirect_hosts",
+        "allowed_redirect_schemes",
+        "extra_redirect_hosts",
+        mode="before",
+    )
+    @classmethod
+    def _split_csv(cls, value: object) -> object:
+        if isinstance(value, str):
+            return tuple(part.strip() for part in value.split(",") if part.strip())
+        return value
+
+    @model_validator(mode="after")
+    def _append_extra_redirect_hosts(self) -> Self:
+        if not self.extra_redirect_hosts:
+            return self
+        if "allowed_redirect_hosts" in self.model_fields_set:
+            raise ValueError(
+                "allowed_redirect_hosts is the whole allowlist once set; "
+                + "list the extra_redirect_hosts in it instead"
+            )
+        self.allowed_redirect_hosts = _extend_allowlist(
+            DEFAULT_ALLOWED_REDIRECT_HOSTS, self.extra_redirect_hosts
+        )
+        return self
 
 
 class RedirectTarget(BaseModel):

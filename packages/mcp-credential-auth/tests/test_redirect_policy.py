@@ -1,10 +1,15 @@
+from typing import ClassVar
+
 import pytest
+from pydantic import ValidationError
+from pydantic_settings import SettingsConfigDict
 
 from mcp_credential_auth.redirect_policy import (
+    DEFAULT_ALLOWED_REDIRECT_HOSTS,
+    RedirectAllowlistSettings,
     RedirectTarget,
     RedirectUriPolicy,
     describe_redirect_target,
-    extend_redirect_allowlist,
 )
 
 _POLICY = RedirectUriPolicy()
@@ -110,11 +115,62 @@ def test_rejects_fragments(redirect_uri: str) -> None:
     assert _POLICY.rejection_reason(redirect_uri) == "has a fragment"
 
 
-def test_extra_entries_extend_an_allowlist_without_duplicates() -> None:
-    assert extend_redirect_allowlist(
-        ["claude.ai", "chatgpt.com"],
-        [" chat.customer.example ", "Claude.ai.", "chat.customer.example"],
-    ) == ("claude.ai", "chatgpt.com", "chat.customer.example")
+class _AuthSettings(RedirectAllowlistSettings):
+    model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")
+
+
+@pytest.fixture
+def clean_redirect_env(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
+    for name in (
+        "AUTH_ALLOWED_REDIRECT_HOSTS",
+        "AUTH_ALLOWED_REDIRECT_SCHEMES",
+        "AUTH_EXTRA_REDIRECT_HOSTS",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    return monkeypatch
+
+
+@pytest.mark.usefixtures("clean_redirect_env")
+def test_settings_default_to_the_supported_clients() -> None:
+    settings = _AuthSettings()
+
+    assert settings.allowed_redirect_hosts == DEFAULT_ALLOWED_REDIRECT_HOSTS
+    assert settings.allowed_redirect_schemes == ("cursor",)
+
+
+def test_settings_lists_replace_the_defaults(clean_redirect_env: pytest.MonkeyPatch) -> None:
+    clean_redirect_env.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "claude.ai, mcp.example.com")
+    clean_redirect_env.setenv("AUTH_ALLOWED_REDIRECT_SCHEMES", "")
+
+    settings = _AuthSettings()
+
+    assert settings.allowed_redirect_hosts == ("claude.ai", "mcp.example.com")
+    assert settings.allowed_redirect_schemes == ()
+
+
+def test_settings_append_extra_hosts_to_the_default_once(
+    clean_redirect_env: pytest.MonkeyPatch,
+) -> None:
+    clean_redirect_env.setenv(
+        "AUTH_EXTRA_REDIRECT_HOSTS", " chat.customer.example ,Claude.ai.,chat.customer.example"
+    )
+
+    settings = _AuthSettings()
+
+    assert settings.allowed_redirect_hosts == (
+        *DEFAULT_ALLOWED_REDIRECT_HOSTS,
+        "chat.customer.example",
+    )
+
+
+def test_settings_refuse_extra_hosts_next_to_a_full_list(
+    clean_redirect_env: pytest.MonkeyPatch,
+) -> None:
+    clean_redirect_env.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "only.example")
+    clean_redirect_env.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "chat.customer.example")
+
+    with pytest.raises(ValidationError, match="allowed_redirect_hosts is the whole allowlist"):
+        _ = _AuthSettings()
 
 
 def test_custom_allowlist_replaces_the_default() -> None:

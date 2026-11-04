@@ -102,27 +102,25 @@ Unique chat and admin are not in the default. They register
 `<chat-host>` is the Unique app, not this server: unique prod is `next.unique.app`, qa is
 `next.qa.unique.app`, uat01 is `uat1.unique.app`. A single tenant's own host is added the same
 way. Set `AUTH_EXTRA_REDIRECT_HOSTS` to that host. It is appended to the default.
-`AUTH_ALLOWED_REDIRECT_HOSTS` replaces the whole list; extra hosts are still appended.
+`AUTH_ALLOWED_REDIRECT_HOSTS`, when set, is the whole list, and the server refuses to start if
+`AUTH_EXTRA_REDIRECT_HOSTS` is set next to it.
 
 | Variable | Default | Why |
 |---|---|---|
-| `AUTH_ALLOWED_REDIRECT_HOSTS` | The hosts below | Hosted MCP clients. Setting it replaces the default. Sources are in backstop-mcp `docs/operator/authentication.md` |
-| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the list, such as a single tenant's chat host |
+| `AUTH_ALLOWED_REDIRECT_HOSTS` | Hosted MCP clients | Setting it replaces the default with exactly this list |
+| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the default, such as a single tenant's chat host |
 | `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Cursor registers `cursor://anysphere.cursor-mcp/oauth/callback` |
 
-Default hosts: `claude.ai`, `claude.com`, `chatgpt.com`, `cursor.com`, `www.cursor.com`,
-`vscode.dev`, `insiders.vscode.dev`, `grok.com`, `www.perplexity.ai`, `enterprise.perplexity.ai`,
-`app.dust.tt`, `dust.tt`, `eu.dust.tt`, `console.mistral.ai`, `api.devin.ai`, `teams.microsoft.com`,
-`global.consent.azure-apim.net`, `replit.com`, `lovable.app`, `lovable.dev`, `api.v0.dev`,
-`app.langdock.com`, `cloud.arcade.dev`, `oauth.n8n.cloud`.
+The default hosts, with the client each one belongs to and its source, are listed in backstop-mcp's
+[authentication doc](../backstop-mcp/docs/operator/authentication.md#Default-hosts). Both servers
+share the list through `mcp-credential-auth`.
 
 Loopback already covers Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Cursor, Windsurf, Zed
 and MCP Inspector. Mistral Le Chat, Glean and self-hosted clients (Open WebUI, LibreChat, n8n on
 the customer's own domain) have no shared host; add the host the registration log rejects.
 
-The host and scheme lists are comma-separated and set under `env` in the Helm chart. Setting
-`AUTH_ALLOWED_REDIRECT_HOSTS` or `AUTH_ALLOWED_REDIRECT_SCHEMES` replaces that default.
-`AUTH_EXTRA_REDIRECT_HOSTS` is appended. A client registered before the check keeps only the
+The host and scheme lists are comma-separated. The Helm chart leaves them unset, so the default
+applies; set them under `env` only to change it. A client registered before the check keeps only the
 redirect URIs the lists still accept.
 
 ## Migrations
