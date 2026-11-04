@@ -34,7 +34,7 @@ For a few hours after the switch is turned on, Graph can still return 403 on som
 **What to do (Teams / Global admin):**
 
 1. Teams admin center → **Meetings → Meeting settings** → under **Transcript API access**, set **Microsoft Graph access → On**
-2. Optionally enable **Include speaker attribution** (Unique expects attributed VTT)
+2. Optionally enable **Include speaker attribution** for speaker names
 3. Or via PowerShell:
    ```powershell
    Set-CsTeamsMeetingConfiguration -Identity Global -EnableGraphTranscriptAccess $true
@@ -42,7 +42,7 @@ For a few hours after the switch is turned on, Graph can still return 403 on som
    ```
 4. Wait for the switch to apply. It can take a few hours, and some requests still return 403 during that time. Then have the user call `start_kb_integration` again and confirm with `verify_kb_integration_status` → `active`
 
-**See also:** [Teams Graph transcript API access](./operator.md#Teams-Graph-transcript-API-access) · [Meeting transcript API access (Microsoft)](https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access)
+**See also:** [Teams Graph transcript API access](./operator.md#teams-graph-transcript-api-access) · [Meeting transcript API access (Microsoft)](https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access)
 
 ### Why do I need a Zitadel service account?
 
