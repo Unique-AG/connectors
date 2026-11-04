@@ -17,6 +17,10 @@ on:
         description: "With a pull request number: rebuild it from main, and drop the commits of a person or the agent"
         type: boolean
         default: false
+      comment:
+        description: "With a pull request number: the id of the comment that asked for this run, to show the result on it"
+        type: string
+        default: ""
 
 permissions:
   contents: read # to read the repository
@@ -331,19 +335,30 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
-      pull-requests: write # to remove the rebuild note and to comment on a failure
+      pull-requests: write # to write the result on the pull request and on the comment that asked for the run
     steps:
-      - name: Remove the rebuild note
+      - name: Show the result
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           NUMBER: ${{ inputs.pr }}
+          COMMENT_ID: ${{ inputs.comment }}
           FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          gh pr view "$NUMBER" --json body --jq .body \
-            | perl -0pe 's/<!-- deps-rebuilding -->.*?<!-- \/deps-rebuilding -->\r?\n(\r?\n)?//s' \
-            | gh pr edit "$NUMBER" --body-file -
+          result=rocket
           if [ "$FAILED" = true ]; then
-            gh pr comment "$NUMBER" --body "The rebuild failed. Read the log of the run: $RUN_URL"
+            result=confused
           fi
+          if [ -n "$COMMENT_ID" ]; then
+            reactions="repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions"
+            gh api "$reactions" --jq '.[] | select(.user.login == "github-actions[bot]") | .id' \
+              | while read -r id; do gh api -X DELETE "$reactions/$id"; done
+            gh api "$reactions" -f content="$result" > /dev/null
+          fi
+          body=$(gh pr view "$NUMBER" --json body --jq .body \
+            | perl -0pe 's/<!-- deps-status -->.*?<!-- \/deps-status -->\r?\n(\r?\n)?//s')
+          if [ "$FAILED" = true ]; then
+            body=$(printf '<!-- deps-status -->\n> [!WARNING]\n> The last rebuild failed. Read the log of the run: %s\n<!-- /deps-status -->\n\n%s' "$RUN_URL" "$body")
+          fi
+          printf '%s\n' "$body" | gh pr edit "$NUMBER" --body-file -
