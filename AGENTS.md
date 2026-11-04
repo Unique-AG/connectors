@@ -2,7 +2,7 @@
 
 ## PR titles
 
-Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. The pattern is `scope = last path segment` (e.g. `packages/logger` → `logger`), with one exception: `pnpm-lock.yaml` and root `package.json` require scope `deps`.
+Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. The pattern is `scope = last path segment` (e.g. `packages/logger` → `logger`), with one exception: `pnpm-lock.yaml`, `pnpm-workspace.yaml` and root `package.json` require scope `deps`.
 
 ## Environment
 - Python services (any `services/*/pyproject.toml`) are driven by `uv`, not pnpm/turbo, and their

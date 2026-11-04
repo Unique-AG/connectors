@@ -1,4 +1,5 @@
 import assert from 'node:assert';
+import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import { commitScope } from './scope.mjs';
 
@@ -11,8 +12,13 @@ kb-mcp = services/kb-mcp/**
 mcp-configs = packages/mcp-configs/**
 ci = .github/**, pnpm-workspace.yaml
 main = *, .*
-deps = package.json, pnpm-lock.yaml
+deps = package.json, pnpm-lock.yaml, pnpm-workspace.yaml
 `;
+
+const repositoryGitcommitizen = readFileSync(
+  new URL('../../../.gitcommitizen', import.meta.url),
+  'utf8',
+);
 
 describe('commitScope', () => {
   it('returns deps when every file belongs to deps', () => {
@@ -29,9 +35,23 @@ describe('commitScope', () => {
     assert.strictEqual(commitScope(files, gitcommitizen), 'main');
   });
 
-  it('returns main when a lock file comes with a file of another scope', () => {
+  it('returns deps when a catalog change comes with the lock file', () => {
     assert.strictEqual(
       commitScope(['pnpm-lock.yaml', 'pnpm-workspace.yaml'], gitcommitizen),
+      'deps',
+    );
+  });
+
+  it('returns deps for a catalog change in the .gitcommitizen of the repository', () => {
+    assert.strictEqual(
+      commitScope(['pnpm-lock.yaml', 'pnpm-workspace.yaml'], repositoryGitcommitizen),
+      'deps',
+    );
+  });
+
+  it('returns main when a lock file comes with a file of another scope', () => {
+    assert.strictEqual(
+      commitScope(['pnpm-lock.yaml', '.github/workflows/ci.yaml'], gitcommitizen),
       'main',
     );
   });
