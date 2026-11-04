@@ -10,6 +10,7 @@ from unique_mcp.meta.context_requirements import ContextRequirements
 from unique_mcp.meta.keys import MetaKeys
 from unique_mcp.meta.part import merge_tool_meta
 import unique_sdk
+from unique_sdk.api_resources._llm_models import LLMModels
 from unique_sdk.api_resources._mcp import McpServersResponse
 
 from space_config_mcp import contexts
@@ -31,6 +32,27 @@ _META_COMPANY = merge_tool_meta(
     {},
     ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]),
 )
+
+
+@tool(
+    title="List Language Models",
+    meta=_META_COMPANY,
+    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
+)
+async def list_language_models(
+    *,
+    upstream: Upstream = Depends(get_upstream),
+    caller: tuple[str, str] = Depends(get_caller),
+) -> LLMModels.LLMModelsResponse:
+    """List all language model IDs available to the company.
+
+    Use this before calling update_space or update_conduct_config to get the exact
+    model identifier strings accepted by language_model and switchable_language_models.
+    """
+    user_id, company_id = caller
+    return await contexts.list_language_models(
+        upstream=upstream, user_id=user_id, company_id=company_id
+    )
 
 
 @tool(
