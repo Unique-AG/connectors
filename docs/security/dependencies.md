@@ -135,6 +135,8 @@ flowchart TD
 
 The nightly job keeps a PR that has a commit from a person or the agent. It lists that PR under "Skipped". The job also keeps a PR when its ecosystem is in "Needs a person". A blocked folder or a failed lookup can hide candidates, so the job does not close on that evidence. The ecosystems `actions` and `docker` have such an item at the moment, so only `/recreate` closes their PRs. A one-PR run closes nothing for another PR.
 
+The job closes only a PR that carries its hidden marker, so a branch `deps/*` of a person stays open. The job also compares the head commit of the PR with the head commit of the plan before it closes the PR. If a commit came after the plan, the job keeps the PR.
+
 Only the event "Label added" starts a run. The nightly job opens a new PR with the label `dependencies`. A rebuilt or updated PR keeps its label and starts no new run. To start a run again, remove the label and add it again. A PR with a commit keeps it, because a rebuild from `main` deletes the fixes of the agent. The label `ai-assisted` does not change this.
 
 ## Ask for a rebase or a rebuild
