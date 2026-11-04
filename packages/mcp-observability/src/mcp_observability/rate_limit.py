@@ -2,7 +2,6 @@
 
 import asyncio
 import time
-from collections import defaultdict
 from collections.abc import Callable
 from typing import override
 
@@ -34,13 +33,15 @@ class RateLimitMiddleware(Middleware):
     _settings: RateLimitSettings
     _get_request_key: RequestKey
     _buckets: dict[str, list[float]]
+    _swept_at: float
     _lock: asyncio.Lock
 
     def __init__(self, settings: RateLimitSettings, *, get_request_key: RequestKey) -> None:
         super().__init__()
         self._settings = settings
         self._get_request_key = get_request_key
-        self._buckets = defaultdict(list)
+        self._buckets = {}
+        self._swept_at = time.monotonic()
         self._lock = asyncio.Lock()
 
     @override
@@ -57,7 +58,10 @@ class RateLimitMiddleware(Middleware):
         window = self._settings.window_seconds
         now = time.monotonic()
         async with self._lock:
-            recent = [t for t in self._buckets[key] if t > now - window]
+            if now - self._swept_at >= window:
+                self._buckets = {k: ts for k, ts in self._buckets.items() if ts[-1] > now - window}
+                self._swept_at = now
+            recent = [t for t in self._buckets.get(key, []) if t > now - window]
             if len(recent) >= limit:
                 raise ToolError(
                     f"Rate limit exceeded: {limit} tool calls per {int(window)} seconds"

@@ -12,6 +12,7 @@ import {
   mcpRateLimitConfigSchema,
   Tool,
 } from '../src';
+import { MCP_RATE_LIMITER, type RateLimiterService } from '../src/services/rate-limiter.service';
 
 const RATE_LIMIT_CONFIG = 'TEST_RATE_LIMIT_CONFIG';
 
@@ -28,13 +29,14 @@ class EchoTool {
 }
 
 const keyFromHeader = (request: HttpRequest) => String(request.headers['x-test-key']);
+const limitedByHeader = { config: RATE_LIMIT_CONFIG, getRequestKey: keyFromHeader };
 
-// Registered globally, as a service's ConfigModule registers its configs.
+// Global and built by a factory, as a service's ConfigModule registers its configs.
 function globalRateLimitConfig(config: McpRateLimitConfig): DynamicModule {
   return {
     module: class RateLimitConfigModule {},
     global: true,
-    providers: [{ provide: RATE_LIMIT_CONFIG, useValue: config }],
+    providers: [{ provide: RATE_LIMIT_CONFIG, useFactory: () => config }],
     exports: [RATE_LIMIT_CONFIG],
   };
 }
@@ -98,7 +100,6 @@ async function callTimes(url: URL, key: string, times: number) {
 }
 
 describe('per-key rate limiting', () => {
-  const limitedByHeader = { config: RATE_LIMIT_CONFIG, getRequestKey: keyFromHeader };
   let app: INestApplication | undefined;
 
   afterEach(async () => {
@@ -141,6 +142,34 @@ describe('per-key rate limiting', () => {
     const responses = await callTimes(started.url, 'key-a', 3);
 
     expect(responses.map((response) => response.error)).toEqual([undefined, undefined, undefined]);
+  });
+});
+
+describe('per-key rate limiting with forRootAsync', () => {
+  it('limits calls with the config the server registers', async () => {
+    const module = await Test.createTestingModule({
+      imports: [
+        OpenTelemetryModule.forRoot(),
+        McpModule.forRootAsync({
+          useFactory: async () => ({
+            name: 'rate-limit-async-test',
+            version: '1.0.0',
+            rateLimit: limitedByHeader,
+          }),
+        }),
+        // After McpModule, so the limiter cannot rely on import order to find the config built.
+        globalRateLimitConfig({ toolCallsPerWindow: 1, windowSeconds: 60 }),
+      ],
+    }).compile();
+    const rateLimiter = module.get<RateLimiterService>(MCP_RATE_LIMITER, { strict: false });
+    const request: HttpRequest = { headers: { 'x-test-key': 'key-a' }, query: {} };
+
+    rateLimiter.check(request);
+
+    expect(() => rateLimiter.check(request)).toThrow(
+      'Rate limit exceeded: 1 tool calls per 60 seconds',
+    );
+    await module.close();
   });
 });
 

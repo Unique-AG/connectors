@@ -1,11 +1,6 @@
 import * as z from 'zod';
 
-/**
- * How many tool calls one key may make within a sliding window. Register it under the
- * `mcpRateLimit` namespace to read `MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW` and
- * `MCP_RATE_LIMIT_WINDOW_SECONDS`. The count is held in each process, so with several replicas a
- * key can make that many calls on each of them.
- */
+/** Tool-call limit per key. The count is held in each process. */
 export const mcpRateLimitConfigSchema = z.object({
   toolCallsPerWindow: z.coerce
     .number()
