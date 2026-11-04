@@ -336,29 +336,33 @@ jobs:
     timeout-minutes: 5
     permissions:
       pull-requests: write # to write the result on the pull request and on the comment that asked for the run
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ inputs.pr }}
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
-      - name: Show the result
+      - name: Update the note in the pull request description
         env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          NUMBER: ${{ inputs.pr }}
-          COMMENT_ID: ${{ inputs.comment }}
-          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          result=rocket
-          if [ "$FAILED" = true ]; then
-            result=confused
-          fi
-          if [ -n "$COMMENT_ID" ]; then
-            reactions="repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions"
-            gh api "$reactions" --jq '.[] | select(.user.login == "github-actions[bot]") | .id' \
-              | while read -r id; do gh api -X DELETE "$reactions/$id"; done
-            gh api "$reactions" -f content="$result" > /dev/null
-          fi
           body=$(gh pr view "$NUMBER" --json body --jq .body \
             | perl -0pe 's/<!-- deps-status -->.*?<!-- \/deps-status -->\r?\n(\r?\n)?//s')
           if [ "$FAILED" = true ]; then
             body=$(printf '<!-- deps-status -->\n> [!WARNING]\n> The last rebuild failed. Read the log of the run: %s\n<!-- /deps-status -->\n\n%s' "$RUN_URL" "$body")
           fi
           printf '%s\n' "$body" | gh pr edit "$NUMBER" --body-file -
+
+      - name: Show the result on the comment
+        if: ${{ always() && inputs.comment != '' }}
+        env:
+          COMMENT_ID: ${{ inputs.comment }}
+        run: |
+          result=rocket
+          if [ "$FAILED" = true ]; then
+            result=confused
+          fi
+          reactions="repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions"
+          gh api "$reactions" --jq '.[] | select(.user.login == "github-actions[bot]") | .id' \
+            | while read -r id; do gh api -X DELETE "$reactions/$id"; done
+          gh api "$reactions" -f content="$result" > /dev/null
