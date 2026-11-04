@@ -9,13 +9,12 @@ import { syncMetricViews } from '~/features/metrics/sync-metric-views';
 import * as packageJson from '../package.json';
 import { AppModule } from './app.module';
 import { type AppConfig, appConfig } from './config';
-import { bearerToken } from './utils/log-secrets';
 
 async function bootstrap() {
   const bufferLogs = process.env.LOGS_BUFFERING !== 'disabled';
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs });
   // Registered before `listen` adds the module middleware, pino-http's included, so it wraps them.
-  app.use(redactRequestSecrets(bearerToken));
+  app.use(redactRequestSecrets());
 
   app.enableShutdownHooks();
   app.set('trust proxy', 1);

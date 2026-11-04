@@ -1,5 +1,7 @@
-import { IncomingMessage } from 'node:http';
-import { Socket } from 'node:net';
+import assert from 'node:assert';
+import { addLogSecrets, createLoggerOptions } from '@unique-ag/logger';
+import { RABBIT_HANDLER, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import type {
   AMQPConfig,
@@ -10,7 +12,7 @@ import type {
   UniqueConfig,
 } from '~/config';
 import { Redacted } from '~/utils/redacted';
-import { bearerToken, deploymentSecrets } from '../log-secrets';
+import { deploymentSecrets, LogSecretsScope } from '../log-secrets';
 
 const mockEncryptionKey = Buffer.alloc(32, 7);
 
@@ -28,25 +30,16 @@ const mockConfigs = {
   unique: { serviceAuthMode: 'cluster_local' } as UniqueConfig,
 };
 
-function requestWith(authorization: string | undefined): IncomingMessage {
-  const request = new IncomingMessage(new Socket());
-  if (authorization !== undefined) {
-    request.headers.authorization = authorization;
-  }
-  return request;
-}
-
 describe('deploymentSecrets', () => {
-  it('lists the configured secrets, the encryption key in both its encodings', () => {
+  it('lists the configured secrets, the encryption key in each of its encodings', () => {
     expect(deploymentSecrets(mockConfigs)).toEqual([
       'hmac-secret-value',
       'microsoft-client-secret',
       'w'.repeat(128),
       mockEncryptionKey.toString('hex'),
+      mockEncryptionKey.toString('hex').toUpperCase(),
       mockEncryptionKey.toString('base64'),
-      'db%2Fpassword-1',
       'db/password-1',
-      'amqp-password-1',
       'amqp-password-1',
     ]);
   });
@@ -61,16 +54,49 @@ describe('deploymentSecrets', () => {
   });
 });
 
-describe('bearerToken', () => {
-  it('returns the token of a bearer authorization header', () => {
-    expect(bearerToken(requestWith('Bearer mcp-access-token'))).toEqual(['mcp-access-token']);
+describe('LogSecretsScope', () => {
+  const mockToken = 'graph-refresh-token-1234';
+
+  function createCapturingLogger() {
+    const pinoHttpOptions = createLoggerOptions().pinoHttp;
+    assert.ok(
+      typeof pinoHttpOptions === 'object' && pinoHttpOptions !== null && 'hooks' in pinoHttpOptions,
+      'Expected pinoHttp options with hooks',
+    );
+    const lines: string[] = [];
+    const logger = pino({ hooks: pinoHttpOptions.hooks }, { write: (line) => lines.push(line) });
+    return { logger, lines };
+  }
+
+  it('redacts a token the handler adds from what it logs, and only while it runs', async () => {
+    const { logger, lines } = createCapturingLogger();
+    class SyncListener {
+      @LogSecretsScope()
+      public async onSync(): Promise<string> {
+        addLogSecrets([mockToken]);
+        logger.error(`Graph rejected ${mockToken}`);
+        return 'done';
+      }
+    }
+
+    await expect(new SyncListener().onSync()).resolves.toBe('done');
+    logger.error(`after ${mockToken}`);
+
+    expect(lines.map((line) => JSON.parse(line).msg)).toEqual([
+      'Graph rejected [Redacted]',
+      `after ${mockToken}`,
+    ]);
   });
 
-  it.each([
-    ['no authorization header', undefined],
-    ['another scheme', 'Basic dXNlcjpwYXNz'],
-    ['a scheme without a token', 'Bearer'],
-  ])('returns nothing for %s', (_case, authorization) => {
-    expect(bearerToken(requestWith(authorization))).toEqual([]);
+  it('keeps the RabbitSubscribe metadata of the handler it wraps', () => {
+    class SyncListener {
+      @RabbitSubscribe({ exchange: 'main', routingKey: 'sync', queue: 'sync' })
+      @LogSecretsScope()
+      public async onSync(): Promise<void> {}
+    }
+
+    expect(Reflect.getMetadata(RABBIT_HANDLER, SyncListener.prototype.onSync)).toMatchObject({
+      queue: 'sync',
+    });
   });
 });
