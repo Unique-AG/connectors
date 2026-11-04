@@ -10,6 +10,7 @@ from unique_mcp.meta.context_requirements import ContextRequirements
 from unique_mcp.meta.keys import MetaKeys
 from unique_mcp.meta.part import merge_tool_meta
 import unique_sdk
+from unique_sdk.api_resources._mcp import McpServersResponse
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
@@ -26,6 +27,32 @@ _META = merge_tool_meta(
     {},
     ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID, MetaKeys.ASSISTANT_ID]),
 )
+_META_COMPANY = merge_tool_meta(
+    {},
+    ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]),
+)
+
+
+@tool(
+    title="List MCP Servers",
+    meta=_META_COMPANY,
+    annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True),
+)
+async def list_mcp_servers(
+    *,
+    upstream: Upstream = Depends(get_upstream),
+    caller: tuple[str, str] = Depends(get_caller),
+) -> McpServersResponse:
+    """List all MCP servers (connectors) available to the company.
+
+    Returns each server's id, name, description, requiresOAuth flag, and the full
+    list of tool names and descriptions. Use this to find server IDs and tool names
+    before calling update_space with mcp_servers.
+    """
+    user_id, company_id = caller
+    return await contexts.list_mcp_servers(
+        upstream=upstream, user_id=user_id, company_id=company_id
+    )
 
 
 @tool(
