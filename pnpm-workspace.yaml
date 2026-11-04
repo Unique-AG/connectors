@@ -8,9 +8,6 @@ packages:
   - "!services/architecture-demo-mcp"
   - packages/*
 
-injectWorkspacePackages: true
-savePrefix: ""
-
 # Versions shared by two or more workspace units live here, and the manifests reference them
 # with `catalog:`. syncpack reports DiffersToCatalog if a manifest pins one of them directly.
 # peerDependencies stay as ranges in each package.json: they are not exact versions, and pnpm
@@ -67,7 +64,7 @@ catalog:
   pino: 10.4.0
   pino-http: 11.0.0
   reflect-metadata: 0.2.2
-  remeda: 2.54.1
+  remeda: 2.58.0
   rxjs: 7.8.2
   serialize-error-cjs: 0.3.0
   supertest: 7.3.1
@@ -79,3 +76,6 @@ catalog:
   vite: 8.3.5
   vitest: 5.0.5
   zod: 4.6.7
+
+injectWorkspacePackages: true
+savePrefix: ""
