@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type * as http from 'node:http';
 import { type OAuthProviderConfig } from '@unique-ag/mcp-oauth';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
@@ -26,6 +27,32 @@ export function microsoftOAuthTokenUrl(signInTenantId: string): string {
   return `https://login.microsoftonline.com/${signInTenantId}/oauth2/v2.0/token`;
 }
 
+function extractTid(accessToken: string): string {
+  const parts = accessToken.split('.');
+  const rawPayload = parts[1];
+  assert.ok(rawPayload !== undefined && parts.length === 3, 'Access token is not a JWT');
+  const payload = JSON.parse(Buffer.from(rawPayload, 'base64url').toString('utf-8')) as Record<
+    string,
+    unknown
+  >;
+  const tid = payload.tid;
+  assert.ok(typeof tid === 'string' && tid.length > 0, 'Access token has no tid claim');
+  return tid;
+}
+
+export function authorizeTenant(
+  accessToken: string,
+  allowedTenantIds: string[],
+): { allowed: true } | { allowed: false; reason: string } {
+  if (allowedTenantIds.length === 0) {
+    return { allowed: true };
+  }
+  const tid = extractTid(accessToken);
+  return allowedTenantIds.includes(tid)
+    ? { allowed: true }
+    : { allowed: false, reason: `Entra tenant ${tid} is not on the allowlist` };
+}
+
 interface OAuth2WithSetAgent {
   setAgent: (agent: http.Agent) => void;
 }
@@ -33,6 +60,7 @@ interface OAuth2WithSetAgent {
 export function createMicrosoftOAuthProvider(
   agent?: http.Agent,
   signInTenantId = 'common',
+  allowedTenantIds: string[] = [],
 ): OAuthProviderConfig {
   class MicrosoftStrategyWithProxy extends MicrosoftStrategy {
     public constructor(...args: ConstructorParameters<typeof MicrosoftStrategy>) {
@@ -61,5 +89,6 @@ export function createMicrosoftOAuthProvider(
       displayName: profile.displayName,
       raw: profile,
     }),
+    authorizeSignIn: ({ accessToken }) => authorizeTenant(accessToken, allowedTenantIds),
   };
 }

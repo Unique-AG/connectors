@@ -6,6 +6,10 @@
 - name: MICROSOFT_SIGN_IN_TENANT_ID
   value: {{ .signInTenantId | quote }}
 {{- end }}
+{{- with .allowedTenantIds }}
+- name: MICROSOFT_ALLOWED_TENANT_IDS
+  value: {{ join "," . | quote }}
+{{- end }}
 {{- if .publicWebhookUrl }}
 - name: MICROSOFT_PUBLIC_WEBHOOK_URL
   value: {{ .publicWebhookUrl | quote }}

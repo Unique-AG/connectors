@@ -50,6 +50,10 @@ one) containers.
 - name: ENTRA_CLIENT_ID
   value: {{ tpl .Values.mcpConfig.entra.clientId . | quote }}
 {{- include "base.valueSource.env" (dict "name" "ENTRA_CLIENT_SECRET" "src" .Values.mcpConfig.entra.clientSecret "ctx" .) | nindent 0 }}
+{{- with .Values.mcpConfig.entra.allowedTenantIds }}
+- name: ENTRA_ALLOWED_TENANT_IDS
+  value: {{ join "," . | quote }}
+{{- end }}
 {{- if .Values.mcpConfig.tools.preset }}
 - name: TOOLS_PRESET
   value: {{ .Values.mcpConfig.tools.preset | quote }}

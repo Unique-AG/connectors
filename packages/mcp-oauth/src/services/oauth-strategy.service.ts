@@ -52,9 +52,13 @@ export class OAuthStrategyService implements OnModuleInit {
         accessToken: string,
         refreshToken: string,
         profile: unknown,
-        done: (error: unknown, user: unknown) => void,
+        done: (error: unknown, user: unknown, info?: { message: string }) => void,
       ) => {
         try {
+          const decision = provider.authorizeSignIn?.({ accessToken, profile });
+          if (decision && !decision.allowed) {
+            return done(null, false, { message: decision.reason });
+          }
           const mappedProfile = provider.profileMapper(profile);
           const result: PassportUser = {
             profile: mappedProfile,

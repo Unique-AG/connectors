@@ -13,7 +13,7 @@ import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { z } from 'zod';
-import { microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
+import { authorizeTenant, microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
 import { DrizzleDatabase } from '../drizzle/drizzle.module';
 import { userProfiles } from '../drizzle/schema';
 import { normalizeError } from '../utils/normalize-error';
@@ -30,6 +30,7 @@ export class TokenProvider implements AuthenticationProvider {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly signInTenantId: string;
+  private readonly allowedTenantIds: string[];
   private readonly scopes: string[];
   private readonly drizzle: DrizzleDatabase;
   private readonly encryptionService: AesGcmEncryptionService;
@@ -41,12 +42,14 @@ export class TokenProvider implements AuthenticationProvider {
       clientId,
       clientSecret,
       signInTenantId,
+      allowedTenantIds,
       scopes,
     }: {
       userProfileId: string;
       clientId: string;
       clientSecret: string;
       signInTenantId: string;
+      allowedTenantIds: string[];
       scopes: string[];
     },
     {
@@ -63,6 +66,7 @@ export class TokenProvider implements AuthenticationProvider {
     this.clientId = clientId;
     this.clientSecret = clientSecret;
     this.signInTenantId = signInTenantId;
+    this.allowedTenantIds = allowedTenantIds;
     this.scopes = scopes;
     this.drizzle = drizzle;
     this.encryptionService = encryptionService;
@@ -133,19 +137,18 @@ export class TokenProvider implements AuthenticationProvider {
         );
 
         if (isPermanentUpstreamOAuthError(parsedError.error)) {
-          await this.drizzle
-            .update(userProfiles)
-            .set({ accessToken: null, refreshToken: null })
-            .where(eq(userProfiles.id, userProfileId));
-
-          await this.onPermanentAuthFailure?.(userProfileId);
-          throw new UpstreamCredentialRevokedError(parsedError.error_description);
+          return await this.revokeUpstreamCredential(userProfileId, parsedError.error_description);
         }
 
         assert.fail(`Token refresh failed: ${response.statusText}`);
       }
 
       const tokenData = TokenRefreshResponse.parse(await response.json());
+
+      const tenant = authorizeTenant(tokenData.access_token, this.allowedTenantIds);
+      if (!tenant.allowed) {
+        return await this.revokeUpstreamCredential(userProfileId, tenant.reason);
+      }
 
       const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
       // Keep old refresh token if new one not provided
@@ -195,5 +198,15 @@ export class TokenProvider implements AuthenticationProvider {
         `Token refresh failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       );
     }
+  }
+
+  private async revokeUpstreamCredential(userProfileId: string, reason?: string): Promise<never> {
+    await this.drizzle
+      .update(userProfiles)
+      .set({ accessToken: null, refreshToken: null })
+      .where(eq(userProfiles.id, userProfileId));
+
+    await this.onPermanentAuthFailure?.(userProfileId);
+    throw new UpstreamCredentialRevokedError(reason);
   }
 }

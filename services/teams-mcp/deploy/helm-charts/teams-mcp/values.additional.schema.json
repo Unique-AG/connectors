@@ -150,6 +150,15 @@
               "description": "Sign-in tenant ID the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as common when users choose their directory at login. Independent of clientId/clientSecret; not the tenant that owns the app registration.",
               "default": "common"
             },
+            "allowedTenantIds": {
+              "type": "array",
+              "description": "Entra tenant IDs (GUIDs) allowed to use the MCP server. Empty allows any tenant. A sign-in from an unlisted tenant is rejected, and a user whose tenant is removed loses access at their next Microsoft token refresh.",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              },
+              "default": []
+            },
             "publicWebhookUrl": {
               "type": "string",
               "description": "The public webhook URL reachable from external network for Microsoft Graph subscriptions. Optional - defaults to SELF_URL if not provided. Example: https://teams.mcp.unique.app/webhooks"

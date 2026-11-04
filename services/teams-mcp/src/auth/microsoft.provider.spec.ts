@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  authorizeTenant,
   CHAT_SCOPES,
   createMicrosoftOAuthProvider,
   IDENTITY_SCOPES,
@@ -9,6 +10,11 @@ import {
   resolveMicrosoftScopes,
   SCOPES,
 } from './microsoft.provider';
+
+function makeJwt(claims: Record<string, unknown>): string {
+  const payload = Buffer.from(JSON.stringify(claims)).toString('base64url');
+  return `eyJhbGciOiJSUzI1NiJ9.${payload}.fake-sig`;
+}
 
 describe(resolveMicrosoftScopes.name, () => {
   it('full mode (chat + ingestion) requests identity, messaging and KB scopes', () => {
@@ -95,5 +101,46 @@ describe(microsoftOAuthTokenUrl.name, () => {
     expect(microsoftOAuthTokenUrl('f66cc3e7-9a7f-42ae-a0fa-adb72979b371')).toBe(
       'https://login.microsoftonline.com/f66cc3e7-9a7f-42ae-a0fa-adb72979b371/oauth2/v2.0/token',
     );
+  });
+});
+
+describe(authorizeTenant.name, () => {
+  const LISTED_TENANT = 'd050ee55-f842-4802-8263-d802dc017162';
+  const OTHER_TENANT = '79a9ddfe-a4f3-4307-8086-471132901889';
+
+  it('allows any tenant when the allowlist is empty', () => {
+    expect(authorizeTenant(makeJwt({ tid: OTHER_TENANT }), [])).toEqual({ allowed: true });
+  });
+
+  it('allows a tenant on the allowlist', () => {
+    expect(authorizeTenant(makeJwt({ tid: LISTED_TENANT }), [LISTED_TENANT])).toEqual({
+      allowed: true,
+    });
+  });
+
+  it('rejects a tenant not on the allowlist and names it in the reason', () => {
+    expect(authorizeTenant(makeJwt({ tid: OTHER_TENANT }), [LISTED_TENANT])).toEqual({
+      allowed: false,
+      reason: `Entra tenant ${OTHER_TENANT} is not on the allowlist`,
+    });
+  });
+
+  it('throws for a token without a tid claim', () => {
+    expect(() => authorizeTenant(makeJwt({ sub: 'user' }), [LISTED_TENANT])).toThrow(
+      'Access token has no tid claim',
+    );
+  });
+
+  it('rejects the sign-in of a user from a tenant not on the allowlist', () => {
+    const provider = createMicrosoftOAuthProvider({
+      chat: 'enabled',
+      ingestion: 'disabled',
+      signInTenantId: 'common',
+      allowedTenantIds: [LISTED_TENANT],
+    });
+
+    expect(
+      provider.authorizeSignIn?.({ accessToken: makeJwt({ tid: OTHER_TENANT }), profile: {} }),
+    ).toEqual({ allowed: false, reason: `Entra tenant ${OTHER_TENANT} is not on the allowlist` });
   });
 });

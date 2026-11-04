@@ -37,6 +37,9 @@ mcpConfig:
   entra:
     tenantId: '{{ fail "mcpConfig.entra.tenantId is mandatory. Override in your deployment values." }}'
     clientId: '{{ fail "mcpConfig.entra.clientId is mandatory. Override in your deployment values." }}'
+    # Tenant IDs (GUIDs) whose users may call the server. Empty allows any tenant. Checked on every
+    # request, and only meaningful when tenantId is 'organizations'.
+    allowedTenantIds: []
     # clientSecret:
     #   fromSecretProvider:
     #     vault: <key-vault-name>

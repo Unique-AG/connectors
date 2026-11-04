@@ -26,6 +26,18 @@ export const mcpOAuthModuleOptionsSchema = z.object({
         output: oauthUserProfileSchema,
       })
       .describe('A function that maps the profile from the strategy to the user profile.'),
+    authorizeSignIn: z
+      .function({
+        input: [z.object({ accessToken: z.string(), profile: z.unknown() })],
+        output: z.discriminatedUnion('allowed', [
+          z.object({ allowed: z.literal(true) }),
+          z.object({ allowed: z.literal(false), reason: z.string() }),
+        ]),
+      })
+      .optional()
+      .describe(
+        'Decides whether a user the provider authenticated may sign in. A rejection fails the sign-in with its reason.',
+      ),
   }),
 
   // Required OAuth Provider Credentials

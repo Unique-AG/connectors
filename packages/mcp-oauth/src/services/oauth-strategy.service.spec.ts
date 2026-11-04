@@ -125,6 +125,36 @@ describe('OAuthStrategyService', () => {
 
       expect(done).toHaveBeenCalledWith(error, null);
     });
+
+    it('fails the sign-in with the reason when the provider rejects it', () => {
+      options.provider.authorizeSignIn = () => ({
+        allowed: false,
+        reason: 'Entra tenant is not on the allowlist',
+      });
+      service.onModuleInit();
+
+      const strategyCallback = mockStrategy.mock.calls[0][1];
+      const done = vi.fn();
+      strategyCallback('access-token', 'refresh-token', { id: 'user-123' }, done);
+
+      expect(done).toHaveBeenCalledWith(null, false, {
+        message: 'Entra tenant is not on the allowlist',
+      });
+    });
+
+    it('signs the user in when the provider allows it', () => {
+      options.provider.authorizeSignIn = () => ({ allowed: true });
+      service.onModuleInit();
+
+      const strategyCallback = mockStrategy.mock.calls[0][1];
+      const done = vi.fn();
+      strategyCallback('access-token', 'refresh-token', { id: 'user-123' }, done);
+
+      expect(done).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ accessToken: 'access-token', provider: 'TestProvider' }),
+      );
+    });
   });
 
   describe('getStrategyName', () => {

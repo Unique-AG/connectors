@@ -2235,6 +2235,15 @@
             "clientSecret": {
               "$ref": "#/$defs/valueSourceSensitive",
               "description": "The app registration's client secret, used for the On-Behalf-Of token exchange."
+            },
+            "allowedTenantIds": {
+              "type": "array",
+              "description": "Tenant IDs (GUIDs) whose users may call the server. Empty allows any tenant. Checked on every request, and only meaningful when tenantId is 'organizations'.",
+              "items": {
+                "type": "string",
+                "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+              },
+              "default": []
             }
           },
           "required": [
