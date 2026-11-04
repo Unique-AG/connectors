@@ -1,0 +1,26 @@
+scenario: outlook_list_event_instances-standup
+fixture: rec-tool-outlook_list_event_instances-standup
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:56:14+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 26
+  keys dropped: 6
+  persona addresses: 6
+  persona names: 6
+  query parameters dropped: 5
+  response headers dropped: 28
+  text kept: 26
+literals:
+- '2026-10-29'
+- '2026-10-30'
+- Daily standup
+- ~today
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

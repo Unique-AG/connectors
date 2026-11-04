@@ -1,0 +1,86 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/onlineMeetings/createOrGet",
+    "json": {
+      "endDateTime": "~tomorrow",
+      "externalId": "00000000-bf38-4c01-8578-79278fa4134a",
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            }
+          },
+          {
+            "identity": {
+              "user": {
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e"
+              }
+            }
+          }
+        ]
+      },
+      "startDateTime": "~tomorrow",
+      "subject": "seed-v1 case-teams_create_meeting-attendees meeting"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "chatInfo": {
+        "messageId": "0",
+        "threadId": "19:uukgfgf_WBOrHDW9YJlpNTSiWR63M1EgHRZeNLUkQOF4LudqYxcsWKCc@thread.v2"
+      },
+      "creationDateTime": "2026-11-02T21:29:48.2403301Z",
+      "endDateTime": "2026-11-03T15:30:00Z",
+      "externalId": "00000000-bf38-4c01-8578-79278fa4134a",
+      "id": "GZdxCgUcWIXgLw4oPBLdDQDkCLKySjVdYP7kSKr0AJYtA8ZzYpRjIKksGJl4nWSvfNssG43ERYx1VZTFXz4OH3PBTSP8AIFbIPjpRj1XM3huGMeNdVrGWHLOrkk3UMqpfV6HKxwMeKetYMVePqGc",
+      "joinUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:uukgfgf_WBOrHDW9YJlpNTSiWR63M1EgHRZeNLUkQOF4LudqYxcsWKCc@thread.v2/synthetic%20text%2003",
+      "joinWebUrl": "https://teams.microsoft.com/synthetic%20text%2001/synthetic%20text%2002/19:uukgfgf_WBOrHDW9YJlpNTSiWR63M1EgHRZeNLUkQOF4LudqYxcsWKCc@thread.v2/synthetic%20text%2003",
+      "lobbyBypassSettings": {
+        "isDialInBypassEnabled": false,
+        "scope": "organization"
+      },
+      "participants": {
+        "attendees": [
+          {
+            "identity": {
+              "user": {
+                "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+              }
+            },
+            "role": "attendee"
+          },
+          {
+            "identity": {
+              "user": {
+                "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e"
+              }
+            },
+            "role": "attendee"
+          }
+        ],
+        "organizer": {
+          "identity": {
+            "user": {
+              "@odata.type": "#microsoft.graph.communicationsUserIdentity",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5",
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537"
+            }
+          },
+          "role": "presenter",
+          "upn": "mia@example.test"
+        }
+      },
+      "startDateTime": "2026-11-03T15:00:00Z",
+      "subject": "seed-v1 case-teams_create_meeting-attendees meeting"
+    }
+  }
+]

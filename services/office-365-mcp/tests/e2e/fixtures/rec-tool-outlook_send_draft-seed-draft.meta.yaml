@@ -1,0 +1,22 @@
+scenario: outlook_send_draft-seed-draft
+fixture: rec-tool-outlook_send_draft-seed-draft
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:37:16+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 15
+  keys dropped: 4
+  persona addresses: 3
+  persona names: 3
+  response headers dropped: 35
+  text kept: 6
+literals:
+- drafts
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

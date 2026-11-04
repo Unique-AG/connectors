@@ -1,0 +1,76 @@
+{
+  "value": [
+    {
+      "id": "AAMkAGI2RUN-0001=",
+      "subject": "Newsletter: October",
+      "bodyPreview": "This month",
+      "from": {
+        "emailAddress": { "name": "Brightway News", "address": "news@brightway.example.invalid" }
+      },
+      "sender": {
+        "emailAddress": { "name": "Brightway News", "address": "news@brightway.example.invalid" }
+      },
+      "toRecipients": [
+        { "emailAddress": { "name": "Mia Wong", "address": "mia@example.invalid" } }
+      ],
+      "replyTo": [],
+      "receivedDateTime": "2026-10-21T07:00:00Z",
+      "isRead": true,
+      "hasAttachments": false,
+      "parentFolderId": "AQMkADAwRUN-inbox",
+      "webLink": "https://outlook.office365.com/owa/?ItemID=RUN0001",
+      "importance": "normal",
+      "flag": { "flagStatus": "notFlagged" },
+      "categories": [],
+      "isDraft": false
+    },
+    {
+      "id": "AAMkAGI2RUN-0002=",
+      "subject": "Newsletter: September",
+      "bodyPreview": "Last month",
+      "from": {
+        "emailAddress": { "name": "Brightway News", "address": "news@brightway.example.invalid" }
+      },
+      "sender": {
+        "emailAddress": { "name": "Brightway News", "address": "news@brightway.example.invalid" }
+      },
+      "toRecipients": [
+        { "emailAddress": { "name": "Mia Wong", "address": "mia@example.invalid" } }
+      ],
+      "replyTo": [],
+      "receivedDateTime": "2026-10-21T06:00:00Z",
+      "isRead": true,
+      "hasAttachments": false,
+      "parentFolderId": "AQMkADAwRUN-inbox",
+      "webLink": "https://outlook.office365.com/owa/?ItemID=RUN0002",
+      "importance": "normal",
+      "flag": { "flagStatus": "notFlagged" },
+      "categories": [],
+      "isDraft": false
+    },
+    {
+      "id": "AAMkAGI2RUN-0003=",
+      "subject": "Newsletter: August",
+      "bodyPreview": "Two months ago",
+      "from": {
+        "emailAddress": { "name": "Brightway News", "address": "news@brightway.example.invalid" }
+      },
+      "sender": {
+        "emailAddress": { "name": "Brightway News", "address": "news@brightway.example.invalid" }
+      },
+      "toRecipients": [
+        { "emailAddress": { "name": "Mia Wong", "address": "mia@example.invalid" } }
+      ],
+      "replyTo": [],
+      "receivedDateTime": "2026-10-21T05:00:00Z",
+      "isRead": true,
+      "hasAttachments": false,
+      "parentFolderId": "AQMkADAwRUN-inbox",
+      "webLink": "https://outlook.office365.com/owa/?ItemID=RUN0003",
+      "importance": "normal",
+      "flag": { "flagStatus": "notFlagged" },
+      "categories": [],
+      "isDraft": false
+    }
+  ]
+}

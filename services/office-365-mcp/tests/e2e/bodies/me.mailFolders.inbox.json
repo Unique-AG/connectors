@@ -1,0 +1,7 @@
+{
+  "@odata.context": "https://graph.microsoft.com/v1.0/$metadata#users('PROBE-USER')/mailFolders(displayName,totalItemCount,unreadItemCount)/$entity",
+  "id": "AQMkADAwPROBE-inbox",
+  "displayName": "Inbox",
+  "totalItemCount": 3,
+  "unreadItemCount": 2
+}

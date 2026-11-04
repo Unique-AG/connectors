@@ -1,0 +1,150 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Project Plan"
+          },
+          "size": 25
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "hitsContainers": [
+            {
+              "hits": [
+                {
+                  "hitId": "01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+                  "rank": 1,
+                  "resource": {
+                    "@odata.type": "#microsoft.graph.driveItem",
+                    "createdBy": {
+                      "user": {
+                        "displayName": "Mia Keller",
+                        "email": "mia@example.test"
+                      }
+                    },
+                    "createdDateTime": "2026-10-26T14:17:29Z",
+                    "file": {
+                      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    },
+                    "id": "01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+                    "lastModifiedBy": {
+                      "user": {
+                        "displayName": "Mia Keller",
+                        "email": "mia@example.test"
+                      }
+                    },
+                    "lastModifiedDateTime": "2026-01-05T09:00:00Z",
+                    "name": "seed-v1 Project Plan.docx",
+                    "parentReference": {
+                      "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+                      "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+                      "siteId": "kiaqdpzfkcrfinyqw-ic.squsbkdinx.ifd,00000000-84a1-4040-8976-7aac948926e9,00000000-a564-4d8d-89c6-a011992bbd1c"
+                    },
+                    "size": 1902,
+                    "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Project%20Plan.docx"
+                  },
+                  "summary": "synthetic text 01"
+                }
+              ],
+              "moreResultsAvailable": false,
+              "total": 1
+            }
+          ],
+          "searchTerms": ["seed-v1", "project", "plan"]
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-1F93-4CA2-8E58-4A8FDDEF4CA3},9\"",
+      "createdBy": {
+        "user": {
+          "displayName": "Mia Keller",
+          "email": "mia@example.test",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5"
+        }
+      },
+      "createdDateTime": "2026-10-26T14:17:29Z",
+      "file": {
+        "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      },
+      "id": "01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ",
+      "lastModifiedBy": {
+        "user": {
+          "displayName": "Mia Keller",
+          "email": "mia@example.test",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5"
+        }
+      },
+      "lastModifiedDateTime": "2026-10-26T14:17:29Z",
+      "name": "seed-v1 Project Plan.docx",
+      "parentReference": {
+        "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+        "driveType": "business",
+        "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+        "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+      },
+      "size": 1902,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/Doc.aspx"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01KIIBR596SCG19JEBRKOGQTMDTA51TQUJ/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/mia_example_test/_layouts/15/download.aspx?UniqueId=00000000-1f93-4ca2-8e58-4a8fddef4ca3&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/mia_example_test/_layouts/15/download.aspx",
+    "query": {
+      "UniqueId": "00000000-1f93-4ca2-8e58-4a8fddef4ca3",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    },
+    "body": "rec-uc-01-06.04.docx"
+  }
+]

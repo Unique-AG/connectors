@@ -1,0 +1,21 @@
+scenario: onenote_list_notebooks-owned
+fixture: rec-tool-onenote_list_notebooks-owned
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:02:34+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 165
+  keys dropped: 41
+  query parameters dropped: 9
+  response headers dropped: 27
+  text kept: 62
+  text replaced: 125
+literals:
+- Owner
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

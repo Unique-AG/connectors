@@ -38,6 +38,7 @@ from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary, write_state_
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_edit_page as editor
 from office_365_mcp.tools.onenote_edit_page import EditCommand, a_person_agrees, edit_page
+from tests.tools.scenarios.support import Person, call, serve
 
 _PAGE_ID = "1-SYNTHETICPAGE00000000000000000000!0-ABCDEF"
 
@@ -1481,3 +1482,101 @@ class TestHowItDeclaresItself:
 
     def test_not_found_advice_points_at_the_lister(self) -> None:
         assert "onenote_list_pages" in editor.GRAPH_NOT_FOUND
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+async def _page_in_the_pad(title: str, body_html: str) -> Mapping[str, object]:
+    notebooks = await call("onenote_list_notebooks", name_contains="seed-v1 Scratch")
+    sections = await call(
+        "onenote_list_sections",
+        parent=_first_uri_of(notebooks, "notebooks"),
+        name_contains="Pad",
+    )
+    return await call(
+        "onenote_create_page",
+        section=_first_uri_of(sections, "sections"),
+        title=title,
+        body_html=body_html,
+    )
+
+
+def _patch_sent(routes: dict[tuple[str, str], respx.Route]) -> object:
+    [route] = [r for (_, path), r in routes.items() if path.endswith("/onenotePatchContent")]
+    return cast("object", json.loads(route.calls.last.request.content))
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_paragraph_is_inserted_after_an_element_without_a_question(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_edit_page-insert")
+        created = await _page_in_the_pad(
+            "seed-v1 case-onenote_edit_page-insert", '<p data-id="intro">Start.</p>'
+        )
+        person = Person()
+
+        edited = await call(
+            "onenote_edit_page",
+            page=created["uri"],
+            commands=[
+                {
+                    "target": "#intro",
+                    "action": "insert",
+                    "position": "after",
+                    "content": "<p>Next.</p>",
+                }
+            ],
+            person=person,
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert _patch_sent(routes) == {
+            "commands": [
+                {
+                    "action": "Insert",
+                    "content": "<p>Next.</p>",
+                    "position": "After",
+                    "target": "#intro",
+                }
+            ]
+        }
+        assert edited["uri"] == created["uri"]
+        assert person.asked == []
+
+    async def test_a_new_title_is_sent_after_a_person_is_warned_it_cannot_be_undone(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_edit_page-title")
+        created = await _page_in_the_pad("seed-v1 case-onenote_edit_page-title", "<p>Start.</p>")
+        person = Person()
+
+        edited = await call(
+            "onenote_edit_page",
+            page=created["uri"],
+            commands=[
+                {
+                    "target": "title",
+                    "action": "replace",
+                    "content": "seed-v1 case-onenote_edit_page-title new",
+                }
+            ],
+            person=person,
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        [question] = person.asked
+        assert "replaces 'title'" in question
+        assert "cannot be undone" in question
+        assert _patch_sent(routes) == {
+            "commands": [
+                {
+                    "action": "Replace",
+                    "content": "seed-v1 case-onenote_edit_page-title new",
+                    "target": "title",
+                }
+            ]
+        }
+        assert edited["title"] == "seed-v1 case-onenote_edit_page-title new"

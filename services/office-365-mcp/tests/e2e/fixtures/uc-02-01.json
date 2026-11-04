@@ -1,0 +1,22 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": { "$select": "displayName,totalItemCount,unreadItemCount" },
+    "status": 200,
+    "body": "me.mailFolders.inbox.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "query": {
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "25",
+      "$orderby": "receivedDateTime desc",
+      "$filter": "receivedDateTime ge ~yesterday and isRead eq false"
+    },
+    "status": 200,
+    "body": "me.messages.unread.json"
+  }
+]

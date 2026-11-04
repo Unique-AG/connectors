@@ -1,0 +1,24 @@
+scenario: onenote_append_to_page-seed
+fixture: rec-tool-onenote_append_to_page-seed
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:58:50+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 160
+  keys dropped: 41
+  query parameters dropped: 13
+  response headers dropped: 105
+  text kept: 67
+  text replaced: 108
+literals:
+- <p>End.</p>
+- <p>Start.</p>
+- seed-v1 Scratch
+- seed-v1 case-onenote_append_to_page-seed
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

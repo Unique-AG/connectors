@@ -1,0 +1,25 @@
+scenario: outlook_check_availability-working-hours
+fixture: rec-tool-outlook_check_availability-working-hours
+source: recorded
+target: graph
+recorded_at: '2026-11-02T20:59:21+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 1
+  persona addresses: 4
+  response headers dropped: 7
+  text kept: 2
+literals:
+- '2026-11-09T08:00:00'
+- '2026-11-09T18:00:00'
+- Europe/Zurich
+- persona:anna
+- persona:tom
+- ~nextMondayT08:00:00
+- ~nextMondayT18:00:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

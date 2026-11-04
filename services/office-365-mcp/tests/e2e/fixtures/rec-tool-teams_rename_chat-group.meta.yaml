@@ -1,0 +1,28 @@
+scenario: teams_rename_chat-group
+fixture: rec-tool-teams_rename_chat-group
+source: recorded
+target: graph
+recorded_at: '2026-10-30T13:42:06+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 8
+  keys dropped: 5
+  persona addresses: 2
+  query parameters dropped: 2
+  response headers dropped: 26
+  text kept: 4
+  text replaced: 8
+literals:
+- group
+- persona:anna.id
+- persona:anna.name
+- persona:tom.id
+- persona:tom.name
+- seed-v1 case-teams-chat
+- seed-v1 case-teams-chat renamed
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

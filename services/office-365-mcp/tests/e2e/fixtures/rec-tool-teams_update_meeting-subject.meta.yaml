@@ -1,0 +1,27 @@
+scenario: teams_update_meeting-subject
+fixture: rec-tool-teams_update_meeting-subject
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:46:47+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 25
+  keys dropped: 88
+  persona addresses: 5
+  query parameters dropped: 7
+  response headers dropped: 34
+  text kept: 5
+  text replaced: 23
+literals:
+- '2026-10-31T16:00:00Z'
+- '2026-10-31T16:30:00Z'
+- seed-v1 case-teams_update_meeting-subject meeting
+- seed-v1 case-teams_update_meeting-subject renamed
+- ~tomorrowT16:00:00Z
+- ~tomorrowT16:30:00Z
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

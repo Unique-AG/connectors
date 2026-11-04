@@ -1,0 +1,33 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNFILE",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "body": "drive.item.agreement.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content",
+    "query": { "$format": "pdf" },
+    "status": 406,
+    "body": "error.notSupported.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNFILE",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "body": "drive.item.agreement.json"
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content",
+    "status": 200,
+    "body": "agreement.docx"
+  }
+]

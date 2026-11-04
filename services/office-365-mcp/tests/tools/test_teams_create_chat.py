@@ -27,6 +27,9 @@ from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
 from office_365_mcp.tools import teams_create_chat as creator
 from office_365_mcp.tools.teams_create_chat import NewChatKind, a_person_agrees, create_chat
+from tests.tools.scenarios.support import Person as Approver
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import GROUP_MEMBERS, GROUP_TOPIC, uncalled, was_sent
 
 from .conftest import ME, OTHER_USER_ID, SIGNED_IN_USER_ID
 
@@ -1038,3 +1041,26 @@ class TestHowItDeclaresItself:
             + "an owner."
         ) in described
         assert 15 <= len(described.split()) <= 60
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_creates_a_group_chat_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_create_chat-group")
+        mia = Approver()
+
+        created = await call(
+            "teams_create_chat",
+            person=mia,
+            chat_type="group",
+            topic=GROUP_TOPIC,
+            members=GROUP_MEMBERS,
+        )
+
+        assert created["chat_id"] == "19:922f7pt174v290p606p2q0ll41b70812@thread.v2"
+        assert created["chat_type"] == "group"
+        assert created["topic"] == GROUP_TOPIC
+        assert "Anna Meier" in mia.asked[0] and "Tom Berger" in mia.asked[0]
+        assert was_sent(routes, "POST", "/chats")
+        assert uncalled(routes) == []

@@ -1,0 +1,70 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailboxSettings",
+    "query": {
+      "$select": "automaticRepliesSetting"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-10-30T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-10-29T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      },
+      "timeZone": "W. Europe Standard Time"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/mailboxSettings",
+    "json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "~tomorrow",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "~today",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "automaticRepliesSetting": {
+        "externalAudience": "all",
+        "externalReplyMessage": "",
+        "internalReplyMessage": "",
+        "scheduledEndDateTime": {
+          "dateTime": "2026-10-30T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "scheduledStartDateTime": {
+          "dateTime": "2026-10-29T15:00:00.0000000",
+          "timeZone": "UTC"
+        },
+        "status": "disabled"
+      }
+    }
+  }
+]

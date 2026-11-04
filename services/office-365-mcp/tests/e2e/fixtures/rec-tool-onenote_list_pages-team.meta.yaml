@@ -1,0 +1,22 @@
+scenario: onenote_list_pages-team
+fixture: rec-tool-onenote_list_pages-team
+source: recorded
+target: graph
+recorded_at: '2026-11-03T11:32:35+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 48
+  keys dropped: 36
+  query parameters dropped: 3
+  response headers dropped: 44
+  text kept: 18
+  text replaced: 32
+literals:
+- Team plan
+- seed-v1 Shared
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

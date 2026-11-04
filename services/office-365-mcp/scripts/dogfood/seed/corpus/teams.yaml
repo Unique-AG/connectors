@@ -1,0 +1,84 @@
+channels:
+  - {key: posts, name: seed-v1 Posts}
+  - {key: long, name: seed-v1 Long channel}
+  - {key: private, name: seed-v1 Private, private: true}
+threads:
+  - id: p01
+    channel: posts
+    author: mia
+    text: Alpine Print sent the offer for the brochure. Please read it before Friday.
+    replies:
+      - {author: anna, text: I read the Alpine Print offer. The price is fair.}
+      - {author: anna, text: I send the budget file to Mia Keller on Friday.}
+  - id: p02
+    channel: posts
+    author: anna
+    text: The budget review is on Thursday. Bring your numbers.
+    replies:
+      - {author: tom, text: I bring the hosting costs.}
+      - {author: tom, text: The hosting costs are lower this year.}
+      - {author: tom, text: I send the hosting plan to Anna Meier.}
+  - id: p03
+    channel: posts
+    author: tom
+    text: The hosting slot is open on Monday morning. Tell me if you need it.
+  - id: p04
+    channel: posts
+    author: mia
+    text: Lena Fischer asked for a call about the website relaunch.
+    replies:
+      - {author: tom, text: I join the call with Lena Fischer.}
+  - id: p05
+    channel: posts
+    author: anna
+    text: The invoice for the brochure is paid.
+  - id: p06
+    channel: posts
+    author: tom
+    text: The backup ran well last night.
+  - id: t51
+    channel: posts
+    author: mia
+    text: The long thread starts here. Add your notes below.
+    replies: {count: 51, author: anna, text: "Note {n} of the long thread."}
+  - id: v01
+    channel: private
+    author: mia
+    text: This note is for the private channel only.
+  - id: v02
+    channel: private
+    author: anna
+    text: I read the private note. I have no change.
+long:
+  count: 60
+  authors: [mia, anna, tom]
+  text: "Long channel note {n}. The weekly status is green."
+chats:
+  - key: unread
+    topic: seed-v1 case-teams-unread chat
+    owner: mia
+    members: [mia, anna, tom]
+    messages:
+      - {id: u1, author: anna, text: "Hello Mia Keller. The Alpine Print offer is ready."}
+      - {id: u2, author: anna, text: The budget file is in my folder.}
+      - {id: u3, author: anna, text: I send the file on Friday.}
+      - {id: u4, author: tom, text: The hosting slot is booked.}
+      - {id: u5, author: tom, text: Tell me if you need a second slot.}
+  - key: send
+    topic: seed-v1 case-teams-send chat
+    owner: mia
+    members: [mia, anna]
+    messages:
+      - {id: s1, author: mia, text: This chat takes the messages of the recorder cases.}
+transcript:
+  mia:
+    - Welcome to the budget meeting.
+    - The first topic is the Alpine Print offer.
+    - Please send me the files by Friday.
+  anna:
+    - Anna sends the budget file by Friday.
+    - The price of the offer is fair.
+    - I have no other topic.
+  tom:
+    - Tom books the hosting slot.
+    - The hosting plan is ready.

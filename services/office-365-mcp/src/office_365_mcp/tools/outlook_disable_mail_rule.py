@@ -8,7 +8,6 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from msgraph.generated.models.message_rule import MessageRule
 from msgraph.generated.models.message_rule_actions import MessageRuleActions
-from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.users.item.mail_folders.item.message_rules.item.message_rule_item_request_builder import (  # noqa: E501
     MessageRuleItemRequestBuilder,
 )
@@ -17,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailRuleHandle, mail_rule_handle
+from office_365_mcp.shared.rules import addresses_of
 from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, graph_client_for_caller
 
 TOOL_NAME = "outlook_disable_mail_rule"
@@ -120,9 +120,9 @@ class DisabledRule(BaseModel):
             display_name=before.display_name,
             was_enabled=before.is_enabled,
             is_enabled=None if after is None else after.is_enabled,
-            forwarded_to=_addresses(None if actions is None else actions.forward_to),
-            redirected_to=_addresses(None if actions is None else actions.redirect_to),
-            forwarded_as_attachment_to=_addresses(
+            forwarded_to=addresses_of(None if actions is None else actions.forward_to),
+            redirected_to=addresses_of(None if actions is None else actions.redirect_to),
+            forwarded_as_attachment_to=addresses_of(
                 None if actions is None else actions.forward_as_attachment_to
             ),
             moved_to_folder=None if actions is None else actions.move_to_folder,
@@ -168,18 +168,6 @@ def _rule_of(client: GraphServiceClient, handle: MailRuleHandle) -> MessageRuleI
     return client.me.mail_folders.by_mail_folder_id(_INBOX_FOLDER).message_rules.by_message_rule_id(
         handle.rule_id
     )
-
-
-def _addresses(recipients: list[Recipient] | None) -> list[str]:
-    named: list[str] = []
-    for recipient in recipients or []:
-        email = recipient.email_address
-        if email is None:
-            continue
-        address = email.address if email.address else email.name
-        if address is not None:
-            named.append(address)
-    return named
 
 
 def _deletes(actions: MessageRuleActions | None) -> bool | None:

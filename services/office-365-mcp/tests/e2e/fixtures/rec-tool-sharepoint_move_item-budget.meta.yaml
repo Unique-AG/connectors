@@ -1,0 +1,24 @@
+scenario: sharepoint_move_item-budget
+fixture: rec-tool-sharepoint_move_item-budget
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:49:26+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 70
+  keys dropped: 19
+  persona addresses: 12
+  persona names: 12
+  query parameters dropped: 8
+  response headers dropped: 55
+  text kept: 24
+  text replaced: 16
+literals:
+- seed-v1 Budget Overview
+- seed-v1 case-sharepoint_move_item-budget
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

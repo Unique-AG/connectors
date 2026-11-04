@@ -1,0 +1,21 @@
+scenario: outlook_get_mail_tips-anna-away
+fixture: rec-tool-outlook_get_mail_tips-anna-away
+source: recorded
+target: graph
+recorded_at: '2026-11-02T20:59:36+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 1
+  persona addresses: 2
+  persona names: 1
+  response headers dropped: 7
+  text kept: 1
+  text replaced: 1
+literals:
+- persona:anna
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

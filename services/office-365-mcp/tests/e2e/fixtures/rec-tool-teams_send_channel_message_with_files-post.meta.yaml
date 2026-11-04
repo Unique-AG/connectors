@@ -1,0 +1,26 @@
+scenario: teams_send_channel_message_with_files-post
+fixture: rec-tool-teams_send_channel_message_with_files-post
+source: recorded
+target: graph
+recorded_at: '2026-11-02T09:37:27+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 33
+  keys dropped: 36
+  persona addresses: 2
+  persona names: 2
+  query parameters dropped: 4
+  response headers dropped: 39
+  text kept: 22
+  text replaced: 9
+literals:
+- seed-v1 Meeting Notes
+- seed-v1 case-teams_send_channel_message_with_files-post notes
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

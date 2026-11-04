@@ -1,0 +1,77 @@
+# Calendar events. None has attendees (plan v2 S3), so no invitation leaves the mailbox.
+# day:       days from the anchor date; a weekly series moves to the first `days` weekday on or after it
+# start/end: local wall-clock time "HH:MM" in `time_zone` (a Windows time zone name)
+# all_day:   true for an all-day event; start and end are then the day boundaries
+events:
+  - id: e01
+    subject: Weekly project sync
+    body: Status of the website relaunch, open points, next steps.
+    location: Room Pilatus
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "09:00"
+    end: "09:30"
+    recurrence: {type: weekly, days: [monday], count: 10}
+  - id: e02
+    subject: Company holiday
+    body: The office is closed.
+    time_zone: W. Europe Standard Time
+    day: 3
+    all_day: true
+  - id: e03
+    subject: Budget review with finance
+    body: Q3 numbers, Q4 forecast.
+    location: Room Rigi
+    time_zone: W. Europe Standard Time
+    day: 2
+    start: "14:00"
+    end: "15:00"
+  - id: e04
+    subject: Call with the print partner in Boston
+    body: Brochure paper samples and delivery dates.
+    location: Phone
+    time_zone: Eastern Standard Time
+    day: 4
+    start: "10:00"
+    end: "10:30"
+  - id: e05
+    subject: Design handover with the Pune studio
+    body: Final assets for the relaunch.
+    location: Video call
+    time_zone: India Standard Time
+    day: 5
+    start: "15:30"
+    end: "16:15"
+  - id: e06
+    subject: Relaunch retrospective
+    body: What went well, what to change next time.
+    location: Room Titlis
+    time_zone: W. Europe Standard Time
+    day: -2
+    start: "10:00"
+    end: "11:00"
+  - id: e07
+    subject: Kick-off offsite planning
+    body: Dates, budget, location ideas.
+    location: Room Pilatus
+    time_zone: UTC
+    day: -7
+    start: "13:00"
+    end: "13:45"
+  - id: e08
+    subject: Laptop exchange slot
+    body: Bring the old laptop and the charger.
+    location: IT desk
+    time_zone: W. Europe Standard Time
+    day: 1
+    start: "10:00"
+    end: "10:15"
+  - id: t-e01
+    owner: tom
+    subject: On-call handover
+    body: Hand over the on-call phone and the open tickets.
+    location: IT desk
+    time_zone: W. Europe Standard Time
+    day: 2
+    start: "08:30"
+    end: "09:00"

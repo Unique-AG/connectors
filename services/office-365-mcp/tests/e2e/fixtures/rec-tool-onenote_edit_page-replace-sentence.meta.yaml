@@ -1,0 +1,26 @@
+scenario: onenote_edit_page-replace-sentence
+fixture: rec-tool-onenote_edit_page-replace-sentence
+source: recorded
+target: graph
+recorded_at: '2026-11-02T23:25:51+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 232
+  keys dropped: 58
+  page htmls scrubbed: 1
+  query parameters dropped: 16
+  response headers dropped: 123
+  text kept: 91
+  text replaced: 143
+literals:
+- <p data-id="one">Changed sentence.</p>
+- <p data-id="one">First sentence.</p><p data-id="two">Second sentence.</p>
+- replace
+- seed-v1 Scratch
+- seed-v1 case-onenote_edit_page-replace-sentence
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

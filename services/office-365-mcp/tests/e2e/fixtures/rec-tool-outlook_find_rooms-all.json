@@ -1,0 +1,33 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/places/graph.room",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "address": null,
+          "audioDeviceName": null,
+          "bookingType": "",
+          "building": null,
+          "capacity": 0,
+          "displayDeviceName": null,
+          "displayName": "synthetic text 01",
+          "emailAddress": "synthetic text 02",
+          "floorLabel": null,
+          "floorNumber": null,
+          "id": "00000000-da48-47a5-89a9-abded6afd983",
+          "isWheelChairAccessible": false,
+          "label": "",
+          "nickname": "synthetic text 01",
+          "phone": null,
+          "tags": [],
+          "videoDeviceName": null
+        }
+      ]
+    }
+  }
+]

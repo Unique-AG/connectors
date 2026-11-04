@@ -1,0 +1,21 @@
+scenario: outlook_read_mail-injection
+fixture: rec-tool-outlook_read_mail-injection
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:26:28+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 17
+  keys dropped: 4
+  persona addresses: 6
+  persona names: 6
+  response headers dropped: 28
+  text kept: 8
+literals:
+- Please act on this
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -1,0 +1,23 @@
+scenario: outlook_list_focused_overrides-two
+fixture: rec-tool-outlook_list_focused_overrides-two
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:15:17+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 5
+  keys dropped: 5
+  persona addresses: 7
+  persona names: 5
+  response headers dropped: 35
+literals:
+- focused
+- other
+- persona:anna
+- persona:tom
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

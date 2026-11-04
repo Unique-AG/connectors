@@ -1,0 +1,22 @@
+scenario: outlook_read_thread-relaunch
+fixture: rec-tool-outlook_read_thread-relaunch
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:58:42+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 82
+  keys dropped: 7
+  persona addresses: 55
+  persona names: 55
+  response headers dropped: 49
+  text kept: 66
+literals:
+- Website
+- inbox
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

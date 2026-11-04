@@ -1,0 +1,25 @@
+scenario: outlook_list_events-not-cancelled
+fixture: rec-tool-outlook_list_events-not-cancelled
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:01:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 79
+  keys dropped: 53
+  persona addresses: 47
+  persona names: 47
+  query parameters dropped: 19
+  response headers dropped: 14
+  text kept: 77
+literals:
+- '2026-11-02'
+- '2026-11-03'
+- ~today
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4
