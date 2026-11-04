@@ -171,13 +171,26 @@ describe('renderBody', () => {
       projects: ['packages/utils'],
       cooldownDays: 3,
     });
-    assert.match(body, /bumps `zod` from 4\.6\.5 to 4\.6\.7/);
+    assert.match(body, /^Bump `zod` from 4\.6\.5 to 4\.6\.7/);
     assert.match(body, /at least 3 days old/);
     assert.match(body, /changed in the lock files \(4\)/);
     assert.match(body, /- `parser`: 7\.1\.0 -> 7\.1\.1, 8\.0\.0 -> 8\.0\.1/);
     assert.match(body, /- `nypm`: 0\.6\.10 -> 0\.6\.11/);
     assert.match(body, /- `gone`: 1\.0\.0 -> removed/);
     assert.match(body, /- `packages\/utils`/);
+  });
+
+  it('keeps the text for the commit above the line `---` and the rest below it', () => {
+    const entry = { ...single, key: 'npm-zod:0123456789ab', members: [{ ...single.members[0], data: { major: true } }] };
+    const body = renderBody({ entry, changes, projects: ['packages/utils'], cooldownDays: 3 });
+    const [commit, rest] = body.split('\n---\n');
+    assert.match(commit, /^Bump `zod` from 4\.6\.5 to 4\.6\.7\.\n\nPackages that changed in the lock files \(4\):\n/);
+    assert.match(commit, /- `gone`: 1\.0\.0 -> removed/);
+    assert.doesNotMatch(commit, /nightly dependency job|major bump|Projects that moved|deps-nightly/);
+    assert.match(rest, /nightly dependency job/);
+    assert.match(rest, /This is a major bump/);
+    assert.match(rest, /- `packages\/utils`/);
+    assert.match(rest, /deps-nightly:npm-zod:0123456789ab/);
   });
 
   it('ends with the marker that holds the key of the entry', () => {
@@ -192,7 +205,7 @@ describe('renderBody', () => {
 
   it('says so when no project moved', () => {
     const body = renderBody({ entry: group, changes, projects: [], cooldownDays: 3 });
-    assert.match(body, /bumps the `rollup` group/);
+    assert.match(body, /^Bump the `rollup` group/);
     assert.match(body, /None\. Only the lock file changed\./);
   });
 
@@ -211,7 +224,7 @@ describe('renderBody', () => {
       projects: ['services/a/deploy/terraform/x/versions.tf'],
       cooldownDays: 3,
     });
-    assert.match(body, /changes the version constraint of the provider `azurerm` from `~> 3`/);
+    assert.match(body, /^Change the version constraint of the provider `azurerm` from `~> 3`/);
     assert.match(body, /release `4\.9\.0` fits/);
     assert.match(body, /This is a major bump/);
     assert.match(body, /Files that changed/);

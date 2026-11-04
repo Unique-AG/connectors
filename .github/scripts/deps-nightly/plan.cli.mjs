@@ -235,13 +235,6 @@ const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
 }
-if (process.env.DASHBOARD_FILE) {
-  const openList = openPulls.map(({ number, branch }) => `#${number} \`${branch}\``);
-  writeFileSync(
-    process.env.DASHBOARD_FILE,
-    `${summary}\n### Open dependency pull requests (${openList.length})\n\n${openList.map((item) => `- ${item}`).join('\n')}\n`,
-  );
-}
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
