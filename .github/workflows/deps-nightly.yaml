@@ -169,20 +169,27 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           GH_REPO: ${{ github.repository }}
           CLOSES: ${{ needs.plan.outputs.closes }}
+          REQUESTED: ${{ inputs.pr }}
         run: |
           gh label create superseded --color ededed --description "The nightly job closed this pull request for a newer version" || true
-          jq -c '.[]' <<< "$CLOSES" | while read -r entry; do
+          status=0
+          while read -r entry; do
             number=$(jq -r .number <<< "$entry")
             planned=$(jq -r .head <<< "$entry")
             current=$(gh pr view "$number" --json headRefOid --jq .headRefOid)
             if [ "$current" != "$planned" ]; then
               echo "- #$number: kept. A commit came after the plan." >> "$GITHUB_STEP_SUMMARY"
+              if [ -n "$REQUESTED" ]; then
+                echo "::error::#$number got a commit after the plan, so the job kept it."
+                status=1
+              fi
               continue
             fi
             gh pr edit "$number" --add-label superseded
             gh pr close "$number" --delete-branch --comment "No update targets this pull request any more. If a new version is due, the job opens a new PR."
             echo "- #$number: closed. No update targets it any more." >> "$GITHUB_STEP_SUMMARY"
-          done
+          done < <(jq -c '.[]' <<< "$CLOSES")
+          exit "$status"
 
   bump:
     name: Bump ${{ matrix.entry.slug }}
