@@ -270,12 +270,15 @@ export function buildPlan({
   );
   const slugs = new Set(ordered.map(({ slug }) => slug));
   const blocked = new Set(needsPerson.map(({ ecosystem }) => ecosystem));
+  const ecosystemOfBranch = (branch) => branch.slice('deps/'.length).split('-')[0];
+  const unplanned = openPulls.filter(({ branch }) => !slugs.has(branch.slice('deps/'.length)));
+  const requested = unplanned.filter(
+    ({ number }) => request?.recreate && number === request.number,
+  );
   const orphans = request
-    ? []
-    : openPulls.filter(({ branch }) => {
-        const slug = branch.slice('deps/'.length);
-        return !slugs.has(slug) && !blocked.has(slug.split('-')[0]);
-      });
+    ? requested
+    : unplanned.filter(({ branch }) => !blocked.has(ecosystemOfBranch(branch)));
+  const changed = request ? [] : orphans.filter(({ humanCommits }) => humanCommits);
   const openByBranch = new Map(openPulls.map((pull) => [pull.branch, pull]));
   const decisions = ordered.map((entry) => {
     const pull = openByBranch.get(`deps/${entry.slug}`);
@@ -302,17 +305,15 @@ export function buildPlan({
     updates: allUpdates.slice(0, MATRIX_LIMIT),
     deferred: [...allEntries.slice(MATRIX_LIMIT), ...allUpdates.slice(MATRIX_LIMIT)],
     closes: orphans
-      .filter(({ humanCommits }) => !humanCommits)
+      .filter((pull) => !changed.includes(pull))
       .map(({ number, branch }) => ({ number, branch })),
     skipped: [
       ...decisions.flatMap(({ entry, skip }) => (skip ? [{ ...entry, reason: skip }] : [])),
-      ...orphans
-        .filter(({ humanCommits }) => humanCommits)
-        .map(({ number, branch }) => ({
-          ecosystem: branch.slice('deps/'.length).split('-')[0],
-          name: `#${number}`,
-          reason: 'no update targets this pull request, but a person or the agent changed it',
-        })),
+      ...changed.map(({ number, branch }) => ({
+        ecosystem: ecosystemOfBranch(branch),
+        name: `#${number}`,
+        reason: 'no update targets this pull request, but a person or the agent changed it',
+      })),
     ],
     ignored,
     needsPerson,

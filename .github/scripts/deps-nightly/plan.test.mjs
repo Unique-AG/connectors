@@ -446,9 +446,22 @@ describe('buildPlan', () => {
         assert.deepStrictEqual(other.closes, [{ number: 8, branch: 'deps/uv-gone' }]);
       });
 
-      it('closes nothing in a run for one pull request', () => {
-        const request = { number: 7, recreate: false };
+      it('closes nothing when a run for one pull request is for another pull request', () => {
+        const request = { number: 7, recreate: true };
         assert.deepStrictEqual(plan([pull(), gone()], { request }).closes, []);
+      });
+
+      it('closes nothing when a rebase asks for it', () => {
+        const request = { number: 8, recreate: false };
+        assert.deepStrictEqual(plan([gone()], { request }).closes, []);
+      });
+
+      it('closes it when a recreate asks for it, even with commits and a blocked ecosystem', () => {
+        const request = { number: 8, recreate: true };
+        const needsPerson = [{ ecosystem: 'npm', name: 'zod', reason: 'Too young.' }];
+        const { closes, skipped } = plan([gone({ humanCommits: true })], { request, needsPerson });
+        assert.deepStrictEqual(closes, [{ number: 8, branch: 'deps/npm-gone' }]);
+        assert.ok(skipped.every(({ name }) => name !== '#8'));
       });
     });
 

@@ -326,7 +326,7 @@ jobs:
 
   finish:
     name: Finish
-    needs: [plan, credentials, update, bump, publish]
+    needs: [plan, credentials, update, close, bump, publish]
     if: always() && !inputs.dry-run && inputs.pr != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 5
