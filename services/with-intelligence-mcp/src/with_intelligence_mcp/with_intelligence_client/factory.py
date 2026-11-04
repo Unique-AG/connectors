@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from typing import cast
 
 import httpx
+from mcp_observability import add_log_secrets
 from pydantic import TypeAdapter
 
 from with_intelligence_mcp.metrics import UPSTREAM_CONCURRENCY_WAIT
@@ -108,27 +109,30 @@ class WithIntelligenceClientFactory:
 
     async def sign_in(self, credential: WiCredential) -> WiSession:
         """`POST /v3/auth/sign-in`. Username and password only — no passcode is involved."""
+        password = credential.password.get_secret_value()
+        add_log_secrets(password)
         return await self._request_session(
-            SIGN_IN_PATH,
-            {
-                "username": credential.username,
-                "password": credential.password.get_secret_value(),
-            },
+            SIGN_IN_PATH, {"username": credential.username, "password": password}
         )
 
     async def refresh_session(self, session: WiSession) -> WiSession:
         """Refresh a WI session."""
-        return await self._request_session(
-            REFRESH_PATH, {"refreshToken": session.refresh_token.get_secret_value()}
-        )
+        refresh_token = session.refresh_token.get_secret_value()
+        add_log_secrets(refresh_token)
+        return await self._request_session(REFRESH_PATH, {"refreshToken": refresh_token})
 
     async def _request_session(self, path: str, payload: dict[str, str]) -> WiSession:
+        """The new tokens stay redacted until the enclosing tool call or HTTP request ends."""
         response = await self._send_auth_request(path, payload)
 
         try:
-            return _SESSION.validate_json(response.content)
+            session = _SESSION.validate_json(response.content)
         except ValueError as exc:
             raise AuthenticationRejected(f"{path} returned an invalid response") from exc
+        add_log_secrets(
+            session.access_token.get_secret_value(), session.refresh_token.get_secret_value()
+        )
+        return session
 
     async def _send_auth_request(self, path: str, payload: dict[str, str]) -> httpx.Response:
         response = await self._post_auth_request(path, payload)

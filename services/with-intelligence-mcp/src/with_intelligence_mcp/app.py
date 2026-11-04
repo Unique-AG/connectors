@@ -6,6 +6,8 @@ from fastmcp import FastMCP
 from mcp_configs import RateLimitSettings
 from mcp_observability import (
     RateLimitMiddleware,
+    RedactRequestSecretsMiddleware,
+    RedactToolCallSecretsMiddleware,
     ToolCallObservabilityMiddleware,
     access_token_subject,
 )
@@ -22,6 +24,8 @@ from with_intelligence_mcp.dependencies import (
     get_app_config,
     get_auth_config,
     get_auth_provider,
+    get_database_config,
+    get_encryption_key,
     get_engine,
     get_session_factory,
 )
@@ -41,7 +45,10 @@ def create_app() -> Starlette:
     config = get_app_config()
     auth_config = get_auth_config()
 
-    configure_logging()
+    configure_logging(
+        encryption_key=get_encryption_key(),
+        database_url=get_database_config().connection_url,
+    )
     configure_metrics(config)
 
     engine = get_engine()
@@ -65,7 +72,9 @@ def create_app() -> Starlette:
         auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
+        # Redaction first, so the tool-call lines are redacted too.
         middleware=[
+            RedactToolCallSecretsMiddleware(),
             ToolCallObservabilityMiddleware(),
             RateLimitMiddleware(RateLimitSettings(), get_request_key=access_token_subject),
         ],
@@ -89,7 +98,16 @@ def create_app() -> Starlette:
     async def login_post(request: Request) -> Response:
         return await auth_provider.handle_login_post(request)
 
-    return mcp.http_app(middleware=[Middleware(OpenTelemetryMiddleware), ops_middleware])
+    return mcp.http_app(
+        middleware=[
+            # The first of ours, so the bearer token is redacted from every line they log. FastMCP
+            # runs its auth middleware ahead of these, so verifying the token happens outside
+            # this scope.
+            Middleware(RedactRequestSecretsMiddleware),
+            Middleware(OpenTelemetryMiddleware),
+            ops_middleware,
+        ]
+    )
 
 
 async def _ready_response(engine: AsyncEngine) -> JSONResponse:
