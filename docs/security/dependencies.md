@@ -273,9 +273,16 @@ An action that is pinned to a branch goes to the list "Needs a person". An image
 
 ## Advisories in lock files
 
-Every night, Trivy scans `pnpm-lock.yaml` and every `uv.lock` on `main`, dev dependencies included. It uploads critical, high, and medium findings that have a fix to the Security tab, category `trivy-lockfiles`.
+Every night, Trivy scans `pnpm-lock.yaml` and every `uv.lock` on `main`, dev dependencies included. It uploads findings of every severity to the Security tab, category `trivy-lockfiles`. A finding without a patch is included.
 
 A lock file alert closes when the fixed lock file reaches `main`. It does not need a release. The nightly job fixes most of them with its next PR.
+
+| Alert type | Where | Category |
+|---|---|---|
+| Lock files | Security tab, Code scanning | `trivy-lockfiles` |
+| Published images | Security tab, Code scanning | `trivy-image/<service>` |
+| Dockerfiles and configuration | Security tab, Code scanning | `trivy-config` |
+| Source code | Security tab, Code scanning | CodeQL |
 
 | File | What it holds |
 |---|---|
