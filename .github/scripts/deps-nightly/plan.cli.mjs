@@ -28,7 +28,7 @@ import {
   trackedFiles,
   uvProjectFolders,
 } from './repo.mjs';
-import { run, runOrThrow, sandboxEnv } from './run.mjs';
+import { isNotFound, run, runOrThrow, sandboxEnv } from './run.mjs';
 import { closedBodiesOf, closedKeysOf } from './state.mjs';
 import { createTerraformLookup, planTerraform } from './terraform.mjs';
 
@@ -179,18 +179,28 @@ const openPullRequests = JSON.parse(
 );
 const openPulls = openPullRequests
   .filter(({ headRefName }) => headRefName.startsWith('deps/'))
-  .map(({ number, headRefName, body, labels }) => ({
-    number,
-    branch: headRefName,
-    body,
-    labels: labels.map(({ name }) => name),
-    behindBy: Number(
-      gh('api', `repos/${repository}/compare/${baseBranch}...${headRefName}`, '--jq', '.behind_by'),
-    ),
-    humanCommits: JSON.parse(
-      gh('pr', 'view', String(number), '--json', 'commits', '--jq', '[.commits[].authors[].login]'),
-    ).some((login) => login !== 'github-actions[bot]'),
-  }));
+  .flatMap(({ number, headRefName, body, labels }) => {
+    const compare = run('gh', [
+      'api',
+      `repos/${repository}/compare/${baseBranch}...${headRefName}`,
+      '--jq',
+      '.behind_by',
+    ]);
+    if (isNotFound(compare)) {
+      return [];
+    }
+    assert.strictEqual(compare.status, 0, `gh api compare of ${headRefName} failed:\n${compare.stderr}`);
+    return {
+      number,
+      branch: headRefName,
+      body,
+      labels: labels.map(({ name }) => name),
+      behindBy: Number(compare.stdout),
+      humanCommits: JSON.parse(
+        gh('pr', 'view', String(number), '--json', 'commits', '--jq', '[.commits[].authors[].login]'),
+      ).some((login) => login !== 'github-actions[bot]'),
+    };
+  });
 const [owner, repositoryName] = repository.split('/');
 const closedBodies = closedBodiesOf(
   JSON.parse(
