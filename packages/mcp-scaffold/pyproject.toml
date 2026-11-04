@@ -35,7 +35,7 @@ service = [
     "fastmcp==4.1.4",
     "httpx2==2.16.0",
     "mcp-types==2.3.0",
-    "pydantic==2.14.1",
+    "pydantic==2.14.2",
     "pydantic-settings==2.16.1",
     "starlette==1.10.0",
     "tenacity==9.2.1",
