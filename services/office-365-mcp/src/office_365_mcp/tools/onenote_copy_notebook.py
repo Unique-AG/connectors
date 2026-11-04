@@ -198,8 +198,8 @@ async def _copy(
     builder = root.notebooks.by_notebook_id(handle.notebook_id).copy_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_notebook_body.CopyNotebookPostRequestBody(group_id=to_group, rename_as=new_name),
     )

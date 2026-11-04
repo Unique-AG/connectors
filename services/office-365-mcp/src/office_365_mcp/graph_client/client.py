@@ -188,13 +188,7 @@ class _QuietUrlReplaceHandler(UrlReplaceHandler):
 
     @override
     def _create_observability_span(self, request: httpx.Request, span_name: str) -> Span:
-        # The ignore is for the base method's unannotated `request` parameter. Its return type is
-        # annotated, hence the `Span` above.
-        return _SpanWithoutTheUrl(
-            super()._create_observability_span(  # pyright: ignore[reportUnknownMemberType]
-                request, span_name
-            )
-        )
+        return _SpanWithoutTheUrl(super()._create_observability_span(request, span_name))
 
 
 def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]:
@@ -305,18 +299,14 @@ async def fetch_response(
     )
     response = cast(
         "object",
-        await adapter.send_primitive_async(  # pyright: ignore[reportUnknownMemberType]
-            request, "bytes", {"XXX": ODataError}
-        ),
+        await adapter.send_primitive_async(request, "bytes", {"XXX": ODataError}),
     )
     assert isinstance(response, httpx.Response), (
         "the native response handler must hand back the raw httpx.Response, not a decoded body"
     )
     span = adapter.start_tracing_span(request, "fetch_response")
     try:
-        await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
-            response, {"XXX": ODataError}, span, span
-        )
+        await adapter.throw_failed_responses(response, {"XXX": ODataError}, span, span)
     finally:
         span.end()
     return FetchedResponse(

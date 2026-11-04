@@ -257,7 +257,7 @@ async def create_page(
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_CREATE):
-                created = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
+                created = await client.request_adapter.send_async(
                     request, OnenotePage, {"XXX": ODataError}
                 )
 
