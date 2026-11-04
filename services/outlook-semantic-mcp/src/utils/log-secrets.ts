@@ -38,12 +38,7 @@ export function deploymentSecrets({
   ];
 }
 
-/**
- * Opens a log-secret scope for each run of an AMQP handler or scheduled job, which runs outside any
- * HTTP request, so a token it reads with `addLogSecrets` is redacted from what it logs. Put it
- * directly above `@NewTrace`, below `@RabbitSubscribe`, so that one attaches its metadata to the
- * function this returns.
- */
+/** Scope for an AMQP handler or job outside a request. Place it above `@NewTrace` and below `@RabbitSubscribe`. */
 export function LogSecretsScope(): MethodDecorator {
   return (_target, _key, descriptor: PropertyDescriptor) => {
     const original = descriptor.value as (...args: unknown[]) => unknown;
