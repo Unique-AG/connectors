@@ -108,6 +108,13 @@ describe('pairVersions and formatChange', () => {
     assert.strictEqual(formatChange('~> 3', '4.9.0'), '~> 3 -> 4.9.0');
   });
 
+  it('keeps a Terraform constraint list whole', () => {
+    assert.strictEqual(formatChange('>= 4, < 6', '6.1.0'), '>= 4, < 6 -> 6.1.0');
+    assert.deepStrictEqual(pairVersions('>= 4, < 6 and ~> 0.12', '6.1.0'), [
+      ['>= 4, < 6 and ~> 0.12', '6.1.0'],
+    ]);
+  });
+
   it('pairs a new major with the newest older version', () => {
     assert.deepStrictEqual(pairVersions('6.1.0, 7.0.0', '8.0.0'), [['7.0.0', '8.0.0']]);
   });

@@ -70,8 +70,13 @@ export function versionLine(version) {
 
 const versionList = (value) => [value].flat().flatMap((item) => item.split(', '));
 
+function oldVersions(from) {
+  const parts = versionList(from);
+  return parts.every((part) => VERSION.test(part)) ? parts : [[from].flat().join(', ')];
+}
+
 export function pairVersions(from, to) {
-  const olds = versionList(from);
+  const olds = oldVersions(from);
   if (olds.length === 1) {
     return versionList(to).map((target) => [olds[0], target]);
   }
