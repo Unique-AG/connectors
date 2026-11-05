@@ -159,6 +159,14 @@ describe('OpenEmailQuery', () => {
     });
   });
 
+  it('reads a message whose attachments Graph returns as null', async () => {
+    graphRequest.get.mockResolvedValue({ ...graphMessage, isDraft: true, attachments: null });
+
+    const { metadata } = await run();
+
+    expect(metadata).toMatchObject({ isDraft: true, attachments: [] });
+  });
+
   it('marks a message without the draft flag as not a draft', async () => {
     const { metadata } = await run();
 

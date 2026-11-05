@@ -82,6 +82,7 @@ export class RemoveAttachmentsFromDraftEmailTool {
       draftId: input.draftId,
       idIsImmutable: input.idIsImmutable,
       mailbox: input.mailbox,
+      parentFolderId: input.parentFolderId,
     };
     const draftState = await this.getDraftStateQuery.run(draftTarget);
     if (draftState.status === 'failed') {
@@ -133,6 +134,7 @@ export class RemoveAttachmentsFromDraftEmailTool {
         draftId: input.draftId,
         idIsImmutable: input.idIsImmutable,
         mailbox: input.mailbox,
+        parentFolderId: input.parentFolderId,
         attachments: toRemove,
       },
     );

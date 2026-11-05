@@ -43,4 +43,11 @@ export const ExistingDraftTargetShape = {
     .describe(
       'UPN of the shared mailbox that holds the draft (e.g. "support@company.com"). Use `openEmailParams.mailbox` when it is set. Omit for the signed-in user\'s own mailbox.',
     ),
+  parentFolderId: z
+    .string()
+    .regex(/^[A-Za-z0-9+/_=-]+$/)
+    .optional()
+    .describe(
+      'The folder containing the draft. Use `openEmailParams.parentFolderId` from the `search_emails` result when it is set: access to some shared mailboxes is granted per folder.',
+    ),
 };

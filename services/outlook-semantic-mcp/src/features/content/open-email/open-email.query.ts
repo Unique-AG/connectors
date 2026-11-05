@@ -3,8 +3,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pipe } from 'remeda';
 import * as z from 'zod';
-import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { graphMessagePath } from '~/msgraph/graph-message-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
@@ -33,7 +33,9 @@ const graphMessageSchema = z.object({
         isInline: z.boolean().nullish(),
       }),
     )
-    .default([]),
+    // Graph sends null, not [], for a message expanded with no attachments.
+    .nullish()
+    .transform((attachments) => attachments ?? []),
 });
 
 export interface OpenEmailResult {
@@ -120,12 +122,7 @@ export class OpenEmailQuery {
     outputTimeZone?: string,
   ): Promise<OpenEmailResult> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
-    const encodedMessageId = encodeGraphItemIdForUrlPath(messageId);
-    const messagePath = !mailbox
-      ? `/me/messages/${encodedMessageId}`
-      : folderId
-        ? `/users/${mailbox}/mailFolders/${encodeGraphItemIdForUrlPath(folderId)}/messages/${encodedMessageId}`
-        : `/users/${mailbox}/messages/${encodedMessageId}`;
+    const messagePath = graphMessagePath({ messageId, mailbox, folderId });
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
       .api(messagePath)

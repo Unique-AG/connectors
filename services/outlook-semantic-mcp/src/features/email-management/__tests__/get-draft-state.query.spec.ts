@@ -66,6 +66,29 @@ describe('GetDraftStateQuery', () => {
     expect(graphRequest.header).toHaveBeenCalledWith('Prefer', 'IdType="ImmutableId"');
   });
 
+  it('reads a draft in a folder of the shared mailbox through that folder', async () => {
+    const { query, api } = makeQuery({ isDraft: true });
+
+    await query.run({
+      userProfileId: 'user-1',
+      draftId: 'draft-1',
+      mailbox: 'shared@example.com',
+      parentFolderId: 'drafts-folder',
+    });
+
+    expect(api).toHaveBeenCalledWith(
+      '/users/shared@example.com/mailFolders/drafts-folder/messages/draft-1',
+    );
+  });
+
+  it('reads a draft whose attachments Graph returns as null', async () => {
+    const { query } = makeQuery({ isDraft: true, subject: 'Offer', attachments: null });
+
+    const result = await query.run({ userProfileId: 'user-1', draftId: 'draft-1' });
+
+    expect(result).toEqual({ status: 'draft', subject: 'Offer', attachments: [] });
+  });
+
   it('fails when the message is no longer a draft', async () => {
     const { query } = makeQuery({ isDraft: false, subject: 'Sent' });
 

@@ -30,6 +30,7 @@ export class StreamUniqueAttachmentCommand {
     chatId,
     userProfileId,
     mailbox,
+    parentFolderId,
     idIsImmutable,
   }: {
     client: Client;
@@ -42,6 +43,7 @@ export class StreamUniqueAttachmentCommand {
     uniqueIdentity: ResolvedUniqueIdentity;
     userProfileId: string;
     mailbox?: string;
+    parentFolderId?: string;
     idIsImmutable?: boolean;
   }): Promise<AttachmentUploadResult> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
@@ -144,6 +146,7 @@ export class StreamUniqueAttachmentCommand {
         totalChunks,
         userProfileId,
         mailbox,
+        parentFolderId,
         idIsImmutable,
       });
     } finally {
@@ -163,6 +166,7 @@ export class StreamUniqueAttachmentCommand {
     totalChunks,
     userProfileId,
     mailbox,
+    parentFolderId,
     idIsImmutable,
   }: {
     reader: {
@@ -177,6 +181,7 @@ export class StreamUniqueAttachmentCommand {
     totalChunks: number;
     userProfileId: string;
     mailbox?: string;
+    parentFolderId?: string;
     idIsImmutable?: boolean;
   }): Promise<void> {
     let offset = 0;
@@ -188,6 +193,7 @@ export class StreamUniqueAttachmentCommand {
         client,
         draftId,
         mailbox,
+        parentFolderId,
         idIsImmutable,
         subPath: '/createUploadSession',
       }).post({

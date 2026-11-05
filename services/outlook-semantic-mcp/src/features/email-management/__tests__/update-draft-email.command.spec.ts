@@ -25,7 +25,7 @@ function makeCommand(draftState: DraftState = DRAFT_STATE) {
     buildWebLinksCommand as never,
     { run: vi.fn().mockResolvedValue({ id: 'user-1', email: 'user@test.com' }) } as never,
   );
-  return { command, api, graphRequest, webLinks };
+  return { command, api, graphRequest, webLinks, getDraftStateQuery };
 }
 
 describe('UpdateDraftEmailCommand', () => {
@@ -85,6 +85,36 @@ describe('UpdateDraftEmailCommand', () => {
       webLink: 'https://owa.test/shared-draft',
       message: 'Draft email updated successfully.',
     });
+  });
+
+  it('patches a draft in a folder of the shared mailbox through that folder', async () => {
+    const { command, api } = makeCommand();
+
+    await command.run(USER_PROFILE_ID, {
+      draftId: 'draft-1',
+      mailbox: 'shared@example.com',
+      parentFolderId: 'drafts-folder',
+      subject: 'Hi',
+    });
+
+    expect(api).toHaveBeenCalledWith(
+      '/users/shared@example.com/mailFolders/drafts-folder/messages/draft-1',
+    );
+  });
+
+  it('reads the draft state through the folder too', async () => {
+    const { command, getDraftStateQuery } = makeCommand();
+
+    await command.run(USER_PROFILE_ID, {
+      draftId: 'draft-1',
+      mailbox: 'shared@example.com',
+      parentFolderId: 'drafts-folder',
+      subject: 'Hi',
+    });
+
+    expect(getDraftStateQuery.run).toHaveBeenCalledWith(
+      expect.objectContaining({ mailbox: 'shared@example.com', parentFolderId: 'drafts-folder' }),
+    );
   });
 
   it('does not patch when the message is no longer a draft', async () => {

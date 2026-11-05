@@ -20,6 +20,7 @@ export class UploadInMemoryAttachmentCommand {
     mimeType,
     userProfileId,
     mailbox,
+    parentFolderId,
     idIsImmutable,
   }: {
     client: Client;
@@ -30,9 +31,10 @@ export class UploadInMemoryAttachmentCommand {
     mimeType: string;
     userProfileId: string;
     mailbox?: string;
+    parentFolderId?: string;
     idIsImmutable?: boolean;
   }): Promise<{ status: 'success' }> {
-    const draftTarget = { client, draftId, mailbox, idIsImmutable };
+    const draftTarget = { client, draftId, mailbox, parentFolderId, idIsImmutable };
     if (totalSize <= 3 * 1024 * 1024) {
       const logInfo = {
         userProfileId,

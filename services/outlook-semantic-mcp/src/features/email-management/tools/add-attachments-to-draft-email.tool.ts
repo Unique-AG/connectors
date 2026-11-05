@@ -72,6 +72,7 @@ export class AddAttachmentsToDraftEmailTool {
       draftId: input.draftId,
       idIsImmutable: input.idIsImmutable,
       mailbox: input.mailbox,
+      parentFolderId: input.parentFolderId,
     });
     if (draftState.status === 'failed') {
       return { success: false, message: draftState.message };
@@ -82,6 +83,7 @@ export class AddAttachmentsToDraftEmailTool {
       attachments: input.attachments,
       chatId: isString(chatId) ? chatId : null,
       mailbox: input.mailbox,
+      parentFolderId: input.parentFolderId,
       idIsImmutable: input.idIsImmutable,
     });
 

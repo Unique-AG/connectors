@@ -56,4 +56,20 @@ describe('UploadInMemoryAttachmentCommand', () => {
     );
     expect(graphRequest.header).toHaveBeenCalledWith('Prefer', 'IdType="ImmutableId"');
   });
+
+  it('posts through the folder of the shared mailbox that holds the draft', async () => {
+    const { client, api } = makeClient();
+
+    await command.run({
+      ...baseInput,
+      client,
+      draftId: 'draft-1',
+      mailbox: 'shared@example.com',
+      parentFolderId: 'drafts-folder',
+    });
+
+    expect(api).toHaveBeenCalledWith(
+      '/users/shared@example.com/mailFolders/drafts-folder/messages/draft-1/attachments',
+    );
+  });
 });

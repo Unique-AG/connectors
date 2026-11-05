@@ -10,6 +10,7 @@ interface RemoveAttachmentsInput {
   draftId: string;
   idIsImmutable?: boolean;
   mailbox?: string;
+  parentFolderId?: string;
   attachments: DraftAttachment[];
 }
 
@@ -27,7 +28,7 @@ export class RemoveAttachmentsFromDraftEmailCommand {
   @Span()
   public async run(
     userProfileId: UserProfileTypeID,
-    { draftId, idIsImmutable, mailbox, attachments }: RemoveAttachmentsInput,
+    { draftId, idIsImmutable, mailbox, parentFolderId, attachments }: RemoveAttachmentsInput,
   ): Promise<RemoveAttachmentsResult> {
     const userProfileIdString = userProfileId.toString();
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
@@ -39,6 +40,7 @@ export class RemoveAttachmentsFromDraftEmailCommand {
           client,
           draftId,
           mailbox,
+          parentFolderId,
           idIsImmutable,
           subPath: `/${encodeGraphItemIdForUrlPath(attachment.id)}`,
         }).delete();

@@ -47,6 +47,21 @@ describe('RemoveAttachmentsFromDraftEmailCommand', () => {
     expect(graphRequest.header).toHaveBeenCalledWith('Prefer', 'IdType="ImmutableId"');
   });
 
+  it('deletes through the folder of the shared mailbox that holds the draft', async () => {
+    const { command, api } = makeCommand();
+
+    await command.run(USER_PROFILE_ID, {
+      draftId: 'draft-1',
+      mailbox: 'shared@example.com',
+      parentFolderId: 'drafts-folder',
+      attachments: [{ id: 'att-1', name: 'a.pdf', isInline: false }],
+    });
+
+    expect(api).toHaveBeenCalledWith(
+      '/users/shared@example.com/mailFolders/drafts-folder/messages/draft-1/attachments/att-1',
+    );
+  });
+
   it('keeps going and reports the attachments that failed', async () => {
     const deleteImpl = vi
       .fn()

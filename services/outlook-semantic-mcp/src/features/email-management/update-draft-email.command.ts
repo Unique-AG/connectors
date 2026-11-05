@@ -3,8 +3,8 @@ import { Span } from 'nestjs-otel';
 import { z } from 'zod';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
-import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { graphMessagePath } from '~/msgraph/graph-message-path';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { toGraphRecipients } from './draft-recipients';
 import { GetDraftStateQuery } from './get-draft-state.query';
@@ -18,6 +18,7 @@ interface UpdateDraftEmailInput {
   draftId: string;
   idIsImmutable?: boolean;
   mailbox?: string;
+  parentFolderId?: string;
   subject?: string;
   content?: string;
   toRecipients?: Array<{ name?: string; email: string }>;
@@ -51,13 +52,13 @@ export class UpdateDraftEmailCommand {
       draftId: input.draftId,
       idIsImmutable: input.idIsImmutable,
       mailbox: input.mailbox,
+      parentFolderId: input.parentFolderId,
     });
     if (draftState.status === 'failed') {
       return { success: false, message: draftState.message };
     }
 
     const userProfile = await this.getUserProfileQuery.run(userProfileId);
-    const prefix = input.mailbox ? `/users/${input.mailbox}` : '/me';
     const client = this.graphClientFactory.createClientForUser(userProfileIdString);
 
     // Graph keeps every property that is absent from the PATCH body.
@@ -72,7 +73,11 @@ export class UpdateDraftEmailCommand {
 
     try {
       let graphRequest = client.api(
-        `${prefix}/messages/${encodeGraphItemIdForUrlPath(input.draftId)}`,
+        graphMessagePath({
+          messageId: input.draftId,
+          mailbox: input.mailbox,
+          folderId: input.parentFolderId,
+        }),
       );
       if (input.idIsImmutable) {
         graphRequest = graphRequest.header('Prefer', 'IdType="ImmutableId"');

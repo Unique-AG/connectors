@@ -463,6 +463,7 @@ All three tools take the same target fields:
 | `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `create_draft_email`. |
 | `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result, or the `idIsImmutable` returned by `create_draft_email`. |
 | `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. |
+| `parentFolderId` | string | No | `openEmailParams.parentFolderId` from the search result when set. Without it, a `mailbox` draft is reached through `/users/{mailbox}/messages/{id}`, which Microsoft Graph refuses when access to the shared mailbox is granted per folder. With it, every request goes through `/users/{mailbox}/mailFolders/{parentFolderId}/messages/{id}`. |
 
 Before changing anything, every tool reads the message from Microsoft Graph and refuses — leaving it untouched — when it is no longer a draft (for example because it was already sent) or cannot be read.
 

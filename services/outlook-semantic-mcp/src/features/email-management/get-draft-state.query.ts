@@ -1,8 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
-import { encodeGraphItemIdForUrlPath } from '~/msgraph/encode-graph-item-id-for-url-path';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
+import { graphMessagePath } from '~/msgraph/graph-message-path';
 
 const DraftStateResponseSchema = z.object({
   isDraft: z.boolean().optional(),
@@ -15,7 +15,9 @@ const DraftStateResponseSchema = z.object({
         isInline: z.boolean().nullish(),
       }),
     )
-    .default([]),
+    // Graph sends null, not [], for a message expanded with no attachments.
+    .nullish()
+    .transform((attachments) => attachments ?? []),
 });
 
 export interface DraftAttachment {
@@ -40,18 +42,19 @@ export class GetDraftStateQuery {
     draftId,
     idIsImmutable,
     mailbox,
+    parentFolderId,
   }: {
     userProfileId: string;
     draftId: string;
     idIsImmutable?: boolean;
     mailbox?: string;
+    parentFolderId?: string;
   }): Promise<DraftState> {
-    const prefix = mailbox ? `/users/${mailbox}` : '/me';
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
     try {
       let request = client
-        .api(`${prefix}/messages/${encodeGraphItemIdForUrlPath(draftId)}`)
+        .api(graphMessagePath({ messageId: draftId, mailbox, folderId: parentFolderId }))
         .select('isDraft,subject')
         .expand('attachments($select=id,name,isInline)');
       if (idIsImmutable) {
