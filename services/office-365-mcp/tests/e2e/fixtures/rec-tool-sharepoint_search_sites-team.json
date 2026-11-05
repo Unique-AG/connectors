@@ -1,0 +1,27 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/sites",
+    "query": {
+      "search": "seed-v1 team"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "createdDateTime": "2026-10-30T13:12:53Z",
+          "description": "The team of the recorder cases.",
+          "displayName": "seed-v1 team",
+          "id": "qwtwkvuabyfwcxxvo.okbidbhjzy.dza,00000000-e263-472b-8fb7-39fbafc89342,00000000-b2dc-4c58-8300-026e8bc8bea1",
+          "lastModifiedDateTime": "2026-10-11T20:18:25Z",
+          "name": "synthetic text 01",
+          "root": {},
+          "webUrl": "https://contoso.sharepoint.com/teams/synthetic%20text%2001"
+        }
+      ]
+    }
+  }
+]

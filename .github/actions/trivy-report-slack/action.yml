@@ -61,6 +61,10 @@ runs:
       run: |
         set -euo pipefail
         PAYLOAD=$(node "${{ github.action_path }}/build-payload.mjs")
+        if [ -z "$PAYLOAD" ]; then
+          echo "::warning title=Slack report not posted::Every image scan failed, so there is nothing to report. Read the scan jobs of this run."
+          echo "Every image scan failed. No Slack report was posted." >> "$GITHUB_STEP_SUMMARY"
+        fi
         {
           echo 'payload<<EOF'
           echo "$PAYLOAD"
@@ -68,6 +72,7 @@ runs:
         } >> "$GITHUB_OUTPUT"
 
     - name: Send Slack notification
+      if: steps.build-payload.outputs.payload != ''
       uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
       with:
         webhook: ${{ inputs.webhook }}

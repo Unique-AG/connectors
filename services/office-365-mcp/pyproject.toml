@@ -8,29 +8,29 @@ dependencies = [
     # `EntraOBOToken` raises ImportError without it, and every tool goes through it. Both packages
     # also arrive transitively via `msgraph-sdk`, which is precisely why this is declared: the day
     # the Graph SDK stops depending on them, OBO must not break silently.
-    "fastmcp[azure]==4.1.4",
+    "fastmcp[azure]==4.1.5",
     # fastmcp already depends on py-key-value-aio[filetree,memory]; declared here for
     # the postgresql extra and because auth.py imports it directly (OAuth state store).
     "py-key-value-aio[postgresql]==0.4.6",
     # The official Microsoft Graph SDK. `msgraph-core` (the request-adapter/telemetry layer),
     # `microsoft-kiota-*` (the HTTP middleware pipeline) and `azure-core` (the credential
     # protocol the SDK authenticates with) all arrive transitively and are pinned in uv.lock.
-    "msgraph-sdk==1.62.0",
+    "msgraph-sdk==1.65.0",
     "uvicorn[standard]==0.54.0",
     # fastmcp already depends on starlette; declared here because app.py imports Starlette,
     # Middleware, Request and JSONResponse directly to assemble the ASGI app.
     "starlette==1.10.0",
-    "pydantic==2.14.1",
-    "pydantic-settings==2.16.1",
+    "pydantic==2.14.2",
+    "pydantic-settings==2.16.2",
     "python-dotenv==1.2.4",
     # The http2 extra (h2) is what `graph_client` builds its transport with, matching the Graph
     # SDK's own default client; the SDK pulls the same extra, but we ask for it directly because
     # we are the ones passing `http2=True`.
     "httpx[http2]==0.28.1",
-    "opentelemetry-api==1.45.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
     "opentelemetry-exporter-prometheus==0.66b1",
-    "opentelemetry-instrumentation-asgi==0.66b1",
+    "opentelemetry-instrumentation-asgi==0.66b2",
     "asyncpg==0.32.0",
     "cryptography==50.0.2",
     "unique-mcp==2026.44.2",
@@ -63,14 +63,17 @@ packages = ["src/office_365_mcp"]
 [dependency-groups]
 dev = [
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1",
+    "pytest-asyncio==1.4.1.post1",
     "hatchling==1.33.0",
     "ruff==0.17.3",
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers==4.15.0",
     "certifi==2026.10.23",
+    "gherkin-official==42.0.1",
     "poethepoet==0.49.0",
+    "pyyaml==6.0.3",
+    "pytest-xdist==3.8.0",
 ]
 
 [tool.poe.tasks]
@@ -89,6 +92,7 @@ asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src", "."]
 filterwarnings = ["ignore::DeprecationWarning:testcontainers"]
+addopts = "-n auto"
 markers = ["docker: needs a live Postgres via testcontainers"]
 
 [tool.ruff]
@@ -100,6 +104,9 @@ exclude = [".venv"]
 # ANN: requires type annotations on function arguments (ANN001-003) and return
 # values (ANN2xx) — enforced everywhere, not just public functions.
 select = ["E", "F", "I", "UP", "B", "SIM", "ANN"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/dogfood/**" = ["E402", "E501", "ANN001", "ANN401"]
 
 [tool.basedpyright]
 venvPath = "."

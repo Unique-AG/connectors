@@ -35,6 +35,9 @@ from office_365_mcp.tools.teams_add_chat_member import (
     a_person_agrees,
     add_chat_member,
 )
+from tests.tools.scenarios.support import Person as Approver
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import TOM, new_group_chat, rows, uncalled, was_sent
 
 from .conftest import OTHER_USER_ID, SIGNED_IN_USER_ID
 
@@ -838,3 +841,26 @@ class TestHowItDeclaresItself:
             )
 
         assert len(graph.calls) == 0
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_adds_a_person_back_to_a_chat_after_removing_him(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_add_chat_member-tom")
+        chat_id = (await new_group_chat())["chat_id"]
+        members = rows(await call("teams_list_chat_members", chat_id=chat_id), "members")
+        tom = next(member for member in members if member["display_name"] == "Tom Berger")
+        _ = await call(
+            "teams_remove_chat_member", chat_id=chat_id, membership_id=tom["membership_id"]
+        )
+        mia = Approver()
+
+        added = await call("teams_add_chat_member", person=mia, chat_id=chat_id, member=TOM)
+
+        assert added["chat_id"] == chat_id
+        assert added["user_id"] == tom["user_id"]
+        assert added["shared_history"] is False
+        assert "Tom Berger" in mia.asked[0]
+        assert was_sent(routes, "POST", f"/chats/{chat_id}/members")
+        assert uncalled(routes) == []

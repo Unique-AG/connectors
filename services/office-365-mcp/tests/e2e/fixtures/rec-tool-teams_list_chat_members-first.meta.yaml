@@ -1,0 +1,23 @@
+scenario: teams_list_chat_members-first
+fixture: rec-tool-teams_list_chat_members-first
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:44:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 59
+  keys dropped: 18
+  other addresses replaced: 6
+  persona addresses: 6
+  persona names: 6
+  query parameters dropped: 3
+  response headers dropped: 32
+  text kept: 1
+  text replaced: 20
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

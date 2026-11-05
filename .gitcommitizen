@@ -39,10 +39,9 @@ backstop-mcp = services/backstop-mcp/**
 office-365-mcp = services/office-365-mcp/**
 with-intelligence-mcp = services/with-intelligence-mcp/**
 exp-tiingo-mcp = services/exp-tiingo-mcp/**
+services = services/**
 
 # Packages
-aes-gcm-encryption = packages/aes-gcm-encryption/**
-instrumentation = packages/instrumentation/**
 logger = packages/logger/**
 mcp-architecture = packages/mcp-architecture/**
 mcp-configs = packages/mcp-configs/**
@@ -52,16 +51,19 @@ mcp-oauth = packages/mcp-oauth/**
 mcp-openapi = packages/mcp-openapi/**
 mcp-scaffold = packages/mcp-scaffold/**
 mcp-server-module = packages/mcp-server-module/**
-probe = packages/probe/**
-proxy = packages/proxy/**
 utils = packages/utils/**
 unique-api = packages/unique-api/**
+packages = packages/**
 
 # Docs
 recordings-and-transcripts = docs/recordings-and-transcripts/**
+docs = docs/**, *.md
+
+# Agent files
+agentic = agentic/**, .claude/**, .cursor/**
 
 # Special scopes
 ci = .github/**, .gitcommitizen, biome.json, turbo.json, tsconfig.json, vitest.config.ts, pnpm-workspace.yaml, docker-compose.yaml, flake.nix, flake.lock, .dockerignore, release-please-config.json, .release-please-manifest.json, .syncpackrc.json
 scripts = scripts/**
 main = *, .*
-deps = package.json, pnpm-lock.yaml
+deps = package.json, **/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, **/uv.lock, **/pyproject.toml, **/Dockerfile, **/*.tf, **/.terraform.lock.hcl, .github/workflows/**, .github/actions/**

@@ -1,0 +1,23 @@
+scenario: onenote_get_operation-notebook
+fixture: rec-tool-onenote_get_operation-notebook
+source: recorded
+target: graph
+recorded_at: '2026-11-03T11:30:04+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 170
+  keys dropped: 45
+  query parameters dropped: 9
+  response headers dropped: 63
+  text kept: 59
+  text replaced: 104
+literals:
+- seed-v1 Spare
+- seed-v1 case-copy-follow 2026-11-04
+- seed-v1 case-copy-follow ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

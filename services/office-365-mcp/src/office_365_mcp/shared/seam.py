@@ -255,8 +255,6 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
     async def elicited(question: str) -> str | None:
         try:
             answer = await ctx.elicit(question, response_type=[agree, decline])
-        except ToolError as already_a_refusal:
-            return str(already_a_refusal)
         except Exception as unanswered:
             if isinstance(unanswered, MCPError) and unanswered.code in _CANNOT_BE_ASKED:
                 return _nobody_to_ask(nothing_happened)
@@ -372,9 +370,7 @@ class GraphAdviceMiddleware(Middleware):
             if isinstance(cause, TokenExchangeFailed):
                 return ToolError(_token_advice(cause.cause, cause.permissions))
             if isinstance(cause, GraphFailure):
-                known = self._advice.get(tool)
-                if known is None:
-                    return None
+                known = self._advice[tool]
                 permissions = known.permissions if narrowed is None else narrowed
                 return ToolError(
                     _advice(

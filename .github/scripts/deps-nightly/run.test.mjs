@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { describe, it } from 'node:test';
-import { sandboxEnv } from './run.mjs';
+import { isNotFound, sandboxEnv } from './run.mjs';
 
 describe('sandboxEnv', () => {
   it('drops the tokens and the runner file commands and keeps the rest', () => {
@@ -34,5 +34,16 @@ describe('sandboxEnv', () => {
       }
       Object.assign(process.env, saved);
     }
+  });
+});
+
+describe('isNotFound', () => {
+  it('is true for a failed gh call that answers HTTP 404', () => {
+    assert.ok(isNotFound({ status: 1, stdout: '', stderr: 'gh: Not Found (HTTP 404)' }));
+  });
+
+  it('is false for another failure and for a success', () => {
+    assert.ok(!isNotFound({ status: 1, stdout: '', stderr: 'gh: Server Error (HTTP 502)' }));
+    assert.ok(!isNotFound({ status: 0, stdout: '3', stderr: '' }));
   });
 });

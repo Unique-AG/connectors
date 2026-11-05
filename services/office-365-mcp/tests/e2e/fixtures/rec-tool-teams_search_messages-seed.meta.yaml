@@ -1,0 +1,18 @@
+scenario: teams_search_messages-seed
+fixture: rec-tool-teams_search_messages-seed
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:01:03+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 1
+  response headers dropped: 6
+  text kept: 3
+literals:
+- seed-v1 case
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

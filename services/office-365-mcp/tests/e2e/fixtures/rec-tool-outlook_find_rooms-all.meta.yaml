@@ -1,0 +1,19 @@
+scenario: outlook_find_rooms-all
+fixture: rec-tool-outlook_find_rooms-all
+source: recorded
+target: graph
+recorded_at: '2026-11-02T20:59:28+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 1
+  keys dropped: 7
+  response headers dropped: 8
+  text kept: 2
+  text replaced: 3
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

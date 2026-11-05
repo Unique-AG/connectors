@@ -33,6 +33,8 @@ from office_365_mcp.shared.messages import ChatImportance, Mention
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
 from office_365_mcp.tools import teams_send_chat_message as sender
 from office_365_mcp.tools.teams_send_chat_message import a_person_agrees, send_chat_message
+from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.teams_recordings import new_group_chat, uncalled, was_sent
 
 from .conftest import TEAMS_SENDER, message_payload
 
@@ -1088,3 +1090,25 @@ class TestHowItDeclaresItself:
             )
 
         assert len(graph.calls) == 0, "a mention the schema refuses reached Graph"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_sends_a_message_to_a_new_chat_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_send_chat_message-group")
+        chat_id = (await new_group_chat())["chat_id"]
+        mia = Person()
+
+        sent = await call(
+            "teams_send_chat_message",
+            person=mia,
+            chat_id=chat_id,
+            message="seed-v1 case-teams_send_chat_message-group hello",
+        )
+
+        assert sent["chat_id"] == chat_id
+        assert sent["body"] == "<p>seed-v1 case-teams_send_chat_message-group hello</p>"
+        assert "seed-v1 case-teams_send_chat_message-group hello" in mia.asked[0]
+        assert was_sent(routes, "POST", f"/chats/{chat_id}/messages")
+        assert uncalled(routes) == []

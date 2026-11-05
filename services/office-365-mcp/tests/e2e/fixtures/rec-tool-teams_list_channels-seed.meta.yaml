@@ -1,0 +1,19 @@
+scenario: teams_list_channels-seed
+fixture: rec-tool-teams_list_channels-seed
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:08:48+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 8
+  keys dropped: 26
+  response headers dropped: 16
+  text kept: 5
+  text replaced: 3
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

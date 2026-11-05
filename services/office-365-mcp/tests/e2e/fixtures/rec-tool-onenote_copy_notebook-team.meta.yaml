@@ -1,0 +1,23 @@
+scenario: onenote_copy_notebook-team
+fixture: rec-tool-onenote_copy_notebook-team
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:22:06+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 171
+  keys dropped: 67
+  query parameters dropped: 9
+  response headers dropped: 53
+  text kept: 62
+  text replaced: 106
+literals:
+- seed-v1 Spare
+- seed-v1 case-copy-team 2026-11-03
+- seed-v1 case-copy-team ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

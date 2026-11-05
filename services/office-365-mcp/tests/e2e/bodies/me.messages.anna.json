@@ -1,0 +1,41 @@
+{
+  "value": [
+    {
+      "id": "AAMkAGI2RUN-0102=",
+      "subject": "Lunch on Friday?",
+      "bodyPreview": "Are you free",
+      "from": {
+        "emailAddress": {
+          "name": "Anna Berg",
+          "address": "anna@example.invalid"
+        }
+      },
+      "sender": {
+        "emailAddress": {
+          "name": "Anna Berg",
+          "address": "anna@example.invalid"
+        }
+      },
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "name": "Mia Wong",
+            "address": "mia@example.invalid"
+          }
+        }
+      ],
+      "replyTo": [],
+      "receivedDateTime": "2026-10-21T08:00:00Z",
+      "isRead": false,
+      "hasAttachments": false,
+      "parentFolderId": "AQMkADAwRUN-inbox",
+      "webLink": "https://outlook.office365.com/owa/?ItemID=RUN0102",
+      "importance": "normal",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "categories": [],
+      "isDraft": false
+    }
+  ]
+}

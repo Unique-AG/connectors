@@ -1,0 +1,108 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/contacts",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.contact",
+      "businessPhones": ["+41 44 555 01 03"],
+      "displayName": "seed-v1 case-outlook_update_contact-keep-numbers",
+      "givenName": "Paul",
+      "homePhones": ["+41 44 555 01 04"],
+      "mobilePhone": "+41 79 555 01 05",
+      "surname": "Roth"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/contacts('QJlKBsHOUNNFLOUVMwwkKe0iyTEnRN-DJa2Hg5Agks25LiELXx2A7foxuyNH9yFZBUKY')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"XXMXZSOEPTDeaCwnNbdyFOToKkOf/VfhGMLuv/M5\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 03"],
+      "categories": [],
+      "changeKey": "FQMDLDYTMDAsrYutKxceXRKlHbYf/WsoOERbc/Y5",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:18:46Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-keep-numbers",
+      "emailAddresses": [],
+      "givenName": "Paul",
+      "homeAddress": {},
+      "homePhones": ["+41 44 555 01 04"],
+      "id": "QJlKBsHOUNNFLOUVMwwkKe0iyTEnRN-DJa2Hg5Agks25LiELXx2A7foxuyNH9yFZBUKY",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:18:47Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": "+41 79 555 01 05",
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Roth",
+      "title": null
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/contacts/QJlKBsHOUNNFLOUVMwwkKe0iyTEnRN-DJa2Hg5Agks25LiELXx2A7foxuyNH9yFZBUKY",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.contact",
+      "jobTitle": "Head of Sales"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"KYOQQVYVRJByoZyvFwivFJJfBoFo/QwwPHGks/M/\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 03"],
+      "categories": [],
+      "changeKey": "NRPCAETKOHHhxRuzDtknJJZrPcOz/IifLUOob/A/",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:18:46Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-keep-numbers",
+      "emailAddresses": [],
+      "givenName": "Paul",
+      "homeAddress": {},
+      "homePhones": ["+41 44 555 01 04"],
+      "id": "QJlKBsHOUNNFLOUVMwwkKe0iyTEnRN-DJa2Hg5Agks25LiELXx2A7foxuyNH9yFZBUKY",
+      "imAddresses": [],
+      "jobTitle": "Head of Sales",
+      "lastModifiedDateTime": "2026-11-02T21:18:47Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": "+41 79 555 01 05",
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Roth",
+      "title": null
+    }
+  }
+]

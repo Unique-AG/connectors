@@ -1,0 +1,25 @@
+scenario: outlook_draft_reply_all-everyone
+fixture: rec-tool-outlook_draft_reply_all-everyone
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:10:40+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 24
+  keys dropped: 15
+  persona addresses: 14
+  persona names: 14
+  response headers dropped: 35
+  text kept: 14
+  text replaced: 2
+literals:
+- <p>Thanks to all.</p>
+- inbox
+- seed-v1
+- seed-v1 case-outlook_draft_reply_all-everyone
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

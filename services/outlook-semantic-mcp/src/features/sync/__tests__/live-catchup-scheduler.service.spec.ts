@@ -9,7 +9,7 @@ import { LiveCatchupSchedulerService } from '../live-catchup-scheduler.service';
 
 vi.mock('~/features/tracing.utils', () => ({
   traceEvent: vi.fn(),
-  NewTrace: () => () => ({}),
+  NewTrace: () => (_target: object, _key: string, descriptor: PropertyDescriptor) => descriptor,
 }));
 
 vi.mock('cron', () => ({

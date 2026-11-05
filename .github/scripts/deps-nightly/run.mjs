@@ -21,6 +21,8 @@ export function runOrThrow(command, args, options = {}) {
   return result.stdout;
 }
 
+export const isNotFound = ({ status, stderr }) => status !== 0 && stderr.includes('HTTP 404');
+
 const PRIVILEGED =
   /^(GH_TOKEN|GITHUB_TOKEN|GITHUB_(OUTPUT|ENV|PATH|STATE|STEP_SUMMARY)|ACTIONS_.+)$/;
 

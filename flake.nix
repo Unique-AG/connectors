@@ -89,6 +89,7 @@
           pkgs.kubectl
           pkgs.kubernetes-helm
           pkgs.azure-cli
+          pkgs.powershell # office-365-mcp scripts/dogfood/admin (Teams and Exchange Online modules)
         ];
 
         # Utilities

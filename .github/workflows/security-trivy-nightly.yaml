@@ -193,9 +193,8 @@ jobs:
           scan-type: fs
           scan-ref: .
           scanners: vuln
-          severity: CRITICAL,HIGH,MEDIUM
+          severity: CRITICAL,HIGH,MEDIUM,LOW
           limit-severities-for-sarif: true
-          ignore-unfixed: true
           format: sarif
           output: trivy-lockfiles.sarif
           exit-code: "0"

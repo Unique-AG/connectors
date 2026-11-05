@@ -632,16 +632,6 @@ class TestHowAWriteIsPutToAPerson:
         with pytest.raises(asyncio.CancelledError):
             _ = await _confirm_with(asyncio.CancelledError(), era)(_QUESTION, _ABOUT)
 
-    async def test_a_tool_error_from_the_client_is_passed_through_as_it_arrived(
-        self, era: str | None
-    ) -> None:
-        """A `ToolError` is already worded for a caller; re-wording it would guess."""
-        already = ToolError("the client refused the request")
-
-        refusal = await _confirm_with(already, era)(_QUESTION, _ABOUT)
-
-        assert refusal == str(already)
-
     @pytest.mark.parametrize(
         "answer",
         [
@@ -649,9 +639,8 @@ class TestHowAWriteIsPutToAPerson:
             AcceptedElicitation(data=_DECLINE),
             MCPError(METHOD_NOT_FOUND, "Method not found"),
             MCPError(REQUEST_TIMEOUT, "Request 'elicitation/create' timed out"),
-            ToolError("the client refused the request"),
         ],
-        ids=["declined", "another-answer", "cannot-ask", "no-answer", "client-error"],
+        ids=["declined", "another-answer", "cannot-ask", "no-answer"],
     )
     async def test_no_refusal_is_ever_raised(self, answer: object, era: str | None) -> None:
         refusal = await _confirm_with(answer, era)(_QUESTION, _ABOUT)
@@ -814,24 +803,6 @@ class TestWhatTheMiddlewareLeavesAlone:
         refusal = ToolError("teams_read_transcript takes teams:///transcripts/{a}/{b}.")
 
         assert await _middleware_message(refusal) == str(refusal)
-
-    async def test_a_refusal_for_an_unknown_tool_keeps_its_own_report(self) -> None:
-        """Unreachable while the table and the registration come from one resolved selection. The
-        alternative, an `assert`, answers a caller who could have acted on the 403."""
-        blind = GraphAdviceMiddleware({})
-        refusal = GraphForbidden("nope", status=403, code=None, request_id=None)
-        delivered = ToolError(f"Error calling tool '{_TOOL}': {refusal}")
-        delivered.__cause__ = refusal
-
-        async def refuse(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
-            _ = context
-            raise delivered
-
-        context = MiddlewareContext(message=CallToolRequestParams(name=_TOOL, arguments={}))
-        with pytest.raises(ToolError) as raised:
-            _ = await blind.on_call_tool(context, refuse)
-
-        assert raised.value is delivered
 
 
 class _Parcel(BaseModel):

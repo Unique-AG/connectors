@@ -40,6 +40,7 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAd
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_copy_section as copier
 from office_365_mcp.tools.onenote_copy_section import a_person_agrees, copy_section
+from tests.tools.scenarios.support import Person, call, serve
 
 _SECTION_ID = "1-SYNTHETICSECTION0000!0-ABCDEF"
 _NOTEBOOK_ID = "1-SYNTHETICNOTEBOOK0000!0-ABCDEF"
@@ -1674,3 +1675,45 @@ class TestNotebooksOfASharePointSite:
         assert message.startswith("onenote_copy_section ")
         assert "notebook of a SharePoint site" in message
         assert "This same call fails again" in message
+
+
+def _first_uri_of(answer: Mapping[str, object], key: str) -> str:
+    return cast("list[Mapping[str, str]]", answer[key])[0]["uri"]
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_a_section_is_copied_into_a_section_group_under_a_new_name(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_copy_section-group")
+        dogfood = await call("onenote_list_notebooks", name_contains="seed-v1 Dogfood")
+        reading = await call(
+            "onenote_list_sections",
+            parent=_first_uri_of(dogfood, "notebooks"),
+            name_contains="Reading",
+        )
+        scratch = await call("onenote_list_notebooks", name_contains="seed-v1 Scratch")
+        bin_ = await call(
+            "onenote_list_sections",
+            parent=_first_uri_of(scratch, "notebooks"),
+            name_contains="Bin",
+        )
+        group = _first_uri_of(bin_, "section_groups")
+        person = Person()
+
+        copy = await call(
+            "onenote_copy_section",
+            section=_first_uri_of(reading, "sections"),
+            to_section_group=group,
+            new_name="seed-v1 case-copy2 ~tomorrow",
+            person=person,
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        [route] = [r for (_, path), r in routes.items() if path.endswith("/copyToSectionGroup")]
+        assert json.loads(route.calls.last.request.content) == {
+            "id": group.removeprefix("onenote:///sectiongroups/"),
+            "renameAs": "seed-v1 case-copy2 ~tomorrow",
+        }
+        assert str(copy["uri"]).startswith("onenote:///operations/")
+        assert person.asked == []

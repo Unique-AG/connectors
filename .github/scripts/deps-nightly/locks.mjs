@@ -45,6 +45,20 @@ export function changedPackages(before, after) {
   });
 }
 
+export function findUnplanned(before, after, members) {
+  const planned = new Map(members.map(({ name, to }) => [name, to]));
+  const strays = changedPackages(before, after)
+    .filter(({ name }) => !planned.has(name))
+    .map(({ name }) => `${name} changed but is not in the entry`);
+  const missing = [...planned].flatMap(([name, to]) =>
+    to
+      .split(', ')
+      .filter((version) => !(after.get(name) ?? []).includes(version))
+      .map((version) => `${name} is not at ${version}`),
+  );
+  return [...strays, ...missing];
+}
+
 export function findDowngrades(before, after) {
   return [...before].flatMap(([name, oldVersions]) => {
     const newVersions = after.get(name);

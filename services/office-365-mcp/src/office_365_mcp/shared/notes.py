@@ -3,7 +3,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from hashlib import sha256
-from typing import Literal, Protocol, Self, assert_never, cast
+from typing import Literal, Protocol, Self, cast
 from urllib.parse import unquote, urlsplit
 
 from kiota_abstractions.base_request_builder import BaseRequestBuilder
@@ -107,8 +107,6 @@ def onenote_root(client: GraphServiceClient, owner: OnenoteOwner | None) -> Onen
             return client.groups.by_group_id(owner.owner_id).onenote
         case "sites":
             return client.sites.by_site_id(owner.owner_id).onenote
-        case _:
-            assert_never(owner.kind)
 
 
 def group_and_site_refused(tool: str) -> str:
@@ -418,8 +416,6 @@ class NotebookAudience:
                     return "which belongs to a Microsoft 365 group"
                 case "sites":
                     return "which belongs to a SharePoint site"
-                case _:
-                    assert_never(self.owner.kind)
         if self.is_shared:
             return "which is shared with other people"
         if self.user_role is not None and self.user_role != OWNER_ROLE:

@@ -1,0 +1,384 @@
+get_me-profile:
+  chain:
+    - tool: get_me
+
+sharepoint_list_drives-mine:
+  chain:
+    - tool: sharepoint_list_drives
+
+sharepoint_browse_folder-root:
+  chain:
+    - tool: sharepoint_browse_folder
+      args: {limit: 10}
+
+sharepoint_browse_folder-seed-folder:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_browse_folder
+      args: {limit: 10}
+      bind: {folder: "$prev.files[0].parent_uri"}
+
+sharepoint_search_files-plan:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan}
+      expect:
+        result: {"files[0].name": seed-v1 Project Plan.docx}
+
+sharepoint_read_file-docx:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.files[0].uri"}
+
+sharepoint_rename_item-notes:
+  destructive: true
+  reseed: [files]
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Meeting Notes, limit: 1}
+    - tool: sharepoint_rename_item
+      args: {name: seed-v1 case-sharepoint_rename_item-notes.txt}
+      bind: {item: "$prev.files[0].uri"}
+
+sharepoint_delete_item-brochure:
+  destructive: true
+  reseed: [files]
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Brochure Proof, limit: 1}
+    - tool: sharepoint_delete_item
+      bind: {item: "$prev.files[0].uri"}
+
+sharepoint_create_folder-seed-folder:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_create_folder-seed-folder}
+      bind: {parent: "$prev.files[0].parent_uri"}
+
+sharepoint_copy_item-brochure:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Brochure Proof, limit: 1}
+    - tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_copy_item-brochure}
+      bind: {parent: "$1.files[0].parent_uri"}
+    - tool: sharepoint_copy_item
+      args: {name: seed-v1 case-sharepoint_copy_item-brochure.pdf}
+      bind: {item: "$1.files[0].uri", to_folder: "$2.uri"}
+
+sharepoint_move_item-budget:
+  destructive: true
+  reseed: [files]
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Budget Overview, limit: 1}
+    - tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_move_item-budget}
+      bind: {parent: "$1.files[0].parent_uri"}
+    - tool: sharepoint_move_item
+      bind: {item: "$1.files[0].uri", to_folder: "$2.uri"}
+
+sharepoint_create_share_link-plan:
+  destructive: true
+  external: true
+  reseed: [files]
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_rename_item
+      args: {name: seed-v1 case-sharepoint_create_share_link-plan.docx}
+      bind: {item: "$prev.files[0].uri"}
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: organization}
+      bind: {item: "$1.files[0].uri"}
+
+sharepoint_create_text_file-seed-folder:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_create_text_file
+      args:
+        name: seed-v1 case-sharepoint_create_text_file-seed-folder.txt
+        content: seed-v1 case text
+      bind: {folder: "$prev.files[0].parent_uri"}
+
+sharepoint_invite-anna:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_invite-anna}
+      bind: {parent: "$prev.files[0].parent_uri"}
+    - tool: sharepoint_invite
+      args: {recipients: [persona:anna], role: read, notify: false}
+      bind: {item: "$prev.uri"}
+
+sharepoint_resolve_url-plan:
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_resolve_url
+      bind: {url: "$prev.files[0].web_url"}
+
+sharepoint_search_sites-all:
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: "*", limit: 3}
+
+sharepoint_browse_folder-nested:
+  needs: &tree [sharepoint-tree]
+  chain:
+    - &root {tool: sharepoint_browse_folder, args: {limit: 100}}
+    - &seed {tool: sharepoint_browse_folder, args: {limit: 100}, bind: {folder: "$prev.items[name=seed-v1 Seed Files].uri"}}
+    - tool: sharepoint_browse_folder
+      args: {limit: 100}
+      bind: {folder: "$prev.items[name=seed-v1 Contracts].uri"}
+      expect:
+        result:
+          "items[name=seed-v1 2026].is_folder": true
+          "items[name=seed-v1 Archive].is_folder": true
+          "items[name=seed-v1 Contracts overview.txt].is_folder": false
+
+sharepoint_browse_folder-newest-first:
+  needs: *tree
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_browse_folder
+      args: {limit: 20, order_by: last_modified}
+      bind: {folder: "$prev.items[name=seed-v1 Ordered].uri"}
+      expect:
+        result:
+          order_covers_level: true
+          "items[*].name": [seed-v1 Order C.txt, seed-v1 Order B.txt, seed-v1 Order A.txt]
+
+sharepoint_search_files-order:
+  needs: *tree
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Order, sort_by: last_modified, limit: 5}
+      expect:
+        result:
+          "files[0].name": seed-v1 Order D.txt
+          "files[0].last_modified_by": Anna Meier
+
+sharepoint_search_files-none:
+  needs: *tree
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 zzqqxx nothing}
+      expect: {result: {files: []}}
+
+sharepoint_read_file-text-2000:
+  needs: *tree
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Text 2000.txt].uri"}
+
+sharepoint_read_file-names-another:
+  needs: *tree
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Read me first.txt].uri"}
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Project Plan, limit: 1}
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.files[0].uri"}
+
+sharepoint_read_file-folder-each:
+  cap: 30
+  needs: *tree
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_browse_folder
+      args: {limit: 100}
+      bind: {folder: "$prev.items[name=seed-v1 Reports].uri"}
+    - tool: sharepoint_read_file
+      bind: {file: "$3.items[name=seed-v1 Report A.txt].uri"}
+    - tool: sharepoint_read_file
+      bind: {file: "$3.items[name=seed-v1 Report B.txt].uri"}
+    - tool: sharepoint_read_file
+      bind: {file: "$3.items[name=seed-v1 Report C.docx].uri"}
+
+sharepoint_read_file-png:
+  needs: *tree
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Gallery.png].uri"}
+
+sharepoint_read_file-pdf:
+  needs: [sharepoint-seed-files]
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Brochure Proof.pdf].uri"}
+
+sharepoint_read_file-xlsx:
+  needs: [sharepoint-seed-files]
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Budget Overview.xlsx].uri"}
+
+sharepoint_read_file-10mib:
+  cap: 30
+  needs: &big [sharepoint-big-files]
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Scan 10MiB.bin].uri"}
+
+sharepoint_read_file-over-cap:
+  needs: *big
+  chain:
+    - *root
+    - *seed
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.items[name=seed-v1 Scan over.bin].uri"}
+      expect: {tool_error: {tools.sharepoint_read_file._megabytes: [10485761]}}
+
+sharepoint_search_sites-team:
+  needs: &team [sharepoint-team-files]
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: seed-v1 team, limit: 3}
+      expect: {result: {"sites[0].display_name": seed-v1 team}}
+
+sharepoint_browse_folder-team-drive:
+  needs: *team
+  chain:
+    - &teams {tool: teams_list_my_teams}
+    - &channels
+      tool: teams_list_channels
+      args: {membership_type: standard}
+      bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
+    - &channel-folder
+      tool: teams_get_channel_files_folder
+      bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[display_name=seed-v1 Long channel].channel_id"}
+    - &channel-item {tool: sharepoint_resolve_url, bind: {url: "$prev.web_url"}}
+    - &library {tool: sharepoint_browse_folder, args: {limit: 100}, bind: {folder: "$prev.parent_uri"}}
+    - tool: sharepoint_browse_folder
+      args: {limit: 100}
+      bind: {folder: "$prev.items[name=seed-v1 Team Files].uri"}
+      expect:
+        result:
+          "items[name=seed-v1 Team Contracts].is_folder": true
+          "items[name=seed-v1 Team Drafts].is_folder": true
+          "items[name=seed-v1 Team Charter.docx].is_folder": false
+
+sharepoint_browse_folder-channel-files:
+  needs: *team
+  chain:
+    - *teams
+    - *channels
+    - *channel-folder
+    - tool: sharepoint_browse_folder
+      args: {limit: 100}
+      bind: {folder: "$prev.uri"}
+      expect: {result: {"items[name=seed-v1 Channel Notes.txt].is_folder": false}}
+
+sharepoint_copy_item-cross-drive:
+  external: true
+  needs: [sharepoint-team-files, sharepoint-tree]
+  chain:
+    - *teams
+    - *channels
+    - *channel-folder
+    - *channel-item
+    - *library
+    - *root
+    - *seed
+    - tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_copy_item-cross-drive}
+      bind: {parent: "$5.items[name=seed-v1 Team Files].uri"}
+    - tool: sharepoint_copy_item
+      bind: {item: "$7.items[name=seed-v1 Reports].uri", to_folder: "$prev.uri"}
+
+sharepoint_invite-write-notify:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - &plan {tool: sharepoint_search_files, args: {query: seed-v1 Project Plan, limit: 1}}
+    - &invite-folder
+      tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_invite-write-notify}
+      bind: {parent: "$prev.files[0].parent_uri"}
+    - tool: sharepoint_invite
+      args: {recipients: [persona:anna], role: write, notify: true, message: seed-v1 case-sharepoint_invite-write-notify}
+      bind: {item: "$prev.uri"}
+
+sharepoint_invite-note-500:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - *plan
+    - tool: sharepoint_create_folder
+      args: {name: seed-v1 case-sharepoint_invite-note-500}
+      bind: {parent: "$prev.files[0].parent_uri"}
+    - tool: sharepoint_invite
+      args: {recipients: [persona:anna], role: read, notify: true}
+      bind: {item: "$prev.uri", message: {repeat: {text: a, count: 500}}}
+
+sharepoint_create_share_link-organization-edit:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - *plan
+    - &link-file
+      tool: sharepoint_create_text_file
+      args: {name: seed-v1 case-sharepoint_create_share_link-organization-edit.txt, content: seed-v1 case text}
+      bind: {folder: "$prev.files[0].parent_uri"}
+    - tool: sharepoint_create_share_link
+      args: {access: edit, audience: organization}
+      bind: {item: "$prev.uri"}
+
+sharepoint_resolve_url-sharing-link:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - *plan
+    - tool: sharepoint_create_text_file
+      args: {name: seed-v1 case-sharepoint_resolve_url-sharing-link.txt, content: seed-v1 case text}
+      bind: {folder: "$prev.files[0].parent_uri"}
+    - tool: sharepoint_create_share_link
+      args: {access: view, audience: organization}
+      bind: {item: "$prev.uri"}
+    - tool: sharepoint_resolve_url
+      bind: {url: "$prev.share_url"}
+
+sharepoint_create_text_file-one-million:
+  needs: [sharepoint-seed-files]
+  chain:
+    - *plan
+    - tool: sharepoint_create_text_file
+      args: {name: seed-v1 case-sharepoint_create_text_file-one-million.txt}
+      bind: {folder: "$prev.files[0].parent_uri", content: {repeat: {text: a, count: 1000000}}}
+      expect: {result: {size: 1000000}}

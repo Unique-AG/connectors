@@ -1,0 +1,39 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/calendar/getSchedule",
+    "json": {
+      "AvailabilityViewInterval": 30,
+      "EndTime": {
+        "dateTime": "~nextThursday",
+        "timeZone": "Europe/Zurich"
+      },
+      "Schedules": ["tom@example.test"],
+      "StartTime": {
+        "dateTime": "~nextThursday",
+        "timeZone": "Europe/Zurich"
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "availabilityView": "00000000000000000000",
+          "scheduleId": "tom@example.test",
+          "scheduleItems": [],
+          "workingHours": {
+            "daysOfWeek": ["monday", "tuesday", "wednesday", "thursday", "friday"],
+            "endTime": "15:30:00.0000000",
+            "startTime": "07:00:00.0000000",
+            "timeZone": {
+              "name": "W. Europe Standard Time"
+            }
+          }
+        }
+      ]
+    }
+  }
+]

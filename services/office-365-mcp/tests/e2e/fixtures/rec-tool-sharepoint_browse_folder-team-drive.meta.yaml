@@ -1,0 +1,23 @@
+scenario: sharepoint_browse_folder-team-drive
+fixture: rec-tool-sharepoint_browse_folder-team-drive
+source: recorded
+target: graph
+recorded_at: '2026-11-03T11:36:56+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 104
+  keys dropped: 36
+  persona addresses: 18
+  persona names: 18
+  query parameters dropped: 4
+  response headers dropped: 48
+  text kept: 29
+  text replaced: 42
+literals:
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

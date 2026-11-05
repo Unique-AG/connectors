@@ -28,7 +28,7 @@ import {
   trackedFiles,
   uvProjectFolders,
 } from './repo.mjs';
-import { run, runOrThrow, sandboxEnv } from './run.mjs';
+import { isNotFound, run, runOrThrow, sandboxEnv } from './run.mjs';
 import { closedBodiesOf, closedKeysOf } from './state.mjs';
 import { createTerraformLookup, planTerraform } from './terraform.mjs';
 
@@ -175,22 +175,33 @@ const repository = process.env.GITHUB_REPOSITORY;
 const baseBranch = process.env.BASE_BRANCH ?? 'main';
 const gh = (...args) => runOrThrow('gh', args);
 const openPullRequests = JSON.parse(
-  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,body,labels'),
+  gh('pr', 'list', '--state', 'open', '--limit', '500', '--json', 'number,headRefName,headRefOid,body,labels'),
 );
 const openPulls = openPullRequests
   .filter(({ headRefName }) => headRefName.startsWith('deps/'))
-  .map(({ number, headRefName, body, labels }) => ({
-    number,
-    branch: headRefName,
-    body,
-    labels: labels.map(({ name }) => name),
-    behindBy: Number(
-      gh('api', `repos/${repository}/compare/${baseBranch}...${headRefName}`, '--jq', '.behind_by'),
-    ),
-    humanCommits: JSON.parse(
-      gh('pr', 'view', String(number), '--json', 'commits', '--jq', '[.commits[].authors[].login]'),
-    ).some((login) => login !== 'github-actions[bot]'),
-  }));
+  .flatMap(({ number, headRefName, headRefOid, body, labels }) => {
+    const compare = run('gh', [
+      'api',
+      `repos/${repository}/compare/${baseBranch}...${headRefName}`,
+      '--jq',
+      '.behind_by',
+    ]);
+    if (isNotFound(compare)) {
+      return [];
+    }
+    assert.strictEqual(compare.status, 0, `gh api compare of ${headRefName} failed:\n${compare.stderr}`);
+    return {
+      number,
+      branch: headRefName,
+      head: headRefOid,
+      body,
+      labels: labels.map(({ name }) => name),
+      behindBy: Number(compare.stdout),
+      humanCommits: JSON.parse(
+        gh('pr', 'view', String(number), '--json', 'commits', '--jq', '[.commits[].authors[].login]'),
+      ).some((login) => login !== 'github-actions[bot]'),
+    };
+  });
 const [owner, repositoryName] = repository.split('/');
 const closedBodies = closedBodiesOf(
   JSON.parse(
@@ -226,23 +237,19 @@ const plan = buildPlan({
   config,
   openPulls,
   closedKeys: closedKeysOf(closedBodies),
+  request: process.env.PR_NUMBER
+    ? { number: Number(process.env.PR_NUMBER), recreate: process.env.RECREATE === 'true' }
+    : undefined,
 });
 
 const summary = renderSummary(plan, process.env.PLAN_NOTE ?? '');
 if (process.env.GITHUB_STEP_SUMMARY) {
   appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary}\n`);
 }
-if (process.env.DASHBOARD_FILE) {
-  const openList = openPulls.map(({ number, branch }) => `#${number} \`${branch}\``);
-  writeFileSync(
-    process.env.DASHBOARD_FILE,
-    `${summary}\n### Open dependency pull requests (${openList.length})\n\n${openList.map((item) => `- ${item}`).join('\n')}\n`,
-  );
-}
 if (process.env.GITHUB_OUTPUT) {
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `entries=${JSON.stringify(plan.entries)}\nupdates=${JSON.stringify(plan.updates)}\n`,
+    `entries=${JSON.stringify(plan.entries)}\nupdates=${JSON.stringify(plan.updates)}\ncloses=${JSON.stringify(plan.closes)}\n`,
   );
 }
 console.log(summary);

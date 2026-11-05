@@ -1,0 +1,27 @@
+scenario: outlook_update_draft-basic
+fixture: rec-tool-outlook_update_draft-basic
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:13:40+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 26
+  keys dropped: 16
+  persona addresses: 10
+  persona names: 9
+  response headers dropped: 42
+  text kept: 18
+literals:
+- <p>First text.</p>
+- <p>Second text.</p>
+- high
+- inbox
+- seed-v1
+- seed-v1 case-outlook_update_draft-basic
+- seed-v1 case-outlook_update_draft-basic changed
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

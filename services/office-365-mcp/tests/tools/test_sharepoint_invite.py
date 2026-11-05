@@ -45,6 +45,7 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, GraphAdviceMiddl
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_invite as inviter
 from office_365_mcp.tools.sharepoint_invite import Invitation, a_person_agrees, invite
+from tests.tools.scenarios.support import call, serve
 
 _DRIVE_ID = "b!SYNTHETICDRIVE0000"
 _FILE_ID = "01SYNTHETICFILE0000"
@@ -1153,3 +1154,41 @@ class TestHowItDeclaresItself:
 
     def test_forbidden_advice_says_nothing_was_shared(self) -> None:
         assert _NOTHING_SHARED in inviter.GRAPH_FORBIDDEN
+
+
+_INVITED_FOLDER = "seed-v1 case-sharepoint_invite-anna"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_shares_a_new_folder_with_one_person_without_a_notice(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-sharepoint_invite-anna")
+        found = await call("sharepoint_search_files", query="seed-v1 Project Plan", limit=1)
+        plan = cast("list[dict[str, str]]", found["files"])[0]
+        folder = await call(
+            "sharepoint_create_folder", parent=plan["parent_uri"], name=_INVITED_FOLDER
+        )
+
+        invitation = await call(
+            "sharepoint_invite",
+            item=folder["uri"],
+            recipients=["anna@example.test"],
+            role="read",
+            notify=False,
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        grant = next(route for (_verb, path), route in routes.items() if path.endswith("/invite"))
+        assert _sent(grant) == {
+            "recipients": [{"email": "anna@example.test"}],
+            "requireSignIn": True,
+            "retainInheritedPermissions": True,
+            "roles": ["read"],
+            "sendInvitation": False,
+        }
+        assert invitation["item_uri"] == folder["uri"]
+        recipients = cast("list[dict[str, object]]", invitation["recipients"])
+        assert [(row["display_name"], row["roles"], row["error"]) for row in recipients] == [
+            ("Anna Meier", ["read"], None)
+        ]

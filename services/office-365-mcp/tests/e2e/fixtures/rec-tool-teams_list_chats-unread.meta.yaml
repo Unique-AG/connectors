@@ -1,0 +1,24 @@
+scenario: teams_list_chats-unread
+fixture: rec-tool-teams_list_chats-unread
+source: recorded
+target: graph
+recorded_at: '2026-11-03T10:21:54+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 318
+  keys dropped: 74
+  other addresses replaced: 4
+  persona addresses: 52
+  persona names: 52
+  query parameters dropped: 20
+  response headers dropped: 16
+  text kept: 13
+  text replaced: 99
+literals:
+- seed-v1 case-teams-unread
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

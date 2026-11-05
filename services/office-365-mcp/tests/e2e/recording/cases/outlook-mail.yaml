@@ -1,0 +1,777 @@
+outlook_list_mail-inbox:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 3}
+
+outlook_move_mail-archive:
+  destructive: true
+  reseed: [mail]
+  chain:
+    - tool: outlook_list_mail
+      args: {category: seed-v1, limit: 1}
+    - tool: outlook_move_mail
+      args: {destination: archive}
+      bind: {message_refs: "$prev.messages[*].uri"}
+
+outlook_list_mail-sentitems:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: sentitems, category: seed-v1, limit: 5}
+
+outlook_list_mail-drafts:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: drafts, category: seed-v1, limit: 5}
+
+outlook_list_mail-flagged:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, flagged: true, limit: 5}
+
+outlook_read_mail-latest:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_read_mail
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_read_mail-with-attachment:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_read_mail
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_read_thread-relaunch:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: Website, limit: 1}
+    - tool: outlook_read_thread
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_search_mail-budget:
+  chain:
+    - tool: outlook_search_mail
+      args: {query: Q3 budget review, category: seed-v1, limit: 5}
+
+outlook_list_attachments-with-files:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$1.messages[0].uri"}
+
+outlook_read_attachment-first:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$1.messages[0].uri"}
+    - tool: outlook_read_attachment
+      bind: {uri: "$2.attachments[0].uri"}
+
+outlook_get_mail_tips-personas:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 2}
+    - tool: outlook_get_mail_tips
+      bind: {addresses: ["$1.messages[0].sender.address", "$1.messages[1].sender.address"]}
+
+outlook_browse_folders-top:
+  chain:
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+
+outlook_browse_folders-children:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_browse_folders-children"}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_browse_folders-children child"}
+      bind: {parent_ref: "$1.uri"}
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+      bind: {parent: "$1.uri"}
+
+outlook_create_folder-top:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_create_folder-top"}
+
+outlook_create_folder-child:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_create_folder-child"}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_create_folder-child inner"}
+      bind: {parent_ref: "$1.uri"}
+
+outlook_rename_folder-renamed:
+  cap: 60
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_rename_folder-renamed"}
+    - tool: outlook_rename_folder
+      args: {name: "seed-v1 case-outlook_rename_folder-renamed again"}
+      bind: {folder_ref: "$1.uri"}
+
+outlook_delete_folder-created:
+  cap: 60
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_delete_folder-created"}
+    - tool: outlook_delete_folder
+      bind: {folder_ref: "$1.uri"}
+
+outlook_copy_mail-to-folder:
+  chain:
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_copy_mail-to-folder"}
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_copy_mail
+      bind: {message_refs: ["$2.messages[0].uri"], folder_ref: "$1.uri"}
+
+outlook_move_mail-copy:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_move_mail-copy from"}
+    - tool: outlook_create_folder
+      args: {name: "seed-v1 case-outlook_move_mail-copy to"}
+    - tool: outlook_copy_mail
+      bind: {message_refs: ["$1.messages[0].uri"], folder_ref: "$2.uri"}
+    - tool: outlook_move_mail
+      bind: {message_refs: ["$4.messages[0].new_uri"], folder_ref: "$3.uri"}
+
+outlook_create_category-basic:
+  chain:
+    - tool: outlook_create_category
+      args: {name: "seed-v1 case-outlook_create_category-basic", color: preset3}
+
+outlook_list_categories-created:
+  chain:
+    - tool: outlook_create_category
+      args: {name: "seed-v1 case-outlook_list_categories-created", color: preset5}
+    - tool: outlook_list_categories
+
+outlook_create_mail_rule-basic:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_create_mail_rule-basic"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_create_mail_rule-basic"]}
+        actions: {mark_as_read: true}
+
+outlook_update_mail_rule-rename:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_update_mail_rule-rename"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_update_mail_rule-rename"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_update_mail_rule
+      args: {display_name: "seed-v1 case-outlook_update_mail_rule-rename again"}
+      bind: {rule_ref: "$1.uri"}
+
+outlook_disable_mail_rule-off:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_disable_mail_rule-off"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_disable_mail_rule-off"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_disable_mail_rule
+      args: {enabled: false}
+      bind: {rule_ref: "$1.uri"}
+
+outlook_delete_mail_rule-created:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_delete_mail_rule-created"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_delete_mail_rule-created"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_delete_mail_rule
+      bind: {rule_ref: "$1.uri"}
+
+outlook_get_mailbox_settings-rules:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_get_mailbox_settings-rules"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_get_mailbox_settings-rules"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_get_mailbox_settings
+      args: {include: rules}
+
+outlook_get_mailbox_settings-replies:
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+
+outlook_get_mailbox_settings-preferences:
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: preferences}
+
+outlook_get_mailbox_settings-categories:
+  chain:
+    - tool: outlook_get_mailbox_settings
+      args: {include: categories}
+
+outlook_set_automatic_reply-disabled:
+  chain:
+    - tool: outlook_set_automatic_reply
+      args: {status: disabled}
+
+outlook_draft_mail-basic:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 2}
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_draft_mail-basic"
+        body: "Written by the recorder."
+        importance: high
+        categories: [Website]
+      bind: {to: ["$1.messages[0].sender.address"], cc: ["$1.messages[1].sender.address"]}
+
+outlook_update_draft-basic:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_update_draft-basic", body: "First text."}
+      bind: {to: ["$1.messages[0].sender.address"]}
+    - tool: outlook_update_draft
+      args:
+        subject: "seed-v1 case-outlook_update_draft-basic changed"
+        body: "Second text."
+        importance: high
+      bind: {message_ref: "$2.uri"}
+
+outlook_draft_reply-reply:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_reply
+      args:
+        mode: reply
+        body: "Thanks for the note."
+        categories: ["seed-v1 case-outlook_draft_reply-reply"]
+      bind: {message_ref: "$1.messages[0].uri"}
+
+outlook_draft_reply-forward:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 2}
+    - tool: outlook_draft_reply
+      args:
+        mode: forward
+        body: "Please read this."
+        categories: ["seed-v1 case-outlook_draft_reply-forward"]
+      bind: {message_ref: "$1.messages[0].uri", to: ["$1.messages[1].sender.address"]}
+
+outlook_draft_reply_all-everyone:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
+    - tool: outlook_draft_reply_all
+      args:
+        body: "Thanks to all."
+        categories: ["seed-v1 case-outlook_draft_reply_all-everyone"]
+      bind: {message_ref: "$1.messages[0].uri"}
+
+outlook_mark_mail-flag:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_mark_mail-flag", body: "A draft to mark."}
+      bind: {to: ["$1.messages[0].sender.address"]}
+    - tool: outlook_mark_mail
+      args: {flagged: true, add_categories: [Website]}
+      bind: {message_refs: ["$2.uri"]}
+
+outlook_set_focused_override-new:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_set_focused_override
+      args: {classify_as: focused}
+      bind: {sender: "$1.messages[0].sender.address"}
+
+outlook_set_focused_override-update:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_set_focused_override
+      args: {classify_as: focused}
+      bind: {sender: "$1.messages[0].sender.address"}
+    - tool: outlook_set_focused_override
+      args: {classify_as: other}
+      bind: {sender: "$1.messages[0].sender.address"}
+
+outlook_list_focused_overrides-set:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, limit: 1}
+    - tool: outlook_set_focused_override
+      args: {classify_as: focused}
+      bind: {sender: "$1.messages[0].sender.address"}
+    - tool: outlook_list_focused_overrides
+
+outlook_send_draft-persona:
+  external: true
+  chain:
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_send_draft-persona"
+        body: "Sent by the recorder."
+        to: ["persona:tom"]
+    - tool: outlook_send_draft
+      bind: {message_ref: "$prev.uri"}
+
+outlook_send_draft-seed-draft:
+  destructive: true
+  external: true
+  reseed: {phases: [mail], personas: [1]}
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: drafts, category: seed-v1, limit: 1}
+    - tool: outlook_send_draft
+      bind: {message_ref: "$prev.messages[0].uri"}
+
+outlook_list_mail-junk:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: junkemail, category: seed-v1, limit: 5}
+      expect:
+        result:
+          "messages[*].subject": [Cheap licences, Free upgrade, Prize offer]
+          capped: false
+
+outlook_list_mail-deleted:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: deleteditems, category: seed-v1, limit: 5}
+      expect:
+        result:
+          "messages[*].subject": [Printer invoice, Old checklist]
+          capped: false
+
+outlook_list_mail-from-mia:
+  chain:
+    - tool: outlook_list_mail
+      args: {folder: inbox, category: seed-v1, from_address: "persona:mia", received_after: "2020-01-01", limit: 5}
+      expect:
+        result:
+          "messages[*].subject": ["Note to self: call the printer"]
+
+outlook_browse_folders-same-name:
+  chain:
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+      expect: {result: {capped: false}}
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+      bind: {parent: "$prev.folders[display_name=seed-v1 Projects].uri"}
+      expect: {result: {"folders[*].child_folder_count": [0, 0]}}
+
+outlook_search_mail-newsletters:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {query: newsletter, category: Newsletter, limit: 5}
+      expect: {result: {more_may_exist: true}}
+
+outlook_read_mail-injection:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Please act on this, limit: 1}
+    - tool: outlook_read_mail
+      bind: {uri: "$prev.messages[0].uri"}
+      expect: {result: {subject: Please act on this}}
+
+outlook_read_thread-long-preview:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Printer replacement, limit: 5}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
+      expect: {result: {message_count: 3}}
+
+outlook_read_attachment-xlsx:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Budget workbook, has_attachments: true, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_read_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+
+outlook_read_attachment-pdf:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Invoice Alpine Print, has_attachments: true, limit: 3}
+    - tool: outlook_list_attachments
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_read_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+
+outlook_read_attachment-10mib:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Scan ten mebibytes, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_read_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+      expect:
+        tool_error: {tools.outlook_read_attachment._too_large: {size: 10485925}}
+
+outlook_read_attachment-at-cap:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Scan at the size cap, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_read_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+
+outlook_read_attachment-above-the-cap:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Scan above the size cap, limit: 1}
+    - tool: outlook_list_attachments
+      bind: {uri: "$prev.messages[0].uri"}
+      expect: {result: {"attachments[0].size": 10485926}}
+    - tool: outlook_read_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+      expect:
+        tool_error: {tools.outlook_read_attachment._too_large: {size: 10485926}}
+
+outlook_draft_reply_all-three:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Hosting handover, limit: 1}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_draft_reply_all
+      args:
+        body: "Thanks to both of you."
+        categories: ["seed-v1 case-outlook_draft_reply_all-three"]
+      bind: {message_ref: "$1.messages[0].uri"}
+      expect: {result: {recipient_count: 2, "to[0].address": "persona:tom"}}
+
+outlook_draft_reply-forward-workbook:
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Budget workbook, has_attachments: true, limit: 1}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_draft_reply
+      args:
+        mode: forward
+        body: "Please read this workbook."
+        categories: ["seed-v1 case-outlook_draft_reply-forward-workbook"]
+        to: ["persona:tom"]
+      bind: {message_ref: "$1.messages[0].uri"}
+
+outlook_move_mail-invoice:
+  destructive: true
+  reseed: [mail]
+  needs: [mail-search-index]
+  chain:
+    - tool: outlook_search_mail
+      args: {subject: Invoice Alpine Print, limit: 3}
+    - tool: outlook_read_thread
+      bind: {uri: "$prev.messages[0].uri"}
+    - tool: outlook_browse_folders
+      args: {limit: 50}
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_move_mail-invoice"
+        body: "The invoice is filed under Clients."
+      bind: {to: ["$1.messages[0].sender.address"]}
+    - tool: outlook_move_mail
+      bind:
+        message_refs: ["$1.messages[0].uri"]
+        folder_ref: "$3.folders[display_name=seed-v1 Clients].uri"
+
+outlook_move_mail-batch:
+  chain:
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_move_mail-batch one", body: "One.", to: ["persona:tom"]}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_move_mail-batch two", body: "Two.", to: ["persona:tom"]}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_move_mail-batch three", body: "Three.", to: ["persona:tom"]}
+    - tool: outlook_move_mail
+      args: {destination: archive}
+      bind: {message_refs: ["$1.uri", "$2.uri", "$3.uri"]}
+      expect: {result: {moved_count: 3}}
+
+outlook_move_mail-restore-deleted:
+  chain:
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_move_mail-restore-deleted"
+        body: "A draft that goes to Deleted Items by mistake."
+        categories: ["seed-v1 case-outlook_move_mail-restore-deleted"]
+        to: ["persona:tom"]
+    - tool: outlook_move_mail
+      args: {destination: deleteditems}
+      bind: {message_refs: ["$prev.uri"]}
+    - tool: outlook_list_mail
+      args:
+        folder: deleteditems
+        category: "seed-v1 case-outlook_move_mail-restore-deleted"
+        limit: 5
+    - tool: outlook_move_mail
+      args: {destination: inbox}
+      bind: {message_refs: ["$prev.messages[0].uri"]}
+      expect: {result: {moved_count: 1}}
+
+outlook_mark_mail-batch:
+  chain:
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_mark_mail-batch one", body: "One.", to: ["persona:tom"]}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_mark_mail-batch two", body: "Two.", to: ["persona:tom"]}
+    - tool: outlook_draft_mail
+      args: {subject: "seed-v1 case-outlook_mark_mail-batch three", body: "Three.", to: ["persona:tom"]}
+    - tool: outlook_mark_mail
+      args: {flagged: true, importance: high}
+      bind: {message_refs: ["$1.uri", "$2.uri", "$3.uri"]}
+
+outlook_mark_mail-flag-dates:
+  chain:
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_mark_mail-flag-dates"
+        body: "A draft with a follow-up."
+        to: ["persona:tom"]
+    - tool: outlook_mark_mail
+      args:
+        flag_status: flagged
+        flag_starts_at: "~todayT09:00:00"
+        flag_due_at: "~tomorrowT09:00:00"
+        flag_time_zone: Europe/Zurich
+      bind: {message_refs: ["$prev.uri"]}
+
+outlook_update_mail_rule-narrow:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_update_mail_rule-narrow"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_update_mail_rule-narrow"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_update_mail_rule
+      args:
+        conditions:
+          subject_contains: ["seed-v1 case-outlook_update_mail_rule-narrow"]
+          from_addresses: ["persona:tom"]
+      bind: {rule_ref: "$prev.uri"}
+
+outlook_update_mail_rule-turn-on:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_update_mail_rule-turn-on"
+        sequence: 10
+        is_enabled: false
+        conditions: {subject_contains: ["seed-v1 case-outlook_update_mail_rule-turn-on"]}
+        actions: {mark_as_read: true}
+    - tool: outlook_update_mail_rule
+      args: {is_enabled: true}
+      bind: {rule_ref: "$prev.uri"}
+
+outlook_create_mail_rule-no-condition:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_create_mail_rule-no-condition"
+        sequence: 10
+        actions: {mark_as_read: true}
+
+outlook_create_mail_rule-forward-persona:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_create_mail_rule-forward-persona"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_create_mail_rule-forward-persona"]}
+        actions: {forward_to: ["persona:anna"]}
+
+outlook_create_mail_rule-delete-action:
+  chain:
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_create_mail_rule-delete-action"
+        sequence: 10
+        conditions: {subject_contains: ["seed-v1 case-outlook_create_mail_rule-delete-action"]}
+        actions: {delete: true}
+
+outlook_create_mail_rule-forward-found-person:
+  deferred: "The tenant index lists a new user 1 to 24 hours after the first mail."
+  needs: [people-index]
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Tom Berger}
+    - tool: outlook_create_mail_rule
+      args:
+        display_name: "seed-v1 case-outlook_create_mail_rule-forward-found-person"
+        sequence: 10
+        conditions: {from_addresses: ["persona:anna"]}
+      bind: {actions: {forward_to: ["$prev.candidates[0].address"]}}
+
+outlook_find_recipient-tom:
+  deferred: "The tenant index lists a new user 1 to 24 hours after the first mail."
+  needs: [people-index]
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Tom Berger}
+      expect:
+        result:
+          outcome: match
+          "candidates[0].source": people
+          "candidates[0].address": "persona:tom"
+
+outlook_draft_mail-to-found-person:
+  deferred: "The tenant index lists a new user 1 to 24 hours after the first mail."
+  needs: [people-index]
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+    - tool: outlook_draft_mail
+      args:
+        subject: "seed-v1 case-outlook_draft_mail-to-found-person"
+        body: "Written for the person that the name found."
+      bind: {to: ["$prev.candidates[0].address"]}
+
+outlook_get_mail_tips-anna-away:
+  chain:
+    - tool: outlook_get_mail_tips
+      args: {addresses: ["persona:anna"]}
+      expect: {result: {"recipients[0].address": "persona:anna"}}
+
+outlook_list_focused_overrides-two:
+  chain:
+    - tool: outlook_set_focused_override
+      args: {sender: "persona:tom", classify_as: focused}
+    - tool: outlook_set_focused_override
+      args: {sender: "persona:anna", classify_as: other}
+    - tool: outlook_list_focused_overrides
+      expect: {result: {capped: false}}
+
+outlook_set_automatic_reply-scheduled:
+  chain:
+    - tool: outlook_set_automatic_reply
+      args:
+        status: scheduled
+        start: "~todayT00:00:00"
+        end: "~tomorrowT18:00:00"
+        time_zone: UTC
+        internal_message: "seed-v1 case-outlook_set_automatic_reply-scheduled: I am away today."
+        external_audience: none
+      expect: {result: {status: scheduled}}
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+      expect: {result: {"automatic_reply.status": scheduled}}
+    - tool: outlook_set_automatic_reply
+      args: {status: disabled}
+      expect: {result: {status: disabled}}
+
+outlook_set_automatic_reply-both-messages:
+  chain:
+    - tool: outlook_set_automatic_reply
+      args:
+        status: scheduled
+        start: "~todayT00:00:00"
+        end: "~tomorrowT18:00:00"
+        time_zone: UTC
+        internal_message: "seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside."
+        external_message: "seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside."
+        external_audience: none
+    - tool: outlook_get_mailbox_settings
+      args: {include: replies}
+    - tool: outlook_set_automatic_reply
+      args: {status: disabled}
+
+outlook_update_contact-add-phone:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_update_contact-add-phone
+        given_name: Nina
+        surname: Frei
+        business_phones: ["+41 44 555 01 03"]
+    - tool: outlook_update_contact
+      args: {add_business_phones: ["+41 44 555 01 06"]}
+      bind: {uri: "$prev.uri"}
+      expect: {result: {business_phones: ["+41 44 555 01 03", "+41 44 555 01 06"]}}
+
+outlook_update_contact-keep-numbers:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_update_contact-keep-numbers
+        given_name: Paul
+        surname: Roth
+        business_phones: ["+41 44 555 01 03"]
+        home_phones: ["+41 44 555 01 04"]
+        mobile_phone: "+41 79 555 01 05"
+    - tool: outlook_update_contact
+      args: {job_title: Head of Sales}
+      bind: {uri: "$prev.uri"}
+      expect:
+        result:
+          business_phones: ["+41 44 555 01 03"]
+          home_phones: ["+41 44 555 01 04"]
+          mobile_phone: "+41 79 555 01 05"
+
+outlook_update_contact-no-duplicate:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_update_contact-no-duplicate
+        given_name: Rita
+        surname: Vogel
+        business_phones: ["+41 44 555 01 03"]
+    - tool: outlook_update_contact
+      args: {add_business_phones: ["+41 44 555 01 03"]}
+      bind: {uri: "$prev.uri"}
+      expect: {result: {business_phones: ["+41 44 555 01 03"]}}
+
+outlook_update_contact-add-home:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_update_contact-add-home
+        given_name: Sven
+        surname: Keller
+    - tool: outlook_update_contact
+      args: {add_home_phones: ["+41 44 555 01 04"], mobile_phone: "+41 79 555 01 05"}
+      bind: {uri: "$prev.uri"}
+      expect:
+        result:
+          home_phones: ["+41 44 555 01 04"]
+          mobile_phone: "+41 79 555 01 05"

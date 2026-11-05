@@ -151,13 +151,6 @@ test('buildMainSectionText keeps the headline when some scans fail', () => {
   assert.match(text, /unique across 2 images/);
 });
 
-test('buildMainSectionText hides the totals when every scan fails', () => {
-  const text = buildMainSectionText(summarize([image('a', [], { failed: true })]));
-
-  assert.match(text, /Vulnerability totals are unavailable/);
-  assert.equal(text.includes('0 critical'), false);
-});
-
 test('buildMainSectionText says so when nothing is published', () => {
   const text = buildMainSectionText(summarize([image('a', [], { published: false })]));
 
@@ -282,7 +275,7 @@ test('buildPayload reads the reports and builds header, table, repository sectio
   );
 });
 
-test('buildPayload marks a service without an artifact as a failed scan', () => {
+test('buildPayload returns nothing when every scan fails', () => {
   const payload = withReports(
     () => {},
     (root) =>
@@ -293,12 +286,32 @@ test('buildPayload marks a service without an artifact as a failed scan', () => 
       }),
   );
 
-  assert.match(payload.blocks[1].text.text, /Scan failed for all 1 images/);
+  assert.equal(payload, null);
+});
+
+test('buildPayload marks a service without an artifact as a failed scan when another scan works', () => {
+  const payload = withReports(
+    (root) =>
+      writeReport(root, 'api', {
+        meta: { found: true },
+        results: { Results: [] },
+      }),
+    (root) =>
+      buildPayload({
+        ...baseEnv,
+        REPORTS_PATH: root,
+        SERVICES: JSON.stringify([
+          { service: 'api', version: '1.2.3' },
+          { service: 'admin', version: '1.2.3' },
+        ]),
+      }),
+  );
+
+  assert.match(payload.blocks[1].text.text, /1 of 2 image\(s\) failed to scan/);
   assert.equal(
     payload.blocks.some((block) => block.type === 'table'),
     true,
   );
-  assert.equal(payload.blocks.at(-1).elements[0].text.includes('Summed per image'), false);
 });
 
 test('buildPayload keeps every text within the Slack limits', () => {

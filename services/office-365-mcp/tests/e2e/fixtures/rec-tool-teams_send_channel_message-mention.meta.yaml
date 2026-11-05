@@ -1,0 +1,25 @@
+scenario: teams_send_channel_message-mention
+fixture: rec-tool-teams_send_channel_message-mention
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:29:00+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 22
+  keys dropped: 30
+  query parameters dropped: 4
+  response headers dropped: 24
+  text kept: 11
+  text replaced: 8
+literals:
+- persona:tom.id
+- persona:tom.name
+- seed-v1 case-teams_send_channel_message-mention hello
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -1,0 +1,23 @@
+scenario: sharepoint_create_folder-seed-folder
+fixture: rec-tool-sharepoint_create_folder-seed-folder
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:45:49+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 32
+  keys dropped: 10
+  persona addresses: 6
+  persona names: 6
+  response headers dropped: 27
+  text kept: 13
+  text replaced: 9
+literals:
+- seed-v1 Project Plan
+- seed-v1 case-sharepoint_create_folder-seed-folder
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3
