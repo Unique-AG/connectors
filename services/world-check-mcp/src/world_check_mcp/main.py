@@ -2,6 +2,7 @@
 
 from functools import partial
 
+from mcp_configs import ElicitationSettings
 from mcp_configs import from_environment
 from mcp_configs import LoggingSettings
 from mcp_configs import RateLimitSettings
@@ -30,7 +31,11 @@ def main() -> None:
     # Without sign-in there is no user to count tool calls under.
     rate_limit = RateLimitSettings() if auth is not None else None
     server = create_server(
-        from_environment(UpstreamSettings), persistence, auth=auth, rate_limit=rate_limit
+        from_environment(UpstreamSettings),
+        persistence,
+        elicitation=ElicitationSettings(),
+        auth=auth,
+        rate_limit=rate_limit,
     )
     run_server(server, server_settings)
 

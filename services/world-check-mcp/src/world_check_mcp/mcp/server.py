@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import AuthProvider
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
+from mcp_configs import ElicitationSettings
 from mcp_configs import RateLimitSettings
 from mcp_observability import access_token_subject
 from mcp_observability import RateLimitMiddleware
@@ -34,6 +35,7 @@ def create_server(
     open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]],
     transport: httpx2.AsyncBaseTransport | None = None,
     *,
+    elicitation: ElicitationSettings,
     auth: AuthProvider | None = None,
     rate_limit: RateLimitSettings | None = None,
 ) -> FastMCP:
@@ -49,7 +51,9 @@ def create_server(
             yield {
                 "upstream": upstream_resource,
                 "persistence": persistence_resource,
-                "approvals": ApprovalGate(),
+                # A saved match decision or passport check is a regulatory record, so its
+                # approval is asked for even when `for_data_modification` is disabled.
+                "approvals": ApprovalGate(ttl_seconds=elicitation.timeout_before_cancel_seconds),
             }
 
     # Every signed-in user shares one LSEG service account, so one caller must not use up its

@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from fastmcp import FastMCP
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
+from mcp_configs import ElicitationSettings
 from mcp_configs import RetrySettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
@@ -31,6 +32,11 @@ def fake_upstream_settings() -> UpstreamSettings:
         timeout_seconds=30,
         retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),
     )
+
+
+def fake_elicitation_settings() -> ElicitationSettings:
+    """Given in full, so the environment does not change how long an approval lasts."""
+    return ElicitationSettings(timeout_before_cancel_seconds=120)
 
 
 def unanswered_upstream() -> httpx2.MockTransport:
@@ -56,7 +62,12 @@ def build_server(
     async def open_persistence() -> AsyncGenerator[Persistence]:
         yield persistence
 
-    return create_server(upstream_settings, open_persistence, upstream_transport)
+    return create_server(
+        upstream_settings,
+        open_persistence,
+        upstream_transport,
+        elicitation=fake_elicitation_settings(),
+    )
 
 
 @asynccontextmanager

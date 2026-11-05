@@ -5,6 +5,7 @@ from typing import cast
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
+from mcp_types import ElicitRequest
 from mcp_types import ElicitResult
 from mcp_types import InputRequiredResult
 import pytest
@@ -39,7 +40,7 @@ def _connection() -> Context:
 
 
 async def test_approval_is_single_use_and_bound_to_the_inputs() -> None:
-    gate = ApprovalGate()
+    gate = ApprovalGate(ttl_seconds=120)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -58,7 +59,7 @@ async def test_approval_is_single_use_and_bound_to_the_inputs() -> None:
 
 
 async def test_a_declined_approval_is_consumed_without_a_plan() -> None:
-    gate = ApprovalGate()
+    gate = ApprovalGate(ttl_seconds=120)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -75,7 +76,7 @@ async def test_a_declined_approval_is_consumed_without_a_plan() -> None:
 
 
 async def test_changed_inputs_do_not_consume_the_approval() -> None:
-    gate = ApprovalGate()
+    gate = ApprovalGate(ttl_seconds=120)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -130,10 +131,12 @@ async def test_every_approval_outcome_is_logged_with_its_case(
 ) -> None:
     caplog.set_level(logging.INFO, logger="world_check_mcp.mcp.approval")
     approve = ElicitResult(action="accept", content={"approve": True})
-    await _take(ApprovalGate(), answer=approve, request=_request())
-    await _take(ApprovalGate(), answer=ElicitResult(action="decline"), request=_request())
+    await _take(ApprovalGate(ttl_seconds=120), answer=approve, request=_request())
+    await _take(
+        ApprovalGate(ttl_seconds=120), answer=ElicitResult(action="decline"), request=_request()
+    )
     await _take(ApprovalGate(ttl_seconds=0), answer=approve, request=_request())
-    await _take(ApprovalGate(), answer=approve, request=_request(matched=False))
+    await _take(ApprovalGate(ttl_seconds=120), answer=approve, request=_request(matched=False))
     answered = [record for record in caplog.records if record.message == "Approval answered"]
     assert [_extra(record, "outcome", "case_system_id") for record in answered] == [
         ("approved", "sys-1"),
@@ -141,3 +144,19 @@ async def test_every_approval_outcome_is_logged_with_its_case(
         ("expired", "sys-1"),
         ("invalid", "sys-1"),
     ]
+
+
+@pytest.mark.parametrize(
+    ("ttl_seconds", "expiry"),
+    [(120, "2 minutes"), (60, "1 minute"), (90, "90 seconds")],
+)
+async def test_the_approval_prompt_states_the_configured_expiry(
+    ttl_seconds: float, expiry: str
+) -> None:
+    asked = await ApprovalGate(ttl_seconds=ttl_seconds).ask(
+        _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
+    )
+    assert isinstance(asked, InputRequiredResult)
+    prompt = (asked.input_requests or {})["approval"]
+    assert isinstance(prompt, ElicitRequest)
+    assert prompt.params.message == f"Save? Approval expires in {expiry}."

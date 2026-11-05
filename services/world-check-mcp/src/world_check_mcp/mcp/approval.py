@@ -19,7 +19,6 @@ from world_check_mcp import contexts
 
 _logger = logging.getLogger(__name__)
 
-_TTL_SECONDS = 300
 _PENDING_LIMIT = 256
 _APPROVAL_SCHEMA: dict[str, object] = {
     "properties": {
@@ -56,9 +55,9 @@ class _Pending(BaseModel):
 
 
 class ApprovalGate:
-    """One approval, bound to the exact inputs and reviewer, kept for five minutes."""
+    """One approval, bound to the exact inputs and reviewer, kept for `ttl_seconds`."""
 
-    def __init__(self, *, ttl_seconds: float = _TTL_SECONDS) -> None:
+    def __init__(self, *, ttl_seconds: float) -> None:
         self._ttl_seconds: float = ttl_seconds
         self._pending: dict[str, _Pending] = {}
 
@@ -89,6 +88,7 @@ class ApprovalGate:
         message: str,
     ) -> contexts.PassportVerificationPlan | contexts.ResolutionPlan | InputRequiredResult | None:
         self.require_elicitation(ctx)
+        message = f"{message} Approval expires in {_duration(self._ttl_seconds)}."
         connection = ctx.request_context
         assert connection is not None, "require_elicitation rejects a missing connection"
         if connection.protocol_version < "2026-07-28":
@@ -187,6 +187,14 @@ class ApprovalGate:
         self._pending = {key: item for key, item in self._pending.items() if item.expires_at > now}
 
 
+def _duration(seconds: float) -> str:
+    whole = round(seconds)
+    if whole >= 60 and whole % 60 == 0:
+        minutes = whole // 60
+        return f"{minutes} minute{'s' if minutes != 1 else ''}"
+    return f"{whole} second{'s' if whole != 1 else ''}"
+
+
 def _log_outcome(
     outcome: Literal["approved", "declined", "expired", "invalid"], *, case_system_id: str
 ) -> None:
@@ -256,6 +264,6 @@ def _with_note(*, lines: list[str], note: str) -> str:
             "Decline leaves the record unchanged.",
             "",
             "Saved in LSEG using the shared service account, with your reviewer identity "
-            "appended to the note. Approval expires in 5 minutes.",
+            "appended to the note.",
         ]
     )

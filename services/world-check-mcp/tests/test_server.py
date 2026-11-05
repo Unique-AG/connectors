@@ -11,6 +11,7 @@ from pydantic import AnyHttpUrl
 import pytest
 from starlette.testclient import TestClient
 
+from tests.offline_server import fake_elicitation_settings
 from tests.offline_server import fake_upstream_settings
 from tests.offline_server import open_fake_persistence
 from tests.offline_server import unanswered_upstream
@@ -128,6 +129,7 @@ def test_a_rate_limit_counts_the_tool_calls_of_each_user(
         fake_upstream_settings(),
         open_fake_persistence,
         unanswered_upstream(),
+        elicitation=fake_elicitation_settings(),
         rate_limit=rate_limit,
     )
     assert any(isinstance(item, RateLimitMiddleware) for item in server.middleware) is limited
