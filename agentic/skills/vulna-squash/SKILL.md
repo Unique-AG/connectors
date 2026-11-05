@@ -94,8 +94,8 @@ To make a fix:
 3. Run the command that the failed job ran.
 4. Commit with `fix(<scope>): adapt to <pkg> <version>`. Push to the same branch.
 5. Set the scope of the PR title from the files of the PR. Keep the type and the subject of the title. Do this after every push.
-   - Get the scope: `scope=$(gh pr view <n> --repo Unique-AG/connectors --json files -q '.files[].path' | node .github/scripts/deps-nightly/scope.cli.mjs)`
-   - Set the title: `gh pr edit <n> --repo Unique-AG/connectors --title "build($scope): <subject>"`
+   - Get the scope: `files=$(gh pr view <n> --repo Unique-AG/connectors --json files -q '.files[].path') && scope=$(printf '%s\n' "$files" | node .github/scripts/deps-nightly/scope.cli.mjs)`
+   - Set the title: `title=$(gh pr view <n> --repo Unique-AG/connectors --json title -q .title) && gh pr edit <n> --repo Unique-AG/connectors --title "$(printf '%s' "$title" | sed -E "s/^([a-z]+)\([^)]*\)/\1($scope)/")"`
    - If a command fails, the result is `human-required`. Put the error in the hand-off section.
 
 After attempt 2, go to Part E.
