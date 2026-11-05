@@ -6,7 +6,6 @@ from world_check_mcp.upstream.actions import PARTIAL_UPDATE_CASE
 from world_check_mcp.upstream.actions import RESOLVE_RESULTS
 from world_check_mcp.upstream.actions import SAVE_AND_SCREEN
 from world_check_mcp.upstream.actions import ScreenedCaseWire
-from world_check_mcp.upstream.actions import ScreeningMatchWire
 from world_check_mcp.upstream.actions import TOGGLE_ONGOING_SCREENING
 from world_check_mcp.upstream.actions import VERIFY_PASSPORT
 from world_check_mcp.upstream.case import CaseWire
@@ -143,7 +142,6 @@ __all__ = [
     "SAVE_AND_SCREEN",
     "SEARCH_CASES",
     "ScreenedCaseWire",
-    "ScreeningMatchWire",
     "SearchCasesRequest",
     "SearchParameterCollection",
     "SortCriterionInput",

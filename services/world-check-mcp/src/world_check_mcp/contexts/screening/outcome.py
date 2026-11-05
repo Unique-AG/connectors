@@ -1,8 +1,8 @@
 from world_check_mcp.contexts.screening.errors import ScreeningError
 from world_check_mcp.contexts.screening.models import ScreeningMatch
 from world_check_mcp.contexts.screening.models import ScreeningOutcome
+from world_check_mcp.upstream import ResultWire
 from world_check_mcp.upstream import ScreenedCaseWire
-from world_check_mcp.upstream import ScreeningMatchWire
 
 
 def outcome(*, screened: ScreenedCaseWire, limit: int) -> ScreeningOutcome:
@@ -26,7 +26,7 @@ def outcome(*, screened: ScreenedCaseWire, limit: int) -> ScreeningOutcome:
     )
 
 
-def match_from_result(*, item: ScreeningMatchWire) -> ScreeningMatch:
+def match_from_result(*, item: ResultWire) -> ScreeningMatch:
     return ScreeningMatch(
         result_id=item.result_id,
         reference_id=item.reference_id,

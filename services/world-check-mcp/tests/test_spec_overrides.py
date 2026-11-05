@@ -61,8 +61,9 @@ def _has_json_success(responses: dict[str, object]) -> bool:
 
 
 def test_generated_result_model_still_drops_the_passport_mrz_lines() -> None:
-    """Justifies upstream.queries.ResultWire and upstream.actions.ScreeningMatchWire: the spec puts
-    mrzLine1-3 on a passport result subtype that the codegen collapses into the base.
+    """Justifies upstream.queries.ResultWire, which the case results and the screen responses
+    share: the spec puts mrzLine1-3 on a passport result subtype that the codegen collapses into
+    the base.
     """
     assert not any(name.startswith("mrz_line") for name in AbstractScreeningResult.model_fields)
 

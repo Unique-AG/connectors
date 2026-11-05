@@ -35,9 +35,9 @@ class CaseSearchWire(BaseModel):
 
 
 class ResultWire(BaseModel):
-    """A case result. Hand-written because it carries the passport mrzLine fields that the generated
-    AbstractScreeningResult drops (the spec models them on a subtype the codegen collapses away).
-    Pinned by tests/test_spec_overrides.py.
+    """A screening result, from a case's results or from a screen. Hand-written because it carries
+    the passport mrzLine fields that the generated AbstractScreeningResult drops (the spec models
+    them on a subtype the codegen collapses away). Pinned by tests/test_spec_overrides.py.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
