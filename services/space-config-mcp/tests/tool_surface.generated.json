@@ -1,0 +1,1153 @@
+[
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Grant access to a user or group on the current space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "description": "Access entries to add. Each entry must have 'entityId', 'entityType' ('USER' or 'GROUP'), and 'type' ('USE', 'MANAGE', or 'UPLOAD').",
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "type": "object"
+    },
+    "name": "add_space_access",
+    "outputSchema": {
+      "properties": {
+        "access": {
+          "items": {
+            "properties": {
+              "entityId": {
+                "type": "string"
+              },
+              "entityType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "entityId",
+              "entityType",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "type": "object"
+    },
+    "title": "Add Space Access"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Delete all stored snapshots for the current space.\n\nRemoves the snapshot file and every version it contains. This cannot be undone.\nIndividual version deletion is not supported by the KB API.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "delete_snapshots",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Delete Snapshots"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Revoke access entries from the current space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "access_ids": {
+          "description": "List of access entry IDs to remove.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "access_ids"
+      ],
+      "type": "object"
+    },
+    "name": "delete_space_access",
+    "outputSchema": {
+      "properties": {
+        "success": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "success"
+      ],
+      "type": "object"
+    },
+    "title": "Delete Space Access"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return the current space config as a portable JSON string. No storage side-effects.\n\nReflects live config at call time. Use snapshot_space to persist a named version.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "export_space_config",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "Export Space Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return the SwappableIntelligence module ID and its typed ConductConfig for the current space.\n\nThe configuration dict uses camelCase keys matching the stored format. Use this before\ncalling update_conduct_config to inspect the current state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_conduct_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Get Conduct Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List MCP servers (connectors) enabled on the current space with their tool selection and OAuth state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_mcp_server_status",
+    "outputSchema": {
+      "properties": {
+        "mcpServers": {
+          "items": {
+            "description": "The calling user's own state for an MCP server enabled on a space.",
+            "properties": {
+              "enabledToolNames": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "isEnabled": {
+                "type": "boolean"
+              },
+              "isOAuth2Connected": {
+                "type": "boolean"
+              },
+              "mcpServerId": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "oauth2Url": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requiresOAuth": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "mcpServerId",
+              "name",
+              "isEnabled",
+              "requiresOAuth",
+              "isOAuth2Connected",
+              "oauth2Url",
+              "enabledToolNames"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "spaceId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "spaceId",
+        "mcpServers"
+      ],
+      "type": "object"
+    },
+    "title": "Get MCP Server Status"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get a single module with its full configuration dict.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "module_id": {
+          "description": "ID of the module to retrieve.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_module",
+    "title": "Get Module"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return the full JSON config stored in a specific snapshot version.\n\nReflects the space config at the time snapshot_space was called for that version.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "description": "Snapshot ID returned by list_snapshots.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id"
+      ],
+      "type": "object"
+    },
+    "name": "get_snapshot",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Get Snapshot"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Get the full configuration of the current space: metadata, modules, scope rules, and access.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_space",
+    "title": "Get Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List current access entries for the current space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_space_access",
+    "outputSchema": {
+      "properties": {
+        "access": {
+          "items": {
+            "properties": {
+              "entityId": {
+                "type": "string"
+              },
+              "entityType": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "entityId",
+              "entityType",
+              "type"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "type": "object"
+    },
+    "title": "Get Space Access"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Apply a previously exported JSON config to the current space. Auto-snapshots before applying.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "config_json": {
+          "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "config_json"
+      ],
+      "type": "object"
+    },
+    "name": "import_space_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Import Space Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List all language model IDs available to the company.\n\nUse this before calling update_space or update_conduct_config to get the exact\nmodel identifier strings accepted by language_model and switchable_language_models.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_language_models",
+    "outputSchema": {
+      "description": "Response for getting available LLM models.",
+      "properties": {
+        "models": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "models"
+      ],
+      "type": "object"
+    },
+    "title": "List Language Models"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List all MCP servers (connectors) available to the company.\n\nReturns each server's id, name, description, requiresOAuth flag, and the full\nlist of tool names and descriptions. Use this to find server IDs and tool names\nbefore calling update_space with mcp_servers.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_mcp_servers",
+    "outputSchema": {
+      "properties": {
+        "mcpServers": {
+          "items": {
+            "description": "An MCP server (connector) of the company that can be attached to a space.",
+            "properties": {
+              "allowedSpaceIds": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "isSpaceRestricted": {
+                "type": "boolean"
+              },
+              "name": {
+                "type": "string"
+              },
+              "requiresOAuth": {
+                "type": "boolean"
+              },
+              "tools": {
+                "items": {
+                  "description": "A tool of an MCP server that the company has enabled.",
+                  "properties": {
+                    "description": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "description"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description",
+              "requiresOAuth",
+              "isSpaceRestricted",
+              "allowedSpaceIds",
+              "tools"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "mcpServers"
+      ],
+      "type": "object"
+    },
+    "title": "List MCP Servers"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List all modules belonging to the current space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_modules",
+    "title": "List Modules"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List all stored snapshots for the current space, newest version first.\n\nReturns snapshot_id (a KB contentVersionId), version_number, label, and captured_at\nfor each snapshot. Pass snapshot_id to get_snapshot or revert_space.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "list_snapshots",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "List Snapshots"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Restore the current space to a prior snapshot version.\n\nAuto-snapshots the current state first so the revert itself is reversible.\nReturns the pre-revert snapshot ID alongside the restored snapshot ID.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_id": {
+          "description": "Snapshot ID returned by list_snapshots.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id"
+      ],
+      "type": "object"
+    },
+    "name": "revert_space",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Revert Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Capture the full configuration of the current space as a versioned JSON snapshot.\n\nStores the snapshot in the knowledge base. Returns snapshot_id for later revert.\nEach call creates a new version of the space's snapshot file.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "default": "",
+          "description": "Human-readable label for this snapshot. Auto-generated if empty.",
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "snapshot_space",
+    "outputSchema": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "title": "Snapshot Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Update the current space's SwappableIntelligence harness configuration.\n\nEach parameter targets a specific key in the stored configuration. Only provided\n(non-None) parameters are written; everything else in the existing config is preserved.\nUse get_conduct_config first to inspect the current state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "agent_md_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Admin AGENT.md content injected into the workspace (setup.agentMdInstructions)."
+        },
+        "claude_autocompact_pct": {
+          "anyOf": [
+            {
+              "maximum": 95,
+              "minimum": 10,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Context autocompact threshold percentage for claude_code (10\u201395)."
+        },
+        "claude_effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "auto",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reasoning effort level for the claude_code strategy."
+        },
+        "claude_max_context_tokens": {
+          "anyOf": [
+            {
+              "maximum": 500000,
+              "minimum": 50000,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum context window tokens for claude_code (50 000\u2013500 000)."
+        },
+        "claude_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Claude model ID for the claude_code/claude_sandbox strategy."
+        },
+        "claude_permission_mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "default",
+                "acceptEdits",
+                "bypassPermissions"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Tool permission mode for the claude_code strategy. 'bypassPermissions' skips all confirmation prompts."
+        },
+        "codex_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model ID for the codex strategy."
+        },
+        "codex_reasoning_effort": {
+          "anyOf": [
+            {
+              "enum": [
+                "none",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reasoning effort level for the codex strategy."
+        },
+        "custom_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Instructions appended to the agent system prompt (setup.customInstructions)."
+        },
+        "enable_browser_control": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable browser automation tools (setup.enableBrowserControl)."
+        },
+        "enable_code_execution": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable bash/write/read tools in the agent (setup.enableCodeExecution)."
+        },
+        "max_turns": {
+          "anyOf": [
+            {
+              "maximum": 1000,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum agent turns (1\u20131000). Applied to the active strategy block (claude.maxTurns, piAgent.maxTurns, or codex.maxTurns)."
+        },
+        "mcp_integration_mode": {
+          "anyOf": [
+            {
+              "enum": [
+                "tools",
+                "skills"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How MCP servers are exposed to the agent: as 'tools' or 'skills' (setup.mcpIntegrationMode)."
+        },
+        "pi_agent_model_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model ID for the pi_agent strategy."
+        },
+        "pi_agent_thinking_level": {
+          "anyOf": [
+            {
+              "enum": [
+                "off",
+                "minimal",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Thinking depth for the pi_agent strategy."
+        },
+        "progress_update_abort_s": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Abort the agent after this many seconds without a progress update. Set to null/None to disable (setup.progressUpdateAbortS)."
+        },
+        "show_thinking_in_chat": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Show agent thinking steps in the chat UI (setup.showThinkingInChat)."
+        },
+        "show_tool_calls_in_chat": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Show tool calls in the chat UI (setup.showToolCallsInChat)."
+        },
+        "strategy": {
+          "anyOf": [
+            {
+              "enum": [
+                "claude_code",
+                "pi_agent",
+                "codex",
+                "cursor_sdk",
+                "claude_sandbox"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Agent execution strategy. 'claude_code' is the standard Claude Code runner. 'pi_agent' uses a Pi-model runner. 'codex' uses an OpenAI Codex runner."
+        },
+        "system_prompt_override": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When non-empty, fully replaces the agent system prompt (setup.systemPromptOverride)."
+        }
+      },
+      "type": "object"
+    },
+    "name": "update_conduct_config",
+    "title": "Update Conduct Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": false
+    },
+    "description": "Merge config_patch into a module's configuration dict. Existing unpatched keys are kept.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "config_patch": {
+          "additionalProperties": true,
+          "description": "Keys to merge into the module's configuration dict. Existing keys not in the patch are preserved. For Conduct spaces, prefer update_conduct_config instead.",
+          "type": "object"
+        },
+        "module_id": {
+          "description": "ID of the module to update.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module_id",
+        "config_patch"
+      ],
+      "type": "object"
+    },
+    "name": "update_module_config",
+    "title": "Update Module Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Update metadata and configuration of the current space. Only the fields you provide are changed.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "alert": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Alert text shown to users of the space."
+        },
+        "allow_model_switching": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether users may switch between models."
+        },
+        "assistant_prompts": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "id": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "order": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "title",
+                  "prompt"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Preset prompt suggestions shown to users. Each entry needs a title and a prompt. Providing this list replaces all existing prompts."
+        },
+        "chat_upload": {
+          "anyOf": [
+            {
+              "enum": [
+                "ENABLED",
+                "DISABLED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Whether users can upload files in the chat input."
+        },
+        "explanation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Description / system-prompt text for the space."
+        },
+        "is_pinned": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Pin the space to the top of listings."
+        },
+        "language_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default language model identifier, e.g. 'gpt-4o'."
+        },
+        "mcp_servers": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "mcpServerId": {
+                    "type": "string"
+                  },
+                  "tools": {
+                    "anyOf": [
+                      {
+                        "items": {
+                          "properties": {
+                            "isEnabled": {
+                              "type": "boolean"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "isEnabled"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null
+                  }
+                },
+                "required": [
+                  "mcpServerId"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "MCP servers (connectors) to configure on the space. Each entry needs an mcpServerId. Optionally supply a tools list \u2014 each tool entry needs a name and isEnabled. An empty tools list disables the server. Omitting tools enables all callable tools for that server. Use get_mcp_server_status to find server IDs and current tool names."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "New display name for the space."
+        },
+        "settings": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Arbitrary settings dict merged at space level."
+        },
+        "switchable_language_models": {
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "languageModel": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "displayName",
+                  "languageModel"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "List of models users can pick from when allow_model_switching is true. Each entry needs a displayName (shown in the UI) and a languageModel (model ID)."
+        }
+      },
+      "type": "object"
+    },
+    "name": "update_space",
+    "title": "Update Space"
+  }
+]
