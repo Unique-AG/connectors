@@ -222,7 +222,8 @@ def _once(
     command = _python("-m", "tests.e2e.recording.record", plan.scenario, "--target", "graph")
     command += ["--max-requests", str(plan.cap or DEFAULT_CAP)]
     command += [] if reads(plan) else ["--allow-writes"]
-    started = time.time()
+    # File mtimes come from a coarser clock than time.time(): a fresh write can predate it.
+    started = time.time() - 1
     env = {
         "GRAPH_TOKEN": token(sh, upns[plan.persona - 1], tools, plan.scopes),
         "SEED_UPNS": ",".join(upns),
