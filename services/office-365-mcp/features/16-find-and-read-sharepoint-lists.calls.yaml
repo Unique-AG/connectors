@@ -87,3 +87,70 @@ uc-16-06:
       uses: {list: uri of the Tasks list}
   note: "sharepoint_list_items reads the columns first and refuses a column that is not indexed before it asks Microsoft for any item."
 
+uc-16-07:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_create_list_item.py::test_it_posts_the_typed_fields_once_the_person_agrees"
+    - "tests/tools/test_sharepoint_create_list_item.py::test_a_declined_question_sends_nothing"
+  ask: "Add the task Close books with the status Open to the Tasks list."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_get_list
+      optional: true
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_create_list_item
+      args: {fields: {Title: Close books, Status: Open}}
+      uses: {list: uri of the Tasks list}
+
+uc-16-08:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_create_list_item.py::test_a_column_it_cannot_write_sends_nothing_and_asks_nobody"
+  ask: "Add the task Close books to the Tasks list with me as the owner."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_get_list
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_create_list_item
+      optional: true
+      args: {fields: {Title: Close books, Owner: me}}
+      uses: {list: uri of the Tasks list}
+  note: "sharepoint_create_list_item reads the columns first and refuses a person, lookup, managed metadata, or multi-value column before it asks anybody. The create step is optional because sharepoint_get_list already shows the type of the column."
+
+uc-16-09:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_update_list_item.py::test_it_patches_with_the_item_etag_and_shows_old_and_new_values"
+    - "tests/tools/test_sharepoint_update_list_item.py::test_a_declined_question_sends_nothing"
+  ask: "Set the status of Close books in the Tasks list to Closed."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_list_items
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_update_list_item
+      args: {fields: {Status: Closed}}
+      uses: {item: uri of the item Close books}
+
+uc-16-10:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_update_list_item.py::test_a_changed_row_is_a_tool_error_that_sends_the_model_to_read_again"
+  ask: "Set the status of Close books in the Tasks list to Closed."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_list_items
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_update_list_item
+      args: {fields: {Status: Closed}}
+      uses: {item: uri of the item Close books}
+    - tool: sharepoint_list_items
+      uses: {list: uri of the Tasks list}
+  note: "The update sends the eTag of the item it read as If-Match. When somebody changed the item since, Microsoft answers 412, and the tool error sends the assistant back to sharepoint_list_items. It does not retry."

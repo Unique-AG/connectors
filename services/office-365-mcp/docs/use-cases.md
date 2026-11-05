@@ -8518,6 +8518,65 @@ What happens:
 - The assistant tells Mia that it can filter only on an indexed column.
 - It does not present other items as the items that match.
 
+#### The assistant adds an item to a list only after Mia agrees
+
+**An item is added after Mia agrees**
+
+Ask your assistant: "Add the task Close books with the status Open to the Tasks list."
+
+Tests: 2
+
+Situation: The list "Tasks" has the column "Title" and the column "Status" with the choices "Open" and "Closed".
+
+What happens:
+
+- The assistant asks Mia to agree to the new item and names its values.
+- After Mia agrees, the list "Tasks" holds the item "Close books" with the status "Open".
+- The assistant asks Mia to approve first.
+
+**A person column is not written**
+
+Ask your assistant: "Add the task Close books to the Tasks list with me as the owner."
+
+Tests: 1
+
+Situation: The column "Owner" of the list "Tasks" holds a person.
+
+What happens:
+
+- The assistant tells Mia that it cannot write a person column.
+- It does not ask Mia to agree, and it adds no item.
+
+#### The assistant changes an item only after Mia agrees to the old and the new values
+
+**The status of an item is changed after Mia agrees**
+
+Ask your assistant: "Set the status of Close books in the Tasks list to Closed."
+
+Tests: 2
+
+Situation: The item "Close books" of the list "Tasks" has the status "Open".
+
+What happens:
+
+- The assistant asks Mia to agree to change the status from "Open" to "Closed".
+- After Mia agrees, the item "Close books" has the status "Closed".
+- The assistant asks Mia to approve first.
+
+**An item that somebody changed in the meantime is not overwritten**
+
+Ask your assistant: "Set the status of Close books in the Tasks list to Closed."
+
+Tests: 1
+
+Situation: Somebody changes the item "Close books" after the assistant reads it.
+
+What happens:
+
+- The assistant tells Mia that the item changed and reads it again.
+- It does not overwrite the other change.
+- The assistant asks Mia to approve first.
+
 ## OneNote
 
 ### Working with notes in OneNote

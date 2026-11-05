@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 124 tools in total.
+- **Size:** 126 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -112,6 +112,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`sharepoint-share`](#sharepoint-share) | `sharepoint-write`, plus sharing links and invitations. | 13 | ⚠️ Yes |
 | [`sharepoint-sites`](#sharepoint-sites) | `sharepoint-read`, plus finding SharePoint sites. | 5 | ⚠️ Yes |
 | [`sharepoint-lists`](#sharepoint-lists) | Find a site and read its lists, columns, and items. | 4 | ⚠️ Yes |
+| [`sharepoint-lists-write`](#sharepoint-lists-write) | `sharepoint-lists`, plus adding and changing list items. | 6 | ⚠️ Yes |
 
 **OneNote.** Notebooks, sections, and pages.
 
@@ -1022,7 +1023,8 @@ Files, folders, sharing, sites, and lists.
 - Find a SharePoint site by free text.
 
 **Note:** This preset adds the permission `Sites.Read.All`. Of the other `sharepoint-` presets, only
-[`sharepoint-lists`](#sharepoint-lists) needs it.
+[`sharepoint-lists`](#sharepoint-lists) and [`sharepoint-lists-write`](#sharepoint-lists-write)
+need it.
 
 **Tools added by this preset**
 
@@ -1061,6 +1063,33 @@ Files, folders, sharing, sites, and lists.
 - **Graph permissions (2):** `Sites.Read.All`, `User.Read`
 - **Admin consent:** ⚠️ Required for `Sites.Read.All`. A tenant administrator must grant consent before any user signs in.
 - **User approval:** None. No tool of this preset asks the user.
+
+### `sharepoint-lists-write`
+
+**6 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-lists`](#sharepoint-lists)
+
+**You can**
+
+- Do everything in `sharepoint-lists`.
+- Add an item to a list.
+- Change the columns of an item.
+
+**Note:** These tools write text, choice, date, number, currency, and yes or no columns. They
+refuse a person, lookup, managed metadata, or multi-value column, and a read-only or hidden one.
+Neither tool deletes an item.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_create_list_item` | 🟠 Add | ✋ Always | Adds one item to a list with the given column values. |
+| `sharepoint_update_list_item` | 🔴 Change | ✋ Always | Changes the given columns of one item. Refuses if somebody changed the item since it was read. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Sites.Read.All`, `Sites.ReadWrite.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Sites.Read.All`, `Sites.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `sharepoint_create_list_item`, `sharepoint_update_list_item`.
 
 ## OneNote presets
 
@@ -1261,7 +1290,7 @@ Two things can go wrong:
 
 ## Reference: every tool
 
-This reference lists all 124 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 126 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1396,6 +1425,8 @@ This reference lists all 124 tools. Use it to build an `enabled` list, or to fin
 | `sharepoint_list_lists` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
 | `sharepoint_get_list` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
 | `sharepoint_list_items` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_create_list_item` | 🟠 Write, adds | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_update_list_item` | 🔴 Write, changes or removes, safe to repeat | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 
 ### OneNote
 

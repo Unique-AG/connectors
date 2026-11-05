@@ -55,3 +55,34 @@ Feature: Finding and reading SharePoint lists
       Then the assistant tells Mia that it can filter only on an indexed column
       But it does not present other items as the items that match
 
+  Rule: The assistant adds an item to a list only after Mia agrees
+
+    @happy @uc-16-07
+    Scenario: An item is added after Mia agrees
+      Given the list "Tasks" has the column "Title" and the column "Status" with the choices "Open" and "Closed"
+      When Mia asks her assistant to add the task "Close books" with the status "Open" to the list "Tasks"
+      Then the assistant asks Mia to agree to the new item and names its values
+      And after Mia agrees, the list "Tasks" holds the item "Close books" with the status "Open"
+
+    @unhappy @uc-16-08
+    Scenario: A person column is not written
+      Given the column "Owner" of the list "Tasks" holds a person
+      When Mia asks her assistant to add the task "Close books" with herself as the owner
+      Then the assistant tells Mia that it cannot write a person column
+      But it does not ask Mia to agree, and it adds no item
+
+  Rule: The assistant changes an item only after Mia agrees to the old and the new values
+
+    @happy @uc-16-09
+    Scenario: The status of an item is changed after Mia agrees
+      Given the item "Close books" of the list "Tasks" has the status "Open"
+      When Mia asks her assistant to set the status of "Close books" to "Closed"
+      Then the assistant asks Mia to agree to change the status from "Open" to "Closed"
+      And after Mia agrees, the item "Close books" has the status "Closed"
+
+    @unhappy @uc-16-10
+    Scenario: An item that somebody changed in the meantime is not overwritten
+      Given somebody changes the item "Close books" after the assistant reads it
+      When Mia agrees to set the status of "Close books" to "Closed"
+      Then the assistant tells Mia that the item changed and reads it again
+      But it does not overwrite the other change

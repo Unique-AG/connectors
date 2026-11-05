@@ -165,6 +165,25 @@ sharepoint_list_items-first-list:
       args: {limit: 5}
       bind: {list: "$prev.lists[0].uri"}
 
+sharepoint_create_list_item-first-list:
+  chain:
+    - *first_site
+    - *first_lists
+    - tool: sharepoint_create_list_item
+      args: {fields: {Title: seed-v1 case-sharepoint_create_list_item-first-list}}
+      bind: {list: "$prev.lists[0].uri"}
+
+sharepoint_update_list_item-first-item:
+  chain:
+    - *first_site
+    - *first_lists
+    - tool: sharepoint_list_items
+      args: {limit: 1}
+      bind: {list: "$prev.lists[0].uri"}
+    - tool: sharepoint_update_list_item
+      args: {fields: {Title: seed-v1 case-sharepoint_update_list_item-first-item}}
+      bind: {item: "$prev.items[0].uri"}
+
 sharepoint_browse_folder-nested:
   needs: &tree [sharepoint-tree]
   chain:

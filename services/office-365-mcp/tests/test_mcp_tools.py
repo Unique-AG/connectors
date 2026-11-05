@@ -683,6 +683,8 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "sharepoint_delete_item",
         "sharepoint_create_share_link",
         "sharepoint_invite",
+        "sharepoint_create_list_item",
+        "sharepoint_update_list_item",
         "teams_send_chat_message",
         "teams_send_channel_message",
         "teams_send_chat_message_with_files",
