@@ -143,6 +143,28 @@ sharepoint_search_sites-all:
     - tool: sharepoint_search_sites
       args: {query: "*", limit: 3}
 
+sharepoint_list_lists-first-site:
+  chain:
+    - &first_site {tool: sharepoint_search_sites, args: {query: "*", limit: 1}}
+    - tool: sharepoint_list_lists
+      args: {limit: 5}
+      bind: {site: "$prev.sites[0].web_url"}
+
+sharepoint_get_list-first-list:
+  chain:
+    - *first_site
+    - &first_lists {tool: sharepoint_list_lists, args: {limit: 1}, bind: {site: "$prev.sites[0].web_url"}}
+    - tool: sharepoint_get_list
+      bind: {list: "$prev.lists[0].uri"}
+
+sharepoint_list_items-first-list:
+  chain:
+    - *first_site
+    - *first_lists
+    - tool: sharepoint_list_items
+      args: {limit: 5}
+      bind: {list: "$prev.lists[0].uri"}
+
 sharepoint_browse_folder-nested:
   needs: &tree [sharepoint-tree]
   chain:

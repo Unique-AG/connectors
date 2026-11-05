@@ -683,6 +683,22 @@ run "preset_sharepoint_sites" {
   }
 }
 
+run "preset_sharepoint_lists" {
+  variables {
+    tools_preset = "sharepoint-lists"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All"
+    error_message = "sharepoint-lists composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All"]
+    error_message = "Sites.Read.All needs an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_onenote_read" {
   variables {
     tools_preset = "onenote-read"

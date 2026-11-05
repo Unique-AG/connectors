@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 121 tools in total.
+- **Size:** 124 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -102,7 +102,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`outlook-contacts`](#outlook-contacts) | Read your contacts. | 2 | No |
 | [`outlook-contacts-write`](#outlook-contacts-write) | Create and change contacts. | 4 | No |
 
-**SharePoint and OneDrive.** Files, folders, sharing, and sites.
+**SharePoint and OneDrive.** Files, folders, sharing, sites, and lists.
 
 | Preset | Use it to | Tools | Admin consent |
 | --- | --- | --- | --- |
@@ -111,6 +111,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`sharepoint-write`](#sharepoint-write) | Create, rename, move, copy, and delete files and folders. | 11 | ⚠️ Yes |
 | [`sharepoint-share`](#sharepoint-share) | `sharepoint-write`, plus sharing links and invitations. | 13 | ⚠️ Yes |
 | [`sharepoint-sites`](#sharepoint-sites) | `sharepoint-read`, plus finding SharePoint sites. | 5 | ⚠️ Yes |
+| [`sharepoint-lists`](#sharepoint-lists) | Find a site and read its lists, columns, and items. | 4 | ⚠️ Yes |
 
 **OneNote.** Notebooks, sections, and pages.
 
@@ -911,7 +912,7 @@ The default Contacts folder.
 
 ## SharePoint and OneDrive presets
 
-Files, folders, sharing, and sites.
+Files, folders, sharing, sites, and lists.
 
 ### `sharepoint-search`
 
@@ -1020,7 +1021,8 @@ Files, folders, sharing, and sites.
 - Do everything in `sharepoint-read`.
 - Find a SharePoint site by free text.
 
-**Note:** This preset adds the permission `Sites.Read.All`. No other `sharepoint-` preset needs it.
+**Note:** This preset adds the permission `Sites.Read.All`. Of the other `sharepoint-` presets, only
+[`sharepoint-lists`](#sharepoint-lists) needs it.
 
 **Tools added by this preset**
 
@@ -1032,6 +1034,32 @@ Files, folders, sharing, and sites.
 
 - **Graph permissions (3):** `Files.Read.All`, `Sites.Read.All`, `User.Read`
 - **Admin consent:** ⚠️ Required for `Files.Read.All`, `Sites.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `sharepoint-lists`
+
+**4 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a SharePoint site by free text.
+- List the lists of a site.
+- Read the columns of a list.
+- Read the items of a list, optionally filtered on one indexed column.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_search_sites` | 🟢 Read | — | Finds SharePoint sites by free text. It does not find files. |
+| `sharepoint_list_lists` | 🟢 Read | — | Lists the visible lists of one site, with a handle for each. Leaves out document libraries. |
+| `sharepoint_get_list` | 🟢 Read | — | Describes the columns of one list: name, type, and whether each is required, read-only, or indexed. |
+| `sharepoint_list_items` | 🟢 Read | — | Reads the items of one list, optionally filtered on one indexed column. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Sites.Read.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Sites.Read.All`. A tenant administrator must grant consent before any user signs in.
 - **User approval:** None. No tool of this preset asks the user.
 
 ## OneNote presets
@@ -1233,7 +1261,7 @@ Two things can go wrong:
 
 ## Reference: every tool
 
-This reference lists all 121 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 124 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1365,6 +1393,9 @@ This reference lists all 121 tools. Use it to build an `enabled` list, or to fin
 | `sharepoint_create_share_link` | 🟠 Write, safe to repeat | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 | `sharepoint_invite` | 🟠 Write, adds | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 | `sharepoint_search_sites` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_list_lists` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_get_list` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_list_items` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
 
 ### OneNote
 

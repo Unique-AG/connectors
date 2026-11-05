@@ -56,6 +56,7 @@ INDEX_NEEDS = {"sharepoint-seed-files", "sharepoint-tree", "sharepoint-big-files
 TEAM_DRIVE = "b!TEAMLIBRARYAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 NEW_FILE = f"{PATH}/{ITEM}:/seed-v1 case-x.txt:/content"
 SHARE = "/shares/u!aHR0cHM6Ly9jb250b3NvLXRlc3QvYQ/driveItem"
+SITE = f"contoso.sharepoint.com,{stand_in.SITE_ID},{stand_in.LIST_ID}"
 
 
 OLD_CASES = {
@@ -329,6 +330,22 @@ class TestGuardRules:
             ("sharepoint_resolve_url", "/shares", False),
             ("sharepoint_resolve_url", "/sites", False),
             ("sharepoint_read_file", SHARE, False),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com", True),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com:/sites/Finance", True),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com:/teams/Sales", True),
+            ("sharepoint_list_lists", f"/sites/{SITE}/lists", True),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com:/sites/Finance/Sub", False),
+            ("sharepoint_list_lists", "/sites/contoso.example:/sites/Finance", False),
+            ("sharepoint_list_lists", f"/sites/{SITE}/drives", False),
+            ("sharepoint_list_lists", f"/sites/{SITE}/lists/L1/items", False),
+            ("sharepoint_get_list", f"/sites/{SITE}/lists/L1/columns", True),
+            ("sharepoint_get_list", f"/sites/{SITE}/lists/L1/items", False),
+            ("sharepoint_get_list", "/sites/contoso.sharepoint.com/lists/L1/columns", False),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/columns", True),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items", True),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items/7", False),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items/7/fields", False),
+            ("sharepoint_list_items", "/sites", False),
         ],
     )
     def test_a_read_glob_allows_one_tool_one_path(

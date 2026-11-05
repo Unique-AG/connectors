@@ -33,7 +33,7 @@ was run by hand. For the tools behind the examples, read the [tool reference](RE
 
 - Outlook: [Finding and reading mail](#finding-and-reading-mail), [Drafting and sending mail](#drafting-and-sending-mail), [Organizing the mailbox](#organizing-the-mailbox), [Mailbox preferences](#mailbox-preferences), [Reading the calendar](#reading-the-calendar), [Scheduling and answering meetings](#scheduling-and-answering-meetings), [Sharing and delegating calendars](#sharing-and-delegating-calendars), [Managing contacts](#managing-contacts)
 - Teams: [Catching up on Teams](#catching-up-on-teams), [Posting in Teams](#posting-in-teams), [Running Teams chats and online meetings](#running-teams-chats-and-online-meetings)
-- SharePoint: [Finding and reading files in OneDrive and SharePoint](#finding-and-reading-files-in-onedrive-and-sharepoint), [Organizing and sharing files in OneDrive and SharePoint](#organizing-and-sharing-files-in-onedrive-and-sharepoint)
+- SharePoint: [Finding and reading files in OneDrive and SharePoint](#finding-and-reading-files-in-onedrive-and-sharepoint), [Organizing and sharing files in OneDrive and SharePoint](#organizing-and-sharing-files-in-onedrive-and-sharepoint), [Finding and reading SharePoint lists](#finding-and-reading-sharepoint-lists)
 - OneNote: [Working with notes in OneNote](#working-with-notes-in-onenote)
 - Across sources: [Working across mail, calendar, files, and Teams](#working-across-mail-calendar-files-and-teams)
 
@@ -8427,6 +8427,96 @@ Cases:
 - The assistant cannot replace the content of an existing file.
 - The assistant cannot save an attached file in a folder.
 - The assistant cannot take back access to a file.
+
+### Finding and reading SharePoint lists
+
+Mia's team tracks tasks and issues in lists on SharePoint sites. Mia asks her assistant which lists a site has, which columns a list has, and which items a list holds. The assistant sees only the lists that Mia herself can open.
+
+**Starting point.** Mia can open the Finance site.
+
+#### The assistant finds the lists of a site that Mia names
+
+**The lists of a site are shown**
+
+Ask your assistant: "Which lists does the Finance site have?"
+
+Tests: 1
+
+Situation: The Finance site holds the lists "Tasks" and "Issues", a hidden list, and the library "Documents".
+
+What happens:
+
+- The assistant names the lists "Tasks" and "Issues".
+- It does not name the hidden list or the library "Documents".
+
+**A site name is not taken for the address of a site**
+
+Ask your assistant: "Which lists does Finance have?"
+
+Tests: 1
+
+Situation: Mia has not given the web address of the Finance site.
+
+What happens:
+
+- The assistant finds the web address of the Finance site before it names a list.
+- It does not name a list of another site.
+
+#### The assistant describes the columns of a list
+
+**The columns of a list are shown**
+
+Ask your assistant: "Which columns does the Tasks list on the Finance site have?"
+
+Tests: 1
+
+Situation: The list "Tasks" has the required column "Title" and the column "Status" with the choices "Open" and "Closed".
+
+What happens:
+
+- The assistant names the columns "Title" and "Status".
+- It says that "Status" takes "Open" or "Closed".
+
+**A folder is not taken for a list**
+
+Ask your assistant: "Which columns does the Tasks list on the Finance site have?"
+
+Tests: 1
+
+Situation: Mia's OneDrive holds a folder "Tasks", and the Finance site holds the list "Tasks".
+
+What happens:
+
+- The assistant names the columns of the list "Tasks" on the Finance site.
+- It does not describe the folder "Tasks" as a list.
+
+#### The assistant reads the items of a list
+
+**The open items of a list are shown**
+
+Ask your assistant: "Which items in the Tasks list are open?"
+
+Tests: 2
+
+Situation: The list "Tasks" holds the open item "Close books" with the amount 12.5.
+
+What happens:
+
+- The assistant names the item "Close books" with the amount 12.5.
+- It gives the web address that opens the item in a browser.
+
+**A filter on a column that the list does not index is refused**
+
+Ask your assistant: "Which items in the Tasks list have q1 in their notes?"
+
+Tests: 1
+
+Situation: The column "Notes" of the list "Tasks" is not indexed.
+
+What happens:
+
+- The assistant tells Mia that it can filter only on an indexed column.
+- It does not present other items as the items that match.
 
 ## OneNote
 

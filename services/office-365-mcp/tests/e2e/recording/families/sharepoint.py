@@ -4,7 +4,10 @@ READ_TOOLS = frozenset(
     {
         "get_me",
         "sharepoint_browse_folder",
+        "sharepoint_get_list",
         "sharepoint_list_drives",
+        "sharepoint_list_items",
+        "sharepoint_list_lists",
         "sharepoint_read_file",
         "sharepoint_resolve_url",
         "sharepoint_search_files",
@@ -15,9 +18,18 @@ READ_POSTS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_search_files": ("POST /v1.0/search/query",),
 }
 _ITEM = "/v1.0/drives/b!*/items/*"
+_LIST = "/v1.0/sites/*,*,*/lists/*"
 READ_GETS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_resolve_url": ("GET /v1.0/shares/u!*/driveItem",),
     "sharepoint_search_sites": ("GET /v1.0/sites",),
+    "sharepoint_list_lists": (
+        "GET /v1.0/sites/*.sharepoint.com",
+        "GET /v1.0/sites/*.sharepoint.com:/sites/*",
+        "GET /v1.0/sites/*.sharepoint.com:/teams/*",
+        "GET /v1.0/sites/*,*,*/lists",
+    ),
+    "sharepoint_get_list": (f"GET {_LIST}/columns",),
+    "sharepoint_list_items": (f"GET {_LIST}/columns", f"GET {_LIST}/items"),
     "sharepoint_browse_folder": (f"GET {_ITEM}/children",),
     "sharepoint_create_folder": (f"GET {_ITEM}",),
     "sharepoint_copy_item": (f"GET {_ITEM}",),

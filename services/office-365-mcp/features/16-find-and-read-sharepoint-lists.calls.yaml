@@ -1,0 +1,89 @@
+uc-16-01:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_list_lists.py::test_it_returns_visible_lists_and_leaves_out_hidden_lists_and_libraries"
+  ask: "Which lists does the Finance site have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: Finance}
+    - tool: sharepoint_list_lists
+      uses: {site: web address of the Finance site from sharepoint_search_sites}
+
+uc-16-02:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_list_lists.py::test_a_value_that_is_not_a_site_url_makes_no_graph_call"
+  ask: "Which lists does Finance have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_lists
+      optional: true
+      args: {site: Finance}
+    - tool: sharepoint_search_sites
+      args: {query: Finance}
+    - tool: sharepoint_list_lists
+      uses: {site: web address of the Finance site from sharepoint_search_sites}
+  note: "sharepoint_list_lists refuses a value that is not a web address, such as a site name or a list handle, before it calls Microsoft, and its error sends the assistant to sharepoint_search_sites. The first step is optional because the description already asks for a web address."
+
+uc-16-03:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_get_list.py::test_it_maps_each_column_facet_to_a_type"
+  ask: "Which columns does the Tasks list on the Finance site have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_get_list
+      uses: {list: uri of the Tasks list}
+
+uc-16-04:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_get_list.py::test_a_value_that_is_not_a_list_handle_makes_no_graph_call"
+  ask: "Which columns does the Tasks list on the Finance site have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_get_list
+      uses: {list: uri of the Tasks list}
+  note: "sharepoint_get_list refuses a list name or a drive folder handle before it calls Microsoft, so a folder found by a file search cannot be read as a list."
+
+uc-16-05:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_list_items.py::test_it_returns_items_with_their_fields_and_a_handle"
+    - "tests/tools/test_sharepoint_list_items.py::test_an_indexed_eq_filter_is_the_only_items_query"
+  ask: "Which items in the Tasks list are open?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_get_list
+      optional: true
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_list_items
+      args: {column: Status, operator: eq, value: Open}
+      uses: {list: uri of the Tasks list}
+
+uc-16-06:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_list_items.py::test_a_filter_it_cannot_send_never_reaches_the_items_route"
+  ask: "Which items in the Tasks list have q1 in their notes?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_get_list
+      optional: true
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_list_items
+      args: {column: Notes, operator: eq, value: q1}
+      uses: {list: uri of the Tasks list}
+  note: "sharepoint_list_items reads the columns first and refuses a column that is not indexed before it asks Microsoft for any item."
+
