@@ -222,8 +222,8 @@ def _once(
     command = _python("-m", "tests.e2e.recording.record", plan.scenario, "--target", "graph")
     command += ["--max-requests", str(plan.cap or DEFAULT_CAP)]
     command += [] if reads(plan) else ["--allow-writes"]
-    # File mtimes come from a coarser clock than time.time(): a fresh write can predate it.
-    started = time.time() - 1
+    written = FIXTURES / f"{plan.fixture}.json"
+    before = written.stat().st_mtime_ns if written.is_file() else None
     env = {
         "GRAPH_TOKEN": token(sh, upns[plan.persona - 1], tools, plan.scopes),
         "SEED_UPNS": ",".join(upns),
@@ -233,8 +233,7 @@ def _once(
     except subprocess.TimeoutExpired as expired:
         stalled = f"timed out after {int(expired.timeout)} seconds"
         return subprocess.CompletedProcess(command, 124, "", stalled), False
-    written = FIXTURES / f"{plan.fixture}.json"
-    return done, written.is_file() and written.stat().st_mtime >= started
+    return done, written.is_file() and (before is None or written.stat().st_mtime_ns > before)
 
 
 def record_one(
