@@ -127,7 +127,7 @@ _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
             "contacts",
         }
     ),
-    "sharepoint:///": frozenset({"files", "folders"}),
+    "sharepoint:///": frozenset({"files", "folders", "lists", "listitems"}),
     "onenote:///": frozenset({"sections", "pages", "notebooks", "sectiongroups", "operations"}),
 }
 _HANDLE_SCHEMES: tuple[str, ...] = tuple(_HANDLE_FAMILIES)

@@ -1,11 +1,12 @@
 """The handle grammar: every shape this connector mints, the parser, and the speller.
 
 Four schemes, one per product. `teams:///` addresses Microsoft Teams, and `outlook:///` addresses a
-mailbox. `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint. `onenote:///`
-addresses a OneNote notebook, section group, section, page or long-running operation. If a mail
-shape used the Teams scheme, it has to answer `MessageHandle.permission` below. That answer reaches
-the declared permissions of `teams_read_message` and, from there, the consent screen of every
-`teams` deployment. The scheme is the cheapest place to keep the products apart.
+mailbox. `sharepoint:///` addresses a file or a folder in OneDrive or SharePoint, and a SharePoint
+list or list item. `onenote:///` addresses a OneNote notebook, section group, section, page or
+long-running operation. If a mail shape used the Teams scheme, it has to answer
+`MessageHandle.permission` below. That answer reaches the declared permissions of
+`teams_read_message` and, from there, the consent screen of every `teams` deployment. The scheme is
+the cheapest place to keep the products apart.
 
 This is the only module that spells or parses these URIs. tests/test_layering.py enforces that.
 A second speller does not look like a disagreement. It looks like a handle that one tool produced
@@ -231,6 +232,30 @@ class DriveFolderHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class ListHandle:
+    site_id: str
+    list_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"sharepoint:///lists/{_segment(self.site_id)}/{_segment(self.list_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class ListItemHandle:
+    site_id: str
+    list_id: str
+    item_id: str
+
+    @property
+    def uri(self) -> str:
+        return (
+            f"sharepoint:///listitems/{_segment(self.site_id)}/{_segment(self.list_id)}"
+            + f"/{_segment(self.item_id)}"
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class OnenoteOwner:
     kind: Literal["groups", "sites"]
     owner_id: str
@@ -305,6 +330,8 @@ _CALENDAR_PERMISSION_HANDLE = re.compile(r"\Aoutlook:///calendarpermissions/([^/
 _CONTACT_HANDLE = re.compile(r"\Aoutlook:///contacts/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
+_LIST_HANDLE = re.compile(r"\Asharepoint:///lists/([^/]+)/([^/]+)\Z")
+_LIST_ITEM_HANDLE = re.compile(r"\Asharepoint:///listitems/([^/]+)/([^/]+)/([^/]+)\Z")
 _ONENOTE_SECTION_HANDLE = re.compile(r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?sections/([^/]+)\Z")
 _ONENOTE_PAGE_HANDLE = re.compile(r"\Aonenote:///(?:(groups|sites)/([^/]+)/)?pages/([^/]+)\Z")
 _ONENOTE_NOTEBOOK_HANDLE = re.compile(
@@ -451,6 +478,16 @@ def drive_item_handle(uri: str) -> DriveFileHandle | DriveFolderHandle | None:
     if file is not None:
         return file
     return drive_folder_handle(uri)
+
+
+def list_handle(uri: str) -> ListHandle | None:
+    ids = _two_ids(_LIST_HANDLE, uri)
+    return None if ids is None else ListHandle(*ids)
+
+
+def list_item_handle(uri: str) -> ListItemHandle | None:
+    ids = _three_ids(_LIST_ITEM_HANDLE, uri)
+    return None if ids is None else ListItemHandle(*ids)
 
 
 def onenote_section_handle(uri: str) -> OnenoteSectionHandle | None:
