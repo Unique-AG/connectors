@@ -131,7 +131,7 @@ Use this table to find the fix for each cause.
 | Cause | Fix |
 |---|---|
 | A Python or Node dependency | The nightly dependency PR, or a fix PR from the patch run |
-| An operating system package | Run the Rebuild Service workflow. The new build takes the patch. The PR names the Debian advisory from the Debian tracker as the source of the fix, not a GHSA. |
+| An operating system package | Run the Rebuild Service workflow. The new build takes the patch. The PR links the GHSA for the description and the Debian advisory from the Debian tracker as the source of the fix. |
 | The base image | Merge the nightly Docker PR for the base image. It starts a release. |
 | A finding with no fix | Do nothing. |
 
