@@ -27,6 +27,14 @@ def root_handlers() -> Iterator[None]:
     root.handlers = handlers
 
 
+@pytest.fixture(autouse=True)
+def ephemeral_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The conftest allows ephemeral storage, which a DATABASE_URL or ENCRYPTION_KEY exported in
+    the shell would turn into half a durable one, and settings reject that."""
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("ENCRYPTION_KEY", raising=False)
+
+
 def _run_main() -> MagicMock:
     with (
         patch("kb_mcp.main.ENV_FILE", None),
