@@ -2,12 +2,15 @@ import asyncio
 from collections.abc import Awaitable, Callable
 import logging
 from secrets import token_urlsafe
-from time import monotonic
+from time import time
 from typing import ClassVar, Literal
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
 from fastmcp.server.elicitation import AcceptedElicitation
+from key_value.aio.protocols import AsyncKeyValue
+from mcp.server.request_state import RequestStateSecurity
+from mcp_configs import ElicitationSettings
 from mcp_types import ElicitRequest
 from mcp_types import ElicitRequestFormParams
 from mcp_types import ElicitResult
@@ -15,12 +18,16 @@ from mcp_types import InputRequiredResult
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from pydantic import ValidationError
 
 from world_check_mcp import contexts
 
 _logger = logging.getLogger(__name__)
 
-_PENDING_LIMIT = 256
+_COLLECTION = "approvals"
+# The sealed state and the unused marker outlive the approval, so an answer that arrives late is
+# told it expired rather than refused by the SDK without a word.
+_GRACE_SECONDS = 60
 _APPROVAL_SCHEMA: dict[str, object] = {
     "properties": {
         "approve": {
@@ -47,24 +54,40 @@ class ApprovalDecision(BaseModel):
 
 
 class _Pending(BaseModel):
+    """What an approval carries to the client and back in `request_state`, which the SDK seals."""
+
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
+    nonce: str
     actor: str
-    request: contexts.PassportVerificationRequest | contexts.ResolutionRequest
-    plan: contexts.PassportVerificationPlan | contexts.ResolutionPlan
+    request: str
+    plan: str
     expires_at: float
 
 
-class ApprovalGate:
-    """One approval, bound to the exact inputs and reviewer, kept for `ttl_seconds`."""
+def request_state_security(settings: ElicitationSettings) -> RequestStateSecurity:
+    """Seals each approval's `request_state` under the shared keys, so the answer opens on any
+    replica. Without keys, only the process that asked can open it.
+    """
+    ttl = settings.timeout_before_cancel_seconds + _GRACE_SECONDS
+    keys = [key.get_secret_value() for key in settings.request_state_keys]
+    return (
+        RequestStateSecurity(keys=keys, ttl=ttl)
+        if keys
+        else RequestStateSecurity.ephemeral(ttl=ttl)
+    )
 
-    def __init__(self, *, ttl_seconds: float) -> None:
+
+class ApprovalGate:
+    """One approval, bound to the exact inputs and reviewer, kept for `ttl_seconds`.
+
+    The plan travels in the sealed `request_state`. The store holds one unused marker per
+    approval, and the first answer to delete it is the only one that counts.
+    """
+
+    def __init__(self, *, store: AsyncKeyValue, ttl_seconds: float) -> None:
+        self._store: AsyncKeyValue = store
         self._ttl_seconds: float = ttl_seconds
-        # TODO(https://github.com/Unique-AG/connectors/pull/1257#discussion_r4467206273): keep
-        # pending approvals in Persistence.store with a TTL. In this process, the answer to an
-        # approval fails when it reaches another replica or arrives after a restart, and the
-        # oldest entry evicted at the limit can belong to another user.
-        self._pending: dict[str, _Pending] = {}
 
     async def run[
         Plan: contexts.PassportVerificationPlan | contexts.ResolutionPlan,
@@ -91,7 +114,7 @@ class ApprovalGate:
                 ctx, request=request, plan=plan, actor=actor, message=message(plan)
             )
         else:
-            decision = self.take(ctx, request=request, actor=actor)
+            decision = await self.take(ctx, request=request, actor=actor, plan_type=plan_type)
         if isinstance(decision, InputRequiredResult):
             return decision
         if not isinstance(decision, plan_type):
@@ -131,7 +154,16 @@ class ApprovalGate:
         if connection.protocol_version < "2026-07-28":
             return await self._elicit(ctx, plan=plan, case=request.case, message=message)
         nonce = token_urlsafe(32)
-        self._remember(nonce=nonce, request=request, plan=plan, actor=actor)
+        await self._store.put(
+            nonce, {}, collection=_COLLECTION, ttl=self._ttl_seconds + _GRACE_SECONDS
+        )
+        pending = _Pending(
+            nonce=nonce,
+            actor=actor,
+            request=request.model_dump_json(),
+            plan=plan.model_dump_json(),
+            expires_at=time() + self._ttl_seconds,
+        )
         return InputRequiredResult(
             input_requests={
                 "approval": ElicitRequest(
@@ -141,27 +173,24 @@ class ApprovalGate:
                     )
                 )
             },
-            request_state=nonce,
+            request_state=pending.model_dump_json(),
         )
 
-    def take(
+    async def take[Plan: contexts.PassportVerificationPlan | contexts.ResolutionPlan](
         self,
         ctx: Context,
         *,
         request: contexts.PassportVerificationRequest | contexts.ResolutionRequest,
         actor: str,
-    ) -> contexts.PassportVerificationPlan | contexts.ResolutionPlan | None:
-        now = monotonic()
-        nonce = ctx.request_state
-        pending = self._pending.get(nonce) if nonce else None
-        self._drop_expired(now=now)
-        expired = pending is not None and pending.expires_at <= now
+        plan_type: type[Plan],
+    ) -> Plan | None:
+        pending = _pending(state=ctx.request_state)
+        expired = pending is not None and pending.expires_at <= time()
         if (
-            nonce is None
-            or pending is None
+            pending is None
             or expired
             or pending.actor != actor
-            or pending.request != request
+            or pending.request != request.model_dump_json()
         ):
             _log_outcome("expired" if expired else "invalid", case=request.case)
             raise ToolError(
@@ -172,12 +201,14 @@ class ApprovalGate:
         if not isinstance(answer, ElicitResult):
             _log_outcome("invalid", case=request.case)
             raise ToolError("A human elicitation response is required. No decision was saved.")
-        self._pending.pop(nonce)
+        if not await self._store.delete(pending.nonce, collection=_COLLECTION):
+            _log_outcome("invalid", case=request.case)
+            raise ToolError("Approval was already used. Request fresh approval.")
         if answer.action != "accept" or (answer.content or {}).get("approve") is not True:
             _log_outcome("declined", case=request.case)
             return None
         _log_outcome("approved", case=request.case)
-        return pending.plan
+        return plan_type.model_validate_json(pending.plan)
 
     async def _elicit(
         self,
@@ -201,28 +232,14 @@ class ApprovalGate:
         _log_outcome("declined", case=case)
         return None
 
-    def _remember(
-        self,
-        *,
-        nonce: str,
-        request: contexts.PassportVerificationRequest | contexts.ResolutionRequest,
-        plan: contexts.PassportVerificationPlan | contexts.ResolutionPlan,
-        actor: str,
-    ) -> None:
-        now = monotonic()
-        self._drop_expired(now=now)
-        if len(self._pending) >= _PENDING_LIMIT:
-            oldest = min(self._pending, key=lambda key: self._pending[key].expires_at)
-            self._pending.pop(oldest)
-        self._pending[nonce] = _Pending(
-            actor=actor,
-            request=request,
-            plan=plan,
-            expires_at=now + self._ttl_seconds,
-        )
 
-    def _drop_expired(self, *, now: float) -> None:
-        self._pending = {key: item for key, item in self._pending.items() if item.expires_at > now}
+def _pending(*, state: str | None) -> _Pending | None:
+    if state is None:
+        return None
+    try:
+        return _Pending.model_validate_json(state)
+    except ValidationError:
+        return None
 
 
 def _duration(seconds: float) -> str:

@@ -5,14 +5,18 @@ from typing import cast
 
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
+from key_value.aio.stores.memory import MemoryStore
+from mcp_configs import ElicitationSettings
 from mcp_types import ElicitRequest
 from mcp_types import ElicitResult
 from mcp_types import InputRequiredResult
+from pydantic import SecretStr
 import pytest
 
 from world_check_mcp.contexts import PassportVerificationPlan
 from world_check_mcp.contexts import PassportVerificationRequest
 from world_check_mcp.mcp.approval import ApprovalGate
+from world_check_mcp.mcp.approval import request_state_security
 
 
 def _request(*, matched: bool = True) -> PassportVerificationRequest:
@@ -30,6 +34,10 @@ def _plan() -> PassportVerificationPlan:
     )
 
 
+def _gate(*, ttl_seconds: float, store: MemoryStore | None = None) -> ApprovalGate:
+    return ApprovalGate(store=store or MemoryStore(), ttl_seconds=ttl_seconds)
+
+
 def _as_context(value: object) -> Context:
     return cast(Context, value)
 
@@ -40,7 +48,7 @@ def _connection() -> Context:
 
 
 async def test_approval_is_single_use_and_bound_to_the_inputs() -> None:
-    gate = ApprovalGate(ttl_seconds=120)
+    gate = _gate(ttl_seconds=120)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -53,13 +61,20 @@ async def test_approval_is_single_use_and_bound_to_the_inputs() -> None:
             input_responses={"approval": ElicitResult(action="accept", content={"approve": True})},
         )
     )
-    assert gate.take(accepted, request=_request(), actor="ada") == _plan()
+    assert (
+        await gate.take(
+            accepted, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
+        == _plan()
+    )
     with pytest.raises(ToolError, match="already used"):
-        gate.take(accepted, request=_request(), actor="ada")
+        await gate.take(
+            accepted, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
 
 
 async def test_a_declined_approval_is_consumed_without_a_plan() -> None:
-    gate = ApprovalGate(ttl_seconds=120)
+    gate = _gate(ttl_seconds=120)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -70,13 +85,20 @@ async def test_a_declined_approval_is_consumed_without_a_plan() -> None:
             input_responses={"approval": ElicitResult(action="decline")},
         )
     )
-    assert gate.take(declined, request=_request(), actor="ada") is None
+    assert (
+        await gate.take(
+            declined, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
+        is None
+    )
     with pytest.raises(ToolError, match="already used"):
-        gate.take(declined, request=_request(), actor="ada")
+        await gate.take(
+            declined, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
 
 
 async def test_changed_inputs_do_not_consume_the_approval() -> None:
-    gate = ApprovalGate(ttl_seconds=120)
+    gate = _gate(ttl_seconds=120)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -88,12 +110,22 @@ async def test_changed_inputs_do_not_consume_the_approval() -> None:
         )
     )
     with pytest.raises(ToolError, match="different inputs"):
-        gate.take(changed, request=_request(matched=False), actor="ada")
-    assert gate.take(changed, request=_request(), actor="ada") == _plan()
+        await gate.take(
+            changed,
+            request=_request(matched=False),
+            actor="ada",
+            plan_type=PassportVerificationPlan,
+        )
+    assert (
+        await gate.take(
+            changed, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
+        == _plan()
+    )
 
 
 async def test_an_expired_approval_cannot_be_used() -> None:
-    gate = ApprovalGate(ttl_seconds=0)
+    gate = _gate(ttl_seconds=0)
     asked = await gate.ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
@@ -105,7 +137,9 @@ async def test_an_expired_approval_cannot_be_used() -> None:
         )
     )
     with pytest.raises(ToolError, match="expired"):
-        gate.take(expired, request=_request(), actor="ada")
+        await gate.take(
+            expired, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
 
 
 def _extra(record: logging.LogRecord, *names: str) -> tuple[object, ...]:
@@ -123,7 +157,7 @@ async def _take(
         SimpleNamespace(request_state=asked.request_state, input_responses={"approval": answer})
     )
     with suppress(ToolError):
-        gate.take(answered, request=request, actor="ada")
+        await gate.take(answered, request=request, actor="ada", plan_type=PassportVerificationPlan)
 
 
 async def test_every_approval_outcome_is_logged_with_its_case(
@@ -131,12 +165,10 @@ async def test_every_approval_outcome_is_logged_with_its_case(
 ) -> None:
     caplog.set_level(logging.INFO, logger="world_check_mcp.mcp.approval")
     approve = ElicitResult(action="accept", content={"approve": True})
-    await _take(ApprovalGate(ttl_seconds=120), answer=approve, request=_request())
-    await _take(
-        ApprovalGate(ttl_seconds=120), answer=ElicitResult(action="decline"), request=_request()
-    )
-    await _take(ApprovalGate(ttl_seconds=0), answer=approve, request=_request())
-    await _take(ApprovalGate(ttl_seconds=120), answer=approve, request=_request(matched=False))
+    await _take(_gate(ttl_seconds=120), answer=approve, request=_request())
+    await _take(_gate(ttl_seconds=120), answer=ElicitResult(action="decline"), request=_request())
+    await _take(_gate(ttl_seconds=0), answer=approve, request=_request())
+    await _take(_gate(ttl_seconds=120), answer=approve, request=_request(matched=False))
     answered = [record for record in caplog.records if record.message == "Approval answered"]
     assert [_extra(record, "outcome", "case") for record in answered] == [
         ("approved", "sys-1"),
@@ -153,10 +185,54 @@ async def test_every_approval_outcome_is_logged_with_its_case(
 async def test_the_approval_prompt_states_the_configured_expiry(
     ttl_seconds: float, expiry: str
 ) -> None:
-    asked = await ApprovalGate(ttl_seconds=ttl_seconds).ask(
+    asked = await _gate(ttl_seconds=ttl_seconds).ask(
         _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
     )
     assert isinstance(asked, InputRequiredResult)
     prompt = (asked.input_requests or {})["approval"]
     assert isinstance(prompt, ElicitRequest)
     assert prompt.params.message == f"Save? Approval expires in {expiry}."
+
+
+async def test_an_approval_asked_on_one_replica_is_answered_on_another() -> None:
+    store = MemoryStore()
+    asked = await _gate(ttl_seconds=120, store=store).ask(
+        _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
+    )
+    assert isinstance(asked, InputRequiredResult)
+    accepted = _as_context(
+        SimpleNamespace(
+            request_state=asked.request_state,
+            input_responses={"approval": ElicitResult(action="accept", content={"approve": True})},
+        )
+    )
+    other = _gate(ttl_seconds=120, store=store)
+    assert (
+        await other.take(
+            accepted, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
+        == _plan()
+    )
+    with pytest.raises(ToolError, match="already used"):
+        await _gate(ttl_seconds=120, store=store).take(
+            accepted, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
+
+
+async def test_a_tampered_request_state_is_refused() -> None:
+    tampered = _as_context(
+        SimpleNamespace(
+            request_state="not an approval",
+            input_responses={"approval": ElicitResult(action="accept", content={"approve": True})},
+        )
+    )
+    with pytest.raises(ToolError, match="Request fresh approval"):
+        await _gate(ttl_seconds=120).take(
+            tampered, request=_request(), actor="ada", plan_type=PassportVerificationPlan
+        )
+
+
+def test_request_state_keys_seal_state_any_replica_opens() -> None:
+    settings = ElicitationSettings(request_state_keys=[SecretStr("k" * 32)])
+    sealed = request_state_security(settings).codec.seal(b"approval")
+    assert request_state_security(settings).codec.unseal(sealed) == b"approval"

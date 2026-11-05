@@ -18,6 +18,7 @@ from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
 from world_check_mcp.mcp.approval import ApprovalGate
+from world_check_mcp.mcp.approval import request_state_security
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import open_upstream
 from world_check_mcp.upstream import upstream_http
@@ -53,7 +54,10 @@ def create_server(
                 "persistence": persistence_resource,
                 # A saved match decision or passport check is a regulatory record, so its
                 # approval is asked for even when `for_data_modification` is disabled.
-                "approvals": ApprovalGate(ttl_seconds=elicitation.timeout_before_cancel_seconds),
+                "approvals": ApprovalGate(
+                    store=persistence_resource.store,
+                    ttl_seconds=elicitation.timeout_before_cancel_seconds,
+                ),
             }
 
     # Every signed-in user shares one LSEG service account, so one caller must not use up its
@@ -71,6 +75,7 @@ def create_server(
         # tool's name alone. A ToolError still reaches it as raised.
         mask_error_details=True,
         lifespan=lifespan,
+        request_state_security=request_state_security(elicitation),
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
         middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
