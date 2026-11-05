@@ -48,13 +48,17 @@ def _post(client: TestClient, body: dict[str, object], headers: Mapping[str, str
     return cast("_HttpResponse", client.post("/mcp", json=body, headers=dict(headers)))
 
 
-def _redirected_logs() -> io.StringIO:
-    logs = io.StringIO()
-    (output,) = [
+def _output_handlers() -> list[logging.StreamHandler[io.TextIOBase]]:
+    return [
         cast("logging.StreamHandler[io.TextIOBase]", handler)
         for handler in logging.getLogger().handlers
         if isinstance(handler.formatter, PinoJsonFormatter)
     ]
+
+
+def _redirected_logs() -> io.StringIO:
+    logs = io.StringIO()
+    (output,) = _output_handlers()
     output.setStream(logs)
     return logs
 
@@ -64,12 +68,15 @@ def _lines(logs: io.StringIO) -> list[dict[str, object]]:
 
 
 @pytest.fixture(autouse=True)
-def stderr_restored() -> Iterator[None]:
+def log_output_restored() -> Iterator[None]:
     """`create_app` reuses the output handler, which these tests point at a buffer."""
+    streams = {handler: handler.stream for handler in _output_handlers()}
     yield
-    for handler in logging.getLogger().handlers:
-        if isinstance(handler.formatter, PinoJsonFormatter):
-            cast("logging.StreamHandler[io.TextIOBase]", handler).setStream(io.StringIO())
+    for handler in _output_handlers():
+        if handler in streams:
+            _ = handler.setStream(streams[handler])
+        else:
+            logging.getLogger().removeHandler(handler)
 
 
 @pytest.fixture

@@ -100,9 +100,7 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
-            # The first of ours, so the bearer token is redacted from every line they log. FastMCP
-            # runs its auth middleware ahead of these, so verifying the token happens outside
-            # this scope.
+            # First, so every line logged after it has the bearer token redacted.
             Middleware(RedactRequestSecretsMiddleware),
             Middleware(OpenTelemetryMiddleware),
             ops_middleware,
