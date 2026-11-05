@@ -53,9 +53,7 @@ export async function parseAttachmentUri(
       ? decodeBase64Attachment(rawData)
       : Buffer.from(decodeURIComponent(rawData));
 
-    if (isBase64) {
-      await assertZipIsReadable(mimeType, data, maxUncompressedSize);
-    }
+    await assertZipIsReadable(mimeType, data, maxUncompressedSize);
 
     return { type: 'data', mimeType, data };
   }
@@ -72,8 +70,11 @@ function decodeBase64Attachment(rawData: string): Buffer {
   try {
     const bytes = (Uint8Array as Uint8ArrayFromBase64).fromBase64(rawData);
     return Buffer.from(bytes);
-  } catch {
-    throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      throw new Error(TRUNCATED_ATTACHMENT_MESSAGE);
+    }
+    throw error;
   }
 }
 

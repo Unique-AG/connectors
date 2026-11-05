@@ -174,6 +174,21 @@ describe('parseAttachmentUri', () => {
       ).rejects.toThrow('Attachment is not a valid Office file and cannot be opened');
     });
 
+    it('rejects a percent-encoded Word file that is not a zip', async () => {
+      await expect(
+        parseAttachmentUri(`data:${WORD_MIME_TYPE},${encodeURIComponent('not a zip')}`),
+      ).rejects.toThrow('Attachment is not a valid Office file and cannot be opened');
+    });
+
+    it('rejects a percent-encoded Word file that is cut off', async () => {
+      const zip = await buildWordFile();
+      const cutOff = encodeURIComponent(zip.subarray(0, 4).toString('utf8'));
+
+      await expect(parseAttachmentUri(`data:${WORD_MIME_TYPE},${cutOff}`)).rejects.toThrow(
+        'Attachment data is truncated and cannot be opened',
+      );
+    });
+
     it('parses a complete zip sent as application/octet-stream', async () => {
       const zip = await buildWordFile();
       const result = await parseAttachmentUri(
