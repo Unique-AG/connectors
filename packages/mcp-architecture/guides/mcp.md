@@ -10,12 +10,15 @@ The FastMCP server, its HTTP serving and middleware, auth, tools and their input
   `http_app` serves the same app to the tests. `run_server` refuses to bind beyond loopback
   while the server has no auth provider, `FastMCP(auth=...)`, so an MCP without auth runs
   locally but never in a pod.
-- `middleware.py`: `http_middleware` puts the host and origin guard first, then CORS, then the
-  MCP's own HTTP middleware, such as a request id, after `instrument(mcp)`. The guard lets a
+- `middleware.py`: `http_middleware` puts `RedactRequestSecretsMiddleware` first, which redacts the
+  request's bearer token from every line logged while the request is handled, then the host and
+  origin guard, then CORS, then the MCP's own HTTP middleware, such as a request id, after
+  `instrument(mcp)`. The guard lets a
   request through only for the host of `MCP_BASE_URL` (`localhost`, `127.0.0.1` and `[::1]`
   alike when that is local) and, from a browser, an allowed origin. `/probe`, `/health` and `/metrics` skip it, since Kubernetes and Prometheus
   reach the pod by IP. MCP-level middleware, which sees tool calls rather than HTTP requests,
-  goes on the server in `create_server`: `mcp.add_middleware(...)`.
+  goes on the server in `create_server`: `mcp.add_middleware(...)`, after
+  `RedactToolCallSecretsMiddleware`, which stays outermost.
 - `auth/`, once the MCP has auth: what FastMCP does not provide itself, behind its own
   `__init__.py`. With `--auth credentials` it is the OAuth server the clients use and its
   `/sign-in` page (see [auth](auth.md)).
