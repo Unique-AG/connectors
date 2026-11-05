@@ -21,6 +21,13 @@ PageReference = Annotated[str | None, Field(description="next_page from the prev
 
 @tool(
     title="Get Ongoing Screening Updates",
+    description=(
+        "Poll WATCHLIST monitoring updates. Defaults to the last 24 hours. LSEG keeps 30 "
+        "days.\n"
+        "\n"
+        "No updates returns an empty list. Reuse window.since, window.until, and the other "
+        "criteria with next_page. This does not acknowledge updates."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("group_id", "case", "mode", "limit", "page_reference")
@@ -40,11 +47,6 @@ async def get_ogs_updates(
     ] = "FULL",
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.OgsPage:
-    """Poll WATCHLIST monitoring updates. Defaults to the last 24 hours. LSEG keeps 30 days.
-
-    No updates returns an empty list. Reuse window.since, window.until, and the other criteria
-    with next_page. This does not acknowledge updates.
-    """
     try:
         return await contexts.get_ogs_updates(
             upstream=upstream,

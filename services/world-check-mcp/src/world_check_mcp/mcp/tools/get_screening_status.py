@@ -12,13 +12,13 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="Get Screening Status",
+    description="Check WATCHLIST and Passport Check progress without screening the case again.",
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("case")
 async def get_screening_status(
     case: CaseArgument, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.ScreeningStatus:
-    """Check WATCHLIST and Passport Check progress without screening the case again."""
     try:
         return await contexts.get_screening_status(upstream=upstream, case=case)
     except contexts.CaseNotFoundError as error:

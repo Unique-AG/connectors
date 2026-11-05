@@ -23,6 +23,13 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="Matches to return.")]
 
 @tool(
     title="Screen Entity",
+    description=(
+        "Create a persistent WATCHLIST case and screen it synchronously.\n"
+        "\n"
+        "This writes a case. Repeated calls without case_id create new cases. An existing "
+        "case_id is refused, not rescreened. Matches are candidates, not confirmed "
+        "identities."
+    ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=False, open_world_hint=True
     ),
@@ -62,11 +69,6 @@ async def screen_entity(
     limit: PageSize = 20,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.ScreeningOutcome:
-    """Create a persistent WATCHLIST case and screen it synchronously.
-
-    This writes a case. Repeated calls without case_id create new cases. An existing case_id is
-    refused, not rescreened. Matches are candidates, not confirmed identities.
-    """
     try:
         return await contexts.screen_entity(
             upstream=upstream,

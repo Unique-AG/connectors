@@ -28,6 +28,12 @@ Query = Annotated[
 
 @tool(
     title="Get Case Audit Events",
+    description=(
+        "Read audit events for one case, newest first, including passport verification "
+        "decisions.\n"
+        "\n"
+        "This does not record an audit action."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("case", "limit", "page_reference")
@@ -41,10 +47,6 @@ async def get_case_audit_events(
     page_reference: PageReference = None,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.AuditPage:
-    """Read audit events for one case, newest first, including passport verification decisions.
-
-    This does not record an audit action.
-    """
     try:
         return await contexts.get_case_audit_events(
             upstream=upstream, case=case, query=query, limit=limit, page_reference=page_reference

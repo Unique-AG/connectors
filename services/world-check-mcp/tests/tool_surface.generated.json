@@ -60,7 +60,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Generate MRZ lines without creating a case or recording a verification.\n\nIssuing state and nationality come from get_reference_data nationalities. ICAO conformity\ndoes not prove authenticity, ownership, or validity.",
+    "description": "Generate MRZ lines without creating a case or recording a verification.\n\nIssuing state and nationality come from get_reference_data nationalities. ICAO conformity does not prove authenticity, ownership, or validity.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -632,7 +632,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get one group's case template and resolution toolkit.\n\nSecondary field type ids and resolution ids are group-specific. Read them before screening\nor resolving a match.",
+    "description": "Get one group's case template and resolution toolkit.\n\nSecondary field type ids and resolution ids are group-specific. Read them before screening or resolving a match.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -837,7 +837,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Poll WATCHLIST monitoring updates. Defaults to the last 24 hours. LSEG keeps 30 days.\n\nNo updates returns an empty list. Reuse window.since, window.until, and the other criteria\nwith next_page. This does not acknowledge updates.",
+    "description": "Poll WATCHLIST monitoring updates. Defaults to the last 24 hours. LSEG keeps 30 days.\n\nNo updates returns an empty list. Reuse window.since, window.until, and the other criteria with next_page. This does not acknowledge updates.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1103,7 +1103,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Look up country codes, passport nationalities, providers, case-search filters, or API info.\n\nWATCHLIST nationality and residence use countries. Passport issuing state and nationality\nuse nationalities.",
+    "description": "Look up country codes, passport nationalities, providers, case-search filters, or API info.\n\nWATCHLIST nationality and residence use countries. Passport issuing state and nationality use nationalities.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1592,7 +1592,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. It does not record a human document comparison. limit truncates\nWATCHLIST matches only.",
+    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. It does not record a human document comparison. limit truncates WATCHLIST matches only.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2411,7 +2411,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Record a WATCHLIST match decision only after a person approves the exact choice.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing.\nStatus, risk, and reason must be allowed together by the group's toolkit.",
+    "description": "Record a WATCHLIST match decision only after a person approves the exact choice.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing. Status, risk, and reason must be allowed together by the group's toolkit.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2568,7 +2568,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Repeated calls without case_id create new cases. An existing case_id is\nrefused, not rescreened. Matches are candidates, not confirmed identities.",
+    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Repeated calls without case_id create new cases. An existing case_id is refused, not rescreened. Matches are candidates, not confirmed identities.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -3099,7 +3099,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Search saved cases in one group with LSEG FIQL, for example query primaryName==\"John Smith\".\n\nUse get_reference_data kind search_filters for the fields. Quote values that contain reserved\ncharacters. EXACT is the mode for an exact caseId. The group filter is always added.",
+    "description": "Search saved cases in one group with LSEG FIQL, for example query primaryName==\"John Smith\".\n\nUse get_reference_data kind search_filters for the fields. Quote values that contain reserved characters. EXACT is the mode for an exact caseId. The group filter is always added.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -3280,7 +3280,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Record a human comparison of the generated MRZ with the document, only after approval.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing.\nA repeat verification requires rescreen_case first.",
+    "description": "Record a human comparison of the generated MRZ with the document, only after approval.\n\nDecline, cancel, expiry, changed inputs, and a replayed approval save nothing. A repeat verification requires rescreen_case first.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

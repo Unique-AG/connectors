@@ -23,6 +23,14 @@ PageReference = Annotated[
 
 @tool(
     title="Search Cases",
+    description=(
+        "Search saved cases in one group with LSEG FIQL, for example query "
+        'primaryName=="John Smith".\n'
+        "\n"
+        "Use get_reference_data kind search_filters for the fields. Quote values that "
+        "contain reserved characters. EXACT is the mode for an exact caseId. The group "
+        "filter is always added."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("group_id", "search_mode", "limit")
@@ -42,11 +50,6 @@ async def search_cases(
     page_reference: PageReference = None,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.CasePage:
-    """Search saved cases in one group with LSEG FIQL, for example query primaryName=="John Smith".
-
-    Use get_reference_data kind search_filters for the fields. Quote values that contain reserved
-    characters. EXACT is the mode for an exact caseId. The group filter is always added.
-    """
     return await contexts.search_cases(
         upstream=upstream,
         group_id=group_id,

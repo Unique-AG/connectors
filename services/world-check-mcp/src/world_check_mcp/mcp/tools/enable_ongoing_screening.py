@@ -12,6 +12,11 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="Enable Ongoing Screening",
+    description=(
+        "Enable WATCHLIST monitoring for one case. A 200 body can still mean it failed.\n"
+        "\n"
+        "This changes the case's screening state. Media Check is not enabled."
+    ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=True, destructive_hint=False, open_world_hint=True
     ),
@@ -20,10 +25,6 @@ from world_check_mcp.upstream import Upstream
 async def enable_ongoing_screening(
     case: CaseArgument, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.OngoingScreening:
-    """Enable WATCHLIST monitoring for one case. A 200 body can still mean it failed.
-
-    This changes the case's screening state. Media Check is not enabled.
-    """
     try:
         return await contexts.enable_ongoing_screening(upstream=upstream, case=case)
     except contexts.CaseNotFoundError as error:

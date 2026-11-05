@@ -20,6 +20,11 @@ PageReference = Annotated[
 
 @tool(
     title="List Cases",
+    description=(
+        "List saved cases in one group, newest first.\n"
+        "\n"
+        "Pass next_page back as page_reference with the same group and limit."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("group_id", "limit", "page_reference")
@@ -29,10 +34,6 @@ async def list_cases(
     page_reference: PageReference = None,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.CasePage:
-    """List saved cases in one group, newest first.
-
-    Pass next_page back as page_reference with the same group and limit.
-    """
     return await contexts.search_cases(
         upstream=upstream, group_id=group_id, limit=limit, page_reference=page_reference
     )

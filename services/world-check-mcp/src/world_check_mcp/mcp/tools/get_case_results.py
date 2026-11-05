@@ -29,6 +29,11 @@ Expression = Annotated[
 
 @tool(
     title="Get Case Results",
+    description=(
+        "Get paginated match facts by internal caseSystemId or exact external caseId.\n"
+        "\n"
+        "reference_id identifies a profile. result_id identifies the match on this case."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("case", "limit", "page_reference")
@@ -41,10 +46,6 @@ async def get_case_results(
     ] = None,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.CaseResults:
-    """Get paginated match facts by internal caseSystemId or exact external caseId.
-
-    reference_id identifies a profile. result_id identifies the match on this case.
-    """
     try:
         return await contexts.get_case_results(
             upstream=upstream,

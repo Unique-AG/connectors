@@ -11,14 +11,15 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="Get Profile",
+    description=(
+        "Get the World-Check record for a match: its names and categories.\n"
+        "\n"
+        "Pass the match's referenceId, not its resultId."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("reference_id")
 async def get_profile(
     reference_id: ReferenceId, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.Profile:
-    """Get the World-Check record for a match: its names and categories.
-
-    Pass the match's referenceId, not its resultId.
-    """
     return await contexts.get_profile(upstream=upstream, reference_id=reference_id)

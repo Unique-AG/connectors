@@ -30,6 +30,12 @@ Note = Annotated[
 
 @tool(
     title="Resolve Result",
+    description=(
+        "Record a WATCHLIST match decision only after a person approves the exact choice.\n"
+        "\n"
+        "Decline, cancel, expiry, changed inputs, and a replayed approval save nothing. "
+        "Status, risk, and reason must be allowed together by the group's toolkit."
+    ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=True, open_world_hint=True
     ),
@@ -53,11 +59,6 @@ async def resolve_result(
     approvals: ApprovalGate = Depends(get_approvals),
     actor: str = Depends(get_reviewer),
 ) -> contexts.ResolutionOutcome | InputRequiredResult:
-    """Record a WATCHLIST match decision only after a person approves the exact choice.
-
-    Decline, cancel, expiry, changed inputs, and a replayed approval save nothing.
-    Status, risk, and reason must be allowed together by the group's toolkit.
-    """
     try:
         return await _resolve(
             case=case,

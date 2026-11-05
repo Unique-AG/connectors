@@ -17,6 +17,12 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="Matches to return.")]
 
 @tool(
     title="Rescreen Case",
+    description=(
+        "Rescreen a case by internal caseSystemId or external caseId without editing its "
+        "fields.\n"
+        "\n"
+        "WATCHLIST and Passport Check only. Media Check is unsupported."
+    ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=True, destructive_hint=False, open_world_hint=True
     ),
@@ -31,10 +37,6 @@ async def rescreen_case(
     limit: PageSize = 20,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.ScreeningOutcome:
-    """Rescreen a case by internal caseSystemId or external caseId without editing its fields.
-
-    WATCHLIST and Passport Check only. Media Check is unsupported.
-    """
     try:
         return await contexts.rescreen_case(upstream=upstream, case=case, delta=delta, limit=limit)
     except contexts.CaseNotFoundError as error:

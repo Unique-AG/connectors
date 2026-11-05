@@ -26,6 +26,13 @@ Note = Annotated[
 
 @tool(
     title="Verify Passport Check",
+    description=(
+        "Record a human comparison of the generated MRZ with the document, only after "
+        "approval.\n"
+        "\n"
+        "Decline, cancel, expiry, changed inputs, and a replayed approval save nothing. A "
+        "repeat verification requires rescreen_case first."
+    ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=True, open_world_hint=True
     ),
@@ -43,11 +50,6 @@ async def verify_passport_check(
     approvals: ApprovalGate = Depends(get_approvals),
     actor: str = Depends(get_reviewer),
 ) -> contexts.PassportVerification | InputRequiredResult:
-    """Record a human comparison of the generated MRZ with the document, only after approval.
-
-    Decline, cancel, expiry, changed inputs, and a replayed approval save nothing.
-    A repeat verification requires rescreen_case first.
-    """
     try:
         return await _verify(
             case=case,

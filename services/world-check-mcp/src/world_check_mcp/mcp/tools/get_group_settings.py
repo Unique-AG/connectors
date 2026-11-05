@@ -11,15 +11,16 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="Get Group Settings",
+    description=(
+        "Get one group's case template and resolution toolkit.\n"
+        "\n"
+        "Secondary field type ids and resolution ids are group-specific. Read them before "
+        "screening or resolving a match."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("group_id")
 async def get_group_settings(
     group_id: GroupId, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.GroupSettings:
-    """Get one group's case template and resolution toolkit.
-
-    Secondary field type ids and resolution ids are group-specific. Read them before screening
-    or resolving a match.
-    """
     return await contexts.get_group_settings(upstream=upstream, group_id=group_id)

@@ -10,12 +10,14 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="List Groups",
+    description=(
+        "List the LSEG groups this service account can screen in, including descendant "
+        "groups.\n"
+        "\n"
+        "Call it before screening, then pass a group id to `get_group_settings`."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments()
 async def list_groups(upstream: Upstream = Depends(get_upstream)) -> list[contexts.Group]:
-    """List the LSEG groups this service account can screen in, including descendant groups.
-
-    Call it before screening, then pass a group id to `get_group_settings`.
-    """
     return await contexts.list_groups(upstream=upstream)

@@ -12,16 +12,18 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="Get Case",
+    description=(
+        "Get a saved case by its internal caseSystemId or its exact external caseId.\n"
+        "\n"
+        "An internal id is tried first. Use the returned case_system_id with the other case "
+        "tools."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("case")
 async def get_case(
     case: CaseArgument, upstream: Upstream = Depends(get_upstream)
 ) -> contexts.CaseDetails:
-    """Get a saved case by its internal caseSystemId or its exact external caseId.
-
-    An internal id is tried first. Use the returned case_system_id with the other case tools.
-    """
     try:
         return await contexts.get_case(upstream=upstream, case=case)
     except contexts.CaseNotFoundError as error:

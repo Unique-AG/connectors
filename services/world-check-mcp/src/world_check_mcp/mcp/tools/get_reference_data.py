@@ -13,6 +13,13 @@ from world_check_mcp.upstream import Upstream
 
 @tool(
     title="Get Reference Data",
+    description=(
+        "Look up country codes, passport nationalities, providers, case-search filters, or "
+        "API info.\n"
+        "\n"
+        "WATCHLIST nationality and residence use countries. Passport issuing state and "
+        "nationality use nationalities."
+    ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
 @trace_arguments("kind")
@@ -28,9 +35,4 @@ async def get_reference_data(
     ],
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.ReferenceData:
-    """Look up country codes, passport nationalities, providers, case-search filters, or API info.
-
-    WATCHLIST nationality and residence use countries. Passport issuing state and nationality
-    use nationalities.
-    """
     return await contexts.get_reference_data(upstream=upstream, kind=kind)
