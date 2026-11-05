@@ -1,4 +1,4 @@
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import {
   DEFAULT_HEALTH_CONNECTIVITY_TIMEOUT_MS,
@@ -6,6 +6,7 @@ import {
   DEFAULT_HEALTH_SYNC_TENANT_FAILURE_THRESHOLD,
 } from '../constants/defaults.constants';
 import { coercedPositiveIntSchema } from '../utils/zod.util';
+import { registerConfig } from './register-config';
 
 export const HealthConfigSchema = z.object({
   syncHistorySize: coercedPositiveIntSchema

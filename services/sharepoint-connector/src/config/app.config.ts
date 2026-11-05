@@ -1,7 +1,8 @@
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
+import { registerConfig } from './register-config';
 
 // ==========================================
 // App Configuration

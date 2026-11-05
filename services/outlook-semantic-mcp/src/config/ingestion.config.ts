@@ -1,8 +1,9 @@
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { json } from '~/utils/zod';
 import { McpBackendType } from './mcp-backend-type.config';
+import { registerConfig } from './register-config';
 
 const connectivityTimeoutMs = z.coerce
   .number()

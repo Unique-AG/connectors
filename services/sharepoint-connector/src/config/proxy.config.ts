@@ -1,4 +1,4 @@
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
@@ -7,6 +7,7 @@ import {
   redactedNonEmptyStringSchema,
   requiredStringSchema,
 } from '../utils/zod.util';
+import { registerConfig } from './register-config';
 
 // ==========================================
 // Proxy Configuration

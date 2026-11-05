@@ -1,7 +1,8 @@
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { envRequiredSecretSchema, json } from '@unique-ag/utils/zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
+import { registerConfig } from './register-config';
 
 const requiredStringSchema = z.string().trim().nonempty();
 
