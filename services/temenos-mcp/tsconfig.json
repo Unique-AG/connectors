@@ -5,9 +5,8 @@
     "rootDir": "./src",
     "removeComments": true,
     "incremental": true,
-    "baseUrl": "./",
     "paths": {
-      "~/*": ["src/*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],

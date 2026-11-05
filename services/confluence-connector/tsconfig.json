@@ -4,8 +4,7 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "removeComments": true,
-    "incremental": true,
-    "baseUrl": "./"
+    "incremental": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

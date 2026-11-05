@@ -5,10 +5,9 @@
     "rootDir": "./src",
     "removeComments": true,
     "incremental": true,
-    "baseUrl": "./",
     "paths": {
       "@generated/*": ["./@generated/*"],
-      "~/*": ["src/*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": ["src/**/*"],
