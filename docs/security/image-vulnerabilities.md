@@ -135,10 +135,15 @@ Use this table to find the fix for each cause.
 | The base image | Merge the nightly Docker PR for the base image. It starts a release. |
 | A finding with no fix | Do nothing. |
 
+The agent decides an operating system alert with the Debian tracker, at `https://security-tracker.debian.org/tracker/<CVE>`. It reads the row of the Debian source package of the alerted package. For example, the package `libapt-pkg7.0` has the source package `apt`. A fix counts in the row of the Debian release of the base image, or in the row `<release> (security)`. If the tracker lists no fix, the agent drops the alert. If the tracker does not answer, the agent keeps the alert. The rule "no fixed version, or a fix younger than 3 days" applies to other packages only.
+
 ## Build and release
 
 - The base image is pinned to one exact digest.
 - The final stage removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build.
+- The container build template turns off the layer cache for the final stage, so `apt-get upgrade` takes the newest patches.
+- A rebuild is a normal release. The Rebuild Service workflow opens one PR for each service. Its `build(...)` commit makes release-please open a patch release.
+- We do not tag a rebuild with a suffix such as `-deps.1`. Semver sorts a suffix before the base version, and release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`.
 - A release pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record.
 - A PR builds the image without a push. It does not scan the image.
 
