@@ -2,10 +2,14 @@ import assert from 'node:assert';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
-/** Shorter values are skipped: replacing them would hit ordinary words and numbers. */
-export const MIN_SECRET_LENGTH = 8;
+/**
+ * A secret shorter than this is replaced only where it stands alone, not inside a longer word or
+ * number: it would otherwise hit ordinary words, such as `test` in `testserver`.
+ */
+export const SHORT_SECRET_LENGTH = 8;
 
 const REDACTED = '[Redacted]';
+const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
 
 // A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
 // step with `packages/mcp-observability`.
@@ -70,7 +74,10 @@ interface LogScope {
 const logScope = new AsyncLocalStorage<LogScope>();
 
 export interface SecretRedactionOptions {
-  /** Known secret values, such as API keys from env. Values under `MIN_SECRET_LENGTH` are skipped. */
+  /**
+   * Known secret values, such as API keys from env. Empty and blank values are skipped. A value
+   * shorter than `SHORT_SECRET_LENGTH` is replaced only where it stands alone.
+   */
   secrets?: readonly string[];
   /**
    * Secret-shaped text to replace, such as `DEFAULT_SECRET_PATTERNS`. Each needs the `g` and `d`
@@ -449,8 +456,9 @@ function decodeJsonString(literal: string): string | undefined {
 function secretVariants(secrets: readonly string[]): string[] {
   return longestFirst(
     secrets
-      // A consumer reading an absent header passes `undefined` whatever the types say.
-      .filter((secret) => typeof secret === 'string' && secret.length >= MIN_SECRET_LENGTH)
+      // A consumer reading an absent header passes `undefined` whatever the types say. A blank value
+      // would match everywhere, so it is no secret.
+      .filter((secret) => typeof secret === 'string' && secret.trim() !== '')
       .flatMap((secret) => [secret, ...urlEncoded(secret)]),
   );
 }
@@ -490,7 +498,36 @@ function percentEncoded(bytes: Uint8Array, safe: string, space: string): string 
 }
 
 function replaceSecrets(text: string, secrets: readonly string[]): string {
-  return secrets.reduce((redacted, secret) => redacted.replaceAll(secret, REDACTED), text);
+  return secrets.reduce((redacted, secret) => replaceSecret(redacted, secret), text);
+}
+
+function replaceSecret(text: string, secret: string): string {
+  if (secret.length >= SHORT_SECRET_LENGTH) {
+    return text.replaceAll(secret, REDACTED);
+  }
+  let redacted = '';
+  let copied = 0;
+  for (let index = text.indexOf(secret); index !== -1; index = text.indexOf(secret, index + 1)) {
+    const end = index + secret.length;
+    if (index >= copied && standsAlone(text, secret, index, end)) {
+      redacted += text.slice(copied, index) + REDACTED;
+      copied = end;
+    }
+  }
+  return redacted + text.slice(copied);
+}
+
+// An edge that is not a word character, such as a symbol, can touch a word and still be the secret.
+function standsAlone(text: string, secret: string, start: number, end: number): boolean {
+  const before = text[start - 1];
+  const after = text[end];
+  const touchesBefore =
+    before !== undefined && WORD_CHARACTER.test(before) && WORD_CHARACTER.test(secret[0] ?? '');
+  const touchesAfter =
+    after !== undefined &&
+    WORD_CHARACTER.test(after) &&
+    WORD_CHARACTER.test(secret[secret.length - 1] ?? '');
+  return !touchesBefore && !touchesAfter;
 }
 
 // Longest first, so a secret that contains another is replaced whole.

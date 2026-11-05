@@ -26,8 +26,9 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
     ERROR.
   - `redaction=SecretRedaction(secrets=(...), patterns=(...))` replaces each secret, such as an
     API key from the settings, with `[Redacted]` in every JSON string of the line: the message,
-    the error's message and stack, and nested `extra`. Secrets shorter than 8 characters are
-    skipped. Each is also matched as `encodeURIComponent`, `quote`, `quote_plus` and
+    the error's message and stack, and nested `extra`. Empty and blank secrets are
+    skipped, and one shorter than 8 characters is replaced only where it stands alone, so a
+    password of `test` is redacted in `password is test` but not in `testserver`. Each is also matched as `encodeURIComponent`, `quote`, `quote_plus` and
     `URLSearchParams` encode it. `patterns` replace secret-shaped text. Pass
     `DEFAULT_SECRET_PATTERNS` for Bearer/Basic credentials, JWTs, `password=` and other
     `key=value` or quoted JSON credentials, URL userinfo, PEM private keys, and `sk-`, GitHub,

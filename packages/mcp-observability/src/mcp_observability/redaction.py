@@ -32,8 +32,9 @@ from starlette.types import Send
 
 from mcp_observability.stacktrace import scrub_stacktrace
 
-# Shorter values are skipped: replacing them would hit ordinary words and numbers.
-MIN_SECRET_LENGTH = 8
+# A secret shorter than this is replaced only where it stands alone, not inside a longer word or
+# number: it would otherwise hit ordinary words, such as `test` in `testserver`.
+SHORT_SECRET_LENGTH = 8
 _REDACTED = "[Redacted]"
 
 # A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
@@ -105,8 +106,8 @@ class SecretRedaction(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
     secrets: tuple[str, ...] = ()
-    """Known secret values, such as API keys from the settings. Shorter than `MIN_SECRET_LENGTH`
-    are skipped."""
+    """Known secret values, such as API keys from the settings. Empty and blank values are
+    skipped. A value shorter than `SHORT_SECRET_LENGTH` is replaced only where it stands alone."""
     patterns: tuple[re.Pattern[str], ...] = ()
     """Secret-shaped text to replace, such as `DEFAULT_SECRET_PATTERNS`. A `secret` named group
     narrows what is replaced."""
@@ -356,8 +357,9 @@ def _secret_variants(secrets: Iterable[str]) -> tuple[str, ...]:
     return _longest_first(
         variant
         for secret in ((secrets,) if isinstance(secrets, str) else secrets)
-        # A consumer reading an absent header passes `None` whatever the types say.
-        if isinstance(secret, str) and len(secret) >= MIN_SECRET_LENGTH  # pyright: ignore[reportUnnecessaryIsInstance]
+        # A consumer reading an absent header passes `None` whatever the types say. A blank value
+        # would match everywhere, so it is no secret.
+        if isinstance(secret, str) and secret.strip()  # pyright: ignore[reportUnnecessaryIsInstance]
         for variant in (secret, *_url_encoded(secret))
     )
 
@@ -428,8 +430,36 @@ def _error_fields(error: Exception) -> dict[str, str]:
 def _replace_secrets(text: str, secrets: tuple[str, ...]) -> str:
     redacted = text
     for secret in secrets:
-        redacted = redacted.replace(secret, _REDACTED)
+        redacted = _replace_secret(redacted, secret)
     return redacted
+
+
+def _replace_secret(text: str, secret: str) -> str:
+    if len(secret) >= SHORT_SECRET_LENGTH:
+        return text.replace(secret, _REDACTED)
+    parts: list[str] = []
+    copied = 0
+    index = text.find(secret)
+    while index != -1:
+        end = index + len(secret)
+        if index >= copied and _stands_alone(text, secret, index, end):
+            parts.extend((text[copied:index], _REDACTED))
+            copied = end
+        index = text.find(secret, index + 1)
+    parts.append(text[copied:])
+    return "".join(parts)
+
+
+def _stands_alone(text: str, secret: str, start: int, end: int) -> bool:
+    """An edge that is not a word character, such as a symbol, can touch a word and still be the
+    secret."""
+    touches_before = start > 0 and _is_word(text[start - 1]) and _is_word(secret[0])
+    touches_after = end < len(text) and _is_word(text[end]) and _is_word(secret[-1])
+    return not touches_before and not touches_after
+
+
+def _is_word(character: str) -> bool:
+    return character.isalnum() or character == "_"
 
 
 def _longest_first(secrets: Iterable[str]) -> tuple[str, ...]:
