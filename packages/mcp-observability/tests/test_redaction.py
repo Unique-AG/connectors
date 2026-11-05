@@ -22,7 +22,6 @@ from mcp_observability import add_log_secrets
 from mcp_observability import bearer_token
 from mcp_observability import configure_logging
 from mcp_observability import log_secrets
-from mcp_observability.redaction import MIN_SECRET_LENGTH
 from mcp_observability.redaction import SecretRedactor
 
 _API_KEY = "kyckr-api-key-0123456789"
@@ -140,11 +139,74 @@ class TestKnownSecrets:
 
         assert redactor.redact_line(f'{{"msg":"with {_API_KEY}"}}') == '{"msg":"with [Redacted]"}'
 
-    def test_secrets_under_the_minimum_length_are_skipped(self) -> None:
-        short = "s" * (MIN_SECRET_LENGTH - 1)
-        redactor = SecretRedactor(("", short))
+    def test_a_secret_under_the_short_length_is_redacted_where_it_stands_alone(self) -> None:
+        redactor = SecretRedactor(("abc",))
 
-        assert redactor.redact_line(f'{{"msg":"{short}"}}') == f'{{"msg":"{short}"}}'
+        line = redactor.redact_line('{"msg":"password is abc, user:abc@host and abc"}')
+
+        assert json.loads(line)["msg"] == (
+            "password is [Redacted], user:[Redacted]@host and [Redacted]"
+        )
+
+    def test_a_secret_under_the_short_length_is_left_inside_a_longer_word_or_number(self) -> None:
+        redactor = SecretRedactor(("test", "12"))
+        line = '{"msg":"testserver, tests, my_test, 2012 and abc12"}'
+
+        assert redactor.redact_line(line) == line
+
+    def test_a_short_secret_that_starts_with_a_symbol_is_redacted_next_to_a_word(self) -> None:
+        redactor = SecretRedactor(("!ab",))
+
+        line = redactor.redact_line('{"msg":"pass!ab and !abc"}')
+
+        assert json.loads(line)["msg"] == "pass[Redacted] and !abc"
+
+    def test_a_url_encoded_secret_is_redacted_whatever_the_case_of_its_escapes(self) -> None:
+        redactor = SecretRedactor(("pa/ss:word",))
+
+        line = redactor.redact_line(
+            '{"msg":"a=pa%2Fss%3Aword b=pa%2fss%3aword c=pa%2fss%3Aword d=pa%2Fss%3aword"}'
+        )
+
+        assert json.loads(line)["msg"] == "a=[Redacted] b=[Redacted] c=[Redacted] d=[Redacted]"
+
+    def test_the_case_of_the_escapes_around_a_url_encoded_secret_is_kept(self) -> None:
+        redactor = SecretRedactor(("pa/ss:word",))
+
+        line = redactor.redact_line('{"msg":"x%2f pa%2fss%3aword y%3a"}')
+
+        assert json.loads(line)["msg"] == "x%2f [Redacted] y%3a"
+
+    def test_a_short_secret_that_ends_with_a_symbol_is_redacted_in_its_encoded_form_too(
+        self,
+    ) -> None:
+        redactor = SecretRedactor(("abc!",))
+
+        line = redactor.redact_line('{"msg":"a=abc!suffix b=abc%21suffix c=abc%21 d=xabc%21"}')
+
+        assert (
+            json.loads(line)["msg"]
+            == "a=[Redacted]suffix b=[Redacted]suffix c=[Redacted] d=xabc%21"
+        )
+
+    def test_the_next_occurrence_is_found_after_one_inside_a_word(self) -> None:
+        redactor = SecretRedactor(("abc",))
+
+        line = redactor.redact_line('{"msg":"xabc abc"}')
+
+        assert json.loads(line)["msg"] == "xabc [Redacted]"
+
+    def test_a_short_secret_with_a_longer_encoding_is_redacted_anywhere(self) -> None:
+        redactor = SecretRedactor(("@@@@",))
+
+        line = redactor.redact_line('{"msg":"q=%40%40%40%40x"}')
+
+        assert json.loads(line)["msg"] == "q=[Redacted]x"
+
+    def test_empty_and_blank_secrets_are_skipped(self) -> None:
+        line = '{"msg":"a message with spaces"}'
+
+        assert SecretRedactor(("", " ", "\t\n")).redact_line(line) == line
 
     def test_a_line_without_secrets_is_unchanged(self) -> None:
         line = '{"level":30,"msg":"all good","till":3}'
@@ -403,6 +465,18 @@ class TestSecretsAddedPartway:
 
         (line,) = logged(capsys)
         assert line["msg"] == "tool failed: upstream rejected [Redacted]"
+
+    def test_an_added_short_secret_is_redacted_where_it_stands_alone(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        _configure()
+
+        with log_secrets():
+            add_log_secrets("abc")
+            _log.info("token abc")
+
+        (line,) = logged(capsys)
+        assert line["msg"] == "token [Redacted]"
 
     async def test_a_secret_added_in_a_child_task_reaches_the_scope_that_started_it(
         self, capsys: pytest.CaptureFixture[str]

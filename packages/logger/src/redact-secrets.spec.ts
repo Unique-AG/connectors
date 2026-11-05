@@ -7,10 +7,10 @@ import {
   bearerToken,
   createSecretRedactor,
   DEFAULT_SECRET_PATTERNS,
-  MIN_SECRET_LENGTH,
   redactRequestSecrets,
   runWithLogSecrets,
   type SecretRedactionOptions,
+  SHORT_SECRET_LENGTH,
 } from './redact-secrets';
 
 const mockApiKey = 'kyckr-api-key-0123456789';
@@ -107,12 +107,74 @@ describe('createSecretRedactor', () => {
       expect(parsedLines(lines)[0]?.msg).toBe('value: [Redacted]');
     });
 
-    it(`skips secrets shorter than ${MIN_SECRET_LENGTH} characters`, () => {
-      const { logger, lines } = createCapturingLogger({ secrets: ['', 'short'] });
+    it(`redacts a secret under ${SHORT_SECRET_LENGTH} characters where it stands alone`, () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['abc'] });
 
-      logger.info('a short message');
+      logger.info('password is abc, user:abc@host and abc');
 
-      expect(parsedLines(lines)[0]?.msg).toBe('a short message');
+      expect(parsedLines(lines)[0]?.msg).toBe(
+        'password is [Redacted], user:[Redacted]@host and [Redacted]',
+      );
+    });
+
+    it(`leaves a secret under ${SHORT_SECRET_LENGTH} characters inside a longer word or number`, () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['test', '12'] });
+
+      logger.info('testserver, tests, my_test, 2012 and abc12');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('testserver, tests, my_test, 2012 and abc12');
+    });
+
+    it('redacts a short secret that starts or ends with a symbol next to a word', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['!ab'] });
+
+      logger.info('pass!ab and !abc');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('pass[Redacted] and !abc');
+    });
+
+    it('redacts a URL-encoded secret whatever the case of its escapes', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['pa/ss:word'] });
+
+      logger.info('a=pa%2Fss%3Aword b=pa%2fss%3aword c=pa%2fss%3Aword d=pa%2Fss%3aword');
+
+      expect(parsedLines(lines)[0]?.msg).toBe(
+        'a=[Redacted] b=[Redacted] c=[Redacted] d=[Redacted]',
+      );
+    });
+
+    it('keeps the case of the escapes around a URL-encoded secret', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['pa/ss:word'] });
+
+      logger.info('x%2f pa%2fss%3aword y%3a');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('x%2f [Redacted] y%3a');
+    });
+
+    it('redacts a short secret that ends with a symbol in its encoded form too', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['abc!'] });
+
+      logger.info('a=abc!suffix b=abc%21suffix c=abc%21 d=xabc%21');
+
+      expect(parsedLines(lines)[0]?.msg).toBe(
+        'a=[Redacted]suffix b=[Redacted]suffix c=[Redacted] d=xabc%21',
+      );
+    });
+
+    it('finds the next occurrence after one that sits inside a word', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['abc'] });
+
+      logger.info('xabc abc');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('xabc [Redacted]');
+    });
+
+    it('skips empty and blank secrets', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['', ' ', '\t\n'] });
+
+      logger.info('a message with spaces');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('a message with spaces');
     });
 
     it('leaves the line unchanged when no secrets are registered', () => {
@@ -396,6 +458,17 @@ describe('createSecretRedactor', () => {
       expect(parsedLines(lines)[0]?.err).toMatchObject({
         message: 'upstream rejected [Redacted]',
       });
+    });
+
+    it('redacts an added secret however short it is', () => {
+      const { logger, lines } = createCapturingLogger();
+
+      runWithLogSecrets([], () => {
+        addLogSecrets(['abc']);
+        logger.info('token abc');
+      });
+
+      expect(parsedLines(lines)[0]?.msg).toBe('token [Redacted]');
     });
 
     it('redacts a secret added in an awaited function from the lines its caller logs', async () => {
