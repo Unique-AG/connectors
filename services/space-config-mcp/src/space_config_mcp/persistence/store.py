@@ -122,10 +122,7 @@ class Persistence:
 
         json_bytes = json.dumps(config, default=str).encode()
         key = f"{space_id}.json"
-        date = captured_at[:10] if len(captured_at) >= 10 else captured_at
-        time_part = captured_at[11:16] if len(captured_at) >= 16 else ""
-        timestamp = f"{date} {time_part}".strip()
-        title = f"{space_id} · {label} · {timestamp}" if time_part else f"{space_id} · {label} · {date}"
+        title = f"{space_id} config history"
         metadata: dict[str, str] = {
             "space_id": space_id,
             "snapshot_id": snapshot_id,
