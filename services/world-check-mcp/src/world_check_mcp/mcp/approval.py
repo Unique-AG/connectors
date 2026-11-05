@@ -60,6 +60,10 @@ class ApprovalGate:
 
     def __init__(self, *, ttl_seconds: float) -> None:
         self._ttl_seconds: float = ttl_seconds
+        # TODO(https://github.com/Unique-AG/connectors/pull/1257#discussion_r4467206273): keep
+        # pending approvals in Persistence.store with a TTL. In this process, the answer to an
+        # approval fails when it reaches another replica or arrives after a restart, and the
+        # oldest entry evicted at the limit can belong to another user.
         self._pending: dict[str, _Pending] = {}
 
     async def run[
