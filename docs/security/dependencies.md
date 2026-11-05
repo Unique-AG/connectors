@@ -63,6 +63,7 @@ The agent hands off when it cannot finish the PR. These causes give the label `h
 - The CI is red after 2 fix attempts.
 - The CI timed out, or a run waits for approval.
 - The cause is unclear, or the fix is outside the PR scope.
+- The agent could not set the scope of the PR title again after a fix.
 
 The agent removes `ai-assisted` first, so a PR never has both labels. The agent never files a Jira ticket. The report gets the section "Hand-off: log a Jira ticket", with a ticket draft. The project is `UN` and the component is `mcp-servers`. A person logs the ticket. To log it with an assistant, ask it to read the report and to follow `agentic/skills/jira/SKILL.md`. The verdicts "safe to merge" and "safe with a gap" give `ai-assisted`.
 
