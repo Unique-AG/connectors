@@ -1,5 +1,6 @@
 import assert from 'node:assert';
 import { addLogSecrets, createLoggerOptions } from '@unique-ag/logger';
+import { ProxyConfigSchema } from '@unique-ag/proxy';
 import { RABBIT_HANDLER, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
 import pino from 'pino';
 import { describe, expect, it } from 'vitest';
@@ -27,6 +28,7 @@ const mockConfigs = {
     clientSecret: new Redacted('microsoft-client-secret'),
     webhookSecret: new Redacted('w'.repeat(128)),
   } as MicrosoftConfig,
+  proxy: ProxyConfigSchema.parse({}),
   unique: { serviceAuthMode: 'cluster_local' } as UniqueConfig,
 };
 
@@ -51,6 +53,24 @@ describe('deploymentSecrets', () => {
     } as UniqueConfig;
 
     expect(deploymentSecrets({ ...mockConfigs, unique })).toContain('zitadel-client-secret');
+  });
+
+  it('adds the proxy password and the Basic credentials it is sent as', () => {
+    const proxy = ProxyConfigSchema.parse({
+      authMode: 'username_password',
+      host: 'proxy.example.com',
+      port: 8080,
+      protocol: 'http',
+      username: 'proxy-user',
+      password: 'proxy-password-1',
+    });
+
+    expect(deploymentSecrets({ ...mockConfigs, proxy })).toEqual(
+      expect.arrayContaining([
+        'proxy-password-1',
+        Buffer.from('proxy-user:proxy-password-1').toString('base64'),
+      ]),
+    );
   });
 });
 

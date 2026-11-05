@@ -4,7 +4,7 @@ import { createLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
-import { ProxyModule, ProxyService, proxyConfig } from '@unique-ag/proxy';
+import { type ProxyConfig, ProxyModule, ProxyService, proxyConfig } from '@unique-ag/proxy';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
@@ -89,6 +89,7 @@ import { deploymentSecrets } from './utils/log-secrets';
         databaseConfig.KEY,
         encryptionConfig.KEY,
         microsoftConfig.KEY,
+        proxyConfig.KEY,
         uniqueConfig.KEY,
       ],
       useFactory: (
@@ -98,10 +99,19 @@ import { deploymentSecrets } from './utils/log-secrets';
         database: DatabaseConfig,
         encryption: EncryptionConfig,
         microsoft: MicrosoftConfig,
+        proxy: ProxyConfig,
         unique: UniqueConfig,
       ) => {
         const loggerOptions = createLoggerOptions({
-          secrets: deploymentSecrets({ amqp, auth, database, encryption, microsoft, unique }),
+          secrets: deploymentSecrets({
+            amqp,
+            auth,
+            database,
+            encryption,
+            microsoft,
+            proxy,
+            unique,
+          }),
         });
         return {
           ...loggerOptions,
