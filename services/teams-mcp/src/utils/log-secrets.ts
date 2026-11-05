@@ -1,3 +1,4 @@
+import { runWithLogSecrets } from '@unique-ag/logger';
 import type {
   AMQPConfig,
   AuthConfig,
@@ -35,6 +36,23 @@ export function deploymentSecrets({
     ...urlPassword(amqp.url.value),
     ...uniqueAppKey(unique),
   ];
+}
+
+/** Scope for an AMQP handler outside a request. Place it below `@RabbitSubscribe`. */
+export function LogSecretsScope() {
+  return (
+    _target: object,
+    _key: string | symbol,
+    descriptor: PropertyDescriptor,
+  ): PropertyDescriptor => {
+    const original = descriptor.value as (...args: unknown[]) => unknown;
+    return {
+      ...descriptor,
+      value: function (this: unknown, ...args: unknown[]) {
+        return runWithLogSecrets([], () => original.apply(this, args));
+      },
+    };
+  };
 }
 
 // URL keeps the password encoded. The logger also matches each secret's encoded forms.

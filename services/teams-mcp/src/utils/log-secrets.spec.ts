@@ -1,3 +1,7 @@
+import assert from 'node:assert';
+import { addLogSecrets, createLoggerOptions } from '@unique-ag/logger';
+import { RABBIT_HANDLER, RabbitSubscribe } from '@golevelup/nestjs-rabbitmq';
+import pino from 'pino';
 import { describe, expect, it } from 'vitest';
 import type {
   AMQPConfig,
@@ -7,7 +11,7 @@ import type {
   MicrosoftConfig,
   UniqueConfig,
 } from '~/config';
-import { deploymentSecrets } from './log-secrets';
+import { deploymentSecrets, LogSecretsScope } from './log-secrets';
 import { Redacted } from './redacted';
 
 const mockEncryptionKey = Buffer.alloc(32, 7);
@@ -58,5 +62,52 @@ describe('deploymentSecrets', () => {
     } as unknown as UniqueConfig;
 
     expect(deploymentSecrets({ ...mockConfigs, unique })).toEqual(deploymentSecrets(mockConfigs));
+  });
+});
+
+describe('LogSecretsScope', () => {
+  const mockToken = 'graph-refresh-token-1234';
+
+  function createCapturingLogger() {
+    const pinoHttpOptions = createLoggerOptions().pinoHttp;
+    assert.ok(
+      typeof pinoHttpOptions === 'object' && pinoHttpOptions !== null && 'hooks' in pinoHttpOptions,
+      'Expected pinoHttp options with hooks',
+    );
+    const lines: string[] = [];
+    const logger = pino({ hooks: pinoHttpOptions.hooks }, { write: (line) => lines.push(line) });
+    return { logger, lines };
+  }
+
+  it('redacts a token the handler adds from what it logs, and only while it runs', async () => {
+    const { logger, lines } = createCapturingLogger();
+    class SyncListener {
+      @LogSecretsScope()
+      public async onSync(): Promise<string> {
+        addLogSecrets([mockToken]);
+        logger.error(`Graph rejected ${mockToken}`);
+        return 'done';
+      }
+    }
+
+    await expect(new SyncListener().onSync()).resolves.toBe('done');
+    logger.error(`after ${mockToken}`);
+
+    expect(lines.map((line) => JSON.parse(line).msg)).toEqual([
+      'Graph rejected [Redacted]',
+      `after ${mockToken}`,
+    ]);
+  });
+
+  it('keeps the RabbitSubscribe metadata of the handler it wraps', () => {
+    class SyncListener {
+      @RabbitSubscribe({ exchange: 'main', routingKey: 'sync', queue: 'sync' })
+      @LogSecretsScope()
+      public async onSync(): Promise<void> {}
+    }
+
+    expect(Reflect.getMetadata(RABBIT_HANDLER, SyncListener.prototype.onSync)).toMatchObject({
+      queue: 'sync',
+    });
   });
 });
