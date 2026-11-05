@@ -29,8 +29,6 @@ from mcp.types import (
     TextContent,
 )
 from mcp.types.version import LATEST_HANDSHAKE_VERSION, LATEST_MODERN_VERSION
-from msgraph.generated.models.o_data_errors.main_error import MainError
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from pydantic import BaseModel
 
 from office_365_mcp.graph_client import (
@@ -42,7 +40,6 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
-from office_365_mcp.graph_client.errors import _classify
 from office_365_mcp.shared.seam import (
     READ_ONLY,
     Advised,
@@ -76,11 +73,12 @@ _LICENSE_MESSAGE = (
 
 
 def _unlicensed_failure() -> GraphFailure:
-    return _classify(
-        ODataError(
-            response_status_code=403,
-            error=MainError(code="Forbidden", message=_LICENSE_MESSAGE),
-        )
+    return GraphForbidden(
+        "Microsoft Graph returned 403 (Forbidden)",
+        status=403,
+        code="Forbidden",
+        request_id=None,
+        reason=_LICENSE_MESSAGE,
     )
 
 

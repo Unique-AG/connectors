@@ -34,7 +34,7 @@ For a few hours after the switch is turned on, Graph can still return 403 on som
 **What to do (Teams / Global admin):**
 
 1. Teams admin center → **Meetings → Meeting settings** → under **Transcript API access**, set **Microsoft Graph access → On**
-2. Optionally enable **Include speaker attribution** for speaker names
+2. Enable **Include speaker attribution**. Capture requests VTT, which Graph can refuse while attribution is off
 3. Or via PowerShell:
    ```powershell
    Set-CsTeamsMeetingConfiguration -Identity Global -EnableGraphTranscriptAccess $true

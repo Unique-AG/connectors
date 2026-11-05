@@ -11,6 +11,7 @@ from fastmcp.exceptions import ToolError
 
 from office_365_mcp.shared import meetings
 from office_365_mcp.shared.handles import meeting_uri_for
+from office_365_mcp.shared.transcripts import MAX_TRANSCRIPT_BYTES
 from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from tests.tools.conftest import (
     JOIN_WEB_URL,
@@ -794,7 +795,7 @@ class TestATranscriptThatCannotBeUsed:
     async def test_it_refuses_a_transcript_of_one_byte_over_100_megabytes_as_too_long(
         self, graph: respx.MockRouter
     ) -> None:
-        over = transcript_reader.MAX_TRANSCRIPT_BYTES + 1
+        over = MAX_TRANSCRIPT_BYTES + 1
         _ = graph.get(CONTENT_PATH).mock(
             return_value=httpx.Response(
                 200, content=b"WEBVTT", headers={"content-length": str(over)}
@@ -803,7 +804,7 @@ class TestATranscriptThatCannotBeUsed:
 
         message = await _refused("teams_read_transcript", uri=TRANSCRIPT_URI)
 
-        assert transcript_reader.MAX_TRANSCRIPT_BYTES == 100 * 1024 * 1024
+        assert MAX_TRANSCRIPT_BYTES == 100 * 1024 * 1024
         assert "too long to read here" in message
         assert "open the meeting in Teams" in message
         assert "no transcript exists" in message and "Do not report" in message

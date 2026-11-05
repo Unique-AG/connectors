@@ -68,7 +68,7 @@ For a few hours after the switch is turned on, Graph can still return that 403 o
 
 1. **Meetings → Meeting settings**
 2. Under **Transcript API access**, set **Microsoft Graph access → On**
-3. Optionally open **Configure** and enable **Include speaker attribution** to add speaker names to attributed VTT
+3. Open **Configure** and enable **Include speaker attribution**. Capture requests the transcript as VTT, and Graph can refuse that request with `SpeakerAttributionNotAllowed` while attribution is off
 
 Docs: [Manage meeting transcript API access](https://learn.microsoft.com/en-us/microsoftteams/meeting-transcript-api-access)
 
@@ -76,7 +76,7 @@ Docs: [Manage meeting transcript API access](https://learn.microsoft.com/en-us/m
 
 ```powershell
 Set-CsTeamsMeetingConfiguration -Identity Global -EnableGraphTranscriptAccess $true
-# optional, for speaker-attributed transcripts:
+# required for capture, which requests speaker-attributed VTT:
 Set-CsTeamsMeetingConfiguration -Identity Global -EnableAttributedTranscripts $true
 ```
 
@@ -90,7 +90,7 @@ Set-CsTeamsMeetingConfiguration -Identity Global -EnableAttributedTranscripts $t
 
 The Office 365 MCP preset `teams-call-transcripts` lists and reads call transcripts. The capture pipeline on this page stores meeting transcripts in the knowledge base. Adding the call preset leaves `teams`, `teams-meetings`, and `teams-transcripts` unchanged. Name `teams-transcripts` as well when the deployment should read meeting transcripts.
 
-Register `CallTranscripts.Read.All` before the preset is in use. `terraform apply` with `teams-call-transcripts` adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
+Register `CallTranscripts.Read.All` before the preset is in use. `terraform apply` with `teams-call-transcripts` adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. For a multi-tenant app (`sign_in_audience = "AzureADMultipleOrgs"`), customer-tenant administrators must also grant consent through `admin_consent_url`, even when `service_principal_configuration` is set. Existing users sign in again after consent to receive the new permission. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
 
 These Teams policies control whether a transcript is available and whether it includes speaker names:
 
@@ -99,7 +99,7 @@ These Teams policies control whether a transcript is available and whether it in
 | `AllowTranscriptionForCalling` | 1:1 and PSTN calls. Off by default | Teams admin center → **Voice → Calling policies** → **Transcription**, or `Set-CsTeamsCallingPolicy -Identity Global -AllowTranscriptionForCalling $true` |
 | `AllowTranscription` | Group calls and meetings | `Set-CsTeamsMeetingPolicy -Identity Global -AllowTranscription $true` |
 | Graph transcript access (`EnableGraphTranscriptAccess`) | Any transcript read through Graph | See [Teams Graph transcript API access](#teams-graph-transcript-api-access) |
-| Speaker attribution (`EnableAttributedTranscripts`) | Optional named speakers on the transcript | In the Teams admin center this is **Include speaker attribution**. See [Teams Graph transcript API access](#teams-graph-transcript-api-access) |
+| Speaker attribution (`EnableAttributedTranscripts`) | Named speakers on the transcript. Required for capture. Optional for the Office 365 MCP call-transcript tools | In the Teams admin center this is **Include speaker attribution**. See [Teams Graph transcript API access](#teams-graph-transcript-api-access) |
 
 Use the policy assigned to the users if it is not `Global`.
 
@@ -268,7 +268,7 @@ For Unique SaaS deployments, Unique applies the flag and both settings for you; 
     - [ ] Teams meeting policy has transcription enabled (`AllowTranscription`)
 3. **Teams meeting settings** (Unique cannot set this via OAuth)
     - [ ] Microsoft Graph transcript access enabled (`EnableGraphTranscriptAccess`) — see [Teams Graph transcript API access](#teams-graph-transcript-api-access)
-    - [ ] (Optional) Speaker attribution enabled (`EnableAttributedTranscripts`) for named speakers
+    - [ ] Speaker attribution enabled (`EnableAttributedTranscripts`). Capture fails without it
 4. **Teams MCP Server**
     - [ ] RabbitMQ reachable
     - [ ] `UNIQUE_INTEGRATION=enabled` with the Unique API and service header values set
