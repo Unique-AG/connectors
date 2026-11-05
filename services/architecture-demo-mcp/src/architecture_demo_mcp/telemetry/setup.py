@@ -7,21 +7,29 @@ from mcp_configs import LoggingSettings
 from mcp_configs import TracingSettings
 from mcp_observability import configure_logging
 from mcp_observability import configure_tracing
+from mcp_observability import SecretRedaction
 from mcp_observability import setup_ops
 from starlette.middleware import Middleware
 
 SERVICE_NAME = "architecture-demo-mcp"
 
 
-def init_telemetry(settings: LoggingSettings) -> None:
-    """Runs before anything logs. Tracing reads its settings (OTEL_*) from the environment."""
+def init_telemetry(settings: LoggingSettings, *, secrets: tuple[str, ...]) -> None:
+    """Runs before anything logs. Tracing reads its settings (OTEL_*) from the environment.
+
+    Every log line has `secrets`, the ones the deployment configures, replaced with `[Redacted]`.
+    """
     configure_tracing(
         TracingSettings(),
         service_name=SERVICE_NAME,
         service_version=version(SERVICE_NAME),
         error_details_policy=settings.error_details_policy,
     )
-    configure_logging(settings, own_loggers=("architecture_demo_mcp",))
+    configure_logging(
+        settings,
+        own_loggers=("architecture_demo_mcp",),
+        redaction=SecretRedaction(secrets=secrets),
+    )
 
 
 def instrument(mcp: FastMCP) -> Middleware:
