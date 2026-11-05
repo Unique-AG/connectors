@@ -507,6 +507,9 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "sharepoint_delete_item": {"item": _DRIVE_ITEM_SOURCES},
     "sharepoint_create_share_link": {"item": _DRIVE_ITEM_SOURCES},
     "sharepoint_invite": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_list_lists": {"site": ("sharepoint_search_sites",)},
+    "sharepoint_get_list": {"list": ("sharepoint_list_lists",)},
+    "sharepoint_list_items": {"list": ("sharepoint_list_lists",)},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
     "onenote_preview_page": {"page": ("onenote_list_pages", "onenote_create_page")},
@@ -1182,6 +1185,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.SHAREPOINT_WRITE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 12),
     (ToolsPreset.SHAREPOINT_SHARE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 14),
     (ToolsPreset.SHAREPOINT_SITES, ("User.Read", "Files.Read.All", "Sites.Read.All"), 2, 6),
+    (ToolsPreset.SHAREPOINT_LISTS, ("User.Read", "Sites.Read.All"), 1, 5),
     (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,
