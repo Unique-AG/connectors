@@ -51,6 +51,14 @@ describe('AddAttachmentsToDraftEmailTool', () => {
     });
   });
 
+  it('does not require a complete attachment list to add attachments', async () => {
+    await tool.addAttachments({ draftId: 'draft-1', attachments }, context, request);
+
+    expect(getDraftStateQuery.run).toHaveBeenCalledWith(
+      expect.objectContaining({ requireCompleteAttachments: false }),
+    );
+  });
+
   it('does not upload when the message is no longer a draft', async () => {
     getDraftStateQuery.run.mockResolvedValue({ status: 'failed', message: 'Already sent.' });
 

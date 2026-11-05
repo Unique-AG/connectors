@@ -53,6 +53,7 @@ export class UpdateDraftEmailCommand {
       idIsImmutable: input.idIsImmutable,
       mailbox: input.mailbox,
       parentFolderId: input.parentFolderId,
+      requireCompleteAttachments: false,
     });
     if (draftState.status === 'failed') {
       return { success: false, message: draftState.message };

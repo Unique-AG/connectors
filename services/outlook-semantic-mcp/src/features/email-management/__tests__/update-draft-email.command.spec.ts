@@ -117,6 +117,16 @@ describe('UpdateDraftEmailCommand', () => {
     );
   });
 
+  it('does not require a complete attachment list to edit the draft', async () => {
+    const { command, getDraftStateQuery } = makeCommand();
+
+    await command.run(USER_PROFILE_ID, { draftId: 'draft-1', subject: 'Hi' });
+
+    expect(getDraftStateQuery.run).toHaveBeenCalledWith(
+      expect.objectContaining({ requireCompleteAttachments: false }),
+    );
+  });
+
   it('still reports the update when the web link cannot be built', async () => {
     const { command, buildWebLinksCommand } = makeCommand();
     buildWebLinksCommand.run.mockRejectedValue(new Error('folder lookup failed'));

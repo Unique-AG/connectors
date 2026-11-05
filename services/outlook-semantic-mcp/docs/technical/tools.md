@@ -454,7 +454,7 @@ Supports two modes selected by `recipientsData.type`:
 
 ## Draft Editing
 
-Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with [`open_email`](#open_email) by passing `openEmailParams`, and then edits `text`.
+Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), then passes the draft's target fields to the edit tool. [`update_draft_email`](#update_draft_email) also needs the live HTML, which the agent reads with [`open_email`](#open_email).
 
 All three tools take the same target fields:
 

@@ -43,7 +43,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | Read and create email messages in the user's mailbox |
-| **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up; creating draft emails via the `draft_email` tool (POST `/me/messages`); editing drafts via `update_draft_email` (PATCH `/me/messages/{id}`) and adding or removing their attachments (POST and DELETE `/me/messages/{id}/attachments`) |
+| **Used For** | Fetching email bodies, headers, and metadata during full sync and live catch-up; creating draft emails via the `draft_email` tool (POST `/me/messages`); editing drafts via `update_draft_email` (PATCH `/me/messages/{id}`) and adding their attachments (POST `/me/messages/{id}/attachments`) and removing them (DELETE `/me/messages/{id}/attachments/{attachmentId}`) |
 | **Why Not `Mail.Read` + `Mail.ReadWrite`** | `Mail.ReadWrite` already includes full read access, making `Mail.Read` and `Mail.ReadBasic` redundant |
 | **Why Not `Mail.Send`** | The server only creates drafts — sending is a deliberate user action in Outlook. `Mail.Send` is not requested. |
 

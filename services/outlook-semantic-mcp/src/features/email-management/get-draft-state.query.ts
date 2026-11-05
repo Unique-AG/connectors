@@ -44,12 +44,14 @@ export class GetDraftStateQuery {
     idIsImmutable,
     mailbox,
     parentFolderId,
+    requireCompleteAttachments = true,
   }: {
     userProfileId: string;
     draftId: string;
     idIsImmutable?: boolean;
     mailbox?: string;
     parentFolderId?: string;
+    requireCompleteAttachments?: boolean;
   }): Promise<DraftState> {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
 
@@ -63,8 +65,8 @@ export class GetDraftStateQuery {
       }
       const message = DraftStateResponseSchema.parse(await request.get());
 
-      if (message['attachments@odata.nextLink'] !== undefined) {
-        // The edit tools remove attachments by name, so a list cut short would hide the one to remove.
+      if (requireCompleteAttachments && message['attachments@odata.nextLink'] !== undefined) {
+        // Removing by name needs the whole list: a list cut short would hide the attachment to remove.
         return {
           status: 'failed',
           message:

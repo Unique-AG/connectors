@@ -105,6 +105,24 @@ describe('GetDraftStateQuery', () => {
     });
   });
 
+  it('returns the draft when the attachment list is incomplete and completeness is not required', async () => {
+    const { query } = makeQuery({
+      isDraft: true,
+      subject: 'Offer',
+      attachments: [{ id: 'att-1', name: 'offer.pdf', isInline: false }],
+      'attachments@odata.nextLink':
+        'https://graph.microsoft.com/v1.0/me/messages/draft-1/attachments?$skip=20',
+    });
+
+    const result = await query.run({
+      userProfileId: 'user-1',
+      draftId: 'draft-1',
+      requireCompleteAttachments: false,
+    });
+
+    expect(result).toMatchObject({ status: 'draft', subject: 'Offer' });
+  });
+
   it('fails when the message is no longer a draft', async () => {
     const { query } = makeQuery({ isDraft: false, subject: 'Sent' });
 
