@@ -99,7 +99,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 | Category | Tools |
 |----------|-------|
 | Email Search | `search_emails`, `fetch_next_search_pages`, `open_email` |
-| Draft Creation and Editing | `create_draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` |
+| Draft Creation and Editing | `draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` |
 | Contact Lookup | `lookup_contacts` |
 | Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |
 | Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
@@ -446,7 +446,7 @@ Emails excluded by inbox filters (`retentionWindowInDays`, `ignoredSenders`, `ig
 
 ### Can I edit a draft that already exists?
 
-**Answer:** Yes, for drafts that were created with `create_draft_email` and for drafts the user wrote in Outlook. The agent finds the draft with `search_emails` restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with `open_email` by passing `openEmailParams`, and then calls:
+**Answer:** Yes, for drafts that were created with `draft_email` and for drafts the user wrote in Outlook. The agent finds the draft with `search_emails` restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with `open_email` by passing `openEmailParams`, and then calls:
 
 - `update_draft_email` to change the subject, body, To recipients, or CC recipients. The body is the HTML from that read, sent back unchanged (no Markdown conversion), and it replaces the whole body, so the agent keeps the formatting, signature, quoted thread, and inline images the user did not ask to change. Each recipient list also replaces the existing one.
 - `add_attachments_to_draft_email` to attach more files. Existing attachments stay.
@@ -456,14 +456,14 @@ All three check that the message is still a draft and fail without changing anyt
 
 ### Can I attach files when creating a draft email?
 
-**Answer:** Yes. The `create_draft_email` tool accepts attachments as an array of objects with `fileName` and `data` fields. The `data` field accepts:
+**Answer:** Yes. The `draft_email` tool accepts attachments as an array of objects with `fileName` and `data` fields. The `data` field accepts:
 
 - A **base64-encoded data URI** (`data:[mediatype];base64,<data>`) — works in all deployment modes
 - A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
 
 If one or more attachments fail to upload, the draft is still created and the failed attachments are listed in the response.
 
-**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+**See also:** [Tools — draft_email](./technical/tools.md#draft_email)
 
 ### Can I create drafts in a shared mailbox?
 
@@ -476,7 +476,7 @@ Both draft types work with shared mailboxes:
 
 Omitting `mailbox` creates the draft in the signed-in user's own mailbox.
 
-**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+**See also:** [Tools — draft_email](./technical/tools.md#draft_email)
 
 ### Why does a reply draft in a shared mailbox appear in Drafts instead of in the thread in Outlook Web?
 
@@ -486,7 +486,7 @@ Omitting `mailbox` creates the draft in the signed-in user's own mailbox.
 
 If you are reviewing or sending the draft, open it from the shared mailbox Drafts folder in Outlook Web, or use Outlook desktop where thread placement is correct.
 
-**See also:** [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+**See also:** [Tools — draft_email](./technical/tools.md#draft_email)
 
 ### What does `reconnect_inbox` do?
 
@@ -613,13 +613,13 @@ A permission error on a *delegated* mailbox is different: that is not `consentRe
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
-**Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `create_draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
+**Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
 
 Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
 
 In addition, `Mail.ReadWrite.Shared` is requested at OAuth time for delegated-access support. It is a no-op when `DELEGATED_ACCESS_SCAN=disabled` — no shared mailbox data is accessed — but it always appears on the Microsoft consent screen.
 
-**See also:** [Permissions](./technical/permissions.md) — [Tools — create_draft_email](./technical/tools.md#create_draft_email)
+**See also:** [Permissions](./technical/permissions.md) — [Tools — draft_email](./technical/tools.md#draft_email)
 
 ### Why can't I use application permissions instead of delegated?
 

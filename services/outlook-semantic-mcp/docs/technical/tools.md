@@ -16,7 +16,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`search_emails`](#search_emails) | Email Search | No | Both |
 | [`fetch_next_search_pages`](#fetch_next_search_pages) | Email Search | No | Both |
 | [`open_email`](#open_email) | Email Search | No | Both |
-| [`create_draft_email`](#create_draft_email) | Draft Creation | Yes | Both |
+| [`draft_email`](#draft_email) | Draft Creation | Yes | Both |
 | [`update_draft_email`](#update_draft_email) | Draft Editing | Yes | Both |
 | [`add_attachments_to_draft_email`](#add_attachments_to_draft_email) | Draft Editing | Yes | Both |
 | [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) | Draft Editing | Yes | Both |
@@ -51,7 +51,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 
 | Tool | What it mutates |
 |------|----------------|
-| `create_draft_email` | Creates a draft message in the user's Outlook mailbox via Microsoft Graph |
+| `draft_email` | Creates a draft message in the user's Outlook mailbox via Microsoft Graph |
 | `update_draft_email` | Replaces the subject, body, or recipient lists of an existing draft via Microsoft Graph |
 | `add_attachments_to_draft_email` | Adds attachments to an existing draft via Microsoft Graph |
 | `remove_attachments_from_draft_email` | Deletes attachments from an existing draft via Microsoft Graph, after the user confirms |
@@ -379,7 +379,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 
 ## Draft Creation
 
-### `create_draft_email`
+### `draft_email`
 
 Create a draft email in the connected Outlook mailbox. The draft is saved to the Drafts folder but **not sent** — the user must open it in Outlook and send manually.
 
@@ -454,14 +454,14 @@ Supports two modes selected by `recipientsData.type`:
 
 ## Draft Editing
 
-Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `create_draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with [`open_email`](#open_email) by passing `openEmailParams`, and then edits `text`.
+Available in both modes. These tools edit an unsent draft that already exists, whether it was created with `draft_email` or written by the user in Outlook. The agent finds a draft with [`search_emails`](#search_emails) restricted to the `Drafts` folder (results carry `isDraft: true`), reads the live HTML with [`open_email`](#open_email) by passing `openEmailParams`, and then edits `text`.
 
 All three tools take the same target fields:
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `create_draft_email`. |
-| `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result, or the `idIsImmutable` returned by `create_draft_email`. |
+| `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `draft_email`. |
+| `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result, or the `idIsImmutable` returned by `draft_email`. |
 | `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. |
 | `parentFolderId` | string | No | `openEmailParams.parentFolderId` from the search result when set. Without it, a `mailbox` draft is reached through `/users/{mailbox}/messages/{id}`, which Microsoft Graph refuses when access to the shared mailbox is granted per folder. With it, every request goes through `/users/{mailbox}/mailFolders/{parentFolderId}/messages/{id}`. |
 
@@ -478,7 +478,7 @@ Edit the subject, body, and recipients of an existing draft.
 | `toRecipients` | array | No | Replacement To list (at least one entry). Replaces the whole list. Omit to keep it. |
 | `ccRecipients` | array | No | Replacement CC list. Replaces the whole list; an empty array removes every CC recipient. Omit to keep it. |
 
-At least one of `subject`, `content`, `toRecipients`, or `ccRecipients` is required. Only the fields passed are sent to Graph (`PATCH /me/messages/{id}`).
+At least one of `subject`, `content`, `toRecipients`, or `ccRecipients` is required. Only the fields passed are sent to Graph, as a `PATCH` on the draft's message path: `/me/messages/{id}`, `/users/{mailbox}/messages/{id}` or `/users/{mailbox}/mailFolders/{parentFolderId}/messages/{id}`, as the target fields select.
 
 **Return shape:**
 
@@ -503,7 +503,7 @@ Attach files to an existing draft. The files already on the draft stay.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `attachments` | array | Yes | Files to attach. Same `fileName` / `data` shape and URI schemes as `create_draft_email`. |
+| `attachments` | array | Yes | Files to attach. Same `fileName` / `data` shape and URI schemes as `draft_email`. |
 
 **Return shape:**
 
@@ -518,7 +518,7 @@ Attach files to an existing draft. The files already on the draft stay.
 **Usage notes:**
 
 - Adding a file whose name is already on the draft attaches a second copy. To replace a file, remove the old one first.
-- The `unique://content/{contentId}` scheme has the same availability restriction as in `create_draft_email`.
+- The `unique://content/{contentId}` scheme has the same availability restriction as in `draft_email`.
 
 ### `remove_attachments_from_draft_email`
 

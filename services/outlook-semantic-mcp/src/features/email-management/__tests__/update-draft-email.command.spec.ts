@@ -25,7 +25,7 @@ function makeCommand(draftState: DraftState = DRAFT_STATE) {
     buildWebLinksCommand as never,
     { run: vi.fn().mockResolvedValue({ id: 'user-1', email: 'user@test.com' }) } as never,
   );
-  return { command, api, graphRequest, webLinks, getDraftStateQuery };
+  return { command, api, graphRequest, webLinks, getDraftStateQuery, buildWebLinksCommand };
 }
 
 describe('UpdateDraftEmailCommand', () => {
@@ -115,6 +115,32 @@ describe('UpdateDraftEmailCommand', () => {
     expect(getDraftStateQuery.run).toHaveBeenCalledWith(
       expect.objectContaining({ mailbox: 'shared@example.com', parentFolderId: 'drafts-folder' }),
     );
+  });
+
+  it('still reports the update when the web link cannot be built', async () => {
+    const { command, buildWebLinksCommand } = makeCommand();
+    buildWebLinksCommand.run.mockRejectedValue(new Error('folder lookup failed'));
+
+    const result = await command.run(USER_PROFILE_ID, { draftId: 'draft-1', subject: 'Hi' });
+
+    expect(result).toEqual({
+      success: true,
+      draftId: 'draft-1',
+      message: 'Draft email updated successfully.',
+    });
+  });
+
+  it('still reports the update when Graph answers the patch with something unexpected', async () => {
+    const { command, graphRequest } = makeCommand();
+    graphRequest.patch.mockResolvedValue({ unexpected: true });
+
+    const result = await command.run(USER_PROFILE_ID, { draftId: 'draft-1', subject: 'Hi' });
+
+    expect(result).toMatchObject({
+      success: true,
+      draftId: 'draft-1',
+      message: 'Draft email updated successfully.',
+    });
   });
 
   it('does not patch when the message is no longer a draft', async () => {

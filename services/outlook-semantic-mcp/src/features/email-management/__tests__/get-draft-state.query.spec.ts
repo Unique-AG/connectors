@@ -89,6 +89,22 @@ describe('GetDraftStateQuery', () => {
     expect(result).toEqual({ status: 'draft', subject: 'Offer', attachments: [] });
   });
 
+  it('fails without a state when Graph returned only part of the attachments', async () => {
+    const { query } = makeQuery({
+      isDraft: true,
+      attachments: [{ id: 'att-1', name: 'offer.pdf', isInline: false }],
+      'attachments@odata.nextLink':
+        'https://graph.microsoft.com/v1.0/me/messages/draft-1/attachments?$skip=20',
+    });
+
+    const result = await query.run({ userProfileId: 'user-1', draftId: 'draft-1' });
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      message: expect.stringContaining('attachment list is incomplete'),
+    });
+  });
+
   it('fails when the message is no longer a draft', async () => {
     const { query } = makeQuery({ isDraft: false, subject: 'Sent' });
 

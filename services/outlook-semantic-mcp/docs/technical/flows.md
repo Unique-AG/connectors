@@ -233,7 +233,7 @@ sequenceDiagram
 
 ## Email Draft Creation Flow
 
-When the user calls the `create_draft_email` tool:
+When the user calls the `draft_email` tool:
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -243,7 +243,7 @@ sequenceDiagram
     participant OutlookMCP as Outlook Semantic MCP Server
     participant MSGraph as Microsoft Graph API
 
-    MCPClient->>OutlookMCP: create_draft_email (subject, body, recipients, attachments)
+    MCPClient->>OutlookMCP: draft_email (subject, body, recipients, attachments)
     OutlookMCP->>MSGraph: POST /me/messages (subject, body as HTML, toRecipients, ccRecipients)
     MSGraph->>OutlookMCP: Draft created (draftId, webLink)
 

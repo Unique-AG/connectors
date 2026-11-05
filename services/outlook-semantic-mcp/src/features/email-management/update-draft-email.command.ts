@@ -71,6 +71,7 @@ export class UpdateDraftEmailCommand {
       ...(input.ccRecipients && { ccRecipients: toGraphRecipients(input.ccRecipients) }),
     };
 
+    let patchResponse: unknown;
     try {
       let graphRequest = client.api(
         graphMessagePath({
@@ -82,30 +83,7 @@ export class UpdateDraftEmailCommand {
       if (input.idIsImmutable) {
         graphRequest = graphRequest.header('Prefer', 'IdType="ImmutableId"');
       }
-      const message = UpdateMessageResponseSchema.parse(await graphRequest.patch(patchBody));
-
-      // See BuildWebLinksCommand for why the Graph webLink cannot be used directly for delegated mailboxes.
-      const messageMailbox = input.mailbox ?? userProfile.email;
-      const webLinks = await this.buildWebLinksCommand.run({
-        userProfileId: userProfileIdString,
-        userProfileEmail: userProfile.email,
-        ids: [
-          {
-            id: message.id,
-            isImmutable: input.idIsImmutable === true,
-            mailbox: messageMailbox,
-            webLink: message.webLink ?? '',
-          },
-        ],
-      });
-      const webLink = webLinks.get(messageMailbox, message.id);
-
-      return {
-        success: true,
-        draftId: message.id,
-        ...(webLink && { webLink }),
-        message: 'Draft email updated successfully.',
-      };
+      patchResponse = await graphRequest.patch(patchBody);
     } catch (err) {
       this.logger.error({
         userProfileId: userProfileIdString,
@@ -116,6 +94,59 @@ export class UpdateDraftEmailCommand {
         success: false,
         message: 'Failed to update draft email via Microsoft Graph. Nothing was changed.',
       };
+    }
+
+    // The draft is updated from here on: what follows only decorates the answer and must not turn
+    // it into a failure, or the agent would report an applied edit as lost and retry it.
+    const message = UpdateMessageResponseSchema.safeParse(patchResponse);
+    const draftId = message.success ? message.data.id : input.draftId;
+    const webLink = await this.buildWebLink({
+      userProfileId: userProfileIdString,
+      userProfileEmail: userProfile.email,
+      mailbox: input.mailbox ?? userProfile.email,
+      draftId,
+      isImmutable: input.idIsImmutable === true,
+      graphWebLink: message.success ? message.data.webLink : undefined,
+    });
+
+    return {
+      success: true,
+      draftId,
+      ...(webLink && { webLink }),
+      message: 'Draft email updated successfully.',
+    };
+  }
+
+  // See BuildWebLinksCommand for why the Graph webLink cannot be used directly for delegated mailboxes.
+  private async buildWebLink({
+    userProfileId,
+    userProfileEmail,
+    mailbox,
+    draftId,
+    isImmutable,
+    graphWebLink,
+  }: {
+    userProfileId: string;
+    userProfileEmail: string;
+    mailbox: string;
+    draftId: string;
+    isImmutable: boolean;
+    graphWebLink: string | undefined;
+  }): Promise<string | undefined> {
+    try {
+      const webLinks = await this.buildWebLinksCommand.run({
+        userProfileId,
+        userProfileEmail,
+        ids: [{ id: draftId, isImmutable, mailbox, webLink: graphWebLink ?? '' }],
+      });
+      return webLinks.get(mailbox, draftId);
+    } catch (err) {
+      this.logger.warn({
+        userProfileId,
+        msg: 'Draft email updated, but its web link could not be built',
+        err,
+      });
+      return undefined;
     }
   }
 }

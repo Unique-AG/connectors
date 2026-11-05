@@ -18,6 +18,7 @@ const DraftStateResponseSchema = z.object({
     // Graph sends null, not [], for a message expanded with no attachments.
     .nullish()
     .transform((attachments) => attachments ?? []),
+  'attachments@odata.nextLink': z.string().optional(),
 });
 
 export interface DraftAttachment {
@@ -62,6 +63,14 @@ export class GetDraftStateQuery {
       }
       const message = DraftStateResponseSchema.parse(await request.get());
 
+      if (message['attachments@odata.nextLink'] !== undefined) {
+        // The edit tools remove attachments by name, so a list cut short would hide the one to remove.
+        return {
+          status: 'failed',
+          message:
+            'The draft has more attachments than Microsoft Graph returned in one answer, so its attachment list is incomplete. Nothing was changed.',
+        };
+      }
       if (message.isDraft !== true) {
         return {
           status: 'failed',

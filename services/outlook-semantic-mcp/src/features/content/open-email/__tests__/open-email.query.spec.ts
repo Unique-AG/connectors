@@ -167,6 +167,19 @@ describe('OpenEmailQuery', () => {
     expect(metadata).toMatchObject({ isDraft: true, attachments: [] });
   });
 
+  it('still returns the attachments Graph sent when it marks the list as cut short', async () => {
+    graphRequest.get.mockResolvedValue({
+      ...graphMessage,
+      attachments: [{ name: 'offer.pdf', size: 10, isInline: false }],
+      'attachments@odata.nextLink':
+        'https://graph.microsoft.com/v1.0/me/messages/msg-1/attachments?$skip=20',
+    });
+
+    const { metadata } = await run();
+
+    expect(metadata.attachments).toEqual([{ name: 'offer.pdf', size: 10, isInline: false }]);
+  });
+
   it('marks a message without the draft flag as not a draft', async () => {
     const { metadata } = await run();
 

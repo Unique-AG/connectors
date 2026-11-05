@@ -6,6 +6,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
+import { GRAPH_ID_PATTERN } from '~/msgraph/graph-id-pattern';
 import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { OpenEmailQuery } from './open-email.query';
@@ -14,6 +15,7 @@ import { META } from './open-email-tool.meta';
 const OpenEmailByIdInputSchema = z.object({
   id: z
     .string()
+    .regex(GRAPH_ID_PATTERN)
     .describe(
       'Microsoft Graph message id. Use `openEmailParams.id` from a `search_emails` result. Pass the whole object.',
     ),
@@ -25,7 +27,7 @@ const OpenEmailByIdInputSchema = z.object({
     ),
   parentFolderId: z
     .string()
-    .regex(/^[A-Za-z0-9+/_=-]+$/)
+    .regex(GRAPH_ID_PATTERN)
     .optional()
     .describe(
       'The folder containing this email. Use `openEmailParams.parentFolderId` from a `search_emails` result when it is set.',

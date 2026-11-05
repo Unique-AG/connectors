@@ -42,7 +42,7 @@ Available in both modes. Behaviour is identical.
 
 **What's supported**
 
-- Create draft emails in the signed-in user's Drafts folder via `create_draft_email`, with subject, body, recipients (To, CC, BCC), and attachments.
+- Create draft emails in the signed-in user's Drafts folder via `draft_email`, with subject, body, recipients (To, CC, BCC), and attachments.
 - The draft is not sent automatically — the tool response includes a `webLink` for the user to open and send from Outlook.
 - Attachments can be provided as base64-encoded data URIs or Unique content URIs (cluster-local mode only).
 
@@ -51,7 +51,7 @@ Available in both modes. Behaviour is identical.
 - Sending email directly from the MCP — drafts must be sent manually by the user.
 - Creating drafts in another user's mailbox (delegated or otherwise).
 
-**See also:** [Tools — create_draft_email](./tools.md#create_draft_email)
+**See also:** [Tools — draft_email](./tools.md#draft_email)
 
 ---
 

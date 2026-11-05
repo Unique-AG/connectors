@@ -56,7 +56,7 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 
 **Draft Creation**
 
-- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `create_draft_email`
+- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `draft_email`
 - Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
 - Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
 - Edit an existing draft (including one the user wrote in Outlook) — subject, body, recipients — via `update_draft_email`, and add or remove its attachments via `add_attachments_to_draft_email` and `remove_attachments_from_draft_email` (removal asks the user to confirm)
@@ -197,7 +197,7 @@ See [Directory Sync Flow](./technical/flows.md#Directory-Sync-Flow) for the deta
 
 ### Draft Creation
 
-The `create_draft_email` tool creates a draft in the user's Outlook Drafts folder via Microsoft Graph. The draft is not sent automatically — the response includes a `webLink` for the user to review and send from Outlook.
+The `draft_email` tool creates a draft in the user's Outlook Drafts folder via Microsoft Graph. The draft is not sent automatically — the response includes a `webLink` for the user to review and send from Outlook.
 
 See [Email Draft Creation Flow](./technical/flows.md#Email-Draft-Creation-Flow) for the detailed sequence diagram.
 
@@ -224,7 +224,7 @@ Existing drafts are edited with `update_draft_email`, `add_attachments_to_draft_
 4. **AI-Assisted Email Tasks** (On-demand)
    - Search emails with `search_emails`
    - Open specific messages with `open_email`
-   - Compose drafts with `create_draft_email` and edit them with `update_draft_email`
+   - Compose drafts with `draft_email` and edit them with `update_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
    - When calendar is enabled: list calendars, search events, check availability, and create or update meetings
@@ -254,7 +254,7 @@ See [Architecture — Authentication](./technical/architecture.md#Authentication
 | Constraint | Details |
 |------------|---------|
 | **Delegated access scope** | By default, the server syncs and searches only the signed-in user's own inbox. When `DELEGATED_ACCESS_SCAN` is enabled, users can also search inboxes of other users who have granted them Exchange mailbox delegation (Full Access or folder-level) — see [Configuration](./operator/configuration.md#DELEGATED_ACCESS_SCAN) |
-| **Draft only, no direct send** | `create_draft_email` creates drafts; sending requires a separate action by the user or a future tool |
+| **Draft only, no direct send** | `draft_email` creates drafts; sending requires a separate action by the user or a future tool |
 | **Bulk deletion with immediate permanent removal** | The server processes emails in the Deleted Items folder and removes them from the Unique knowledge base. If the user permanently deletes emails from Deleted Items (e.g. via "Empty Folder") before the server finishes processing them, those emails are no longer visible to the server and will not be removed. They remain in the Unique knowledge base until the content expiration window removes them. |
 
 ### Scaling Considerations

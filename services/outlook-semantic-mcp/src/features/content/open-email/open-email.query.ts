@@ -36,6 +36,7 @@ const graphMessageSchema = z.object({
     // Graph sends null, not [], for a message expanded with no attachments.
     .nullish()
     .transform((attachments) => attachments ?? []),
+  'attachments@odata.nextLink': z.string().optional(),
 });
 
 export interface OpenEmailResult {
@@ -134,6 +135,12 @@ export class OpenEmailQuery {
       .get();
 
     const message = graphMessageSchema.parse(raw);
+    if (message['attachments@odata.nextLink'] !== undefined) {
+      this.logger.warn({
+        msg: 'Microsoft Graph returned only part of the attachments of the message',
+        userProfileId,
+      });
+    }
 
     return {
       id: message.id,

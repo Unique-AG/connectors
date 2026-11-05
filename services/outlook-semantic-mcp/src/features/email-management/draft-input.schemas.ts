@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { GRAPH_ID_PATTERN } from '~/msgraph/graph-id-pattern';
 
 export const DraftRecipientsSchema = z.array(
   z.object({
@@ -28,6 +29,7 @@ export const DraftAttachmentsSchema = z.array(
 export const ExistingDraftTargetShape = {
   draftId: z
     .string()
+    .regex(GRAPH_ID_PATTERN)
     .describe(
       'Microsoft Graph message ID of the draft. Use `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `draft_email`.',
     ),
@@ -38,14 +40,14 @@ export const ExistingDraftTargetShape = {
       'Whether `draftId` is an immutable ID. Use `openEmailParams.idIsImmutable` from the `search_emails` result, or the `idIsImmutable` that `draft_email` returned with the `draftId`.',
     ),
   mailbox: z
-    .string()
+    .email()
     .optional()
     .describe(
       'UPN of the shared mailbox that holds the draft (e.g. "support@company.com"). Use `openEmailParams.mailbox` when it is set. Omit for the signed-in user\'s own mailbox.',
     ),
   parentFolderId: z
     .string()
-    .regex(/^[A-Za-z0-9+/_=-]+$/)
+    .regex(GRAPH_ID_PATTERN)
     .optional()
     .describe(
       'The folder containing the draft. Use `openEmailParams.parentFolderId` from the `search_emails` result when it is set: access to some shared mailboxes is granted per folder.',
