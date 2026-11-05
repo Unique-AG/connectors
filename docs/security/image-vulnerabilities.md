@@ -26,18 +26,26 @@ These rules follow the policy page "Vulnerability Patch Management Process".
 | Medium | 3 months |
 | Low | 6 months |
 
-- A release needs no fixable critical or high finding.
-- A finding with no fix is visible. It does not block.
-- A fix younger than 3 days does not count.
-- The age of a fix comes from the package registry. If the registry does not answer after one retry, the age is unknown and the finding blocks the release. For operating system packages, the date of the advisory is the age, because they have no registry lookup.
+| Rule | Value |
+|---|---|
+| Release | A release needs no fixable critical or high finding. |
+| No fix | A finding with no fix is visible. It does not block. |
+| Young fix | A fix younger than 3 days does not count. |
+| Age of a fix | It comes from the package registry. If the registry gives no answer after one retry, the age is unknown and the finding blocks the release. For an operating system package, the date of the advisory is the age. |
 
 ## The release gate
 
-The gate runs on the release-please PR. It builds the image fresh from the PR head and scans it. It fails for a fixable critical or high finding that is older than 3 days.
+| Fact | Value |
+|---|---|
+| Runs on | The release-please PR |
+| Does | It builds the image fresh from the PR head and scans it. |
+| Fails for | A fixable critical or high finding that is older than 3 days |
+| State | A person approves the workflow runs on the release PR. The gate reads the state at that moment. |
 
-A person approves the workflow runs on the release PR. The gate then reads the state at that moment.
+If the gate blocks a release:
 
-If the gate blocks a release, fix the finding in a new PR. Merging that PR updates the release PR. Then approve the runs again.
+1. Fix the finding in a new PR. Merging that PR updates the release PR.
+2. Approve the workflow runs again.
 
 If a release must ship with a critical or high finding, read [Skip the release gate](#skip-the-release-gate).
 
@@ -61,37 +69,38 @@ flowchart TD
 
 To undo the skip, remove the label.
 
-| Rule | Reason |
+| Rule | Value |
 |---|---|
-| The label is the only step. | No second step can be forgotten. |
-| A bot comment records every change. | It shows the state, the person, the time, and the commit. It updates in place when someone adds or removes the label. Its history lists every change. |
-| Anyone with write access can set the label. | This is a deviation. GitHub knows who set the label, and the comment shows it on the PR. |
-| A label with no blocking finding does nothing. | The gate says that the label is not needed. |
-| The label stays when the release PR gets a new commit. | Read the job summary after each new commit. It lists every skipped finding. Remove the label if the new commit needs a new decision. |
+| One step | The label is the only step, so no second step can be forgotten. |
+| Record | A bot comment shows the state, the person, the time, and the commit. It updates in place. Its history lists every change. |
+| Who | Anyone with write access. This is a deviation. |
+| No blocking finding | The label does nothing. The gate says that the label is not needed. |
+| New commit | The label stays. Read the job summary after each new commit. Remove the label if the commit needs a new decision. |
 
-The skip covers one release PR. The finding stays visible in the nightly scan, and the finding stays in the Security tab until a new version ships. On any other PR, the label `security-exception` skips the dependency review. See [DEVIATION from monorepo setup](../../SECURITY-PROCESS.md#deviation-from-monorepo-setup).
+The skip covers one release PR. The finding stays visible in the nightly scan, and it stays in the Security tab until a new version ships. On any other PR, the label `security-exception` skips the dependency review. See [DEVIATION from monorepo setup](../../SECURITY-PROCESS.md#deviation-from-monorepo-setup).
 
 ## The nightly scan
 
-Every night, the scan reads the latest published image of each service. It posts a report to Slack. The report has the counts of critical, high, and medium findings, and a table with one row for each image that has findings. A second part has the title "Repository (main)". It has the counts for the lock files and the configuration of `main`. Its table has a row only for a scan that has a finding. If the job cannot read the open alerts, this part says so.
+Every night, the scan reads the latest published image of each service.
+
+| Output | What it holds |
+|---|---|
+| Slack report | The counts of critical, high, and medium findings. A table with one row for each image that has findings. |
+| Slack part "Repository (main)" | The counts for the lock files and the configuration of `main`. A table row only for a scan that has a finding. If the job cannot read the open alerts, this part says so. |
+| Security tab, category `trivy-image/<service>` | One alert for each CVE and package. Each message starts with the image and the tag. |
+| Security tab, category `trivy-config` | Misconfiguration in the Dockerfiles and the compose files of `main`. A person fixes these alerts. |
 
 | Result of the image scans | What you see |
 |---|---|
-| All scans work | The Slack report posts |
+| All scans work | The Slack report posts. |
 | Some scans fail | The report posts. Each failed image is marked "scan failed". |
 | Every scan fails | No Slack report. The run shows the warning "Slack report not posted". Read the scan jobs of that run. |
 
-The scan also updates alerts in the Security tab, category `trivy-image/<service>`. Each alert message starts with the image and the tag, so you can see which version holds the finding. The nightly scan also checks the Dockerfiles and the compose files of `main` for misconfiguration, category `trivy-config`. A person fixes those alerts. The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
-
-The report shows which old images need a patch in a new release. A published image never changes, so only a new version clears a finding.
+The run turns red when it finds a fixable critical or high finding. A missing or empty Trivy results file fails the scan of that image. It does not count as clean.
 
 ## Why the Security tab does not show 0
 
-The Security tab holds one alert for each CVE and package in each published image. A published image never changes. So an alert closes only when its service ships a new version.
-
-Each service ships on its own, through its own release PR. Releases roll through the week. So the count falls one service at a time.
-
-The tab does not need one big release. It needs every affected service to ship once. The last service to ship brings the count to 0. A new advisory can raise the count again at any time.
+The tab holds one alert for each CVE and package in each published image. A published image never changes, so an alert closes only when its service ships a new version. Each service ships through its own release PR, so the count falls one service at a time. A new advisory can raise it again.
 
 ```mermaid
 flowchart LR
@@ -105,18 +114,18 @@ flowchart LR
   shipC --> zero
 ```
 
-Four facts follow from this:
-
-- A fixed lockfile on `main` does not close an image alert. Only a release does.
-- A lock file alert, category `trivy-lockfiles`, closes when the fixed lock file reaches `main`. It does not need a release.
-- A service with no code change needs the Rebuild Service workflow, so that it can ship an operating system patch.
-- The patch windows give 1 month for critical and high findings. A count above 0 during the week is normal.
+| Fact | Result |
+|---|---|
+| A fixed lockfile on `main` | It does not close an image alert. Only a release does. |
+| A lock file alert, category `trivy-lockfiles` | It closes when the fixed lock file reaches `main`. It needs no release. |
+| A service with no code change | It needs the Rebuild Service workflow to ship an operating system patch. |
+| A count above 0 during the week | It is normal. The window for critical and high findings is 1 month. |
 
 The nightly Slack report is the list of images that still need a release.
 
 ## Patch a finding
 
-The cron automation `connectors-vulna-patchy` starts the skill `vulna-squash` in mode `findings` at 05:00 UTC. It runs after the 03:00 scan. The skill opens fix PRs for the findings. A person merges them, and a critical or high finding must ship within 1 month. For each PR, see [One agent run for every PR](./dependencies.md#one-agent-run-for-every-pr).
+The cron automation `connectors-vulna-patchy` starts the skill `vulna-squash` in mode `findings` at 05:00 UTC, after the 03:00 scan. The skill opens fix PRs for the findings. A person merges them. A critical or high finding must ship within 1 month. For each PR, see [One agent run for every PR](./dependencies.md#one-agent-run-for-every-pr).
 
 ```mermaid
 flowchart LR
@@ -126,25 +135,44 @@ flowchart LR
   fix --> release[Release PR and release gate]
 ```
 
-Use this table to find the fix for each cause.
-
 | Cause | Fix |
 |---|---|
 | A Python or Node dependency | The nightly dependency PR, or a fix PR from the patch run |
-| An operating system package | Run the Rebuild Service workflow. The new build takes the patch. The PR links the GHSA for the description and the Debian advisory from the Debian tracker. The advisory is the source of the fix. If none exists, the fixed row of the tracker is the source. If the tracker did not answer, the PR says that the fix is not confirmed. |
+| An operating system package | The Rebuild Service workflow. The new build takes the patch. |
 | The base image | Merge the nightly Docker PR for the base image. It starts a release. |
 | A finding with no fix | Do nothing. |
 
-The agent decides an operating system alert with the Debian tracker, at `https://security-tracker.debian.org/tracker/<CVE>`. It reads the row of the Debian source package of the alerted package. For example, the package `libapt-pkg7.0` has the source package `apt`. A fix counts in the row of the Debian release of the base image, or in the row `<release> (security)`. If the tracker lists no fix, the agent drops the alert. If the tracker does not answer, the agent keeps the alert. The rule "no fixed version, or a fix younger than 3 days" applies to other packages only.
+### An operating system alert
+
+The agent decides the alert with the Debian tracker at `https://security-tracker.debian.org/tracker/<CVE>`.
+
+```mermaid
+flowchart TD
+  alert[Alert for an operating system package] --> tracker{Does the tracker answer?}
+  tracker -->|no| keep[Keep the alert]
+  tracker -->|yes| row["Read the row of the Debian source package. For example, libapt-pkg7.0 has the source package apt."]
+  row --> fixed{"Is the status fixed in the row of the release of the base image, or in the row release (security)?"}
+  fixed -->|yes| keep
+  fixed -->|no| drop[Drop the alert]
+```
+
+The rule "no fixed version, or a fix younger than 3 days" applies to other packages only. The PR body of an operating system fix follows these rules.
+
+| Item | Rule |
+|---|---|
+| Links | The GHSA for the description and the Debian advisory (DSA or DLA), each when it exists. If one is missing, the CVE and the tracker URL. |
+| Source of the fix | A DSA or DLA, when one exists. Otherwise the fixed row and version of the Debian tracker. If the tracker did not answer, the PR says that the fix is not confirmed. |
 
 ## Build and release
 
-- The base image is pinned to one exact digest.
-- The final stage removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build.
-- The container build template turns off the layer cache for the final stage, so `apt-get upgrade` takes the newest patches.
-- A rebuild is a normal release. The Rebuild Service workflow opens one PR for each service. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`.
-- A release pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record.
-- A PR builds the image without a push. It does not scan the image.
+| Fact | Value |
+|---|---|
+| Base image | One exact digest |
+| Final stage | It removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build. |
+| Layer cache | The container build template turns it off for the final stage, so `apt-get upgrade` takes the newest patches. |
+| A rebuild | A normal release. The Rebuild Service workflow opens one PR for each service. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`. |
+| A release | It pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record. |
+| A PR | It builds the image without a push. It does not scan the image. |
 
 ## Files
 

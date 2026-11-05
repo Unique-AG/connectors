@@ -94,7 +94,7 @@ flowchart LR
 | The result of an agent run | The skill `vulna-squash` | The report comment on the PR, the labels, and for the patch run the Slack message | When the agent runs |
 | GitHub Dependabot alerts | The dependency graph of GitHub | Security tab, Dependabot. This process does not read them. | When GitHub scans |
 
-If every image scan fails, the nightly scan posts no Slack report. The run shows the warning "Slack report not posted". A missing report means: read the scan jobs of the last run.
+A missing Slack report means that every image scan failed. Read the scan jobs of the last run.
 
 ## Required configuration
 
@@ -107,14 +107,20 @@ If every image scan fails, the nightly scan posts no Slack report. The run shows
 
 ## Cursor automations
 
-The monorepo defines the two automations in `.cursor/automations/workflows/*.yaml`. Terraform applies them. This repository does not define them. Both use the repository `Unique-AG/connectors` and the branch `main`. Memory is off. Only `connectors-vulna-patchy` has a Slack action, on the channel `C0C1PR9CNMP`. The PR automation has no Slack action. The agent uses no Jira tool and never files a ticket.
+| Fact | Value |
+|---|---|
+| Defined in | The monorepo, in `.cursor/automations/workflows/*.yaml`. Terraform applies them. This repository does not define them. |
+| Repository and branch | `Unique-AG/connectors`, `main` |
+| Memory | Off |
+| Slack action | Only `connectors-vulna-patchy`, on the channel `C0C1PR9CNMP` |
+| Jira | The agent uses no Jira tool and never files a ticket. |
 
 | Name | Trigger | Prompt |
 |---|---|---|
 | `connectors-vulna-patchy` | Cron `0 5 * * *` (05:00 UTC) | Run the skill `vulna-squash` in mode `findings`. |
 | `connectors-dependency-pr-assess` | "Label added" with the label `dependencies` on a PR | Run the skill `vulna-squash` in mode `pr` for the PR of this event. |
 
-The prompt names the skill only. All steps live in the skill. Cursor loads the skill from the repository that it checks out, so the skill lives here, in `agentic/skills/vulna-squash/`.
+The prompt names the skill only. All steps live in the skill. Cursor loads the skill from its checkout of this repository, so the skill lives here, in `agentic/skills/vulna-squash/`.
 
 ## DEVIATION from monorepo setup
 
