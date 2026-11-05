@@ -1,3 +1,5 @@
+from contextlib import suppress
+import logging
 from types import SimpleNamespace
 from typing import cast
 
@@ -103,3 +105,39 @@ async def test_an_expired_approval_cannot_be_used() -> None:
     )
     with pytest.raises(ToolError, match="expired"):
         gate.take(expired, request=_request(), actor="ada")
+
+
+def _extra(record: logging.LogRecord, *names: str) -> tuple[object, ...]:
+    return tuple(cast(object, record.__dict__[name]) for name in names)
+
+
+async def _take(
+    gate: ApprovalGate, *, answer: ElicitResult, request: PassportVerificationRequest
+) -> None:
+    asked = await gate.ask(
+        _connection(), request=_request(), plan=_plan(), actor="ada", message="Save?"
+    )
+    assert isinstance(asked, InputRequiredResult)
+    answered = _as_context(
+        SimpleNamespace(request_state=asked.request_state, input_responses={"approval": answer})
+    )
+    with suppress(ToolError):
+        gate.take(answered, request=request, actor="ada")
+
+
+async def test_every_approval_outcome_is_logged_with_its_case(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    caplog.set_level(logging.INFO, logger="world_check_mcp.mcp.approval")
+    approve = ElicitResult(action="accept", content={"approve": True})
+    await _take(ApprovalGate(), answer=approve, request=_request())
+    await _take(ApprovalGate(), answer=ElicitResult(action="decline"), request=_request())
+    await _take(ApprovalGate(ttl_seconds=0), answer=approve, request=_request())
+    await _take(ApprovalGate(), answer=approve, request=_request(matched=False))
+    answered = [record for record in caplog.records if record.message == "Approval answered"]
+    assert [_extra(record, "outcome", "case_system_id") for record in answered] == [
+        ("approved", "sys-1"),
+        ("declined", "sys-1"),
+        ("expired", "sys-1"),
+        ("invalid", "sys-1"),
+    ]
