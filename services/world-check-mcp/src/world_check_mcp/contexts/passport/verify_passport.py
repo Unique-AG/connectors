@@ -20,7 +20,7 @@ _GUIDANCE = (
 )
 
 
-@traced(arguments=("request.case_system_id", "request.mrz_matched"))
+@traced(arguments=("request.case", "request.mrz_matched"))
 async def prepare_passport_verification(
     *,
     upstream: Upstream,
@@ -28,7 +28,7 @@ async def prepare_passport_verification(
     actor: str,
 ) -> PassportVerificationPlan:
     """The MRZ lines and note a person must approve. This does not write."""
-    case = await get_case(upstream=upstream, case=request.case_system_id)
+    case = await get_case(upstream=upstream, case=request.case)
     if "PASSPORT_CHECK" not in case.provider_types:
         raise PassportError("The case is not configured for Passport Check.")
     try:
@@ -64,7 +64,7 @@ async def prepare_passport_verification(
 
 
 @traced(
-    arguments=("request.case_system_id", "request.mrz_matched"),
+    arguments=("request.case", "request.mrz_matched"),
     result=lambda r: {"recorded": r.recorded},
 )
 async def apply_passport_verification(
@@ -74,7 +74,9 @@ async def apply_passport_verification(
     plan: PassportVerificationPlan,
     actor: str,
 ) -> PassportVerification:
-    """Save an already approved comparison, after reading the case once more."""
+    """Save an already approved comparison, after reading the case once more. A case id that now
+    maps to another case changes the plan, so it is refused too.
+    """
     current = await prepare_passport_verification(upstream=upstream, request=request, actor=actor)
     if current != plan:
         raise PassportError(
@@ -82,13 +84,13 @@ async def apply_passport_verification(
         )
     await upstream.call_untyped(
         VERIFY_PASSPORT,
-        caseSystemId=request.case_system_id,
+        caseSystemId=plan.case_system_id,
         mrzMatched=plan.mrz_matched,
         note=plan.note,
     )
     return PassportVerification(
         recorded=True,
-        case_system_id=request.case_system_id,
+        case_system_id=plan.case_system_id,
         mrz_matched=plan.mrz_matched,
         note=plan.note,
         guidance=_GUIDANCE,

@@ -59,62 +59,25 @@ async def resolve_result(
     approvals: ApprovalGate = Depends(get_approvals),
     actor: str = Depends(get_reviewer),
 ) -> contexts.ResolutionOutcome | InputRequiredResult:
+    request = contexts.ResolutionRequest(
+        case=case, result_id=result_id, status=status, risk=risk, reason=reason, note=note
+    )
     try:
-        return await _resolve(
-            case=case,
-            result_id=result_id,
-            status=status,
-            risk=risk,
-            reason=reason,
-            note=note,
-            ctx=ctx,
-            upstream=upstream,
-            approvals=approvals,
+        outcome = await approvals.run(
+            ctx,
+            request=request,
             actor=actor,
+            plan_type=contexts.ResolutionPlan,
+            prepare=lambda: contexts.prepare_resolution(
+                upstream=upstream, request=request, actor=actor
+            ),
+            message=resolution_message,
+            apply=lambda plan: contexts.apply_resolution(
+                upstream=upstream, request=request, plan=plan, actor=actor
+            ),
         )
     except contexts.CaseNotFoundError as error:
         raise ToolError(str(error)) from error
     except contexts.ResolutionError as error:
         raise ToolError(str(error)) from error
-
-
-async def _resolve(
-    *,
-    case: str,
-    result_id: str,
-    status: str,
-    risk: str,
-    reason: str | None,
-    note: str,
-    ctx: Context,
-    upstream: Upstream,
-    approvals: ApprovalGate,
-    actor: str,
-) -> contexts.ResolutionOutcome | InputRequiredResult:
-    approvals.require_elicitation(ctx)
-    found = await contexts.get_case(upstream=upstream, case=case)
-    request = contexts.ResolutionRequest(
-        case_system_id=found.case_system_id,
-        result_id=result_id,
-        status=status,
-        risk=risk,
-        reason=reason,
-        note=note,
-    )
-    if ctx.request_state is None and ctx.input_responses is None:
-        plan = await contexts.prepare_resolution(upstream=upstream, request=request, actor=actor)
-        decision = await approvals.ask(
-            ctx, request=request, plan=plan, actor=actor, message=resolution_message(plan)
-        )
-    else:
-        decision = approvals.take(ctx, request=request, actor=actor)
-    if isinstance(decision, InputRequiredResult):
-        return decision
-    if not isinstance(decision, contexts.ResolutionPlan):
-        return contexts.ResolutionOutcome(resolved=False, status="cancelled")
-    current = await contexts.get_case(upstream=upstream, case=case)
-    if current.case_system_id != request.case_system_id:
-        raise ToolError("Case mapping changed during approval. Request fresh approval.")
-    return await contexts.apply_resolution(
-        upstream=upstream, request=request, plan=decision, actor=actor
-    )
+    return outcome or contexts.ResolutionOutcome(resolved=False, status="cancelled")

@@ -49,7 +49,7 @@ class PassportCheck(BaseModel):
 class PassportVerificationRequest(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    case_system_id: str
+    case: str
     mrz_matched: bool
     note: str
 

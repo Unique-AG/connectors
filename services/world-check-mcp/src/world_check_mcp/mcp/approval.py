@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Awaitable, Callable
 import logging
 from secrets import token_urlsafe
 from time import monotonic
@@ -61,6 +62,38 @@ class ApprovalGate:
         self._ttl_seconds: float = ttl_seconds
         self._pending: dict[str, _Pending] = {}
 
+    async def run[
+        Plan: contexts.PassportVerificationPlan | contexts.ResolutionPlan,
+        Outcome,
+    ](
+        self,
+        ctx: Context,
+        *,
+        request: contexts.PassportVerificationRequest | contexts.ResolutionRequest,
+        actor: str,
+        plan_type: type[Plan],
+        prepare: Callable[[], Awaitable[Plan]],
+        message: Callable[[Plan], str],
+        apply: Callable[[Plan], Awaitable[Outcome]],
+    ) -> Outcome | InputRequiredResult | None:
+        """Prepare a write and ask for approval, or take the answer and apply the approved plan.
+
+        None means the reviewer declined, and nothing was written.
+        """
+        self.require_elicitation(ctx)
+        if ctx.request_state is None and ctx.input_responses is None:
+            plan = await prepare()
+            decision = await self.ask(
+                ctx, request=request, plan=plan, actor=actor, message=message(plan)
+            )
+        else:
+            decision = self.take(ctx, request=request, actor=actor)
+        if isinstance(decision, InputRequiredResult):
+            return decision
+        if not isinstance(decision, plan_type):
+            return None
+        return await apply(decision)
+
     def require_elicitation(self, ctx: Context) -> None:
         request = ctx.request_context
         if request is None:
@@ -92,7 +125,7 @@ class ApprovalGate:
         connection = ctx.request_context
         assert connection is not None, "require_elicitation rejects a missing connection"
         if connection.protocol_version < "2026-07-28":
-            return await self._elicit(ctx, plan=plan, message=message)
+            return await self._elicit(ctx, plan=plan, case=request.case, message=message)
         nonce = token_urlsafe(32)
         self._remember(nonce=nonce, request=request, plan=plan, actor=actor)
         return InputRequiredResult(
@@ -126,20 +159,20 @@ class ApprovalGate:
             or pending.actor != actor
             or pending.request != request
         ):
-            _log_outcome("expired" if expired else "invalid", case_system_id=request.case_system_id)
+            _log_outcome("expired" if expired else "invalid", case=request.case)
             raise ToolError(
                 "Approval is missing, expired, already used, or belongs to different inputs. "
                 "Request fresh approval."
             )
         answer = (ctx.input_responses or {}).get("approval")
         if not isinstance(answer, ElicitResult):
-            _log_outcome("invalid", case_system_id=request.case_system_id)
+            _log_outcome("invalid", case=request.case)
             raise ToolError("A human elicitation response is required. No decision was saved.")
         self._pending.pop(nonce)
         if answer.action != "accept" or (answer.content or {}).get("approve") is not True:
-            _log_outcome("declined", case_system_id=request.case_system_id)
+            _log_outcome("declined", case=request.case)
             return None
-        _log_outcome("approved", case_system_id=request.case_system_id)
+        _log_outcome("approved", case=request.case)
         return pending.plan
 
     async def _elicit(
@@ -147,20 +180,21 @@ class ApprovalGate:
         ctx: Context,
         *,
         plan: contexts.PassportVerificationPlan | contexts.ResolutionPlan,
+        case: str,
         message: str,
     ) -> contexts.PassportVerificationPlan | contexts.ResolutionPlan | None:
         try:
             async with asyncio.timeout(self._ttl_seconds):
                 answer = await ctx.elicit(message, response_type=ApprovalDecision)
         except TimeoutError as error:
-            _log_outcome("expired", case_system_id=plan.case_system_id)
+            _log_outcome("expired", case=case)
             raise ToolError(
                 "Approval expired. No write was performed. Request fresh approval."
             ) from error
         if isinstance(answer, AcceptedElicitation) and answer.data.approve is True:
-            _log_outcome("approved", case_system_id=plan.case_system_id)
+            _log_outcome("approved", case=case)
             return plan
-        _log_outcome("declined", case_system_id=plan.case_system_id)
+        _log_outcome("declined", case=case)
         return None
 
     def _remember(
@@ -196,10 +230,10 @@ def _duration(seconds: float) -> str:
 
 
 def _log_outcome(
-    outcome: Literal["approved", "declined", "expired", "invalid"], *, case_system_id: str
+    outcome: Literal["approved", "declined", "expired", "invalid"], *, case: str
 ) -> None:
     # The tool-call middleware adds the caller's subject, so who decided stays on record.
-    _logger.info("Approval answered", extra={"outcome": outcome, "case_system_id": case_system_id})
+    _logger.info("Approval answered", extra={"outcome": outcome, "case": case})
 
 
 def passport_message(plan: contexts.PassportVerificationPlan) -> str:

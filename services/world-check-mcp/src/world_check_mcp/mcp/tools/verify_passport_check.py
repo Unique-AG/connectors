@@ -50,53 +50,23 @@ async def verify_passport_check(
     approvals: ApprovalGate = Depends(get_approvals),
     actor: str = Depends(get_reviewer),
 ) -> contexts.PassportVerification | InputRequiredResult:
+    request = contexts.PassportVerificationRequest(case=case, mrz_matched=mrz_matched, note=note)
     try:
-        return await _verify(
-            case=case,
-            mrz_matched=mrz_matched,
-            note=note,
-            ctx=ctx,
-            upstream=upstream,
-            approvals=approvals,
+        outcome = await approvals.run(
+            ctx,
+            request=request,
             actor=actor,
+            plan_type=contexts.PassportVerificationPlan,
+            prepare=lambda: contexts.prepare_passport_verification(
+                upstream=upstream, request=request, actor=actor
+            ),
+            message=passport_message,
+            apply=lambda plan: contexts.apply_passport_verification(
+                upstream=upstream, request=request, plan=plan, actor=actor
+            ),
         )
     except contexts.CaseNotFoundError as error:
         raise ToolError(str(error)) from error
     except contexts.PassportError as error:
         raise ToolError(str(error)) from error
-
-
-async def _verify(
-    *,
-    case: str,
-    mrz_matched: bool,
-    note: str,
-    ctx: Context,
-    upstream: Upstream,
-    approvals: ApprovalGate,
-    actor: str,
-) -> contexts.PassportVerification | InputRequiredResult:
-    approvals.require_elicitation(ctx)
-    found = await contexts.get_case(upstream=upstream, case=case)
-    request = contexts.PassportVerificationRequest(
-        case_system_id=found.case_system_id, mrz_matched=mrz_matched, note=note
-    )
-    if ctx.request_state is None and ctx.input_responses is None:
-        plan = await contexts.prepare_passport_verification(
-            upstream=upstream, request=request, actor=actor
-        )
-        decision = await approvals.ask(
-            ctx, request=request, plan=plan, actor=actor, message=passport_message(plan)
-        )
-    else:
-        decision = approvals.take(ctx, request=request, actor=actor)
-    if isinstance(decision, InputRequiredResult):
-        return decision
-    if not isinstance(decision, contexts.PassportVerificationPlan):
-        return contexts.PassportVerification(recorded=False, status="cancelled")
-    current = await contexts.get_case(upstream=upstream, case=case)
-    if current.case_system_id != request.case_system_id:
-        raise ToolError("Case mapping changed during approval. Request fresh approval.")
-    return await contexts.apply_passport_verification(
-        upstream=upstream, request=request, plan=decision, actor=actor
-    )
+    return outcome or contexts.PassportVerification(recorded=False, status="cancelled")

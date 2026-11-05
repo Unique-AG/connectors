@@ -34,6 +34,8 @@ def _body(request: httpx2.Request) -> dict[str, object]:
 
 _screen_modes: list[str] = []
 _writes: list[tuple[str, dict[str, object]]] = []
+# The last entry is the case LSEG maps the external caseId "ext-1" to.
+_ext_1_maps_to: list[str] = ["sys-1"]
 
 
 def _passport_template() -> httpx2.Response:
@@ -212,7 +214,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
     if path.endswith("/groups/g1"):
         return _json(200, {"id": "g1", "name": "KYC"})
     if "/references/cases/" in path and path.endswith("ext-1"):
-        return _json(200, {"caseId": "ext-1", "caseSystemId": "sys-1"})
+        return _json(200, {"caseId": "ext-1", "caseSystemId": _ext_1_maps_to[-1]})
     if path.endswith("/cases/ext-1"):
         return httpx2.Response(404)
     if path.endswith("/cases/media-1"):
@@ -893,6 +895,29 @@ async def test_resolve_result_saves_an_approved_watchlist_decision() -> None:
     assert body["resultIds"] == ["r1"]
     assert body["statusId"] == "s1"
     assert "MCP reviewer:" in str(body["resolutionRemark"])
+
+
+async def _approve_after_ext_1_moves(
+    message: str, response_type: object, params: object, context: object
+) -> dict[str, bool]:
+    _ext_1_maps_to.append("sys-pass")
+    return await _approve(message, response_type, params, context)
+
+
+async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_after_approval() -> (
+    None
+):
+    _writes.clear()
+    _ext_1_maps_to[:] = ["sys-1"]
+    async with Client(_server(), elicitation_handler=_approve_after_ext_1_moves) as client:
+        with pytest.raises(ToolError):
+            await client.call_tool(
+                "resolve_result",
+                {"case": "ext-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"},
+            )
+
+    _ext_1_maps_to[:] = ["sys-1"]
+    assert _writes == []
 
 
 async def test_resolve_result_decline_does_not_write() -> None:

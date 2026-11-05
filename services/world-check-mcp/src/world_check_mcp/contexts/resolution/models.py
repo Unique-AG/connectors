@@ -8,7 +8,7 @@ from pydantic import Field
 class ResolutionRequest(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
-    case_system_id: str
+    case: str
     result_id: str
     status: str
     risk: str

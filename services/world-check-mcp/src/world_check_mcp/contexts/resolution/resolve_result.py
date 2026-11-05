@@ -20,7 +20,7 @@ from world_check_mcp.upstream import StatusResolutionField
 from world_check_mcp.upstream import Upstream
 
 
-@traced(arguments=("request.case_system_id", "request.result_id", "request.status", "request.risk"))
+@traced(arguments=("request.case", "request.result_id", "request.status", "request.risk"))
 async def prepare_resolution(
     *,
     upstream: Upstream,
@@ -28,7 +28,7 @@ async def prepare_resolution(
     actor: str,
 ) -> ResolutionPlan:
     """The match, status, risk, and note a person must approve. This does not write."""
-    case = await get_case(upstream=upstream, case=request.case_system_id)
+    case = await get_case(upstream=upstream, case=request.case)
     try:
         results = await all_case_results(upstream=upstream, case_system_id=case.case_system_id)
     except ResultPageError as error:
@@ -88,7 +88,7 @@ async def prepare_resolution(
 
 
 @traced(
-    arguments=("request.case_system_id", "request.result_id", "request.status", "request.risk"),
+    arguments=("request.case", "request.result_id", "request.status", "request.risk"),
     result=lambda r: {"resolved": r.resolved},
 )
 async def apply_resolution(
@@ -98,14 +98,16 @@ async def apply_resolution(
     plan: ResolutionPlan,
     actor: str,
 ) -> ResolutionOutcome:
-    """Save an already approved match decision, after reading the case once more."""
+    """Save an already approved match decision, after reading the case once more. A case id that
+    now maps to another case changes the plan, so it is refused too.
+    """
     current = await prepare_resolution(upstream=upstream, request=request, actor=actor)
     if current != plan:
         raise ResolutionError(
             "Case, match, or toolkit changed during approval. Review and request fresh approval."
         )
     arguments: dict[str, object] = {
-        "caseSystemId": request.case_system_id,
+        "caseSystemId": plan.case_system_id,
         "resultIds": [request.result_id],
         "statusId": plan.status.id,
         "riskId": plan.risk.id,
@@ -116,7 +118,7 @@ async def apply_resolution(
     await upstream.call_untyped(RESOLVE_RESULTS, **arguments)
     return ResolutionOutcome(
         resolved=True,
-        case_system_id=request.case_system_id,
+        case_system_id=plan.case_system_id,
         result_id=request.result_id,
         status_id=plan.status.id,
         risk_id=plan.risk.id,

@@ -16,7 +16,7 @@ from world_check_mcp.mcp.approval import ApprovalGate
 
 
 def _request(*, matched: bool = True) -> PassportVerificationRequest:
-    return PassportVerificationRequest(case_system_id="sys-1", mrz_matched=matched, note="")
+    return PassportVerificationRequest(case="sys-1", mrz_matched=matched, note="")
 
 
 def _plan() -> PassportVerificationPlan:
@@ -138,7 +138,7 @@ async def test_every_approval_outcome_is_logged_with_its_case(
     await _take(ApprovalGate(ttl_seconds=0), answer=approve, request=_request())
     await _take(ApprovalGate(ttl_seconds=120), answer=approve, request=_request(matched=False))
     answered = [record for record in caplog.records if record.message == "Approval answered"]
-    assert [_extra(record, "outcome", "case_system_id") for record in answered] == [
+    assert [_extra(record, "outcome", "case") for record in answered] == [
         ("approved", "sys-1"),
         ("declined", "sys-1"),
         ("expired", "sys-1"),
