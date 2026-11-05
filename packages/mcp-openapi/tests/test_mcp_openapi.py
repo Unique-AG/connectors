@@ -70,6 +70,21 @@ paths:
               schema:
                 type: object
                 properties: {ok: {type: boolean}, other: {type: string}}
+    patch:
+      operationId: patchThing
+      parameters:
+        - {name: name, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, properties: {note: {type: string}}}
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: {type: object}
     get:
       operationId: getThing
       parameters:
@@ -118,6 +133,7 @@ def test_operation_ids_lists_the_operations_of_the_spec() -> None:
         "getThings",
         "getThing",
         "postThing",
+        "patchThing",
     }
 
 
@@ -185,6 +201,18 @@ def test_call_untyped_error_includes_the_start_of_the_response_body() -> None:
         asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
 
 
+def test_call_untyped_reads_an_empty_body_as_none_when_the_type_allows_it() -> None:
+    client = api(lambda _: httpx2.Response(204))
+    result = asyncio.run(client.call_untyped(Operation("getThings", TypeAdapter(list[Row] | None))))
+    assert result is None
+
+
+def test_call_untyped_rejects_an_empty_body_when_the_type_needs_json() -> None:
+    client = api(lambda _: httpx2.Response(204))
+    with pytest.raises(UpstreamError, match="Unexpected response: empty body"):
+        asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
+
+
 def test_call_untyped_names_the_body_when_it_is_not_json() -> None:
     client = api(lambda _: httpx2.Response(200, content=b"<html>"))
     with pytest.raises(UpstreamError, match="Unexpected response: body: Invalid JSON"):
@@ -233,6 +261,30 @@ def test_call_untyped_sends_path_query_header_and_body_arguments_where_the_spec_
     assert request.headers["content-type"] == "application/json"
     assert json.loads(request.content) == {"label": "x", "qty": 3}
     assert request.headers["authorization"] == "Token k"
+
+
+def test_call_untyped_sends_an_empty_object_for_a_required_body_no_arg_fills() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={})
+
+    asyncio.run(api(handler).call_untyped(Operation("patchThing", OBJECT), name="a"))
+    assert seen[0].headers["content-type"] == "application/json"
+    assert json.loads(seen[0].content) == {}
+
+
+def test_call_untyped_sends_no_body_when_the_spec_has_none() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={"name": "a"})
+
+    asyncio.run(api(handler).call_untyped(Operation("getThing", OBJECT), name="a"))
+    assert seen[0].content == b""
+    assert "content-type" not in seen[0].headers
 
 
 def test_call_untyped_rejects_an_argument_the_spec_does_not_know() -> None:

@@ -17,6 +17,7 @@ on:
           - sharepoint-connector
           - teams-mcp
           - with-intelligence-mcp
+          - world-check-mcp
       existing-version:
         description: "Version to release again, without a leading v (for example 3.1.3). The run builds from the release tag and reuses an image that exists."
         required: true
