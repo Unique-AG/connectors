@@ -512,6 +512,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "sharepoint_list_items": {"list": ("sharepoint_list_lists",)},
     "sharepoint_create_list_item": {"list": ("sharepoint_list_lists",)},
     "sharepoint_update_list_item": {"item": ("sharepoint_list_items",)},
+    "sharepoint_delete_list_item": {"item": ("sharepoint_list_items",)},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
     "onenote_preview_page": {"page": ("onenote_list_pages", "onenote_create_page")},
@@ -812,6 +813,11 @@ _OPT_IN: tuple[tuple[ToolsPreset, ToolsPreset, frozenset[str]], ...] = (
         ),
     ),
     (ToolsPreset.ONENOTE_DELETE, ToolsPreset.ONENOTE_WRITE, frozenset({"onenote_delete_page"})),
+    (
+        ToolsPreset.SHAREPOINT_LISTS_DELETE,
+        ToolsPreset.SHAREPOINT_LISTS_WRITE,
+        frozenset({"sharepoint_delete_list_item"}),
+    ),
 )
 
 
@@ -1195,6 +1201,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ("User.Read", "Sites.Read.All", "Sites.ReadWrite.All"),
         2,
         7,
+    ),
+    (
+        ToolsPreset.SHAREPOINT_LISTS_DELETE,
+        ("User.Read", "Sites.Read.All", "Sites.ReadWrite.All"),
+        2,
+        8,
     ),
     (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
     (

@@ -48,6 +48,7 @@ _DELETING_TOOLS = {
     "outlook_delete_folder",
     "outlook_delete_mail_rule",
     "sharepoint_delete_item",
+    "sharepoint_delete_list_item",
     "teams_delete_meeting",
     "teams_delete_message",
     "teams_remove_chat_member",

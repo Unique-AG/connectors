@@ -86,3 +86,19 @@ Feature: Finding and reading SharePoint lists
       When Mia agrees to set the status of "Close books" to "Closed"
       Then the assistant tells Mia that the item changed and reads it again
       But it does not overwrite the other change
+
+  Rule: The assistant moves an item to the recycle bin only after Mia agrees
+
+    @happy @uc-16-11
+    Scenario: An item is moved to the recycle bin after Mia agrees
+      Given the list "Tasks" holds the item "Close books"
+      When Mia asks her assistant to delete the item "Close books" from the list "Tasks"
+      Then the assistant asks Mia to agree to move "Close books" to the recycle bin of the site
+      And after Mia agrees, the list "Tasks" no longer holds the item "Close books"
+
+    @unhappy @uc-16-12
+    Scenario: An item stays when Mia declines
+      Given the list "Tasks" holds the item "Close books"
+      When Mia asks her assistant to delete the item "Close books" and then declines the question
+      Then the assistant tells Mia that the item was not moved to the recycle bin
+      But the list "Tasks" still holds the item "Close books"

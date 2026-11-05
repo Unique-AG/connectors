@@ -184,6 +184,16 @@ sharepoint_update_list_item-first-item:
       args: {fields: {Title: seed-v1 case-sharepoint_update_list_item-first-item}}
       bind: {item: "$prev.items[0].uri"}
 
+sharepoint_delete_list_item-own-row:
+  chain:
+    - *first_site
+    - *first_lists
+    - tool: sharepoint_create_list_item
+      args: {fields: {Title: seed-v1 case-sharepoint_delete_list_item-own-row}}
+      bind: {list: "$prev.lists[0].uri"}
+    - tool: sharepoint_delete_list_item
+      bind: {item: "$prev.uri"}
+
 sharepoint_browse_folder-nested:
   needs: &tree [sharepoint-tree]
   chain:

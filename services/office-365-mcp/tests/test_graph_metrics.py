@@ -696,6 +696,7 @@ GRAPH_STEPS = frozenset(
         "list_item",
         "create_list_item",
         "update_list_item",
+        "delete_list_item",
         "my_drive",
         "my_drives",
         "folder_children",

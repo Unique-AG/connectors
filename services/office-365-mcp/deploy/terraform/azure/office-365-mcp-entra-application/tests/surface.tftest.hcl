@@ -715,6 +715,22 @@ run "preset_sharepoint_lists_write" {
   }
 }
 
+run "preset_sharepoint_lists_delete" {
+  variables {
+    tools_preset = "sharepoint-lists-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All,Sites.ReadWrite.All"
+    error_message = "sharepoint-lists-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All", "Sites.ReadWrite.All"]
+    error_message = "Sites.Read.All and Sites.ReadWrite.All need an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_onenote_read" {
   variables {
     tools_preset = "onenote-read"

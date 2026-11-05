@@ -8577,6 +8577,36 @@ What happens:
 - It does not overwrite the other change.
 - The assistant asks Mia to approve first.
 
+#### The assistant moves an item to the recycle bin only after Mia agrees
+
+**An item is moved to the recycle bin after Mia agrees**
+
+Ask your assistant: "Delete the task Close books from the Tasks list."
+
+Tests: 1
+
+Situation: The list "Tasks" holds the item "Close books".
+
+What happens:
+
+- The assistant asks Mia to agree to move "Close books" to the recycle bin of the site.
+- After Mia agrees, the list "Tasks" no longer holds the item "Close books".
+- The assistant asks Mia to approve first.
+
+**An item stays when Mia declines**
+
+Ask your assistant: "Delete the task Close books from the Tasks list."
+
+Tests: 1
+
+Situation: The list "Tasks" holds the item "Close books".
+
+What happens:
+
+- The assistant tells Mia that the item was not moved to the recycle bin.
+- The list "Tasks" still holds the item "Close books".
+- The assistant asks Mia to approve first.
+
 ## OneNote
 
 ### Working with notes in OneNote

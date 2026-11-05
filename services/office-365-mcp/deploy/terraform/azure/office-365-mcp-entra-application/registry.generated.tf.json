@@ -701,6 +701,12 @@
           ]
         },
         {
+          "name": "sharepoint_delete_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
           "name": "onenote_list_notebooks",
           "permissions": [
             "Notes.Read"
@@ -929,6 +935,7 @@
         "sharepoint_list_items",
         "sharepoint_create_list_item",
         "sharepoint_update_list_item",
+        "sharepoint_delete_list_item",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -1332,6 +1339,15 @@
           "sharepoint_list_items",
           "sharepoint_create_list_item",
           "sharepoint_update_list_item"
+        ],
+        "sharepoint-lists-delete": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item",
+          "sharepoint_delete_list_item"
         ],
         "onenote-read": [
           "onenote_list_notebooks",

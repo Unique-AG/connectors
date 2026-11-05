@@ -103,6 +103,7 @@ class ToolsPreset(StrEnum):
     SHAREPOINT_SITES = "sharepoint-sites"
     SHAREPOINT_LISTS = "sharepoint-lists"
     SHAREPOINT_LISTS_WRITE = "sharepoint-lists-write"
+    SHAREPOINT_LISTS_DELETE = "sharepoint-lists-delete"
     ONENOTE_READ = "onenote-read"
     ONENOTE_WRITE = "onenote-write"
     ONENOTE_DELETE = "onenote-delete"

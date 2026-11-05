@@ -32,6 +32,7 @@ READ_GETS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_list_items": (f"GET {_LIST}/columns", f"GET {_LIST}/items"),
     "sharepoint_create_list_item": (f"GET {_LIST}/columns",),
     "sharepoint_update_list_item": (f"GET {_LIST}/columns", f"GET {_LIST}/items/*"),
+    "sharepoint_delete_list_item": (f"GET {_LIST}/items/*",),
     "sharepoint_browse_folder": (f"GET {_ITEM}/children",),
     "sharepoint_create_folder": (f"GET {_ITEM}",),
     "sharepoint_copy_item": (f"GET {_ITEM}",),
@@ -47,6 +48,7 @@ WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_create_text_file": ("PUT /v1.0/drives/b!*/items/*:/seed-v1?case-*:/content",),
     "sharepoint_create_list_item": (f"POST {_LIST}/items",),
     "sharepoint_update_list_item": (f"PATCH {_LIST}/items/*/fields",),
+    "sharepoint_delete_list_item": (f"DELETE {_LIST}/items/*",),
 }
 CREATED_ONLY: Mapping[str, int] = {"sharepoint_invite": 0}
 EXTERNAL = frozenset({"sharepoint_create_share_link", "sharepoint_invite"})

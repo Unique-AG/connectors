@@ -154,3 +154,32 @@ uc-16-10:
     - tool: sharepoint_list_items
       uses: {list: uri of the Tasks list}
   note: "The update sends the eTag of the item it read as If-Match. When somebody changed the item since, Microsoft answers 412, and the tool error sends the assistant back to sharepoint_list_items. It does not retry."
+
+uc-16-11:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_delete_list_item.py::test_it_deletes_the_row_only_after_the_person_agrees_to_the_named_row"
+  ask: "Delete the task Close books from the Tasks list."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_list_items
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_delete_list_item
+      uses: {item: uri of the item Close books}
+
+uc-16-12:
+  status: untested
+  tests:
+    - "tests/tools/test_sharepoint_delete_list_item.py::test_a_declined_question_sends_nothing"
+  ask: "Delete the task Close books from the Tasks list."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: sharepoint_list_lists
+    - tool: sharepoint_list_items
+      uses: {list: uri of the Tasks list}
+    - tool: sharepoint_delete_list_item
+      uses: {item: uri of the item Close books}
+  note: "sharepoint_delete_list_item asks every time. When Mia declines, it sends no DELETE and the tool error says the row was not moved to the recycle bin."

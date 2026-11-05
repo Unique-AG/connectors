@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 126 tools in total.
+- **Size:** 127 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -40,10 +40,10 @@ Rules for the selection:
   needs admin consent when at least one of the presets needs it.
 - A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
   preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
-- Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and
-  `onenote-delete`. Each one is a base preset plus the tools that remove an item, write an inbox
-  rule, forward an event, or share a calendar. No other preset holds these tools. A list of presets
-  gets them only when the list names one of these four.
+- Five presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`,
+  `sharepoint-lists-delete`, and `onenote-delete`. Each one is a base preset plus the tools that
+  remove an item, write an inbox rule, forward an event, or share a calendar. No other preset holds
+  these tools. A list of presets gets them only when the list names one of these five.
 
 ## Preset index
 
@@ -113,6 +113,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`sharepoint-sites`](#sharepoint-sites) | `sharepoint-read`, plus finding SharePoint sites. | 5 | ⚠️ Yes |
 | [`sharepoint-lists`](#sharepoint-lists) | Find a site and read its lists, columns, and items. | 4 | ⚠️ Yes |
 | [`sharepoint-lists-write`](#sharepoint-lists-write) | `sharepoint-lists`, plus adding and changing list items. | 6 | ⚠️ Yes |
+| [`sharepoint-lists-delete`](#sharepoint-lists-delete) | `sharepoint-lists-write`, plus moving list items to the recycle bin. | 7 | ⚠️ Yes |
 
 **OneNote.** Notebooks, sections, and pages.
 
@@ -1023,8 +1024,8 @@ Files, folders, sharing, sites, and lists.
 - Find a SharePoint site by free text.
 
 **Note:** This preset adds the permission `Sites.Read.All`. Of the other `sharepoint-` presets, only
-[`sharepoint-lists`](#sharepoint-lists) and [`sharepoint-lists-write`](#sharepoint-lists-write)
-need it.
+[`sharepoint-lists`](#sharepoint-lists), [`sharepoint-lists-write`](#sharepoint-lists-write), and
+[`sharepoint-lists-delete`](#sharepoint-lists-delete) need it.
 
 **Tools added by this preset**
 
@@ -1076,7 +1077,7 @@ need it.
 
 **Note:** These tools write text, choice, date, number, currency, and yes or no columns. They
 refuse a person, lookup, managed metadata, or multi-value column, and a read-only or hidden one.
-Neither tool deletes an item.
+Neither tool deletes an item. [`sharepoint-lists-delete`](#sharepoint-lists-delete) does.
 
 **Tools added by this preset**
 
@@ -1090,6 +1091,30 @@ Neither tool deletes an item.
 - **Graph permissions (3):** `Sites.Read.All`, `Sites.ReadWrite.All`, `User.Read`
 - **Admin consent:** ⚠️ Required for `Sites.Read.All`, `Sites.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
 - **User approval:** Asks ✋ every time for `sharepoint_create_list_item`, `sharepoint_update_list_item`.
+
+### `sharepoint-lists-delete`
+
+**7 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-lists-write`](#sharepoint-lists-write)
+
+**You can**
+
+- Do everything in `sharepoint-lists-write`.
+- Move an item of a list to the recycle bin of its site.
+
+**Note:** Opt-in preset. It adds no permission to `sharepoint-lists-write`. The tool never erases an
+item permanently.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_delete_list_item` | 🔴 Change | ✋ Always | Moves one item to the recycle bin of its site. Never erases it permanently. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Sites.Read.All`, `Sites.ReadWrite.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Sites.Read.All`, `Sites.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `sharepoint_create_list_item`, `sharepoint_update_list_item`, `sharepoint_delete_list_item`.
 
 ## OneNote presets
 
@@ -1290,7 +1315,7 @@ Two things can go wrong:
 
 ## Reference: every tool
 
-This reference lists all 126 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 127 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1427,6 +1452,7 @@ This reference lists all 126 tools. Use it to build an `enabled` list, or to fin
 | `sharepoint_list_items` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
 | `sharepoint_create_list_item` | 🟠 Write, adds | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 | `sharepoint_update_list_item` | 🔴 Write, changes or removes, safe to repeat | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_delete_list_item` | 🔴 Write, changes or removes, safe to repeat | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 
 ### OneNote
 
