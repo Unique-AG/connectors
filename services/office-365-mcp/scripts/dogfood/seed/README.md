@@ -120,8 +120,8 @@ A default `apply` skips `cal-group` and the step of `cal-answers` that tags Mia'
 run only when `--phases` names phases and does not name all four of the phases `folders`, `mail`,
 `events` and `files`.
 
-The sharepoint family has four phases. Its data is in `corpus/files-tree.yaml`. Each phase is
-idempotent: a file or folder that is already there is not made again.
+The sharepoint family has five phases. Its data is in `corpus/files-tree.yaml`. Each phase is
+idempotent: a file, folder, list, column or row that is already there is not made again.
 
 - `sharepoint` makes the folder `seed-v1 Move Target` for Mia.
 - `files-tree` makes the folder `seed-v1 Seed Files` if the folder is missing. It makes
@@ -135,6 +135,16 @@ idempotent: a file or folder that is already there is not made again.
   folders and three files in the library of the team, and one note in the folder of the channel.
   The site can need some minutes. If the library is not ready, the run stops. Run it again later.
   It needs the permission Channel.Create. `cleanup` keeps the channel.
+- `lists` is opt-in and runs as Mia. It needs the team. It reads the site id from the
+  `sharepointIds` of the team library and makes the generic lists `seed-v1 Tasks` and
+  `seed-v1 Issues` on that site. `seed-v1 Tasks` gets the columns `Status` (choice, indexed),
+  `Amount` (number), `Notes` (text) and `Owner` (person, left empty), and the row
+  `seed-v1 Close books`. Mia's OneDrive root gets the folder `seed-v1 Tasks`, so a folder and a list
+  share a name. Creating a list or a column needs Sites.Manage.All, which `run_all.sh` does not
+  ask for. Put the token of `get_token.py <Mia UPN> --scopes Sites.Manage.All` in `GRAPH_TOKEN` and
+  run `seed.py apply --as 1 --phases lists`. `cleanup --phases lists` and the case sweep
+  delete the rows of both lists whose Title starts with `seed-v1 case-`. They keep the lists, the
+  columns and `seed-v1 Close books`.
 
 The onenote family has two more phases. `onenote-group` runs as Mia. It makes the notebook
 `seed-v1 Shared Notes` for the team, with one section and one page. `onenote-big` makes the page
@@ -213,6 +223,8 @@ the fallback that makes plain drafts.
   - The paths of `teams/<id>/channels`, `groups/<id>/events|calendar|drive|onenote`, `drives/<id>`
     and `chats/<id>/messages`, and only for an id that an earlier step of the same run found or
     created for this user (`Step.learns`: `team`, `drive` or `chat`).
+  - `/v1.0/sites/<id>/lists` and the paths below it, for the site id of the team library that an
+    earlier step found (`Step.learns`: `site`).
   - `GET /v1.0/groups/<id>/members` and `POST /v1.0/groups/<id>/members/$ref`, for the team id
     that an earlier step found or created. They add Anna and Tom to the team of the seed.
   - `/v1.0/users/<SEED_SHARED_UPN>/mailFolders`, when the variable is set.

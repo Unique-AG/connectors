@@ -33,7 +33,7 @@ import docgen
 import families
 import httpx
 import yaml
-from model import ConfigError, Context, SeedError, Step
+from model import ConfigError, Context, SeedError, Step, site_id
 
 TAG = "seed-v1"
 BASE = "https://graph.microsoft.com/v1.0"
@@ -51,6 +51,7 @@ MEMBER_PATHS = (
         re.compile(r"/v1\.0/groups/([^/]+)/(?:events|calendar\w*|drive|onenote|members)(?:/.*)?"),
     ),
     ("drive", re.compile(r"/v1\.0/drives/([^/]+)(?:/.*)?")),
+    ("site", re.compile(r"/v1\.0/sites/([^/]+)/lists(?:/.*)?")),
     ("chat", re.compile(r"/v1\.0/chats/([^/]+)/messages")),
 )
 MAX_RETRY_WAIT = 120.0
@@ -638,7 +639,12 @@ class Graph:
         self._sleep = sleep
         self._shared = f"/v1.0/users/{shared_upn.lower()}/mailfolders" if shared_upn else None
         self._upload_url: str | None = None
-        self._known: dict[str, set[str]] = {"team": set(), "drive": set(), "chat": set()}
+        self._known: dict[str, set[str]] = {
+            "team": set(),
+            "drive": set(),
+            "site": set(),
+            "chat": set(),
+        }
         self.max_requests = max_requests
         self.count = 0
         self.sends = 0
@@ -852,6 +858,13 @@ def run_lookup(
     graph: Graph, step: Step, path: str, found: dict[str, dict[str, Any]], ctx: Context
 ) -> None:
     params = dict(step.params)
+    if step.lookup == "site":
+        response = graph.request("GET", path, params=params, ok_statuses=(404,))
+        site = site_id(response.json()) if response.status_code == 200 else None
+        if site is not None:
+            found[str(step.key)] = {"id": site}
+            _learn(graph, step, found[str(step.key)])
+        return
     if step.lookup in ("drive-folder", "single"):
         response = graph.request("GET", path, params=params, ok_statuses=(404,))
         key = "drive:folder" if step.lookup == "drive-folder" else str(step.key)
@@ -862,12 +875,17 @@ def run_lookup(
         return
     for item in graph.get_all(path, params):
         if step.lookup == "named":
-            name = str(item.get("displayName") or item.get("title") or item.get("topic") or "")
+            title = (item.get("fields") or {}).get("Title")
+            name = str(
+                item.get("displayName") or item.get("title") or item.get("topic") or title or ""
+            )
             key = f"{step.phase}:{name}" if name.startswith(f"{TAG} ") else None
         elif step.lookup == "subject":
             key = f"subject:{item.get('subject')}"
         elif step.lookup == "members":
             key = f"member:{str(item.get('userPrincipalName') or '').lower()}"
+        elif step.lookup == "columns":
+            key = f"column:{step.key}:{item.get('name')}"
         elif step.lookup == "attachments":
             key = f"attachment:{step.key}:{item.get('name')}"
         elif step.lookup == "replies":

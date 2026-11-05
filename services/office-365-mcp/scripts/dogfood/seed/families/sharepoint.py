@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import docgen
 import yaml
-from model import ConfigError, Context, Step
+from model import ConfigError, Context, Step, site_id
 
 from families.onenote import ASSETS, team_id
 from families.teams import TEAM_NAME
@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 type Spec = Mapping[str, Any]
 
 TAG = "seed-v1"
-PHASES: tuple[str, ...] = ("sharepoint", "files-tree", "files-big", "team-files")
+LIST_PHASE = "lists"
+PHASES: tuple[str, ...] = ("sharepoint", "files-tree", "files-big", "team-files", LIST_PHASE)
+OPT_IN = (LIST_PHASE,)
 MOVE_TARGET = "seed-v1 Move Target"
 CASE_TAG = "seed-v1 case-"
 CORPUS = Path(__file__).resolve().parents[1] / "corpus"
@@ -36,6 +38,8 @@ TEAM = f"{{{TEAM_PHASE}:{TEAM_NAME}}}"
 TEAM_DRIVE = f"{TEAM_PHASE}:drive"
 CHANNEL_FOLDER = f"{TEAM_PHASE}:channel folder"
 ABSENT = (400, 403, 404)
+SITE = f"{LIST_PHASE}:site"
+ROWS = (("$select", "id"), ("$expand", "fields($select=Title)"))
 
 
 def _named(name: str) -> str:
@@ -216,6 +220,65 @@ def _team(ctx: Context, corpus: Spec) -> list[Step]:
     ]
 
 
+def _lists(corpus: Spec) -> list[Step]:
+    spec, phase = corpus["lists"], LIST_PHASE
+    folder, lists = _named(spec["folder"]), f"/sites/{{{SITE}}}/lists"
+    name = (("$select", "id,displayName"),)
+    found = [
+        Step(
+            phase,
+            "lookup",
+            "GET",
+            "/me/drive/items/root/children",
+            LISTING,
+            lookup="drive-children",
+        ),
+        Step(
+            phase,
+            "create",
+            "POST",
+            "/me/drive/root/children",
+            body={"name": folder, "folder": {}} | FAIL,
+            key=f"file:{folder}",
+        ),
+        Step(phase, "lookup", "GET", "/me/joinedTeams", name, lookup="named", learns="team"),
+        Step(
+            phase,
+            "lookup",
+            "GET",
+            f"/groups/{{{phase}:{TEAM_NAME}}}/drive",
+            (("$select", "id,sharepointIds"),),
+            key=SITE,
+            lookup="site",
+            learns="site",
+        ),
+        Step(phase, "lookup", "GET", lists, name, lookup="named"),
+    ]
+    for one in spec["lists"]:
+        key = f"{phase}:{_named(one['name'])}"
+        at = f"{lists}/{{{key}}}"
+        body = {"displayName": _named(one["name"]), "list": {"template": "genericList"}}
+        found += [Step(phase, "create", "POST", lists, body=body, key=key)]
+        if columns := one.get("columns", []):
+            params = (("$select", "id,name"),)
+            found += [
+                Step(phase, "lookup", "GET", f"{at}/columns", params, key=key, lookup="columns")
+            ]
+        found += [
+            Step(phase, "create", "POST", f"{at}/columns", body=c, key=f"column:{key}:{c['name']}")
+            for c in columns
+        ]
+        if rows := one.get("rows", []):
+            found += [Step(phase, "lookup", "GET", f"{at}/items", ROWS, lookup="named")]
+        for row in rows:
+            fields = row | {"Title": _named(row["Title"])}
+            key = f"{phase}:{fields['Title']}"
+            found += [
+                Step(phase, "create", "POST", f"{at}/items", body={"fields": fields}, key=key)
+            ]
+    return found
+
+
 def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
     corpus, found = _corpus(), []
     if "sharepoint" in phases and owner == ctx.persona(1):
@@ -240,6 +303,8 @@ def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
     found += _drive(ctx, owner, phases & {"files-tree", "files-big"}, corpus)
     if TEAM_PHASE in phases and owner == ctx.persona(1):
         found += _team(ctx, corpus)
+    if LIST_PHASE in phases and owner == ctx.persona(1):
+        found += _lists(corpus)
     return found
 
 
@@ -252,12 +317,34 @@ def _id_at(graph: Graph, path: str) -> str | None:
     return str(found.json()["id"]) if found.status_code == 200 else None
 
 
-def _team_drive(graph: Graph) -> str | None:
+def _team_drive(graph: Graph) -> dict[str, Any] | None:
     team = team_id(graph)
-    drive = None if team is None else _id_at(graph, f"/groups/{team}/drive")
-    if drive is not None:
-        graph.learn("drive", drive)
+    params = {"$select": "id,sharepointIds"}
+    found = (
+        None
+        if team is None
+        else graph.request("GET", f"/groups/{team}/drive", params=params, ok_statuses=ABSENT)
+    )
+    if found is None or found.status_code != 200:
+        return None
+    drive = found.json()
+    graph.learn("drive", str(drive["id"]))
+    if (site := site_id(drive)) is not None:
+        graph.learn("site", site)
     return drive
+
+
+def _case_rows(graph: Graph, drive: Spec) -> Iterator[tuple[str, str]]:
+    if (site := site_id(drive)) is None:
+        return
+    names = {_named(one["name"]) for one in _corpus()["lists"]["lists"]}
+    lists = f"/sites/{site}/lists"
+    for found in graph.get_all(lists, {"$select": "id,displayName"}):
+        if found.get("displayName") not in names:
+            continue
+        for row in graph.get_all(f"{lists}/{found['id']}/items", dict(ROWS)):
+            if str((row.get("fields") or {}).get("Title", "")).startswith(CASE_TAG):
+                yield "DELETE", f"{lists}/{found['id']}/items/{row['id']}"
 
 
 def _cases_below(
@@ -275,13 +362,14 @@ def sweep(graph: Graph, owner: str) -> Iterator[tuple[str, str]]:
     for name in (_seed_folder(), MOVE_TARGET):
         if (folder := _id_at(graph, f"/me/drive/root:/{name}")) is not None:
             yield from _cases_below(graph, "/me/drive", folder)
-    drive = _team_drive(graph) if owner == "mia" else None
-    if drive is None:
+    team = _team_drive(graph) if owner == "mia" else None
+    if team is None:
         return
-    top = _named(_corpus()["team"]["folders"][0]["name"])
+    drive, top = team["id"], _named(_corpus()["team"]["folders"][0]["name"])
     for child in _children(graph, f"/drives/{drive}/root/children"):
         if child.get("name") == top:
             yield from _cases_below(graph, f"/drives/{drive}", str(child["id"]))
+    yield from _case_rows(graph, team)
 
 
 def cleanup(
@@ -299,9 +387,17 @@ def cleanup(
         for child in _children(graph, f"/me/drive/items/{folder}/children"):
             if child.get("name") in names:
                 yield "DELETE", f"/me/drive/items/{child['id']}", None
-    if TEAM_PHASE not in phases or owner != "mia" or (drive := _team_drive(graph)) is None:
+    if (
+        not phases & {TEAM_PHASE, LIST_PHASE}
+        or owner != "mia"
+        or (found := _team_drive(graph)) is None
+    ):
         return
-    team = corpus["team"]
+    if LIST_PHASE in phases:
+        yield from ((method, path, None) for method, path in _case_rows(graph, found))
+    if TEAM_PHASE not in phases:
+        return
+    drive, team = found["id"], corpus["team"]
     top, channel = _named(team["folders"][0]["name"]), _named(team["channel"])
     notes = {_named(f["name"]) for f in team["channel_files"]}
     for child in _children(graph, f"/drives/{drive}/root/children"):

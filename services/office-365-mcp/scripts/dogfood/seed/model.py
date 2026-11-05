@@ -2,6 +2,7 @@ import datetime as dt
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 
 class SeedError(Exception):
@@ -23,14 +24,23 @@ class Step:
     content_type: str | None = None
     key: str | None = None
     lookup: str | None = None  # "tagged", "named", "subject", "drive-folder", "drive-children",
-    # "single" (one object, found under `key`),
+    # "single" (one object, found under `key`), "site" (the site of a drive, found under `key`),
+    # "columns" (found under `column:<key>:<name>`),
     # "attachments" (found under `attachment:<key>:<name>`) or "replies" (found under `reply:<key>:<text>`)
     poll: bool = False  # the answer is 202: wait for the operation in its Location header
     learns: str | None = (
-        None  # "team", "drive" or "chat": the id of the found or created item joins the guard
+        None  # "team", "drive", "site" or "chat": the id of the found or created item joins the guard
     )
     payload: bytes | None = None  # the bytes that an "upload" step sends to the uploadUrl in chunks
     generated: tuple[str, int, str] | None = None  # (generator, size, label) of docgen.generate
+
+
+def site_id(drive: Mapping[str, Any]) -> str | None:
+    """The Graph site id (host,SPSite id,SPWeb id) from the `sharepointIds` of a drive."""
+    ids = drive.get("sharepointIds")
+    if not ids:
+        return None
+    return f"{urlsplit(ids['siteUrl']).hostname},{ids['siteId']},{ids['webId']}"
 
 
 @dataclass(frozen=True)
