@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { runWithLogSecrets } from '@unique-ag/logger';
 import { OAuthUserProfile } from '@unique-ag/mcp-oauth';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Client, GraphError } from '@microsoft/microsoft-graph-client';
@@ -132,6 +133,10 @@ export class SharedMailboxSyncService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async runSyncWithRetries(): Promise<void> {
+    await runWithLogSecrets([], () => this.syncWithRetries());
+  }
+
+  private async syncWithRetries(): Promise<void> {
     if (this.syncIsRunning) {
       return;
     }

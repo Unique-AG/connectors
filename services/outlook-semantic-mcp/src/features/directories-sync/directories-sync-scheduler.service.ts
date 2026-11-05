@@ -3,6 +3,7 @@ import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { AppConfig, appConfig } from '~/config';
 import { NewTrace } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { SyncDirectoriesForAllUserProfilesCommand } from './sync-directories-for-all-user-profiles.command';
 
 @Injectable()
@@ -36,6 +37,8 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
     this.schedulerRegistry.addCronJob('sharepoint-scan', job);
     job.start();
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.directory-sync')
   public async runScheduledScan(): Promise<void> {
