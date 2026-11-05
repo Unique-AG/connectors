@@ -161,6 +161,22 @@ class TestKnownSecrets:
 
         assert json.loads(line)["msg"] == "pass[Redacted] and !abc"
 
+    def test_a_url_encoded_secret_is_redacted_whatever_the_case_of_its_escapes(self) -> None:
+        redactor = SecretRedactor(("pa/ss:word",))
+
+        line = redactor.redact_line(
+            '{"msg":"a=pa%2Fss%3Aword b=pa%2fss%3aword c=pa%2fss%3Aword d=pa%2Fss%3aword"}'
+        )
+
+        assert json.loads(line)["msg"] == "a=[Redacted] b=[Redacted] c=[Redacted] d=[Redacted]"
+
+    def test_the_case_of_the_escapes_around_a_url_encoded_secret_is_kept(self) -> None:
+        redactor = SecretRedactor(("pa/ss:word",))
+
+        line = redactor.redact_line('{"msg":"x%2f pa%2fss%3aword y%3a"}')
+
+        assert json.loads(line)["msg"] == "x%2f [Redacted] y%3a"
+
     def test_the_next_occurrence_is_found_after_one_inside_a_word(self) -> None:
         redactor = SecretRedactor(("abc",))
 

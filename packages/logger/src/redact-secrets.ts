@@ -10,6 +10,8 @@ export const SHORT_SECRET_LENGTH = 8;
 
 const REDACTED = '[Redacted]';
 const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
+const ENCODED_BYTE = /%[0-9A-F]{2}/;
+const ESCAPE = /%[0-9a-f]{2}/gi;
 
 // A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
 // step with `packages/mcp-observability`.
@@ -502,14 +504,25 @@ function replaceSecrets(text: string, secrets: readonly string[]): string {
 }
 
 function replaceSecret(text: string, secret: string): string {
-  if (secret.length >= SHORT_SECRET_LENGTH) {
+  const encoded = ENCODED_BYTE.test(secret);
+  if (secret.length >= SHORT_SECRET_LENGTH && !encoded) {
     return text.replaceAll(secret, REDACTED);
   }
+  // A URL encodes a byte as upper-case hex, but a DSN written by hand may say `%2f`. Both spell
+  // the same length, so a match in the folded text is a match in the original.
+  const haystack = encoded ? text.replace(ESCAPE, (escape) => escape.toUpperCase()) : text;
   let redacted = '';
   let copied = 0;
-  for (let index = text.indexOf(secret); index !== -1; index = text.indexOf(secret, index + 1)) {
+  for (
+    let index = haystack.indexOf(secret);
+    index !== -1;
+    index = haystack.indexOf(secret, index + 1)
+  ) {
     const end = index + secret.length;
-    if (index >= copied && standsAlone(text, secret, index, end)) {
+    if (
+      index >= copied &&
+      (secret.length >= SHORT_SECRET_LENGTH || standsAlone(text, secret, index, end))
+    ) {
       redacted += text.slice(copied, index) + REDACTED;
       copied = end;
     }

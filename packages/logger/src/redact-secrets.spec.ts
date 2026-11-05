@@ -133,6 +133,24 @@ describe('createSecretRedactor', () => {
       expect(parsedLines(lines)[0]?.msg).toBe('pass[Redacted] and !abc');
     });
 
+    it('redacts a URL-encoded secret whatever the case of its escapes', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['pa/ss:word'] });
+
+      logger.info('a=pa%2Fss%3Aword b=pa%2fss%3aword c=pa%2fss%3Aword d=pa%2Fss%3aword');
+
+      expect(parsedLines(lines)[0]?.msg).toBe(
+        'a=[Redacted] b=[Redacted] c=[Redacted] d=[Redacted]',
+      );
+    });
+
+    it('keeps the case of the escapes around a URL-encoded secret', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['pa/ss:word'] });
+
+      logger.info('x%2f pa%2fss%3aword y%3a');
+
+      expect(parsedLines(lines)[0]?.msg).toBe('x%2f [Redacted] y%3a');
+    });
+
     it('finds the next occurrence after one that sits inside a word', () => {
       const { logger, lines } = createCapturingLogger({ secrets: ['abc'] });
 

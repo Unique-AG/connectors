@@ -36,6 +36,8 @@ from mcp_observability.stacktrace import scrub_stacktrace
 # number: it would otherwise hit ordinary words, such as `test` in `testserver`.
 SHORT_SECRET_LENGTH = 8
 _REDACTED = "[Redacted]"
+_ENCODED_BYTE = re.compile(r"%[0-9A-F]{2}")
+_ESCAPE = re.compile(r"%[0-9a-fA-F]{2}")
 
 # A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
 # step with `packages/logger`.
@@ -435,17 +437,23 @@ def _replace_secrets(text: str, secrets: tuple[str, ...]) -> str:
 
 
 def _replace_secret(text: str, secret: str) -> str:
-    if len(secret) >= SHORT_SECRET_LENGTH:
+    encoded = _ENCODED_BYTE.search(secret) is not None
+    if len(secret) >= SHORT_SECRET_LENGTH and not encoded:
         return text.replace(secret, _REDACTED)
+    # A URL encodes a byte as upper-case hex, but a DSN written by hand may say `%2f`. Both spell
+    # the same length, so a match in the folded text is a match in the original.
+    haystack = _ESCAPE.sub(lambda escape: escape.group().upper(), text) if encoded else text
     parts: list[str] = []
     copied = 0
-    index = text.find(secret)
+    index = haystack.find(secret)
     while index != -1:
         end = index + len(secret)
-        if index >= copied and _stands_alone(text, secret, index, end):
+        if index >= copied and (
+            len(secret) >= SHORT_SECRET_LENGTH or _stands_alone(text, secret, index, end)
+        ):
             parts.extend((text[copied:index], _REDACTED))
             copied = end
-        index = text.find(secret, index + 1)
+        index = haystack.find(secret, index + 1)
     parts.append(text[copied:])
     return "".join(parts)
 
