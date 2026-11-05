@@ -177,6 +177,18 @@ class TestKnownSecrets:
 
         assert json.loads(line)["msg"] == "x%2f [Redacted] y%3a"
 
+    def test_a_short_secret_that_ends_with_a_symbol_is_redacted_in_its_encoded_form_too(
+        self,
+    ) -> None:
+        redactor = SecretRedactor(("abc!",))
+
+        line = redactor.redact_line('{"msg":"a=abc!suffix b=abc%21suffix c=abc%21 d=xabc%21"}')
+
+        assert (
+            json.loads(line)["msg"]
+            == "a=[Redacted]suffix b=[Redacted]suffix c=[Redacted] d=xabc%21"
+        )
+
     def test_the_next_occurrence_is_found_after_one_inside_a_word(self) -> None:
         redactor = SecretRedactor(("abc",))
 

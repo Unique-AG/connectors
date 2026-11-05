@@ -11,6 +11,7 @@ export const SHORT_SECRET_LENGTH = 8;
 const REDACTED = '[Redacted]';
 const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
 const ENCODED_BYTE = /%[0-9A-F]{2}/;
+const ENDS_WITH_ENCODED_BYTE = /%[0-9A-F]{2}$/;
 const ESCAPE = /%[0-9a-f]{2}/gi;
 
 // A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
@@ -510,7 +511,7 @@ function replaceSecret(text: string, secret: string): string {
   }
   // A URL encodes a byte as upper-case hex, but a DSN written by hand may say `%2f`. Both spell
   // the same length, so a match in the folded text is a match in the original.
-  const haystack = encoded ? text.replace(ESCAPE, (escape) => escape.toUpperCase()) : text;
+  const haystack = encoded ? text.replace(ESCAPE, (sequence) => sequence.toUpperCase()) : text;
   let redacted = '';
   let copied = 0;
   for (
@@ -531,6 +532,7 @@ function replaceSecret(text: string, secret: string): string {
 }
 
 // An edge that is not a word character, such as a symbol, can touch a word and still be the secret.
+// An encoded byte is such an edge too: `abc!` is `abc%21`, whose last character is a digit.
 function standsAlone(text: string, secret: string, start: number, end: number): boolean {
   const before = text[start - 1];
   const after = text[end];
@@ -539,7 +541,8 @@ function standsAlone(text: string, secret: string, start: number, end: number): 
   const touchesAfter =
     after !== undefined &&
     WORD_CHARACTER.test(after) &&
-    WORD_CHARACTER.test(secret[secret.length - 1] ?? '');
+    WORD_CHARACTER.test(secret[secret.length - 1] ?? '') &&
+    !ENDS_WITH_ENCODED_BYTE.test(secret);
   return !touchesBefore && !touchesAfter;
 }
 

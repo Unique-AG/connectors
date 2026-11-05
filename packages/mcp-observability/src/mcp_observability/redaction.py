@@ -38,6 +38,7 @@ SHORT_SECRET_LENGTH = 8
 _REDACTED = "[Redacted]"
 _ENCODED_BYTE = re.compile(r"%[0-9A-F]{2}")
 _ESCAPE = re.compile(r"%[0-9a-fA-F]{2}")
+_ENDS_WITH_ENCODED_BYTE = re.compile(r"%[0-9A-F]{2}$")
 
 # A `secret` group narrows what is replaced, so `Bearer ` or `password=` stays readable. Kept in
 # step with `packages/logger`.
@@ -460,9 +461,15 @@ def _replace_secret(text: str, secret: str) -> str:
 
 def _stands_alone(text: str, secret: str, start: int, end: int) -> bool:
     """An edge that is not a word character, such as a symbol, can touch a word and still be the
-    secret."""
+    secret. An encoded byte is such an edge too: `abc!` is `abc%21`, whose last character is a
+    digit."""
     touches_before = start > 0 and _is_word(text[start - 1]) and _is_word(secret[0])
-    touches_after = end < len(text) and _is_word(text[end]) and _is_word(secret[-1])
+    touches_after = (
+        end < len(text)
+        and _is_word(text[end])
+        and _is_word(secret[-1])
+        and _ENDS_WITH_ENCODED_BYTE.search(secret) is None
+    )
     return not touches_before and not touches_after
 
 

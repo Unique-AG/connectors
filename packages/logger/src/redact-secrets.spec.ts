@@ -151,6 +151,16 @@ describe('createSecretRedactor', () => {
       expect(parsedLines(lines)[0]?.msg).toBe('x%2f [Redacted] y%3a');
     });
 
+    it('redacts a short secret that ends with a symbol in its encoded form too', () => {
+      const { logger, lines } = createCapturingLogger({ secrets: ['abc!'] });
+
+      logger.info('a=abc!suffix b=abc%21suffix c=abc%21 d=xabc%21');
+
+      expect(parsedLines(lines)[0]?.msg).toBe(
+        'a=[Redacted]suffix b=[Redacted]suffix c=[Redacted] d=xabc%21',
+      );
+    });
+
     it('finds the next occurrence after one that sits inside a word', () => {
       const { logger, lines } = createCapturingLogger({ secrets: ['abc'] });
 
