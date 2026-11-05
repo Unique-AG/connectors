@@ -1,7 +1,6 @@
 import type { MessageErrorHandler } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
 import { SpanStatusCode, trace } from '@opentelemetry/api';
-import type { Channel, ConsumeMessage } from 'amqplib';
 
 const logger = new Logger('AMQPErrorHandler');
 
@@ -11,8 +10,8 @@ const logger = new Logger('AMQPErrorHandler');
  * @param handler RabbitMQ error handler function.
  * @returns Wrapped handler.
  */
-export const wrapErrorHandlerOTEL = (handler: MessageErrorHandler) => {
-  return (channel: Channel, msg: ConsumeMessage, err: unknown) => {
+export const wrapErrorHandlerOTEL = (handler: MessageErrorHandler): MessageErrorHandler => {
+  return (channel, msg, err) => {
     logger.error({ msg: 'RabbitMQ message handler threw', err });
 
     const span = trace.getActiveSpan();

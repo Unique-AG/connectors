@@ -1,3 +1,5 @@
+import assert from 'node:assert';
+import { EventEmitter } from 'node:events';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
 import { SpanStatusCode } from '@opentelemetry/api';
@@ -46,12 +48,15 @@ export class AMQPService implements OnApplicationBootstrap {
         // Listen once for a connection-level 'error' event.
         // Some AMQP errors may occur asynchronously (e.g., broker issues) and not
         // be thrown directly by the publish call; this captures those OOB errors.
-        amqpConn.connection.once('error', onError);
+        // amqplib 2.x types Connection without EventEmitter methods. Runtime is still 0.10.9.
+        const connection = amqpConn.connection;
+        assert.ok(connection instanceof EventEmitter, 'AMQP connection is not an EventEmitter');
+        connection.once('error', onError);
 
         // Delegate to the original publish behavior with the original arguments.
         return original(...args).finally(() =>
           // Unregister the listener to prevent building them up over time.
-          amqpConn.connection.removeListener('error', onError),
+          connection.removeListener('error', onError),
         );
       };
 
