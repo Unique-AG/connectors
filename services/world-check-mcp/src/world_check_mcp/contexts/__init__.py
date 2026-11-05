@@ -6,6 +6,7 @@ from world_check_mcp.contexts.cases import CaseNotFoundError
 from world_check_mcp.contexts.cases import CasePage
 from world_check_mcp.contexts.cases import CaseReferenceDetails
 from world_check_mcp.contexts.cases import CaseResults
+from world_check_mcp.contexts.cases import CaseSearchError
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.cases import get_case_audit_events
 from world_check_mcp.contexts.cases import get_case_reference
@@ -59,6 +60,7 @@ __all__ = [
     "AuditPage",
     "CaseDetails",
     "CaseNotFoundError",
+    "CaseSearchError",
     "CasePage",
     "CaseReferenceDetails",
     "CaseResults",

@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
+from fastmcp.exceptions import ToolError
 from fastmcp.tools import tool
 from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
@@ -50,12 +51,15 @@ async def search_cases(
     page_reference: PageReference = None,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.CasePage:
-    return await contexts.search_cases(
-        upstream=upstream,
-        group_id=group_id,
-        query=query,
-        expression=expression,
-        search_mode=search_mode,
-        limit=limit,
-        page_reference=page_reference,
-    )
+    try:
+        return await contexts.search_cases(
+            upstream=upstream,
+            group_id=group_id,
+            query=query,
+            expression=expression,
+            search_mode=search_mode,
+            limit=limit,
+            page_reference=page_reference,
+        )
+    except contexts.CaseSearchError as error:
+        raise ToolError(str(error)) from error

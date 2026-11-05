@@ -11,15 +11,15 @@ from world_check_mcp.upstream import CaseTemplateResponse
 from world_check_mcp.upstream import FieldDefinition
 
 _PASSPORT_FIELDS = (
-    ("given_name", "SFCT_8", "TEXT"),
-    ("last_name", "SFCT_9", "TEXT"),
-    ("gender", "SFCT_10", "GENDER"),
-    ("issuing_state", "SFCT_11", "STATE"),
-    ("nationality", "SFCT_12", "STATE"),
-    ("date_of_birth", "SFCT_13", "DATE"),
-    ("document_type", "SFCT_14", "PASSPORT_DOCUMENT_TYPE"),
-    ("identification_number", "SFCT_15", "TEXT"),
-    ("date_of_expiry", "SFCT_16", "DATE"),
+    ("given_name", "GIVEN_NAME", "TEXT"),
+    ("last_name", "LAST_NAME", "TEXT"),
+    ("gender", "GENDER", "GENDER"),
+    ("issuing_state", "ISSUING_STATE", "STATE"),
+    ("nationality", "NATIONALITY", "STATE"),
+    ("date_of_birth", "DATE_OF_BIRTH", "DATE"),
+    ("document_type", "DOCUMENT_TYPE", "PASSPORT_DOCUMENT_TYPE"),
+    ("identification_number", "IDENTIFICATION_NUMBER", "TEXT"),
+    ("date_of_expiry", "DATE_OF_EXPIRY", "DATE"),
 )
 
 
@@ -47,12 +47,14 @@ def passport_arguments(
             "The group requires additional providers. Enable include_watchlist or choose another "
             "group. Media Check is unsupported."
         )
-    definitions = _entity_fields(template=template, provider="PASSPORT_CHECK")
-    if include_watchlist:
-        definitions = [*definitions, *_entity_fields(template=template, provider="WATCHLIST")]
+    passport_definitions = _entity_fields(template=template, provider="PASSPORT_CHECK")
+    watchlist_definitions = (
+        _entity_fields(template=template, provider="WATCHLIST") if include_watchlist else []
+    )
+    definitions = [*passport_definitions, *watchlist_definitions]
     provided = [
         *secondary_fields,
-        *_passport_fields(passport=passport, definitions=definitions),
+        *_passport_fields(passport=passport, definitions=passport_definitions),
     ]
     body: dict[str, object] = {
         "name": name,
@@ -81,7 +83,9 @@ def passport_arguments(
 
 
 def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) -> list[FieldValue]:
-    available = {field.type_id: field for field in definitions}
+    """The passport's values under the typeIds the group's PASSPORT_CHECK fields carry, found by
+    label as screening does, since the ids differ between groups.
+    """
     values: dict[str, date | str] = {
         "given_name": passport.given_name,
         "last_name": passport.last_name,
@@ -94,13 +98,18 @@ def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) 
         "date_of_expiry": passport.date_of_expiry,
     }
     fields: list[FieldValue] = []
-    for attribute, type_id, value_type in _PASSPORT_FIELDS:
-        definition = available.get(type_id)
-        if definition is None or definition.field_value_type != value_type:
+    for attribute, label, value_type in _PASSPORT_FIELDS:
+        matches = [
+            field
+            for field in definitions
+            if _normalized(value=field.label) == label and field.field_value_type == value_type
+        ]
+        if len(matches) != 1:
             raise PassportError(
-                f"The group does not expose passport field {type_id} ({value_type}). "
+                f"Cannot uniquely map passport field {label} ({value_type}). "
                 "See get_group_settings."
             )
+        type_id = matches[0].type_id
         value = values[attribute]
         if isinstance(value, date):
             fields.append(FieldValue(type_id=type_id, date_time_value=value))

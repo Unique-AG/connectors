@@ -39,16 +39,17 @@ _ext_1_maps_to: list[str] = ["sys-1"]
 
 
 def _passport_template() -> httpx2.Response:
+    """Ids other groups do not use, so a passport field is found by its label."""
     passport_fields = [
-        ("SFCT_8", "TEXT", "GIVEN NAME"),
-        ("SFCT_9", "TEXT", "LAST NAME"),
-        ("SFCT_10", "GENDER", "GENDER"),
-        ("SFCT_11", "STATE", "ISSUING STATE"),
-        ("SFCT_12", "STATE", "NATIONALITY"),
-        ("SFCT_13", "DATE", "DATE OF BIRTH"),
-        ("SFCT_14", "PASSPORT_DOCUMENT_TYPE", "DOCUMENT TYPE"),
-        ("SFCT_15", "TEXT", "IDENTIFICATION NUMBER"),
-        ("SFCT_16", "DATE", "DATE OF EXPIRY"),
+        ("SFCT_108", "TEXT", "GIVEN NAME"),
+        ("SFCT_109", "TEXT", "LAST NAME"),
+        ("SFCT_110", "GENDER", "GENDER"),
+        ("SFCT_111", "STATE", "ISSUING STATE"),
+        ("SFCT_112", "STATE", "NATIONALITY"),
+        ("SFCT_113", "DATE", "DATE OF BIRTH"),
+        ("SFCT_114", "PASSPORT_DOCUMENT_TYPE", "DOCUMENT TYPE"),
+        ("SFCT_115", "TEXT", "IDENTIFICATION NUMBER"),
+        ("SFCT_116", "DATE", "DATE OF EXPIRY"),
     ]
     return _json(
         200,
@@ -284,7 +285,10 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             assert body["query"] == 'primaryName=="Ada"'
             assert body["filter"] == '(lifecycleState==UNARCHIVED);groupId=="g1"'
         else:
-            assert body["filter"] == 'groupId=="g1"'
+            assert body["filter"] in {
+                'groupId=="g1"',
+                '(primaryName=="Ada (Countess)");groupId=="g1"',
+            }
         return _json(
             200,
             {
@@ -396,7 +400,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         assert "MEDIA_CHECK" not in providers
         if providers == ["WATCHLIST", "PASSPORT_CHECK"]:
             secondary = cast(list[dict[str, object]], body["secondaryFields"])
-            assert {"typeId": "SFCT_8", "value": "Ada"} in secondary
+            assert {"typeId": "SFCT_108", "value": "Ada"} in secondary
             return _json(
                 200,
                 _screened(
@@ -578,6 +582,27 @@ async def test_search_cases_keeps_the_group_filter_with_the_query() -> None:
     page = result.structured_content
     assert page is not None
     assert page["cases"][0]["name"] == "Ada Lovelace"
+
+
+@pytest.mark.parametrize(
+    "expression",
+    ['lifecycleState==UNARCHIVED),groupId=="other"', "(lifecycleState==UNARCHIVED"],
+)
+async def test_search_cases_refuses_an_expression_that_could_escape_the_group_filter(
+    expression: str,
+) -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Balance the parentheses"):
+            await client.call_tool("search_cases", {"group_id": "g1", "expression": expression})
+
+
+async def test_search_cases_accepts_a_parenthesis_inside_a_quoted_value() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "search_cases", {"group_id": "g1", "expression": 'primaryName=="Ada (Countess)"'}
+        )
+
+    assert result.structured_content is not None
 
 
 async def test_get_case_results_resolves_an_external_case_id() -> None:

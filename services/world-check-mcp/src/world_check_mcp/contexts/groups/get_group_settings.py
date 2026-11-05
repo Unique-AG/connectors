@@ -1,3 +1,5 @@
+import asyncio
+
 from mcp_observability import traced
 
 from world_check_mcp.contexts.groups.models import GroupSettings
@@ -24,17 +26,19 @@ from world_check_mcp.upstream import Upstream
 @traced(arguments=("group_id",))
 async def get_group_settings(*, upstream: Upstream, group_id: str) -> GroupSettings:
     """The group's template and the resolution choices its matches accept."""
-    group = await upstream.call(
-        GET_GROUP_BY_ID, GetGroupByIdRequest(path=GetGroupByIdPath(group_id=group_id))
-    )
-    template = await upstream.call(
-        GET_CASE_TEMPLATE_FOR_GROUP,
-        GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
-    )
-    toolkits = await upstream.call(
-        GET_RESOLUTION_TOOLKITS_FOR_GROUP,
-        GetResolutionToolkitsForGroupRequest(
-            path=GetResolutionToolkitsForGroupPath(group_id=group_id)
+    group, template, toolkits = await asyncio.gather(
+        upstream.call(
+            GET_GROUP_BY_ID, GetGroupByIdRequest(path=GetGroupByIdPath(group_id=group_id))
+        ),
+        upstream.call(
+            GET_CASE_TEMPLATE_FOR_GROUP,
+            GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
+        ),
+        upstream.call(
+            GET_RESOLUTION_TOOLKITS_FOR_GROUP,
+            GetResolutionToolkitsForGroupRequest(
+                path=GetResolutionToolkitsForGroupPath(group_id=group_id)
+            ),
         ),
     )
     return GroupSettings(
