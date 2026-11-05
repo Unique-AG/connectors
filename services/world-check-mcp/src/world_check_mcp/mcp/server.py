@@ -10,6 +10,9 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import AuthProvider
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
+from mcp_configs import RateLimitSettings
+from mcp_observability import access_token_subject
+from mcp_observability import RateLimitMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
@@ -32,6 +35,7 @@ def create_server(
     transport: httpx2.AsyncBaseTransport | None = None,
     *,
     auth: AuthProvider | None = None,
+    rate_limit: RateLimitSettings | None = None,
 ) -> FastMCP:
     """Build the server. `open_persistence` opens every store, so the tests can open their own."""
     http = upstream_http(upstream, transport)
@@ -48,6 +52,13 @@ def create_server(
                 "approvals": ApprovalGate(),
             }
 
+    # Every signed-in user shares one LSEG service account, so one caller must not use up its
+    # quota for the others.
+    rate_limiting = (
+        [RateLimitMiddleware(rate_limit, get_request_key=access_token_subject)]
+        if rate_limit is not None
+        else []
+    )
     mcp = FastMCP(
         name="World Check MCP",
         version=version("world-check-mcp"),
@@ -58,7 +69,7 @@ def create_server(
         lifespan=lifespan,
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware()],
+        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")

@@ -4,11 +4,17 @@ from collections.abc import Iterator
 
 from fastmcp import FastMCP
 from fastmcp.server.auth import StaticTokenVerifier
+from mcp_configs import RateLimitSettings
 from mcp_configs import ServerSettings
+from mcp_observability import RateLimitMiddleware
 from pydantic import AnyHttpUrl
 import pytest
 from starlette.testclient import TestClient
 
+from tests.offline_server import fake_upstream_settings
+from tests.offline_server import open_fake_persistence
+from tests.offline_server import unanswered_upstream
+from world_check_mcp.mcp import create_server
 from world_check_mcp.mcp import http_app
 from world_check_mcp.mcp import run_server
 
@@ -109,3 +115,19 @@ def test_uvicorn_logs_through_the_pino_handler(
     run_server(server, server_settings)
 
     assert uvicorn_configs == [{"access_log": False, "log_config": None}]
+
+
+@pytest.mark.parametrize(
+    ("rate_limit", "limited"),
+    [(RateLimitSettings(tool_calls_per_window=5, window_seconds=60), True), (None, False)],
+)
+def test_a_rate_limit_counts_the_tool_calls_of_each_user(
+    rate_limit: RateLimitSettings | None, limited: bool
+) -> None:
+    server = create_server(
+        fake_upstream_settings(),
+        open_fake_persistence,
+        unanswered_upstream(),
+        rate_limit=rate_limit,
+    )
+    assert any(isinstance(item, RateLimitMiddleware) for item in server.middleware) is limited
