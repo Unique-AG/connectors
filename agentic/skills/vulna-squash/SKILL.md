@@ -38,7 +38,7 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 3. Drop an alert when any of these is true:
    - The severity is not `critical` or `high`.
    - No fixed version exists, or the fix is younger than 3 days. The age check does not apply to operating system packages.
-   - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
+   - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. The tracker lists Debian source packages, so use the row of the source package of the alerted package (for example, `libapt-pkg7.0` has the source package `apt`). A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
    - `main` already holds the fixed version.
    - An open PR with the label `dependencies` already changes the package. The nightly job covers it.
    - A closed PR that was not merged names the same package and version. A person rejected it.
