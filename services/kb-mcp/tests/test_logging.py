@@ -69,6 +69,23 @@ def test_redacts_the_keys_and_the_decoded_database_password(
     )
 
 
+def test_redacts_a_database_password_given_in_the_query_string(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("ZITADEL_JWT_SIGNING_KEY", _JWT_SIGNING_KEY)
+    monkeypatch.setenv("ENCRYPTION_KEY", _ENCRYPTION_KEY)
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://kb@db:5432/kb?password=db%2Fpassword-2&sslmode=require",
+    )
+    monkeypatch.setenv("ALLOW_EPHEMERAL_OAUTH_STORAGE", "false")
+
+    _run_main()
+    logging.getLogger("kb_mcp.tests").warning("connecting with db/password-2")
+
+    assert _test_message(capsys) == "connecting with [Redacted]"
+
+
 def test_redacts_the_signing_key_with_ephemeral_storage_and_no_app_key(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

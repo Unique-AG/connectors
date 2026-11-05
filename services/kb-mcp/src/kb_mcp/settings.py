@@ -186,12 +186,15 @@ class Settings(BaseSettings):
         return frozenset(names)
 
     def secret_values(self) -> tuple[str, ...]:
-        """Every configured secret, with the database password URL-decoded."""
+        """Every configured secret, with the database password URL-decoded. asyncpg reads the
+        password from either the URL's userinfo or its `password` query parameter."""
         keys = (self.zitadel_jwt_signing_key, self.encryption_key, self.unique_app_key)
         hosts = self.database_url.hosts() if self.database_url else []
+        query = self.database_url.query_params() if self.database_url else []
         return (
             *(key.get_secret_value() for key in keys if key is not None),
             *(unquote(host["password"]) for host in hosts if host["password"]),
+            *(value for name, value in query if name == "password" and value),
         )
 
     def disabled_tool_names(self) -> frozenset[str]:
