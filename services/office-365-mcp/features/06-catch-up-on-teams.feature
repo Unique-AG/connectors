@@ -19,7 +19,7 @@ Feature: Catching up on Teams
       When Mia asks her assistant for her chats
       Then the assistant shows that chat as the chat with Anna and Tom
 
-    @happy @uc-06-34 @deferred
+    @happy @uc-06-34
     Scenario: Unread posts in channels are listed
       Given Mia belongs to the team "Sales", and 2 posts in its channel "Offers" are unread
       When Mia asks her assistant what she missed in her Teams channels
@@ -28,7 +28,7 @@ Feature: Catching up on Teams
 
   Rule: The assistant finds a message in any chat or channel
 
-    @happy @uc-06-03 @deferred
+    @happy @uc-06-03
     Scenario: A topic is found in a chat and in a channel
       Given Tom wrote about the pricing change in a chat with Mia
       And Priya wrote about the pricing change in the channel "Sales"
@@ -44,7 +44,7 @@ Feature: Catching up on Teams
       And it includes the 4 replies under their post
       And it says whether it read all posts of the channel
 
-    @happy @uc-06-09 @deferred
+    @happy @uc-06-09
     Scenario: Messages that mention Mia are found
       Given Tom mentioned Mia in a chat on Monday
       And Priya mentioned Mia in the channel "Sales" on Tuesday
@@ -52,7 +52,7 @@ Feature: Catching up on Teams
       Then the assistant shows the message of Tom
       And it shows the message of Priya
 
-    @happy @uc-06-10 @deferred
+    @happy @uc-06-10
     Scenario: The messages of one person in a time window are found
       Given Tom wrote in a chat yesterday and in the channel "Sales" yesterday
       And Tom also wrote in a chat last week
@@ -321,14 +321,14 @@ Feature: Catching up on Teams
 
   Rule: The assistant finds a message by what it says
 
-    @happy @uc-06-42 @deferred
+    @happy @uc-06-42
     Scenario: A search shows the full text and the reactions of each message that it finds
       Given Tom wrote "I send the offer to the customer" in a chat, and Anna reacted to the message
       When Mia asks her assistant to find "offer" and to show the full text of each message
       Then the assistant shows the full text of the message of Tom
       And it shows that Anna reacted to the message
 
-    @happy @uc-06-43 @deferred
+    @happy @uc-06-43
     Scenario Outline: A search is narrowed by one more condition
       Given Mia, Anna, and Tom wrote about "offer" in Teams
       When Mia asks her assistant to find "offer" <condition>
@@ -341,7 +341,7 @@ Feature: Catching up on Teams
         | in the messages that have an attachment   |
         | in the messages that Tom sent before 9:00 |
 
-    @unhappy @uc-06-44 @deferred
+    @unhappy @uc-06-44
     Scenario Outline: A message that Microsoft sends without a sender or without an address is shown as far as it can be
       Given Microsoft finds a message for "offer" <problem>
       When Mia asks her assistant to find "offer" and to show the full text of each message
@@ -352,7 +352,7 @@ Feature: Catching up on Teams
         | and names no sender or no id of the message   | does not list the message                                         |
         | and names no chat and no channel for it       | lists the message without its text and without a way to open it |
 
-    @unhappy @uc-06-45 @deferred
+    @unhappy @uc-06-45
     Scenario: A search that Microsoft answers with no list of results finds nothing
       Given Microsoft answers the search for "offer" with no list of results
       When Mia asks her assistant to find "offer"

@@ -618,7 +618,7 @@ SHAPES.update(
                                     "rank": 1,
                                     "summary": "The <c0>Alpine</c0> Print offer",
                                     "resource": {
-                                        "@odata.type": "#microsoft.graph.chatMessage",
+                                        "@odata.type": "microsoft.graph.chatMessage",
                                         "id": POST,
                                         "createdDateTime": "2026-10-28T09:00:00Z",
                                         "from": {

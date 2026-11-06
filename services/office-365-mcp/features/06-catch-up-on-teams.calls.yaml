@@ -27,8 +27,6 @@ uc-06-02:
       args: {include_member_emails: true}
 
 uc-06-03:
-  deferred:
-    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_finds_a_topic_in_a_chat_and_in_a_channel"
@@ -135,8 +133,6 @@ uc-06-08:
       uses: {meeting_uri: uri of the meeting}
 
 uc-06-09:
-  deferred:
-    - teams_search_messages-lena
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_for_messages_that_mention_mia"
@@ -151,8 +147,6 @@ uc-06-09:
       uses: {uri: uri of a hit}
 
 uc-06-10:
-  deferred:
-    - teams_search_messages-person-window
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_the_messages_of_one_person_in_a_time_window"
@@ -550,8 +544,6 @@ uc-06-30:
   note: "One call reads at most 50 chats. Expected behaviour from src/office_365_mcp/tools/teams_list_chats.py:42 and :215-222: capped is true when the walk stopped after it collected the limit; chats can remain beyond what the call reached; the assistant says so and does not call the result the full answer."
 
 uc-06-34:
-  deferred:
-    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_finds_unread_posts_of_channels_through_the_read_state_search"
@@ -570,7 +562,6 @@ uc-06-35:
   deferred:
     - teams_list_meeting_transcripts-past
     - teams_read_transcript-past
-    - teams_search_messages-person-window
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_the_summary_from_the_transcript_and_the_message_written_after_it"
@@ -642,9 +633,6 @@ uc-06-40:
   note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner."
 
 uc-06-42:
-  deferred:
-    - teams_search_messages-alpine
-    - teams_search_messages-lena
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_the_full_text_and_the_reactions_of_each_hit_when_mia_asks_for_it"
@@ -654,11 +642,9 @@ uc-06-42:
   chain:
     - tool: teams_search_messages
       args: {query: offer, include_body: true}
-  note: "Microsoft sends chatMessage without a hash, so the tool drops every real hit today. The test answers with hits that have the hash. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:247: with include_body the tool reads the full message of each hit, in its chat or its channel."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py: with include_body the tool reads the full message of each hit, in its chat or its channel."
 
 uc-06-43:
-  deferred:
-    - teams_search_messages-person-window
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_narrows_a_search_by_one_more_condition"
@@ -668,11 +654,9 @@ uc-06-43:
   chain:
     - tool: teams_search_messages
       args: {query: offer}
-  note: "Rows 1 to 4 are recipient, mentions, has_attachment, and sent_before. Microsoft sends chatMessage without a hash, so the tool drops every real hit today. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:170: each condition becomes one term of the search text."
+  note: "Rows 1 to 4 are recipient, mentions, has_attachment, and sent_before. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:170: each condition becomes one term of the search text."
 
 uc-06-44:
-  deferred:
-    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_leaves_out_a_hit_that_names_no_sender_or_no_message"
@@ -687,8 +671,6 @@ uc-06-44:
   note: "Row 1 is a hit with no sender or no message id, and row 2 is a hit with no chat and no channel. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:106 and src/office_365_mcp/tools/teams_search_messages.py:299: a hit with no sender or no message id is left out; a hit with no address has no uri, and the tool reads no text for it."
 
 uc-06-45:
-  deferred:
-    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_finds_nothing_when_microsoft_answers_with_no_hits_container"

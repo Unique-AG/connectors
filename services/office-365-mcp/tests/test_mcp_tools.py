@@ -46,7 +46,7 @@ _ME = {
 }
 
 _SEARCH_HIT_RESOURCE = {
-    "@odata.type": "#microsoft.graph.chatMessage",
+    "@odata.type": "microsoft.graph.chatMessage",
     "id": "1770000000000",
     "chatId": "19:release@thread.v2",
     "createdDateTime": "2026-02-11T09:15:22.31Z",
@@ -1686,6 +1686,40 @@ class TestCallingThem:
                 "https://graph.microsoft.com/ChannelMessage.Read.All",
             )
         ]
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "odata_type",
+        [
+            pytest.param("microsoft.graph.chatMessage", id="without-hash"),
+            pytest.param("#microsoft.graph.chatMessage", id="with-hash"),
+        ],
+    )
+    async def test_teams_search_messages_reads_a_hit_whatever_the_type_spelling(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        odata_type: str,
+    ) -> None:
+        link = "https://teams.microsoft.invalid/l/message/19:release@thread.v2/1770000000000"
+        hit = {**_SEARCH_HIT_RESOURCE, "@odata.type": odata_type, "webLink": link}
+        search = {
+            "value": [
+                {
+                    "hitsContainers": [
+                        {"hits": [{"hitId": "1", "rank": 1, "resource": hit}], "total": 1}
+                    ]
+                }
+            ]
+        }
+        graph.post("/search/query").mock(return_value=httpx.Response(200, json=search))
+
+        result = await mcp_client.call_tool("teams_search_messages", {"query": "release"})
+
+        (message,) = cast("Sequence[Mapping[str, object]]", _structured(result)["messages"])
+        assert message["uri"] == "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
+        assert cast("Mapping[str, object]", message["sender"])["display_name"] == "Ada Lovelace"
+        assert message["web_url"] == link
 
     async def test_a_handle_from_a_search_result_reads_the_message_behind_it(
         self,

@@ -1,4 +1,5 @@
 import asyncio
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import UTC, date, datetime
@@ -8,6 +9,7 @@ from uuid import UUID
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from kiota_serialization_json.json_parse_node_factory import JsonParseNodeFactory
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.entity_type import EntityType
 from msgraph.generated.models.search_hit import SearchHit
@@ -19,7 +21,13 @@ from msgraph.generated.search.query.query_post_response import QueryPostResponse
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step
+from office_365_mcp.graph_client import (
+    GraphFailure,
+    fetch_response,
+    graph_errors,
+    graph_step,
+    native_response,
+)
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     CHAT_PERMISSION,
@@ -47,6 +55,8 @@ GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "release"}
 
 _HYDRATION_CONCURRENCY = 3
+
+_UNHASHED_GRAPH_TYPE = re.compile(rb'("@odata\.type"\s*:\s*")(microsoft\.graph\.)')
 
 _DESCRIPTION = (
     "Searches every Teams message the signed-in user can see, by keyword, sender, mention, "
@@ -82,7 +92,7 @@ class MessageHit(BaseModel):
     last_modified_at: datetime | None = Field(description="When the message was last modified.")
     importance: str | None = Field(description="`normal`, `high`, or `urgent`.")
     web_url: str | None = Field(
-        description="A link to open the message in Teams; null for chat messages."
+        description="A link to open the message in Teams; null when Graph sends none."
     )
     body: str | None = Field(
         description=(
@@ -126,7 +136,7 @@ class MessageHit(BaseModel):
             created_at=resource.created_date_time,
             last_modified_at=resource.last_modified_date_time,
             importance=resource.importance,
-            web_url=resource.web_url,
+            web_url=resource.web_url or _web_link(resource),
             body=None,
             body_is_plain_text=False,
             reactions=[],
@@ -225,9 +235,8 @@ async def teams_search_messages(
     )
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SEARCH):
-            response = await client.search.query.post(body)
+            response = await _search(client, body)
 
-        assert response is not None, "Graph answered POST /search/query with no response"
         container = _hits_container(response)
         hits = (container.hits or []) if container is not None else []
         more_to_come = bool(container.more_results_available) if container else False
@@ -242,6 +251,23 @@ async def teams_search_messages(
         messages=messages,
         next_offset=offset + len(hits) if more_to_come and hits else None,
     )
+
+
+async def _search(client: GraphServiceClient, body: QueryPostRequestBody) -> QueryPostResponse:
+    request = client.search.query.to_post_request_information(body)
+    request.add_request_options(native_response())
+    fetched = await fetch_response(client, request)
+    node = JsonParseNodeFactory().get_root_parse_node(
+        "application/json", _UNHASHED_GRAPH_TYPE.sub(rb"\1#\2", fetched.content)
+    )
+    response = node.get_object_value(QueryPostResponse)
+    assert response is not None, "Graph answered POST /search/query with no response"
+    return response
+
+
+def _web_link(message: ChatMessage) -> str | None:
+    link = (message.additional_data or {}).get("webLink")
+    return link if isinstance(link, str) else None
 
 
 async def _hydrated(client: GraphServiceClient, hits: list[MessageHit]) -> list[MessageHit]:

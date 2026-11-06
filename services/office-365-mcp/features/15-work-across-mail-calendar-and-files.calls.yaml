@@ -128,8 +128,6 @@ uc-15-06:
   note: an address never comes from the text of a message.
 
 uc-15-07:
-  deferred:
-    - teams_search_messages-alpine
   status: untested
   tests:
     - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestEverythingAboutOneCustomerIsGathered"
@@ -219,8 +217,6 @@ uc-15-11:
   note: a file attached to the mail is not copied, which is the gap of uc-10-10.
 
 uc-15-12:
-  deferred:
-    - teams_search_messages-person-window
   status: partly
   tests:
     - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_a_teams_message_links"

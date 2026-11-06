@@ -106,7 +106,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 25 of 716. Recorder cases with a `deferred` reason: 21. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 15 of 716. Recorder cases with a `deferred` reason: 18. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |
@@ -128,9 +128,6 @@ Scenarios tagged `@deferred`: 25 of 716. Recorder cases with a `deferred` reason
 | `teams_read_meeting-past` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-13-39` |
 | `teams_read_transcript-lines` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-06-05` |
 | `teams_read_transcript-past` | A person holds one Teams meeting at a time. Mia, Anna and Tom must join and record one. | `uc-06-05`, `uc-06-15`, `uc-06-35`, `uc-15-09` |
-| `teams_search_messages-alpine` | Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change. | `uc-06-03`, `uc-06-34`, `uc-06-42`, `uc-06-44`, `uc-06-45`, `uc-15-07` |
-| `teams_search_messages-lena` | Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change. | `uc-06-09`, `uc-06-42` |
-| `teams_search_messages-person-window` | Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change. | `uc-06-10`, `uc-06-35`, `uc-06-43`, `uc-15-12` |
 
 ## Tool coverage
 

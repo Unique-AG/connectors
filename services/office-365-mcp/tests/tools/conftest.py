@@ -186,7 +186,7 @@ def channel_hit(
 
 def _chat_message(*, message_id: str, sender: Mapping[str, object] | None) -> dict[str, object]:
     return {
-        "@odata.type": "#microsoft.graph.chatMessage",
+        "@odata.type": "microsoft.graph.chatMessage",
         "id": message_id,
         "createdDateTime": "2026-02-11T09:15:22.31Z",
         "lastModifiedDateTime": "2026-02-11T09:20:00Z",
