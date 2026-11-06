@@ -36,8 +36,8 @@ class Step:
 
 
 def site_id(drive: Mapping[str, Any]) -> str | None:
-    """The Graph site id (host,SPSite id,SPWeb id) from the `sharepointIds` of a drive."""
-    ids = drive.get("sharepointIds")
+    """The Graph site id (host,SPSite id,SPWeb id) from a drive's SharePoint ids."""
+    ids = drive.get("sharePointIds") or drive.get("sharepointIds")
     if not ids:
         return None
     return f"{urlsplit(ids['siteUrl']).hostname},{ids['siteId']},{ids['webId']}"

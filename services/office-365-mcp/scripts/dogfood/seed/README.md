@@ -30,6 +30,8 @@ recorder replaces any text that is not seed text, but unknown mail still changes
 1. The Entra app registration has "Allow public client flows" = Yes. The device-code flow needs it.
 2. The app has these delegated permissions with consent: Mail.ReadWrite, Calendars.ReadWrite,
    Contacts.ReadWrite, Files.ReadWrite, Files.Read.All, Sites.Read.All, Team.Create and User.Read.
+   The opt-in phase `lists` also needs Sites.Manage.All, and only to create a list or a column.
+   `run_all.sh` does not ask for it. Grant it for that apply, then it can be removed.
 3. `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `SEED_UPNS` are set in your shell. Do not put a client
    secret in the environment.
 
@@ -136,13 +138,15 @@ idempotent: a file, folder, list, column or row that is already there is not mad
   The site can need some minutes. If the library is not ready, the run stops. Run it again later.
   It needs the permission Channel.Create. `cleanup` keeps the channel.
 - `lists` is opt-in and runs as Mia. It needs the team. It reads the site id from the
-  `sharepointIds` of the team library and makes the generic lists `seed-v1 Tasks` and
+  `sharePointIds` of the team library and makes the generic lists `seed-v1 Tasks` and
   `seed-v1 Issues` on that site. `seed-v1 Tasks` gets the columns `Status` (choice, indexed),
   `Amount` (number), `Notes` (text) and `Owner` (person, left empty), and the row
   `seed-v1 Close books`. Mia's OneDrive root gets the folder `seed-v1 Tasks`, so a folder and a list
-  share a name. Creating a list or a column needs Sites.Manage.All, which `run_all.sh` does not
-  ask for. Put the token of `get_token.py <Mia UPN> --scopes Sites.Manage.All` in `GRAPH_TOKEN` and
-  run `seed.py apply --as 1 --phases lists`. `cleanup --phases lists` and the case sweep
+  share a name. Creating a list or a column needs Sites.Manage.All. The standing consent above
+  and `run_all.sh` do not include it. Grant it for this apply, then it can be removed. Put the
+  token of `get_token.py <Mia UPN> --scopes Sites.Manage.All` in `GRAPH_TOKEN` and run
+  `seed.py apply --as 1 --phases lists`. Reading or changing a row does not need it.
+  `cleanup --phases lists` and the case sweep
   delete the rows of both lists whose Title starts with `seed-v1 case-`. They keep the lists, the
   columns and `seed-v1 Close books`.
 

@@ -472,7 +472,7 @@ class ListFake(DriveFake):
             self.calls.append((request.method, path))
             ids = {"siteId": "spsite-1", "webId": "spweb-1"}
             ids["siteUrl"] = "https://contoso.sharepoint.com/sites/seed-team"
-            return httpx.Response(200, json={"id": "b!team", "sharepointIds": ids})
+            return httpx.Response(200, json={"id": "b!team", "sharePointIds": ids})
         found = re.fullmatch(
             rf"/sites/{re.escape(SITE)}/lists(?:/([^/]+)(?:/(columns|items)(?:/([^/]+))?)?)?", path
         )
