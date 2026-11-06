@@ -581,6 +581,7 @@ class TestAChannelWithItsReplies:
             channel_id=CHANNEL_ID,
             limit=1,
             page_token=link,
+            include_window_completeness=True,
         )
 
         ids = {m["message_id"] for m in _rows(second, "messages")}

@@ -67,7 +67,8 @@ class ChannelPosts(BaseModel):
     posts_cut_to_limit: bool | None = Field(
         description=(
             "Whether the page held more posts than `limit`; null unless "
-            "`include_window_completeness` is set."
+            "`include_window_completeness` is set. Null on a next page, because a next page "
+            "keeps every post."
         )
     )
     next_page_token: str | None = Field(
@@ -129,7 +130,9 @@ async def teams_browse_channel(
     return ChannelPosts(
         messages=messages,
         more_posts_in_channel=bool(page.odata_next_link) if include_window_completeness else None,
-        posts_cut_to_limit=len(kept) < len(posts) if include_window_completeness else None,
+        posts_cut_to_limit=(
+            len(kept) < len(posts) if include_window_completeness and page_token is None else None
+        ),
         next_page_token=page.odata_next_link,
     )
 
