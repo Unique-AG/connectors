@@ -7,6 +7,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { NewTrace } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { DiscoverDelegatedAccessCommand } from './discover-delegated-access.command';
 import { DiscoverDelegatedAccessEventDto } from './discover-delegated-access-event.dto';
 
@@ -26,6 +27,7 @@ export class DiscoverDelegatedAccessListener {
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   @NewTrace('amqp.discover-delegated-access')
   public async onDiscoverDelegatedAccessEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = DiscoverDelegatedAccessEventDto.parse(payload);

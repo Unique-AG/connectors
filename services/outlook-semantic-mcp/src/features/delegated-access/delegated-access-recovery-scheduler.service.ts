@@ -9,6 +9,7 @@ import {
   DelegatedAccessVerificationCacheType,
 } from '~/db/schema/cache/cache.data';
 import { NewTrace } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { PersistentCacheService } from '../persistent-cache/persistent-cache.service';
 import {
   DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
@@ -69,6 +70,8 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
     this.schedulerRegistry.addCronJob('delegated-access-recovery', job);
     job.start();
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.delegated-access-recovery')
   public async runRecovery(): Promise<void> {

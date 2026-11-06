@@ -12,6 +12,7 @@ import { AppConfig, appConfig, McpBackendType } from '~/config';
 import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.query';
 import { NewTrace } from '~/features/tracing.utils';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { SyncDirectoriesCommand } from '../directories-sync/sync-directories.command';
 import { SubscriptionCreateService } from '../subscriptions/subscription-create.service';
 
@@ -36,6 +37,7 @@ export class PostAuthorizationListener {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   @NewTrace('amqp.post-authorization')
   public async onUserAuthorized(@RabbitPayload() payload: unknown): Promise<void> {
     const event = UserAuthorizedEventDto.parse(payload);

@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 127 tools in total.
+- **Size:** 129 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -58,6 +58,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`teams-messages`](#teams-messages) | Find and read Teams messages. | 5 | ⚠️ Yes |
 | [`teams-channels`](#teams-channels) | Walk teams and read channel posts. | 4 | ⚠️ Yes |
 | [`teams-transcripts`](#teams-transcripts) | Find a meeting and read its transcript. | 3 | ⚠️ Yes |
+| [`teams-call-transcripts`](#teams-call-transcripts) | Find a call and read its transcript. | 3 | ⚠️ Yes |
 | [`teams-recordings`](#teams-recordings) | See whether a meeting was recorded. | 2 | ⚠️ Yes |
 | [`teams-meetings`](#teams-meetings) | Read transcripts and recording details of a meeting. | 4 | ⚠️ Yes |
 | [`teams-write`](#teams-write) | Post messages and reactions in chats and channels. | 8 | No |
@@ -172,7 +173,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 - Search every Teams message that you can see.
 - Read the transcript of a meeting, and see whether a recording exists.
 
-**Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder` and `teams_read_meeting`.
+**Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder`, `teams_read_meeting`, `teams_list_call_transcripts`, and `teams_read_call_transcript`. Call transcripts are on [`teams-call-transcripts`](#teams-call-transcripts).
 
 **Tools**
 
@@ -294,6 +295,36 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 
 - **Graph permissions (4):** `Chat.Read`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `User.Read`
 - **Admin consent:** ⚠️ Required for `OnlineMeetingTranscript.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-call-transcripts`
+
+**3 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- List your chats and your call transcripts.
+- Narrow the list to one chat.
+- Read one transcript, one page at a time.
+
+**Note:** Adding this preset leaves `teams`, `teams-meetings`, and `teams-transcripts` unchanged. Name `teams-transcripts` as well to read meeting transcripts. Each reader needs an Office 365 license. A user reads only calls they were on. As observed in one test tenant against one external tenant, a transcript is readable only when our side started the transcription (1:1) or the call (group). Otherwise Teams shows the user the transcript but Unique cannot read it. Only transcribed calls are listed, from 1 to 2 minutes after the call ends. PSTN calls and calls with guests are not tested yet.
+
+Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PSTN calls, `AllowTranscription` for group calls, and Graph transcript access. Speaker attribution is optional; when it is unavailable, `teams_read_call_transcript` returns turns with null speaker names. A policy change can take hours to reach users. A calling policy with Copilot on and transcription off keeps no transcript.
+
+**Risk:** `teams_list_call_transcripts` calls `adhocCalls/getAllTranscripts`, which Microsoft documents for application permissions only. It works with the user's delegated token today. If Microsoft stops accepting that, the list tool fails and there is no delegated fallback.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_call_transcripts` | 🟢 Read | — | Lists call transcripts, newest first. The optional argument is `chat_id`, the id `teams_list_chats` reports, not `chat_uri`. |
+| `teams_read_call_transcript` | 🟢 Read | — | Reads one page of a call transcript, as timestamped turns with speaker names when available. |
+
+**What it needs**
+
+- **Graph permissions (3):** `CallTranscripts.Read.All`, `Chat.Read`, `User.Read`
+- **Admin consent:** ⚠️ Required for `CallTranscripts.Read.All`. Register it before anyone signs in to a deployment that uses this preset. `terraform apply` with the preset adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. For a multi-tenant app (`sign_in_audience = "AzureADMultipleOrgs"`), customer-tenant administrators must also grant consent through `admin_consent_url`, even when `service_principal_configuration` is set. Existing users should not need to sign in again after consent. This is not confirmed on a test tenant yet. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
 - **User approval:** None. No tool of this preset asks the user.
 
 ### `teams-recordings`
@@ -1284,7 +1315,7 @@ mcpConfig:
     preset: teams        # or: enabled: [get_me, teams_list_chats]
 ```
 
-The `preset` key names one of the 39 presets in the [preset index](#preset-index), or several of
+The `preset` key names one of the 40 presets in the [preset index](#preset-index), or several of
 them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
 exact list of tool names instead. Write that list as a YAML list or as one comma-separated string.
 The `tools_preset` input of the Terraform module takes the same comma-separated string. A deployment
@@ -1315,7 +1346,7 @@ Two things can go wrong:
 
 ## Reference: every tool
 
-This reference lists all 127 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 129 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1346,6 +1377,8 @@ This reference lists all 127 tools. Use it to build an `enabled` list, or to fin
 | `teams_delete_message` | 🔴 Write, changes or removes | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | ⚠️ Yes | ✋ Always |
 | `teams_list_meeting_transcripts` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | ⚠️ Yes | — |
 | `teams_read_transcript` | 🟢 Read | `OnlineMeetingTranscript.Read.All` | ⚠️ Yes | — |
+| `teams_list_call_transcripts` | 🟢 Read | `CallTranscripts.Read.All`, `Chat.Read`, `User.Read` | ⚠️ Yes | — |
+| `teams_read_call_transcript` | 🟢 Read | `CallTranscripts.Read.All` | ⚠️ Yes | — |
 | `teams_list_meeting_recordings` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All`, `User.Read` | ⚠️ Yes | — |
 | `teams_read_meeting` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingArtifact.Read.All`, `User.Read` | No | — |
 | `teams_create_meeting` | 🟠 Write, safe to repeat | `OnlineMeetings.ReadWrite` | No | ✋ Always |

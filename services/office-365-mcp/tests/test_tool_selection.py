@@ -410,6 +410,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
+    "teams_list_call_transcripts": {"chat_id": ("teams_list_chats",)},
+    "teams_read_call_transcript": {"uri": ("teams_list_call_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_create_meeting": {
@@ -957,6 +959,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (
         ToolsPreset.TEAMS_TRANSCRIPTS,
         ("User.Read", "Chat.Read", "OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
+        1,
+        4,
+    ),
+    (
+        ToolsPreset.TEAMS_CALL_TRANSCRIPTS,
+        ("User.Read", "Chat.Read", "CallTranscripts.Read.All"),
         1,
         4,
     ),

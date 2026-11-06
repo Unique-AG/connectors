@@ -262,9 +262,14 @@ def test_a_bug_of_our_own_is_not_reported_as_graph_being_unavailable() -> None:
 
 @pytest.mark.parametrize(
     ("status", "reason"),
-    [(400, "Invalid filter clause."), (409, "Invalid filter clause."), (403, None), (404, None)],
+    [
+        (400, "Invalid filter clause."),
+        (409, "Invalid filter clause."),
+        (403, "Invalid filter clause."),
+        (404, None),
+    ],
 )
-async def test_only_a_rejected_request_keeps_graphs_reason_and_never_in_its_logged_message(
+async def test_graph_failures_keep_graphs_reason_out_of_their_logged_message(
     client: GraphServiceClient, graph: respx.MockRouter, status: int, reason: str | None
 ) -> None:
     graph.get("/me").mock(

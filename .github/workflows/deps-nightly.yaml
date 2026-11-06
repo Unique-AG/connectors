@@ -41,6 +41,7 @@ jobs:
       mode: ${{ inputs.dry-run && 'plan' || 'pr' }}
       entries: ${{ steps.plan.outputs.entries }}
       updates: ${{ steps.plan.outputs.updates }}
+      closes: ${{ steps.plan.outputs.closes }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -143,6 +144,52 @@ jobs:
             echo "::warning::#$NUMBER does not update from main. A person must resolve the conflict."
             echo "- #$NUMBER: main did not merge in. A person must resolve the conflict." >> "$GITHUB_STEP_SUMMARY"
           fi
+
+  close:
+    name: Close
+    needs: [plan, credentials]
+    if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.closes != '[]'
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    environment: workflow-automation # to read the credentials of the GitHub App
+    timeout-minutes: 10
+    permissions:
+      contents: read # this job reads no content, the App token does the writes
+    steps:
+      - name: Create the App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Close the pull requests that no update targets
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          CLOSES: ${{ needs.plan.outputs.closes }}
+          REQUESTED: ${{ inputs.pr }}
+        run: |
+          gh label create superseded --color ededed --description "The nightly job closed this pull request for a newer version" || true
+          status=0
+          while read -r entry; do
+            number=$(jq -r .number <<< "$entry")
+            planned=$(jq -r .head <<< "$entry")
+            current=$(gh pr view "$number" --json headRefOid --jq .headRefOid)
+            if [ "$current" != "$planned" ]; then
+              echo "- #$number: kept. A commit came after the plan." >> "$GITHUB_STEP_SUMMARY"
+              if [ -n "$REQUESTED" ]; then
+                echo "::error::#$number got a commit after the plan, so the job kept it."
+                status=1
+              fi
+              continue
+            fi
+            gh pr edit "$number" --add-label superseded
+            gh pr close "$number" --delete-branch --comment "No update targets this pull request any more. If a new version is due, the job opens a new PR."
+            echo "- #$number: closed. No update targets it any more." >> "$GITHUB_STEP_SUMMARY"
+          done < <(jq -c '.[]' <<< "$CLOSES")
+          exit "$status"
 
   bump:
     name: Bump ${{ matrix.entry.slug }}
@@ -280,6 +327,8 @@ jobs:
 
           if [ "$ACTION" = rebuild ]; then
             gh pr edit "$NUMBER" --title "$title" --body-file "$RUNNER_TEMP/pr/pr-body.md"
+            gh pr edit "$NUMBER" --remove-label ai-assisted --remove-label human-required --remove-label dependencies
+            gh pr edit "$NUMBER" --add-label dependencies
             url=$(gh pr view "$NUMBER" --json url --jq .url)
           else
             if [ "$ACTION" = replace ]; then
@@ -293,7 +342,7 @@ jobs:
 
   finish:
     name: Finish
-    needs: [plan, credentials, update, bump, publish]
+    needs: [plan, credentials, update, close, bump, publish]
     if: always() && !inputs.dry-run && inputs.pr != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 5

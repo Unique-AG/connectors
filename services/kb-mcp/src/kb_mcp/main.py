@@ -13,6 +13,9 @@ from fastmcp.server.providers.skills import SkillsDirectoryProvider
 from mcp_configs import LoggingSettings, RateLimitSettings
 from mcp_observability import (
     RateLimitMiddleware,
+    RedactRequestSecretsMiddleware,
+    RedactToolCallSecretsMiddleware,
+    SecretRedaction,
     ToolCallObservabilityMiddleware,
     access_token_subject,
     configure_logging,
@@ -103,7 +106,11 @@ def main() -> None:
     settings = get_settings()
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
-    configure_logging(LoggingSettings(), own_loggers=("kb_mcp",))
+    configure_logging(
+        LoggingSettings(),
+        own_loggers=("kb_mcp",),
+        redaction=SecretRedaction(secrets=settings.secret_values()),
+    )
     logging.getLogger("unique_toolkit.monitoring.memory").addFilter(
         _DowngradeMemoryTrimNoise()
     )
@@ -126,7 +133,9 @@ def main() -> None:
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
+        # Redaction first, so the tool-call lines are redacted too.
         middleware=[
+            RedactToolCallSecretsMiddleware(),
             ToolCallObservabilityMiddleware(),
             RateLimitMiddleware(
                 RateLimitSettings(), get_request_key=access_token_subject
@@ -139,7 +148,9 @@ def main() -> None:
 
     # No CORS: /mcp is server-side and OAuth redirects are top-level navigation.
     middleware = [
-        # First: short-circuits /probe before anything else looks at it.
+        # First, so the bearer token is redacted from every line logged below it.
+        Middleware(RedactRequestSecretsMiddleware),
+        # Short-circuits /probe before anything else of ours looks at it.
         Middleware(PoolHealthMiddleware),
         # HTTP Prometheus metrics; MCP tool spans come from FastMCP + configure_tracing.
         setup_ops(mcp),

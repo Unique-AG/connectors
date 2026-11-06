@@ -36,6 +36,7 @@ from office_365_mcp.shared.meetings import (
     newest_of,
     resolve_meeting,
     settled,
+    user_id_of,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
@@ -142,7 +143,7 @@ class RecordingSummary(BaseModel):
     @classmethod
     def from_recording(cls, recording: CallRecording, caller: str | None) -> Self:
         assert recording.id is not None, "Graph returned a recording with no id"
-        organizer = _organizer_user_id(recording)
+        organizer = user_id_of(recording.meeting_organizer)
         return cls(
             recording_id=recording.id,
             started_at=recording.created_date_time,
@@ -268,19 +269,6 @@ async def teams_list_meeting_recordings(
 def _absence(*, settled: bool) -> RecordingStatus:
     """Which empty answer to give: stop, wait, or neither."""
     return "not_recorded" if settled else "not_ready"
-
-
-def _organizer_user_id(recording: CallRecording) -> str | None:
-    """Organizer's Entra object id, or None if Graph named nobody.
-
-    TRAP: the identitySet's @odata.type is not always a known SDK type (Microsoft's own sample
-    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity); an unknown discriminator deserializes
-    to base identity, which still carries the id.
-    """
-    organizer = recording.meeting_organizer
-    if organizer is None or organizer.user is None:
-        return None
-    return organizer.user.id
 
 
 def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:

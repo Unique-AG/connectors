@@ -134,8 +134,10 @@ Scenarios tagged `@deferred`: 25 of 728. Recorder cases with a `deferred` reason
 
 ## Tool coverage
 
-126 of 127 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
+126 of 129 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
 
 | Tool | happy | unhappy | Reason |
 | --- | --- | --- | --- |
 | `outlook_list_calendar_groups` | 1 | 0 | The only condition of its own is a listing that stops after 1000 groups or calendars, which no user reaches. The faults of a read are stated for the read chain of uc-03-10. |
+| `teams_list_call_transcripts` | 0 | 0 | Call transcripts are a separate Teams surface, and the current use-case corpus covers meetings but has no call scenario yet. |
+| `teams_read_call_transcript` | 0 | 0 | Call transcripts are a separate Teams surface, and the current use-case corpus covers meetings but has no call scenario yet. |

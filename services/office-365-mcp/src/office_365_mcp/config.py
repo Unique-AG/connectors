@@ -73,6 +73,7 @@ class ToolsPreset(StrEnum):
     TEAMS_MESSAGES = "teams-messages"
     TEAMS_CHANNELS = "teams-channels"
     TEAMS_TRANSCRIPTS = "teams-transcripts"
+    TEAMS_CALL_TRANSCRIPTS = "teams-call-transcripts"
     TEAMS_RECORDINGS = "teams-recordings"
     TEAMS_MEETINGS = "teams-meetings"
     TEAMS_WRITE = "teams-write"

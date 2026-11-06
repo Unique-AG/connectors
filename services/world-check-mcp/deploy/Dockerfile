@@ -1,0 +1,33 @@
+# syntax=docker/dockerfile:1.7
+# mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
+
+FROM python:3.14-slim-trixie@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.12.10@sha256:2bb3ebca0a796a155094a27773d290c4b074572e6107f171d88d086682fd2500 /uv /bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0 UV_PROJECT_ENVIRONMENT=/app/.venv
+WORKDIR /workspace/services/world-check-mcp
+COPY packages/mcp-configs /workspace/packages/mcp-configs
+COPY packages/mcp-observability /workspace/packages/mcp-observability
+COPY packages/mcp-openapi /workspace/packages/mcp-openapi
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=services/world-check-mcp/uv.lock,target=uv.lock \
+    --mount=type=bind,source=services/world-check-mcp/pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev --no-editable
+COPY services/world-check-mcp /workspace/services/world-check-mcp
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-editable
+
+FROM python:3.14-slim-trixie@sha256:51dafde81dbdb6ebde285137a295cf18a47ca95234fe388a343719cb97305b3d AS runtime
+WORKDIR /app
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
+RUN rm -rf /usr/local/lib/python*/site-packages/pip \
+           /usr/local/lib/python*/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.* \
+ && ! python -c "import pip" 2>/dev/null
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+USER app
+EXPOSE 8000
+CMD ["world-check-mcp"]

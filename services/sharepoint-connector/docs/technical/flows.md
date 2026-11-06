@@ -303,7 +303,6 @@ IMPORTANT: For SharePoint site groups, the connector must be able to read group 
 
 - Set group visibility to "Everyone"
 - Add app principal as group member/owner
-- Grant Full Control to app principal
 
 ### Public Site and Tenant-Wide Groups
 

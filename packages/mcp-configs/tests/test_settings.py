@@ -219,6 +219,7 @@ def test_elicitation_asks_for_everything_by_default() -> None:
     assert settings.for_data_modification is Toggle.ENABLED
     assert settings.for_data_removal is Toggle.ENABLED
     assert settings.timeout_before_cancel_seconds == 120
+    assert settings.request_state_keys == []
 
 
 def test_elicitation_reads_each_toggle(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -230,6 +231,25 @@ def test_elicitation_reads_each_toggle(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.for_data_modification is Toggle.DISABLED
     assert settings.for_data_removal is Toggle.ENABLED
     assert settings.timeout_before_cancel_seconds == 45
+
+
+def test_elicitation_reads_the_request_state_keys_in_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ELICITATION_REQUEST_STATE_KEYS", f'["{"n" * 32}", "{"o" * 32}"]')
+
+    settings = ElicitationSettings()
+
+    assert [key.get_secret_value() for key in settings.request_state_keys] == ["n" * 32, "o" * 32]
+
+
+def test_elicitation_rejects_a_request_state_key_under_32_characters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ELICITATION_REQUEST_STATE_KEYS", '["short"]')
+
+    with pytest.raises(ValidationError):
+        ElicitationSettings()
 
 
 def test_elicitation_rejects_a_toggle_that_is_not_enabled_or_disabled(

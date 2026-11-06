@@ -140,6 +140,20 @@
           ]
         },
         {
+          "name": "teams_list_call_transcripts",
+          "permissions": [
+            "User.Read",
+            "Chat.Read",
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
+          "name": "teams_read_call_transcript",
+          "permissions": [
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
           "name": "teams_list_meeting_recordings",
           "permissions": [
             "OnlineMeetings.Read",
@@ -849,6 +863,8 @@
         "teams_delete_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
+        "teams_list_call_transcripts",
+        "teams_read_call_transcript",
         "teams_list_meeting_recordings",
         "teams_read_meeting",
         "teams_create_meeting",
@@ -994,6 +1010,11 @@
           "teams_list_chats",
           "teams_list_meeting_transcripts",
           "teams_read_transcript"
+        ],
+        "teams-call-transcripts": [
+          "teams_list_chats",
+          "teams_list_call_transcripts",
+          "teams_read_call_transcript"
         ],
         "teams-recordings": [
           "teams_list_chats",
@@ -1416,6 +1437,7 @@
         "ChannelMessage.ReadWrite",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
+        "CallTranscripts.Read.All",
         "OnlineMeetingRecording.Read.All",
         "OnlineMeetingArtifact.Read.All",
         "OnlineMeetings.ReadWrite",
@@ -1456,6 +1478,7 @@
         "ChannelMessage.Send": false,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
+        "CallTranscripts.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "ChannelMessage.ReadWrite": true,
         "Chat.ReadWrite": false,
