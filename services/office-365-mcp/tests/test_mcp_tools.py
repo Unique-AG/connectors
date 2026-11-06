@@ -580,6 +580,7 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
     "teams_list_chat_messages": ("sent_before",),
+    "teams_list_call_transcripts": ("created_after", "created_before"),
     "sharepoint_search_files": ("modified_after", "modified_before"),
     "onenote_list_pages": (
         "modified_after",

@@ -21,6 +21,7 @@ mock_provider "azuread" {
         "ChannelMessage.Send"              = "e2222222-2222-2222-2222-222222222222"
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
+        "CallTranscripts.Read.All"         = "9a9a9a9a-9a9a-9a9a-9a9a-9a9a9a9a9a9a"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
         "ChannelMessage.ReadWrite"         = "e3333333-3333-3333-3333-333333333333"
         "Chat.ReadWrite"                   = "e4444444-4444-4444-4444-444444444444"
@@ -188,6 +189,17 @@ run "preset_teams_transcripts" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingTranscript.Read.All"
     error_message = "teams-transcripts composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_teams_call_transcripts" {
+  variables {
+    tools_preset = "teams-call-transcripts"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,CallTranscripts.Read.All"
+    error_message = "teams-call-transcripts composed ${join(",", local.permissions)}"
   }
 }
 
