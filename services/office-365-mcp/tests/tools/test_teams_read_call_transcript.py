@@ -11,6 +11,7 @@ from fastmcp.tools import FunctionTool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
+from office_365_mcp.shared import transcripts
 from office_365_mcp.shared.handles import CallTranscriptHandle
 from office_365_mcp.tools import teams_read_call_transcript as reader
 
@@ -189,7 +190,7 @@ class TestTheRefusals:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """Graph declares the length, so this is refused before a byte of it is read."""
-        monkeypatch.setattr(reader, "MAX_TRANSCRIPT_BYTES", 64)
+        monkeypatch.setattr(transcripts, "MAX_TRANSCRIPT_BYTES", 64)
         route = graph.get(_CONTENT).mock(
             return_value=httpx.Response(200, content=TRANSCRIPT_VTT.encode())
         )

@@ -2,18 +2,26 @@
 
 import html
 import re
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Self
+from tempfile import gettempdir
+from typing import Annotated, Protocol, Self
 
 import httpx
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.headers_collection import HeadersCollection
 from kiota_abstractions.request_information import RequestInformation
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphForbidden, download_to_file, graph_step
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphResponseTooLarge,
+    download_to_file,
+    graph_step,
+)
 
 CALL_TRANSCRIPT_PERMISSION = "CallTranscripts.Read.All"
 
@@ -159,20 +167,52 @@ class _Window:
     speaker: str | None
 
 
-async def read_turns(
+class TranscriptPage(BaseModel):
+    speaker_attribution: bool = Field(
+        description=(
+            "If this value is true, the turns name the speakers. If this value is false, the "
+            "tenant disabled speaker names, and every `speaker` is null. Do not infer who spoke "
+            "from the content of a turn."
+        )
+    )
+    turns: list[TranscriptTurn] = Field(
+        description=(
+            "This list holds the turns that match the filters. If the caller gives no filter, "
+            "this list holds every turn. An empty list means that nothing matched. An empty "
+            "list does not mean that nobody spoke."
+        )
+    )
+    next_offset: int | None = Field(
+        description=(
+            "The offset of the next page of matching turns. If this page is the last page, this "
+            "value is null. To continue, pass this value back as `offset` with the same filters."
+        )
+    )
+
+
+class _Content(Protocol):
+    def to_get_request_information(
+        self, request_configuration: RequestConfiguration[QueryParameters] | None = None
+    ) -> RequestInformation: ...
+
+
+async def read_page(
     client: GraphServiceClient,
     transport: httpx.AsyncClient,
-    request_for: Callable[[HeadersCollection], RequestInformation],
+    content: _Content,
     *,
-    directory: Path,
-    max_bytes: int,
     offset: int,
     limit: int,
     from_seconds: float | None,
     to_seconds: float | None,
     speaker: str | None,
-) -> tuple[list[TranscriptTurn], int | None, bool]:
-    """The page, parsed off a file that exists only inside the download block that wrote it."""
+) -> TranscriptPage:
+    """Matching turns from `offset`. One Graph request, or two when attribution is refused."""
+    assert limit >= 1, f"limit must be at least 1, got {limit}"
+    assert offset >= 0, f"offset must not be negative, got {offset}"
+    assert from_seconds is None or to_seconds is None or from_seconds <= to_seconds, (
+        f"from_seconds must not be after to_seconds, got {from_seconds} and {to_seconds}"
+    )
     window = _Window(
         offset=offset,
         limit=limit,
@@ -180,9 +220,12 @@ async def read_turns(
         to_seconds=to_seconds,
         speaker=speaker,
     )
+    directory = Path(gettempdir())
 
     def asking(media_type: str) -> RequestInformation:
-        return request_for(_accepting(media_type))
+        return content.to_get_request_information(
+            RequestConfiguration[QueryParameters](headers=_accepting(media_type))
+        )
 
     try:
         with graph_step(STEP_ATTRIBUTED):
@@ -191,10 +234,12 @@ async def read_turns(
                 transport,
                 asking(_ATTRIBUTED_FORMAT),
                 directory=directory,
-                max_bytes=max_bytes,
+                max_bytes=MAX_TRANSCRIPT_BYTES,
             ) as downloaded:
                 turns, next_offset = _page(downloaded.path, attributed=True, window=window)
-                return (turns, next_offset, True)
+                return TranscriptPage(
+                    speaker_attribution=True, turns=turns, next_offset=next_offset
+                )
     except GraphForbidden as refusal:
         if refusal.inner_code != _SPEAKER_ATTRIBUTION_REFUSED:
             raise
@@ -204,10 +249,29 @@ async def read_turns(
             transport,
             asking(_UNATTRIBUTED_FORMAT),
             directory=directory,
-            max_bytes=max_bytes,
+            max_bytes=MAX_TRANSCRIPT_BYTES,
         ) as downloaded:
             turns, next_offset = _page(downloaded.path, attributed=False, window=window)
-            return (turns, next_offset, False)
+            return TranscriptPage(speaker_attribution=False, turns=turns, next_offset=next_offset)
+
+
+def too_large(refusal: GraphResponseTooLarge, *, noun: str, lister: str) -> str:
+    counted = refusal.size if refusal.size is not None else refusal.declared
+    measured = (
+        "Microsoft did not declare the size of this transcript."
+        if counted is None
+        else f"This transcript is {counted} bytes."
+    )
+    return (
+        f"{measured} This connector reads at most {MAX_TRANSCRIPT_BYTES} bytes. This tool read "
+        + "no turns. Nothing about the request is wrong, and no argument makes it smaller. "
+        + "from_seconds, to_seconds and speaker narrow the answer, but they do not narrow the "
+        + "call. Microsoft publishes no ranged read of a transcript. Every call for any part of "
+        + "a transcript fetches the whole transcript. Report that this transcript is too long to "
+        + f"read here. Do not report that the {noun} was silent. Do not report that no "
+        + f"transcript exists. {lister} still lists this transcript. The "
+        + f"user can open the {noun} in Teams, and read or download the transcript there."
+    )
 
 
 def _accepting(media_type: str) -> HeadersCollection:

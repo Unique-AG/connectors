@@ -9,10 +9,9 @@ import pytest
 import respx
 from fastmcp.exceptions import ToolError
 
-from office_365_mcp.shared import meetings
+from office_365_mcp.shared import meetings, transcripts
 from office_365_mcp.shared.handles import meeting_uri_for
 from office_365_mcp.shared.transcripts import MAX_TRANSCRIPT_BYTES
-from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from tests.tools.conftest import (
     JOIN_WEB_URL,
     ME,
@@ -812,7 +811,7 @@ class TestATranscriptThatCannotBeUsed:
     async def test_it_reads_a_transcript_whose_size_equals_the_ceiling(
         self, graph: respx.MockRouter, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        monkeypatch.setattr(transcript_reader, "MAX_TRANSCRIPT_BYTES", len(DESIGN_REVIEW.encode()))
+        monkeypatch.setattr(transcripts, "MAX_TRANSCRIPT_BYTES", len(DESIGN_REVIEW.encode()))
         _ = _the_transcript_says(graph)
 
         read = await call("teams_read_transcript", uri=TRANSCRIPT_URI)

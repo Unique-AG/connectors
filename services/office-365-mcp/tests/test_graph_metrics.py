@@ -38,9 +38,9 @@ from office_365_mcp.graph_client import (
     graph_step,
 )
 from office_365_mcp.metrics import configure_metrics
+from office_365_mcp.shared import transcripts
 from office_365_mcp.shared.handles import TranscriptHandle
 from office_365_mcp.shared.transcripts import STEP_ATTRIBUTED
-from office_365_mcp.tools import teams_read_transcript as transcript_reader
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
 from office_365_mcp.tools.teams_list_call_transcripts import (
     STEP_TRANSCRIPTS as STEP_CALL_TRANSCRIPTS,
@@ -206,7 +206,7 @@ class TestAGraphCallIsCountedAndTimed:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(transcript_reader, "MAX_TRANSCRIPT_BYTES", 64)
+        monkeypatch.setattr(transcripts, "MAX_TRANSCRIPT_BYTES", 64)
         _ = graph.get(_TRANSCRIPT_PATH).mock(
             return_value=httpx.Response(
                 200, content=b"x" * 65, headers={"Content-Type": "text/vtt"}

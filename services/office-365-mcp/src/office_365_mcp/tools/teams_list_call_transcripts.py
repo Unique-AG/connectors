@@ -273,9 +273,7 @@ async def _listing(
 
 def _has_no_transcripts(refusal: ODataError) -> bool:
     """Graph's answer for a user with no call transcripts, unlike a 404 for a closed route.
-
-    Matches Graph's literal text. If Microsoft rewords it, an empty listing becomes an error.
-    """
+    It matches Graph's literal text, so a rewording would turn an empty listing into an error."""
     body = refusal.error
     return (
         refusal.response_status_code == _NOT_FOUND

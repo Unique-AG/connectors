@@ -1,19 +1,13 @@
 """One page of a Teams meeting transcript, read off a streamed file rather than held whole."""
 
 from collections.abc import Mapping
-from pathlib import Path
-from tempfile import gettempdir
 from typing import Annotated
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
-from kiota_abstractions.headers_collection import HeadersCollection
-from kiota_abstractions.request_information import RequestInformation
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel, Field
+from pydantic import Field
 
 from office_365_mcp.graph_client import GraphResponseTooLarge, graph_errors
 from office_365_mcp.shared.handles import TranscriptHandle, transcript_handle
@@ -26,9 +20,10 @@ from office_365_mcp.shared.transcripts import (
     Offset,
     Speaker,
     ToSeconds,
-    TranscriptTurn,
+    TranscriptPage,
     bad_filters,
-    read_turns,
+    read_page,
+    too_large,
 )
 
 TOOL_NAME = "teams_read_transcript"
@@ -73,49 +68,10 @@ GRAPH_NOT_FOUND = (
 )
 
 
-def _too_large(refusal: GraphResponseTooLarge) -> str:
-    counted = refusal.size if refusal.size is not None else refusal.declared
-    measured = (
-        "Microsoft did not declare the size of this transcript."
-        if counted is None
-        else f"This transcript is {counted} bytes."
-    )
-    return (
-        f"{measured} This connector reads at most {MAX_TRANSCRIPT_BYTES} bytes. This tool read "
-        + "no turns. Nothing about the request is wrong, and no argument makes it smaller. "
-        + "from_seconds, to_seconds and speaker narrow the answer, but they do not narrow the "
-        + "call. Microsoft publishes no ranged read of a transcript. Every call for any part of "
-        + "a transcript fetches the whole transcript. Report that this transcript is too long to "
-        + "read here. Do not report that the meeting was silent. Do not report that no "
-        + "transcript exists. teams_list_meeting_transcripts still lists this transcript. The "
-        + "user can open the meeting in Teams, and read or download the transcript there."
-    )
-
-
-class Transcript(BaseModel):
+class Transcript(TranscriptPage):
     uri: str = Field(description="This tool echoes back the handle that it read.")
     meeting_id: str = Field(description="This value is the meeting Graph id.")
     transcript_id: str = Field(description="This value is the transcript Graph id.")
-    speaker_attribution: bool = Field(
-        description=(
-            "If this value is true, the turns name the speakers. If this value is false, the "
-            "tenant disabled speaker names, and every `speaker` is null. Do not infer who spoke "
-            "from the content of a turn."
-        )
-    )
-    turns: list[TranscriptTurn] = Field(
-        description=(
-            "This list holds the turns that match the filters. If the caller gives no filter, "
-            "this list holds every turn. An empty list means that nothing matched. An empty "
-            "list does not mean that the meeting was silent."
-        )
-    )
-    next_offset: int | None = Field(
-        description=(
-            "The offset of the next page of matching turns. If this page is the last page, this "
-            "value is null. To continue, pass this value back as `offset` with the same filters."
-        )
-    )
 
 
 async def teams_read_transcript(
@@ -129,33 +85,17 @@ async def teams_read_transcript(
     to_seconds: float | None = None,
     speaker: str | None = None,
 ) -> Transcript:
-    """Matching turns from `offset`. One Graph request, or two when attribution is refused."""
-    assert limit >= 1, f"limit must be at least 1, got {limit}"
-    assert offset >= 0, f"offset must not be negative, got {offset}"
-    assert from_seconds is None or to_seconds is None or from_seconds <= to_seconds, (
-        f"from_seconds must not be after to_seconds, got {from_seconds} and {to_seconds}"
-    )
-
-    endpoint = (
+    content = (
         client.me.online_meetings.by_online_meeting_id(handle.meeting_id)
         .transcripts.by_call_transcript_id(handle.transcript_id)
         .content
     )
-
-    def request_for(headers: HeadersCollection) -> RequestInformation:
-        return endpoint.to_get_request_information(
-            RequestConfiguration[QueryParameters](headers=headers)
-        )
-
-    scratch = Path(gettempdir())
     try:
         with graph_errors(TOOL_NAME):
-            turns, next_offset, attributed = await read_turns(
+            page = await read_page(
                 client,
                 transport,
-                request_for,
-                directory=scratch,
-                max_bytes=MAX_TRANSCRIPT_BYTES,
+                content,
                 offset=offset,
                 limit=limit,
                 from_seconds=from_seconds,
@@ -166,12 +106,12 @@ async def teams_read_transcript(
             uri=handle.uri,
             meeting_id=handle.meeting_id,
             transcript_id=handle.transcript_id,
-            speaker_attribution=attributed,
-            turns=turns,
-            next_offset=next_offset,
+            speaker_attribution=page.speaker_attribution,
+            turns=page.turns,
+            next_offset=page.next_offset,
         )
     except GraphResponseTooLarge as refusal:
-        refused = _too_large(refusal)
+        refused = too_large(refusal, noun="meeting", lister="teams_list_meeting_transcripts")
     raise ToolError(refused)
 
 
