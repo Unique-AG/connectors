@@ -607,7 +607,7 @@ uc-01-33:
   blocker:
     kind: tool
     tool: sharepoint_list_drives
-    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries.
+    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives says that no tool lists them, and that sharepoint_search_files needs a word to search for and shows files, not libraries.
     user: The assistant cannot list the document libraries of a site.
   provenance: drafted
   asks_user: false
@@ -616,7 +616,7 @@ uc-01-33:
       optional: true
     - tool: sharepoint_search_sites
       args: {query: Sales}
-  note: "expected behaviour from tools/sharepoint_list_drives.py:36-37: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
+  note: "expected behaviour from the description of sharepoint_list_drives: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
 
 uc-01-34:
   status: untested

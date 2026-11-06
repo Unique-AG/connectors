@@ -294,8 +294,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
+                    "The meeting handle, `teams:///meetings/{join_web_url}`. teams_list_chats "
+                    + "gives it for a meeting chat. For a meeting with no chat, write "
+                    + "`teams:///meetings/` and then the `join_url` of the calendar event, "
+                    + "percent-encoded, with each `/` included. A `teams:///transcripts/...` "
+                    + "handle is not valid here."
                 ),
             ),
         ],

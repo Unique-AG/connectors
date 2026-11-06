@@ -1344,6 +1344,74 @@ class TestTheToolsThisServerAdvertises:
             "outlook_find_recipient"
         ]
 
+    async def test_outlook_create_mail_rule_tells_a_model_to_ask_when_no_condition_is_given(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tool = _named(await every_tool.list_tools())["outlook_create_mail_rule"]
+        conditions = str(_object(_properties(tool.input_schema)["conditions"])["description"])
+
+        assert "ask the user before you call this tool" in (tool.description or "")
+        assert "If the user gave no condition, ask the user for one" in conditions
+
+    async def test_the_meeting_tools_say_how_a_calendar_event_becomes_a_meeting_handle(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        for name in ("teams_list_meeting_transcripts", "teams_list_meeting_recordings"):
+            meeting_uri = _object(_properties(tools[name].input_schema)["meeting_uri"])
+            assert "the `join_url` of the calendar event, percent-encoded" in str(
+                meeting_uri["description"]
+            ), name
+
+    async def test_the_event_tools_say_which_one_writes_to_a_second_calendar_of_the_user(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+        on_behalf = tools["outlook_create_event_on_behalf"]
+        calendar_ref = _object(_properties(on_behalf.input_schema)["calendar_ref"])
+
+        assert "a second calendar of the user" in (on_behalf.description or "")
+        assert "`is_mine` and `can_edit` are both true" in str(calendar_ref["description"])
+        assert "and for a second calendar of the user" in (
+            tools["outlook_create_event"].description or ""
+        )
+
+    async def test_the_mail_tools_say_that_uri_is_the_handle_and_folder_id_is_not(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        for name in ("outlook_move_mail", "outlook_mark_mail"):
+            message_refs = _object(_properties(tools[name].input_schema)["message_refs"])
+            assert "A `folder_id` and a `web_link` are not handles" in str(
+                message_refs["description"]
+            ), name
+        assert any(
+            "`folder_id` and `web_link` are not message handles" in text
+            for text in _described(tools["outlook_list_mail"].output_schema)
+        )
+
+    async def test_outlook_set_automatic_reply_says_what_an_unset_value_and_a_bare_end_mean(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tool = _named(await every_tool.list_tools())["outlook_set_automatic_reply"]
+        audience = _object(_properties(tool.input_schema)["external_audience"])
+
+        assert "set `end` to 00:00 on Saturday" in (tool.description or "")
+        assert "keeps the stored value" in (tool.description or "")
+        assert "With no stored value, it is `none`" in str(audience["description"])
+
+    async def test_the_sharepoint_tools_say_where_a_destination_folder_comes_from(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        assert "needs a word to search for" in (tools["sharepoint_list_drives"].description or "")
+        assert "No tool gives the top folder of a site library" in (
+            tools["sharepoint_copy_item"].description or ""
+        )
+
     async def test_every_description_that_spells_a_group_handle_spells_a_site_handle_too(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:

@@ -1783,9 +1783,6 @@ Ask your assistant: "Make a rule that moves the mail I do not need to my Archive
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may create a rule for every new message without asking which mail Mia means.
-
 What happens:
 
 - The assistant asks Mia which mail the rule is for.
@@ -2572,9 +2569,6 @@ Mia sets how her mailbox behaves while she is away and which senders reach her a
 Ask your assistant: "Turn on my out-of-office reply from Monday to Friday and tell everyone I am away."
 
 Tests: 2
-
-!!! warning "Limit"
-    The assistant can leave outside senders without a reply. It can also stop the reply a day early or use the wrong time zone.
 
 What happens:
 
@@ -3670,9 +3664,6 @@ What happens:
 Ask your assistant: "Put the Offsite on my Team calendar."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may not put a meeting on a second calendar of Mia. Nobody tested it.
 
 Situation: Mia has a second calendar named "Team".
 
@@ -5331,9 +5322,6 @@ What happens:
 Ask your assistant: "Summarize the Budget review that is on my calendar."
 
 No test: assistant
-
-!!! warning "Limit"
-    The assistant may not be able to read the transcript of a meeting that has no meeting chat. Nobody tested it.
 
 Situation: "Budget review" is on Mia's calendar and it has a transcript. Mia has no meeting chat for "Budget review".
 

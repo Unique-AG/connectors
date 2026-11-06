@@ -228,14 +228,9 @@ uc-06-15:
   deferred:
     - teams_list_meeting_transcripts-past
     - teams_read_transcript-past
-  status: partly
+  status: untested
   no_test: "assistant: The assistant must build the meeting handle from the join address of a calendar event, and only a model can show that it does."
   ask: "Summarize the Budget review that is on my calendar."
-  blocker:
-    kind: description
-    tool: teams_list_meeting_transcripts
-    text: The description of meeting_uri says to copy the handle verbatim from teams_list_chats, and only a meeting chat gives it. The join_url of a calendar event should be the address that the handle wraps, as teams:///meetings/ plus the percent-encoded join address, but no description says so and nobody ran it.
-    user: The assistant may not be able to read the transcript of a meeting that has no meeting chat. Nobody tested it.
   provenance: drafted
   asks_user: false
   chain:

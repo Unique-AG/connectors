@@ -1,14 +1,9 @@
 uc-11-01:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_reply_from_monday_to_saturday_in_the_zone_of_mia"
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_message_for_senders_inside_and_outside_the_organization"
   ask: "Turn on my out-of-office reply from Monday to Friday and tell everyone I am away."
-  blocker:
-    kind: description
-    tool: outlook_set_automatic_reply
-    text: The description does not say that an unset `external_audience` keeps the stored value, or none when nothing is stored. It does not say what an `end` date without a time of day means.
-    user: The assistant can leave outside senders without a reply. It can also stop the reply a day early or use the wrong time zone.
   provenance: drafted
   asks_user: true
   chain:

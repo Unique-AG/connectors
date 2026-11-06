@@ -136,23 +136,18 @@ uc-07-08:
   note: "the workaround creates the event with an empty `attendees` list and the required `time_zone` (tools/outlook_create_event.py:657-690), and it asks nothing, because the tool asks only for an event with an attendee, a room, or a location (:123-125). Adding the attendees is a separate later request, after Mia finishes: outlook_update_event with `attendees` and `optional_attendees` together (tools/outlook_update_event.py:159-166 and :433-437 refuse one list alone), and that call asks Mia (:110-113). The update is not a step of this chain."
 
 uc-07-09:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_on_a_second_calendar_of_mia_is_not_put_on_the_main_one"
   provenance: drafted
   ask: "Put the Offsite on my Team calendar."
-  blocker:
-    kind: description
-    tool: outlook_create_event_on_behalf
-    text: outlook_create_event takes no calendar argument. The description of outlook_create_event_on_behalf says that it is only for a calendar that somebody else owns, so the assistant does not pick it for a second calendar of Mia.
-    user: The assistant may not put a meeting on a second calendar of Mia. Nobody tested it.
   asks_user: true
   chain:
     - tool: outlook_list_calendars
     - tool: outlook_create_event_on_behalf
       args: {subject: Offsite, attendees: none}
       uses: {calendar_ref: handle of the calendar Team}
-  note: outlook_create_event_on_behalf checks only that the calendar is editable, so it can write to a second calendar of Mia. Nobody ran it.
+  note: the description of outlook_create_event_on_behalf names a second calendar of Mia, and the tool checks only that the calendar is editable. Nobody ran it.
 
 uc-07-10:
   status: untested

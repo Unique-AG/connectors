@@ -8,8 +8,8 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 10 | 3 | 354 | 372 |
-| Teams | 0 | 2 | 1 | 143 | 146 |
+| Outlook | 5 | 7 | 3 | 357 | 372 |
+| Teams | 0 | 1 | 1 | 144 | 146 |
 | SharePoint | 0 | 3 | 3 | 92 | 98 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
@@ -50,9 +50,9 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
-| `uc-01-33` | Finding and reading files in OneDrive and SharePoint | The libraries of a site are not listed as drives | partly | `sharepoint_list_drives` | No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries. |
+| `uc-01-33` | Finding and reading files in OneDrive and SharePoint | The libraries of a site are not listed as drives | partly | `sharepoint_list_drives` | No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives says that no tool lists them, and that sharepoint_search_files needs a word to search for and shows files, not libraries. |
 | `uc-04-11` | Drafting and sending mail | A new file is attached to a draft | gap | `outlook_draft_mail` | the draft tools write text only, and no other tool adds a file to a message |
-| `uc-10-02` | Organizing and sharing files in OneDrive and SharePoint | A folder is copied to another drive | partly | `sharepoint_list_drives` | No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns. |
+| `uc-10-02` | Organizing and sharing files in OneDrive and SharePoint | A folder is copied to another drive | partly | `sharepoint_list_drives` | No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns. The description of sharepoint_copy_item says so. |
 | `uc-10-05` | Organizing and sharing files in OneDrive and SharePoint | The content of an existing file is replaced | gap | `sharepoint_create_text_file` | The tool creates new text files only and cannot replace a file or write a Word file. |
 | `uc-10-08` | Organizing and sharing files in OneDrive and SharePoint | Access is taken back | gap | `sharepoint_invite` | No tool removes a permission, and the description of sharepoint_invite says so. |
 | `uc-10-10` | Organizing and sharing files in OneDrive and SharePoint | A file attached to a mail is saved in a folder | gap | `sharepoint_create_text_file` | No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file. |
@@ -66,15 +66,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | --- | --- | --- | --- | --- | --- |
 | `uc-04-17` | Drafting and sending mail | A blind copy is put on a draft | gap | `outlook_draft_mail` | outlook_draft_mail, outlook_update_draft, outlook_draft_reply and outlook_draft_reply_all have no argument for blind copy recipients |
 | `uc-06-04` | Catching up on Teams | A channel is read with its replies | partly | `teams_browse_channel` | The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week. |
-
-### A description steers the assistant away (4)
-
-| Id | Feature | Scenario | Status | Tool | Cause |
-| --- | --- | --- | --- | --- | --- |
-| `uc-05-23` | Organizing the mailbox | A rule without a clear condition is checked with Mia first | partly | `outlook_create_mail_rule` | the tool asks only before a rule that forwards or redirects mail, and the `conditions` field says to omit it to make a rule for every incoming message. Nothing in the description tells the model to ask the user first when the user gave no condition. |
-| `uc-06-15` | Catching up on Teams | A meeting from the calendar is summarized from its transcript | partly | `teams_list_meeting_transcripts` | The description of meeting_uri says to copy the handle verbatim from teams_list_chats, and only a meeting chat gives it. The join_url of a calendar event should be the address that the handle wraps, as teams:///meetings/ plus the percent-encoded join address, but no description says so and nobody ran it. |
-| `uc-07-09` | Scheduling and answering meetings | A meeting is booked on a calendar other than the main one | partly | `outlook_create_event_on_behalf` | outlook_create_event takes no calendar argument. The description of outlook_create_event_on_behalf says that it is only for a calendar that somebody else owns, so the assistant does not pick it for a second calendar of Mia. |
-| `uc-11-01` | Mailbox preferences | An automatic reply runs for a fixed period | partly | `outlook_set_automatic_reply` | The description does not say that an unset `external_audience` keeps the stored value, or none when nothing is stored. It does not say what an `end` date without a time of day means. |
 
 ### The tools sit in different presets (3)
 
@@ -98,7 +89,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | --- | --- | --- | --- | --- | --- |
 | `uc-01-11` | Finding and reading files in OneDrive and SharePoint | A file that Microsoft cannot convert is read as it is or reported | partly | `sharepoint_read_file` | When Microsoft answers 406 to `convert_to` pdf, the tool raises an error that asks for a second call without `convert_to`, and that call returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known. |
 | `uc-02-07` | Finding and reading mail | The content of an Excel attachment answers a question | partly | `outlook_read_attachment` | The tool returns the workbook in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read an Excel file in that form, so the cause is not known. |
-| `uc-05-03` | Organizing the mailbox | Messages that Mia names by subject are found again and filed | partly | `outlook_move_mail` | the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle. The message_refs field says "`uri` values from a search, list, or thread result". But MailSummary.uri says only to pass it to outlook_read_mail, and listings also show folder_id and web_link. |
+| `uc-05-03` | Organizing the mailbox | Messages that Mia names by subject are found again and filed | partly | `outlook_move_mail` | the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle, because listings also show folder_id and web_link. The message_refs fields of outlook_move_mail and outlook_mark_mail and the field MailSummary.uri now say that the `uri` is the handle and that folder_id and web_link are not. The cause stays open until the logs show the wrong values. |
 | `uc-15-12` | Working across mail, calendar, files, and Teams | A file that Anna posted in Teams is read | partly | `sharepoint_resolve_url` | The description says that Microsoft documents the lookup for sharing links and that another form of web address can fail. Nobody ran it on the web address of a Teams file attachment, so whether it fails is not known. |
 
 ## Deferred work
