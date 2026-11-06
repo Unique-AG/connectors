@@ -8,6 +8,7 @@ import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations } from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { DeleteInboxDataEventDto } from './delete-inbox-data-event.dto';
 import { STALE_DELETE_INBOX_CONFIGURATION_THRESHOLD_IN_MINUTES } from './execute-inbox-deletion.command';
 
@@ -59,6 +60,8 @@ export class DeleteInboxRecoveryService implements OnModuleInit, OnModuleDestroy
     this.schedulerRegistry.addCronJob('delete-inbox-data-recovery', job);
     job.start();
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.delete-inbox-recovery')
   public async checkAndRetriggerStuckDeletions(): Promise<void> {

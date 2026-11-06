@@ -1,6 +1,6 @@
 import assert from 'node:assert';
 import { AesGcmEncryptionModule, AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
-import { defaultLoggerOptions } from '@unique-ag/logger';
+import { createLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
@@ -21,21 +21,26 @@ import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { registerChatModule } from './chat/chat.module';
 import {
+  type AMQPConfig,
   type AppConfig,
   type AppConfigNamespaced,
+  type AuthConfig,
   type AuthConfigNamespaced,
   amqpConfig,
   appConfig,
   authConfig,
   type ChatConfigNamespaced,
   chatConfig,
+  type DatabaseConfig,
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
   healthConfig,
+  type MicrosoftConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
   rateLimitConfig,
+  type UniqueConfig,
   type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
@@ -47,6 +52,7 @@ import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
 import { serverIcons } from './server-icons';
 import { GraphErrorFilter } from './utils/graph-error.filter';
+import { deploymentSecrets } from './utils/log-secrets';
 
 @Module({
   imports: [
@@ -67,12 +73,31 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       ],
     }),
     LoggerModule.forRootAsync({
-      inject: [appConfig.KEY],
-      useFactory: (config: AppConfig) => {
+      inject: [
+        appConfig.KEY,
+        amqpConfig.KEY,
+        authConfig.KEY,
+        databaseConfig.KEY,
+        encryptionConfig.KEY,
+        microsoftConfig.KEY,
+        uniqueConfig.KEY,
+      ],
+      useFactory: (
+        config: AppConfig,
+        amqp: AMQPConfig,
+        auth: AuthConfig,
+        database: DatabaseConfig,
+        encryption: EncryptionConfig,
+        microsoft: MicrosoftConfig,
+        unique: UniqueConfig,
+      ) => {
+        const loggerOptions = createLoggerOptions({
+          secrets: deploymentSecrets({ amqp, auth, database, encryption, microsoft, unique }),
+        });
         return {
-          ...defaultLoggerOptions,
+          ...loggerOptions,
           pinoHttp: {
-            ...defaultLoggerOptions.pinoHttp,
+            ...loggerOptions.pinoHttp,
             level: config.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());

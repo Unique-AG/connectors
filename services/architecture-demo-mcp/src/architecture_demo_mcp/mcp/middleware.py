@@ -5,6 +5,7 @@ from typing import override
 from fastmcp import FastMCP
 from fastmcp.server.http import HostOriginGuardMiddleware
 from mcp_configs import ServerSettings
+from mcp_observability import RedactRequestSecretsMiddleware
 from starlette.middleware import Middleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.types import Receive
@@ -17,12 +18,14 @@ OPS_PATHS = frozenset({"/probe", "/health", "/metrics"})
 
 
 def http_middleware(mcp: FastMCP, settings: ServerSettings) -> list[Middleware]:
-    """The host and origin guard, then CORS, then the MCP's own HTTP middleware.
+    """The request's bearer token redacted from every line, the host and origin guard, then CORS,
+    then the MCP's own HTTP middleware.
 
     Add the MCP's own after `instrument(mcp)`, such as a request id. MCP-level middleware, which
     sees tool calls rather than HTTP requests, goes on the server: `mcp.add_middleware(...)`.
     """
     return [
+        Middleware(RedactRequestSecretsMiddleware),
         Middleware(
             _OpsExemptGuard,
             allowed_hosts=settings.allowed_hosts,
