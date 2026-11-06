@@ -10,11 +10,11 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 | --- | --- | --- | --- | --- | --- |
 | Outlook | 5 | 4 | 2 | 361 | 372 |
 | Teams | 0 | 0 | 1 | 145 | 146 |
-| SharePoint | 0 | 3 | 3 | 92 | 98 |
+| SharePoint | 0 | 3 | 3 | 104 | 110 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
-Scenarios with an executable run: 19 of 716.
+Scenarios with an executable run: 19 of 728.
 
 ## Tests by surface
 
@@ -24,11 +24,11 @@ A scenario has `tests` (node ids of pytest tests), or `no_test` (a kind and a re
 | --- | --- | --- | --- | --- |
 | Outlook | 362 | 10 | 0 | 372 |
 | Teams | 142 | 4 | 0 | 146 |
-| SharePoint | 97 | 1 | 0 | 98 |
+| SharePoint | 109 | 1 | 0 | 110 |
 | OneNote | 73 | 1 | 0 | 74 |
 | Across sources | 25 | 1 | 0 | 26 |
 
-Scenarios with an executable test: 699 of 716 (17 with an explained reason, 0 pending).
+Scenarios with an executable test: 711 of 728 (17 with an explained reason, 0 pending).
 
 ## Happy and unhappy paths by surface
 
@@ -38,7 +38,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 | --- | --- | --- | --- |
 | Outlook | 161 | 211 | 372 |
 | Teams | 53 | 93 | 146 |
-| SharePoint | 34 | 64 | 98 |
+| SharePoint | 40 | 70 | 110 |
 | OneNote | 30 | 44 | 74 |
 | Across sources | 12 | 14 | 26 |
 
@@ -79,7 +79,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 14 of 716. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 14 of 728. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |
@@ -103,7 +103,7 @@ Scenarios tagged `@deferred`: 14 of 716. Recorder cases with a `deferred` reason
 
 ## Tool coverage
 
-120 of 123 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
+126 of 129 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
 
 | Tool | happy | unhappy | Reason |
 | --- | --- | --- | --- |

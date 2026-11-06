@@ -34,6 +34,7 @@ WELL_KNOWN_FOLDERS = frozenset(
     {"inbox", "archive", "drafts", "sentitems", "deleteditems", "junkemail"}
 )
 _WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
+_LIST_ROWS = re.compile(r"/v1\.0/sites/[^/]+/lists/([^/]+)/items(?:/[^/]+)?")
 _PREFLIGHT_PATHS = frozenset({"/v1.0/me", "/v1.0/organization", "/v1.0/me/drive"})
 _DESTINATIONS = frozenset({"DestinationId", "destinationId"})
 _NAMES = frozenset({"name", "displayName", "subject", "title", "topic"})
@@ -92,7 +93,11 @@ def match_glob(glob: str, shown: str) -> list[str] | None:
         fnmatchcase(p, g) for g, p in zip(pattern, path, strict=True)
     ):
         return None
-    return [p[: len(p) - len(g) + 1] for g, p in zip(pattern, path, strict=True) if g[:1] == "*"]
+    return [
+        p[: len(p) - len(g.rpartition("*")[2])]
+        for g, p in zip(pattern, path, strict=True)
+        if g[:1] == "*"
+    ]
 
 
 def _name(where: str) -> bool:
@@ -114,7 +119,9 @@ def _is_tagged(found: Mapping[str, object]) -> bool:
     categories = found.get("categories")
     if isinstance(categories, list) and SEED_TAG in cast("list[object]", categories):
         return True
-    named = found.get("name", found.get("displayName"))
+    row = found.get("fields")
+    title = cast("Mapping[str, object]", row).get("Title") if isinstance(row, Mapping) else None
+    named = found.get("name") or found.get("displayName") or title
     return isinstance(named, str) and named.startswith(f"{SEED_TAG} ")
 
 
@@ -261,6 +268,8 @@ class Guard:
         if self.write_failed:
             return f"{shown} would repeat a write after a failed or throttled write"
         targets = [unquote(one) for one in matched]
+        if "/lists/*/items/*" in glob:
+            targets[1] = f"{targets[0]}/{targets[1]}"
         targets += [
             value
             for where, value in body
@@ -394,6 +403,18 @@ class Guard:
                 if isinstance(found.get("id"), str)
             )
 
+    def _remember_rows(self, request: httpx.Request, body: object) -> None:
+        """A list row id is only unique inside its list, so a row is known as `list/row`."""
+        rows = _LIST_ROWS.fullmatch(unquote(request.url.path))
+        if rows is None:
+            return
+        known = self.seen_seed if request.method == "GET" else self.created
+        known.update(
+            f"{rows[1]}/{found['id']}"
+            for found in mappings(body)
+            if isinstance(found.get("id"), str) and (request.method == "POST" or _is_tagged(found))
+        )
+
     def _remember_members(self, body: object) -> None:
         for found in mappings(body):
             mail = next((found[k] for k in ("email", "mail") if isinstance(found.get(k), str)), "")
@@ -433,6 +454,7 @@ class Guard:
         if status == 429 or status >= 500:
             self.write_failed = True
         self.seen_seed.update(seed_ids(body))
+        self._remember_rows(request, body)
         self.default_calendars.update(default_calendar_ids(body))
         self._remember_well_known(request, status, body)
         self._remember_channels(request, status, body)

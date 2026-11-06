@@ -159,6 +159,13 @@ class TestGuardPlugIns:
         assert match_glob("PATCH /v1.0/me/messages/*", "PATCH /v1.0/me/messages/a") == ["a"]
         assert match_glob("POST /v1.0/me/messages/*/move", "POST /v1.0/me/messages/a/move") == ["a"]
 
+    def test_a_star_between_slashes_gives_a_compound_site_id_whole(self) -> None:
+        shown = "POST /v1.0/sites/host.example,id-1,web-2/lists/L1/items"
+        assert match_glob("POST /v1.0/sites/*,*,*/lists/*/items", shown) == [
+            "host.example,id-1,web-2",
+            "L1",
+        ]
+
     def test_a_star_at_the_start_of_a_segment_gives_the_rest_of_the_segment_away(self) -> None:
         glob = "PUT /v1.0/drives/b!*/items/*:/seed-v1?case-*:/content"
         shown = "PUT /v1.0/drives/b!d/items/P1:/seed-v1 case-x.txt:/content"

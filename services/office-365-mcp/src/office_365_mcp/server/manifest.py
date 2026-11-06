@@ -44,6 +44,7 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Files.Read.All": True,
     "Files.ReadWrite.All": True,
     "Sites.Read.All": True,
+    "Sites.ReadWrite.All": True,
     "Notes.Read": False,
     "Notes.Read.All": False,
     "Notes.Create": False,

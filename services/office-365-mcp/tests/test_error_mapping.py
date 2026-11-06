@@ -98,6 +98,7 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_update_event",
         "sharepoint_copy_item",
         "sharepoint_create_folder",
+        "sharepoint_create_list_item",
         "sharepoint_create_text_file",
         "sharepoint_invite",
         "teams_add_chat_member",

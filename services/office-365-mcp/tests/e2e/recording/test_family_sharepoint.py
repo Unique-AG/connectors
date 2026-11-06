@@ -56,6 +56,7 @@ INDEX_NEEDS = {"sharepoint-seed-files", "sharepoint-tree", "sharepoint-big-files
 TEAM_DRIVE = "b!TEAMLIBRARYAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 NEW_FILE = f"{PATH}/{ITEM}:/seed-v1 case-x.txt:/content"
 SHARE = "/shares/u!aHR0cHM6Ly9jb250b3NvLXRlc3QvYQ/driveItem"
+SITE = f"contoso.sharepoint.com,{stand_in.SITE_ID},{stand_in.LIST_ID}"
 
 
 OLD_CASES = {
@@ -329,6 +330,27 @@ class TestGuardRules:
             ("sharepoint_resolve_url", "/shares", False),
             ("sharepoint_resolve_url", "/sites", False),
             ("sharepoint_read_file", SHARE, False),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com", True),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com:/sites/Finance", True),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com:/teams/Sales", True),
+            ("sharepoint_list_lists", f"/sites/{SITE}/lists", True),
+            ("sharepoint_list_lists", "/sites/contoso.sharepoint.com:/sites/Finance/Sub", False),
+            ("sharepoint_list_lists", "/sites/contoso.example:/sites/Finance", False),
+            ("sharepoint_list_lists", f"/sites/{SITE}/drives", False),
+            ("sharepoint_list_lists", f"/sites/{SITE}/lists/L1/items", False),
+            ("sharepoint_get_list", f"/sites/{SITE}/lists/L1/columns", True),
+            ("sharepoint_get_list", f"/sites/{SITE}/lists/L1/items", False),
+            ("sharepoint_get_list", "/sites/contoso.sharepoint.com/lists/L1/columns", False),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/columns", True),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items", True),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items/7", False),
+            ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items/7/fields", False),
+            ("sharepoint_list_items", "/sites", False),
+            ("sharepoint_create_list_item", f"/sites/{SITE}/lists/L1", True),
+            ("sharepoint_update_list_item", f"/sites/{SITE}/lists/L1", True),
+            ("sharepoint_delete_list_item", f"/sites/{SITE}/lists/L1", True),
+            ("sharepoint_get_list", f"/sites/{SITE}/lists/L1", False),
+            ("sharepoint_create_list_item", "/sites/contoso.sharepoint.com/lists/L1", False),
         ],
     )
     def test_a_read_glob_allows_one_tool_one_path(
@@ -339,6 +361,38 @@ class TestGuardRules:
     def test_a_read_glob_allows_a_get_and_nothing_else(self) -> None:
         assert "outside" in str(refusal("sharepoint_search_sites", "POST", "/sites"))
         assert "outside" in str(refusal("sharepoint_resolve_url", "DELETE", SHARE))
+
+    @pytest.mark.parametrize(
+        ("tool", "method", "suffix"),
+        [
+            ("sharepoint_create_list_item", "POST", "items"),
+            ("sharepoint_update_list_item", "PATCH", "items/7/fields"),
+            ("sharepoint_delete_list_item", "DELETE", "items/7"),
+        ],
+    )
+    def test_a_list_item_write_checks_the_list_and_the_row_but_not_the_site(
+        self, tool: str, method: str, suffix: str
+    ) -> None:
+        shown = f"/sites/{SITE}/lists/L1/{suffix}"
+        made = guard()
+        request = httpx.Request(method, f"{GRAPH}{shown}", content=json.dumps({}))
+        assert "did not read as seed data" in str(made.refuses_request(request, tool))
+        listed = {
+            "value": [
+                {"id": "L1", "displayName": "seed-v1 Tasks"},
+                {"id": "L2", "displayName": "seed-v1 Issues"},
+            ]
+        }
+        read = {"value": [{"id": "7", "fields": {"Title": "seed-v1 Close books"}}]}
+        for path, body in (
+            (f"/sites/{SITE}/lists", listed),
+            (f"/sites/{SITE}/lists/L1/items", read),
+        ):
+            made.saw(httpx.Request("GET", f"{GRAPH}{path}"), 200, None, body)
+        assert made.refuses_request(request, tool) is None
+        other = httpx.Request(method, f"{GRAPH}/sites/{SITE}/lists/L2/{suffix}", content="{}")
+        refused = made.refuses_request(other, tool)
+        assert ("did not read as seed data" in str(refused)) == ("7" in suffix)
 
     def test_a_read_of_the_search_index_is_allowed(self) -> None:
         assert refusal("sharepoint_search_files", "POST", "/search/query") is None
