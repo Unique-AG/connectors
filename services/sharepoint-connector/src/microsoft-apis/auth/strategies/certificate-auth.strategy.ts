@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { Dispatcher } from 'undici';
 import { Config } from '../../../config';
 import { sanitizeError } from '../../../utils/normalize-error';
+import type { Redacted } from '../../../utils/redacted';
 import { ProxiedMsalNetworkClient } from '../msal-proxy-config';
 import { TokenAcquisitionResult } from '../types';
 import { AuthStrategy } from './auth-strategy.interface';
@@ -37,19 +38,10 @@ export class CertificateAuthStrategy implements AuthStrategy {
       privateKeyPassword,
     } = sharePointConfig.auth;
 
-    const privateKeyRaw = readFileSync(privateKeyPath, 'utf8').trim();
-
-    let privateKey: string;
-    if (privateKeyPassword) {
-      const privateKeyObject = crypto.createPrivateKey({
-        key: privateKeyRaw,
-        passphrase: privateKeyPassword.value,
-        format: 'pem',
-      });
-      privateKey = privateKeyObject.export({ format: 'pem', type: 'pkcs8' }).toString();
-    } else {
-      privateKey = privateKeyRaw;
-    }
+    const { unencrypted: privateKey } = readCertificatePrivateKey(
+      privateKeyPath,
+      privateKeyPassword,
+    );
 
     const msalConfig: Configuration = {
       auth: {
@@ -96,4 +88,21 @@ export class CertificateAuthStrategy implements AuthStrategy {
       throw error;
     }
   }
+}
+
+/** The key as its file stores it, and the unencrypted PKCS#8 PEM MSAL signs with. */
+export function readCertificatePrivateKey(
+  privateKeyPath: string,
+  privateKeyPassword: Redacted<string> | undefined,
+): { stored: string; unencrypted: string } {
+  const stored = readFileSync(privateKeyPath, 'utf8').trim();
+  if (!privateKeyPassword) {
+    return { stored, unencrypted: stored };
+  }
+
+  const unencrypted = crypto
+    .createPrivateKey({ key: stored, passphrase: privateKeyPassword.value, format: 'pem' })
+    .export({ format: 'pem', type: 'pkcs8' })
+    .toString();
+  return { stored, unencrypted };
 }

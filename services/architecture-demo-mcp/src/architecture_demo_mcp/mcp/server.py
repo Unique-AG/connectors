@@ -13,6 +13,7 @@ import httpx2
 from mcp_configs import RateLimitSettings
 from mcp_observability import access_token_subject
 from mcp_observability import RateLimitMiddleware
+from mcp_observability import RedactToolCallSecretsMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
@@ -67,8 +68,13 @@ def create_server(
         mask_error_details=True,
         lifespan=lifespan,
         auth=auth,
-        # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
+        # Redaction outermost, so the caller's access token is redacted from the tool-call lines.
+        # The tool-call lines replace FastMCP's per-call lines, which can quote the input.
+        middleware=[
+            RedactToolCallSecretsMiddleware(),
+            ToolCallObservabilityMiddleware(),
+            *rate_limiting,
+        ],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")
