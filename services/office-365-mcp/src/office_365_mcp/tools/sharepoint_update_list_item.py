@@ -71,8 +71,11 @@ sharepoint_get_list first to learn the internal column names, their types, and t
 Notes:
 - This tool asks the user to agree before it changes anything, every time, and shows the old and \
 the new value of each column.
-- It writes text, choice, date, number, currency, and yes or no columns. It refuses a person, \
-lookup, managed metadata, or multi-value column, and a read-only or hidden column.
+- It writes text, choice, date, number, currency, and yes or no columns. It refuses a call that \
+names a person, lookup, managed metadata, or multi-value column, or a read-only or hidden column.
+- Pass every column the user named in `fields`, even one the tool refuses, such as a person \
+column. The tool refuses it before it asks the user and changes nothing, so tell the user the \
+refusal. Never drop a named column or say the user did not ask for it.
 - If somebody changes the row between this tool's read and its write, Microsoft refuses and \
 nothing changes.
 - This call is safe to repeat after a timeout.

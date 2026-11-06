@@ -63,7 +63,9 @@ type FieldValue = str | int | float | bool
 FIELDS_RULES = (
     "Key each value by the internal `name` of its column, not its display name. Write every "
     + "value as text: a number as a plain decimal such as 12.5, a yes or no value as true or "
-    + "false, a date as 2026-01-31T00:00:00Z, and a choice as one of the `choices` of its column."
+    + "false, a date as 2026-01-31T00:00:00Z, and a choice as one of the `choices` of its column. "
+    + "Send every column the user named, even one this tool cannot write, and no column they "
+    + "did not name."
 )
 
 
@@ -163,9 +165,17 @@ class ListItemSummary(BaseModel):
         return cls(
             uri=ListItemHandle(handle.site_id, handle.list_id, item.id).uri,
             fields=values,
-            web_url=item.web_url,
+            web_url=_display_form_url(item),
             last_modified_at=item.last_modified_date_time,
         )
+
+
+def _display_form_url(item: ListItem) -> str | None:
+    # Graph sends `<list>/<id>_.000`, which a browser downloads as a file. DispForm opens the row.
+    legacy_tail = f"/{item.id}_.000"
+    if item.web_url is None or not item.web_url.endswith(legacy_tail):
+        return item.web_url
+    return f"{item.web_url.removesuffix(legacy_tail)}/DispForm.aspx?ID={item.id}"
 
 
 def value_refusal(column: ListColumn, value: str) -> str | None:

@@ -36,7 +36,7 @@ _COLUMNS: list[dict[str, object]] = [
 def _item(*, etag: str | None = _ETAG) -> dict[str, object]:
     item: dict[str, object] = {
         "id": "7",
-        "webUrl": "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/DispForm.aspx?ID=7",
+        "webUrl": "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/7_.000",
         "fields": {"id": "7", "Title": "Close books", "Status": "Open", "Tags": ["a"]},
     }
     if etag is not None:

@@ -44,7 +44,7 @@ _COLUMNS = [
 
 _CREATED = {
     "id": "8",
-    "webUrl": "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/DispForm.aspx?ID=8",
+    "webUrl": "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/8_.000",
     "lastModifiedDateTime": "2026-02-11T09:15:22Z",
     "fields": {"id": "8", "Title": "Close books", "Status": "Open"},
 }
@@ -125,7 +125,10 @@ async def test_it_posts_the_typed_fields_once_the_person_agrees(
     assert "'Close books'" in question
     assert "Status: 'Open'" in question
     assert list_item_handle(created.uri) == ListItemHandle(_SITE_ID, _LIST_ID, "8")
-    assert created.web_url == _CREATED["webUrl"]
+    assert (
+        created.web_url
+        == "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/DispForm.aspx?ID=8"
+    )
 
 
 async def test_a_declined_question_sends_nothing(

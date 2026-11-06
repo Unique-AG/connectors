@@ -61,8 +61,11 @@ types, and the allowed choices. sharepoint_list_items reads the new row.
 
 Notes:
 - This tool asks the user to agree before it adds anything, every time.
-- It writes text, choice, date, number, currency, and yes or no columns. It refuses a person, \
-lookup, managed metadata, or multi-value column, and a read-only or hidden column.
+- It writes text, choice, date, number, currency, and yes or no columns. It refuses a call that \
+names a person, lookup, managed metadata, or multi-value column, or a read-only or hidden column.
+- Pass every column the user named in `fields`, even one the tool refuses, such as a person \
+column. The tool refuses it before it asks the user and adds nothing, so tell the user the \
+refusal. Never drop a named column or say the user did not ask for it.
 - If a call times out, do not call this tool again first. Make sure that sharepoint_list_items \
 does not show the row before you call again.
 """

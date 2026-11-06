@@ -38,7 +38,7 @@ _COLUMNS = [
 
 _ITEM = {
     "id": "7",
-    "webUrl": "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/DispForm.aspx?ID=7",
+    "webUrl": "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/7_.000",
     "lastModifiedDateTime": "2026-02-11T09:15:22Z",
     "fields": {"id": "70", "Title": "Close books", "Amount": 12.5, "CustomTag": "q1"},
 }
@@ -69,7 +69,10 @@ async def test_it_returns_items_with_their_fields_and_a_handle(
     (row,) = result.items
     assert list_item_handle(row.uri) == ListItemHandle(_SITE_ID, _LIST_ID, "7")
     assert row.fields == {"id": "70", "Title": "Close books", "Amount": 12.5, "CustomTag": "q1"}
-    assert row.web_url == _ITEM["webUrl"]
+    assert (
+        row.web_url
+        == "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks/DispForm.aspx?ID=7"
+    )
     assert row.last_modified_at is not None
     assert row.last_modified_at.isoformat() == "2026-02-11T09:15:22+00:00"
     assert result.capped is False
