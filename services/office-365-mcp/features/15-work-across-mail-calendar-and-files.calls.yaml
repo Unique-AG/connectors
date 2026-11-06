@@ -380,7 +380,7 @@ uc-15-21:
     - tool: outlook_read_mail
       uses: {uri: uri of the mail}
   must_not: [sharepoint_create_text_file]
-  note: "The failing step is outlook_read_mail. Expected behaviour from src/office_365_mcp/tools/outlook_read_mail.py:84-92: Microsoft answers deleted, never existed, and not allowed to see in the same way; report that the tool failed to read the message, never that it was never sent; search again for a new handle."
+  note: "The failing step is outlook_read_mail. Expected behaviour from src/office_365_mcp/tools/outlook_read_mail.py:85-93: Microsoft answers deleted, never existed, and not allowed to see in the same way; report that the tool failed to read the message, never that it was never sent; search again for a new handle."
 
 uc-15-22:
   status: untested

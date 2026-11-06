@@ -308,7 +308,7 @@ uc-01-18:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:126). One busy answer is uc-01-30."
+  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is uc-01-30."
 
 uc-01-19:
   status: untested
@@ -569,7 +569,7 @@ uc-01-30:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:126; tests/conftest.py retry_sleeps): the read is a GET, so one 429 with Retry-After is waited out and asked again by the connector, and the assistant gets the file as if nothing had happened. OPEN: with 4 busy answers in a row the wait is about 90 s, longer than the 60 s tool limit of node-chat."
+  note: "expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:127; tests/conftest.py retry_sleeps): the read is a GET, so one 429 with Retry-After is waited out and asked again by the connector, and the assistant gets the file as if nothing had happened. OPEN: with 4 busy answers in a row the wait is about 90 s, longer than the 60 s tool limit of node-chat."
 
 uc-01-31:
   status: untested
@@ -597,7 +597,7 @@ uc-01-32:
   asks_user: false
   chain:
     - tool: sharepoint_list_drives
-  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:62-67)
+  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:64-69)
 
 uc-01-33:
   status: partly

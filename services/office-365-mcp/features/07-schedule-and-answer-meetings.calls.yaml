@@ -278,7 +278,7 @@ uc-07-19:
   chain:
     - tool: outlook_check_availability
       args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00}
-  note: "expected behaviour from shared/seam.py, one row each. Sign-in expired, :520-525: ask the user to sign in to this connector again. No access, :528-537: ask a Microsoft 365 administrator to grant the permission, retrying will not help. Busy with a wait of 30 seconds, :509-513: retry after that, not sooner. Rejected question, :579-584: a bad request that fails the same way again, with the reason of Microsoft. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:126; uc-07-35), so the busy row means busy through every try."
+  note: "expected behaviour from shared/seam.py, one row each. Sign-in expired, :520-525: ask the user to sign in to this connector again. No access, :528-537: ask a Microsoft 365 administrator to grant the permission, retrying will not help. Busy with a wait of 30 seconds, :509-513: retry after that, not sooner. Rejected question, :579-584: a bad request that fails the same way again, with the reason of Microsoft. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-07-35), so the busy row means busy through every try."
 
 uc-07-20:
   status: untested
@@ -418,7 +418,7 @@ uc-07-28:
     - tool: outlook_list_events
       optional: true
     - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
-  note: "expected behaviour from shared/seam.py:236-241 _not_agreed: nothing was changed, this is not a failure to report as one, say that the request was not confirmed, and do not call the tool again for the same request unless the user asks for it in a new message (:187-189). Each tool adds its own first sentence: No event was created (create), No response was sent (respond), Nothing was cancelled (cancel), Nothing was changed (update), This tool forwarded nothing (forward). The asks of the rows: book the Launch review on Monday at 14:00 with Anna and Tom; decline the Launch review with the note I am on leave; cancel my Design review with Anna tomorrow; move next Thursday's Team sync to Friday; forward the Launch review to Priya."
+  note: "expected behaviour from shared/seam.py:236-241 _not_agreed: nothing was changed, this is not a failure to report as one, say that the request was not confirmed, and do not call the tool again for the same request unless the user asks for it in a new message (:189-191). Each tool adds its own first sentence: No event was created (create), No response was sent (respond), Nothing was cancelled (cancel), Nothing was changed (update), This tool forwarded nothing (forward). The asks of the rows: book the Launch review on Monday at 14:00 with Anna and Tom; decline the Launch review with the note I am on leave; cancel my Design review with Anna tomorrow; move next Thursday's Team sync to Friday; forward the Launch review to Priya."
 
 uc-07-29:
   status: untested
@@ -431,7 +431,7 @@ uc-07-29:
     - tool: outlook_list_events
       optional: true
     - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
-  note: "expected behaviour from shared/seam.py:227-233 _no_answer, reached from :260-263 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:187-189). The asks of the rows are the asks of uc-07-28."
+  note: "expected behaviour from shared/seam.py:227-233 _no_answer, reached from :260-263 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:189-191). The asks of the rows are the asks of uc-07-28."
 
 uc-07-30:
   status: untested
@@ -517,7 +517,7 @@ uc-07-35:
   chain:
     - tool: outlook_check_availability
       args: {addresses: Anna and Tom, starts_at: Monday 08:00, ends_at: Monday 18:00}
-  note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-07-19 reaches the assistant only when Microsoft stays busy through every try."
+  note: "expected behaviour from graph_client/client.py:339-342 and config.py:127: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-07-19 reaches the assistant only when Microsoft stays busy through every try."
 
 uc-07-36:
   status: untested
@@ -749,7 +749,7 @@ uc-07-52:
   asks_user: true
   chain:
     - any_of: [outlook_create_event, outlook_create_event_on_behalf]
-  note: "tools/outlook_create_event.py:565-570 and tools/outlook_create_event_on_behalf.py:570-590: with no person the question says that no person is invited and that Microsoft sends the request to the mailbox of the room. The second test shows that a calendar with no named owner is called the person who owns that calendar."
+  note: "tools/outlook_create_event.py:565-570 and tools/outlook_create_event_on_behalf.py:572-592: with no person the question says that no person is invited and that Microsoft sends the request to the mailbox of the room. The second test shows that a calendar with no named owner is called the person who owns that calendar."
 
 uc-07-53:
   status: untested

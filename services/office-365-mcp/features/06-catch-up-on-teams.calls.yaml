@@ -279,7 +279,7 @@ uc-06-18:
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
-  note: "The failing step is teams_list_chats. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. Row 1, expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam.py:514-518: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
+  note: "The failing step is teams_list_chats. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:127: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. Row 1, expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam.py:514-518: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
   variants:
     limited:
       fixture: uc-06-01
@@ -453,7 +453,7 @@ uc-06-25:
     - tool: teams_list_meeting_transcripts
       uses: {meeting_uri: uri of the meeting}
   must_not: [teams_read_transcript]
-  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:138-141: status not_ready means that nothing is there yet and more can still arrive; wait and call again later; it is not the same as no transcript. A meeting counts as not ready for 4 hours after its end (src/office_365_mcp/shared/meetings.py:57)."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:139-142: status not_ready means that nothing is there yet and more can still arrive; wait and call again later; it is not the same as no transcript. A meeting counts as not ready for 4 hours after its end (src/office_365_mcp/shared/meetings.py:57)."
 
 uc-06-26:
   status: untested
@@ -468,7 +468,7 @@ uc-06-26:
     - tool: teams_list_meeting_transcripts
       uses: {meeting_uri: uri of the meeting}
   must_not: [teams_read_transcript]
-  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:145-146: status meeting_not_found means that no meeting that this user can see matched the join address; do not retry or rebuild the handle."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:146-147: status meeting_not_found means that no meeting that this user can see matched the join address; do not retry or rebuild the handle."
 
 uc-06-33:
   status: untested
@@ -483,7 +483,7 @@ uc-06-33:
     - tool: teams_list_meeting_transcripts
       uses: {meeting_uri: uri of the meeting}
   must_not: [teams_read_transcript]
-  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:147-148: a refusal reflects this user, not the meeting, and the tool can refuse a participant even when the organizer succeeds. This is the generic refusal and not the switch of uc-06-14, so the text of src/office_365_mcp/shared/seam.py:528-537 applies: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
+  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:148-149: a refusal reflects this user, not the meeting, and the tool can refuse a participant even when the organizer succeeds. This is the generic refusal and not the switch of uc-06-14, so the text of src/office_365_mcp/shared/seam.py:528-537 applies: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
 
 uc-06-27:
   status: untested
@@ -495,7 +495,7 @@ uc-06-27:
   chain:
     - tool: teams_search_messages
       optional: true
-  note: "The assistant needs no call, because it asks Mia first. If it calls with no criterion, the tool refuses. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:162-166: a search with none of the criteria returns an arbitrary sample, not an answer; add the keywords, person, or date range."
+  note: "The assistant needs no call, because it asks Mia first. If it calls with no criterion, the tool refuses. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:173-177: a search with none of the criteria returns an arbitrary sample, not an answer; add the keywords, person, or date range."
 
 uc-06-28:
   status: untested
@@ -550,7 +550,7 @@ uc-06-34:
     - tool: teams_read_message
       optional: true
       uses: {uri: uri of a hit}
-  note: "teams_list_chats lists chats and not channels, so the unread posts of channels come from the search by read state (src/office_365_mcp/tools/teams_search_messages.py:152 and :188-189). A hit of a channel post has a team and a channel and a hit of a chat message has neither (:109-117), so the assistant keeps the posts. Nobody ran it: whether Microsoft keeps a read state for channel posts is not proven."
+  note: "teams_list_chats lists chats and not channels, so the unread posts of channels come from the search by read state (src/office_365_mcp/tools/teams_search_messages.py:163 and :199-200). A hit of a channel post has a team and a channel and a hit of a chat message has neither (:119-128), so the assistant keeps the posts. Nobody ran it: whether Microsoft keeps a read state for channel posts is not proven."
 
 uc-06-35:
   deferred:
@@ -624,7 +624,7 @@ uc-06-40:
     - tool: teams_browse_channel
       args: {include_window_completeness: true}
       uses: {team_id: id of the team, channel_id: id of the channel}
-  note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:126: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner."
+  note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:127: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner."
 
 uc-06-42:
   status: untested
@@ -648,7 +648,7 @@ uc-06-43:
   chain:
     - tool: teams_search_messages
       args: {query: offer}
-  note: "Rows 1 to 4 are recipient, mentions, has_attachment, and sent_before. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:170: each condition becomes one term of the search text."
+  note: "Rows 1 to 4 are recipient, mentions, has_attachment, and sent_before. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:181: each condition becomes one term of the search text."
 
 uc-06-44:
   status: untested
@@ -662,7 +662,7 @@ uc-06-44:
   chain:
     - tool: teams_search_messages
       args: {query: offer, include_body: true}
-  note: "Row 1 is a hit with no sender or no message id, and row 2 is a hit with no chat and no channel. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:106 and src/office_365_mcp/tools/teams_search_messages.py:299: a hit with no sender or no message id is left out; a hit with no address has no uri, and the tool reads no text for it."
+  note: "Row 1 is a hit with no sender or no message id, and row 2 is a hit with no chat and no channel. Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:116 and src/office_365_mcp/tools/teams_search_messages.py:326: a hit with no sender or no message id is left out; a hit with no address has no uri, and the tool reads no text for it."
 
 uc-06-45:
   status: untested
@@ -674,7 +674,7 @@ uc-06-45:
   chain:
     - tool: teams_search_messages
       args: {query: offer}
-  note: "Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:292: an answer with no list of results is an answer with no hits."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_search_messages.py:319: an answer with no list of results is an answer with no hits."
 
 uc-06-47:
   status: untested

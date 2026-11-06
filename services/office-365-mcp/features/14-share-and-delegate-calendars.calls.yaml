@@ -85,7 +85,7 @@ uc-14-06:
     - tool: outlook_list_group_events
       args: {starts_on: Monday, ends_on: Sunday}
       uses: {group_id: id of the team Platform}
-  note: "expected behaviour, one row each. Sign-in expired, shared/seam.py:520-525: ask the user to sign in to this connector again. No access, shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the permission, retrying will not help. The row for a team with no calendar is uc-14-18. Busy with a wait of 30 seconds, shared/seam.py:509-513: retry after that, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:126; uc-14-19), so this row means busy through every try. Rejected question, shared/seam.py:579-584: a bad request that fails the same way again, with the reason of Microsoft."
+  note: "expected behaviour, one row each. Sign-in expired, shared/seam.py:520-525: ask the user to sign in to this connector again. No access, shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the permission, retrying will not help. The row for a team with no calendar is uc-14-18. Busy with a wait of 30 seconds, shared/seam.py:509-513: retry after that, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-14-19), so this row means busy through every try. Rejected question, shared/seam.py:579-584: a bad request that fails the same way again, with the reason of Microsoft."
 
 uc-14-07:
   status: untested
@@ -147,7 +147,7 @@ uc-14-10:
       optional: true
       args: {subject: Budget review, attendees: Anna}
       uses: {calendar_ref: handle of Lena's calendar}
-  note: "expected behaviour from tools/outlook_create_event_on_behalf.py:158-166 _READ_ONLY_CALENDAR: no event is created and nobody is invited, tell the user they can read that calendar and cannot add to it and that the owner has to grant edit access in Outlook first, and to put the event in the own calendar of the user call outlook_create_event. The refusal comes before the question to Mia (:441). The listing already shows can_edit false, so the assistant can stop before the call, and then the call is not made. This scenario differs from uc-14-04: there Lena shared nothing with Mia, here Lena shared the calendar for reading only."
+  note: "expected behaviour from tools/outlook_create_event_on_behalf.py:160-167 _READ_ONLY_CALENDAR: no event is created and nobody is invited, tell the user they can read that calendar and cannot add to it and that the owner has to grant edit access in Outlook first, and to put the event in the own calendar of the user call outlook_create_event. The refusal comes before the question to Mia (:444). The listing already shows can_edit false, so the assistant can stop before the call, and then the call is not made. This scenario differs from uc-14-04: there Lena shared nothing with Mia, here Lena shared the calendar for reading only."
 
 uc-14-11:
   status: untested
@@ -206,7 +206,7 @@ uc-14-14:
     - tool: outlook_list_calendars
       optional: true
     - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf, outlook_delete_calendar]
-  note: "expected behaviour from shared/seam.py:236-241 _not_agreed: nothing was changed, this is not a failure to report as one, say that the request was not confirmed, and do not call the tool again for the same request unless the user asks for it in a new message (:187-189). Each tool adds its own first sentence: The calendar was not shared (share), The share was not removed (unshare), No event was created (booking). The asks of the rows: give Anna read access to my calendar; stop sharing my calendar with Anna; book the Budget review with Anna on Lena's calendar."
+  note: "expected behaviour from shared/seam.py:236-241 _not_agreed: nothing was changed, this is not a failure to report as one, say that the request was not confirmed, and do not call the tool again for the same request unless the user asks for it in a new message (:189-191). Each tool adds its own first sentence: The calendar was not shared (share), The share was not removed (unshare), No event was created (booking). The asks of the rows: give Anna read access to my calendar; stop sharing my calendar with Anna; book the Budget review with Anna on Lena's calendar."
 
 uc-14-15:
   status: untested
@@ -219,7 +219,7 @@ uc-14-15:
     - tool: outlook_list_calendars
       optional: true
     - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf, outlook_delete_calendar]
-  note: "expected behaviour from shared/seam.py:227-233 _no_answer, reached from :260-263 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:187-189). The asks of the rows are the asks of uc-14-14."
+  note: "expected behaviour from shared/seam.py:227-233 _no_answer, reached from :260-263 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:189-191). The asks of the rows are the asks of uc-14-14."
 
 uc-14-16:
   status: untested
@@ -275,7 +275,7 @@ uc-14-19:
     - tool: outlook_list_group_events
       args: {starts_on: Monday, ends_on: Sunday}
       uses: {group_id: id of the team Platform}
-  note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-14-06 reaches the assistant only when Microsoft stays busy through every try."
+  note: "expected behaviour from graph_client/client.py:339-342 and config.py:127: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-14-06 reaches the assistant only when Microsoft stays busy through every try."
 
 uc-14-20:
   status: untested
@@ -357,4 +357,4 @@ uc-14-25:
     - tool: outlook_create_event_on_behalf
       args: {subject: Budget review, online_meeting: true}
       uses: {calendar_ref: handle of the calendar of Lena}
-  note: "tools/outlook_create_event_on_behalf.py:556-560: when the calendar allows Teams meetings, the tool asks Mia and sends the event as a Teams meeting. When it takes none, the tool refuses (uc-07-24 shows the same rule for Mia's own calendar)."
+  note: "tools/outlook_create_event_on_behalf.py:558-562: when the calendar allows Teams meetings, the tool asks Mia and sends the event as a Teams meeting. When it takes none, the tool refuses (uc-07-24 shows the same rule for Mia's own calendar)."
