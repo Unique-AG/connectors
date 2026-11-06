@@ -111,7 +111,7 @@ As observed in one test tenant against one external tenant, a transcript was rea
 
 Other limits:
 
-- Only transcribed calls are listed. Unique does not transcribe a call itself. Passing a group chat's `chat_id` names calls in that chat that ended without a transcription. A 1:1 chat gives no such hint.
+- Only transcribed calls are listed. Unique does not transcribe a call itself. Passing a group chat's `chat_id` names calls in that chat that ended without a transcription. In the one test tenant, only group chats carried call-end events, so a 1:1 chat can report `other_organization` or `not_ready` but not `not_transcribed`. A call whose transcript started just before the window opened can appear as `unknown`, because the transcript list and the chat events use different times.
 - A transcript appears 1 to 2 minutes after the call ends.
 - Without speaker attribution, the transcript is returned without speaker names.
 - PSTN calls and calls with guests are not tested yet. A PSTN call has a transcript only if the tenant has Teams Phone.

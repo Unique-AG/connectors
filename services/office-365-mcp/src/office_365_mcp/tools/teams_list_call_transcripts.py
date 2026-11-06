@@ -161,10 +161,12 @@ class UnmatchedCall(BaseModel):
         description=(
             "Why Microsoft lists no transcript of this call for this user:\n"
             + "- `other_organization`: someone outside this user's organization owns the "
-            + "transcript, so Microsoft 365 will not return it. A retry does not change this.\n"
-            + "- `not_ready`: the transcript is under about 2 minutes old. Wait, then call "
-            + "again.\n"
-            + "- `not_transcribed`: the call ended and nobody started a transcription.\n"
+            + "transcript, so Microsoft 365 will not return it. A retry is unlikely to change "
+            + "this.\n"
+            + "- `not_ready`: the call or its transcript is under about 2 minutes old. Wait, then "
+            + "call again.\n"
+            + "- `not_transcribed`: the call ended and left no transcript event. In testing, that "
+            + "meant nobody started a transcription.\n"
             + "- `unknown`: nothing tells why, for example a call that may still be running."
         )
     )
@@ -270,7 +272,10 @@ async def _listing(
 
 
 def _has_no_transcripts(refusal: ODataError) -> bool:
-    """Graph's answer for a user with no call transcripts, unlike a 404 for a closed route."""
+    """Graph's answer for a user with no call transcripts, unlike a 404 for a closed route.
+
+    Matches Graph's literal text. If Microsoft rewords it, an empty listing becomes an error.
+    """
     body = refusal.error
     return (
         refusal.response_status_code == _NOT_FOUND
@@ -349,10 +354,13 @@ def _unmatched(
             organizer = detail.meeting_organizer
             reason = _transcript_reason(organizer, message.created_date_time, tenant, now=now)
             seen = transcribed
-        # Another organization's transcription still leaves a callTranscript event, so an ended
-        # call without one was not transcribed. Only group chats carry end events today.
+        # As seen in one test tenant, another organization's transcription still leaves a
+        # callTranscript event, and only group chats carry end events.
         elif isinstance(detail, CallEndedEventMessageDetail):
-            organizer, reason, seen = detail.initiator, "not_transcribed", ended
+            organizer, seen = detail.initiator, ended
+            reason = (
+                "not_ready" if _is_recent(message.created_date_time, now) else "not_transcribed"
+            )
         # Started and never ended in the window: it may still be running.
         elif isinstance(detail, CallStartedEventMessageDetail):
             organizer, reason, seen = detail.initiator, "unknown", started
@@ -377,9 +385,11 @@ def _transcript_reason(
     organizer_tenant = _tenant_id(organizer)
     if None not in (organizer_tenant, tenant) and organizer_tenant != tenant:
         return "other_organization"
-    if created is not None and now - as_utc(created) < TRANSCRIPT_DELAY:
-        return "not_ready"
-    return "unknown"
+    return "not_ready" if _is_recent(created, now) else "unknown"
+
+
+def _is_recent(created: datetime | None, now: datetime) -> bool:
+    return created is not None and now - as_utc(created) < TRANSCRIPT_DELAY
 
 
 def _call_id(message: ChatMessage) -> str | None:

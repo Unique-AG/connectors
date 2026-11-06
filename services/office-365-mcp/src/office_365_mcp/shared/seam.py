@@ -438,7 +438,6 @@ _TRANSCRIPTS_SWITCHED_OFF = (
     + "it. A Microsoft Teams administrator has to turn it on: Teams admin center → Meetings → "
     + "Meeting settings → Transcript API access → Microsoft Graph access, or "
     + "`Set-CsTeamsMeetingConfiguration -EnableGraphTranscriptAccess $true -Identity Global`. "
-    + "A switch-on in the last few hours may still be applying. "
     + "Microsoft documents no request-side workaround: until an administrator acts, every "
     + "transcript call from this connector fails identically, so do not retry this one and do not "
     + "try another meeting or another transcript. Everything else this connector does — chats, "
@@ -449,8 +448,9 @@ _TRANSCRIPTS_SWITCHED_OFF = (
 _LICENSE_INFORMATION_MISSING = "Failed to get license information for the user"
 
 _NEEDS_A_TEAMS_LICENSE = (
-    "Microsoft 365 refused this request because this user needs an Office 365 license that "
-    + "includes Teams. Retrying will not help, and no other arguments will succeed either."
+    "Microsoft 365 refused this request because this user's Office 365 license does not cover "
+    + "it. An administrator has to assign a license that includes the service this tool uses. A "
+    + "new license can take time to apply, so trying again later may work."
 )
 
 

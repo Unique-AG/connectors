@@ -44,8 +44,7 @@ _DESCRIPTION = f"""\
 Returns the spoken turns of one Teams call transcript. Use this tool to read what a \
 call said or decided. Each turn has a start time and an end time in seconds. Each turn can \
 have a speaker name. Use the `uri` that teams_list_call_transcripts reports. \
-A meeting \
-transcript handle is not valid here.
+A meeting transcript handle is not valid here.
 
 Notes:
 - Only a call the signed-in user was on. Readable only when someone in that user's organization \

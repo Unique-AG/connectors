@@ -366,10 +366,10 @@ class TestUnmatchedCalls:
 
         assert [call.reason for call in found.unmatched_calls or []] == ["unknown"]
 
-    async def test_an_ended_call_without_a_transcript_event_is_not_transcribed_in_any_chat(
+    async def test_an_ended_call_without_a_transcript_event_is_not_transcribed(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """No callStarted event, as in a 1:1 chat: the callEnded event alone decides."""
+        """No callStarted event: the callEnded event alone decides."""
         tenant_lookup = _signed_in(graph)
         _ = _listing(graph, _page([]))
         _ = _chat(graph, _event("callEnded", "call-ended", datetime.now(UTC) - timedelta(hours=1)))
@@ -378,6 +378,19 @@ class TestUnmatchedCalls:
 
         assert [call.reason for call in found.unmatched_calls or []] == ["not_transcribed"]
         assert not tenant_lookup.called
+
+    async def test_a_call_that_ended_a_moment_ago_is_not_ready(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _signed_in(graph)
+        _ = _listing(graph, _page([]))
+        _ = _chat(
+            graph, _event("callEnded", "call-just-ended", datetime.now(UTC) - timedelta(seconds=30))
+        )
+
+        found = await _list(client, chat_id=_CHAT_ID)
+
+        assert [call.reason for call in found.unmatched_calls or []] == ["not_ready"]
 
     async def test_a_call_that_only_started_is_unknown(
         self, client: GraphServiceClient, graph: respx.MockRouter

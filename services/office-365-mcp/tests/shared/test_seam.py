@@ -183,7 +183,6 @@ class TestTheTwoRemediesGraphCannotTellApart:
 
         assert "Teams transcripts" in message
         assert "Teams meeting transcripts" not in message
-        assert "last few hours" in message
         assert "do not retry" in message
         assert "Teams administrator" in message
         assert "Set-CsTeamsMeetingConfiguration" in message
@@ -362,7 +361,7 @@ class TestRetryAdvice:
         assert "Teams administrator" in message
         assert "Refused." not in message
 
-    async def test_an_unlicensed_reader_is_told_to_get_teams_before_the_tools_own_words(
+    async def test_an_unlicensed_reader_is_told_to_get_a_license_before_the_tools_own_words(
         self,
     ) -> None:
         message = await _message(
@@ -370,9 +369,9 @@ class TestRetryAdvice:
             forbidden="Refused.",
         )
 
-        assert "Office 365 license that includes Teams" in message
+        assert "license that includes the service this tool uses" in message
         assert "Refused." not in message
-        assert "Retrying will not help" in message
+        assert "Retrying will not help" not in message
 
     async def test_the_403_wording_does_not_replace_the_404_advice(self) -> None:
         message = await _message(
