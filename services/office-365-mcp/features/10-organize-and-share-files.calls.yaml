@@ -23,7 +23,7 @@ uc-10-02:
   blocker:
     kind: tool
     tool: sharepoint_list_drives
-    text: No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns. The description of sharepoint_copy_item says so.
+    text: No tool lists the libraries of a site, so the destination must be a folder, or the parent_uri of an item, that a search on the site returns. The description of sharepoint_copy_item says so.
     user: The assistant can copy into the Sales site only when it can find a folder there.
   provenance: drafted
   asks_user: true

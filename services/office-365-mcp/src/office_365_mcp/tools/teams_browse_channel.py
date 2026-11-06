@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Annotated
-from urllib.parse import parse_qs, quote, urlsplit
+from urllib.parse import quote, urlsplit
 
 import httpx
 from fastmcp import FastMCP
@@ -91,7 +91,7 @@ async def teams_browse_channel(
         base_url = channel_messages.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
         channel_messages = channel_messages.with_url(
             f"{base_url}/teams/{quote(team_id, safe='')}/channels/{quote(channel_id, safe='')}"
-            + f"/messages?$expand=replies&$top={limit}&$skiptoken={quote(page_token, safe='')}"
+            + f"/messages?$expand=replies&$top={limit}&$skiptoken={page_token}"
         )
     with graph_errors(TOOL_NAME, step=STEP):
         page = await channel_messages.get(request_configuration=configuration)
@@ -129,7 +129,9 @@ async def teams_browse_channel(
 def _page_token(page: ChatMessageCollectionResponse) -> str | None:
     if not page.odata_next_link:
         return None
-    tokens = parse_qs(urlsplit(page.odata_next_link).query).get("$skiptoken")
+    prefix = "$skiptoken="
+    pairs = urlsplit(page.odata_next_link).query.split("&")
+    tokens = [pair.removeprefix(prefix) for pair in pairs if pair.startswith(prefix)]
     assert tokens, "Graph advertised a next page of channel messages with no $skiptoken"
     return tokens[0]
 
@@ -200,6 +202,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
+                pattern=r"^[A-Za-z0-9%._~+=/-]+$",
                 description=(
                     "The `next_page_token` of the previous call. Omit it to read the first page."
                 ),

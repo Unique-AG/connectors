@@ -1412,7 +1412,7 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await every_tool.list_tools())
 
         assert "needs a word to search for" in (tools["sharepoint_list_drives"].description or "")
-        assert "No tool gives the top folder of a site library" in (
+        assert "No tool lists the libraries of a site" in (
             tools["sharepoint_copy_item"].description or ""
         )
 
@@ -1693,12 +1693,14 @@ class TestCallingThem:
         assert route.call_count == 3, "one request per call, and the cursor still never followed"
 
     @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize("token", ["a%2Bb%3D", "a+b%3D", "a%20b"])
     async def test_a_channel_is_read_page_by_page_with_the_token_of_the_page_before(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
+        token: str,
     ) -> None:
-        link = f"{GRAPH_V1}{_CHANNEL_MESSAGES_PATH}?$expand=replies&$top=1&$skiptoken=a%2Bb%3D"
+        link = f"{GRAPH_V1}{_CHANNEL_MESSAGES_PATH}?$expand=replies&$top=1&$skiptoken={token}"
         route = graph.get(_CHANNEL_MESSAGES_PATH).mock(
             side_effect=[
                 httpx.Response(200, json={**_CHANNEL_POSTS, "@odata.nextLink": link}),
@@ -1715,11 +1717,13 @@ class TestCallingThem:
             )
         )
 
-        assert first["next_page_token"] == "a+b="
+        assert first["next_page_token"] == token
         assert last["next_page_token"] is None
-        params = route.calls.last.request.url.params
-        assert params["$skiptoken"] == "a+b=", "the token goes back as Microsoft sent it"
-        assert (params["$top"], params["$expand"]) == ("1", "replies")
+        request = route.calls.last.request
+        assert request.url.query.decode().endswith(f"$skiptoken={token}"), (
+            "the token goes back as Microsoft sent it"
+        )
+        assert (request.url.params["$top"], request.url.params["$expand"]) == ("1", "replies")
 
     @pytest.mark.usefixtures("obo")
     async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(

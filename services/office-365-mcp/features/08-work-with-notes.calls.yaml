@@ -471,7 +471,7 @@ uc-08-33:
       optional: true
       args: {name: "2025"}
       uses: {parent: handle of the notebook Project Falcon}
-  note: "expected behaviour from tools/onenote_create_section.py (description and GRAPH_FORBIDDEN): Microsoft can refuse a create under a section group with error 403, then create under the notebook, or copy a section into the group with onenote_copy_section. The source gives two options, so the assistant asks Mia which one she wants and does not choose. The first create is the failing call, so it is optional. The second create is optional because it follows Mia's answer."
+  note: "expected behaviour from tools/onenote_create_section.py (description and GRAPH_FORBIDDEN): Microsoft can refuse a create under a section group with error 403, then create under the notebook only when Mia agrees, or copy a section into the group with onenote_copy_section when the notebook is not on a SharePoint site. The source gives two options, so the assistant asks Mia which one she wants and does not choose. The first create is the failing call, so it is optional. The second create is optional because it follows Mia's answer."
 
 uc-08-34:
   status: untested

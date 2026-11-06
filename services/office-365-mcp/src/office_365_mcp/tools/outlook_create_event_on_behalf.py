@@ -294,8 +294,9 @@ class CreatedEventOnBehalf(BaseModel):
     )
     organizer: MailAddress | None = Field(
         description=(
-            "This is who Microsoft recorded as the organizer, and this is the CALENDAR OWNER, "
-            + "never the signed-in user. Microsoft documents that the delegate's identity "
+            "This is who Microsoft recorded as the organizer, and this is the CALENDAR OWNER. On "
+            + "a calendar that another person shared, it is never the signed-in user. "
+            + "Microsoft documents that the delegate's identity "
             + "reaches only the invitation mail. No property of the event names the delegate. "
             + "This is the name that the attendees see. This field is null when Graph recorded "
             + "no organizer."
@@ -681,7 +682,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                     + "an outlook_list_calendars row, verbatim. This is the only shape that this "
                     + "tool accepts. Pick the row whose `owner` is the named person and whose "
                     + "`can_edit` is true. For a second calendar of the user, pick the row whose "
-                    + "`is_mine` and `can_edit` are both true."
+                    + "`is_mine` and `can_edit` are both true and whose `name` is the calendar "
+                    + "that the user named."
                 ),
             ),
         ],

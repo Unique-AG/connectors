@@ -70,8 +70,10 @@ people or belongs to somebody else. A section in the user's own unshared noteboo
 without a question.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_sections does not show a section named `name`.
-- Microsoft can refuse a create under a section group with error 403. Then create under the \
-notebook, or copy a section into the group with onenote_copy_section.
+- Microsoft can refuse a create under a section group with error 403. A section under the \
+notebook is not in the group. Create it there only when the user agrees. A copy of a section \
+into the group with onenote_copy_section works only for a notebook that is not on a SharePoint \
+site.
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -99,10 +101,12 @@ GRAPH_NOT_FOUND = (
 GRAPH_FORBIDDEN = (
     "Microsoft 365 refused to create this section for the signed-in user. No section was "
     + "created. Microsoft can refuse a create under a section group while it accepts a create "
-    + "under the notebook. If `parent` is a section group, create the section under the "
-    + "notebook, or copy a section into the group with onenote_copy_section. If `parent` is a "
-    + "notebook, the user cannot write to it. Tell the user, because the owner of the notebook "
-    + "can give more access. A call with the same arguments fails the same way."
+    + "under the notebook. If `parent` is a section group, tell the user. A section under the "
+    + "notebook is not in the group, so create it there only when the user agrees. A copy of a "
+    + "section into the group with onenote_copy_section works only for a notebook that is not "
+    + "on a SharePoint site. If `parent` is a notebook, the user may lack write access to it, "
+    + "or a policy of the tenant may refuse the write. Tell the user. A call with the same "
+    + "arguments fails the same way."
 )
 
 

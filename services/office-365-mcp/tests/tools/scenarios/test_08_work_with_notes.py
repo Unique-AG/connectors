@@ -904,10 +904,11 @@ class TestNamesAndNotebooks:
                 name="2025",
             )
 
-        assert "create the section under the notebook" in str(refused.value)
-        assert "copy a section into the group with onenote_copy_section" in str(refused.value)
+        assert "create it there only when the user agrees" in str(refused.value)
+        assert "copy of a section into the group with onenote_copy_section" in str(refused.value)
+        assert "not on a SharePoint site" in str(refused.value)
         assert "administrator" not in str(refused.value)
-        assert "copy a section into the group" in (description or "")
+        assert "copy of a section into the group" in (description or "")
 
 
 def _operation(*, status: str = "Running", error: Row | None = None) -> Row:
