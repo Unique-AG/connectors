@@ -19,11 +19,15 @@ from office_365_mcp.graph_client import GraphResponseTooLarge, graph_errors
 from office_365_mcp.shared.handles import CallTranscriptHandle, call_transcript_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.transcripts import (
-    BLANK_SPEAKER,
     CALL_TRANSCRIPT_PERMISSION,
-    INVERTED_TIME_WINDOW,
     MAX_TRANSCRIPT_BYTES,
+    FromSeconds,
+    Limit,
+    Offset,
+    Speaker,
+    ToSeconds,
     TranscriptTurn,
+    bad_filters,
     read_turns,
 )
 
@@ -202,67 +206,18 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        offset: Annotated[
-            int,
-            Field(
-                ge=0,
-                description=(
-                    "This value is the number of turns to skip. The first turn is 0. To "
-                    "continue, pass the `next_offset` value of the previous response."
-                ),
-            ),
-        ] = 0,
-        limit: Annotated[
-            int,
-            Field(
-                ge=1,
-                description=(
-                    "This value is the number of turns to return. This tool fetches the whole "
-                    "transcript for every call. One wide `limit` costs less than several pages."
-                ),
-            ),
-        ] = 200,
-        from_seconds: Annotated[
-            float | None,
-            Field(
-                description=(
-                    "This tool returns only the turns that overlap at or after this moment. The "
-                    "unit is seconds from transcription start. This bound is inclusive. A "
-                    "negative value is valid."
-                )
-            ),
-        ] = None,
-        to_seconds: Annotated[
-            float | None,
-            Field(
-                description=(
-                    "This tool returns only the turns that overlap at or before this moment. "
-                    "The unit is the same as the unit of `from_seconds`. This bound is "
-                    "inclusive. To read one window, give this value and `from_seconds` "
-                    "together."
-                )
-            ),
-        ] = None,
-        speaker: Annotated[
-            str | None,
-            Field(
-                min_length=1,
-                description=(
-                    "This tool returns only the turns whose speaker name contains this "
-                    "substring. The match is case-insensitive. To read every turn, omit "
-                    "this parameter. A blank value is invalid."
-                ),
-            ),
-        ] = None,
+        offset: Offset = 0,
+        limit: Limit = 200,
+        from_seconds: FromSeconds = None,
+        to_seconds: ToSeconds = None,
+        speaker: Speaker = None,
         client: GraphServiceClient = graph,
     ) -> CallTranscript:
         handle = call_transcript_handle(uri)
         if handle is None:
             raise ToolError(_NOT_A_CALL_TRANSCRIPT_HANDLE)
-        if from_seconds is not None and to_seconds is not None and from_seconds > to_seconds:
-            raise ToolError(INVERTED_TIME_WINDOW)
-        if speaker is not None and not speaker.strip():
-            raise ToolError(BLANK_SPEAKER)
+        if refusal := bad_filters(from_seconds, to_seconds, speaker):
+            raise ToolError(refusal)
         return await teams_read_call_transcript(
             client,
             transport,

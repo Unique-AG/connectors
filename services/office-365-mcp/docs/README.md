@@ -308,6 +308,8 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 
 Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PSTN calls, `AllowTranscription` for group calls, and Graph transcript access. Speaker attribution is optional; when it is unavailable, `teams_read_call_transcript` returns turns with null speaker names. A policy change can take hours to reach users. A calling policy with Copilot on and transcription off keeps no transcript.
 
+**Risk:** `teams_list_call_transcripts` calls `adhocCalls/getAllTranscripts`, which Microsoft documents for application permissions only. It works with the user's delegated token today. If Microsoft stops accepting that, the list tool fails and there is no delegated fallback.
+
 **Tools**
 
 | Tool | Kind | User approval | What it does |
@@ -319,7 +321,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 **What it needs**
 
 - **Graph permissions (3):** `CallTranscripts.Read.All`, `Chat.Read`, `User.Read`
-- **Admin consent:** ⚠️ Required for `CallTranscripts.Read.All`. Register it before anyone signs in to a deployment that uses this preset. `terraform apply` with the preset adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. For a multi-tenant app (`sign_in_audience = "AzureADMultipleOrgs"`), customer-tenant administrators must also grant consent through `admin_consent_url`, even when `service_principal_configuration` is set. Existing users sign in again after consent to receive the new permission. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
+- **Admin consent:** ⚠️ Required for `CallTranscripts.Read.All`. Register it before anyone signs in to a deployment that uses this preset. `terraform apply` with the preset adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. For a multi-tenant app (`sign_in_audience = "AzureADMultipleOrgs"`), customer-tenant administrators must also grant consent through `admin_consent_url`, even when `service_principal_configuration` is set. Existing users should not need to sign in again after consent. This is not confirmed on a test tenant yet. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
 - **User approval:** None. No tool of this preset asks the user.
 
 ### `teams-recordings`

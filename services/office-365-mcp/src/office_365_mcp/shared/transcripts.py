@@ -5,7 +5,7 @@ import re
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Self
+from typing import Annotated, Self
 
 import httpx
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -30,6 +30,74 @@ BLANK_SPEAKER = (
     + "parameter. To filter, give any part of the speaker name. The match is case-insensitive, "
     + "and it matches anywhere in the name."
 )
+
+Offset = Annotated[
+    int,
+    Field(
+        ge=0,
+        description=(
+            "This value is the number of turns to skip. The first turn is 0. To "
+            "continue, pass the `next_offset` value of the previous response."
+        ),
+    ),
+]
+
+Limit = Annotated[
+    int,
+    Field(
+        ge=1,
+        description=(
+            "This value is the number of turns to return. This tool fetches the whole "
+            "transcript for every call. One wide `limit` costs less than several pages."
+        ),
+    ),
+]
+
+FromSeconds = Annotated[
+    float | None,
+    Field(
+        description=(
+            "This tool returns only the turns that overlap at or after this moment. The "
+            "unit is seconds from transcription start. This bound is inclusive. A "
+            "negative value is valid."
+        )
+    ),
+]
+
+ToSeconds = Annotated[
+    float | None,
+    Field(
+        description=(
+            "This tool returns only the turns that overlap at or before this moment. "
+            "The unit is the same as the unit of `from_seconds`. This bound is "
+            "inclusive. To read one window, give this value and `from_seconds` "
+            "together."
+        )
+    ),
+]
+
+Speaker = Annotated[
+    str | None,
+    Field(
+        min_length=1,
+        description=(
+            "This tool returns only the turns whose speaker name contains this "
+            "substring. The match is case-insensitive. To read every turn, omit "
+            "this parameter. A blank value is invalid."
+        ),
+    ),
+]
+
+
+def bad_filters(
+    from_seconds: float | None, to_seconds: float | None, speaker: str | None
+) -> str | None:
+    if from_seconds is not None and to_seconds is not None and from_seconds > to_seconds:
+        return INVERTED_TIME_WINDOW
+    if speaker is not None and not speaker.strip():
+        return BLANK_SPEAKER
+    return None
+
 
 STEP_ATTRIBUTED = "transcript_attributed"
 STEP_UNATTRIBUTED = "transcript_unattributed"

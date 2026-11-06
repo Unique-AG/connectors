@@ -54,7 +54,8 @@ This tool lists the signed-in user's Teams chats: one-to-one chats, group chats,
 chats, newest last message first. The result shows who is in a conversation and when it was \
 last active. It also shows the last message, its sender, and whether the user read it. A \
 meeting chat reports a `meeting_uri` for its transcripts and recordings. This tool does not \
-cover channel activity.
+cover channel activity. teams_browse_channel walks one channel, and teams_search_messages \
+searches message text across chats and channels.
 
 Notes:
 - To find a meeting's `meeting_uri`, set `chat_type="meeting"` and, if you know it, \
@@ -97,8 +98,8 @@ class ChatSummary(BaseModel):
     chat_id: str = Field(
         description=(
             "Graph's id for this chat, for example `19:...@thread.v2`. It is not a `teams:///` "
-            + "handle, and no handle can be built from it. A message handle comes only from a "
-            + "search or browse result, not from something the caller builds."
+            + "handle, and no handle can be built from it. teams_read_message needs the `uri` "
+            + "that a search or browse result reports."
         )
     )
     chat_type: str = Field(
@@ -115,10 +116,10 @@ class ChatSummary(BaseModel):
     meeting_uri: str | None = Field(
         description=(
             "A handle for the Teams meeting behind this chat. It is the only route from a "
-            + "conversation to its meeting. Pass it verbatim when listing that meeting's "
-            + "transcripts, to make sure that the meeting was transcribed. This value is null "
-            + "when the chat carries no join URL. In that case, this connector cannot reach "
-            + "the meeting's transcripts."
+            + "conversation to its meeting. Pass it verbatim to teams_list_meeting_transcripts to "
+            + "make sure that the meeting was transcribed. This value is null when the chat "
+            + "carries no join URL. In that case, this connector cannot reach the meeting's "
+            + "transcripts."
         )
     )
     last_message_at: datetime | None = Field(
