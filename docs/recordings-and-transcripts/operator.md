@@ -26,11 +26,13 @@ Two of the scopes below read meeting content and are therefore privileged: `Onli
 
 Admin consent alone is **not** enough. You must also enable Microsoft Graph transcript API access in Teams meeting settings — see [Teams Graph transcript API access](#Teams-Graph-transcript-API-access).
 
-**Recommended for most clients.** When Unique runs Teams MCP with capture enabled, Unique provisions this app registration for you. You only need to grant admin consent:
+**Recommended for most clients.** When Unique runs Teams MCP with capture enabled, Unique provisions this app registration for you. You only need to grant admin consent. Open the `/admin/consent` path of your capture-enabled Teams MCP server, the same address you connect to with `/mcp` replaced by `/admin/consent`:
 
 ```
-https://login.microsoftonline.com/organizations/adminconsent?client_id=c55409b0-c2c3-4dcc-96c9-ceb85a729ba5
+https://<your-teams-mcp-host>/admin/consent
 ```
+
+The link needs no sign-in. It redirects to the Microsoft admin consent page for the capture app and the sign-in tenant of that deployment — see [Teams MCP - Authentication — Admin consent link](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#Admin-consent-link).
 
 The consent prompt lists **only** these Microsoft Graph delegated permissions — there are no Teams chat or channel messaging scopes on this app:
 
@@ -43,7 +45,7 @@ The consent prompt lists **only** these Microsoft Graph delegated permissions �
 
 Least-privilege justification for each scope is in [Required Microsoft Graph permissions](./technical.md#required-microsoft-graph-permissions).
 
-If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `c55409b0-c2c3-4dcc-96c9-ceb85a729ba5`.
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. Unless Unique pinned your deployment to one directory, Microsoft opens the directory of the admin account you sign in with.
 
 Consenting the correct directory is not enough if Unique hosts a dedicated Teams MCP for that customer: the MCP OAuth login still defaults to `/common`, and Microsoft can open the signed-in admin's home tenant (often production) instead of the foreign tenant that holds the Enterprise Application. Pin login with `mcpConfig.microsoft.signInTenantId` (env `MICROSOFT_SIGN_IN_TENANT_ID`) set to that directory's GUID — see [Teams MCP - Authentication — OAuth authority](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/1803026436/Teams+MCP+-+Authentication#OAuth-authority-MICROSOFT_SIGN_IN_TENANT_ID).
 
