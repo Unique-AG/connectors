@@ -165,32 +165,32 @@ sharepoint_list_items-first-list:
       args: {limit: 5}
       bind: {list: "$prev.lists[0].uri"}
 
-sharepoint_create_list_item-first-list:
+sharepoint_create_list_item-seed-list:
   chain:
-    - *first_site
-    - *first_lists
+    - &seed_site {tool: sharepoint_search_sites, args: {query: seed-v1 team, limit: 5}}
+    - &seed_lists {tool: sharepoint_list_lists, args: {limit: 25}, bind: {site: "$prev.sites[display_name=seed-v1 team].web_url"}}
     - tool: sharepoint_create_list_item
-      args: {fields: {Title: seed-v1 case-sharepoint_create_list_item-first-list}}
-      bind: {list: "$prev.lists[0].uri"}
+      args: {fields: {Title: seed-v1 case-sharepoint_create_list_item-seed-list}}
+      bind: {list: "$prev.lists[display_name=seed-v1 Tasks].uri"}
 
 sharepoint_update_list_item-own-row:
   chain:
-    - *first_site
-    - *first_lists
+    - *seed_site
+    - *seed_lists
     - tool: sharepoint_create_list_item
       args: {fields: {Title: seed-v1 case-sharepoint_update_list_item-own-row}}
-      bind: {list: "$prev.lists[0].uri"}
+      bind: {list: "$prev.lists[display_name=seed-v1 Tasks].uri"}
     - tool: sharepoint_update_list_item
       args: {fields: {Title: seed-v1 case-sharepoint_update_list_item-renamed}}
       bind: {item: "$prev.uri"}
 
 sharepoint_delete_list_item-own-row:
   chain:
-    - *first_site
-    - *first_lists
+    - *seed_site
+    - *seed_lists
     - tool: sharepoint_create_list_item
       args: {fields: {Title: seed-v1 case-sharepoint_delete_list_item-own-row}}
-      bind: {list: "$prev.lists[0].uri"}
+      bind: {list: "$prev.lists[display_name=seed-v1 Tasks].uri"}
     - tool: sharepoint_delete_list_item
       bind: {item: "$prev.uri"}
 
