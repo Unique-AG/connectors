@@ -369,7 +369,7 @@ class CreatedEventOnBehalf(BaseModel):
         description=(
             "This is the name under which this event went out, taken from the calendar read "
             + "before the create. Name this person when you report back to the user. The user "
-            + "asked for an event on somebody's calendar, and this is the person that Microsoft "
+            + "asked for an event on another calendar, and this is the person that Microsoft "
             + "holds that calendar for. This field is null when Graph recorded no owner."
         )
     )
@@ -668,7 +668,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Calendar Event for Somebody Else",
+        title="Create a Calendar Event on Another Calendar",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

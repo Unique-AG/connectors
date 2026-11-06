@@ -104,8 +104,8 @@ GRAPH_FORBIDDEN = (
     + "under the notebook. If `parent` is a section group, tell the user. A section under the "
     + "notebook is not in the group, so create it there only when the user agrees. A copy of a "
     + "section into the group with onenote_copy_section works only for a notebook that is not "
-    + "on a SharePoint site. If `parent` is a notebook, the user may lack write access to it, "
-    + "or a policy of the tenant may refuse the write. Tell the user. A call with the same "
+    + "on a SharePoint site. If `parent` is a notebook, the user can lack write access to it, "
+    + "or a policy of the tenant can refuse the write. Tell the user. A call with the same "
     + "arguments fails the same way."
 )
 

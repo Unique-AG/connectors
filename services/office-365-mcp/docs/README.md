@@ -96,7 +96,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`outlook-calendar`](#outlook-calendar) | Read calendars, events, and free time. | 12 | No |
 | [`outlook-calendar-write`](#outlook-calendar-write) | Create, change, and cancel events. Answer invitations. | 16 | No |
 | [`outlook-calendar-manage`](#outlook-calendar-manage) | `outlook-calendar-write`, plus forward, delete, and share. | 21 | No |
-| [`outlook-calendar-delegate`](#outlook-calendar-delegate) | `outlook-calendar-write`, plus events for another person. | 17 | No |
+| [`outlook-calendar-delegate`](#outlook-calendar-delegate) | `outlook-calendar-write`, plus events on another calendar. | 17 | No |
 | [`outlook-calendar-rooms`](#outlook-calendar-rooms) | `outlook-calendar-write`, plus finding meeting rooms. | 17 | ⚠️ Yes |
 | [`outlook-group-calendar`](#outlook-group-calendar) | Read the calendar of a team. | 2 | ⚠️ Yes |
 
@@ -808,13 +808,13 @@ Calendars, events, availability, rooms, and sharing.
 **You can**
 
 - Do everything in `outlook-calendar-write`.
-- Create an event on a calendar that another person delegated to you.
+- Create an event on another calendar: a calendar that another person delegated to you, or a second calendar of your own.
 
 **Tools added by this preset**
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on a calendar that another person delegated, sent under that person's name. |
+| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. |
 
 **What it needs**
 

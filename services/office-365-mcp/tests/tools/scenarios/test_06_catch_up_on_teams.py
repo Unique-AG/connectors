@@ -1024,8 +1024,8 @@ class TestAReferenceThatTheAssistantMadeUp:
                 {"uri": f"{CHANNEL_POST_URI}/1/replies/2"},
                 "A reply handle ends in",
             ),
-            ("teams_list_meeting_transcripts", {"meeting_uri": "Design review"}, "not this"),
-            ("teams_list_meeting_recordings", {"meeting_uri": "Design review"}, "This is not one"),
+            ("teams_list_meeting_transcripts", {"meeting_uri": "Design review"}, "this is not one"),
+            ("teams_list_meeting_recordings", {"meeting_uri": "Design review"}, "this is not one"),
             ("teams_read_transcript", {"uri": "Design review"}, "different shape"),
         ],
         ids=[

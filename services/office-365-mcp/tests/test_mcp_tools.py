@@ -1074,6 +1074,29 @@ class TestTheToolsThisServerAdvertises:
         assert "at most 50 posts" in description
         assert "pass the token unchanged as `page_token`" in description
 
+    async def test_teams_browse_channel_caps_the_pages_of_a_period_read(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await mcp_client.list_tools())
+        description = tools["teams_browse_channel"].description
+
+        assert "one request a second, across the whole tenant" in (description or "")
+        assert "Read at most five pages" in (description or "")
+
+    async def test_the_mail_tools_say_how_to_read_and_keep_a_stored_bcc(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+        update = tools["outlook_update_draft"]
+        bcc = _object(_properties(update.input_schema)["bcc"])
+        read_bcc = _object(_properties(tools["outlook_read_mail"].output_schema)["bcc"])
+
+        assert "first read the draft with outlook_read_mail" in (update.description or "")
+        assert "read the draft with outlook_read_mail and send the full list" in str(
+            bcc["description"]
+        )
+        assert "only for a draft or a sent message" in str(read_bcc["description"])
+
     async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
@@ -1365,7 +1388,7 @@ class TestTheToolsThisServerAdvertises:
 
         for name in ("teams_list_meeting_transcripts", "teams_list_meeting_recordings"):
             meeting_uri = _object(_properties(tools[name].input_schema)["meeting_uri"])
-            assert "the `join_url` of the calendar event, percent-encoded" in str(
+            assert "a letter or a digit, also `/`, `:`, `?` and `%`" in str(
                 meeting_uri["description"]
             ), name
 
