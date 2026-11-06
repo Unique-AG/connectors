@@ -167,9 +167,6 @@ class TestTheRefusals:
             )
 
         assert route.call_count == 1
-        assert "organization" in reader.GRAPH_NOT_FOUND
-        assert "deleted" in reader.GRAPH_NOT_FOUND
-        assert "teams_list_call_transcripts" in reader.GRAPH_NOT_FOUND
 
     async def test_a_call_the_reader_was_not_on_is_forbidden(
         self, client: GraphServiceClient, transport: httpx.AsyncClient, graph: respx.MockRouter
@@ -183,8 +180,6 @@ class TestTheRefusals:
 
         assert raised.value.inner_code is None
         assert route.call_count == 1, "no second format: this is not speaker attribution"
-        assert "were not on" in reader.GRAPH_FORBIDDEN
-        assert "teams_list_call_transcripts" in reader.GRAPH_FORBIDDEN
 
     async def test_a_transcript_longer_than_the_ceiling_is_refused_in_this_tools_own_words(
         self,

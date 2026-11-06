@@ -61,7 +61,8 @@ _NOT_A_TRANSCRIPT_HANDLE = (
     "teams_read_transcript takes the handle teams:///transcripts/{meeting_id}/{transcript_id}. "
     + "teams_list_meeting_transcripts reports that handle. This value has a different shape. "
     + "Call teams_list_meeting_transcripts and use its `uri`. Do not use the meeting "
-    + "`meeting_uri`, and do not use a Teams message handle. A retry will fail identically."
+    + "`meeting_uri`, and do not use a Teams message handle. A `teams:///calltranscripts/...` "
+    + "handle belongs to teams_read_call_transcript. A retry will fail identically."
 )
 
 GRAPH_NOT_FOUND = (

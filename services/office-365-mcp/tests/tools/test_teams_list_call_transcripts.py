@@ -93,7 +93,7 @@ def _signed_in(graph: respx.MockRouter) -> respx.Route:
     """Mocks the signed-in user, and returns the route of the home-tenant lookup."""
     _ = graph.get("/me").mock(return_value=httpx.Response(200, json=ME))
     return graph.get("/organization").mock(
-        return_value=httpx.Response(200, json={"value": [{"id": _OWN_TENANT}]})
+        return_value=httpx.Response(200, json={"value": [{"id": _OWN_TENANT.upper()}]})
     )
 
 
@@ -316,6 +316,7 @@ class TestUnmatchedCalls:
             _event(
                 "callTranscript", "call-external", now - timedelta(hours=1), tenant=_OTHER_TENANT
             ),
+            _event("callEnded", "call-external", now - timedelta(minutes=50)),
             _event("callEnded", "call-untranscribed", now - timedelta(hours=2)),
             _event("callStarted", "call-untranscribed", now - timedelta(hours=2, minutes=10)),
             _event("callTranscript", "call-unexplained", now - timedelta(hours=3)),

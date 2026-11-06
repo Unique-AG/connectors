@@ -3,13 +3,8 @@
 import pytest
 
 from office_365_mcp.shared import handles
+from tests.tools.conftest import JOIN_WEB_URL, MEETING_ID
 
-JOIN_WEB_URL = (
-    "https://teams.microsoft.invalid/l/meetup-join/"
-    + "19%3ameeting_TjAwMDAwMDAwMDAwMA%40thread.v2/0"
-    + "?context=%7b%22Tid%22%3a%228a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81%22%7d&anon=true"
-)
-MEETING_ID = "MSpiYTMyMWUwZC03OWVlLTQ3OGQtOGUyOC04NWExOTUwN2Y0NTYqMCoq"
 _TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0001"
 
 
@@ -39,3 +34,8 @@ class TestTheCallTranscriptHandleGrammar:
     )
     def test_what_is_not_a_call_transcript_handle(self, uri: str) -> None:
         assert handles.call_transcript_handle(uri) is None
+
+    def test_a_call_transcript_uri_is_not_a_meeting_transcript_handle(self) -> None:
+        uri = handles.CallTranscriptHandle("call-1", _TRANSCRIPT_ID).uri
+
+        assert handles.transcript_handle(uri) is None
