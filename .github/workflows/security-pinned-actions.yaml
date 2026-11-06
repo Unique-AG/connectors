@@ -5,6 +5,7 @@ on:
   # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
   # Only `paths` decides when the workflow runs.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - ".github/workflows/**"
 
@@ -18,6 +19,7 @@ concurrency:
 jobs:
   check-pinned-actions:
     name: Verify action SHAs are pinned
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:

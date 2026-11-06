@@ -2,7 +2,7 @@ name: "[Security] Dependency Review"
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, labeled, unlabeled]
+    types: [opened, synchronize, reopened, labeled, unlabeled, ready_for_review]
     paths:
       - "pnpm-lock.yaml"
       - "services/**/package.json"
@@ -23,7 +23,7 @@ jobs:
     name: dependency-review
     runs-on: ubuntu-slim
     timeout-minutes: 10
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'security-exception') }}
+    if: ${{ github.event.pull_request.draft != true && !contains(github.event.pull_request.labels.*.name, 'security-exception') }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
