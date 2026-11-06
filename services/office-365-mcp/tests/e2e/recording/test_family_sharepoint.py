@@ -377,7 +377,12 @@ class TestGuardRules:
         made = guard()
         request = httpx.Request(method, f"{GRAPH}{shown}", content=json.dumps({}))
         assert "did not read as seed data" in str(made.refuses_request(request, tool))
-        listed = {"value": [{"id": "L1", "displayName": "seed-v1 Tasks"}]}
+        listed = {
+            "value": [
+                {"id": "L1", "displayName": "seed-v1 Tasks"},
+                {"id": "L2", "displayName": "seed-v1 Issues"},
+            ]
+        }
         read = {"value": [{"id": "7", "fields": {"Title": "seed-v1 Close books"}}]}
         for path, body in (
             (f"/sites/{SITE}/lists", listed),
@@ -385,6 +390,9 @@ class TestGuardRules:
         ):
             made.saw(httpx.Request("GET", f"{GRAPH}{path}"), 200, None, body)
         assert made.refuses_request(request, tool) is None
+        other = httpx.Request(method, f"{GRAPH}/sites/{SITE}/lists/L2/{suffix}", content="{}")
+        refused = made.refuses_request(other, tool)
+        assert ("did not read as seed data" in str(refused)) == ("7" in suffix)
 
     def test_a_read_of_the_search_index_is_allowed(self) -> None:
         assert refusal("sharepoint_search_files", "POST", "/search/query") is None

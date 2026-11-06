@@ -164,7 +164,7 @@ def _site_path(site: str) -> str:
         decoded = again
     segments = decoded.replace("\\", "/").strip("/").split("/")
     host = parts.hostname or ""
-    plain_host = "@" not in parts.netloc and _DNS_NAME.fullmatch(host) is not None
+    plain_host = parts.netloc.lower() == host and _DNS_NAME.fullmatch(host) is not None
     encoded_separator = re.search(r"%(?:2f|5c)", site, re.IGNORECASE) is not None
     if (
         parts.scheme not in {"http", "https"}
