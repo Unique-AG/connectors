@@ -27,7 +27,6 @@ _PERSONAS = persona_values(stand_in.UPNS, {}, synthetic=True) | {
 }
 _NEEDS_RE_RECORDING = frozenset(
     {
-        "onenote_get_operation-notebook",
         "onenote_list_pages-team",
         "outlook_list_group_events-team",
         "outlook_respond_to_invite-accept",

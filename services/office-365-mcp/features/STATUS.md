@@ -106,11 +106,10 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 15 of 716. Recorder cases with a `deferred` reason: 18. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 14 of 716. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |
-| `onenote_get_operation-notebook` | Graph sends the status not started and the SDK parses it to None. The server needs a change. | `uc-08-40` |
 | `outlook_create_event_on_behalf-manager` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-14-03` |
 | `outlook_create_mail_rule-forward-found-person` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-05-40` |
 | `outlook_draft_mail-to-found-person` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-04-01`, `uc-05-58`, `uc-15-06` |
