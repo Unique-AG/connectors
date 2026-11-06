@@ -13,6 +13,11 @@ variable "tools_preset" {
     condition     = var.tools_preset == null ? true : alltrue([for names in [[for name in try(tolist(var.tools_preset), split(",", var.tools_preset)) : trimspace(name)]] : length(names) > 0 && alltrue([for name in names : contains(keys(local.presets), name)])])
     error_message = "tools_preset names no preset, or a surface this connector has not. It takes one preset, a list of presets, or a comma-separated string of presets. Valid presets: ${join(", ", sort(keys(local.presets)))}."
   }
+
+  validation {
+    condition     = var.tools_preset == null ? true : !anytrue([for name in try(tolist(var.tools_preset), []) : strcontains(name, ",")])
+    error_message = "tools_preset is a list of preset names, not a comma-separated string inside a list. Write [\"teams-chat\", \"outlook-read\"], not [\"teams-chat,outlook-read\"]. To use a comma-separated string, set tools_preset to the string itself."
+  }
 }
 
 variable "tools_enabled" {
