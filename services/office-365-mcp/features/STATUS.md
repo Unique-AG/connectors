@@ -8,7 +8,7 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 11 | 4 | 352 | 372 |
+| Outlook | 5 | 10 | 4 | 353 | 372 |
 | Teams | 0 | 2 | 1 | 143 | 146 |
 | SharePoint | 0 | 3 | 3 | 92 | 98 |
 | OneNote | 0 | 1 | 1 | 72 | 74 |
@@ -101,7 +101,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-01-11` | Finding and reading files in OneDrive and SharePoint | A file that Microsoft cannot convert is read as it is or reported | partly | `sharepoint_read_file` | When Microsoft answers 406 to `convert_to` pdf, the tool raises an error that asks for a second call without `convert_to`, and that call returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known. |
 | `uc-02-07` | Finding and reading mail | The content of an Excel attachment answers a question | partly | `outlook_read_attachment` | The tool returns the workbook in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read an Excel file in that form, so the cause is not known. |
 | `uc-05-03` | Organizing the mailbox | Messages that Mia names by subject are found again and filed | partly | `outlook_move_mail` | the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle. The message_refs field says "`uri` values from a search, list, or thread result". But MailSummary.uri says only to pass it to outlook_read_mail, and listings also show folder_id and web_link. |
-| `uc-14-05` | Sharing and delegating calendars | The events of a team calendar are listed for a week | partly | `outlook_list_group_events` | The only call in prod failed and the logs give no cause, and the tool declares the permission Calendars.Read only. |
 | `uc-15-12` | Working across mail, calendar, files, and Teams | A file that Anna posted in Teams is read | partly | `sharepoint_resolve_url` | The description says that Microsoft documents the lookup for sharing links and that another form of web address can fail. Nobody ran it on the web address of a Teams file attachment, so whether it fails is not known. |
 
 ## Deferred work

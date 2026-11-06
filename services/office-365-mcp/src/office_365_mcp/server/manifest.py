@@ -47,6 +47,7 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Notes.Create": False,
     "Notes.ReadWrite": False,
     "Place.Read.All": True,
+    "Group.Read.All": True,
     "Contacts.Read": False,
     "Contacts.ReadWrite": False,
 }

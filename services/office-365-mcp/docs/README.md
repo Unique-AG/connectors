@@ -93,7 +93,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`outlook-calendar-manage`](#outlook-calendar-manage) | `outlook-calendar-write`, plus forward, delete, and share. | 21 | No |
 | [`outlook-calendar-delegate`](#outlook-calendar-delegate) | `outlook-calendar-write`, plus events for another person. | 17 | No |
 | [`outlook-calendar-rooms`](#outlook-calendar-rooms) | `outlook-calendar-write`, plus finding meeting rooms. | 17 | ⚠️ Yes |
-| [`outlook-group-calendar`](#outlook-group-calendar) | Read the calendar of a team. | 2 | No |
+| [`outlook-group-calendar`](#outlook-group-calendar) | Read the calendar of a team. | 2 | ⚠️ Yes |
 
 **Outlook contacts.** The default Contacts folder.
 
@@ -840,7 +840,7 @@ Calendars, events, availability, rooms, and sharing.
 
 ### `outlook-group-calendar`
 
-**2 tools** · Admin consent: **not required**
+**2 tools** · Admin consent: ⚠️ **required**
 
 **You can**
 
@@ -856,8 +856,8 @@ Calendars, events, availability, rooms, and sharing.
 
 **What it needs**
 
-- **Graph permissions (3):** `Calendars.Read`, `Team.ReadBasic.All`, `User.Read`
-- **Admin consent:** Not required.
+- **Graph permissions (3):** `Group.Read.All`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Group.Read.All`. A tenant administrator must grant consent before any user signs in.
 - **User approval:** None. No tool of this preset asks the user.
 
 ## Outlook contacts presets
@@ -1323,7 +1323,7 @@ This reference lists all 121 tools. Use it to build an `enabled` list, or to fin
 | `outlook_list_event_attachments` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
 | `outlook_read_event_attachment` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
 | `outlook_list_reminders` | 🟢 Read | `Calendars.ReadBasic` | No | — |
-| `outlook_list_group_events` | 🟢 Read | `Calendars.Read` | No | — |
+| `outlook_list_group_events` | 🟢 Read | `Group.Read.All` | ⚠️ Yes | — |
 | `outlook_check_availability` | 🟢 Read | `Calendars.ReadBasic` | No | — |
 | `outlook_suggest_meeting_times` | 🟢 Read | `Calendars.Read.Shared` | No | — |
 | `outlook_find_rooms` | 🟢 Read | `Place.Read.All` | ⚠️ Yes | — |

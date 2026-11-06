@@ -52,6 +52,7 @@ mock_provider "azuread" {
         "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
         "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
         "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
+        "Group.Read.All"                   = "f4444444-4444-4444-4444-444444444444"
       }
     }
   }
@@ -546,7 +547,7 @@ run "preset_outlook_group_calendar" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Calendars.Read"
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Group.Read.All"
     error_message = "outlook-group-calendar composed ${join(",", local.permissions)}"
   }
 
@@ -556,8 +557,8 @@ run "preset_outlook_group_calendar" {
   }
 
   assert {
-    condition     = length(local.admin_consent) == 0
-    error_message = "the group calendar view takes Calendars.Read in place of Group.Read.All, so it needs no administrator, and this needs ${join(",", local.admin_consent)}"
+    condition     = local.admin_consent == ["Group.Read.All"]
+    error_message = "Microsoft marks the delegated Group.Read.All as AdminConsentRequired: Yes, and the group calendar view needs no other administrator permission; this composed ${join(",", local.admin_consent)}"
   }
 }
 

@@ -4487,9 +4487,6 @@ Ask your assistant: "What is on the calendar of the Platform team this week?"
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not be able to read a team calendar. One attempt failed, and the cause is not known.
-
 Situation: The team "Platform" has 4 events on its calendar this week.
 
 What happens:

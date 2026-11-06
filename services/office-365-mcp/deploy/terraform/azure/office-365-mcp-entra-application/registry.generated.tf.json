@@ -478,7 +478,7 @@
         {
           "name": "outlook_list_group_events",
           "permissions": [
-            "Calendars.Read"
+            "Group.Read.All"
           ]
         },
         {
@@ -1369,6 +1369,7 @@
         "Calendars.Read",
         "Calendars.Read.Shared",
         "Calendars.ReadBasic",
+        "Group.Read.All",
         "Place.Read.All",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
@@ -1419,6 +1420,7 @@
         "Notes.Create": false,
         "Notes.ReadWrite": false,
         "Place.Read.All": true,
+        "Group.Read.All": true,
         "Contacts.Read": false,
         "Contacts.ReadWrite": false
       },

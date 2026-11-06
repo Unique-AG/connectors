@@ -59,17 +59,13 @@ uc-14-04:
   must_not: [outlook_create_event_on_behalf]
 
 uc-14-05:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_it_lists_the_four_events_of_the_calendar_of_a_team"
   provenance: observed
   evidence: outlook_list_group_events in 1 call, which failed
   ask: "What is on the calendar of the Platform team this week?"
-  blocker:
-    kind: unknown
-    tool: outlook_list_group_events
-    text: The only call in prod failed and the logs give no cause, and the tool declares the permission Calendars.Read only.
-    user: The assistant may not be able to read a team calendar. One attempt failed, and the cause is not known.
+  note: The only call in prod failed and the logs give no cause. The tool now declares Group.Read.All, the permission that Microsoft lists for a group calendar. No run shows that the call works.
   asks_user: false
   chain:
     - tool: teams_list_my_teams
