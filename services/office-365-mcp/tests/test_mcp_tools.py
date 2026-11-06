@@ -1082,6 +1082,8 @@ class TestTheToolsThisServerAdvertises:
 
         assert "one request a second, across the whole tenant" in (description or "")
         assert "Read at most five pages" in (description or "")
+        assert "is older than the start of the period" in (description or "")
+        assert "so do not stop on it" in (description or "")
 
     async def test_the_mail_tools_say_how_to_read_and_keep_a_stored_bcc(
         self, every_tool: Client[FastMCPTransport]

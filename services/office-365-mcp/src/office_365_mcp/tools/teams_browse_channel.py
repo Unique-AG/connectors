@@ -49,8 +49,10 @@ Notes:
 - If `next_page_token` is set, more posts exist. To read them, call this tool again with the same \
 `team_id` and `channel_id`, and pass the token unchanged as `page_token`. The page size stays \
 the one of the first call.
-- To answer a question about a period, read pages until the last thread of a page has no message \
-from the period. Keep the posts and replies whose `created_at` is in the period.
+- To answer a question about a period, read pages until the newest message of the last thread of a \
+page is older than the start of the period. A thread that is newer than the period can come before \
+threads in the period, so do not stop on it. Keep the posts and replies whose `created_at` is in \
+the period.
 - A given channel allows this whole connector about one request a second, across the whole \
 tenant. Read at most five pages. Then tell the user that the period can be incomplete.\
 """
