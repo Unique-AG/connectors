@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping
 from typing import Annotated, Self
 from urllib.parse import quote, unquote, urlsplit
@@ -150,6 +151,11 @@ def _is_shown(found: List_) -> bool:
     return found.id is not None and not hidden and not library
 
 
+_DNS_NAME = re.compile(
+    r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]", re.IGNORECASE
+)
+
+
 def _site_path(site: str) -> str:
     """`{host}` or `{host}:{path}`, the two ways Graph addresses a site by its web address."""
     parts = urlsplit(site)
@@ -157,10 +163,18 @@ def _site_path(site: str) -> str:
     while (again := unquote(decoded)) != decoded:
         decoded = again
     segments = decoded.replace("\\", "/").strip("/").split("/")
-    if parts.scheme not in {"http", "https"} or not parts.hostname or {".", ".."} & {*segments}:
+    host = parts.hostname or ""
+    plain_host = "@" not in parts.netloc and _DNS_NAME.fullmatch(host) is not None
+    encoded_separator = re.search(r"%(?:2f|5c)", site, re.IGNORECASE) is not None
+    if (
+        parts.scheme not in {"http", "https"}
+        or not plain_host
+        or encoded_separator
+        or {".", ".."} & {*segments}
+    ):
         raise ToolError(_NOT_A_SITE)
     path = quote(parts.path.rstrip("/"), safe="/%")
-    return f"{parts.hostname}:{path}" if path else parts.hostname
+    return f"{host}:{path}" if path else host
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

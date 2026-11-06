@@ -79,6 +79,15 @@ async def test_a_site_url_with_no_path_resolves_the_root_site(
         "https://contoso.sharepoint.com/sites/%2e%2e/Finance",
         "https://contoso.sharepoint.com/sites/%252e%252e/Finance",
         "https://contoso.sharepoint.com/sites/a%2f..%2fFinance",
+        "https://contoso.sharepoint.com/sites%2fFinance",
+        "https://user:secret@contoso.sharepoint.com/sites/Finance",
+        "https://contoso.sharepoint.com@other.example/sites/Finance",
+        "https://../sites/Finance",
+        "https://%2e%2e/sites/Finance",
+        "https://a%2fb.sharepoint.com/sites/Finance",
+        "https://contoso..sharepoint.com/sites/Finance",
+        "https://-bad.sharepoint.com/sites/Finance",
+        "https://localhost/sites/Finance",
     ],
 )
 async def test_a_value_that_is_not_a_site_url_makes_no_graph_call(

@@ -377,7 +377,13 @@ class TestGuardRules:
         made = guard()
         request = httpx.Request(method, f"{GRAPH}{shown}", content=json.dumps({}))
         assert "did not read as seed data" in str(made.refuses_request(request, tool))
-        made.seen_seed.update({"L1", "7"})
+        listed = {"value": [{"id": "L1", "displayName": "seed-v1 Tasks"}]}
+        read = {"value": [{"id": "7", "fields": {"Title": "seed-v1 Close books"}}]}
+        for path, body in (
+            (f"/sites/{SITE}/lists", listed),
+            (f"/sites/{SITE}/lists/L1/items", read),
+        ):
+            made.saw(httpx.Request("GET", f"{GRAPH}{path}"), 200, None, body)
         assert made.refuses_request(request, tool) is None
 
     def test_a_read_of_the_search_index_is_allowed(self) -> None:

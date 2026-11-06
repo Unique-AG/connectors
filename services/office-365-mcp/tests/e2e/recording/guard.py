@@ -118,7 +118,9 @@ def _is_tagged(found: Mapping[str, object]) -> bool:
     categories = found.get("categories")
     if isinstance(categories, list) and SEED_TAG in cast("list[object]", categories):
         return True
-    named = found.get("name", found.get("displayName"))
+    row = found.get("fields")
+    title = cast("Mapping[str, object]", row).get("Title") if isinstance(row, Mapping) else None
+    named = found.get("name") or found.get("displayName") or title
     return isinstance(named, str) and named.startswith(f"{SEED_TAG} ")
 
 

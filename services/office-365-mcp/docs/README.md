@@ -1284,7 +1284,7 @@ mcpConfig:
     preset: teams        # or: enabled: [get_me, teams_list_chats]
 ```
 
-The `preset` key names one of the 36 presets in the [preset index](#preset-index), or several of
+The `preset` key names one of the 39 presets in the [preset index](#preset-index), or several of
 them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
 exact list of tool names instead. Write that list as a YAML list or as one comma-separated string.
 The `tools_preset` input of the Terraform module takes the same comma-separated string. A deployment

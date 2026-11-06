@@ -854,9 +854,8 @@ def _resolve(path: str, refs: Mapping[str, str]) -> str | None:
     return re.sub(r"\{([^}]+)\}", lambda m: refs[m.group(1)], path)
 
 
-def run_lookup(
-    graph: Graph, step: Step, path: str, found: dict[str, dict[str, Any]], ctx: Context
-) -> None:
+def run_lookup(graph: Graph, step: Step, path: str, ctx: Context) -> dict[str, dict[str, Any]]:
+    found: dict[str, dict[str, Any]] = {}
     params = dict(step.params)
     if step.lookup == "site":
         response = graph.request("GET", path, params=params, ok_statuses=(404,))
@@ -864,7 +863,7 @@ def run_lookup(
         if site is not None:
             found[str(step.key)] = {"id": site}
             _learn(graph, step, found[str(step.key)])
-        return
+        return found
     if step.lookup in ("drive-folder", "single"):
         response = graph.request("GET", path, params=params, ok_statuses=(404,))
         key = "drive:folder" if step.lookup == "drive-folder" else str(step.key)
@@ -872,7 +871,7 @@ def run_lookup(
         if response.status_code == 200 and named:
             found[key] = response.json()
             _learn(graph, step, response.json())
-        return
+        return found
     for item in graph.get_all(path, params):
         if step.lookup == "named":
             title = (item.get("fields") or {}).get("Title")
@@ -895,6 +894,7 @@ def run_lookup(
         if key:
             found[key] = item
             _learn(graph, step, item)
+    return found
 
 
 def _learn(graph: Graph, step: Step, item: Mapping[str, Any]) -> None:
@@ -914,7 +914,7 @@ def apply(
         if step.kind == "lookup":
             if path is None:
                 continue
-            run_lookup(graph, step, path, found, ctx)
+            found.update(run_lookup(graph, step, path, ctx))
             continue
         if step.key in found:
             skipped += 1
