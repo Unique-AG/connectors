@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated, Literal, Self
 
@@ -13,7 +14,7 @@ from msgraph.generated.models.online_meeting import OnlineMeeting
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import GraphNotFound, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
 from office_365_mcp.shared.meetings import (
@@ -316,12 +317,13 @@ async def teams_read_meeting(
                 more_records=False,
             )
         reports_of = client.me.online_meetings.by_online_meeting_id(meeting.id).attendance_reports
-        with graph_step(STEP_REPORTS):
+        found: list[MeetingAttendanceReport] = []
+        with suppress(GraphNotFound), graph_step(STEP_REPORTS):
             listed = await reports_of.get()
             assert listed is not None, "Graph answered an attendance report listing with no value"
-            collected = await collect_pages(listed, client, limit=MAX_REPORTS)
+            found = (await collect_pages(listed, client, limit=MAX_REPORTS)).items
         reports = sorted(
-            (AttendanceReportSummary.from_report(report) for report in collected.items),
+            (AttendanceReportSummary.from_report(report) for report in found),
             key=_began_at,
             reverse=True,
         )

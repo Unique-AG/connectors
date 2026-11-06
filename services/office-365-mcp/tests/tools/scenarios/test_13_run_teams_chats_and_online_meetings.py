@@ -900,6 +900,34 @@ class TestAChatAndAMeetingThatTeamsAccepts:
         assert result["status"] == "no_report"
         assert result["newest_report_attendance"] == []
 
+    @pytest.mark.parametrize(
+        ("now", "status"),
+        [
+            (datetime(2026, 2, 10, 15, 10, tzinfo=UTC), "not_ready"),
+            (datetime(2026, 2, 11, 15, 10, tzinfo=UTC), "no_report"),
+        ],
+    )
+    async def test_it_reads_the_not_found_of_the_reports_of_a_meeting_nobody_joined_as_no_report(
+        self,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+        now: datetime,
+        status: str,
+    ) -> None:
+        _the_clock_reads(monkeypatch, now)
+        _the_meeting_is(graph, _meeting())
+        _ = graph.get(f"{MEETING_PATH}/attendanceReports").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "NotFound"}}
+            )
+        )
+
+        result = await call("teams_read_meeting", meeting_uri=MEETING_URI)
+
+        assert result["status"] == status
+        assert result["reports"] == []
+        assert result["newest_report_attendance"] == []
+
 
 class TestNothingChangesUnlessMiaClearlyAgrees:
     @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
