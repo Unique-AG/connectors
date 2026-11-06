@@ -112,6 +112,7 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Files.ReadWrite.All",
         "Sites.Read.All",
         "Notes.Read",
+        "Notes.Read.All",
         "Notes.Create",
         "Notes.ReadWrite",
         "Place.Read.All",

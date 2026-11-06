@@ -1064,7 +1064,7 @@ Notebooks, sections, and pages.
 
 **What it needs**
 
-- **Graph permissions (2):** `Notes.Read`, `User.Read`
+- **Graph permissions (3):** `Notes.Read`, `Notes.Read.All`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** None. No tool of this preset asks the user.
 
@@ -1097,7 +1097,7 @@ Notebooks, sections, and pages.
 
 **What it needs**
 
-- **Graph permissions (4):** `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read`
+- **Graph permissions (5):** `Notes.Create`, `Notes.Read`, `Notes.Read.All`, `Notes.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** Asks 🤝 in some cases for `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`.
 
@@ -1120,7 +1120,7 @@ Notebooks, sections, and pages.
 
 **What it needs**
 
-- **Graph permissions (4):** `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read`
+- **Graph permissions (5):** `Notes.Create`, `Notes.Read`, `Notes.Read.All`, `Notes.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** Asks ✋ every time for `onenote_delete_page`. Asks 🤝 in some cases for `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`.
 
@@ -1379,7 +1379,7 @@ This reference lists all 121 tools. Use it to build an `enabled` list, or to fin
 | `onenote_read_resource` | 🟢 Read | `Notes.Read` | No | — |
 | `onenote_find_notebook_from_url` | 🟢 Read | `Notes.Read` | No | — |
 | `onenote_list_recent_notebooks` | 🟢 Read | `Notes.Read` | No | — |
-| `onenote_list_sections` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_list_sections` | 🟢 Read | `Notes.Read.All` | No | — |
 | `onenote_create_notebook` | 🟠 Write, adds | `Notes.Create` | No | 🤝 A group or site notebook |
 | `onenote_create_section` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
 | `onenote_create_section_group` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |

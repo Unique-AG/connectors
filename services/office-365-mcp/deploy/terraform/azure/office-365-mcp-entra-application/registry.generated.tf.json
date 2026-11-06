@@ -727,7 +727,7 @@
         {
           "name": "onenote_list_sections",
           "permissions": [
-            "Notes.Read"
+            "Notes.Read.All"
           ]
         },
         {
@@ -1379,7 +1379,8 @@
         "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "Notes.Read.All"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -1417,6 +1418,7 @@
         "Files.ReadWrite.All": true,
         "Sites.Read.All": true,
         "Notes.Read": false,
+        "Notes.Read.All": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false,
         "Place.Read.All": true,

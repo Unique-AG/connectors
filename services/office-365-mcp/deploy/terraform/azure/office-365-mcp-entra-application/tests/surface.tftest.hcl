@@ -53,6 +53,7 @@ mock_provider "azuread" {
         "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
         "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
         "Group.Read.All"                   = "f4444444-4444-4444-4444-444444444444"
+        "Notes.Read.All"                   = "d4444444-4444-4444-4444-444444444444"
       }
     }
   }
@@ -690,7 +691,7 @@ run "preset_onenote_read" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Read.All"
     error_message = "onenote-read composed ${join(",", local.permissions)}"
   }
 
@@ -706,7 +707,7 @@ run "preset_onenote_write" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite,Notes.Read.All"
     error_message = "onenote-write composed ${join(",", local.permissions)}"
   }
 
@@ -722,7 +723,7 @@ run "preset_onenote_delete" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite,Notes.Read.All"
     error_message = "onenote-delete composed ${join(",", local.permissions)}"
   }
 
