@@ -79,3 +79,18 @@ async def test_the_pool_passes_the_modes_that_may_fall_back_to_plain_text_by_nam
 
     _, options = pool_requests[0]
     assert options["ssl"] == ssl_mode
+
+
+async def test_the_sqlalchemy_cache_option_becomes_asyncpgs_pool_argument(
+    pool_requests: list[PoolRequest],
+) -> None:
+    settings = PostgresSettings(
+        url=SecretStr(f"{URL}?prepared_statement_cache_size=0"),
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    await _PostgresStore(settings)._create_pool()
+
+    (dsn,), options = pool_requests[0]
+    assert dsn == URL
+    assert options["statement_cache_size"] == 0
