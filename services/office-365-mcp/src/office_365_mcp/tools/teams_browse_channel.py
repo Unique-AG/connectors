@@ -1,13 +1,13 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Annotated
-from urllib.parse import quote, urlsplit
+from urllib.parse import unquote, urlsplit
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.chat_message import ChatMessage
-from msgraph.generated.models.chat_message_collection_response import ChatMessageCollectionResponse
 from msgraph.generated.teams.item.channels.item.messages.messages_request_builder import (
     MessagesRequestBuilder,
 )
@@ -34,6 +34,12 @@ MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
+_FOREIGN_PAGE_TOKEN = (
+    "`page_token` is not the `next_page_token` of a page of this channel. Pass the "
+    "`next_page_token` of the previous call of this tool unchanged, with the same `team_id` and "
+    "`channel_id`. This same value fails again, so do not retry it."
+)
+
 _DESCRIPTION = f"""\
 Reads one page of a Teams channel's posts and their replies in one call. The posts are ordered by \
 reply activity rather than post date: the thread with the newest message comes first.
@@ -41,7 +47,8 @@ reply activity rather than post date: the thread with the newest message comes f
 Notes:
 - One page holds at most {MAX_POSTS} posts. This tool has no date filter.
 - If `next_page_token` is set, more posts exist. To read them, call this tool again with the same \
-`team_id`, `channel_id` and `limit`, and pass the token as `page_token`.
+`team_id` and `channel_id`, and pass the token unchanged as `page_token`. The page size stays \
+the one of the first call.
 - To answer a question about a period, read pages until the last thread of a page has no message \
 from the period. Keep the posts and replies whose `created_at` is in the period.\
 """
@@ -64,7 +71,9 @@ class ChannelPosts(BaseModel):
         )
     )
     next_page_token: str | None = Field(
-        description="Pass this as `page_token` to read the next page. Null on the last page."
+        description=(
+            "Pass this unchanged as `page_token` to read the next page. Null on the last page."
+        )
     )
 
 
@@ -90,8 +99,7 @@ async def teams_browse_channel(
     else:
         base_url = channel_messages.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
         channel_messages = channel_messages.with_url(
-            f"{base_url}/teams/{quote(team_id, safe='')}/channels/{quote(channel_id, safe='')}"
-            + f"/messages?$expand=replies&$top={limit}&$skiptoken={page_token}"
+            _own_continuation(page_token, base_url=base_url, team_id=team_id, channel_id=channel_id)
         )
     with graph_errors(TOOL_NAME, step=STEP):
         page = await channel_messages.get(request_configuration=configuration)
@@ -122,18 +130,18 @@ async def teams_browse_channel(
         messages=messages,
         more_posts_in_channel=bool(page.odata_next_link) if include_window_completeness else None,
         posts_cut_to_limit=len(kept) < len(posts) if include_window_completeness else None,
-        next_page_token=_page_token(page),
+        next_page_token=page.odata_next_link,
     )
 
 
-def _page_token(page: ChatMessageCollectionResponse) -> str | None:
-    if not page.odata_next_link:
-        return None
-    prefix = "$skiptoken="
-    pairs = urlsplit(page.odata_next_link).query.split("&")
-    tokens = [pair.removeprefix(prefix) for pair in pairs if pair.startswith(prefix)]
-    assert tokens, "Graph advertised a next page of channel messages with no $skiptoken"
-    return tokens[0]
+def _own_continuation(link: str, *, base_url: str, team_id: str, channel_id: str) -> str:
+    parts, base = urlsplit(link), urlsplit(base_url)
+    messages_path = f"{base.path}/teams/{team_id}/channels/{channel_id}/messages"
+    if (parts.scheme, parts.netloc) != (base.scheme, base.netloc) or (
+        unquote(parts.path) != messages_path
+    ):
+        raise ToolError(_FOREIGN_PAGE_TOKEN)
+    return link
 
 
 def _is_a_post(message: ChatMessage) -> bool:
@@ -202,7 +210,6 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str | None,
             Field(
                 min_length=1,
-                pattern=r"^[A-Za-z0-9%._~+=/-]+$",
                 description=(
                     "The `next_page_token` of the previous call. Omit it to read the first page."
                 ),

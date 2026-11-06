@@ -48,7 +48,7 @@ uc-06-04:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_posts_with_their_replies_and_reports_the_posts_it_did_not_read"
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_has_no_date_bound_so_it_returns_the_older_posts_as_well"
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reports_a_page_that_held_more_posts_than_the_limit"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_the_next_page_of_posts_with_the_token_of_the_first_page"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_the_next_page_of_posts_with_the_link_of_the_first_page"
   ask: "What happened in the Releases channel this week?"
   provenance: drafted
   asks_user: false

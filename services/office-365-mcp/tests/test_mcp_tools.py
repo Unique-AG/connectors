@@ -16,6 +16,7 @@ from azure.core.exceptions import ClientAuthenticationError
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
+from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
 from mcp.types import TextContent, Tool
@@ -1071,7 +1072,7 @@ class TestTheToolsThisServerAdvertises:
 
         assert "ordered by reply activity" in description
         assert "at most 50 posts" in description
-        assert "pass the token as `page_token`" in description
+        assert "pass the token unchanged as `page_token`" in description
 
     async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
@@ -1694,7 +1695,7 @@ class TestCallingThem:
 
     @pytest.mark.usefixtures("obo")
     @pytest.mark.parametrize("token", ["a%2Bb%3D", "a+b%3D", "a%20b"])
-    async def test_a_channel_is_read_page_by_page_with_the_token_of_the_page_before(
+    async def test_a_channel_is_read_page_by_page_with_the_link_of_the_page_before(
         self,
         mcp_client: Client[FastMCPTransport],
         graph: respx.MockRouter,
@@ -1717,13 +1718,35 @@ class TestCallingThem:
             )
         )
 
-        assert first["next_page_token"] == token
+        assert first["next_page_token"] == link
         assert last["next_page_token"] is None
-        request = route.calls.last.request
-        assert request.url.query.decode().endswith(f"$skiptoken={token}"), (
-            "the token goes back as Microsoft sent it"
-        )
-        assert (request.url.params["$top"], request.url.params["$expand"]) == ("1", "replies")
+        assert str(route.calls.last.request.url) == link, "the link goes back as Microsoft sent it"
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "link",
+        [
+            "https://evil.example/v1.0/teams/T/channels/C/messages?$skiptoken=x",
+            f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/19:other@thread.tacv2/messages?$skiptoken=x",
+            f"{GRAPH_V1}/me/messages?$skiptoken=x",
+            "x",
+        ],
+    )
+    async def test_a_channel_page_link_that_is_not_of_this_channel_is_refused(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        link: str,
+    ) -> None:
+        route = graph.route().mock(return_value=httpx.Response(200, json=_CHANNEL_POSTS))
+
+        with pytest.raises(ToolError, match="not the `next_page_token`"):
+            _ = await mcp_client.call_tool(
+                "teams_browse_channel",
+                {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID, "page_token": link},
+            )
+
+        assert route.call_count == 0
 
     @pytest.mark.usefixtures("obo")
     async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(
