@@ -135,7 +135,7 @@ export class AddAttachmentsToDraftEmailCommand {
     userProfileId: string;
     mailbox?: string;
   }): Promise<AttachmentUploadResult> {
-    const parsed = parseAttachmentUri(data);
+    const parsed = await parseAttachmentUri(data);
 
     switch (parsed.type) {
       case 'unique': {
