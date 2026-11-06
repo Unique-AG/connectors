@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.1-alpha.1](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.1-alpha...kyckr-mcp@0.1.1-alpha.1) (2026-11-06)
+
+
+### Features
+
+* **kyckr-mcp:** redact the deployment's secrets from every log line ([#1442](https://github.com/Unique-AG/connectors/issues/1442)) ([5b5662c](https://github.com/Unique-AG/connectors/commit/5b5662cbc127a8ad6a37d9dd195fe9e93088beda))
+
+
+### Bug Fixes
+
+* **confluence-connector,kyckr-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,temenos-mcp:** bump node to 26.12.1 security release ([#1269](https://github.com/Unique-AG/connectors/issues/1269)) ([c57480f](https://github.com/Unique-AG/connectors/commit/c57480fbd576cbae8a53d35975e01db345f65c7b))
+* **instrumentation,kyckr-mcp,temenos-mcp:** redact the API key from OpenTelemetry spans and HTTP metrics ([#1352](https://github.com/Unique-AG/connectors/issues/1352)) ([3b07ea9](https://github.com/Unique-AG/connectors/commit/3b07ea948db1441021f851d45865a0476c8ee8d9))
+* **kyckr-mcp,temenos-mcp:** add timeouts, 429 backoff and body size cap to upstream HTTP clients ([#1351](https://github.com/Unique-AG/connectors/issues/1351)) ([5262d69](https://github.com/Unique-AG/connectors/commit/5262d69549fa1a1a364cc532edabfc6c2bca54c2))
+* **teams-mcp,outlook-semantic-mcp,kb-mcp,backstop-mcp,with-intelligence-mcp,kyckr-mcp,temenos-mcp:** mark upstream content as untrusted in tool descriptions ([#1355](https://github.com/Unique-AG/connectors/issues/1355)) ([8aeef96](https://github.com/Unique-AG/connectors/commit/8aeef9675771f2f121e2dafae722d8bfdc4b294b))
+
+
+### Dependencies
+
+* bump node in /services/*/deploy ([#1142](https://github.com/Unique-AG/connectors/issues/1142)) ([336dd69](https://github.com/Unique-AG/connectors/commit/336dd694053576d07366c6f0adbf30f45ed95988))
+* bump node in /services/*/deploy ([#1232](https://github.com/Unique-AG/connectors/issues/1232)) ([fd0e934](https://github.com/Unique-AG/connectors/commit/fd0e934ec3ad1e9d9cb38a2e5003d6bfae46a4b2))
+* **deps:** bump node from 26.12.1-trixie@a98e6fda54fd to 26.13.0-trixie@6d2c7d5d074b ([#1430](https://github.com/Unique-AG/connectors/issues/1430)) ([72e4fc2](https://github.com/Unique-AG/connectors/commit/72e4fc26b28c855225a14e83c57ce575f8d77ff4))
+
 ## [0.1.1-alpha](https://github.com/Unique-AG/connectors/compare/kyckr-mcp@0.1.0...kyckr-mcp@0.1.1-alpha) (2026-09-21)
 
 
