@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.3.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.2.0...sharepoint-connector@3.3.0) (2026-11-06)
+
+
+### Features
+
+* **ci,main:** gate releases, scan images nightly, and update dependencies nightly ([#1305](https://github.com/Unique-AG/connectors/issues/1305)) ([b3b274c](https://github.com/Unique-AG/connectors/commit/b3b274cf0ab3cecc3a1dece3eff5c116d24d9418))
+* **sharepoint-connector:** redact the deployment's secrets from every log line ([#1447](https://github.com/Unique-AG/connectors/issues/1447)) ([79d8100](https://github.com/Unique-AG/connectors/commit/79d8100f3132db57c1780e28cd0571692a05d2bc))
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.11.0 to 5.12.0 ([#1395](https://github.com/Unique-AG/connectors/issues/1395)) ([582a096](https://github.com/Unique-AG/connectors/commit/582a09693c5656b9b016ea8e42a1317f0fd090de))
+* **deps:** bump node from 26.12.1-trixie@a98e6fda54fd to 26.13.0-trixie@6d2c7d5d074b ([#1430](https://github.com/Unique-AG/connectors/issues/1430)) ([72e4fc2](https://github.com/Unique-AG/connectors/commit/72e4fc26b28c855225a14e83c57ce575f8d77ff4))
+
 ## [3.2.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.1.4...sharepoint-connector@3.2.0) (2026-10-28)
 
 
