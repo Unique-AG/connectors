@@ -33,8 +33,10 @@ one drive, their own OneDrive. Pass `root_uri` as `folder` to sharepoint_browse_
 what a drive holds.
 
 Notes:
-- This tool does not list the document libraries of SharePoint sites. To find files on a site, \
-use sharepoint_search_files and its `sites` answer.
+- This tool does not list the document libraries of SharePoint sites, and no tool lists them. \
+sharepoint_search_files needs a word to search for, and it returns files and folders, not \
+libraries. To find files on a site, give the web address of the site as `path` of \
+sharepoint_search_files.
 """
 
 

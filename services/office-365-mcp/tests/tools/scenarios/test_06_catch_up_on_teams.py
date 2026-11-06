@@ -269,6 +269,7 @@ class TestFindingAMessage:
             "Priya Rao",
             "19:sales@thread.tacv2",
         )
+        assert (in_chat["chat_id"], in_channel["chat_id"]) == ("19:tom-and-mia@thread.v2", None)
         assert "pricing change" in _query_sent(route)
 
     async def test_it_reads_a_hit_in_full(self, graph: respx.MockRouter) -> None:
@@ -482,7 +483,7 @@ class TestAChannelWithItsReplies:
                 200,
                 json={
                     "value": self._posts(),
-                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/next",
+                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/next?$skiptoken=page2",
                 },
             )
         )
@@ -535,6 +536,58 @@ class TestAChannelWithItsReplies:
         )
 
         assert result["posts_cut_to_limit"] is True
+
+    async def test_it_reads_the_next_page_of_posts_with_the_link_of_the_first_page(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = f"https://graph.microsoft.com/v1.0{CHANNEL_MESSAGES_PATH}?$expand=replies&$top=3&$skiptoken=page2"
+        route = graph.get(CHANNEL_MESSAGES_PATH).mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "value": self._posts()[:3],
+                        "@odata.nextLink": link,
+                    },
+                ),
+                httpx.Response(200, json={"value": self._posts()[3:]}),
+            ]
+        )
+
+        first = await call("teams_browse_channel", team_id=TEAM_ID, channel_id=CHANNEL_ID, limit=3)
+        second = await call(
+            "teams_browse_channel",
+            team_id=TEAM_ID,
+            channel_id=CHANNEL_ID,
+            limit=3,
+            page_token=first["next_page_token"],
+        )
+
+        assert first["next_page_token"] == link
+        assert second["next_page_token"] is None
+        assert [m["message_id"] for m in _rows(second, "messages")] == ["post4", "post5"]
+        assert str(route.calls.last.request.url) == link
+
+    async def test_it_keeps_every_post_of_a_next_page_whatever_limit_the_caller_gives(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = f"https://graph.microsoft.com/v1.0{CHANNEL_MESSAGES_PATH}?$expand=replies&$top=5&$skiptoken=p2"
+        _ = graph.get(CHANNEL_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json={"value": self._posts()})
+        )
+
+        second = await call(
+            "teams_browse_channel",
+            team_id=TEAM_ID,
+            channel_id=CHANNEL_ID,
+            limit=1,
+            page_token=link,
+            include_window_completeness=True,
+        )
+
+        ids = {m["message_id"] for m in _rows(second, "messages")}
+        assert {f"post{n}" for n in range(1, 6)} <= ids
+        assert second["posts_cut_to_limit"] is None
 
     async def test_it_reads_a_thread_of_fifty_replies_and_says_that_more_exist(
         self, graph: respx.MockRouter
@@ -971,8 +1024,8 @@ class TestAReferenceThatTheAssistantMadeUp:
                 {"uri": f"{CHANNEL_POST_URI}/1/replies/2"},
                 "A reply handle ends in",
             ),
-            ("teams_list_meeting_transcripts", {"meeting_uri": "Design review"}, "not this"),
-            ("teams_list_meeting_recordings", {"meeting_uri": "Design review"}, "This is not one"),
+            ("teams_list_meeting_transcripts", {"meeting_uri": "Design review"}, "this is not one"),
+            ("teams_list_meeting_recordings", {"meeting_uri": "Design review"}, "this is not one"),
             ("teams_read_transcript", {"uri": "Design review"}, "different shape"),
         ],
         ids=[

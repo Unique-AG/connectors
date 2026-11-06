@@ -59,7 +59,7 @@ Feature: Working across mail, calendar, files, and Teams
 
   Rule: Mia gathers what she has on one customer from three places
 
-    @happy @uc-15-07 @deferred
+    @happy @uc-15-07
     Scenario: Mail, Teams messages, and files about a customer are gathered
       Given Acme wrote to Mia by mail about the renewal
       And Tom wrote about Acme in a Teams chat
@@ -101,7 +101,7 @@ Feature: Working across mail, calendar, files, and Teams
       Then Mia is asked to approve the new file first
       And after she approves, "Offers" holds a text file with the text of the mail
 
-    @happy @uc-15-12 @deferred
+    @happy @uc-15-12
     Scenario: A file that Anna posted in Teams is read
       Given Anna posted the file "Offer.docx" in a chat with Mia yesterday
       When Mia asks her assistant what is in the file that Anna posted

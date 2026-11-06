@@ -308,7 +308,7 @@ uc-01-18:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:126). One busy answer is uc-01-30."
+  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is uc-01-30."
 
 uc-01-19:
   status: untested
@@ -569,7 +569,7 @@ uc-01-30:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:126; tests/conftest.py retry_sleeps): the read is a GET, so one 429 with Retry-After is waited out and asked again by the connector, and the assistant gets the file as if nothing had happened. OPEN: with 4 busy answers in a row the wait is about 90 s, longer than the 60 s tool limit of node-chat."
+  note: "expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:127; tests/conftest.py retry_sleeps): the read is a GET, so one 429 with Retry-After is waited out and asked again by the connector, and the assistant gets the file as if nothing had happened. OPEN: with 4 busy answers in a row the wait is about 90 s, longer than the 60 s tool limit of node-chat."
 
 uc-01-31:
   status: untested
@@ -597,7 +597,7 @@ uc-01-32:
   asks_user: false
   chain:
     - tool: sharepoint_list_drives
-  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:62-67)
+  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:64-69)
 
 uc-01-33:
   status: partly
@@ -607,7 +607,7 @@ uc-01-33:
   blocker:
     kind: tool
     tool: sharepoint_list_drives
-    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries.
+    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives says that no tool lists them, and that sharepoint_search_files needs a word to search for and shows files, not libraries.
     user: The assistant cannot list the document libraries of a site.
   provenance: drafted
   asks_user: false
@@ -616,7 +616,7 @@ uc-01-33:
       optional: true
     - tool: sharepoint_search_sites
       args: {query: Sales}
-  note: "expected behaviour from tools/sharepoint_list_drives.py:36-37: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
+  note: "expected behaviour from the description of sharepoint_list_drives: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
 
 uc-01-34:
   status: untested

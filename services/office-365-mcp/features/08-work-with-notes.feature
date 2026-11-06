@@ -367,7 +367,7 @@ Feature: Working with notes in OneNote
 
   Rule: The assistant copies notebooks, sections, and pages
 
-    @happy @uc-08-40 @deferred
+    @happy @uc-08-40
     Scenario: A notebook is copied under a new name
       Given Mia has the notebook "Customers"
       When Mia asks her assistant to copy "Customers" as "Customers 2026"

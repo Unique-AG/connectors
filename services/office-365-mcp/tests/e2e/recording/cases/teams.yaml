@@ -508,7 +508,6 @@ teams_delete_message-chat:
       bind: {uri: "$prev.uri"}
 
 teams_search_messages-alpine:
-  deferred: "Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change."
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages
@@ -516,7 +515,6 @@ teams_search_messages-alpine:
       expect: {result: {"messages[0].body_is_plain_text": true}}
 
 teams_search_messages-lena:
-  deferred: "Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change."
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages
@@ -524,7 +522,6 @@ teams_search_messages-lena:
       expect: {result: {"messages[0].body_is_plain_text": true}}
 
 teams_search_messages-person-window:
-  deferred: "Graph sends chatMessage without a hash, so teams_search_messages drops every hit. The server needs a change."
   needs: [teams-seed-chats]
   chain:
     - tool: teams_search_messages

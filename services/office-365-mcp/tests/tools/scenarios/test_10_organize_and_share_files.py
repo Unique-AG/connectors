@@ -297,6 +297,7 @@ class TestGivingAccess:
 
         [anna] = cast("list[Row]", shared["recipients"])
         assert (anna["display_name"], anna["roles"]) == ("Anna Meier", ["write"])
+        assert anna["email"] == "anna@example.test"
         assert _body(invite)["recipients"] == [{"email": "anna@example.test"}]
         assert _body(invite)["sendInvitation"] is True
         assert len(person.asked) == 1

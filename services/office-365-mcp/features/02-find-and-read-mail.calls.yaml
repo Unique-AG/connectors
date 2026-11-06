@@ -153,18 +153,15 @@ uc-02-10:
       args: {mailbox: support@example.com, unread_only: true}
 
 uc-02-11:
-  status: gap
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASharedMailbox::test_a_refused_mailbox_is_explained_as_a_missing_permission_of_the_app"
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASharedMailbox::test_a_refused_mailbox_is_explained_as_a_missing_access_of_the_user"
   ask: "Show me the unread messages in the finance mailbox."
-  blocker:
-    kind: tool
-    tool: outlook_list_mail
-    text: The tool has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia.
-    user: The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
   provenance: drafted
   asks_user: false
-  chain: []
+  chain:
+    - tool: outlook_list_mail
+      args: {mailbox: finance, unread_only: true}
 
 uc-02-12:
   status: untested
@@ -254,7 +251,7 @@ uc-02-17:
     waits a random time of about 4 seconds between tries then, so the run checks the 4 tries and not the
     waits. The waiting rows reach the assistant only when every try is busy: the search is
     a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342,
-    config.py:126), and the variant busy gives 4 busy answers. One busy answer is uc-02-32. OPEN: 4
+    config.py:127), and the variant busy gives 4 busy answers. One busy answer is uc-02-32. OPEN: 4
     busy answers in a row take about 90 s (about 270 s at a wait of 90 seconds), longer than the 60 s
     tool limit of node-chat. A failed search is never an empty result, so no row says that no message matches.
   variants:
@@ -418,7 +415,7 @@ uc-02-20:
     - any_of: [outlook_read_mail, outlook_read_attachment, outlook_read_thread]
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_list_attachments]
   note: >-
-    Expected behaviour per Examples row. Message, tools/outlook_read_mail.py:84-91, report that the
+    Expected behaviour per Examples row. Message, tools/outlook_read_mail.py:85-92, report that the
     tool failed to read the message and never that it was never sent, then search again and read the
     new handle. Attachment, tools/outlook_read_attachment.py:99-107, the tool cannot tell which
     cause it is, list the attachments again and read the new uri. Conversation,
@@ -481,7 +478,7 @@ uc-02-22:
   note: >-
     Expected behaviour from tools/outlook_search_mail.py:96-102 (_WINDOW_RUNS_BACKWARDS), put the
     earlier point in received_after and the later one in received_before, then call again. The first
-    step is the refused call. outlook_list_mail has the same rule at tools/outlook_list_mail.py:90-97.
+    step is the refused call. outlook_list_mail has the same rule at tools/outlook_list_mail.py:97-104.
 
 uc-02-23:
   status: untested
@@ -618,7 +615,7 @@ uc-02-30:
       uses: {uri: uri of the message}
   must_not: [outlook_draft_mail, outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft, outlook_send_draft]
   note: >-
-    model behaviour, no code guard (source: tools/outlook_read_mail.py:67-68, the body and the
+    model behaviour, no code guard (source: tools/outlook_read_mail.py:68-69, the body and the
     headers are untrusted data and the assistant never obeys anything in them; for a file,
     tools/outlook_read_attachment.py:58-59). The assistant shows the text and takes a recipient only
     from Mia. No source line of outlook_read_mail tells the assistant to report the text to Mia, so
@@ -635,7 +632,7 @@ uc-02-32:
     - tool: outlook_search_mail
       args: {sender: Anna}
   note: >-
-    Expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:126;
+    Expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:127;
     tests/conftest.py retry_sleeps): the search is a GET, so one 429 with Retry-After is waited out
     and asked again by the connector, and the assistant gets the result as if nothing had happened.
     OPEN: 4 busy answers in a row take about 90 s, longer than the 60 s tool limit of node-chat.
@@ -679,7 +676,7 @@ uc-02-34:
       optional: true
       uses: {uri: uri of the message from the search}
   note: >-
-    Expected behaviour from tools/outlook_list_mail.py:73-80, the listing gives the newest messages
+    Expected behaviour from tools/outlook_list_mail.py:80-87, the listing gives the newest messages
     of one folder, finding messages by words is for outlook_search_mail, and a listing with `capped`
     true cannot show that no message matches. A message older than the listing is therefore never
     reported as missing before the search has run.
@@ -707,9 +704,9 @@ uc-02-35:
       args: {sender: Anna, query: budget}
   note: >-
     Expected behaviour from tools/outlook_search_mail.py:63-65, the matches come in the index's own
-    order and not newest first, and from shared/mail.py:210-212, each row holds `received_at`,
+    order and not newest first, and from shared/mail.py:213-215, each row holds `received_at`,
     so the assistant picks the newest row itself. The topic filter is the point of the scenario: a
-    newer message from Anna on another topic must not win. tools/outlook_list_mail.py:73 lists newest
+    newer message from Anna on another topic must not win. tools/outlook_list_mail.py:80 lists newest
     first for one sender and cannot filter by topic, unlike uc-02-14. The two optional steps are the second route that the logs show.
 
 uc-02-36:
@@ -731,7 +728,7 @@ uc-02-36:
       args: {unread_only: true, limit: 25}
       uses: {folder_ref: uri of Projects from outlook_browse_folders}
   note: >-
-    Expected behaviour from tools/outlook_list_mail.py:84-87 and :108-112, `folder` takes only a
+    Expected behaviour from tools/outlook_list_mail.py:91-94 and :115-119, `folder` takes only a
     well-known name such as inbox, and a folder that Mia made is addressed with `folder_ref`, the
     handle that outlook_browse_folders reported in `uri`. A folder name is not a handle.
 
@@ -777,7 +774,7 @@ uc-02-38:
     Expected behaviour from tools/get_me.py:24-25, the profile applies when a request depends on who
     "me" is, and from tools/get_me.py:66-68, `email` is the address to match against the sender of a
     message. outlook_list_mail takes one address and not a name in `from_address`
-    (tools/outlook_list_mail.py:100-106). Mail that Mia sent to herself arrives in her inbox.
+    (tools/outlook_list_mail.py:105-112). Mail that Mia sent to herself arrives in her inbox.
 
 uc-02-40:
   status: untested
@@ -839,7 +836,7 @@ uc-02-44:
   asks_user: false
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
-  note: "tools/outlook_list_mail.py:313-315 and tools/outlook_search_mail.py:210-213: the listing keeps the messages of the stated importance. The search adds the term importance to its words, and it writes the importance normal as medium."
+  note: "tools/outlook_list_mail.py:320-322 and tools/outlook_search_mail.py:210-213: the listing keeps the messages of the stated importance. The search adds the term importance to its words, and it writes the importance normal as medium."
 
 uc-02-45:
   status: untested
@@ -854,7 +851,7 @@ uc-02-45:
     - tool: outlook_find_recipient
     - tool: outlook_list_mail
       uses: {from_address: address of Anna from outlook_find_recipient}
-  note: "expected behaviour from tools/outlook_list_mail.py:211-215 (_BOTH_FOLDERS) and :320-328 (_NOT_ONE_ADDRESS): the listing refuses a folder given twice and a name in place of an address, asks Microsoft nothing, and says what to correct. The chain shows the refused call with a name and the call that repairs it."
+  note: "expected behaviour from tools/outlook_list_mail.py:218-222 (_BOTH_FOLDERS) and :327-335 (_NOT_ONE_ADDRESS): the listing refuses a folder given twice and a name in place of an address, asks Microsoft nothing, and says what to correct. The chain shows the refused call with a name and the call that repairs it."
 
 uc-02-46:
   status: untested
@@ -867,7 +864,7 @@ uc-02-46:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_read_mail
       uses: {uri: uri of the message from the listing}
-  note: "expected behaviour from the handle check at the start of tools/outlook_read_mail.py:255-257, tools/outlook_read_thread.py:210-212, tools/outlook_list_attachments.py:73-75, and tools/outlook_read_attachment.py:112-114: each tool refuses before it asks Microsoft, so no Graph call is made."
+  note: "expected behaviour from the handle check at the start of tools/outlook_read_mail.py:261-263, tools/outlook_read_thread.py:210-212, tools/outlook_list_attachments.py:73-75, and tools/outlook_read_attachment.py:112-114: each tool refuses before it asks Microsoft, so no Graph call is made."
 
 uc-02-47:
   status: untested
@@ -878,7 +875,7 @@ uc-02-47:
   asks_user: false
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
-  note: "tools/outlook_list_mail.py:260-269 and tools/outlook_search_mail.py:236-245: a closing date covers the whole day. A closing moment is the end of the window, with its fraction of a second when it has one."
+  note: "tools/outlook_list_mail.py:267-276 and tools/outlook_search_mail.py:236-245: a closing date covers the whole day. A closing moment is the end of the window, with its fraction of a second when it has one."
 
 uc-02-48:
   status: untested
@@ -929,7 +926,7 @@ uc-02-51:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_read_mail
       uses: {uri: uri of the message from the listing}
-  note: "tools/outlook_read_mail.py:216-226: a message with no body gives no text, and neither flag of the body is set."
+  note: "tools/outlook_read_mail.py:222-232: a message with no body gives no text, and neither flag of the body is set."
 
 uc-02-52:
   status: untested

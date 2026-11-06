@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 
-from office_365_mcp.tools import PRESETS, TOOL_NAMES
+from office_365_mcp.tools import TOOL_NAMES, resolve
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import Person
 from tests.graph_fixtures import response, serve
@@ -407,18 +407,25 @@ class TestEmptyingDeletedItemsIsLeftToMia:
         assert times_asked(graph, "POST", "/move") == 0
 
 
-class TestWhatNoPresetCanDoToday:
+class TestSeveralPresetsHoldTheToolsOfATask:
     @pytest.mark.parametrize(
-        "pair",
+        ("presets", "tools"),
         [
-            ("outlook_create_category", "outlook_mark_mail"),
-            ("outlook_browse_folders", "outlook_create_mail_rule"),
+            (
+                ("outlook-write", "outlook-automate"),
+                ("outlook_create_category", "outlook_mark_mail"),
+            ),
+            (
+                ("outlook-read", "outlook-rules"),
+                ("outlook_browse_folders", "outlook_create_mail_rule"),
+            ),
         ],
         ids=["category-and-mail", "folders-and-rules"],
     )
-    def test_no_preset_holds_both_tools_of_the_task(self, pair: tuple[str, str]) -> None:
-        assert set(pair) <= set(TOOL_NAMES)
-        assert [name for name, tools in PRESETS.items() if set(pair) <= set(tools)] == []
+    def test_the_union_of_two_presets_holds_both_tools_of_the_task(
+        self, presets: tuple[str, str], tools: tuple[str, str]
+    ) -> None:
+        assert set(tools) <= set(resolve(presets=presets, enabled=None).tools)
 
     def test_no_tool_renames_a_category(self) -> None:
         assert {name for name in TOOL_NAMES if "categor" in name} == {

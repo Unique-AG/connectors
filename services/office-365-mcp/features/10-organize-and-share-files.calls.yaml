@@ -23,7 +23,7 @@ uc-10-02:
   blocker:
     kind: tool
     tool: sharepoint_list_drives
-    text: No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns.
+    text: No tool lists the libraries of a site, so the destination must be a folder, or the parent_uri of an item, that a search on the site returns. The description of sharepoint_copy_item says so.
     user: The assistant can copy into the Sales site only when it can find a folder there.
   provenance: drafted
   asks_user: true
@@ -304,7 +304,7 @@ uc-10-21:
   asks_user: false
   chain:
     - any_of: [sharepoint_move_item, sharepoint_rename_item, sharepoint_copy_item, sharepoint_delete_item]
-  note: "expected behaviour per row: move from tools/sharepoint_move_item.py:104-109 (_THE_TOP_FOLDER_STAYS: the top folder of a drive cannot move, to move what it holds move each item inside it). Rename from tools/sharepoint_rename_item.py:71-76 (_THE_DRIVE_ROOT: rename a file or a folder inside the drive instead). Copy from tools/sharepoint_copy_item.py:103-109 (_TOP_FOLDER_CANNOT_BE_COPIED: copy the items inside it one at a time). Delete from tools/sharepoint_delete_item.py:72-78 (_THE_DRIVE_ROOT: to delete a file or a folder inside the drive, pass the handle of that item). Every refusal comes before the question to Mia. The ask names rename, and each row uses the matching ask."
+  note: "expected behaviour per row: move from tools/sharepoint_move_item.py:104-109 (_THE_TOP_FOLDER_STAYS: the top folder of a drive cannot move, to move what it holds move each item inside it). Rename from tools/sharepoint_rename_item.py:71-76 (_THE_DRIVE_ROOT: rename a file or a folder inside the drive instead). Copy from tools/sharepoint_copy_item.py:107-113 (_TOP_FOLDER_CANNOT_BE_COPIED: copy the items inside it one at a time). Delete from tools/sharepoint_delete_item.py:72-78 (_THE_DRIVE_ROOT: to delete a file or a folder inside the drive, pass the handle of that item). Every refusal comes before the question to Mia. The ask names rename, and each row uses the matching ask."
 
 uc-10-22:
   status: untested
@@ -354,7 +354,7 @@ uc-10-24:
     - tool: sharepoint_browse_folder
       optional: true
       uses: {folder: handle of the folder Projects}
-  note: "expected behaviour from tools/sharepoint_copy_item.py:68-85 (description): if the destination already holds an item with the same name the copy fails, to copy an item into its own folder give the copy a new name"
+  note: "expected behaviour from tools/sharepoint_copy_item.py:68-89 (description): if the destination already holds an item with the same name the copy fails, to copy an item into its own folder give the copy a new name"
 
 uc-10-25:
   status: untested
@@ -484,7 +484,7 @@ uc-10-33:
     - tool: sharepoint_invite
       args: {role: write, message: the note of 2000 characters}
       uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
-  note: "expected behaviour from tools/sharepoint_invite.py:56 and 353-358: the schema of message allows at most MESSAGE_CHARACTERS (2000) characters, and Microsoft accepts 2,000 characters at most, so a note of exactly 2000 characters goes out"
+  note: "expected behaviour from tools/sharepoint_invite.py:56 and 364-369: the schema of message allows at most MESSAGE_CHARACTERS (2000) characters, and Microsoft accepts 2,000 characters at most, so a note of exactly 2000 characters goes out"
 
 uc-10-34:
   status: untested
@@ -500,7 +500,7 @@ uc-10-34:
     - tool: sharepoint_invite
       args: {role: write, message: the note of 2001 characters}
       uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
-  note: "expected behaviour from tools/sharepoint_invite.py:56 and 353-358: the schema of message has max_length 2000, so a longer note fails the validation of the arguments before the tool runs, and nothing is shared"
+  note: "expected behaviour from tools/sharepoint_invite.py:56 and 364-369: the schema of message has max_length 2000, so a longer note fails the validation of the arguments before the tool runs, and nothing is shared"
 
 uc-10-35:
   status: untested
@@ -545,7 +545,7 @@ uc-10-37:
       uses: {item: handle of the folder Template, to_folder: handle of the folder Archive}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Archive}
-  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:57) and tools/sharepoint_copy_item.py:82-83: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:259), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:76), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:78-81), and no text says who tells Mia."
+  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:57) and tools/sharepoint_copy_item.py:86-87: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:263), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:76), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:82-85), and no text says who tells Mia."
 
 uc-10-38:
   status: untested
@@ -572,7 +572,7 @@ uc-10-39:
   asks_user: false
   chain:
     - any_of: [sharepoint_move_item, sharepoint_copy_item, sharepoint_rename_item, sharepoint_delete_item, sharepoint_invite, sharepoint_create_share_link, sharepoint_create_folder, sharepoint_create_text_file]
-  note: "expected behaviour per row: each tool refuses a value that is no handle of the needed kind before any Graph call and before the question. Move tools/sharepoint_move_item.py:73-89 (_NOT_AN_ITEM_HANDLE, _NOT_A_FOLDER_HANDLE). Copy tools/sharepoint_copy_item.py:86-103. Rename tools/sharepoint_rename_item.py:62. Delete tools/sharepoint_delete_item.py:62. Invite tools/sharepoint_invite.py:90. Link tools/sharepoint_create_share_link.py:77. Folder tools/sharepoint_create_folder.py:72. Text file tools/sharepoint_create_text_file.py:95. Each text ends with: this same value fails again, so do not retry it."
+  note: "expected behaviour per row: each tool refuses a value that is no handle of the needed kind before any Graph call and before the question. Move tools/sharepoint_move_item.py:73-89 (_NOT_AN_ITEM_HANDLE, _NOT_A_FOLDER_HANDLE). Copy tools/sharepoint_copy_item.py:90-107. Rename tools/sharepoint_rename_item.py:62. Delete tools/sharepoint_delete_item.py:62. Invite tools/sharepoint_invite.py:90. Link tools/sharepoint_create_share_link.py:77. Folder tools/sharepoint_create_folder.py:72. Text file tools/sharepoint_create_text_file.py:95. Each text ends with: this same value fails again, so do not retry it."
 
 uc-10-40:
   status: untested
@@ -594,7 +594,7 @@ uc-10-41:
   asks_user: false
   chain:
     - any_of: [sharepoint_create_folder, sharepoint_create_text_file, sharepoint_copy_item, sharepoint_move_item]
-  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:82-86 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:110-114. Copy tools/sharepoint_copy_item.py:110-114 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:110-114. Every refusal comes before the question to Mia."
+  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:82-86 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:110-114. Copy tools/sharepoint_copy_item.py:114-118 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:110-114. Every refusal comes before the question to Mia."
 
 uc-10-42:
   status: untested

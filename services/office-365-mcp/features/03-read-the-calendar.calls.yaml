@@ -138,7 +138,7 @@ uc-03-10:
   chain:
     - tool: outlook_list_events
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
-  note: "expected behaviour from shared/seam.py, one row each. Sign-in expired, :520-525: ask the user to sign in to this connector again. No access, :528-537: ask a Microsoft 365 administrator to grant the permission, retrying will not help. Busy with a wait of 30 seconds, :509-513: retry after that, not sooner. Rejected question, :579-584: a bad request that fails the same way again, with the reason of Microsoft. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:126; uc-03-21), so the busy row means busy through every try."
+  note: "expected behaviour from shared/seam.py, one row each. Sign-in expired, :520-525: ask the user to sign in to this connector again. No access, :528-537: ask a Microsoft 365 administrator to grant the permission, retrying will not help. Busy with a wait of 30 seconds, :509-513: retry after that, not sooner. Rejected question, :579-584: a bad request that fails the same way again, with the reason of Microsoft. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-03-21), so the busy row means busy through every try."
 
 uc-03-11:
   status: untested
@@ -297,7 +297,7 @@ uc-03-21:
   chain:
     - tool: outlook_list_events
       args: {starts_on: tomorrow, ends_on: tomorrow, time_zone: Europe/Zurich}
-  note: "expected behaviour from graph_client/client.py:339-342 and config.py:126: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-03-10 reaches the assistant only when Microsoft stays busy through every try."
+  note: "expected behaviour from graph_client/client.py:339-342 and config.py:127: the retry handler of the SDK retries a read up to 3 times on 429, 503 and 504 and waits the Retry-After time, so the assistant makes one call and never sees the busy answer (tests/conftest.py retry_sleeps). The busy text of uc-03-10 reaches the assistant only when Microsoft stays busy through every try."
 
 uc-03-22:
   status: untested
