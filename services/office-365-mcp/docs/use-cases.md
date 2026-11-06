@@ -795,6 +795,19 @@ What happens:
 - The assistant tells Mia that Tom is already on the draft.
 - The draft stays as it is until Mia chooses.
 
+**A blind copy is put on a draft**
+
+Ask your assistant: "Put Priya on blind copy on my draft to Anna."
+
+Tests: 1
+
+Situation: Mia has a draft addressed to Anna.
+
+What happens:
+
+- Priya is on the draft as a blind copy.
+- Anna cannot see Priya on the message.
+
 **The subject, the importance, and a recipient of a draft change**
 
 Ask your assistant: "Take Priya off my draft, call it Contract for signature, and mark it important."
@@ -1471,7 +1484,6 @@ What happens:
 
 #### Not supported yet in drafting and sending mail
 
-- The assistant cannot add a blind copy to a draft yet.
 - The assistant cannot attach a file to a draft yet.
 
 ### Organizing the mailbox

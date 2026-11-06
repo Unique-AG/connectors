@@ -233,18 +233,17 @@ uc-04-16:
   note: the tool refuses a message that is no longer a draft
 
 uc-04-17:
-  status: gap
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_the_draft_tools_offer_no_blind_copy"
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_puts_a_person_on_the_draft_as_a_blind_copy"
   ask: "Put Priya on blind copy on my draft to Anna."
   provenance: drafted
   asks_user: false
-  blocker:
-    kind: parameter
-    tool: outlook_draft_mail
-    text: outlook_draft_mail, outlook_update_draft, outlook_draft_reply and outlook_draft_reply_all have no argument for blind copy recipients
-    user: The assistant cannot add a blind copy to a draft yet.
-  chain: []
+  chain:
+    - any_of: [outlook_list_mail, outlook_read_mail]
+    - tool: outlook_update_draft
+      uses: {message_ref: uri of the draft, bcc: the address of Priya}
+  must_not: [outlook_draft_mail]
 
 uc-04-18:
   status: untested

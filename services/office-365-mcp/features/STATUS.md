@@ -8,7 +8,7 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 7 | 3 | 357 | 372 |
+| Outlook | 5 | 7 | 2 | 358 | 372 |
 | Teams | 0 | 1 | 1 | 144 | 146 |
 | SharePoint | 0 | 3 | 3 | 92 | 98 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
@@ -60,11 +60,10 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-13-01` | Running Teams chats and online meetings | A group chat is created and named | gap | `teams_create_chat` | No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from get_me, a chat member row, or a message sender. |
 | `uc-15-10` | Working across mail, calendar, files, and Teams | A file is sent to a colleague as a link in a mail draft | partly | `outlook_draft_mail` | The draft tools write text only and cannot add a file, so the assistant puts a sharing link in the draft and not the file. |
 
-### A parameter is missing (2)
+### A parameter is missing (1)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
-| `uc-04-17` | Drafting and sending mail | A blind copy is put on a draft | gap | `outlook_draft_mail` | outlook_draft_mail, outlook_update_draft, outlook_draft_reply and outlook_draft_reply_all have no argument for blind copy recipients |
 | `uc-06-04` | Catching up on Teams | A channel is read with its replies | partly | `teams_browse_channel` | The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week. |
 
 ### The tools sit in different presets (3)

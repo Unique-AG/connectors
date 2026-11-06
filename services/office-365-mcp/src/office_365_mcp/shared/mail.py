@@ -281,10 +281,15 @@ def carries_category(message: Message, category: str) -> bool:
 
 
 def copied_and_marked(
-    cc: Sequence[str], *, importance: MailImportance | None, categories: Sequence[str]
+    cc: Sequence[str],
+    *,
+    bcc: Sequence[str],
+    importance: MailImportance | None,
+    categories: Sequence[str],
 ) -> str:
     return (
         (f" It is copied to {', '.join(cc)}." if cc else "")
+        + (f" It is blind copied to {', '.join(bcc)}." if bcc else "")
         + ("" if importance is None else f" It has {importance} importance.")
         + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
     )
