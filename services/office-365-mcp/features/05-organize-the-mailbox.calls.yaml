@@ -162,17 +162,12 @@ uc-05-09:
   note: the tool refuses a folder that Outlook creates for every mailbox
 
 uc-05-10:
-  status: partly
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestWhatNoPresetCanDoToday::test_no_preset_holds_both_tools_of_the_task"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestSeveralPresetsHoldTheToolsOfATask::test_the_union_of_two_presets_holds_both_tools_of_the_task"
   ask: "Create a red category Follow-up Q4 and put it on my unread messages from Tom Berger."
   provenance: drafted
   asks_user: false
-  blocker:
-    kind: preset
-    tool: outlook_create_category
-    text: no single preset holds both outlook_create_category and outlook_mark_mail, so this needs two presets or a custom `enabled` list
-    user: The assistant creates the category and puts it on mail only when the administrator has turned on both groups of tools.
   chain:
     - tool: outlook_list_categories
       optional: true
@@ -188,17 +183,12 @@ uc-05-10:
       uses: {message_refs: uri values from the listing}
 
 uc-05-11:
-  status: partly
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestWhatNoPresetCanDoToday::test_no_preset_holds_both_tools_of_the_task"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestSeveralPresetsHoldTheToolsOfATask::test_the_union_of_two_presets_holds_both_tools_of_the_task"
   ask: "Make a rule that moves mail from billing@example.com to my Finance folder."
   provenance: drafted
   asks_user: false
-  blocker:
-    kind: preset
-    tool: outlook_create_mail_rule
-    text: no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs two presets or a custom `enabled` list
-    user: The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
   chain:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_browse_folders
@@ -323,13 +313,13 @@ uc-05-21:
     - tool: outlook_browse_folders
     - tool: outlook_delete_folder
       uses: {folder_ref: folder handle of Deleted Items}
-  note: the limit is deliberate, because this connector erases no mail for good. The tool refuses Deleted Items and tells the model to tell the user to empty it in Outlook.
+  note: this connector erases no mail for good, so the tool refuses Deleted Items and tells the model to tell the user to empty it in Outlook.
 
 uc-05-22:
   status: partly
   tests:
-    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestWhatNoPresetCanDoToday::test_no_preset_holds_both_tools_of_the_task"
-    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestWhatNoPresetCanDoToday::test_no_tool_renames_a_category"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestSeveralPresetsHoldTheToolsOfATask::test_the_union_of_two_presets_holds_both_tools_of_the_task"
+    - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestSeveralPresetsHoldTheToolsOfATask::test_no_tool_renames_a_category"
   ask: "Rename my category Follow-up Q4 to Follow-up Q1."
   provenance: drafted
   asks_user: false
@@ -345,7 +335,6 @@ uc-05-22:
     - tool: outlook_mark_mail
       args: {add_categories: [Follow-up Q1], remove_categories: [Follow-up Q4]}
       uses: {message_refs: uri values of the messages that carry Follow-up Q4}
-  note: no preset holds both outlook_create_category and outlook_mark_mail, so this also needs two presets or a custom `enabled` list
 
 uc-05-23:
   status: untested
@@ -586,24 +575,19 @@ uc-05-37:
   note: "expected behaviour from shared/seam.py:571-578 (409) and tools/outlook_create_category.py:64: each category name is unique, Microsoft refuses a name that the list already has, the same call fails the same way, change the name or list the categories to find that one."
 
 uc-05-38:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_rule_that_microsoft_rejects_as_invalid_is_not_repeated_and_gives_the_reason"
   ask: "Make a rule that moves mail from billing@example.com to my Finance folder."
   provenance: drafted
   asks_user: false
-  blocker:
-    kind: preset
-    tool: outlook_create_mail_rule
-    text: no preset holds both outlook_browse_folders and outlook_create_mail_rule, so this needs two presets or a custom `enabled` list
-    user: The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
   chain:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_browse_folders
     - tool: outlook_create_mail_rule
       args: {display_name: Billing to Finance, conditions: sender billing}
       uses: {sequence: next free sequence from outlook_get_mailbox_settings, actions: move_to_folder is the uri of Finance from outlook_browse_folders}
-  note: "expected behaviour from shared/seam.py:579-584 (400 bad request) and 587-589: the same call fails the same way, and Microsoft's reason follows. The assistant tells Mia that reason and does not create the same rule again. The preset limit of uc-05-11 applies here too."
+  note: "expected behaviour from shared/seam.py:579-584 (400 bad request) and 587-589: the same call fails the same way, and Microsoft's reason follows. The assistant tells Mia that reason and does not create the same rule again."
 
 uc-05-39:
   status: untested

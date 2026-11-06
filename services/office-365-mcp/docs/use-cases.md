@@ -1699,9 +1699,6 @@ Ask your assistant: "Create a red category Follow-up Q4 and put it on my unread 
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant creates the category and puts it on mail only when the administrator has turned on both groups of tools.
-
 Situation: Mia has 4 unread messages from Tom Berger.
 
 What happens:
@@ -1732,9 +1729,6 @@ What happens:
 Ask your assistant: "Make a rule that moves mail from billing@example.com to my Finance folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
 
 What happens:
 
@@ -2039,9 +2033,6 @@ What happens:
 Ask your assistant: "Make a rule that moves mail from billing@example.com to my Finance folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
 
 Situation: Mia asks her assistant for a rule that moves mail from "billing@example.com" to "Finance".
 

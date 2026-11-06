@@ -18,6 +18,8 @@ through the Microsoft Graph API.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
+- **Use cases:** The [use cases](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md)
+  show what people ask an assistant to do, and what the tools do for each request.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
 
@@ -38,6 +40,9 @@ Rules for the selection:
 - A deployment can name several presets in a comma-separated list, for example
   `teams-write,outlook-read`. It gets the union of their tools and of their permissions. The union
   needs admin consent when at least one of the presets needs it.
+- Two presets can hold the tools of one task. For example, `outlook-write,outlook-automate` lets the
+  assistant create a category and put it on mail. `outlook-read,outlook-rules` lets it find a
+  folder and make a rule that files mail into it.
 - A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
   preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
 - Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and
@@ -1484,6 +1489,7 @@ model then tells the user.
 | A file is larger than 10 MB | The tool refuses the file. It never sends part of a file. The model gives the user a link to open the file. |
 | A user wants a file that is not plain text | The tool creates only text files, such as `txt`, `md`, `csv`, `json`, and `html`. It cannot create a Word, Excel, PowerPoint, or PDF file. |
 | A file with the same name exists | The tool cannot replace a file. No tool uploads a file. |
+| A user wants the document libraries of a site | No tool lists them. `sharepoint_list_drives` lists only the drives of the signed-in user. |
 | A user shares a file | A link gives view access or edit access, to the organization or to anyone. The tool sets no expiry and no password. No tool removes a link or an invitation. |
 
 #### Outlook mail
@@ -1507,6 +1513,7 @@ model then tells the user.
 
 | Limit | What the user sees |
 | --- | --- |
+| A user asks for the phone number of a person in the directory | `outlook_find_recipient` returns names and email addresses. No tool reads the phone number of a directory person. |
 | A contact is in a folder other than the default folder | The tools do not reach it. They use the default Contacts folder only. |
 | A contact has a department, an address, a birthday, or a note | A tool reads these fields. A tool cannot write them. |
 | A user clears a name, a company, a job title, or a mobile number | The tool cannot clear them. The user clears them in Outlook. |
@@ -1517,6 +1524,7 @@ model then tells the user.
 | --- | --- |
 | A channel has more than 50 posts | The tool reads one page of 50 posts at most, ordered by reply activity. A token reads the next page. Microsoft limits channel reads to about one request each second. |
 | A post has more than 50 replies | The tool reads 50 replies and marks the list as incomplete. The rest is out of reach. |
+| A user asks to start a chat with a person by name | `teams_create_chat` needs the Microsoft Entra id of the person. No tool turns a name or an email address into an id. |
 | A user sends a file in a message | The file must already be in SharePoint. No tool uploads a file. |
 | A meeting is old | Microsoft erases the transcripts of a one-off meeting about 60 days after the meeting. |
 | A tenant turns off transcripts | The tool cannot read them. A Teams administrator must turn them on. |
