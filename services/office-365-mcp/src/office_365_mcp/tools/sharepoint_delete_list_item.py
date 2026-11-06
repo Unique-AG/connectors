@@ -118,7 +118,9 @@ async def delete_list_item(
         title = title if isinstance(title, str) and title else None
 
         with not_graph():
-            answer = await confirm(_question(title, handle), write_state_for(TOOL_NAME, handle.uri))
+            answer = await confirm(
+                _question(title, handle), write_state_for(TOOL_NAME, handle.uri, title or "")
+            )
         if answer is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE):
                 await item.delete(

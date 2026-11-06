@@ -18,7 +18,7 @@ sys.path.insert(0, str(HERE))
 
 import seed
 from families import onenote, sharepoint
-from model import ConfigError, Context
+from model import ConfigError, Context, site_id
 from test_seed import ANCHOR as ANCHOR_ARGS
 from test_seed import ENV, UPNS, FakeGraph, run
 
@@ -217,6 +217,12 @@ def test_the_phase_creates_the_move_target_once() -> None:
     assert names(fake).count(TARGET) == 1
     assert run(["apply", "--as", "1", "--phases", "sharepoint"], fake) == 0
     assert names(fake).count(TARGET) == 1
+
+
+def test_a_partial_sharepoint_ids_object_gives_no_site_id() -> None:
+    ids = {"siteUrl": "https://contoso.sharepoint.com/sites/seed-team", "siteId": "s"}
+    assert site_id({"sharePointIds": ids}) is None
+    assert site_id({"sharePointIds": ids | {"webId": "w"}}) == "contoso.sharepoint.com,s,w"
 
 
 def test_the_phase_adds_nothing_for_the_other_personas() -> None:

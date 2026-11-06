@@ -105,6 +105,10 @@ class ListColumn(BaseModel):
     choices: list[str] | None = Field(
         description="The allowed values of a choice column. Null for every other type."
     )
+    several: bool = Field(
+        default=False,
+        description="True when a choice column lets a person pick more than one value.",
+    )
 
     @classmethod
     def from_column(cls, column: ColumnDefinition) -> Self:
@@ -117,6 +121,7 @@ class ListColumn(BaseModel):
             hidden=column.hidden,
             indexed=column.indexed,
             choices=None if column.choice is None else list(column.choice.choices or []),
+            several=column.choice is not None and column.choice.display_as == "checkBoxes",
         )
 
 
@@ -216,11 +221,14 @@ def _write_refusal(column: ListColumn | None, name: str, value: str) -> str | No
         )
     if column.read_only is True or column.hidden is True:
         return f"The column {name!r} is read-only or hidden, so this connector does not write it."
+    if column.several:
+        return f"The column {name!r} takes several values, so this connector does not write it."
     if column.type not in VALUE_TYPES:
         return (
             f"This connector cannot write the column {name!r}, because its type is "
             + f"{column.type}. It writes text, choice, date, number, currency, and yes or no "
-            + "columns. Tell the user to change this column in SharePoint."
+            + "columns. Tell the user to set this column in SharePoint themselves, once the row "
+            + "exists."
         )
     choices = column.choices or []
     if column.type == "choice" and value not in choices:

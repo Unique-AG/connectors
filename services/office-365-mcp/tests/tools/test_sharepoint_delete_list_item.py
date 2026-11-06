@@ -74,6 +74,25 @@ async def test_it_deletes_the_row_only_after_the_person_agrees_to_the_named_row(
     )
 
 
+async def test_the_confirmation_state_changes_when_the_row_is_renamed(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    states: list[str] = []
+
+    async def noting(_question: str, about: str) -> str | None:
+        states.append(about)
+        return "not agreed"
+
+    for title in ("Close books", "Open books"):
+        _ = graph.get(_ITEM_ROUTE).mock(
+            return_value=httpx.Response(200, json={"id": "7", "fields": {"Title": title}})
+        )
+        with pytest.raises(ToolError):
+            _ = await delete_list_item(client, item_uri=_ITEM_URI, confirm=noting)
+
+    assert states[0] != states[1]
+
+
 async def test_a_declined_question_sends_nothing(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:

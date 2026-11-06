@@ -35,6 +35,11 @@ _COLUMNS = [
     _column("Done", "boolean"),
     _column("Due", "dateTime"),
     _column("Owner", "personOrGroup"),
+    {
+        "name": "Tags",
+        "displayName": "Tags",
+        "choice": {"choices": ["a", "b"], "displayAs": "checkBoxes"},
+    },
     _column("Parent", "lookup"),
     _column("Topic", "term"),
     _column("Location", "geolocation"),
@@ -150,6 +155,7 @@ async def test_a_declined_question_sends_nothing(
     [
         {"Owner": "someone@contoso.sharepoint.invalid"},
         {"OwnerLookupId": "7"},
+        {"Tags": "a"},
         {"Parent": "3"},
         {"ParentLookupId": "3"},
         {"Topic": "Finance"},

@@ -8,10 +8,7 @@ from office_365_mcp.shared.handles import ListHandle, list_handle
 from office_365_mcp.tools.sharepoint_list_lists import list_lists
 
 _HOST = "contoso.sharepoint.invalid"
-_SITE_ID = (
-    f"{_HOST},00000000-0000-4000-8000-00000000000a,"
-    + "11111111-aaaa-bbbb-cccc-222222222222"
-)
+_SITE_ID = f"{_HOST},00000000-0000-4000-8000-00000000000a," + "11111111-aaaa-bbbb-cccc-222222222222"
 _SITE = {"id": _SITE_ID, "webUrl": f"https://{_HOST}/sites/Finance"}
 _LISTS_ROUTE = f"/sites/{_SITE_ID}/lists"
 

@@ -92,7 +92,11 @@ def match_glob(glob: str, shown: str) -> list[str] | None:
         fnmatchcase(p, g) for g, p in zip(pattern, path, strict=True)
     ):
         return None
-    return [p[: len(p) - len(g) + 1] for g, p in zip(pattern, path, strict=True) if g[:1] == "*"]
+    return [
+        p[: len(p) - len(g.rpartition("*")[2])]
+        for g, p in zip(pattern, path, strict=True)
+        if g[:1] == "*"
+    ]
 
 
 def _name(where: str) -> bool:
