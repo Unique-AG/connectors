@@ -933,6 +933,25 @@ class TestWhatItAnswers:
 
         assert answer.recipients[0].email == _ADA
 
+    @pytest.mark.parametrize(("later", "address"), [(_ADA, _ADA), (None, None)])
+    async def test_an_empty_identity_address_is_skipped(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        later: str | None,
+        address: str | None,
+    ) -> None:
+        _ = _reads(graph)
+        row = _row(identity_email="")
+        del row["invitation"]
+        if later is not None:
+            row["grantedTo"] = {"user": {"email": later}}
+        _ = _invites(graph, [row])
+
+        answer = await _invite(client)
+
+        assert answer.recipients[0].email == address
+
     async def test_the_invitation_address_wins_over_the_identity_address(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:

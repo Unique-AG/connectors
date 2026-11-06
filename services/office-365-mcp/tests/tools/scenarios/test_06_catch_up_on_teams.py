@@ -269,6 +269,7 @@ class TestFindingAMessage:
             "Priya Rao",
             "19:sales@thread.tacv2",
         )
+        assert (in_chat["chat_id"], in_channel["chat_id"]) == ("19:tom-and-mia@thread.v2", None)
         assert "pricing change" in _query_sent(route)
 
     async def test_it_reads_a_hit_in_full(self, graph: respx.MockRouter) -> None:

@@ -317,11 +317,14 @@ async def teams_read_meeting(
                 more_records=False,
             )
         reports_of = client.me.online_meetings.by_online_meeting_id(meeting.id).attendance_reports
-        found: list[MeetingAttendanceReport] = []
+        listed = None
         with suppress(GraphNotFound), graph_step(STEP_REPORTS):
             listed = await reports_of.get()
             assert listed is not None, "Graph answered an attendance report listing with no value"
-            found = (await collect_pages(listed, client, limit=MAX_REPORTS)).items
+        found: list[MeetingAttendanceReport] = []
+        if listed is not None:
+            with graph_step(STEP_REPORTS):
+                found = (await collect_pages(listed, client, limit=MAX_REPORTS)).items
         reports = sorted(
             (AttendanceReportSummary.from_report(report) for report in found),
             key=_began_at,

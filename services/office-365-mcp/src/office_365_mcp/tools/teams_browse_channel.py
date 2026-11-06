@@ -140,8 +140,10 @@ async def teams_browse_channel(
 def _own_continuation(link: str, *, base_url: str, team_id: str, channel_id: str) -> str:
     parts, base = urlsplit(link), urlsplit(base_url)
     messages_path = f"{base.path}/teams/{team_id}/channels/{channel_id}/messages"
-    if (parts.scheme, parts.netloc) != (base.scheme, base.netloc) or (
-        unquote(parts.path) != messages_path
+    if (
+        not link.isprintable()
+        or (parts.scheme, parts.netloc) != (base.scheme, base.netloc)
+        or unquote(parts.path) != messages_path
     ):
         raise ToolError(_FOREIGN_PAGE_TOKEN)
     return link

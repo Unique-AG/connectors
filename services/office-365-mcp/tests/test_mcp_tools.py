@@ -1691,7 +1691,9 @@ class TestCallingThem:
         assert told["messages"] == unasked["messages"] == whole["messages"], (
             "asking about completeness changes what is reported and never what was read"
         )
-        assert route.call_count == 3, "one request per call, and the cursor still never followed"
+        assert route.call_count == 3, (
+            "one request per call, and the cursor followed only when a caller passes it"
+        )
 
     @pytest.mark.usefixtures("obo")
     @pytest.mark.parametrize("token", ["a%2Bb%3D", "a+b%3D", "a%20b"])
@@ -1730,6 +1732,11 @@ class TestCallingThem:
             f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/19:other@thread.tacv2/messages?$skiptoken=x",
             f"{GRAPH_V1}/me/messages?$skiptoken=x",
             "x",
+            f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages\n?$skiptoken=x",
+            f"http://graph.microsoft.com/v1.0/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages",
+            f"https://graph.microsoft.com/beta/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages?$skiptoken=x",
+            f"https://graph.microsoft.com@evil.example/v1.0/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages?$skiptoken=x",
+            f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages/?$skiptoken=x",
         ],
     )
     async def test_a_channel_page_link_that_is_not_of_this_channel_is_refused(

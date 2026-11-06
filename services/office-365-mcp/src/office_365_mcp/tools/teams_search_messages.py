@@ -119,15 +119,16 @@ class MessageHit(BaseModel):
         channel = resource.channel_identity
         team_id = channel.team_id if channel is not None else None
         channel_id = channel.channel_id if channel is not None else None
+        chat_id = None if team_id is not None and channel_id is not None else resource.chat_id
         return cls(
             uri=_hit_uri(
                 message_id=resource.id,
-                chat_id=resource.chat_id,
+                chat_id=chat_id,
                 team_id=team_id,
                 channel_id=channel_id,
             ),
             message_id=resource.id,
-            chat_id=resource.chat_id,
+            chat_id=chat_id,
             team_id=team_id,
             channel_id=channel_id,
             subject=resource.subject,

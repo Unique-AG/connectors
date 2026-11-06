@@ -179,6 +179,7 @@ def channel_hit(
     message_id: str = "1770000000000",
 ) -> dict[str, object]:
     resource = _chat_message(message_id=message_id, sender=MAILBOX_SENDER)
+    resource["chatId"] = channel_id
     resource["channelIdentity"] = {"teamId": team_id, "channelId": channel_id}
     resource["webUrl"] = f"https://teams.microsoft.invalid/l/message/{channel_id}/{message_id}"
     return {"hitId": message_id, "rank": 1, "summary": "synthetic snippet", "resource": resource}

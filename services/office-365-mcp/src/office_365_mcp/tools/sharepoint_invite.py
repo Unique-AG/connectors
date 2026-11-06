@@ -302,7 +302,7 @@ def _address_of(permission: Permission) -> str | None:
     for identity in (permission.granted_to_v2, permission.granted_to):
         user = None if identity is None else identity.user
         address = None if user is None else user.additional_data.get("email")
-        if isinstance(address, str):
+        if isinstance(address, str) and address:
             return address
     return None
 
