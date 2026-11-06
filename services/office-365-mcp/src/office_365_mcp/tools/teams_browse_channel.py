@@ -106,7 +106,7 @@ async def teams_browse_channel(
         assert page is not None, "Graph answered a channel message listing with no collection"
 
     posts = [message for message in (page.value or []) if _is_a_post(message)]
-    kept = posts[:limit]
+    kept = posts if page_token is not None else posts[:limit]
 
     messages: list[TeamsMessage] = []
     for post in kept:

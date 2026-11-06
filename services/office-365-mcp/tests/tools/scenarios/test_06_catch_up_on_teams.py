@@ -567,6 +567,26 @@ class TestAChannelWithItsReplies:
         assert [m["message_id"] for m in _rows(second, "messages")] == ["post4", "post5"]
         assert str(route.calls.last.request.url) == link
 
+    async def test_it_keeps_every_post_of_a_next_page_whatever_limit_the_caller_gives(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = f"https://graph.microsoft.com/v1.0{CHANNEL_MESSAGES_PATH}?$expand=replies&$top=5&$skiptoken=p2"
+        _ = graph.get(CHANNEL_MESSAGES_PATH).mock(
+            return_value=httpx.Response(200, json={"value": self._posts()})
+        )
+
+        second = await call(
+            "teams_browse_channel",
+            team_id=TEAM_ID,
+            channel_id=CHANNEL_ID,
+            limit=1,
+            page_token=link,
+        )
+
+        ids = {m["message_id"] for m in _rows(second, "messages")}
+        assert {f"post{n}" for n in range(1, 6)} <= ids
+        assert second["posts_cut_to_limit"] is None
+
     async def test_it_reads_a_thread_of_fifty_replies_and_says_that_more_exist(
         self, graph: respx.MockRouter
     ) -> None:
