@@ -371,7 +371,7 @@ class TestRetryAdvice:
 
         assert "license that includes the service this tool uses" in message
         assert "Refused." not in message
-        assert "Retrying will not help" not in message
+        assert "trying again later may work" in message
 
     async def test_the_403_wording_does_not_replace_the_404_advice(self) -> None:
         message = await _message(
