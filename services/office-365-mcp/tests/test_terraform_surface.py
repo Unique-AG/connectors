@@ -95,21 +95,28 @@ def _scalar(name: str) -> str:
     return value
 
 
-def _chart_preset_pattern() -> str:
+def _chart_preset_branches() -> list[Mapping[str, object]]:
     node: object = cast("object", json.loads(_CHART_SCHEMA.read_text()))
-    for key in (
-        "properties",
-        "mcpConfig",
-        "properties",
-        "tools",
-        "properties",
-        "preset",
-        "pattern",
-    ):
+    for key in ("properties", "mcpConfig", "properties", "tools", "properties", "preset", "oneOf"):
         assert isinstance(node, Mapping), f"the chart schema has no {key} under this path"
         node = cast("Mapping[str, object]", node)[key]
-    assert isinstance(node, str), "tools.preset carries no pattern in the chart schema"
-    return node
+    assert isinstance(node, list), "tools.preset is no longer a string or an array in the chart"
+    return cast("list[Mapping[str, object]]", node)
+
+
+def _chart_preset_pattern() -> str:
+    (pattern,) = [
+        branch["pattern"] for branch in _chart_preset_branches() if branch["type"] == "string"
+    ]
+    assert isinstance(pattern, str), "tools.preset carries no pattern in the chart schema"
+    return pattern
+
+
+def _chart_preset_list_enum() -> list[str]:
+    (items,) = [branch["items"] for branch in _chart_preset_branches() if branch["type"] == "array"]
+    enum = cast("Mapping[str, object]", items)["enum"]
+    assert isinstance(enum, list), "the array form of tools.preset carries no enum of names"
+    return cast("list[str]", enum)
 
 
 def _chart_preset_names() -> list[str]:
@@ -172,6 +179,7 @@ class TestTheThreePlacesThePresetNamesAreWritten:
             cast("Mapping[str, object]", presets)
         )
         assert {preset.value for preset in ToolsPreset} == set(_chart_preset_names())
+        assert {preset.value for preset in ToolsPreset} == set(_chart_preset_list_enum())
 
     @pytest.mark.parametrize(
         "spelling", ["teams-chat", "teams-chat,outlook-read", "teams-chat, outlook-read ", " teams"]

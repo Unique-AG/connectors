@@ -10,8 +10,11 @@ Set **exactly one** of `tools_preset` or `tools_enabled`. You never write a Grap
 anywhere in this interface — the module derives the delegated permissions, and the subset needing
 admin consent, from the tools selected. There is deliberately no default: "every tool" is the widest
 consent screen a tenant can be asked for, so it has to be chosen (`tools_preset = "teams"`). To
-turn on several presets, write them as a comma-separated string
-(`tools_preset = "teams-write,outlook-read"`). The module takes the union of their tools, as the pod does.
+turn on several presets, write them as a list of strings
+(`tools_preset = ["teams-write", "outlook-read"]`) or as a comma-separated string
+(`tools_preset = "teams-write,outlook-read"`). Both forms give the same tools. The module takes the
+union of their tools, as the pod does. The `tool_surface` output always shows the `preset` as one
+comma-separated string.
 
 ## The selection lives in two places and they must agree
 

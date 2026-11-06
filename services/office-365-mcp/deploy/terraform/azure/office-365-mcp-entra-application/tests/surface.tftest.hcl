@@ -158,6 +158,99 @@ run "several_presets_are_the_union_of_their_tools" {
   }
 }
 
+run "a_list_of_presets_resolves_like_the_comma_separated_string" {
+  variables {
+    tools_preset = ["teams-chat", "outlook-read"]
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Mail.Read,Mail.Read.Shared,People.Read"
+    error_message = "the list teams-chat, outlook-read composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "the list teams-chat, outlook-read resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = output.tool_surface.preset == "teams-chat,outlook-read"
+    error_message = "tool_surface.preset is ${coalesce(output.tool_surface.preset, "null")}, not the comma-separated string the pod reads"
+  }
+}
+
+run "a_list_of_one_preset_resolves" {
+  variables {
+    tools_preset = ["teams-chat"]
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read"
+    error_message = "the list teams-chat composed ${join(",", local.permissions)}"
+  }
+}
+
+run "a_string_with_spaces_resolves_like_a_list" {
+  variables {
+    tools_preset = "teams-chat, outlook-read "
+  }
+
+  assert {
+    condition     = length(local.tools) == 13 && output.tool_surface.preset == "teams-chat,outlook-read"
+    error_message = "teams-chat, outlook-read resolved ${length(local.tools)} tools and preset ${coalesce(output.tool_surface.preset, "null")}"
+  }
+}
+
+run "every_preset_as_a_list_resolves_every_tool" {
+  command = plan
+
+  variables {
+    tools_preset = [
+      "teams",
+      "teams-chat",
+      "teams-messages",
+      "teams-channels",
+      "teams-transcripts",
+      "teams-recordings",
+      "teams-meetings",
+      "teams-write",
+      "teams-write-files",
+      "teams-edit",
+      "teams-meetings-write",
+      "teams-chat-admin",
+      "teams-files",
+      "outlook-read",
+      "outlook-write",
+      "outlook-delete",
+      "outlook-send",
+      "outlook-mailbox",
+      "outlook-automate",
+      "outlook-rules",
+      "outlook-calendar",
+      "outlook-calendar-write",
+      "outlook-calendar-manage",
+      "outlook-calendar-delegate",
+      "outlook-calendar-rooms",
+      "outlook-group-calendar",
+      "outlook-contacts",
+      "outlook-contacts-write",
+      "sharepoint-search",
+      "sharepoint-read",
+      "sharepoint-write",
+      "sharepoint-share",
+      "sharepoint-sites",
+      "onenote-read",
+      "onenote-write",
+      "onenote-delete",
+    ]
+  }
+
+  assert {
+    condition     = length(local.tools) == length(local.tool_names)
+    error_message = "every preset in a list resolved ${length(local.tools)} tools, not every tool of the registry"
+  }
+}
+
 run "preset_teams_messages" {
   variables {
     tools_preset = "teams-messages"
@@ -1124,4 +1217,45 @@ run "a_multi_tenant_registration_emits_the_organizations_authority" {
     condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == "organizations"
     error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id, not the organizations authority the pod validates every tenant's tokens under"
   }
+}
+
+run "a_list_with_an_unknown_preset_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = ["teams-chat", "outlook"]
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "an_empty_list_of_presets_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = []
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "a_comma_separated_string_inside_a_list_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = ["teams-chat,outlook-read"]
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "a_list_of_presets_and_tools_enabled_are_refused_together" {
+  command = plan
+
+  variables {
+    tools_preset  = ["teams-chat"]
+    tools_enabled = ["teams_list_chats"]
+  }
+
+  expect_failures = [var.tools_enabled]
 }
