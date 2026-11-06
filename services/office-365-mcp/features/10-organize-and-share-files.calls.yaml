@@ -484,7 +484,7 @@ uc-10-33:
     - tool: sharepoint_invite
       args: {role: write, message: the note of 2000 characters}
       uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
-  note: "expected behaviour from tools/sharepoint_invite.py:56 and 353-358: the schema of message allows at most MESSAGE_CHARACTERS (2000) characters, and Microsoft accepts 2,000 characters at most, so a note of exactly 2000 characters goes out"
+  note: "expected behaviour from tools/sharepoint_invite.py:56 and 364-369: the schema of message allows at most MESSAGE_CHARACTERS (2000) characters, and Microsoft accepts 2,000 characters at most, so a note of exactly 2000 characters goes out"
 
 uc-10-34:
   status: untested
@@ -500,7 +500,7 @@ uc-10-34:
     - tool: sharepoint_invite
       args: {role: write, message: the note of 2001 characters}
       uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
-  note: "expected behaviour from tools/sharepoint_invite.py:56 and 353-358: the schema of message has max_length 2000, so a longer note fails the validation of the arguments before the tool runs, and nothing is shared"
+  note: "expected behaviour from tools/sharepoint_invite.py:56 and 364-369: the schema of message has max_length 2000, so a longer note fails the validation of the arguments before the tool runs, and nothing is shared"
 
 uc-10-35:
   status: untested

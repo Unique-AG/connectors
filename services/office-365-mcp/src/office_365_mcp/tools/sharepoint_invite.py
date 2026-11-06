@@ -130,8 +130,9 @@ def _repeated(address: str) -> str:
 class InvitedRecipient(BaseModel):
     email: str | None = Field(
         description=(
-            "The address that Microsoft recorded for the invitation of this person. Null when "
-            + "Graph recorded no address for this row."
+            "The address of this person. It comes from the invitation that Microsoft recorded. "
+            + "For a person in the organization, it comes from the identity that Microsoft holds. "
+            + "Null when Graph gave no address for this row."
         )
     )
     display_name: str | None = Field(
@@ -156,9 +157,8 @@ class InvitedRecipient(BaseModel):
 
     @classmethod
     def from_permission(cls, permission: Permission) -> Self:
-        invitation = permission.invitation
         return cls(
-            email=None if invitation is None else invitation.email,
+            email=_address_of(permission),
             display_name=display_name(permission.granted_to_v2)
             or display_name(permission.granted_to),
             roles=list(permission.roles or []),
@@ -294,6 +294,17 @@ def _error_of(permission: Permission) -> str | None:
         return None
     reason = cast("Mapping[str, object]", error).get("message") if isinstance(error, dict) else None
     return reason if isinstance(reason, str) and reason else _NO_REASON_FROM_GRAPH
+
+
+def _address_of(permission: Permission) -> str | None:
+    if permission.invitation is not None and permission.invitation.email:
+        return permission.invitation.email
+    for identity in (permission.granted_to_v2, permission.granted_to):
+        user = None if identity is None else identity.user
+        address = None if user is None else user.additional_data.get("email")
+        if isinstance(address, str):
+            return address
+    return None
 
 
 def a_person_agrees(ctx: Context) -> Confirm:

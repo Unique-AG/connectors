@@ -88,12 +88,16 @@ def _row(
     roles: Sequence[str] = ("read",),
     error: Mapping[str, object] | None = None,
     identity_key: str = "grantedToV2",
+    identity_email: str | None = None,
 ) -> dict[str, object]:
+    identity = {"id": "00000000-0000-4000-8000-000000000002", "displayName": name}
     row: dict[str, object] = {
         "id": f"SYNTHETIC-PERMISSION-{email}",
         "roles": list(roles),
         "invitation": {"email": email, "signInRequired": True},
-        identity_key: {"user": {"id": "00000000-0000-4000-8000-000000000002", "displayName": name}},
+        identity_key: {
+            "user": identity | ({} if identity_email is None else {"email": identity_email})
+        },
     }
     if error is not None:
         row["error"] = dict(error)
@@ -916,6 +920,29 @@ class TestWhatItAnswers:
 
         assert answer.recipients[0].email is None
 
+    @pytest.mark.parametrize("identity_key", ["grantedToV2", "grantedTo"])
+    async def test_a_colleague_with_no_invitation_gets_the_address_of_the_identity(
+        self, client: GraphServiceClient, graph: respx.MockRouter, identity_key: str
+    ) -> None:
+        _ = _reads(graph)
+        row = _row(identity_key=identity_key, identity_email=_ADA)
+        del row["invitation"]
+        _ = _invites(graph, [row])
+
+        answer = await _invite(client)
+
+        assert answer.recipients[0].email == _ADA
+
+    async def test_the_invitation_address_wins_over_the_identity_address(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _invites(graph, [_row(identity_email="other@example.invalid")])
+
+        answer = await _invite(client)
+
+        assert answer.recipients[0].email == _ADA
+
     async def test_an_empty_collection_is_an_empty_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1189,6 +1216,6 @@ class TestAgainstAnswersRecordedFromGraph:
         }
         assert invitation["item_uri"] == folder["uri"]
         recipients = cast("list[dict[str, object]]", invitation["recipients"])
-        assert [(row["display_name"], row["roles"], row["error"]) for row in recipients] == [
-            ("Anna Meier", ["read"], None)
-        ]
+        assert [
+            (row["email"], row["display_name"], row["roles"], row["error"]) for row in recipients
+        ] == [("anna@example.test", "Anna Meier", ["read"], None)]
