@@ -12,6 +12,8 @@ from mcp_configs import RateLimitSettings, TracingSettings
 from mcp_observability import (
     OPS_PATHS,
     RateLimitMiddleware,
+    RedactRequestSecretsMiddleware,
+    RedactToolCallSecretsMiddleware,
     ToolCallObservabilityMiddleware,
     access_token_subject,
     configure_tracing,
@@ -34,6 +36,7 @@ from backstop_mcp.dependencies import (
     get_auth_config,
     get_auth_provider,
     get_backstop_client_factory,
+    get_database_config,
     get_encryption_key,
     get_engine,
     get_logging_settings,
@@ -69,7 +72,11 @@ def create_app() -> Starlette:
     auth_config = get_auth_config()
 
     logging_settings = get_logging_settings()
-    configure_logging(logging_settings, encryption_key=get_encryption_key())
+    configure_logging(
+        logging_settings,
+        encryption_key=get_encryption_key(),
+        database_url=get_database_config().connection_url,
+    )
     configure_metrics(config)
     # Before FastMCP is built. Tracing is off unless an OTEL_* variable turns it on.
     configure_tracing(
@@ -104,8 +111,10 @@ def create_app() -> Starlette:
         lifespan=lifespan,
         instructions=compose_instructions(INSTRUCTIONS, guidance),
         mask_error_details=True,
-        # Outermost MCP middleware. `setup_ops` appends metrics inside it.
+        # Redaction first, so the tool-call lines are redacted too. `setup_ops` appends metrics
+        # inside them.
         middleware=[
+            RedactToolCallSecretsMiddleware(),
             ToolCallObservabilityMiddleware(),
             RateLimitMiddleware(RateLimitSettings(), get_request_key=access_token_subject),
         ],
@@ -145,6 +154,8 @@ def create_app() -> Starlette:
 
     return mcp.http_app(
         middleware=[
+            # First of ours. FastMCP's auth runs ahead of this list and only hashes the token.
+            Middleware(RedactRequestSecretsMiddleware),
             # Same cap as StreamableHTTPSessionManager; FastMCP has no knob, so matching
             # avoids two limits that can drift. Also bounds the unauthenticated login POST.
             Middleware(RequestBodyLimitMiddleware, max_body_size=DEFAULT_MAX_REQUEST_BODY_SIZE),

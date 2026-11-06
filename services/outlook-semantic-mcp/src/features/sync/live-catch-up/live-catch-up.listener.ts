@@ -11,6 +11,7 @@ import { IngestionConfig, ingestionConfig, McpBackendType } from '~/config';
 import { DRIZZLE, DrizzleDatabase, inboxConfigurations, subscriptions } from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { greatestFrom } from '~/utils/greatest-from';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { Nullish } from '~/utils/nullish';
 import { LiveCatchUpCommand } from './live-catch-up.command';
 import { LiveCatchUpEventDto } from './live-catch-up-event.dto';
@@ -33,6 +34,7 @@ export class LiveCatchUpListener {
     queueOptions: { deadLetterExchange: DEAD_EXCHANGE.name },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   @NewTrace('amqp.live-catch-up')
   public async onLiveCatchUpEvent(@RabbitPayload() payload: unknown): Promise<void> {
     if (this.config.mcpBackend !== McpBackendType.MicrosoftGraphAndUniqueApi) {

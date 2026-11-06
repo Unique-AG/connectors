@@ -11,6 +11,7 @@ import { UserAuthorizedEventDto } from '~/auth/dtos/user-authorized-event.dto';
 import type { EnabledUniqueConfig } from '~/config';
 import { KB_INTEGRATION_ENABLED_CONFIG } from '~/kb-integration/kb-integration-config.module';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { normalizeError } from '~/utils/normalize-error';
 import { SubscriptionCreateService } from './subscription-create.service';
 
@@ -33,6 +34,7 @@ export class PostAuthorizationListener {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   public async onUserAuthorized(@RabbitPayload() payload: unknown): Promise<void> {
     const event = UserAuthorizedEventDto.parse(payload);
     const { userProfileId } = event.payload;

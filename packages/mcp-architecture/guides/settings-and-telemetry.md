@@ -27,9 +27,12 @@ own.
 
 `telemetry/setup.py` sets it up under the MCP's name, with `packages/mcp-observability`:
 
-- `init_telemetry(settings)` runs first in `main`, before anything logs: JSON logs in the format
-  Loki expects, with trace ids, and OpenTelemetry tracing, off unless `mcp_configs.TracingSettings`
-  finds it turned on in the environment.
+- `init_telemetry(settings, secrets=...)` runs first in `main`, before anything logs: JSON logs in
+  the format Loki expects, with trace ids, and OpenTelemetry tracing, off unless
+  `mcp_configs.TracingSettings` finds it turned on in the environment. Every log line has `secrets`,
+  the ones the deployment configures, replaced with `[Redacted]`. `main` builds the list in
+  `_secrets`, from the upstream key, the Zitadel keys and the passwords in the database and store
+  URLs, so a new secret the MCP is configured with is added there.
 - `instrument(mcp)` mounts the `/probe`, `/health` and `/metrics` routes and returns the
   metrics middleware that `http_middleware` lists. Every tool, resource and prompt call gets a
   counter, a duration and a log line.
@@ -46,8 +49,9 @@ person or quotes a payload goes there in clear. `mcp_observability` has every pi
 - A tool declares the arguments worth seeing with `@trace_arguments` under its `@tool`, as
   `get_price_performance` does with `@trace_arguments("ticker", "start_date", "end_date")`. They go
   on FastMCP's `tools/call <tool>` span as `tool.argument.<name>`, and on the `Tool call started`
-  and `completed`, `failed` or `cancelled` lines of `ToolCallObservabilityMiddleware`, the
-  outermost middleware `create_server` installs. A tool logs no start or end of its own.
+  and `completed`, `failed` or `cancelled` lines of `ToolCallObservabilityMiddleware`, which
+  `create_server` installs just inside `RedactToolCallSecretsMiddleware`, the outermost, so the
+  caller's access token is redacted from those lines too. A tool logs no start or end of its own.
 - A context with a step worth its own span gets `@traced`: a child span named after the function,
   with `arguments` as `input.<name>` and what `result` computes as `result.<name>`. The demo's
   `get_price_performance` context traces its period and the number of trading days it found.

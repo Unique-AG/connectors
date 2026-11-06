@@ -17,6 +17,7 @@ on:
           - sharepoint-connector
           - teams-mcp
           - with-intelligence-mcp
+          - world-check-mcp
 
 permissions:
   contents: read # to read the repository
