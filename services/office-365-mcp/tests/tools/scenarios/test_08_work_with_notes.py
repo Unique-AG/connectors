@@ -883,7 +883,7 @@ class TestNamesAndNotebooks:
         [create] = [route for (verb, _), route in routes.items() if verb == "POST"]
         assert json.loads(create.calls.last.request.content)["displayName"] == "n" * limit
 
-    async def test_a_section_refused_in_a_section_group_gets_the_generic_administrator_advice(
+    async def test_a_section_refused_in_a_section_group_gets_the_advice_of_the_tool(
         self, graph: respx.MockRouter
     ) -> None:
         _ = graph.route(method="GET").mock(side_effect=_onenote_reads)
@@ -904,11 +904,11 @@ class TestNamesAndNotebooks:
                 name="2025",
             )
 
-        assert "Ask a Microsoft 365 administrator to grant the delegated permission" in str(
-            refused.value
-        )
-        assert "Retrying will not help" in str(refused.value)
-        assert "copy a section into the group" in (description or "")
+        assert "create it there only when the user agrees" in str(refused.value)
+        assert "copy of a section into the group with onenote_copy_section" in str(refused.value)
+        assert "not on a SharePoint site" in str(refused.value)
+        assert "administrator" not in str(refused.value)
+        assert "copy of a section into the group" in (description or "")
 
 
 def _operation(*, status: str = "Running", error: Row | None = None) -> Row:
@@ -946,6 +946,40 @@ class TestCopying:
         assert {method for method, _ in _sent(graph)} == {"POST", "GET"}
         [post] = [path for method, path in _sent(graph) if method == "POST"]
         assert post.endswith("/copyNotebook")
+
+    @pytest.mark.parametrize(
+        ("word", "status"),
+        [
+            ("not started", "NotStarted"),
+            ("running", "Running"),
+            ("completed", "Completed"),
+            ("failed", "Failed"),
+        ],
+    )
+    async def test_a_poll_reads_the_status_word_that_graph_sends(
+        self, graph: respx.MockRouter, word: str, status: str
+    ) -> None:
+        _ = graph.get(f"/me/onenote/operations/{_OPERATION_ID}").mock(
+            return_value=httpx.Response(200, json=_operation(status=word) | {"id": _OPERATION_ID})
+        )
+
+        state = await call(
+            "onenote_get_operation", operation=OnenoteOperationHandle(_OPERATION_ID).uri
+        )
+
+        assert state["status"] == status
+
+    async def test_a_poll_of_the_recorded_copy_reads_not_started(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-onenote_get_operation-notebook")
+        operation_id = _id_in(routes, "GET", "/me/onenote/operations/")
+
+        state = await call(
+            "onenote_get_operation", operation=OnenoteOperationHandle(operation_id).uri
+        )
+
+        assert state["status"] == "NotStarted"
 
     async def test_a_notebook_is_copied_into_a_team_after_the_person_approves(
         self, graph: respx.MockRouter

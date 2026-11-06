@@ -187,7 +187,10 @@ class MailFlag(BaseModel):
 
 class MailSummary(BaseModel):
     uri: str = Field(
-        description="A handle for this message; pass it to outlook_read_mail to read the body."
+        description=(
+            "The handle of this message. Copy it word for word wherever a tool asks for a "
+            "message handle. `folder_id` and `web_link` are not message handles."
+        )
     )
     subject: str | None = Field(description="The subject line, or null if none was set.")
     preview: str | None = Field(
@@ -278,10 +281,15 @@ def carries_category(message: Message, category: str) -> bool:
 
 
 def copied_and_marked(
-    cc: Sequence[str], *, importance: MailImportance | None, categories: Sequence[str]
+    cc: Sequence[str],
+    *,
+    bcc: Sequence[str],
+    importance: MailImportance | None,
+    categories: Sequence[str],
 ) -> str:
     return (
         (f" It is copied to {', '.join(cc)}." if cc else "")
+        + (f" It is blind copied to {', '.join(bcc)}." if bcc else "")
         + ("" if importance is None else f" It has {importance} importance.")
         + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
     )

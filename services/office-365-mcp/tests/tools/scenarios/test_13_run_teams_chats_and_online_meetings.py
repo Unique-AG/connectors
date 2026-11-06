@@ -17,6 +17,7 @@ from office_365_mcp.shared.handles import meeting_uri_for
 from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.graph_fixtures import recorded_json
 from tests.tools.conftest import (
+    GRAPH_V1,
     JOIN_WEB_URL,
     ME,
     MEETING_ID,
@@ -899,6 +900,62 @@ class TestAChatAndAMeetingThatTeamsAccepts:
 
         assert result["status"] == "no_report"
         assert result["newest_report_attendance"] == []
+
+    @pytest.mark.parametrize(
+        ("now", "status"),
+        [
+            (datetime(2026, 2, 10, 15, 10, tzinfo=UTC), "not_ready"),
+            (datetime(2026, 2, 11, 15, 10, tzinfo=UTC), "no_report"),
+        ],
+    )
+    async def test_it_reads_the_not_found_of_the_reports_of_a_meeting_nobody_joined_as_no_report(
+        self,
+        graph: respx.MockRouter,
+        monkeypatch: pytest.MonkeyPatch,
+        now: datetime,
+        status: str,
+    ) -> None:
+        _the_clock_reads(monkeypatch, now)
+        _the_meeting_is(graph, _meeting())
+        _ = graph.get(f"{MEETING_PATH}/attendanceReports").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "NotFound"}}
+            )
+        )
+
+        result = await call("teams_read_meeting", meeting_uri=MEETING_URI)
+
+        assert result["status"] == status
+        assert result["reports"] == []
+        assert result["newest_report_attendance"] == []
+
+    async def test_it_raises_the_not_found_of_a_later_page_of_reports(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _the_meeting_is(graph, _meeting())
+        next_page = f"{GRAPH_V1}{MEETING_PATH}/attendanceReports?$skiptoken=page2"
+        _ = graph.get(f"{MEETING_PATH}/attendanceReports").mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "value": [
+                            {
+                                "id": "report1",
+                                "meetingStartDateTime": "2026-02-10T14:00:00Z",
+                                "meetingEndDateTime": "2026-02-10T15:00:00Z",
+                            }
+                        ],
+                        "@odata.nextLink": next_page,
+                    },
+                ),
+                httpx.Response(404, json=_error("NotFound", "NotFound")),
+            ]
+        )
+
+        message = await _refused_by(None, "teams_read_meeting", meeting_uri=MEETING_URI)
+
+        assert "(HTTP 404, Graph error code NotFound)" in message
 
 
 class TestNothingChangesUnlessMiaClearlyAgrees:

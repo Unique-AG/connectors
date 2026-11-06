@@ -76,12 +76,12 @@ Notes:
 
 # Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids it.
 _NOT_A_MEETING_HANDLE = (
-    "teams_list_meeting_recordings takes the `meeting_uri` from teams_list_chats: "
-    + "teams:///meetings/{join_web_url}. This is not one. Call teams_list_chats, find the meeting "
-    + "chat, "
-    + "and pass its `meeting_uri` verbatim. A `teams:///transcripts/...` handle belongs to "
-    + "teams_read_transcript. No recording is addressable here. Retrying this value will fail "
-    + "identically."
+    "teams_list_meeting_recordings takes teams:///meetings/{join_web_url}, and this is not one. "
+    + "The handle comes from the `meeting_uri` of teams_list_chats. For a meeting with no chat, "
+    + "it is `teams:///meetings/` plus the `join_url` of the calendar event. Percent-encode "
+    + "every character of the `join_url` that is not a letter or a digit, also `/`, `:`, `?` "
+    + "and `%`. A `teams:///transcripts/...` handle belongs to teams_read_transcript. No "
+    + "recording is addressable here. Retrying this value will fail identically."
 )
 
 
@@ -310,8 +310,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
+                    "The meeting handle, `teams:///meetings/{join_web_url}`. teams_list_chats "
+                    + "gives it for a meeting chat. For a meeting with no chat, write "
+                    + "`teams:///meetings/` and then the `join_url` of the calendar event. "
+                    + "Percent-encode every character of the `join_url` that is not a letter or "
+                    + "a digit, also `/`, `:`, `?` and `%`. A `teams:///transcripts/...` handle "
+                    + "is not valid here."
                 ),
             ),
         ],

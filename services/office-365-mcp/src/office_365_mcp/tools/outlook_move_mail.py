@@ -300,7 +300,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The messages to move: `uri` values from a search, list, or thread result."
+                    "The messages to move. Each one is the `uri` of a mail result, copied word "
+                    "for word. A `folder_id` and a `web_link` are not handles."
                 ),
             ),
         ],

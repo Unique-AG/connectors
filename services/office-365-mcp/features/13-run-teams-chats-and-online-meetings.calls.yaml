@@ -482,7 +482,7 @@ uc-13-28:
       args: {chat_type: meeting, topic_contains: Design review}
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
-  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:61 and :259: status not_ready means that no report exists yet; wait, then call again; it does not mean that nobody attended. A meeting counts as not ready for 4 hours after its end (src/office_365_mcp/shared/meetings.py:57)."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:62 and :260: status not_ready means that no report exists yet; wait, then call again; it does not mean that nobody attended. A meeting counts as not ready for 4 hours after its end (src/office_365_mcp/shared/meetings.py:57)."
 
 uc-13-29:
   status: untested
@@ -496,7 +496,7 @@ uc-13-29:
       args: {chat_type: meeting, topic_contains: Design review}
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
-  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:260 and :330: status no_report means that the meeting ended with no report; a retry does not change this."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:261 and :335: status no_report means that the meeting ended with no report; a retry does not change this."
 
 uc-13-30:
   status: untested
@@ -590,7 +590,7 @@ uc-13-39:
       args: {chat_type: meeting, topic_contains: Design review}
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
-  note: "The organizer gets the report. Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:258 and :343-346: status available means that a report exists; newest_report_attendance holds each person of the newest report with the total time in seconds and the periods of attendance (:226-233); more_records is true when the list is not complete."
+  note: "The organizer gets the report. Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:259 and :348-351: status available means that a report exists; newest_report_attendance holds each person of the newest report with the total time in seconds and the periods of attendance (:227-234); more_records is true when the list is not complete."
 
 uc-13-40:
   status: untested
@@ -663,7 +663,7 @@ uc-13-45:
     - tool: teams_list_chats
       args: {chat_type: meeting, topic_contains: Design review}
     - any_of: [teams_delete_meeting, teams_read_meeting]
-  note: "Row 1 is teams_delete_meeting and row 2 is teams_read_meeting. Expected behaviour from src/office_365_mcp/tools/teams_delete_meeting.py:118 and src/office_365_mcp/tools/teams_read_meeting.py:303: Microsoft shows no meeting with this handle to the signed-in user; the tool asks nobody and deletes nothing."
+  note: "Row 1 is teams_delete_meeting and row 2 is teams_read_meeting. Expected behaviour from src/office_365_mcp/tools/teams_delete_meeting.py:118 and src/office_365_mcp/tools/teams_read_meeting.py:304: Microsoft shows no meeting with this handle to the signed-in user; the tool asks nobody and deletes nothing."
 
 uc-13-48:
   status: untested
