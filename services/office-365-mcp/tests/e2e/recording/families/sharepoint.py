@@ -18,7 +18,7 @@ READ_POSTS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_search_files": ("POST /v1.0/search/query",),
 }
 _ITEM = "/v1.0/drives/b!*/items/*"
-_LIST = "/v1.0/sites/*,*,*/lists/*"
+_LIST = "/v1.0/sites/?*,*,*/lists/*"  # "?*" keeps the site id out of the seed targets
 READ_GETS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_resolve_url": ("GET /v1.0/shares/u!*/driveItem",),
     "sharepoint_search_sites": ("GET /v1.0/sites",),
@@ -30,9 +30,9 @@ READ_GETS: Mapping[str, tuple[str, ...]] = {
     ),
     "sharepoint_get_list": (f"GET {_LIST}/columns",),
     "sharepoint_list_items": (f"GET {_LIST}/columns", f"GET {_LIST}/items"),
-    "sharepoint_create_list_item": (f"GET {_LIST}/columns",),
-    "sharepoint_update_list_item": (f"GET {_LIST}/columns", f"GET {_LIST}/items/*"),
-    "sharepoint_delete_list_item": (f"GET {_LIST}/items/*",),
+    "sharepoint_create_list_item": (f"GET {_LIST}", f"GET {_LIST}/columns"),
+    "sharepoint_update_list_item": (f"GET {_LIST}", f"GET {_LIST}/columns", f"GET {_LIST}/items/*"),
+    "sharepoint_delete_list_item": (f"GET {_LIST}", f"GET {_LIST}/items/*"),
     "sharepoint_browse_folder": (f"GET {_ITEM}/children",),
     "sharepoint_create_folder": (f"GET {_ITEM}",),
     "sharepoint_copy_item": (f"GET {_ITEM}",),

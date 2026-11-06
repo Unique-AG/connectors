@@ -692,6 +692,7 @@ GRAPH_STEPS = frozenset(
         "site_by_url",
         "site_lists",
         "list_columns",
+        "read_list",
         "list_items",
         "list_item",
         "create_list_item",

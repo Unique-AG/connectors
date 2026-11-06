@@ -8573,7 +8573,7 @@ Situation: Somebody changes the item "Close books" after the assistant reads it.
 
 What happens:
 
-- The assistant tells Mia that the item changed and reads it again.
+- The assistant tells Mia that the item changed.
 - It does not overwrite the other change.
 - The assistant asks Mia to approve first.
 

@@ -84,7 +84,7 @@ Feature: Finding and reading SharePoint lists
     Scenario: An item that somebody changed in the meantime is not overwritten
       Given somebody changes the item "Close books" after the assistant reads it
       When Mia agrees to set the status of "Close books" to "Closed"
-      Then the assistant tells Mia that the item changed and reads it again
+      Then the assistant tells Mia that the item changed
       But it does not overwrite the other change
 
   Rule: The assistant moves an item to the recycle bin only after Mia agrees

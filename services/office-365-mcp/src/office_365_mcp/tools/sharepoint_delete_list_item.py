@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import ListHandle, ListItemHandle, list_item_handle
+from office_365_mcp.shared.lists import list_label
 from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -27,6 +28,7 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_delete_list_item"
 
+STEP_LIST = "read_list"
 STEP_READ_ITEM = "list_item"
 STEP_DELETE = "delete_list_item"
 
@@ -117,9 +119,12 @@ async def delete_list_item(
         title = fields.get("Title")
         title = title if isinstance(title, str) and title else None
 
+        with graph_step(STEP_LIST):
+            label = await list_label(client, ListHandle(handle.site_id, handle.list_id))
         with not_graph():
             answer = await confirm(
-                _question(title, handle), write_state_for(TOOL_NAME, handle.uri, title or "")
+                _question(label, title, handle),
+                write_state_for(TOOL_NAME, handle.uri, label, title or ""),
             )
         if answer is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE):
@@ -136,9 +141,9 @@ async def delete_list_item(
     )
 
 
-def _question(title: str | None, handle: ListItemHandle) -> str:
+def _question(label: str, title: str | None, handle: ListItemHandle) -> str:
     row = f"with id {handle.item_id}" if title is None else repr(cut_for_a_question(title))
-    return f"Move the row {row} of this SharePoint list to the recycle bin of its site?"
+    return f"Move the row {row} of the SharePoint list {label} to the recycle bin of its site?"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

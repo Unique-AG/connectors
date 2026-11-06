@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages
 from office_365_mcp.shared.handles import ListHandle, ListItemHandle
+from office_365_mcp.shared.prose import cut_for_a_question
 
 ColumnType = Literal[
     "boolean",
@@ -141,6 +142,14 @@ async def list_columns(client: GraphServiceClient, handle: ListHandle) -> list[L
     return [ListColumn.from_column(column) for column in collected.items]
 
 
+async def list_label(client: GraphServiceClient, handle: ListHandle) -> str:
+    """The name and web address of a list, for a question that asks a person about a write."""
+    found = await client.sites.by_site_id(handle.site_id).lists.by_list_id(handle.list_id).get()
+    assert found is not None, "Graph answered a list read with no list"
+    name = repr(cut_for_a_question(found.display_name or handle.list_id))
+    return f"{name} ({found.web_url})" if found.web_url else name
+
+
 class ListItemSummary(BaseModel):
     uri: str = Field(description="The handle of this item. Copy it exactly. Never build one.")
     fields: dict[str, object] = Field(
@@ -189,7 +198,17 @@ def value_refusal(column: ListColumn, value: str) -> str | None:
         return f"The column {column.name!r} holds numbers. Pass a plain decimal."
     if column.type == "boolean" and value not in {"true", "false"}:
         return f"The column {column.name!r} is yes or no. Pass true or false."
+    if column.type == "dateTime" and not _is_iso_date(value):
+        return f"The column {column.name!r} holds dates. Pass an ISO 8601 date, such as 2026-01-31."
     return None
+
+
+def _is_iso_date(value: str) -> bool:
+    try:
+        _ = datetime.fromisoformat(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _typed(column: ListColumn, value: str) -> FieldValue:

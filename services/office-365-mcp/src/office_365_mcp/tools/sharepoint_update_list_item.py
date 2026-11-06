@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Annotated
 
 import httpx
@@ -24,6 +25,7 @@ from office_365_mcp.shared.lists import (
     FieldValue,
     ListItemSummary,
     list_columns,
+    list_label,
     written_fields,
 )
 from office_365_mcp.shared.notes import write_state_for
@@ -39,6 +41,7 @@ from office_365_mcp.shared.seam import (
 TOOL_NAME = "sharepoint_update_list_item"
 
 STEP_COLUMNS = "list_columns"
+STEP_LIST = "read_list"
 STEP_READ_ITEM = "list_item"
 STEP_UPDATE = "update_list_item"
 
@@ -158,11 +161,19 @@ async def _update(
     if current.e_tag is None:
         return _NO_ETAG
 
+    with graph_step(STEP_LIST):
+        label = await list_label(client, owner)
+    title = old.get("Title")
     about = write_state_for(
-        TOOL_NAME, handle.uri, current.e_tag, json.dumps(dict(fields), sort_keys=True)
+        TOOL_NAME,
+        handle.uri,
+        label,
+        str(title),
+        current.e_tag,
+        json.dumps(dict(fields), sort_keys=True),
     )
     with not_graph():
-        answer = await confirm(_question(body, old), about)
+        answer = await confirm(_question(label, handle.item_id, title, body, old), about)
     if answer is not None:
         return answer
 
@@ -176,16 +187,30 @@ async def _update(
             ),
         )
     assert patched is not None, "Graph answered a list item update with no fields"
+    modified = patched.additional_data.get("Modified")
     return ListItemSummary.from_item(
-        owner, ListItem(id=handle.item_id, web_url=current.web_url, fields=patched)
+        owner,
+        ListItem(
+            id=handle.item_id,
+            web_url=current.web_url,
+            fields=patched,
+            last_modified_date_time=modified if isinstance(modified, datetime) else None,
+        ),
     )
 
 
-def _question(body: Mapping[str, FieldValue], old: Mapping[str, object]) -> str:
+def _question(
+    label: str,
+    item_id: str,
+    title: object,
+    body: Mapping[str, FieldValue],
+    old: Mapping[str, object],
+) -> str:
     changes = "; ".join(
         f"{name}: {_shown(old.get(name))} to {_shown(value)}" for name, value in body.items()
     )
-    return f"Change this SharePoint list row? {changes}."
+    row = f"with id {item_id}" if not title else repr(cut_for_a_question(str(title)))
+    return f"Change the row {row} of the SharePoint list {label}? {changes}."
 
 
 def _shown(value: object) -> str:

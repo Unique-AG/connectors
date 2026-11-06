@@ -23,10 +23,8 @@ class Step:
     body: Any = None  # dict (JSON) or bytes (file upload)
     content_type: str | None = None
     key: str | None = None
-    lookup: str | None = None  # "tagged", "named", "subject", "drive-folder", "drive-children",
-    # "single" (one object, found under `key`), "site" (the site of a drive, found under `key`),
-    # "columns" (found under `column:<key>:<name>`),
-    # "attachments" (found under `attachment:<key>:<name>`) or "replies" (found under `reply:<key>:<text>`)
+    lookup: str | None = None  # how a step finds an id, stored under `key`: "tagged", "named",
+    # "subject", "drive-folder", "drive-children", "single", "site", "columns", "attachments", "replies"
     poll: bool = False  # the answer is 202: wait for the operation in its Location header
     learns: str | None = (
         None  # "team", "drive", "site" or "chat": the id of the found or created item joins the guard

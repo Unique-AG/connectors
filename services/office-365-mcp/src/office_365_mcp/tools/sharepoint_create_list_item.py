@@ -21,6 +21,7 @@ from office_365_mcp.shared.lists import (
     FieldValue,
     ListItemSummary,
     list_columns,
+    list_label,
     written_fields,
 )
 from office_365_mcp.shared.notes import write_state_for
@@ -35,6 +36,7 @@ from office_365_mcp.shared.seam import (
 TOOL_NAME = "sharepoint_create_list_item"
 
 STEP_COLUMNS = "list_columns"
+STEP_LIST = "read_list"
 STEP_CREATE = "create_list_item"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Sites.ReadWrite.All",)
@@ -100,9 +102,11 @@ async def _create(
     if isinstance(body, str):
         return body
 
-    about = write_state_for(TOOL_NAME, handle.uri, json.dumps(dict(fields), sort_keys=True))
+    with graph_step(STEP_LIST):
+        label = await list_label(client, handle)
+    about = write_state_for(TOOL_NAME, handle.uri, label, json.dumps(dict(fields), sort_keys=True))
     with not_graph():
-        answer = await confirm(_question(body), about)
+        answer = await confirm(_question(label, body), about)
     if answer is not None:
         return answer
 
@@ -119,9 +123,9 @@ async def _create(
     return ListItemSummary.from_item(handle, created)
 
 
-def _question(body: Mapping[str, FieldValue]) -> str:
+def _question(label: str, body: Mapping[str, FieldValue]) -> str:
     shown = "; ".join(f"{name}: {cut_for_a_question(str(value))!r}" for name, value in body.items())
-    return f"Add a row to this SharePoint list with {shown}?"
+    return f"Add a row to the SharePoint list {label} with {shown}?"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

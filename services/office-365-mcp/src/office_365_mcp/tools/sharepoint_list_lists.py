@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from typing import Annotated, Self
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote, urlsplit
 
 import httpx
 from fastmcp import FastMCP
@@ -153,7 +153,10 @@ def _is_shown(found: List_) -> bool:
 def _site_path(site: str) -> str:
     """`{host}` or `{host}:{path}`, the two ways Graph addresses a site by its web address."""
     parts = urlsplit(site)
-    segments = parts.path.strip("/").split("/")
+    decoded = parts.path
+    while (again := unquote(decoded)) != decoded:
+        decoded = again
+    segments = decoded.replace("\\", "/").strip("/").split("/")
     if parts.scheme not in {"http", "https"} or not parts.hostname or {".", ".."} & {*segments}:
         raise ToolError(_NOT_A_SITE)
     path = quote(parts.path.rstrip("/"), safe="/%")

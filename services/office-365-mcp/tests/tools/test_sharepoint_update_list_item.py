@@ -1,16 +1,20 @@
 import json
 from collections.abc import Mapping
+from datetime import UTC, datetime
+from typing import cast
 
 import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
+from respx.models import Call
 
 from office_365_mcp.shared.handles import ListItemHandle
 from office_365_mcp.shared.lists import ListItemSummary
 from office_365_mcp.shared.seam import Confirm
-from office_365_mcp.tools.sharepoint_update_list_item import update_list_item
+from office_365_mcp.tools.sharepoint_update_list_item import a_person_agrees, update_list_item
+from tests.tools.two_call_confirmation import accepted, modern_context
 
 _SITE_ID = (
     "contoso.sharepoint.invalid,00000000-0000-4000-8000-00000000000a,"
@@ -18,6 +22,8 @@ _SITE_ID = (
 )
 _LIST_ID = "00000000-0000-4000-8000-00000000000b"
 _ITEM_URI = ListItemHandle(_SITE_ID, _LIST_ID, "7").uri
+_LIST_ROUTE = f"/sites/{_SITE_ID}/lists/{_LIST_ID}"
+_LIST_URL = "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks"
 _COLUMNS_ROUTE = f"/sites/{_SITE_ID}/lists/{_LIST_ID}/columns"
 _ITEM_ROUTE = f"/sites/{_SITE_ID}/lists/{_LIST_ID}/items/7"
 _FIELDS_ROUTE = f"{_ITEM_ROUTE}/fields"
@@ -44,7 +50,16 @@ def _item(*, etag: str | None = _ETAG) -> dict[str, object]:
     return item
 
 
+def _list_read(graph: respx.MockRouter, name: str = "Tasks") -> None:
+    _ = graph.get(_LIST_ROUTE).mock(
+        return_value=httpx.Response(
+            200, json={"id": _LIST_ID, "displayName": name, "webUrl": _LIST_URL}
+        )
+    )
+
+
 def _reads(graph: respx.MockRouter, item: Mapping[str, object] | None = None) -> None:
+    _list_read(graph)
     _ = graph.get(_COLUMNS_ROUTE).mock(return_value=httpx.Response(200, json={"value": _COLUMNS}))
     _ = graph.get(_ITEM_ROUTE).mock(
         return_value=httpx.Response(200, json=dict(_item() if item is None else item))
@@ -53,7 +68,13 @@ def _reads(graph: respx.MockRouter, item: Mapping[str, object] | None = None) ->
 
 def _patches(graph: respx.MockRouter, response: httpx.Response | None = None) -> respx.Route:
     answer = response or httpx.Response(
-        200, json={"id": "7", "Title": "Close books", "Status": "Closed"}
+        200,
+        json={
+            "id": "7",
+            "Title": "Close books",
+            "Status": "Closed",
+            "Modified": "2026-02-11T09:15:22Z",
+        },
     )
     return graph.patch(_FIELDS_ROUTE).mock(return_value=answer)
 
@@ -62,12 +83,6 @@ async def _agrees(question: str, about: str) -> str | None:
     assert question
     assert about
     return None
-
-
-async def _declines(question: str, about: str) -> str | None:
-    assert question
-    assert about
-    return "Nothing was changed."
 
 
 def _asking(asked: list[str]) -> Confirm:
@@ -102,8 +117,84 @@ async def test_it_patches_with_the_item_etag_and_shows_old_and_new_values(
     assert json.loads(request.content) == {"Status": "Closed"}
     (question,) = asked
     assert "Status: 'Open' to 'Closed'" in question
+    assert f"'Tasks' ({_LIST_URL})" in question
     assert updated.uri == _ITEM_URI
     assert updated.fields["Status"] == "Closed"
+    assert updated.last_modified_at == datetime(2026, 2, 11, 9, 15, 22, tzinfo=UTC)
+    row_read = next(
+        call.request
+        for call in cast("list[Call]", graph.calls)
+        if call.request.method == "GET" and call.request.url.path.endswith("/items/7")
+    )
+    assert dict(row_read.url.params) == {"$expand": "fields"}
+
+
+async def test_an_answer_given_before_somebody_changed_the_row_patches_nothing(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    _reads(graph)
+    patch = _patches(graph)
+    fields = {"Status": "Closed"}
+    first = await update_list_item(
+        client, item_uri=_ITEM_URI, fields=fields, confirm=a_person_agrees(modern_context())
+    )
+    _ = graph.get(_ITEM_ROUTE).mock(
+        return_value=httpx.Response(
+            200, json=_item(etag='"00000000-0000-4000-8000-00000000000c,4"')
+        )
+    )
+
+    with pytest.raises(ToolError, match="given for a different request"):
+        _ = await update_list_item(
+            client,
+            item_uri=_ITEM_URI,
+            fields=fields,
+            confirm=a_person_agrees(accepted(first, "change the row")),
+        )
+
+    assert not patch.called
+
+
+async def test_the_second_call_patches_the_row_the_person_agreed_to(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    _reads(graph)
+    patch = _patches(graph)
+    fields = {"Status": "Closed"}
+    first = await update_list_item(
+        client, item_uri=_ITEM_URI, fields=fields, confirm=a_person_agrees(modern_context())
+    )
+
+    _ = await update_list_item(
+        client,
+        item_uri=_ITEM_URI,
+        fields=fields,
+        confirm=a_person_agrees(accepted(first, "change the row")),
+    )
+
+    assert patch.call_count == 1
+
+
+async def test_an_answer_given_before_the_list_was_renamed_patches_nothing(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    _reads(graph)
+    patch = _patches(graph)
+    fields = {"Status": "Closed"}
+    first = await update_list_item(
+        client, item_uri=_ITEM_URI, fields=fields, confirm=a_person_agrees(modern_context())
+    )
+    _list_read(graph, "Issues")
+
+    with pytest.raises(ToolError, match="given for a different request"):
+        _ = await update_list_item(
+            client,
+            item_uri=_ITEM_URI,
+            fields=fields,
+            confirm=a_person_agrees(accepted(first, "change the row")),
+        )
+
+    assert not patch.called
 
 
 async def test_a_declined_question_sends_nothing(
@@ -111,10 +202,17 @@ async def test_a_declined_question_sends_nothing(
 ) -> None:
     _reads(graph)
     patch = _patches(graph)
+    fields = {"Status": "Closed"}
+    first = await update_list_item(
+        client, item_uri=_ITEM_URI, fields=fields, confirm=a_person_agrees(modern_context())
+    )
 
     with pytest.raises(ToolError, match="Nothing was changed."):
         _ = await update_list_item(
-            client, item_uri=_ITEM_URI, fields={"Status": "Closed"}, confirm=_declines
+            client,
+            item_uri=_ITEM_URI,
+            fields=fields,
+            confirm=a_person_agrees(accepted(first, "do not change it")),
         )
 
     assert not patch.called

@@ -72,7 +72,14 @@ async def test_a_site_url_with_no_path_resolves_the_root_site(
 
 @pytest.mark.parametrize(
     "site",
-    ["Finance", "contoso.sharepoint.invalid/sites/Finance", ListHandle(_SITE_ID, "L-TASKS").uri],
+    [
+        "Finance",
+        "contoso.sharepoint.invalid/sites/Finance",
+        ListHandle(_SITE_ID, "L-TASKS").uri,
+        "https://contoso.sharepoint.com/sites/%2e%2e/Finance",
+        "https://contoso.sharepoint.com/sites/%252e%252e/Finance",
+        "https://contoso.sharepoint.com/sites/a%2f..%2fFinance",
+    ],
 )
 async def test_a_value_that_is_not_a_site_url_makes_no_graph_call(
     client: GraphServiceClient, graph: respx.MockRouter, site: str

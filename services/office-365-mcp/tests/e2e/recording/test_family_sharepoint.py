@@ -346,6 +346,11 @@ class TestGuardRules:
             ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items/7", False),
             ("sharepoint_list_items", f"/sites/{SITE}/lists/L1/items/7/fields", False),
             ("sharepoint_list_items", "/sites", False),
+            ("sharepoint_create_list_item", f"/sites/{SITE}/lists/L1", True),
+            ("sharepoint_update_list_item", f"/sites/{SITE}/lists/L1", True),
+            ("sharepoint_delete_list_item", f"/sites/{SITE}/lists/L1", True),
+            ("sharepoint_get_list", f"/sites/{SITE}/lists/L1", False),
+            ("sharepoint_create_list_item", "/sites/contoso.sharepoint.com/lists/L1", False),
         ],
     )
     def test_a_read_glob_allows_one_tool_one_path(
@@ -356,6 +361,24 @@ class TestGuardRules:
     def test_a_read_glob_allows_a_get_and_nothing_else(self) -> None:
         assert "outside" in str(refusal("sharepoint_search_sites", "POST", "/sites"))
         assert "outside" in str(refusal("sharepoint_resolve_url", "DELETE", SHARE))
+
+    @pytest.mark.parametrize(
+        ("tool", "method", "suffix"),
+        [
+            ("sharepoint_create_list_item", "POST", "items"),
+            ("sharepoint_update_list_item", "PATCH", "items/7/fields"),
+            ("sharepoint_delete_list_item", "DELETE", "items/7"),
+        ],
+    )
+    def test_a_list_item_write_checks_the_list_and_the_row_but_not_the_site(
+        self, tool: str, method: str, suffix: str
+    ) -> None:
+        shown = f"/sites/{SITE}/lists/L1/{suffix}"
+        made = guard()
+        request = httpx.Request(method, f"{GRAPH}{shown}", content=json.dumps({}))
+        assert "did not read as seed data" in str(made.refuses_request(request, tool))
+        made.seen_seed.update({"L1", "7"})
+        assert made.refuses_request(request, tool) is None
 
     def test_a_read_of_the_search_index_is_allowed(self) -> None:
         assert refusal("sharepoint_search_files", "POST", "/search/query") is None

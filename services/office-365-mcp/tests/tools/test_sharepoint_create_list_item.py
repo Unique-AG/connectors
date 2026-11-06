@@ -12,7 +12,8 @@ from office_365_mcp.graph_client import GraphUnavailable
 from office_365_mcp.shared.handles import ListHandle, ListItemHandle, list_item_handle
 from office_365_mcp.shared.lists import ListItemSummary
 from office_365_mcp.shared.seam import Confirm
-from office_365_mcp.tools.sharepoint_create_list_item import create_list_item
+from office_365_mcp.tools.sharepoint_create_list_item import a_person_agrees, create_list_item
+from tests.tools.two_call_confirmation import accepted, modern_context
 
 _SITE_ID = (
     "contoso.sharepoint.invalid,00000000-0000-4000-8000-00000000000a,"
@@ -21,6 +22,8 @@ _SITE_ID = (
 _LIST_ID = "00000000-0000-4000-8000-00000000000b"
 _LIST_URI = ListHandle(_SITE_ID, _LIST_ID).uri
 _COLUMNS_ROUTE = f"/sites/{_SITE_ID}/lists/{_LIST_ID}/columns"
+_LIST_ROUTE = f"/sites/{_SITE_ID}/lists/{_LIST_ID}"
+_LIST_URL = "https://contoso.sharepoint.invalid/sites/Finance/Lists/Tasks"
 _ITEMS_ROUTE = f"/sites/{_SITE_ID}/lists/{_LIST_ID}/items"
 
 
@@ -55,7 +58,16 @@ _CREATED = {
 }
 
 
+def _list_read(graph: respx.MockRouter, name: str = "Tasks") -> None:
+    _ = graph.get(_LIST_ROUTE).mock(
+        return_value=httpx.Response(
+            200, json={"id": _LIST_ID, "displayName": name, "webUrl": _LIST_URL}
+        )
+    )
+
+
 def _columns(graph: respx.MockRouter) -> respx.Route:
+    _list_read(graph)
     return graph.get(_COLUMNS_ROUTE).mock(
         return_value=httpx.Response(200, json={"value": _COLUMNS})
     )
@@ -69,12 +81,6 @@ async def _agrees(question: str, about: str) -> str | None:
     assert question
     assert about
     return None
-
-
-async def _declines(question: str, about: str) -> str | None:
-    assert question
-    assert about
-    return "No row was added."
 
 
 def _asking(asked: list[str]) -> Confirm:
@@ -127,6 +133,7 @@ async def test_it_posts_the_typed_fields_once_the_person_agrees(
         "Due": "2026-01-31T00:00:00Z",
     }
     (question,) = asked
+    assert f"'Tasks' ({_LIST_URL})" in question
     assert "'Close books'" in question
     assert "Status: 'Open'" in question
     assert list_item_handle(created.uri) == ListItemHandle(_SITE_ID, _LIST_ID, "8")
@@ -136,15 +143,89 @@ async def test_it_posts_the_typed_fields_once_the_person_agrees(
     )
 
 
+async def test_an_answer_given_before_the_list_was_renamed_adds_nothing(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    _ = _columns(graph)
+    post = _posts(graph)
+    first = await create_list_item(
+        client,
+        list_uri=_LIST_URI,
+        fields={"Title": "Close books"},
+        confirm=a_person_agrees(modern_context()),
+    )
+    _list_read(graph, "Issues")
+
+    with pytest.raises(ToolError, match="given for a different request"):
+        _ = await create_list_item(
+            client,
+            list_uri=_LIST_URI,
+            fields={"Title": "Close books"},
+            confirm=a_person_agrees(accepted(first, "add the row")),
+        )
+
+    assert not post.called
+
+
+async def test_an_answer_given_for_other_fields_adds_nothing(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    _ = _columns(graph)
+    post = _posts(graph)
+    first = await create_list_item(
+        client,
+        list_uri=_LIST_URI,
+        fields={"Title": "Close books"},
+        confirm=a_person_agrees(modern_context()),
+    )
+
+    with pytest.raises(ToolError, match="given for a different request"):
+        _ = await create_list_item(
+            client,
+            list_uri=_LIST_URI,
+            fields={"Title": "Open books"},
+            confirm=a_person_agrees(accepted(first, "add the row")),
+        )
+
+    assert not post.called
+
+
+async def test_the_second_call_adds_the_row_that_the_person_agreed_to(
+    client: GraphServiceClient, graph: respx.MockRouter
+) -> None:
+    _ = _columns(graph)
+    post = _posts(graph)
+    fields = {"Title": "Close books"}
+    first = await create_list_item(
+        client, list_uri=_LIST_URI, fields=fields, confirm=a_person_agrees(modern_context())
+    )
+
+    _ = await create_list_item(
+        client,
+        list_uri=_LIST_URI,
+        fields=fields,
+        confirm=a_person_agrees(accepted(first, "add the row")),
+    )
+
+    assert post.call_count == 1
+
+
 async def test_a_declined_question_sends_nothing(
     client: GraphServiceClient, graph: respx.MockRouter
 ) -> None:
     _ = _columns(graph)
     post = _posts(graph)
+    fields = {"Title": "Close books"}
+    first = await create_list_item(
+        client, list_uri=_LIST_URI, fields=fields, confirm=a_person_agrees(modern_context())
+    )
 
     with pytest.raises(ToolError, match="No row was added."):
         _ = await create_list_item(
-            client, list_uri=_LIST_URI, fields={"Title": "Close books"}, confirm=_declines
+            client,
+            list_uri=_LIST_URI,
+            fields=fields,
+            confirm=a_person_agrees(accepted(first, "do not add it")),
         )
 
     assert not post.called
@@ -166,6 +247,7 @@ async def test_a_declined_question_sends_nothing(
         {"Status": "Pending"},
         {"Amount": "12 or 1"},
         {"Done": "yes"},
+        {"Due": "next Friday"},
         {"Title": "Close books", "Owner": "someone@contoso.sharepoint.invalid"},
     ],
 )
