@@ -6,6 +6,7 @@ packages:
   - "!services/office-365-mcp"
   - "!services/with-intelligence-mcp"
   - "!services/architecture-demo-mcp"
+  - "!services/world-check-mcp"
   - packages/*
 
 # Versions shared by two or more workspace units live here, and the manifests reference them

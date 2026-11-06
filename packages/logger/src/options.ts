@@ -3,6 +3,7 @@ import path from 'node:path';
 import { RequestMethod } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
 import { isPlainObject } from 'remeda';
+import { createSecretRedactor, type SecretRedactionOptions } from './redact-secrets';
 import { sanitizeError } from './sanitize-error';
 
 // pino-http hands a custom req serializer the output of pino-std-serializers, not the IncomingMessage.
@@ -27,7 +28,11 @@ export const developmentTarget = {
   target: path.resolve(__dirname, './development'),
 };
 
-export const defaultLoggerOptions: Params = {
+/**
+ * The shared logger options, with `redaction` replacing known secrets and pattern matches in
+ * every log line on top of the path-based `redact`.
+ */
+export const createLoggerOptions = (redaction: SecretRedactionOptions = {}): Params => ({
   renameContext: process.env.NODE_ENV !== 'production' ? 'caller' : undefined,
   pinoHttp: {
     enabled: true,
@@ -42,6 +47,9 @@ export const defaultLoggerOptions: Params = {
         'req.query["api-key"]',
       ],
       censor: () => '[Redacted]',
+    },
+    hooks: {
+      streamWrite: createSecretRedactor(redaction),
     },
     serializers: {
       err: sanitizePinoError,
@@ -72,7 +80,9 @@ export const defaultLoggerOptions: Params = {
       path: 'metrics',
     },
   ],
-};
+});
+
+export const defaultLoggerOptions = createLoggerOptions();
 
 function getOperationName(req: IncomingMessage): string | undefined {
   if (!('body' in req)) {

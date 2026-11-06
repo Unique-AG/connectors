@@ -8,6 +8,7 @@ from mcp_configs import from_environment
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
+from sqlalchemy import make_url
 
 from architecture_demo_mcp.persistence.database import Database
 from architecture_demo_mcp.persistence.database import DatabaseSettings
@@ -22,6 +23,11 @@ class PersistenceSettings(BaseModel):
 
     database: DatabaseSettings = Field(default_factory=DatabaseSettings)
     store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
+
+    def passwords(self) -> tuple[str, ...]:
+        """The passwords in the database and store URLs, decoded. Either URL may have none."""
+        urls = (self.database.connection_url, self.store.url.get_secret_value())
+        return tuple(password for url in urls if (password := make_url(url).password))
 
 
 class Persistence(BaseModel):

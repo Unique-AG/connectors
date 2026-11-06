@@ -7,7 +7,7 @@ from typing import NoReturn, cast, overload
 
 import httpx
 from fastmcp.exceptions import ToolError
-from mcp_observability import failure_level, identifiable_value
+from mcp_observability import add_log_secrets, failure_level, identifiable_value
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind, Status, StatusCode
 
@@ -18,7 +18,11 @@ from backstop_mcp.backstop_client.auth_recheck import (
     confirmed_rejection,
     probe_outcome,
 )
-from backstop_mcp.backstop_client.credential import CallerSession, CallerSessionProvider
+from backstop_mcp.backstop_client.credential import (
+    BackstopCredentialSecret,
+    CallerSession,
+    CallerSessionProvider,
+)
 from backstop_mcp.backstop_client.errors import (
     BackstopApiError,
     BackstopAuthError,
@@ -59,6 +63,13 @@ SYSTEM_INFO_PATH = "/system-info"
 # report-sized page default; everything else gets the ordinary CRUD profile. Each slow call
 # holds a per-user slot for as long as it runs; only `run_report` collects one in the background.
 _SLOW_ENDPOINT_MARKERS = ("/reports", "/analytics")
+
+
+def _basic_auth(credential: BackstopCredentialSecret) -> httpx.BasicAuth:
+    """The API token stays redacted until the enclosing tool call or HTTP request ends."""
+    api_token = credential.api_token.get_secret_value()
+    add_log_secrets(api_token)
+    return httpx.BasicAuth(credential.username, api_token)
 
 
 def _mark_failed(span: trace.Span, exc: Exception) -> None:
@@ -283,7 +294,7 @@ class BackstopClient:
     ) -> httpx.Response:
         """The whole transport stack for one request, authenticated as `session`."""
         credential = session.credential
-        auth = httpx.BasicAuth(credential.username, credential.api_token.get_secret_value())
+        auth = _basic_auth(credential)
         timeout = (
             self._settings.reports_timeout_seconds
             if any(marker in path for marker in _SLOW_ENDPOINT_MARKERS)
@@ -517,7 +528,7 @@ class BackstopClient:
     ) -> httpx.Response:
         """GET `/system-info`; gate wait and HTTP share the leftover re-check window."""
         credential = session.credential
-        auth = httpx.BasicAuth(credential.username, credential.api_token.get_secret_value())
+        auth = _basic_auth(credential)
         url = resolve_request_url(self._settings.base_url, SYSTEM_INFO_PATH)
         shared_client = await self._http_client()
         route = metric_route(SYSTEM_INFO_PATH)
