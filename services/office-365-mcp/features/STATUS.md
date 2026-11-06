@@ -8,10 +8,10 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 10 | 4 | 353 | 372 |
+| Outlook | 5 | 10 | 3 | 354 | 372 |
 | Teams | 0 | 2 | 1 | 143 | 146 |
 | SharePoint | 0 | 3 | 3 | 92 | 98 |
-| OneNote | 0 | 1 | 1 | 72 | 74 |
+| OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
 Scenarios with an executable run: 19 of 716.
@@ -46,12 +46,11 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 These causes are in the connector: a tool, a parameter, a description, or a preset.
 
-### A tool is missing (10)
+### A tool is missing (9)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-01-33` | Finding and reading files in OneDrive and SharePoint | The libraries of a site are not listed as drives | partly | `sharepoint_list_drives` | No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries. |
-| `uc-02-11` | Finding and reading mail | A mailbox that Mia cannot open is explained as missing access | gap | `outlook_list_mail` | The tool has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia. |
 | `uc-04-11` | Drafting and sending mail | A new file is attached to a draft | gap | `outlook_draft_mail` | the draft tools write text only, and no other tool adds a file to a message |
 | `uc-10-02` | Organizing and sharing files in OneDrive and SharePoint | A folder is copied to another drive | partly | `sharepoint_list_drives` | No tool gives the top folder of a site library, so the destination must be a folder that a search on the site returns. |
 | `uc-10-05` | Organizing and sharing files in OneDrive and SharePoint | The content of an existing file is replaced | gap | `sharepoint_create_text_file` | The tool creates new text files only and cannot replace a file or write a Word file. |
@@ -68,14 +67,13 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-04-17` | Drafting and sending mail | A blind copy is put on a draft | gap | `outlook_draft_mail` | outlook_draft_mail, outlook_update_draft, outlook_draft_reply and outlook_draft_reply_all have no argument for blind copy recipients |
 | `uc-06-04` | Catching up on Teams | A channel is read with its replies | partly | `teams_browse_channel` | The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week. |
 
-### A description steers the assistant away (5)
+### A description steers the assistant away (4)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-05-23` | Organizing the mailbox | A rule without a clear condition is checked with Mia first | partly | `outlook_create_mail_rule` | the tool asks only before a rule that forwards or redirects mail, and the `conditions` field says to omit it to make a rule for every incoming message. Nothing in the description tells the model to ask the user first when the user gave no condition. |
 | `uc-06-15` | Catching up on Teams | A meeting from the calendar is summarized from its transcript | partly | `teams_list_meeting_transcripts` | The description of meeting_uri says to copy the handle verbatim from teams_list_chats, and only a meeting chat gives it. The join_url of a calendar event should be the address that the handle wraps, as teams:///meetings/ plus the percent-encoded join address, but no description says so and nobody ran it. |
 | `uc-07-09` | Scheduling and answering meetings | A meeting is booked on a calendar other than the main one | partly | `outlook_create_event_on_behalf` | outlook_create_event takes no calendar argument. The description of outlook_create_event_on_behalf says that it is only for a calendar that somebody else owns, so the assistant does not pick it for a second calendar of Mia. |
-| `uc-08-33` | Working with notes in OneNote | A section that Microsoft refuses in a section group is created in the notebook | partly | `onenote_create_section` | The tool has no GRAPH_FORBIDDEN text and the notebook is Mia's own, so a 403 gives the generic text of shared/seam.py:530-537, which says to ask an administrator and that no other arguments will succeed. The description at tools/onenote_create_section.py:73-75 says the opposite: create under the notebook, or copy a section into the group. |
 | `uc-11-01` | Mailbox preferences | An automatic reply runs for a fixed period | partly | `outlook_set_automatic_reply` | The description does not say that an unset `external_audience` keeps the stored value, or none when nothing is stored. It does not say what an `end` date without a time of day means. |
 
 ### The tools sit in different presets (3)

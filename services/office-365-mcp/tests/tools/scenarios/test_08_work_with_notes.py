@@ -883,7 +883,7 @@ class TestNamesAndNotebooks:
         [create] = [route for (verb, _), route in routes.items() if verb == "POST"]
         assert json.loads(create.calls.last.request.content)["displayName"] == "n" * limit
 
-    async def test_a_section_refused_in_a_section_group_gets_the_generic_administrator_advice(
+    async def test_a_section_refused_in_a_section_group_gets_the_advice_of_the_tool(
         self, graph: respx.MockRouter
     ) -> None:
         _ = graph.route(method="GET").mock(side_effect=_onenote_reads)
@@ -904,10 +904,9 @@ class TestNamesAndNotebooks:
                 name="2025",
             )
 
-        assert "Ask a Microsoft 365 administrator to grant the delegated permission" in str(
-            refused.value
-        )
-        assert "Retrying will not help" in str(refused.value)
+        assert "create the section under the notebook" in str(refused.value)
+        assert "copy a section into the group with onenote_copy_section" in str(refused.value)
+        assert "administrator" not in str(refused.value)
         assert "copy a section into the group" in (description or "")
 
 

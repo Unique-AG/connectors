@@ -546,6 +546,18 @@ What happens:
 - The assistant lists the 3 unread messages of "support@example.com".
 - It does not list messages of Mia's own mailbox.
 
+**A mailbox that Mia cannot open is explained as missing access**
+
+Ask your assistant: "Show me the unread messages in the finance mailbox."
+
+Tests: 1
+
+Situation: Mia has no access to the shared mailbox "finance".
+
+What happens:
+
+- The assistant tells Mia that she has no access to "finance".
+
 #### Mia is told what happened when Microsoft cannot do what she asked
 
 The assistant never reports a search that failed as a search that found nothing.
@@ -696,10 +708,6 @@ What happens:
 
 - The message is listed.
 - The message shows no flag.
-
-#### Not supported yet in finding and reading mail
-
-- The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
 
 ### Drafting and sending mail
 
@@ -8862,9 +8870,6 @@ Cases:
 Ask your assistant: "Create a section 2025 in my Archive section group of Project Falcon."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may tell Mia that an administrator must act, although it could create the section in the notebook instead.
 
 Situation: Mia has the section group "Archive" in her notebook "Project Falcon". Microsoft refuses a new section in "Archive".
 

@@ -153,18 +153,15 @@ uc-02-10:
       args: {mailbox: support@example.com, unread_only: true}
 
 uc-02-11:
-  status: gap
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASharedMailbox::test_a_refused_mailbox_is_explained_as_a_missing_permission_of_the_app"
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASharedMailbox::test_a_refused_mailbox_is_explained_as_a_missing_access_of_the_user"
   ask: "Show me the unread messages in the finance mailbox."
-  blocker:
-    kind: tool
-    tool: outlook_list_mail
-    text: The tool has no advice for a refused mailbox, so the answer blames the app registration (Mail.Read.Shared) and not the missing access of Mia.
-    user: The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
   provenance: drafted
   asks_user: false
-  chain: []
+  chain:
+    - tool: outlook_list_mail
+      args: {mailbox: finance, unread_only: true}
 
 uc-02-12:
   status: untested

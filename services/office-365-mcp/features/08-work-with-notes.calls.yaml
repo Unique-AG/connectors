@@ -455,15 +455,10 @@ uc-08-32:
   note: "expected behaviour per row from the schema of name (tools/onenote_create_notebook.py:45 and 234, tools/onenote_create_section.py:53 and 264, tools/onenote_create_section_group.py:53 and 255): the limit is inclusive, so a name of exactly 128 characters for a notebook and 50 for a section or a section group is accepted. The row for a section uses the ask Create a section with a name of 50 characters in Project Falcon, and the row for a section group uses Create a section group with a name of 50 characters in Project Falcon."
 
 uc-08-33:
-  status: partly
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNamesAndNotebooks::test_a_section_refused_in_a_section_group_gets_the_generic_administrator_advice"
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestNamesAndNotebooks::test_a_section_refused_in_a_section_group_gets_the_advice_of_the_tool"
   ask: "Create a section 2025 in my Archive section group of Project Falcon."
-  blocker:
-    kind: description
-    tool: onenote_create_section
-    text: "The tool has no GRAPH_FORBIDDEN text and the notebook is Mia's own, so a 403 gives the generic text of shared/seam.py:530-537, which says to ask an administrator and that no other arguments will succeed. The description at tools/onenote_create_section.py:73-75 says the opposite: create under the notebook, or copy a section into the group."
-    user: "The assistant may tell Mia that an administrator must act, although it could create the section in the notebook instead."
   provenance: drafted
   asks_user: false
   chain:
@@ -476,7 +471,7 @@ uc-08-33:
       optional: true
       args: {name: "2025"}
       uses: {parent: handle of the notebook Project Falcon}
-  note: "expected behaviour from tools/onenote_create_section.py:73-75 (description): Microsoft can refuse a create under a section group with error 403, then create under the notebook, or copy a section into the group with onenote_copy_section. The source gives two options, so the assistant asks Mia which one she wants and does not choose. The first create is the failing call, so it is optional. The second create is optional because it follows Mia's answer."
+  note: "expected behaviour from tools/onenote_create_section.py (description and GRAPH_FORBIDDEN): Microsoft can refuse a create under a section group with error 403, then create under the notebook, or copy a section into the group with onenote_copy_section. The source gives two options, so the assistant asks Mia which one she wants and does not choose. The first create is the failing call, so it is optional. The second create is optional because it follows Mia's answer."
 
 uc-08-34:
   status: untested

@@ -96,6 +96,16 @@ GRAPH_NOT_FOUND = (
 )
 
 
+GRAPH_FORBIDDEN = (
+    "Microsoft 365 refused to create this section for the signed-in user. No section was "
+    + "created. Microsoft can refuse a create under a section group while it accepts a create "
+    + "under the notebook. If `parent` is a section group, create the section under the "
+    + "notebook, or copy a section into the group with onenote_copy_section. If `parent` is a "
+    + "notebook, the user cannot write to it. Tell the user, because the owner of the notebook "
+    + "can give more access. A call with the same arguments fails the same way."
+)
+
+
 class CreatedSection(BaseModel):
     uri: str = Field(
         description=(
