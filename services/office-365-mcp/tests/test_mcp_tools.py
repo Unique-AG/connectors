@@ -831,6 +831,7 @@ class TestTheToolsThisServerAdvertises:
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
+            "next_page_token",
         }
         assert set(_properties(tools["teams_list_message_replies"].output_schema)) == {
             "messages",
@@ -1051,6 +1052,7 @@ class TestTheToolsThisServerAdvertises:
             "channel_id",
             "limit",
             "include_window_completeness",
+            "page_token",
         }
         assert schema.get("required") == ["team_id", "channel_id"]
         assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
@@ -1068,6 +1070,8 @@ class TestTheToolsThisServerAdvertises:
         assert description is not None
 
         assert "ordered by reply activity" in description
+        assert "at most 50 posts" in description
+        assert "pass the token as `page_token`" in description
 
     async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
@@ -1687,6 +1691,35 @@ class TestCallingThem:
             "asking about completeness changes what is reported and never what was read"
         )
         assert route.call_count == 3, "one request per call, and the cursor still never followed"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_channel_is_read_page_by_page_with_the_token_of_the_page_before(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        link = f"{GRAPH_V1}{_CHANNEL_MESSAGES_PATH}?$expand=replies&$top=1&$skiptoken=a%2Bb%3D"
+        route = graph.get(_CHANNEL_MESSAGES_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json={**_CHANNEL_POSTS, "@odata.nextLink": link}),
+                httpx.Response(200, json=_CHANNEL_POSTS),
+            ]
+        )
+        ids = {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID, "limit": 1}
+
+        first = _structured(await mcp_client.call_tool("teams_browse_channel", ids))
+        assert "$skiptoken" not in route.calls.last.request.url.params
+        last = _structured(
+            await mcp_client.call_tool(
+                "teams_browse_channel", {**ids, "page_token": first["next_page_token"]}
+            )
+        )
+
+        assert first["next_page_token"] == "a+b="
+        assert last["next_page_token"] is None
+        params = route.calls.last.request.url.params
+        assert params["$skiptoken"] == "a+b=", "the token goes back as Microsoft sent it"
+        assert (params["$top"], params["$expand"]) == ("1", "replies")
 
     @pytest.mark.usefixtures("obo")
     async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(
@@ -2733,9 +2766,9 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         message = _error_text(result)
-        assert "replies of the posts on the first page of the channel" in message, message
+        assert "replies of the posts on the page it returns" in message, message
         assert "no route to its full text" in message
-        assert "a second browse returns the same window" in message
+        assert "a page read again returns the same window" in message
         assert "stop looking" in message
 
     @pytest.mark.usefixtures("obo")

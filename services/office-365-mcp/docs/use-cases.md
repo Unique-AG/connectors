@@ -5166,10 +5166,7 @@ What happens:
 
 Ask your assistant: "What happened in the Releases channel this week?"
 
-Tests: 3
-
-!!! warning "Limit"
-    The assistant may miss posts of a busy channel when it reads a whole week.
+Tests: 4
 
 Situation: The channel "Releases" has 3 posts this week and 2 older posts, and one post of this week has 4 replies.
 

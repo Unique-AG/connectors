@@ -43,17 +43,13 @@ uc-06-03:
       uses: {uri: uri of a hit}
 
 uc-06-04:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_posts_with_their_replies_and_reports_the_posts_it_did_not_read"
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_has_no_date_bound_so_it_returns_the_older_posts_as_well"
     - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reports_a_page_that_held_more_posts_than_the_limit"
+    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_the_next_page_of_posts_with_the_token_of_the_first_page"
   ask: "What happened in the Releases channel this week?"
-  blocker:
-    kind: parameter
-    tool: teams_browse_channel
-    text: The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week.
-    user: The assistant may miss posts of a busy channel when it reads a whole week.
   provenance: drafted
   asks_user: false
   chain:
@@ -63,6 +59,9 @@ uc-06-04:
     - tool: teams_browse_channel
       args: {include_window_completeness: true}
       uses: {team_id: id of the team, channel_id: id of the channel}
+    - tool: teams_browse_channel
+      optional: true
+      uses: {team_id: id of the team, channel_id: id of the channel, page_token: next_page_token of the page}
     - tool: teams_list_message_replies
       optional: true
       uses: {uri: uri of a post}

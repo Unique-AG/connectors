@@ -9,7 +9,7 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
 | Outlook | 5 | 7 | 2 | 358 | 372 |
-| Teams | 0 | 1 | 1 | 144 | 146 |
+| Teams | 0 | 0 | 1 | 145 | 146 |
 | SharePoint | 0 | 3 | 3 | 92 | 98 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
@@ -59,12 +59,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-12-02` | Managing contacts | A person who is only in the company directory is found | gap | `outlook_find_recipient` | The tool gives an address, a job title, and a department, and no telephone number. No other tool reads a person of the company directory. |
 | `uc-13-01` | Running Teams chats and online meetings | A group chat is created and named | gap | `teams_create_chat` | No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from get_me, a chat member row, or a message sender. |
 | `uc-15-10` | Working across mail, calendar, files, and Teams | A file is sent to a colleague as a link in a mail draft | partly | `outlook_draft_mail` | The draft tools write text only and cannot add a file, so the assistant puts a sharing link in the draft and not the file. |
-
-### A parameter is missing (1)
-
-| Id | Feature | Scenario | Status | Tool | Cause |
-| --- | --- | --- | --- | --- | --- |
-| `uc-06-04` | Catching up on Teams | A channel is read with its replies | partly | `teams_browse_channel` | The tool has no date bound, orders posts by reply activity, and reads at most 50 posts with no paging, so a busy channel can hide posts of the week. |
 
 ### The tools sit in different presets (3)
 

@@ -482,7 +482,7 @@ class TestAChannelWithItsReplies:
                 200,
                 json={
                     "value": self._posts(),
-                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/next",
+                    "@odata.nextLink": "https://graph.microsoft.com/v1.0/next?$skiptoken=page2",
                 },
             )
         )
@@ -535,6 +535,36 @@ class TestAChannelWithItsReplies:
         )
 
         assert result["posts_cut_to_limit"] is True
+
+    async def test_it_reads_the_next_page_of_posts_with_the_token_of_the_first_page(
+        self, graph: respx.MockRouter
+    ) -> None:
+        route = graph.get(CHANNEL_MESSAGES_PATH).mock(
+            side_effect=[
+                httpx.Response(
+                    200,
+                    json={
+                        "value": self._posts()[:3],
+                        "@odata.nextLink": "https://graph.microsoft.com/v1.0/next?$skiptoken=page2",
+                    },
+                ),
+                httpx.Response(200, json={"value": self._posts()[3:]}),
+            ]
+        )
+
+        first = await call("teams_browse_channel", team_id=TEAM_ID, channel_id=CHANNEL_ID, limit=3)
+        second = await call(
+            "teams_browse_channel",
+            team_id=TEAM_ID,
+            channel_id=CHANNEL_ID,
+            limit=3,
+            page_token=first["next_page_token"],
+        )
+
+        assert first["next_page_token"] == "page2"
+        assert second["next_page_token"] is None
+        assert [m["message_id"] for m in _rows(second, "messages")] == ["post4", "post5"]
+        assert route.calls.last.request.url.params["$skiptoken"] == "page2"
 
     async def test_it_reads_a_thread_of_fifty_replies_and_says_that_more_exist(
         self, graph: respx.MockRouter

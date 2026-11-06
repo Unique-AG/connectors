@@ -1,11 +1,13 @@
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Annotated
+from urllib.parse import parse_qs, quote, urlsplit
 
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.chat_message import ChatMessage
+from msgraph.generated.models.chat_message_collection_response import ChatMessageCollectionResponse
 from msgraph.generated.teams.item.channels.item.messages.messages_request_builder import (
     MessagesRequestBuilder,
 )
@@ -32,10 +34,17 @@ MAX_POSTS = 50
 
 type _MessagesQuery = MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters
 
-_DESCRIPTION = (
-    "Reads a Teams channel's posts and their replies in one call, ordered by reply "
-    "activity rather than post date."
-)
+_DESCRIPTION = f"""\
+Reads one page of a Teams channel's posts and their replies in one call. The posts are ordered by \
+reply activity rather than post date: the thread with the newest message comes first.
+
+Notes:
+- One page holds at most {MAX_POSTS} posts. This tool has no date filter.
+- If `next_page_token` is set, more posts exist. To read them, call this tool again with the same \
+`team_id`, `channel_id` and `limit`, and pass the token as `page_token`.
+- To answer a question about a period, read pages until the last thread of a page has no message \
+from the period. Keep the posts and replies whose `created_at` is in the period.\
+"""
 
 
 class ChannelPosts(BaseModel):
@@ -54,6 +63,9 @@ class ChannelPosts(BaseModel):
             "`include_window_completeness` is set."
         )
     )
+    next_page_token: str | None = Field(
+        description="Pass this as `page_token` to read the next page. Null on the last page."
+    )
 
 
 async def teams_browse_channel(
@@ -63,20 +75,26 @@ async def teams_browse_channel(
     channel_id: str,
     limit: int,
     include_window_completeness: bool,
+    page_token: str | None = None,
 ) -> ChannelPosts:
     assert 1 <= limit <= MAX_POSTS, f"limit must be within 1..{MAX_POSTS}, got {limit}"
 
-    configuration = RequestConfiguration[_MessagesQuery](
-        query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-            expand=["replies"], top=limit
+    channel_messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
+    configuration: RequestConfiguration[_MessagesQuery] | None = None
+    if page_token is None:
+        configuration = RequestConfiguration[_MessagesQuery](
+            query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
+                expand=["replies"], top=limit
+            )
         )
-    )
+    else:
+        base_url = channel_messages.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+        channel_messages = channel_messages.with_url(
+            f"{base_url}/teams/{quote(team_id, safe='')}/channels/{quote(channel_id, safe='')}"
+            + f"/messages?$expand=replies&$top={limit}&$skiptoken={quote(page_token, safe='')}"
+        )
     with graph_errors(TOOL_NAME, step=STEP):
-        page = await (
-            client.teams.by_team_id(team_id)
-            .channels.by_channel_id(channel_id)
-            .messages.get(request_configuration=configuration)
-        )
+        page = await channel_messages.get(request_configuration=configuration)
         assert page is not None, "Graph answered a channel message listing with no collection"
 
     posts = [message for message in (page.value or []) if _is_a_post(message)]
@@ -104,7 +122,16 @@ async def teams_browse_channel(
         messages=messages,
         more_posts_in_channel=bool(page.odata_next_link) if include_window_completeness else None,
         posts_cut_to_limit=len(kept) < len(posts) if include_window_completeness else None,
+        next_page_token=_page_token(page),
     )
+
+
+def _page_token(page: ChatMessageCollectionResponse) -> str | None:
+    if not page.odata_next_link:
+        return None
+    tokens = parse_qs(urlsplit(page.odata_next_link).query).get("$skiptoken")
+    assert tokens, "Graph advertised a next page of channel messages with no $skiptoken"
+    return tokens[0]
 
 
 def _is_a_post(message: ChatMessage) -> bool:
@@ -157,7 +184,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ge=1,
                 le=MAX_POSTS,
                 description=(
-                    f"How many posts to return, each with its replies, at most {MAX_POSTS}."
+                    f"How many posts one page holds, each with its replies, at most {MAX_POSTS}."
                 ),
             ),
         ] = 20,
@@ -169,6 +196,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 )
             ),
         ] = False,
+        page_token: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The `next_page_token` of the previous call. Omit it to read the first page."
+                ),
+            ),
+        ] = None,
         client: GraphServiceClient = graph,
     ) -> ChannelPosts:
         return await teams_browse_channel(
@@ -177,4 +213,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             channel_id=channel_id,
             limit=limit,
             include_window_completeness=include_window_completeness,
+            page_token=page_token,
         )

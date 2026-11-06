@@ -180,7 +180,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 | `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
 | `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
 | `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
-| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_browse_channel` | 🟢 Read | — | Reads one page of the posts of a channel, with their replies, ordered by reply activity. A page holds at most 50 posts. A token reads the next page. |
 | `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
 | `teams_search_messages` | 🟢 Read | — | Searches the text of every chat and channel message that you can see. |
 | `teams_read_message` | 🟢 Read | — | Reads one message in full, from a handle that another tool gave. |
@@ -260,7 +260,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 | --- | --- | --- | --- |
 | `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
 | `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
-| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_browse_channel` | 🟢 Read | — | Reads one page of the posts of a channel, with their replies, ordered by reply activity. A page holds at most 50 posts. A token reads the next page. |
 | `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
 
 **What it needs**
@@ -412,7 +412,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_browse_channel` | 🟢 Read | — | Reads one page of the posts of a channel, with their replies, ordered by reply activity. A page holds at most 50 posts. A token reads the next page. |
 | `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
 | `teams_edit_message` | 🔴 Change | ✋ Always | Replaces the text of one message that you sent. |
 | `teams_delete_message` | 🔴 Change | ✋ Always | Deletes one message that you sent. Teams shows it as deleted. This connector cannot restore it. |
@@ -1515,7 +1515,7 @@ model then tells the user.
 
 | Limit | What the user sees |
 | --- | --- |
-| A channel has more than 50 posts | The tool reads the newest 50 posts. Microsoft limits channel reads to about one request each second, so older posts are out of reach. |
+| A channel has more than 50 posts | The tool reads one page of 50 posts at most, ordered by reply activity. A token reads the next page. Microsoft limits channel reads to about one request each second. |
 | A post has more than 50 replies | The tool reads 50 replies and marks the list as incomplete. The rest is out of reach. |
 | A user sends a file in a message | The file must already be in SharePoint. No tool uploads a file. |
 | A meeting is old | Microsoft erases the transcripts of a one-off meeting about 60 days after the meeting. |
