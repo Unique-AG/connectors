@@ -87,11 +87,12 @@ Notes:
 """
 
 _NOT_A_MEETING_HANDLE = (
-    "teams_list_meeting_transcripts takes teams:///meetings/{join_web_url} from teams_list_chats, "
-    + "not this. "
-    + "Call teams_list_chats and use its `meeting_uri`. A `teams:///transcripts/...` handle is "
-    + "teams_read_transcript's. This tool is what produces it. Retrying this value will fail "
-    + "identically."
+    "teams_list_meeting_transcripts takes teams:///meetings/{join_web_url}, and this is not one. "
+    + "The handle comes from the `meeting_uri` of teams_list_chats. For a meeting with no chat, "
+    + "it is `teams:///meetings/` plus the `join_url` of the calendar event. Percent-encode "
+    + "every character of the `join_url` that is not a letter or a digit, also `/`, `:`, `?` "
+    + "and `%`. A `teams:///transcripts/...` handle is teams_read_transcript's. This tool is "
+    + "what produces it. Retrying this value will fail identically."
 )
 
 
@@ -294,8 +295,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
+                    "The meeting handle, `teams:///meetings/{join_web_url}`. teams_list_chats "
+                    + "gives it for a meeting chat. For a meeting with no chat, write "
+                    + "`teams:///meetings/` and then the `join_url` of the calendar event. "
+                    + "Percent-encode every character of the `join_url` that is not a letter or "
+                    + "a digit, also `/`, `:`, `?` and `%`. A `teams:///transcripts/...` handle "
+                    + "is not valid here."
                 ),
             ),
         ],

@@ -21,6 +21,7 @@ mock_provider "azuread" {
         "ChannelMessage.Send"              = "e2222222-2222-2222-2222-222222222222"
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
+        "CallTranscripts.Read.All"         = "9a9a9a9a-9a9a-9a9a-9a9a-9a9a9a9a9a9a"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
         "ChannelMessage.ReadWrite"         = "e3333333-3333-3333-3333-333333333333"
         "Chat.ReadWrite"                   = "e4444444-4444-4444-4444-444444444444"
@@ -52,6 +53,8 @@ mock_provider "azuread" {
         "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
         "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
         "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
+        "Group.Read.All"                   = "f4444444-4444-4444-4444-444444444444"
+        "Notes.Read.All"                   = "d4444444-4444-4444-4444-444444444444"
       }
     }
   }
@@ -188,6 +191,17 @@ run "preset_teams_transcripts" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingTranscript.Read.All"
     error_message = "teams-transcripts composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_teams_call_transcripts" {
+  variables {
+    tools_preset = "teams-call-transcripts"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,CallTranscripts.Read.All"
+    error_message = "teams-call-transcripts composed ${join(",", local.permissions)}"
   }
 }
 
@@ -546,7 +560,7 @@ run "preset_outlook_group_calendar" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Calendars.Read"
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Group.Read.All"
     error_message = "outlook-group-calendar composed ${join(",", local.permissions)}"
   }
 
@@ -556,8 +570,8 @@ run "preset_outlook_group_calendar" {
   }
 
   assert {
-    condition     = length(local.admin_consent) == 0
-    error_message = "the group calendar view takes Calendars.Read in place of Group.Read.All, so it needs no administrator, and this needs ${join(",", local.admin_consent)}"
+    condition     = local.admin_consent == ["Group.Read.All"]
+    error_message = "Microsoft marks the delegated Group.Read.All as AdminConsentRequired: Yes, and the group calendar view needs no other administrator permission; this composed ${join(",", local.admin_consent)}"
   }
 }
 
@@ -689,7 +703,7 @@ run "preset_onenote_read" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Read.All"
     error_message = "onenote-read composed ${join(",", local.permissions)}"
   }
 
@@ -705,7 +719,7 @@ run "preset_onenote_write" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite,Notes.Read.All"
     error_message = "onenote-write composed ${join(",", local.permissions)}"
   }
 
@@ -721,7 +735,7 @@ run "preset_onenote_delete" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite,Notes.Read.All"
     error_message = "onenote-delete composed ${join(",", local.permissions)}"
   }
 

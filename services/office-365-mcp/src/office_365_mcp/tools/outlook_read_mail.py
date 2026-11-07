@@ -44,6 +44,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _MESSAGE_FIELDS: tuple[str, ...] = (
     *SUMMARY_FIELDS,
     "ccRecipients",
+    "bccRecipients",
     "sentDateTime",
     "body",
     "uniqueBody",
@@ -108,8 +109,12 @@ class MessageHeader(BaseModel):
 
 
 class MailMessage(MailSummary):
-    cc: list[MailAddress] = Field(
-        description="The Cc recipients; Bcc is never included, because it is not obtainable."
+    cc: list[MailAddress] = Field(description="The Cc recipients.")
+    bcc: list[MailAddress] = Field(
+        description=(
+            "The Bcc recipients. Microsoft stores Bcc only for a draft or a sent message, so the "
+            "list is empty for received mail."
+        )
     )
     sent_at: str | None = Field(
         description="When the sender sent it, ISO-8601 in UTC; null if Graph recorded none."
@@ -197,6 +202,7 @@ def _answer(
         {
             **dict(summary),
             "cc": MailAddress.each_of(message.cc_recipients),
+            "bcc": MailAddress.each_of(message.bcc_recipients),
             "sent_at": (
                 None if message.sent_date_time is None else message.sent_date_time.isoformat()
             ),

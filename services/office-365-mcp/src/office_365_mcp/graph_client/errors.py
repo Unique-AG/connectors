@@ -323,7 +323,12 @@ def _classify(error: APIError) -> GraphFailure:
         )
     if status in (401, 403):
         return GraphForbidden(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=_reason(error),
         )
     if status == 404:
         return GraphNotFound(

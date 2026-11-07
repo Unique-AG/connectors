@@ -97,9 +97,15 @@ async def resolve_meeting(
 def organized_by(meeting: OnlineMeeting, user: User) -> bool:
     participants = meeting.participants
     organizer = None if participants is None else participants.organizer
-    identities = None if organizer is None else organizer.identity
-    named = None if identities is None or identities.user is None else identities.user.id
+    named = user_id_of(None if organizer is None else organizer.identity)
     return named is not None and user.id is not None and named.casefold() == user.id.casefold()
+
+
+def user_id_of(identities: IdentitySet | None) -> str | None:
+    """The user's Entra object id. An unknown `@odata.type` on the identity still deserializes to
+    the base `identity`, which carries the id."""
+    user = None if identities is None else identities.user
+    return None if user is None else user.id
 
 
 def meeting_times(

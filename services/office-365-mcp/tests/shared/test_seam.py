@@ -66,6 +66,21 @@ _UNCONSENTED = (
     + "this user and resource."
 )
 
+_LICENSE_MESSAGE = (
+    "Failed to get license information for the user. Ensure user has a valid "
+    + "Office365 license assigned to them."
+)
+
+
+def _unlicensed_failure() -> GraphFailure:
+    return GraphForbidden(
+        "Microsoft Graph returned 403 (Forbidden)",
+        status=403,
+        code="Forbidden",
+        request_id=None,
+        reason=_LICENSE_MESSAGE,
+    )
+
 
 _FALLTHROUGH = "because it is a bad request, not an outage or a permission problem"
 
@@ -154,7 +169,7 @@ class TestTheTwoRemediesGraphCannotTellApart:
 
     async def test_the_transcript_tenant_switch_is_neither_of_those_and_says_so(self) -> None:
         """A third remedy behind the same status and outer code, and not a permission at all:
-        Graph access to Teams meeting transcripts is a tenant-wide Teams setting, off by default,
+        Graph access to Teams transcripts is a tenant-wide Teams setting, off by default,
         that no app can turn on."""
         message = await _message(
             GraphForbidden(
@@ -166,6 +181,9 @@ class TestTheTwoRemediesGraphCannotTellApart:
             )
         )
 
+        assert "Teams transcripts" in message
+        assert "Teams meeting transcripts" not in message
+        assert "do not retry" in message
         assert "Teams administrator" in message
         assert "Set-CsTeamsMeetingConfiguration" in message
         assert "sign in again will not change it" in message
@@ -342,6 +360,18 @@ class TestRetryAdvice:
 
         assert "Teams administrator" in message
         assert "Refused." not in message
+
+    async def test_an_unlicensed_reader_is_told_to_get_a_license_before_the_tools_own_words(
+        self,
+    ) -> None:
+        message = await _message(
+            _unlicensed_failure(),
+            forbidden="Refused.",
+        )
+
+        assert "license that includes the service this tool uses" in message
+        assert "Refused." not in message
+        assert "trying again later may work" in message
 
     async def test_the_403_wording_does_not_replace_the_404_advice(self) -> None:
         message = await _message(

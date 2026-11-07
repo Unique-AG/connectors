@@ -19,7 +19,10 @@ OIDC_CONFIGURATION = {
     "subject_types_supported": ["public"],
     "id_token_signing_alg_values_supported": ["RS256"],
 }
-STORE = StoreSettings(url=SecretStr("redis://localhost:6379/0"), _env_file=None)  # pyright: ignore[reportCallIssue]
+STORE = StoreSettings(
+    url=SecretStr("postgresql://user:secret@localhost:5432/world_check"),
+    _env_file=None,  # pyright: ignore[reportCallIssue]
+)
 
 
 @pytest.fixture
