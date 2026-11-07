@@ -49,6 +49,8 @@ vi.mock('node:fs', () => ({
   readFileSync: vi.fn().mockReturnValue(Buffer.from('fake-cert')),
 }));
 
+// https-proxy-agent 9 is ESM-only; moduleResolution "node" cannot read its exports map.
+// @ts-expect-error TS2307
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { Agent, ProxyAgent } from 'undici';
 import { ProxyService } from '../proxy.service';
