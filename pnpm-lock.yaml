@@ -98,8 +98,8 @@ catalogs:
       specifier: 5.0.5
       version: 5.0.5
     amqplib:
-      specifier: 0.10.9
-      version: 0.10.9
+      specifier: 2.2.1
+      version: 2.2.1
     bottleneck:
       specifier: 2.19.5
       version: 2.19.5
@@ -1124,7 +1124,7 @@ importers:
         version: 5.0.5(vitest@5.0.5)
       amqplib:
         specifier: 'catalog:'
-        version: 0.10.9
+        version: 2.2.1
       istanbul-badges-readme:
         specifier: 'catalog:'
         version: 1.9.0
@@ -1465,7 +1465,7 @@ importers:
         version: 5.0.5(vitest@5.0.5)
       amqplib:
         specifier: 'catalog:'
-        version: 0.10.9
+        version: 2.2.1
       istanbul-badges-readme:
         specifier: 'catalog:'
         version: 1.9.0
@@ -3894,6 +3894,10 @@ packages:
   amqplib@0.10.9:
     resolution: {integrity: sha512-jwSftI4QjS3mizvnSnOrPGYiUnm1vI2OP1iXeOUz5pb74Ua0nbf6nPyyTzuiCLEE3fMpaJORXh2K/TQ08H5xGA==}
     engines: {node: '>=10'}
+
+  amqplib@2.2.1:
+    resolution: {integrity: sha512-J3JjAydC2vJ/AgkgVAE0kVH5M4RNfm51zUaspHpwSai3W35lD3hKryvYY/xqMnYcNfR66NYL06Eik+Adn293dQ==}
+    engines: {node: '>=18'}
 
   ansi-align@3.0.1:
     resolution: {integrity: sha512-IOfwwBF5iczOjp/WeY4YxyjqAFMQoZufdQWDd19SEExbVLNXqvpzSJ/M7Za4/sCPmQ0+GRquoA7bGcINcxew6w==}
@@ -9045,6 +9049,8 @@ snapshots:
     dependencies:
       buffer-more-ints: 1.0.0
       url-parse: 1.5.10
+
+  amqplib@2.2.1: {}
 
   ansi-align@3.0.1:
     dependencies:
