@@ -58,6 +58,13 @@ GRAPH_NOT_FOUND = (
     + "what this mailbox actually has. Retrying with the same argument will fail identically."
 )
 
+GRAPH_FORBIDDEN = (
+    "Microsoft 365 refused to open this mailbox for the signed-in user. No message was "
+    + "listed. The user can lack access to the mailbox, or a policy of the organization can "
+    + "refuse the request. Tell the user about the refusal. The owner of the mailbox can give "
+    + "the user access. A call with the same arguments fails the same way."
+)
+
 MAX_RESULTS = 1000
 
 DEFAULT_FOLDER: WellKnownFolder = "inbox"

@@ -176,10 +176,6 @@ scenarios that wait on it have `@deferred` and a `deferred` list in their sideca
 - Meeting (6 cases): a person holds one Teams meeting at a time. Run `record_all.sh meeting all`.
 - Private channel (3 cases): the tenant policy refuses to create a private channel. An
   administrator must switch on private channels.
-- Search (3 cases, recorded, expect unmet): Graph sends `chatMessage` without a hash, so
-  `teams_search_messages` drops every hit. The server needs a change.
-- `onenote_get_operation-notebook` (recorded, expect unmet): Graph sends the status not started
-  and the SDK parses it to None. The server needs a change.
 
 The fixture is `rec-tool-<id>`. A case that creates what it changes needs no reseed: name the item
 `seed-v1 case-<id>`, and `seed.py cleanup --cases --as N` deletes it. `--link` does not apply to a

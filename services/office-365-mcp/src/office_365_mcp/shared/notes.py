@@ -22,7 +22,6 @@ from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_section import OnenoteSection
-from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.section_group import SectionGroup
 from msgraph.generated.sites.item.onenote import onenote_request_builder as site_onenote
 from msgraph.generated.users.item.onenote import onenote_request_builder as user_onenote
@@ -641,12 +640,16 @@ def operation_id_in(location: str | None) -> str | None:
 
 OperationState = Literal["NotStarted", "Running", "Completed", "Failed"]
 
-_STATUS_TEXT: Mapping[OperationStatus, OperationState] = {
-    OperationStatus.NotStarted: "NotStarted",
-    OperationStatus.Running: "Running",
-    OperationStatus.Completed: "Completed",
-    OperationStatus.Failed: "Failed",
+_STATE_OF_WORD: Mapping[str, OperationState] = {
+    "notstarted": "NotStarted",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
 }
+
+
+def operation_state(word: str | None) -> OperationState | None:
+    return None if word is None else _STATE_OF_WORD.get("".join(word.split()).lower())
 
 
 class OperationSummary(BaseModel):
@@ -663,7 +666,8 @@ class OperationSummary(BaseModel):
     status: OperationState | None = Field(
         description=(
             "Microsoft's own status word for this operation: NotStarted, Running, Completed or "
-            + "Failed. Null right after Microsoft accepts a copy, before it reports any status. "
+            + "Failed. Microsoft writes NotStarted as the two words not started. Null when "
+            + "Microsoft names no status, for example right after it accepts a copy. "
             + "Poll onenote_get_operation with `uri` to fill it in. Poll again until it reads "
             + "Completed or Failed."
         )
@@ -709,14 +713,20 @@ class OperationSummary(BaseModel):
     )
 
     @classmethod
-    def from_operation(cls, op: OnenoteOperation, *, owner: OnenoteOwner | None = None) -> Self:
+    def from_operation(
+        cls,
+        op: OnenoteOperation,
+        state: OperationState | None,
+        *,
+        owner: OnenoteOwner | None = None,
+    ) -> Self:
         assert op.id is not None, "Graph answered with an operation that has no id"
         result = resource_handle_of(op.resource_location, op.resource_id)
         result_uri, result_kind = result if result is not None else (None, None)
         error = op.error
         return cls(
             uri=OnenoteOperationHandle(op.id, owner=owner).uri,
-            status=(None if op.status is None else _STATUS_TEXT[op.status]),
+            status=state,
             percent_complete=op.percent_complete,
             created_at=op.created_date_time,
             last_action_at=op.last_action_date_time,
@@ -751,7 +761,9 @@ def accepted_operation(
         node = JsonParseNodeFactory().get_root_parse_node(_JSON_MEDIA_TYPE, fetched.content)
         operation = node.get_object_value(OnenoteOperation)
         if operation.id is not None:
-            return OperationSummary.from_operation(operation, owner=owner)
+            word = node.get_child_node("status")
+            state = operation_state(None if word is None else word.get_str_value())
+            return OperationSummary.from_operation(operation, state, owner=owner)
     operation_id = operation_id_in(fetched.headers.get("operation-location"))
     if operation_id is None:
         return None
