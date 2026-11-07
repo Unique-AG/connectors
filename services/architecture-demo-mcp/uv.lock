@@ -239,9 +239,9 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.1.6" },
     { name = "starlette", specifier = "==1.10.0" },
     { name = "tenacity", specifier = "==9.2.1" },
-    { name = "unique-mcp", specifier = "==2026.44.2" },
-    { name = "unique-sdk", specifier = "==2026.44.2" },
-    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.44.2" },
+    { name = "unique-mcp", specifier = "==2026.44.3" },
+    { name = "unique-sdk", specifier = "==2026.44.3" },
+    { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.44.3" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.54.0" },
 ]
 
@@ -3313,7 +3313,7 @@ wheels = [
 
 [[package]]
 name = "unique-mcp"
-version = "2026.44.2"
+version = "2026.44.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastmcp" },
@@ -3329,14 +3329,14 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unique-toolkit", extra = ["monitoring", "otel"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/92/c0/0703e80d43c6e6323fa1d333aa65ed7e53a36817d5039396b779c9293dbe/unique_mcp-2026.44.2.tar.gz", hash = "sha256:26f094aa0dbb7059d013c4d5c388ee088f95349875f95842129cdd5890a264c9", size = 18460, upload-time = "2026-10-27T09:02:24.863Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/6f/4a/60a779e86c637a5f1b57c3619a1e1f9c998080361d73139786253367e085/unique_mcp-2026.44.3.tar.gz", hash = "sha256:b9a63903c135c576a59248263b5ace884e86dcd99c5ab0374b1c148e7eb82f16", size = 18459, upload-time = "2026-11-02T12:21:32.05Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c8/09/d8847f2d4a1edb0664590f9562446cf28b7eeef5d6cfc1284ec77eb5d6c4/unique_mcp-2026.44.2-py3-none-any.whl", hash = "sha256:68c386da72b059478afa7017b9cb8f209c9a98e7b3bdbe0b214c6326724eb7d7", size = 25578, upload-time = "2026-10-27T09:02:23.799Z" },
+    { url = "https://files.pythonhosted.org/packages/09/b3/9a2e16a2fb1d7963cc7908d605a3504115e43f519bf826ae03dc9d619b9b/unique_mcp-2026.44.3-py3-none-any.whl", hash = "sha256:89e9399e665810a8539085e1f7df236494c0a047dd105fa70cd11b404fdc0ff8", size = 25578, upload-time = "2026-11-02T12:21:31.076Z" },
 ]
 
 [[package]]
 name = "unique-sdk"
-version = "2026.44.2"
+version = "2026.44.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -3348,14 +3348,14 @@ dependencies = [
     { name = "tiktoken" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/60/d6/dd0104cd446cb78602a0756dfff4f12f9846bd51083650bb9bf6b37c207c/unique_sdk-2026.44.2.tar.gz", hash = "sha256:796748621752b2708392c0e27592a7621f6821f89ae1b3f9ed73f9c02d6f80b5", size = 222864, upload-time = "2026-10-27T09:02:16.918Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/aa/31/0363d9a9082761291ad8ebf4a6c447d2f6f49db116067658e3587ee704f1/unique_sdk-2026.44.3.tar.gz", hash = "sha256:ad49407fb3a6981b8124393c0e856ec2dcc8370cc05c4e87e390570cf506e5b5", size = 222864, upload-time = "2026-11-02T12:21:20.162Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ae/50/ede027b743fbb6439fc224c9d79db3db3a011a3beced7e9722594b2a0c8e/unique_sdk-2026.44.2-py3-none-any.whl", hash = "sha256:12b62dbe0ea402477de5098f90ed5054357e0745662e0562d0d8581f0d9ce89e", size = 272151, upload-time = "2026-10-27T09:02:15.222Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/46/3e01357f3b86ce69d998181ef4a86543ec19594d5aed339ff87cfff88315/unique_sdk-2026.44.3-py3-none-any.whl", hash = "sha256:a4c731c04564bb3dd11e41445c6b2e5c2fb1ce3cda585cc8808974cb9336ce61", size = 272151, upload-time = "2026-11-02T12:21:18.556Z" },
 ]
 
 [[package]]
 name = "unique-toolkit"
-version = "2026.44.2"
+version = "2026.44.3"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
@@ -3388,9 +3388,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "unique-sdk" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/57/4e/5b69a23c345f650bbdb1524070cb847ed1e58759e6a0bb204e94039d56ff/unique_toolkit-2026.44.2.tar.gz", hash = "sha256:c4da2625293f1de76e4ceb1218ff2d9c23d53237c32ba857b807cfe1222bc875", size = 4576968, upload-time = "2026-10-27T09:02:17.85Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/77/e8/e3f5c0e9af16d9e5010017755a870d98096c7bbdcba8965a2206c1c1027f/unique_toolkit-2026.44.3.tar.gz", hash = "sha256:3d060058e80afcfd199f8586f65ba80648576e171f074ce710ae8124ff5846fb", size = 4576999, upload-time = "2026-11-02T12:21:27.916Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/40/b8/5e697a91aa87138226242c15b9634c6fedfa73e673a0107bebe544e9494f/unique_toolkit-2026.44.2-py3-none-any.whl", hash = "sha256:a5155b0523dff90566f66daae2c1e46bbb7c1530542970f86db4b67166b1e2b3", size = 4783045, upload-time = "2026-10-27T09:02:15.427Z" },
+    { url = "https://files.pythonhosted.org/packages/5e/cb/ec3b4a368d2be7afaa8094d5870595523cbcb6174c48919ef93f28034fe4/unique_toolkit-2026.44.3-py3-none-any.whl", hash = "sha256:65098611dc3ef95cc2476c1b484c3e4981585f5c21d7d8929be27443d2f87d95", size = 4783048, upload-time = "2026-11-02T12:21:25.63Z" },
 ]
 
 [package.optional-dependencies]
