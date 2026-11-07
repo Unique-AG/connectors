@@ -30,9 +30,9 @@ The app registration requests the following application permissions.
 
 **SharePoint REST API** (list attachment sync when `listAttachmentsScan` is enabled, and permission sync when enabled):
 
-| Permission       | Type        | Description                                              |
-| ---------------- | ----------- | -------------------------------------------------------- |
-| `Sites.Selected` | Application | List and download attachments; read site groups         |
+| Permission       | Type        | Description                                     |
+| ---------------- | ----------- | ----------------------------------------------- |
+| `Sites.Selected` | Application | List and download attachments; read site groups |
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
@@ -112,7 +112,7 @@ For detailed instructions, see:
      - `GroupMember.Read.All`
      - `User.ReadBasic.All`
    - Select **SharePoint** → **Application permissions**:
-     - Add `Sites.Selected` (required for permission sync to read site groups)
+     - Add `Sites.Selected` (required for permission sync and list attachments scanning)
 5. Click **Grant admin consent for [Your Organization]**
 
 #### 3. Create Azure AD Service Principal
@@ -207,7 +207,7 @@ Grant-PnPAzureADAppSitePermission `
 **Via Graph Explorer:**
 
 1. Open [Graph Explorer](https://developer.microsoft.com/en-us/graph/graph-explorer) and sign in as admin.
-2. In **Modify permissions**, consent to `Sites.Read.All` (one-time admin action for list discovery and grant checks).
+2. In **Modify permissions**, consent to `Sites.FullControl.All` (one-time admin action needed to create the library grant; the app itself only receives `read`).
 3. Resolve target library ID:
 
 ```http
@@ -338,13 +338,12 @@ Token endpoint:
 https://{tenant}.sharepoint.com
 ```
 
-**Site group access requirements:** When using permission sync, the app principal must be able to read site group members. If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members.
+**Site group access requirements:** When using permission sync, the app principal must be able to read site group members. If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members. It still syncs the group, but without members, so those users do not get access in Unique.
 
 Mitigation options:
 
 1. Set group visibility to "Everyone"
 2. Add the app principal as a group member/owner
-3. Grant Full Control to the app principal
 
 ## Troubleshooting
 
@@ -353,11 +352,13 @@ Mitigation options:
 **Symptom:** `AADSTS700016: Application with identifier 'xxx' was not found`
 
 **Causes:**
+
 - App registration not found in the tenant
 - Service principal not created
 - Wrong tenant ID
 
 **Resolution:**
+
 1. Verify app registration exists
 2. Create service principal via admin consent
 3. Check tenant ID configuration
@@ -367,11 +368,13 @@ Mitigation options:
 **Symptom:** `AADSTS700027: Client assertion contains an invalid signature`
 
 **Causes:**
+
 - Wrong certificate uploaded to Azure
 - Certificate expired
 - Private key doesn't match certificate
 
 **Resolution:**
+
 1. Re-upload certificate to Azure AD
 2. Generate new certificate if expired
 3. Verify certificate and key match
@@ -383,6 +386,7 @@ Mitigation options:
 **Cause:** The connector received key material in an unsupported format (for example a plain secret string instead of file-based PEM/asymmetric key content).
 
 **Resolution:**
+
 1. Provide the private key as file content in supported PEM/asymmetric format.
 2. Ensure the key matches the uploaded certificate.
 3. If using KeyVault-backed configuration, make sure the secret value contains valid key file content.
@@ -392,11 +396,13 @@ Mitigation options:
 **Symptom:** `403 Forbidden` when accessing sites or libraries
 
 **Causes:**
+
 - `Sites.Selected` or `Lists.SelectedOperations.Selected` not granted for the target site/library
 - Admin consent not completed
 - **Permission scope mismatch:** The app registration has `Sites.Selected` but the admin granted **library-level** access (via `-List` parameter). Library-level grants require `Lists.SelectedOperations.Selected` — `Sites.Selected` alone does not cover them and will return 403.
 
 **Resolution:**
+
 1. Verify the app registration includes the correct permission for the type of grant issued:
    - Site-level grants → `Sites.Selected`
    - Library-level grants → `Lists.SelectedOperations.Selected`
@@ -424,11 +430,13 @@ Mount the PEM file containing the additional CA certificates into the pod and po
 **Symptom:** `Site not found` or `404` errors
 
 **Causes:**
+
 - Incorrect site ID
 - Site deleted or renamed
 - No access to site
 
 **Resolution:**
+
 1. Verify site ID using Graph Explorer
 2. Re-grant site access if renamed
 3. Check site exists in SharePoint

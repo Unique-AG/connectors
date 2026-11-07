@@ -25,7 +25,7 @@ TOOL_NAME = "outlook_list_group_events"
 
 STEP = "calendar_events"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Group.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "group_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",

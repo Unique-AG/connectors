@@ -23,6 +23,9 @@ by the two ids that its content path is built from, and not by that join URL. So
 not repeat the resolve, spend a second request and permission on it, and answer a 403 that can be
 about either.
 
+A call transcript is its own family, because the meeting parser would accept a call handle and the
+meeting reader would answer 404 with meeting text.
+
 The family name is the first segment for this reason. Nesting `{x}` under both `meetings` and
 `transcripts` in one URI, like `teams:///meetings/{x}/transcripts/{y}`, makes `{x}` ambiguous. It
 reads as a join URL in one shape and as a meeting id in another. A parser cannot tell them apart.
@@ -107,6 +110,16 @@ class TranscriptHandle:
     @property
     def uri(self) -> str:
         return f"teams:///transcripts/{_segment(self.meeting_id)}/{_segment(self.transcript_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class CallTranscriptHandle:
+    call_id: str
+    transcript_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"teams:///calltranscripts/{_segment(self.call_id)}/{_segment(self.transcript_id)}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -294,6 +307,7 @@ _REPLY_HANDLE = re.compile(
 )
 _MEETING_HANDLE = re.compile(r"\Ateams:///meetings/([^/]+)\Z")
 _TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///transcripts/([^/]+)/([^/]+)\Z")
+_CALL_TRANSCRIPT_HANDLE = re.compile(r"\Ateams:///calltranscripts/([^/]+)/([^/]+)\Z")
 _MAIL_MESSAGE_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)\Z")
 _MAIL_ATTACHMENT_HANDLE = re.compile(r"\Aoutlook:///messages/([^/]+)/attachments/([^/]+)\Z")
 _MAIL_FOLDER_HANDLE = re.compile(r"\Aoutlook:///folders/([^/]+)\Z")
@@ -384,6 +398,11 @@ def transcript_handle(uri: str) -> TranscriptHandle | None:
     if not meeting_id.strip() or not transcript_id.strip():
         return None
     return TranscriptHandle(meeting_id, transcript_id)
+
+
+def call_transcript_handle(uri: str) -> CallTranscriptHandle | None:
+    ids = _two_ids(_CALL_TRANSCRIPT_HANDLE, uri)
+    return None if ids is None else CallTranscriptHandle(*ids)
 
 
 def mail_message_handle(uri: str) -> MailMessageHandle | None:

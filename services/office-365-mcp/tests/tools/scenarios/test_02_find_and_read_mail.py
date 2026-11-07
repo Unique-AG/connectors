@@ -634,7 +634,7 @@ class TestASharedMailbox:
             "/v1.0/users/support@example.com/mailFolders/inbox/messages",
         }
 
-    async def test_a_refused_mailbox_is_explained_as_a_missing_permission_of_the_app(
+    async def test_a_refused_mailbox_is_explained_as_a_missing_access_of_the_user(
         self, graph: respx.MockRouter
     ) -> None:
         _ = graph.get("/users/finance/mailFolders/inbox").mock(
@@ -645,9 +645,9 @@ class TestASharedMailbox:
             "outlook_list_mail", mailbox="finance", unread_only=True, limit=25
         )
 
-        assert "Mail.Read.Shared" in advice
-        assert "administrator" in advice
-        assert "no access to the mailbox" not in advice
+        assert "can lack access to the mailbox" in advice
+        assert "Mail.Read.Shared" not in advice
+        assert "administrator" not in advice
 
 
 class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:

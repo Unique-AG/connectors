@@ -435,6 +435,20 @@ Source: [onlineMeeting: getAllTranscripts](https://learn.microsoft.com/en-us/gra
 
 Source: [Limits and specifications for Microsoft Teams](https://learn.microsoft.com/en-us/microsoftteams/limits-specifications-teams)
 
+### Call transcripts
+
+Office 365 MCP reads call transcripts live with the `teams-call-transcripts` preset. The capture pipeline above stores meeting transcripts in the knowledge base, and call transcripts stay on Graph. [Call transcripts in Office 365 MCP](./operator.md#Call-transcripts-in-Office-365-MCP) covers how to turn the preset on and which Teams policies it needs.
+
+Each reader needs an Office 365 license. A user reads only calls they were on.
+
+As observed in one test tenant against one external tenant, a transcript was readable only when our side started the transcription (1:1) or the call (group). Otherwise Teams shows the user the transcript but Unique cannot read it.
+
+`teams_list_call_transcripts` takes an optional `chat_id`, the id `teams_list_chats` reports, not `chat_uri`.
+
+The list tool calls `adhocCalls/getAllTranscripts(userId=...)` with the user's delegated token. Microsoft documents this route for application permissions only. It works delegated today, but Microsoft could change that without notice, and there is no delegated fallback. The route needs the user's object id (the literal `me` returns 400) and both `startDateTime` and `endDateTime`.
+
+The [operator guide](./operator.md#Call-transcripts-in-Office-365-MCP) lists the other limits: only transcribed calls appear, a transcript appears 1 to 2 minutes after the call, and PSTN and guests are not tested yet.
+
 ## Required Microsoft Graph permissions
 
 Capture uses a dedicated Entra ID app that requests **only** these four delegated Microsoft Graph permissions. It does not request Teams chat or channel messaging scopes. A chat-only Teams MCP deployment uses a different app and none of the meeting-content scopes below.

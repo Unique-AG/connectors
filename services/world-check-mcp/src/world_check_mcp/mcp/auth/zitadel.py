@@ -20,7 +20,7 @@ def create_auth(
     """
     if zitadel is None:
         return None
-    assert store is not None, "Zitadel sign-in needs REDIS_URL"
+    assert store is not None, "Zitadel sign-in needs DATABASE_URL"
     signing_key = zitadel.jwt_signing_key.get_secret_value()
     return create_zitadel_oidc_proxy(
         mcp_server_base_url=server.base_url,
@@ -30,7 +30,7 @@ def create_auth(
             client_secret=zitadel.client_secret,
             jwt_signing_key=zitadel.jwt_signing_key,
         ),
-        # Tokens at rest in Redis are encrypted with a key derived from the signing key, so
+        # Tokens at rest in Postgres are encrypted with a key derived from the signing key, so
         # rotating it signs everyone out, as it would anyway.
         client_storage=FernetEncryptionWrapper(
             key_value=sign_in_store(store),

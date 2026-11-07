@@ -512,6 +512,18 @@ class TestATeamCalendar:
 
         assert told in str(refused.value)
 
+    async def test_a_refused_team_calendar_names_the_group_permission(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_TEAM_VIEW).mock(
+            return_value=response({"status": 403, "body": "error.accessDenied.json"})
+        )
+
+        with pytest.raises(ToolError) as refused:
+            _ = await _platform_week()
+
+        assert "the delegated permission Group.Read.All" in str(refused.value)
+
     async def test_a_team_without_a_calendar_is_reported_with_the_way_to_look_the_teams_up_again(
         self, graph: respx.MockRouter
     ) -> None:

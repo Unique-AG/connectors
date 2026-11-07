@@ -470,8 +470,7 @@ list for UN-27222.
   so the cause is not known. Does the assistant send one message in each call? 20 consecutive calls
   in one session suggest it.
 - Does `outlook_create_event_on_behalf` work on a second calendar of Mia in a real mailbox? The
-  source allows it. Nobody ran it. If it works, change the description and set `uc-07-09` to
-  `untested`.
+  description names it, and the source allows it. Nobody ran it.
 
 ### For the code owners
 

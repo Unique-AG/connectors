@@ -85,7 +85,7 @@
       "prefer": "IdType=\"ImmutableId\", outlook.body-content-type=\"text\""
     },
     "query": {
-      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo,ccRecipients,sentDateTime,body,uniqueBody,internetMessageHeaders"
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo,ccRecipients,bccRecipients,sentDateTime,body,uniqueBody,internetMessageHeaders"
     },
     "status": 200,
     "response_headers": {
