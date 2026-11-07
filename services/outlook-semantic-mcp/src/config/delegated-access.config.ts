@@ -1,6 +1,7 @@
-import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
+import { registerConfig } from './register-config';
 
 // Send as (‎0‎)
 // The Send as permission allows the delegate to send an email from this mailbox. Message will appear to have been sent from this mailbox owner.

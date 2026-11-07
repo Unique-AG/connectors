@@ -1,9 +1,6 @@
-import {
-  type ConfigType,
-  type NamespacedConfigType,
-  registerConfig,
-} from '@proventuslabs/nestjs-zod';
+import { type ConfigType, type NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
+import { registerConfig } from './register-config';
 
 const ConfigSchema = z.object({
   connectivityTimeoutMs: z.coerce

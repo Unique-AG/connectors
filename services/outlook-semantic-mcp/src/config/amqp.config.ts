@@ -1,11 +1,8 @@
-import {
-  type ConfigType,
-  type NamespacedConfigType,
-  registerConfig,
-} from '@proventuslabs/nestjs-zod';
+import { type ConfigType, type NamespacedConfigType } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { Redacted } from '~/utils/redacted';
 import { redacted, stringToURL } from '~/utils/zod';
+import { registerConfig } from './register-config';
 
 const urlConfigSchema = z.object({
   url: redacted(
