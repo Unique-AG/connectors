@@ -14,10 +14,12 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 121 tools in total.
+- **Size:** 123 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
+- **Use cases:** The [use cases](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md)
+  show what people ask an assistant to do, and what the tools do for each request.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
 
@@ -38,6 +40,9 @@ Rules for the selection:
 - A deployment can name several presets in a comma-separated list, for example
   `teams-write,outlook-read`. It gets the union of their tools and of their permissions. The union
   needs admin consent when at least one of the presets needs it.
+- Two presets can hold the tools of one task. For example, `outlook-write,outlook-automate` lets the
+  assistant create a category and put it on mail. `outlook-read,outlook-rules` lets it find a
+  folder and make a rule that files mail into it.
 - A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
   preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
 - Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and
@@ -58,6 +63,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`teams-messages`](#teams-messages) | Find and read Teams messages. | 5 | ⚠️ Yes |
 | [`teams-channels`](#teams-channels) | Walk teams and read channel posts. | 4 | ⚠️ Yes |
 | [`teams-transcripts`](#teams-transcripts) | Find a meeting and read its transcript. | 3 | ⚠️ Yes |
+| [`teams-call-transcripts`](#teams-call-transcripts) | Find a call and read its transcript. | 3 | ⚠️ Yes |
 | [`teams-recordings`](#teams-recordings) | See whether a meeting was recorded. | 2 | ⚠️ Yes |
 | [`teams-meetings`](#teams-meetings) | Read transcripts and recording details of a meeting. | 4 | ⚠️ Yes |
 | [`teams-write`](#teams-write) | Post messages and reactions in chats and channels. | 8 | No |
@@ -91,9 +97,9 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`outlook-calendar`](#outlook-calendar) | Read calendars, events, and free time. | 12 | No |
 | [`outlook-calendar-write`](#outlook-calendar-write) | Create, change, and cancel events. Answer invitations. | 16 | No |
 | [`outlook-calendar-manage`](#outlook-calendar-manage) | `outlook-calendar-write`, plus forward, delete, and share. | 21 | No |
-| [`outlook-calendar-delegate`](#outlook-calendar-delegate) | `outlook-calendar-write`, plus events for another person. | 17 | No |
+| [`outlook-calendar-delegate`](#outlook-calendar-delegate) | `outlook-calendar-write`, plus events on another calendar. | 17 | No |
 | [`outlook-calendar-rooms`](#outlook-calendar-rooms) | `outlook-calendar-write`, plus finding meeting rooms. | 17 | ⚠️ Yes |
-| [`outlook-group-calendar`](#outlook-group-calendar) | Read the calendar of a team. | 2 | No |
+| [`outlook-group-calendar`](#outlook-group-calendar) | Read the calendar of a team. | 2 | ⚠️ Yes |
 
 **Outlook contacts.** The default Contacts folder.
 
@@ -169,7 +175,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 - Search every Teams message that you can see.
 - Read the transcript of a meeting, and see whether a recording exists.
 
-**Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder` and `teams_read_meeting`.
+**Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder`, `teams_read_meeting`, `teams_list_call_transcripts`, and `teams_read_call_transcript`. Call transcripts are on [`teams-call-transcripts`](#teams-call-transcripts).
 
 **Tools**
 
@@ -180,7 +186,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 | `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
 | `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
 | `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
-| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_browse_channel` | 🟢 Read | — | Reads one page of the posts of a channel, with their replies, ordered by reply activity. A page holds at most 50 posts. A token reads the next page. |
 | `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
 | `teams_search_messages` | 🟢 Read | — | Searches the text of every chat and channel message that you can see. |
 | `teams_read_message` | 🟢 Read | — | Reads one message in full, from a handle that another tool gave. |
@@ -260,7 +266,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 | --- | --- | --- | --- |
 | `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
 | `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
-| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_browse_channel` | 🟢 Read | — | Reads one page of the posts of a channel, with their replies, ordered by reply activity. A page holds at most 50 posts. A token reads the next page. |
 | `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
 
 **What it needs**
@@ -291,6 +297,36 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 
 - **Graph permissions (4):** `Chat.Read`, `OnlineMeetingTranscript.Read.All`, `OnlineMeetings.Read`, `User.Read`
 - **Admin consent:** ⚠️ Required for `OnlineMeetingTranscript.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `teams-call-transcripts`
+
+**3 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- List your chats and your call transcripts.
+- Narrow the list to one chat.
+- Read one transcript, one page at a time.
+
+**Note:** Adding this preset leaves `teams`, `teams-meetings`, and `teams-transcripts` unchanged. Name `teams-transcripts` as well to read meeting transcripts. Each reader needs an Office 365 license. A user reads only calls they were on. As observed in one test tenant against one external tenant, a transcript is readable only when our side started the transcription (1:1) or the call (group). Otherwise Teams shows the user the transcript but Unique cannot read it. Only transcribed calls are listed, from 1 to 2 minutes after the call ends. PSTN calls and calls with guests are not tested yet.
+
+Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PSTN calls, `AllowTranscription` for group calls, and Graph transcript access. Speaker attribution is optional; when it is unavailable, `teams_read_call_transcript` returns turns with null speaker names. A policy change can take hours to reach users. A calling policy with Copilot on and transcription off keeps no transcript.
+
+**Risk:** `teams_list_call_transcripts` calls `adhocCalls/getAllTranscripts`, which Microsoft documents for application permissions only. It works with the user's delegated token today. If Microsoft stops accepting that, the list tool fails and there is no delegated fallback.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `teams_list_chats` | 🟢 Read | — | Lists your chats, newest first. Shows the last message, the sender, and the read status. |
+| `teams_list_call_transcripts` | 🟢 Read | — | Lists call transcripts, newest first. The optional argument is `chat_id`, the id `teams_list_chats` reports, not `chat_uri`. |
+| `teams_read_call_transcript` | 🟢 Read | — | Reads one page of a call transcript, as timestamped turns with speaker names when available. |
+
+**What it needs**
+
+- **Graph permissions (3):** `CallTranscripts.Read.All`, `Chat.Read`, `User.Read`
+- **Admin consent:** ⚠️ Required for `CallTranscripts.Read.All`. Register it before anyone signs in to a deployment that uses this preset. `terraform apply` with the preset adds the permission. When `service_principal_configuration` is set, the module also grants it tenant-wide in the tenant that owns the app registration. When it is `null`, Terraform creates no service principal or consent grant; the customer-tenant administrator must grant consent separately through `admin_consent_url` or Entra. For a multi-tenant app (`sign_in_audience = "AzureADMultipleOrgs"`), customer-tenant administrators must also grant consent through `admin_consent_url`, even when `service_principal_configuration` is set. Existing users should not need to sign in again after consent. This is not confirmed on a test tenant yet. On a registration created by hand, an administrator adds `CallTranscripts.Read.All` and grants it. If that order is reversed, every fresh sign-in is blocked with "Approval required", meeting transcripts included. "Grant admin consent" approves every permission on the registration, so the registration should list only what the presets need.
 - **User approval:** None. No tool of this preset asks the user.
 
 ### `teams-recordings`
@@ -412,7 +448,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `teams_browse_channel` | 🟢 Read | — | Reads the newest 50 posts of one channel, with their replies. |
+| `teams_browse_channel` | 🟢 Read | — | Reads one page of the posts of a channel, with their replies, ordered by reply activity. A page holds at most 50 posts. A token reads the next page. |
 | `teams_list_message_replies` | 🟢 Read | — | Reads up to 50 replies to one channel post, oldest first. |
 | `teams_edit_message` | 🔴 Change | ✋ Always | Replaces the text of one message that you sent. |
 | `teams_delete_message` | 🔴 Change | ✋ Always | Deletes one message that you sent. Teams shows it as deleted. This connector cannot restore it. |
@@ -803,13 +839,13 @@ Calendars, events, availability, rooms, and sharing.
 **You can**
 
 - Do everything in `outlook-calendar-write`.
-- Create an event on a calendar that another person delegated to you.
+- Create an event on another calendar: a calendar that another person delegated to you, or a second calendar of your own.
 
 **Tools added by this preset**
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on a calendar that another person delegated, sent under that person's name. |
+| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. |
 
 **What it needs**
 
@@ -840,7 +876,7 @@ Calendars, events, availability, rooms, and sharing.
 
 ### `outlook-group-calendar`
 
-**2 tools** · Admin consent: **not required**
+**2 tools** · Admin consent: ⚠️ **required**
 
 **You can**
 
@@ -856,8 +892,8 @@ Calendars, events, availability, rooms, and sharing.
 
 **What it needs**
 
-- **Graph permissions (3):** `Calendars.Read`, `Team.ReadBasic.All`, `User.Read`
-- **Admin consent:** Not required.
+- **Graph permissions (3):** `Group.Read.All`, `Team.ReadBasic.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Group.Read.All`. A tenant administrator must grant consent before any user signs in.
 - **User approval:** None. No tool of this preset asks the user.
 
 ## Outlook contacts presets
@@ -1064,7 +1100,7 @@ Notebooks, sections, and pages.
 
 **What it needs**
 
-- **Graph permissions (2):** `Notes.Read`, `User.Read`
+- **Graph permissions (3):** `Notes.Read`, `Notes.Read.All`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** None. No tool of this preset asks the user.
 
@@ -1097,7 +1133,7 @@ Notebooks, sections, and pages.
 
 **What it needs**
 
-- **Graph permissions (4):** `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read`
+- **Graph permissions (5):** `Notes.Create`, `Notes.Read`, `Notes.Read.All`, `Notes.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** Asks 🤝 in some cases for `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`.
 
@@ -1120,7 +1156,7 @@ Notebooks, sections, and pages.
 
 **What it needs**
 
-- **Graph permissions (4):** `Notes.Create`, `Notes.Read`, `Notes.ReadWrite`, `User.Read`
+- **Graph permissions (5):** `Notes.Create`, `Notes.Read`, `Notes.Read.All`, `Notes.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** Asks ✋ every time for `onenote_delete_page`. Asks 🤝 in some cases for `onenote_create_page`, `onenote_append_to_page`, `onenote_create_notebook`, `onenote_create_section`, `onenote_create_section_group`, `onenote_edit_page`, `onenote_rename_page`, `onenote_copy_page`, `onenote_copy_section`, `onenote_copy_notebook`.
 
@@ -1202,7 +1238,7 @@ mcpConfig:
     preset: teams        # or: enabled: [get_me, teams_list_chats]
 ```
 
-The `preset` key names one of the 36 presets in the [preset index](#preset-index), or several of
+The `preset` key names one of the 37 presets in the [preset index](#preset-index), or several of
 them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
 exact list of tool names instead. Write that list as a YAML list or as one comma-separated string.
 The `tools_preset` input of the Terraform module takes the same comma-separated string. A deployment
@@ -1233,7 +1269,7 @@ Two things can go wrong:
 
 ## Reference: every tool
 
-This reference lists all 121 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 123 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1264,6 +1300,8 @@ This reference lists all 121 tools. Use it to build an `enabled` list, or to fin
 | `teams_delete_message` | 🔴 Write, changes or removes | `Chat.ReadWrite`, `ChannelMessage.ReadWrite`, `User.Read`, `ChannelMessage.Read.All` | ⚠️ Yes | ✋ Always |
 | `teams_list_meeting_transcripts` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingTranscript.Read.All` | ⚠️ Yes | — |
 | `teams_read_transcript` | 🟢 Read | `OnlineMeetingTranscript.Read.All` | ⚠️ Yes | — |
+| `teams_list_call_transcripts` | 🟢 Read | `CallTranscripts.Read.All`, `Chat.Read`, `User.Read` | ⚠️ Yes | — |
+| `teams_read_call_transcript` | 🟢 Read | `CallTranscripts.Read.All` | ⚠️ Yes | — |
 | `teams_list_meeting_recordings` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingRecording.Read.All`, `User.Read` | ⚠️ Yes | — |
 | `teams_read_meeting` | 🟢 Read | `OnlineMeetings.Read`, `OnlineMeetingArtifact.Read.All`, `User.Read` | No | — |
 | `teams_create_meeting` | 🟠 Write, safe to repeat | `OnlineMeetings.ReadWrite` | No | ✋ Always |
@@ -1323,7 +1361,7 @@ This reference lists all 121 tools. Use it to build an `enabled` list, or to fin
 | `outlook_list_event_attachments` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
 | `outlook_read_event_attachment` | 🟢 Read | `Calendars.Read`, `Calendars.Read.Shared` | No | — |
 | `outlook_list_reminders` | 🟢 Read | `Calendars.ReadBasic` | No | — |
-| `outlook_list_group_events` | 🟢 Read | `Calendars.Read` | No | — |
+| `outlook_list_group_events` | 🟢 Read | `Group.Read.All` | ⚠️ Yes | — |
 | `outlook_check_availability` | 🟢 Read | `Calendars.ReadBasic` | No | — |
 | `outlook_suggest_meeting_times` | 🟢 Read | `Calendars.Read.Shared` | No | — |
 | `outlook_find_rooms` | 🟢 Read | `Place.Read.All` | ⚠️ Yes | — |
@@ -1379,7 +1417,7 @@ This reference lists all 121 tools. Use it to build an `enabled` list, or to fin
 | `onenote_read_resource` | 🟢 Read | `Notes.Read` | No | — |
 | `onenote_find_notebook_from_url` | 🟢 Read | `Notes.Read` | No | — |
 | `onenote_list_recent_notebooks` | 🟢 Read | `Notes.Read` | No | — |
-| `onenote_list_sections` | 🟢 Read | `Notes.Read` | No | — |
+| `onenote_list_sections` | 🟢 Read | `Notes.Read.All` | No | — |
 | `onenote_create_notebook` | 🟠 Write, adds | `Notes.Create` | No | 🤝 A group or site notebook |
 | `onenote_create_section` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
 | `onenote_create_section_group` | 🟠 Write, adds | `Notes.Create` | No | 🤝 Shared notebook |
@@ -1484,6 +1522,7 @@ model then tells the user.
 | A file is larger than 10 MB | The tool refuses the file. It never sends part of a file. The model gives the user a link to open the file. |
 | A user wants a file that is not plain text | The tool creates only text files, such as `txt`, `md`, `csv`, `json`, and `html`. It cannot create a Word, Excel, PowerPoint, or PDF file. |
 | A file with the same name exists | The tool cannot replace a file. No tool uploads a file. |
+| A user wants the document libraries of a site | No tool lists them. `sharepoint_list_drives` lists only the drives of the signed-in user. |
 | A user shares a file | A link gives view access or edit access, to the organization or to anyone. The tool sets no expiry and no password. No tool removes a link or an invitation. |
 
 #### Outlook mail
@@ -1507,6 +1546,7 @@ model then tells the user.
 
 | Limit | What the user sees |
 | --- | --- |
+| A user asks for the phone number of a person in the directory | `outlook_find_recipient` returns names and email addresses. No tool reads the phone number of a directory person. |
 | A contact is in a folder other than the default folder | The tools do not reach it. They use the default Contacts folder only. |
 | A contact has a department, an address, a birthday, or a note | A tool reads these fields. A tool cannot write them. |
 | A user clears a name, a company, a job title, or a mobile number | The tool cannot clear them. The user clears them in Outlook. |
@@ -1515,8 +1555,9 @@ model then tells the user.
 
 | Limit | What the user sees |
 | --- | --- |
-| A channel has more than 50 posts | The tool reads the newest 50 posts. Microsoft limits channel reads to about one request each second, so older posts are out of reach. |
+| A channel has more than 50 posts | The tool reads one page of 50 posts at most, ordered by reply activity. A token reads the next page. Microsoft limits channel reads to about one request each second. |
 | A post has more than 50 replies | The tool reads 50 replies and marks the list as incomplete. The rest is out of reach. |
+| A user asks to start a chat with a person by name | `teams_create_chat` needs the Microsoft Entra id of the person. No tool turns a name or an email address into an id. |
 | A user sends a file in a message | The file must already be in SharePoint. No tool uploads a file. |
 | A meeting is old | Microsoft erases the transcripts of a one-off meeting about 60 days after the meeting. |
 | A tenant turns off transcripts | The tool cannot read them. A Teams administrator must turn them on. |

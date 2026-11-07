@@ -140,6 +140,20 @@
           ]
         },
         {
+          "name": "teams_list_call_transcripts",
+          "permissions": [
+            "User.Read",
+            "Chat.Read",
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
+          "name": "teams_read_call_transcript",
+          "permissions": [
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
           "name": "teams_list_meeting_recordings",
           "permissions": [
             "OnlineMeetings.Read",
@@ -478,7 +492,7 @@
         {
           "name": "outlook_list_group_events",
           "permissions": [
-            "Calendars.Read"
+            "Group.Read.All"
           ]
         },
         {
@@ -727,7 +741,7 @@
         {
           "name": "onenote_list_sections",
           "permissions": [
-            "Notes.Read"
+            "Notes.Read.All"
           ]
         },
         {
@@ -813,6 +827,8 @@
         "teams_delete_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
+        "teams_list_call_transcripts",
+        "teams_read_call_transcript",
         "teams_list_meeting_recordings",
         "teams_read_meeting",
         "teams_create_meeting",
@@ -952,6 +968,11 @@
           "teams_list_chats",
           "teams_list_meeting_transcripts",
           "teams_read_transcript"
+        ],
+        "teams-call-transcripts": [
+          "teams_list_chats",
+          "teams_list_call_transcripts",
+          "teams_read_call_transcript"
         ],
         "teams-recordings": [
           "teams_list_chats",
@@ -1351,6 +1372,7 @@
         "ChannelMessage.ReadWrite",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
+        "CallTranscripts.Read.All",
         "OnlineMeetingRecording.Read.All",
         "OnlineMeetingArtifact.Read.All",
         "OnlineMeetings.ReadWrite",
@@ -1369,6 +1391,7 @@
         "Calendars.Read",
         "Calendars.Read.Shared",
         "Calendars.ReadBasic",
+        "Group.Read.All",
         "Place.Read.All",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
@@ -1378,7 +1401,8 @@
         "Sites.Read.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "Notes.Read.All"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -1390,6 +1414,7 @@
         "ChannelMessage.Send": false,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
+        "CallTranscripts.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "ChannelMessage.ReadWrite": true,
         "Chat.ReadWrite": false,
@@ -1416,9 +1441,11 @@
         "Files.ReadWrite.All": true,
         "Sites.Read.All": true,
         "Notes.Read": false,
+        "Notes.Read.All": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false,
         "Place.Read.All": true,
+        "Group.Read.All": true,
         "Contacts.Read": false,
         "Contacts.ReadWrite": false
       },

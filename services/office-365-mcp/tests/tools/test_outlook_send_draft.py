@@ -76,6 +76,7 @@ def _draft(
     *,
     to: Sequence[Mapping[str, object]] = (),
     cc: Sequence[Mapping[str, object]] = (),
+    bcc: Sequence[Mapping[str, object]] = (),
     subject: str | None = _SUBJECT,
     is_draft: bool | None = True,
     change_key: str | None = _CHANGE_KEY,
@@ -87,6 +88,7 @@ def _draft(
         "subject": subject,
         "toRecipients": [dict(one) for one in (to or [_recipient("Ada Lovelace", _ADA)])],
         "ccRecipients": [dict(one) for one in cc],
+        "bccRecipients": [dict(one) for one in bcc],
     }
 
 
@@ -893,8 +895,14 @@ class TestWhatItAnswers:
         assert sent_at.utcoffset() == UTC.utcoffset(None)
         assert before <= sent_at <= datetime.now(UTC)
 
-    def test_no_blind_copy_is_addressable_in_the_answer_at_all(self) -> None:
-        assert not [name for name in MailSent.model_fields if "bcc" in name.casefold()]
+    async def test_the_blind_copy_recipients_come_back(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph, _draft(bcc=[_recipient("Pam Beesly", _PAM)]))
+
+        answer = _mail_sent(await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF))
+
+        assert [address.address for address in answer.bcc] == [_PAM]
 
 
 class TestTheFailuresItPassesOn:

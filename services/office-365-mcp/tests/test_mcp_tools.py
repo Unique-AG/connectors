@@ -16,6 +16,7 @@ from azure.core.exceptions import ClientAuthenticationError
 from fastmcp import Client, FastMCP
 from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
+from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
 from mcp.types import TextContent, Tool
@@ -46,7 +47,7 @@ _ME = {
 }
 
 _SEARCH_HIT_RESOURCE = {
-    "@odata.type": "#microsoft.graph.chatMessage",
+    "@odata.type": "microsoft.graph.chatMessage",
     "id": "1770000000000",
     "chatId": "19:release@thread.v2",
     "createdDateTime": "2026-02-11T09:15:22.31Z",
@@ -580,6 +581,7 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_search_mail": ("received_after", "received_before"),
     "teams_search_messages": ("sent_after", "sent_before"),
     "teams_list_chat_messages": ("sent_before",),
+    "teams_list_call_transcripts": ("created_after", "created_before"),
     "sharepoint_search_files": ("modified_after", "modified_before"),
     "onenote_list_pages": (
         "modified_after",
@@ -831,6 +833,7 @@ class TestTheToolsThisServerAdvertises:
             "messages",
             "more_posts_in_channel",
             "posts_cut_to_limit",
+            "next_page_token",
         }
         assert set(_properties(tools["teams_list_message_replies"].output_schema)) == {
             "messages",
@@ -1051,6 +1054,7 @@ class TestTheToolsThisServerAdvertises:
             "channel_id",
             "limit",
             "include_window_completeness",
+            "page_token",
         }
         assert schema.get("required") == ["team_id", "channel_id"]
         assert (limit["type"], limit["minimum"], limit["maximum"], limit["default"]) == (
@@ -1068,6 +1072,34 @@ class TestTheToolsThisServerAdvertises:
         assert description is not None
 
         assert "ordered by reply activity" in description
+        assert "at most 50 posts" in description
+        assert "pass the token unchanged as `page_token`" in description
+
+    async def test_teams_browse_channel_caps_the_pages_of_a_period_read(
+        self, mcp_client: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await mcp_client.list_tools())
+        description = tools["teams_browse_channel"].description
+
+        assert "one request a second, across the whole tenant" in (description or "")
+        assert "Read at most five pages" in (description or "")
+        assert "read pages until `next_page_token` is null" in (description or "")
+        assert "the date of a page does not tell when to stop" in (description or "")
+        assert "still set after five pages" in (description or "")
+
+    async def test_the_mail_tools_say_how_to_read_and_keep_a_stored_bcc(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+        update = tools["outlook_update_draft"]
+        bcc = _object(_properties(update.input_schema)["bcc"])
+        read_bcc = _object(_properties(tools["outlook_read_mail"].output_schema)["bcc"])
+
+        assert "first read the draft with outlook_read_mail" in (update.description or "")
+        assert "read the draft with outlook_read_mail and send the full list" in str(
+            bcc["description"]
+        )
+        assert "only for a draft or a sent message" in str(read_bcc["description"])
 
     async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
@@ -1344,6 +1376,74 @@ class TestTheToolsThisServerAdvertises:
             "outlook_find_recipient"
         ]
 
+    async def test_outlook_create_mail_rule_tells_a_model_to_ask_when_no_condition_is_given(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tool = _named(await every_tool.list_tools())["outlook_create_mail_rule"]
+        conditions = str(_object(_properties(tool.input_schema)["conditions"])["description"])
+
+        assert "ask the user before you call this tool" in (tool.description or "")
+        assert "If the user gave no condition, ask the user for one" in conditions
+
+    async def test_the_meeting_tools_say_how_a_calendar_event_becomes_a_meeting_handle(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        for name in ("teams_list_meeting_transcripts", "teams_list_meeting_recordings"):
+            meeting_uri = _object(_properties(tools[name].input_schema)["meeting_uri"])
+            assert "a letter or a digit, also `/`, `:`, `?` and `%`" in str(
+                meeting_uri["description"]
+            ), name
+
+    async def test_the_event_tools_say_which_one_writes_to_a_second_calendar_of_the_user(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+        on_behalf = tools["outlook_create_event_on_behalf"]
+        calendar_ref = _object(_properties(on_behalf.input_schema)["calendar_ref"])
+
+        assert "a second calendar of the user" in (on_behalf.description or "")
+        assert "`is_mine` and `can_edit` are both true" in str(calendar_ref["description"])
+        assert "and for a second calendar of the user" in (
+            tools["outlook_create_event"].description or ""
+        )
+
+    async def test_the_mail_tools_say_that_uri_is_the_handle_and_folder_id_is_not(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        for name in ("outlook_move_mail", "outlook_mark_mail"):
+            message_refs = _object(_properties(tools[name].input_schema)["message_refs"])
+            assert "A `folder_id` and a `web_link` are not handles" in str(
+                message_refs["description"]
+            ), name
+        assert any(
+            "`folder_id` and `web_link` are not message handles" in text
+            for text in _described(tools["outlook_list_mail"].output_schema)
+        )
+
+    async def test_outlook_set_automatic_reply_says_what_an_unset_value_and_a_bare_end_mean(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tool = _named(await every_tool.list_tools())["outlook_set_automatic_reply"]
+        audience = _object(_properties(tool.input_schema)["external_audience"])
+
+        assert "set `end` to 00:00 on Saturday" in (tool.description or "")
+        assert "keeps the stored value" in (tool.description or "")
+        assert "With no stored value, it is `none`" in str(audience["description"])
+
+    async def test_the_sharepoint_tools_say_where_a_destination_folder_comes_from(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        tools = _named(await every_tool.list_tools())
+
+        assert "needs a word to search for" in (tools["sharepoint_list_drives"].description or "")
+        assert "No tool lists the libraries of a site" in (
+            tools["sharepoint_copy_item"].description or ""
+        )
+
     async def test_every_description_that_spells_a_group_handle_spells_a_site_handle_too(
         self, every_tool: Client[FastMCPTransport]
     ) -> None:
@@ -1618,7 +1718,69 @@ class TestCallingThem:
         assert told["messages"] == unasked["messages"] == whole["messages"], (
             "asking about completeness changes what is reported and never what was read"
         )
-        assert route.call_count == 3, "one request per call, and the cursor still never followed"
+        assert route.call_count == 3, (
+            "one request per call, and the cursor followed only when a caller passes it"
+        )
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize("token", ["a%2Bb%3D", "a+b%3D", "a%20b"])
+    async def test_a_channel_is_read_page_by_page_with_the_link_of_the_page_before(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        token: str,
+    ) -> None:
+        link = f"{GRAPH_V1}{_CHANNEL_MESSAGES_PATH}?$expand=replies&$top=1&$skiptoken={token}"
+        route = graph.get(_CHANNEL_MESSAGES_PATH).mock(
+            side_effect=[
+                httpx.Response(200, json={**_CHANNEL_POSTS, "@odata.nextLink": link}),
+                httpx.Response(200, json=_CHANNEL_POSTS),
+            ]
+        )
+        ids = {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID, "limit": 1}
+
+        first = _structured(await mcp_client.call_tool("teams_browse_channel", ids))
+        assert "$skiptoken" not in route.calls.last.request.url.params
+        last = _structured(
+            await mcp_client.call_tool(
+                "teams_browse_channel", {**ids, "page_token": first["next_page_token"]}
+            )
+        )
+
+        assert first["next_page_token"] == link
+        assert last["next_page_token"] is None
+        assert str(route.calls.last.request.url) == link, "the link goes back as Microsoft sent it"
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "link",
+        [
+            "https://evil.example/v1.0/teams/T/channels/C/messages?$skiptoken=x",
+            f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/19:other@thread.tacv2/messages?$skiptoken=x",
+            f"{GRAPH_V1}/me/messages?$skiptoken=x",
+            "x",
+            f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages\n?$skiptoken=x",
+            f"http://graph.microsoft.com/v1.0/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages",
+            f"https://graph.microsoft.com/beta/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages?$skiptoken=x",
+            f"https://graph.microsoft.com@evil.example/v1.0/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages?$skiptoken=x",
+            f"{GRAPH_V1}/teams/{_TEAM_ID}/channels/{_CHANNEL_ID}/messages/?$skiptoken=x",
+        ],
+    )
+    async def test_a_channel_page_link_that_is_not_of_this_channel_is_refused(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        link: str,
+    ) -> None:
+        route = graph.route().mock(return_value=httpx.Response(200, json=_CHANNEL_POSTS))
+
+        with pytest.raises(ToolError, match="not the `next_page_token`"):
+            _ = await mcp_client.call_tool(
+                "teams_browse_channel",
+                {"team_id": _TEAM_ID, "channel_id": _CHANNEL_ID, "page_token": link},
+            )
+
+        assert route.call_count == 0
 
     @pytest.mark.usefixtures("obo")
     async def test_a_collection_microsoft_never_ends_is_refused_in_eleven_requests(
@@ -1686,6 +1848,40 @@ class TestCallingThem:
                 "https://graph.microsoft.com/ChannelMessage.Read.All",
             )
         ]
+
+    @pytest.mark.usefixtures("obo")
+    @pytest.mark.parametrize(
+        "odata_type",
+        [
+            pytest.param("microsoft.graph.chatMessage", id="without-hash"),
+            pytest.param("#microsoft.graph.chatMessage", id="with-hash"),
+        ],
+    )
+    async def test_teams_search_messages_reads_a_hit_whatever_the_type_spelling(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        odata_type: str,
+    ) -> None:
+        link = "https://teams.microsoft.invalid/l/message/19:release@thread.v2/1770000000000"
+        hit = {**_SEARCH_HIT_RESOURCE, "@odata.type": odata_type, "webLink": link}
+        search = {
+            "value": [
+                {
+                    "hitsContainers": [
+                        {"hits": [{"hitId": "1", "rank": 1, "resource": hit}], "total": 1}
+                    ]
+                }
+            ]
+        }
+        graph.post("/search/query").mock(return_value=httpx.Response(200, json=search))
+
+        result = await mcp_client.call_tool("teams_search_messages", {"query": "release"})
+
+        (message,) = cast("Sequence[Mapping[str, object]]", _structured(result)["messages"])
+        assert message["uri"] == "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000"
+        assert cast("Mapping[str, object]", message["sender"])["display_name"] == "Ada Lovelace"
+        assert message["web_url"] == link
 
     async def test_a_handle_from_a_search_result_reads_the_message_behind_it(
         self,
@@ -2631,9 +2827,9 @@ class TestWhatAModelIsToldWhenGraphRefuses:
         )
 
         message = _error_text(result)
-        assert "replies of the posts on the first page of the channel" in message, message
+        assert "replies of the posts on the page it returns" in message, message
         assert "no route to its full text" in message
-        assert "a second browse returns the same window" in message
+        assert "a page read again returns the same window" in message
         assert "stop looking" in message
 
     @pytest.mark.usefixtures("obo")

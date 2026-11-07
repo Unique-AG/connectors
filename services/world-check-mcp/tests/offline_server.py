@@ -45,7 +45,7 @@ def unanswered_upstream() -> httpx2.MockTransport:
 
 @asynccontextmanager
 async def open_fake_persistence() -> AsyncGenerator[Persistence]:
-    """An in-memory store in place of Redis, which CI does not run."""
+    """An in-memory store in place of Postgres, which CI does not run."""
     yield Persistence(store=MemoryStore())
 
 

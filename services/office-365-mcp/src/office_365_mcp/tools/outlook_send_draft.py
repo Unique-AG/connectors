@@ -123,6 +123,7 @@ GRAPH_NOT_FOUND = (
 class MailSent(BaseModel):
     to: list[MailAddress] = Field(description="Who received the message.")
     cc: list[MailAddress] = Field(description="Who received a copy.")
+    bcc: list[MailAddress] = Field(description="Who received a blind copy.")
     subject: str | None = Field(description="The subject the message was sent with, or null.")
     sent_at: str = Field(description="When the send was accepted, ISO-8601 in UTC.")
 
@@ -235,6 +236,7 @@ def _answer(draft: Message, *, sent_at: datetime) -> MailSent:
     return MailSent(
         to=MailAddress.each_of(draft.to_recipients),
         cc=MailAddress.each_of(draft.cc_recipients),
+        bcc=MailAddress.each_of(draft.bcc_recipients),
         subject=draft.subject,
         sent_at=sent_at.isoformat(),
     )

@@ -410,6 +410,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
+    "teams_list_call_transcripts": {"chat_id": ("teams_list_chats",)},
+    "teams_read_call_transcript": {"uri": ("teams_list_call_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_create_meeting": {
@@ -948,6 +950,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         4,
     ),
     (
+        ToolsPreset.TEAMS_CALL_TRANSCRIPTS,
+        ("User.Read", "Chat.Read", "CallTranscripts.Read.All"),
+        1,
+        4,
+    ),
+    (
         ToolsPreset.TEAMS_RECORDINGS,
         ("User.Read", "Chat.Read", "OnlineMeetings.Read", "OnlineMeetingRecording.Read.All"),
         1,
@@ -1166,8 +1174,8 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     ),
     (
         ToolsPreset.OUTLOOK_GROUP_CALENDAR,
-        ("User.Read", "Team.ReadBasic.All", "Calendars.Read"),
-        0,
+        ("User.Read", "Team.ReadBasic.All", "Group.Read.All"),
+        1,
         3,
     ),
     (ToolsPreset.OUTLOOK_CONTACTS, ("User.Read", "Contacts.Read"), 0, 3),
@@ -1182,16 +1190,16 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.SHAREPOINT_WRITE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 12),
     (ToolsPreset.SHAREPOINT_SHARE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 14),
     (ToolsPreset.SHAREPOINT_SITES, ("User.Read", "Files.Read.All", "Sites.Read.All"), 2, 6),
-    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
+    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read", "Notes.Read.All"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,
-        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
+        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite", "Notes.Read.All"),
         0,
         20,
     ),
     (
         ToolsPreset.ONENOTE_DELETE,
-        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
+        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite", "Notes.Read.All"),
         0,
         21,
     ),
