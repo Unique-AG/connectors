@@ -185,14 +185,12 @@ async def _resolve(
     builder = onenote_root(client, owner).notebooks.get_notebook_from_web_url
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _post_body.GetNotebookFromWebUrlPostRequestBody(web_url=web_url),
     )
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, CopyNotebookModel, {"XXX": ODataError}
-    )
+    return await client.request_adapter.send_async(request, CopyNotebookModel, {"XXX": ODataError})
 
 
 def _answer(found: CopyNotebookModel, owner: OnenoteOwner | None) -> FoundNotebook:

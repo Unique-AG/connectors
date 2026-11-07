@@ -26,7 +26,7 @@ _CHUNK_BYTES = 64 * 1024
 
 _MAX_ERROR_BODY_BYTES = 64 * 1024
 
-_ERROR_MAP: dict[str, type[ParsableFactory[ODataError]]] = {"XXX": ODataError}
+_ERROR_MAP: dict[str, type[ParsableFactory]] = {"XXX": ODataError}
 
 _RECOMPUTED_PER_BODY = frozenset({"content-length"})
 
@@ -98,7 +98,7 @@ async def _raise_for_status(adapter: HttpxRequestAdapter, response: httpx.Respon
             truncated = True
             break
     span = trace.get_current_span()
-    await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
+    await adapter.throw_failed_responses(
         _rebuilt(response, bytes(body), parsable=not truncated), _ERROR_MAP, span, span
     )
 

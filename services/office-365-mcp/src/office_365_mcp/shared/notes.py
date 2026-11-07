@@ -175,9 +175,7 @@ async def get_with_query[M: Parsable](
         typed=typed,
     )
     request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, model, {"XXX": ODataError}
-    )
+    return await client.request_adapter.send_async(request, model, {"XXX": ODataError})
 
 
 async def patch_page(
@@ -194,16 +192,14 @@ async def patch_page(
     )
     request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _post_request_body.OnenotePatchContentPostRequestBody(commands=list(commands)),
     )
     if not safe_to_repeat:
         request.add_request_options(no_retry())
-    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
-        request, {"XXX": ODataError}
-    )
+    await client.request_adapter.send_no_response_content_async(request, {"XXX": ODataError})
 
 
 class _Links(Protocol):

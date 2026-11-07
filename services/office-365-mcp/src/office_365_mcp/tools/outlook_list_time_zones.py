@@ -109,7 +109,7 @@ async def _first_page(
     )
     request = RequestInformation(Method.GET, template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
+    return await client.request_adapter.send_async(
         request, SupportedTimeZonesGetResponse, {"XXX": ODataError}
     )
 

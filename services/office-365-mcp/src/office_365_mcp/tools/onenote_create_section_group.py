@@ -197,15 +197,13 @@ async def _post_section_group(
     nested = root.section_groups.by_section_group_id(handle.section_group_id).section_groups
     request = RequestInformation(Method.POST, nested.url_template, dict(nested.path_parameters))
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         SectionGroup(display_name=name),
     )
     request.add_request_options(no_retry())
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, SectionGroup, {"XXX": ODataError}
-    )
+    return await client.request_adapter.send_async(request, SectionGroup, {"XXX": ODataError})
 
 
 def _answer(
