@@ -546,6 +546,18 @@ What happens:
 - The assistant lists the 3 unread messages of "support@example.com".
 - It does not list messages of Mia's own mailbox.
 
+**A mailbox that Mia cannot open is explained as missing access**
+
+Ask your assistant: "Show me the unread messages in the finance mailbox."
+
+Tests: 1
+
+Situation: Mia has no access to the shared mailbox "finance".
+
+What happens:
+
+- The assistant tells Mia that she has no access to "finance".
+
 #### Mia is told what happened when Microsoft cannot do what she asked
 
 The assistant never reports a search that failed as a search that found nothing.
@@ -697,10 +709,6 @@ What happens:
 - The message is listed.
 - The message shows no flag.
 
-#### Not supported yet in finding and reading mail
-
-- The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
-
 ### Drafting and sending mail
 
 Mia lets her assistant write mail for her. The assistant leaves each message as a draft for Mia to read, and sends it only after Mia approves.
@@ -786,6 +794,19 @@ What happens:
 
 - The assistant tells Mia that Tom is already on the draft.
 - The draft stays as it is until Mia chooses.
+
+**A blind copy is put on a draft**
+
+Ask your assistant: "Put Priya on blind copy on my draft to Anna."
+
+Tests: 1
+
+Situation: Mia has a draft addressed to Anna.
+
+What happens:
+
+- Priya is on the draft as a blind copy.
+- Anna cannot see Priya on the message.
 
 **The subject, the importance, and a recipient of a draft change**
 
@@ -1463,7 +1484,6 @@ What happens:
 
 #### Not supported yet in drafting and sending mail
 
-- The assistant cannot add a blind copy to a draft yet.
 - The assistant cannot attach a file to a draft yet.
 
 ### Organizing the mailbox
@@ -1679,9 +1699,6 @@ Ask your assistant: "Create a red category Follow-up Q4 and put it on my unread 
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant creates the category and puts it on mail only when the administrator has turned on both groups of tools.
-
 Situation: Mia has 4 unread messages from Tom Berger.
 
 What happens:
@@ -1712,9 +1729,6 @@ What happens:
 Ask your assistant: "Make a rule that moves mail from billing@example.com to my Finance folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
 
 What happens:
 
@@ -1774,9 +1788,6 @@ What happens:
 Ask your assistant: "Make a rule that moves the mail I do not need to my Archive folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may create a rule for every new message without asking which mail Mia means.
 
 What happens:
 
@@ -2022,9 +2033,6 @@ What happens:
 Ask your assistant: "Make a rule that moves mail from billing@example.com to my Finance folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
 
 Situation: Mia asks her assistant for a rule that moves mail from "billing@example.com" to "Finance".
 
@@ -2564,9 +2572,6 @@ Mia sets how her mailbox behaves while she is away and which senders reach her a
 Ask your assistant: "Turn on my out-of-office reply from Monday to Friday and tell everyone I am away."
 
 Tests: 2
-
-!!! warning "Limit"
-    The assistant can leave outside senders without a reply. It can also stop the reply a day early or use the wrong time zone.
 
 What happens:
 
@@ -3663,9 +3668,6 @@ Ask your assistant: "Put the Offsite on my Team calendar."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not put a meeting on a second calendar of Mia. Nobody tested it.
-
 Situation: Mia has a second calendar named "Team".
 
 What happens:
@@ -4487,9 +4489,6 @@ Ask your assistant: "What is on the calendar of the Platform team this week?"
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not be able to read a team calendar. One attempt failed, and the cause is not known.
-
 Situation: The team "Platform" has 4 events on its calendar this week.
 
 What happens:
@@ -5158,10 +5157,7 @@ What happens:
 
 Ask your assistant: "What happened in the Releases channel this week?"
 
-Tests: 3
-
-!!! warning "Limit"
-    The assistant may miss posts of a busy channel when it reads a whole week.
+Tests: 4
 
 Situation: The channel "Releases" has 3 posts this week and 2 older posts, and one post of this week has 4 replies.
 
@@ -5326,9 +5322,6 @@ What happens:
 Ask your assistant: "Summarize the Budget review that is on my calendar."
 
 No test: assistant
-
-!!! warning "Limit"
-    The assistant may not be able to read the transcript of a meeting that has no meeting chat. Nobody tested it.
 
 Situation: "Budget review" is on Mia's calendar and it has a transcript. Mia has no meeting chat for "Budget review".
 
@@ -8865,9 +8858,6 @@ Cases:
 Ask your assistant: "Create a section 2025 in my Archive section group of Project Falcon."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may tell Mia that an administrator must act, although it could create the section in the notebook instead.
 
 Situation: Mia has the section group "Archive" in her notebook "Project Falcon". Microsoft refuses a new section in "Archive".
 

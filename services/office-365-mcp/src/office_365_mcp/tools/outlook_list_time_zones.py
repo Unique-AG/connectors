@@ -39,9 +39,9 @@ Notes:
 - A tool that lists or reads events, event occurrences, or reminders takes only IANA names in \
 `time_zone`. This tool lists Windows names by default. For a tool that takes only IANA names, \
 set `standard` to `iana`.
-- If this deployment exposes outlook_check_availability, that tool also takes only IANA names. A \
-tool that creates or changes an event sends the zone name to Microsoft as written. Microsoft \
-documents that it can refuse some zone names there.
+- If this deployment exposes outlook_check_availability or outlook_suggest_meeting_times, those \
+tools also take only IANA names. A tool that creates or changes an event sends the zone name to \
+Microsoft as written. Microsoft documents that it can refuse some zone names there.
 - Find the row that matches the place that the user named. Do not guess a zone name. An \
 `Etc/GMT+N` name is N hours behind UTC, not ahead of it.
 """

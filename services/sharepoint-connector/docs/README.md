@@ -51,11 +51,11 @@ SharePoint REST API (list attachment sync on sites with `listAttachmentsScan` en
 Microsoft Graph:
 
 - `GroupMember.Read.All` - Read members of the groups files were shared with
-- `User.ReadBasic.All` - Read details of the groups files were shared with
+- `User.ReadBasic.All` - Read the name, email and login of the members of those groups
 
 SharePoint REST API:
 
-- `Sites.Selected` - Read details and members of site groups files were shared with for granted sites
+- `Sites.Selected` - Read members of site groups files were shared with for granted sites
 
 For detailed permission justifications, see [Microsoft Graph Permissions](./technical/permissions.md).
 
@@ -274,7 +274,7 @@ See [Content Sync Flow](./technical/flows.md#Content-Sync-Flow) for additional d
 | **One connector per SharePoint tenant** | Multiple deployments for multi-tenant                            | Document multi-origin workaround                                                    |
 | **Horizontal scaling not supported**    | Single pod deployment                                            | Adequate resource allocation                                                        |
 | **Singleton per site**                  | A site must not be configured in more than one connector process | Ensure non-overlapping sites across multiple processes for the same Unique instance |
-| **Permission sync group visibility**    | App principal needs member/owner or Full Control                 | Document requirement                                                                |
+| **Permission sync group visibility**    | App principal needs member/owner, or visibility set to Everyone  | Document requirement                                                                |
 
 ## Future Versions
 

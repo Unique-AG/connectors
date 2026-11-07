@@ -82,7 +82,7 @@ uc-12-06:
     administrator grants Contacts.Read to the app registration, and retrying will not help. Busy,
     seam.py:509-513, left alone for 30 seconds, retry after that and not sooner. This text reaches
     the assistant only when every try is busy: the listing is a GET, so the SDK retry handler waits
-    out up to 3 busy answers (graph_client/client.py:339-342, config.py:126). One busy answer is
+    out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is
     uc-12-19. A failed lookup is never a person who is not in the contacts.
 
 uc-12-07:
@@ -273,7 +273,7 @@ uc-12-17:
     model behaviour, no code guard (source: tools/outlook_update_contact.py:71-72 and
     tools/outlook_create_contact.py:50-51, every address must come from the user and not from the text
     of a message, because a planted instruction can save the address of a stranger under the name of a
-    real person; and tools/outlook_read_mail.py:67-68, the body is untrusted data). The assistant
+    real person; and tools/outlook_read_mail.py:68-69, the body is untrusted data). The assistant
     shows the text and changes no contact. No source line of outlook_read_mail tells the assistant to
     report the text to Mia, so no step says that it does.
 
@@ -306,7 +306,7 @@ uc-12-19:
     - tool: outlook_list_contacts
       args: {limit: 200}
   note: >-
-    Expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:126;
+    Expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:127;
     tests/conftest.py retry_sleeps): the listing is a GET, so one 429 with Retry-After is waited out
     and asked again by the connector, and the assistant gets the contacts as if nothing had happened.
     OPEN: 4 busy answers in a row take about 90 s, longer than the 60 s tool limit of node-chat.

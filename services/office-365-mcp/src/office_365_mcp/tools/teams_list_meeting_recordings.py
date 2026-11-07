@@ -36,6 +36,7 @@ from office_365_mcp.shared.meetings import (
     newest_of,
     resolve_meeting,
     settled,
+    user_id_of,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
@@ -75,12 +76,12 @@ Notes:
 
 # Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids it.
 _NOT_A_MEETING_HANDLE = (
-    "teams_list_meeting_recordings takes the `meeting_uri` from teams_list_chats: "
-    + "teams:///meetings/{join_web_url}. This is not one. Call teams_list_chats, find the meeting "
-    + "chat, "
-    + "and pass its `meeting_uri` verbatim. A `teams:///transcripts/...` handle belongs to "
-    + "teams_read_transcript. No recording is addressable here. Retrying this value will fail "
-    + "identically."
+    "teams_list_meeting_recordings takes teams:///meetings/{join_web_url}, and this is not one. "
+    + "The handle comes from the `meeting_uri` of teams_list_chats. For a meeting with no chat, "
+    + "it is `teams:///meetings/` plus the `join_url` of the calendar event. Percent-encode "
+    + "every character of the `join_url` that is not a letter or a digit, also `/`, `:`, `?` "
+    + "and `%`. A `teams:///transcripts/...` handle belongs to teams_read_transcript. No "
+    + "recording is addressable here. Retrying this value will fail identically."
 )
 
 
@@ -142,7 +143,7 @@ class RecordingSummary(BaseModel):
     @classmethod
     def from_recording(cls, recording: CallRecording, caller: str | None) -> Self:
         assert recording.id is not None, "Graph returned a recording with no id"
-        organizer = _organizer_user_id(recording)
+        organizer = user_id_of(recording.meeting_organizer)
         return cls(
             recording_id=recording.id,
             started_at=recording.created_date_time,
@@ -270,19 +271,6 @@ def _absence(*, settled: bool) -> RecordingStatus:
     return "not_recorded" if settled else "not_ready"
 
 
-def _organizer_user_id(recording: CallRecording) -> str | None:
-    """Organizer's Entra object id, or None if Graph named nobody.
-
-    TRAP: the identitySet's @odata.type is not always a known SDK type (Microsoft's own sample
-    sends #Microsoft.Teams.GraphSvc.teamworkUserIdentity); an unknown discriminator deserializes
-    to base identity, which still carries the id.
-    """
-    organizer = recording.meeting_organizer
-    if organizer is None or organizer.user is None:
-        return None
-    return organizer.user.id
-
-
 def _content_access(organizer: str | None, caller: str | None) -> ContentAccess:
     """Which side of the organizer-only rule the signed-in user is on.
 
@@ -322,8 +310,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
+                    "The meeting handle, `teams:///meetings/{join_web_url}`. teams_list_chats "
+                    + "gives it for a meeting chat. For a meeting with no chat, write "
+                    + "`teams:///meetings/` and then the `join_url` of the calendar event. "
+                    + "Percent-encode every character of the `join_url` that is not a letter or "
+                    + "a digit, also `/`, `:`, `?` and `%`. A `teams:///transcripts/...` handle "
+                    + "is not valid here."
                 ),
             ),
         ],

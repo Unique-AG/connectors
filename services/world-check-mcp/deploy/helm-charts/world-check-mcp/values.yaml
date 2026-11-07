@@ -16,11 +16,13 @@ env:
   PORT: "8000"
   LOG_LEVEL: info
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+  # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
+  DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
 
 # Set per deployment in the overlay. The app refuses to start without them.
 # - MCP_BASE_URL: the public https origin, matching routes.hostname
 # - every secret in .env.example, from a secret through envVars: UPSTREAM_API_KEY,
-#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET, ZITADEL_JWT_SIGNING_KEY, REDIS_URL
+#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET, ZITADEL_JWT_SIGNING_KEY
 envVars: []
 
 image:
@@ -71,13 +73,28 @@ volumes:
   - name: tmp
     emptyDir:
       sizeLimit: 64Mi
+  # Optional for a managed Postgres. An overlay that sets volumes repeats it.
+  - name: pg-cluster-ca
+    secret:
+      secretName: world-check-mcp-pg-cluster-ca
+      optional: true
+      items:
+        - key: ca.crt
+          path: ca.crt
 
 volumeMounts:
   - name: tmp
     mountPath: /tmp
+  - name: pg-cluster-ca
+    mountPath: /etc/postgresql-ca
+    readOnly: true
 
 postgresql:
-  enabled: false
+  enabled: true
+  connection:
+    sslMode: verify
+    # The overlay supplies the host or URL. The base chart injects DATABASE_URL and
+    # PG_DATABASE_SSL_MODE, which mcp_configs.PostgresSettings reads.
 
 rabbitmq:
   enabled: false

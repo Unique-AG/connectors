@@ -261,6 +261,28 @@ class TestExecution:
         )
         assert results["r1"] == {"status": "refused", "note": "refused: nope"}
 
+    def test_a_forced_rerun_that_leaves_the_old_fixture_in_place_is_refused(
+        self, fixtures: Path, tmp_path: Path
+    ) -> None:
+        _ = (fixtures / "rec-tool-r1.json").write_text("[]")
+        calls = Calls(fixtures)
+
+        def refusing(
+            command: Sequence[str], env: Mapping[str, str]
+        ) -> subprocess.CompletedProcess[str]:
+            if "-m" in command[1:2]:
+                return subprocess.CompletedProcess(command, 2, "", "refused: nope\n")
+            return calls(command, env)
+
+        results = execute(
+            plan_runs([READ], frozenset({"rec-tool-r1"}), {}, True),
+            UPNS,
+            refusing,
+            calls.sleeps.append,
+            tmp_path / "r.json",
+        )
+        assert results["r1"] == {"status": "refused", "note": "refused: nope"}
+
     def test_a_refusal_with_findings_keeps_the_first_three(
         self, fixtures: Path, tmp_path: Path
     ) -> None:
