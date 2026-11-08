@@ -49,7 +49,7 @@ service-dev = [
     "ruff==0.17.3",
 ]
 service-openapi = ["pyyaml==6.0.3"]
-service-postgres = ["alembic==1.20.1", "asyncpg==0.32.0", "sqlalchemy[asyncio]==2.1.6"]
+service-postgres = ["alembic==1.20.1", "asyncpg==0.32.0", "sqlalchemy[asyncio]==2.1.8"]
 # The tests open SQLite in place of Postgres.
 service-postgres-dev = ["aiosqlite==0.22.1"]
 service-redis = ["py-key-value-aio[redis]==0.4.6"]
