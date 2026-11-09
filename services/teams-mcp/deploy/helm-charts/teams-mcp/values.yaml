@@ -288,6 +288,10 @@ mcpConfig:
     # Leave as "common" when users choose their directory at login.
     # Independent of clientId/clientSecret; not the tenant that owns the app registration.
     signInTenantId: common
+    # -- Where Microsoft Entra sends a tenant admin after they grant admin consent through `{selfUrl}/admin/consent`.
+    # Must be registered as a redirect URI on the app registration.
+    # Optional - defaults to https://www.unique.ai/setup/consent-completed/entra-id, the Terraform module's default.
+    # adminConsentRedirectUri: ""
     # -- Entra tenant IDs (GUIDs) allowed to use the MCP server. Empty allows any tenant.
     # A sign-in from an unlisted tenant is rejected, and a user whose tenant is removed loses
     # access at their next Microsoft token refresh.
