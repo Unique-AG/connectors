@@ -156,6 +156,15 @@ describe('ChatService listChats lastMessagePreview', () => {
     expect(preview).toBe(`${'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH)}…`);
   });
 
+  it('keeps an emoji whole when it sits at the preview length', async () => {
+    const lead = 'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH - 1);
+    const preview = await previewFor({
+      body: { contentType: 'text', content: `${lead}😄 and more` },
+    });
+
+    expect(preview).toBe(`${lead}😄…`);
+  });
+
   it('returns null for a deleted last message', async () => {
     const preview = await previewFor({
       isDeleted: true,

@@ -73,7 +73,7 @@ export class ListChatsTool {
       'Those tell apart chats that share a topic or a member. ' +
       'Returns one page of up to 25. ' +
       'Pass a chatId to get_chat_messages or send_chat_message. A chatId names one chat exactly, so prefer it over a topic or a member name. ' +
-      'chatId is internal: never show it to the user. Present each chat by its topic or members, its type, its last message date and, when it helps tell chats apart, its last message preview.',
+      'chatId is internal: never show it to the user. Present each chat by its topic or members, its type and its last message date. Add its last message preview only when two chats would otherwise read the same.',
     parameters: ListChatsInputSchema,
     outputSchema: ListChatsOutputSchema,
     annotations: {
@@ -86,7 +86,7 @@ export class ListChatsTool {
     _meta: {
       'unique.app/icon': 'message-circle',
       'unique.app/system-prompt':
-        'Never show chatId to the user. List chats as numbered entries with topic or members, type, last message date and last message preview, and map the number the user picks back to its chatId.',
+        'Never show chatId to the user. List chats as numbered entries with topic or members, type and last message date. Add the last message preview only when two chats would otherwise read the same. Map the number the user picks back to its chatId.',
     },
   })
   @AttributeUpstreamErrors()

@@ -16,7 +16,7 @@ list_teams / list_chats / list_channels  →  id  →  get_*_messages / send_*_m
 
 The `list_*` tools return distinguishing metadata (creation dates, last-message timestamps, archived/membership flags, member names) so the agent can pick the right id when several teams, chats, or channels share a display name.
 
-The ids are internal. The tool descriptions, output schemas and server instructions tell the agent to pass them between tools unchanged but never show them to the user. A chat list shows the topic or members, the type and the last-message date, numbered so the user can pick an entry by number.
+The ids are internal. The tool descriptions, output schemas and server instructions tell the agent to pass them between tools unchanged but never show them to the user. A chat list shows the topic or members, the type and the last-message date, numbered so the user can pick an entry by number. The last-message preview is added only when two chats would otherwise read the same.
 
 ## Tool Overview
 
