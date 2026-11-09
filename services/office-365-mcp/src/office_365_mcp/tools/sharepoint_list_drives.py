@@ -5,6 +5,7 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.method import Method
 from msgraph.generated.models.drive import Drive
 from msgraph.generated.models.drive_collection_response import DriveCollectionResponse
 from msgraph.generated.sites.item.drives.drives_request_builder import (
@@ -19,19 +20,19 @@ from office_365_mcp.graph_client import (
     collect_pages,
     graph_errors,
     graph_step,
+    request_with_query,
+    send_parsed,
 )
 from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.sites import not_a_site, site_by_path, site_path_of
+from office_365_mcp.shared.sites import not_a_site, site_path_of
 
 TOOL_NAME = "sharepoint_list_drives"
 
 STEP = "my_drives"
 
 STEP_SITE_DRIVES = "site_drives"
-
-STEP_SITE = "site_by_url"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)
 
@@ -43,6 +44,8 @@ _DRIVE_FIELDS: tuple[str, ...] = ("id", "name", "driveType", "webUrl", "descript
 _DrivesQuery = DrivesRequestBuilder.DrivesRequestBuilderGetQueryParameters
 
 _SiteDrivesQuery = SiteDrivesRequestBuilder.DrivesRequestBuilderGetQueryParameters
+
+_SITE_DRIVES = "{+baseurl}/sites/{+site_path}{?%24select}"
 
 _DESCRIPTION = """\
 Lists drives, each with a handle for its top folder. Without `site`, it lists the drives of the \
@@ -158,15 +161,17 @@ async def list_drives(client: GraphServiceClient, *, site: str | None = None) ->
 async def _site_drives(
     client: GraphServiceClient, site_path: str
 ) -> DriveCollectionResponse | None:
-    with graph_step(STEP_SITE):
-        found = await site_by_path(client, site_path)
-    assert found is not None and found.id is not None, "Graph answered a site lookup with no site"
+    drives_path = f"{site_path}:/drives" if ":" in site_path else f"{site_path}/drives"
+    request = request_with_query(
+        Method.GET,
+        _SITE_DRIVES,
+        {**client.sites.path_parameters, "site_path": drives_path},
+        query={},
+        typed=_SiteDrivesQuery(select=list(_DRIVE_FIELDS)),
+    )
+    request.headers.try_add("Accept", "application/json")
     with graph_step(STEP_SITE_DRIVES):
-        return await client.sites.by_site_id(found.id).drives.get(
-            request_configuration=RequestConfiguration[_SiteDrivesQuery](
-                query_parameters=_SiteDrivesQuery(select=list(_DRIVE_FIELDS))
-            )
-        )
+        return await send_parsed(client, request, DriveCollectionResponse)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

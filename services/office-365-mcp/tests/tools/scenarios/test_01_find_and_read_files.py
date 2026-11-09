@@ -517,10 +517,7 @@ class TestWhereTheFilesAreStored:
     async def test_the_libraries_of_a_site_are_listed_from_its_web_address(
         self, graph: respx.MockRouter
     ) -> None:
-        site = graph.get("/sites/contoso.sharepoint.com:/sites/Sales").mock(
-            return_value=httpx.Response(200, json={"id": "contoso.sharepoint.com,s1,w1"})
-        )
-        libraries = graph.route(method="GET", path__regex=r"/sites/[^/]+/drives$").mock(
+        libraries = graph.get("/sites/contoso.sharepoint.com:/sites/Sales:/drives").mock(
             return_value=httpx.Response(
                 200,
                 json={
@@ -543,7 +540,7 @@ class TestWhereTheFilesAreStored:
         [library] = _rows(listed, "drives")
         assert (library["name"], library["drive_type"]) == ("Shared Documents", "documentLibrary")
         assert str(library["root_uri"]).startswith("sharepoint:///folders/")
-        assert (site.call_count, libraries.call_count, len(graph.calls)) == (1, 1, 2)
+        assert (libraries.call_count, len(graph.calls)) == (1, 1)
 
     async def test_the_library_of_a_recorded_team_site_is_listed(
         self, graph: respx.MockRouter

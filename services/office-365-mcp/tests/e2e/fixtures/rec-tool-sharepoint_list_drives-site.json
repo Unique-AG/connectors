@@ -68,32 +68,32 @@
           "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2012"
         },
         {
-          "createdDateTime": "2025-11-14T14:57:03Z",
-          "displayName": "synthetic text 13",
-          "id": "ejeqglvcdnqtmpzic.ucemeqagqu.gcb,00000000-97ae-43d0-837a-2d58301e50a9,00000000-a742-4251-8886-4fb594b43ce9",
-          "lastModifiedDateTime": "2025-11-14T14:57:12Z",
-          "name": "synthetic text 14",
-          "root": {},
-          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2014"
-        },
-        {
           "createdDateTime": "2026-03-13T16:42:14Z",
           "description": " ",
-          "displayName": "synthetic text 15",
+          "displayName": "synthetic text 13",
           "id": "rvqoiutaetkgqefdj.iqefidaqns.cxe,00000000-f0bd-4ad6-8820-dd17601ebc92,00000000-1542-4d27-8f75-a8742d4cbf1e",
           "lastModifiedDateTime": "2026-03-05T03:19:56Z",
-          "name": "synthetic text 15",
+          "name": "synthetic text 13",
           "root": {},
-          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2015"
+          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2013"
         },
         {
           "createdDateTime": "2026-04-16T07:43:24Z",
-          "displayName": "synthetic text 16",
+          "displayName": "synthetic text 14",
           "id": "mishaaoubwlxsiwxj.uavsgfrgzc.rwv,00000000-97fb-4771-86b9-f4cec1f007b5,00000000-4b2a-4441-8508-a6aab545e3ae",
           "lastModifiedDateTime": "2026-04-16T07:43:33Z",
-          "name": "synthetic text 17",
+          "name": "synthetic text 15",
           "root": {},
           "webUrl": "https://contoso.sharepoint.com/teams/QHH-BUDdeyhsagdcsicitwibj1"
+        },
+        {
+          "createdDateTime": "2025-11-14T14:57:03Z",
+          "displayName": "synthetic text 16",
+          "id": "ejeqglvcdnqtmpzic.ucemeqagqu.gcb,00000000-97ae-43d0-837a-2d58301e50a9,00000000-a742-4251-8886-4fb594b43ce9",
+          "lastModifiedDateTime": "2025-11-14T14:57:12Z",
+          "name": "synthetic text 17",
+          "root": {},
+          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2017"
         },
         {
           "createdDateTime": "2025-11-17T13:19:24Z",
@@ -151,38 +151,38 @@
           "webUrl": "https://contoso.sharepoint.com/teams/Z3FBbzikfHpbolbaEpkg"
         },
         {
-          "createdDateTime": "2026-08-17T08:54:10Z",
-          "displayName": "synthetic text 29",
-          "id": "dgkufxwiytbaksupv.ptoeeqcelk.rrr,00000000-5ba8-4fe6-8ccb-793dc398cb95,00000000-3162-4a2d-8b3f-5795d9bcd71d",
-          "lastModifiedDateTime": "2026-08-15T20:19:18Z",
-          "name": "synthetic text 30",
-          "root": {},
-          "webUrl": "https://contoso.sharepoint.com/teams/H7XUqjellFncuoeqBfct-JteajcFPCXN0qnvb"
-        },
-        {
           "createdDateTime": "2026-03-01T17:02:06Z",
-          "displayName": "synthetic text 31",
+          "displayName": "synthetic text 29",
           "id": "wqodrzbaygolxegjl.urgwomtklm.vma,00000000-cea4-456a-8c64-d37e8f1336dc,00000000-46da-4165-8688-25a61dcb80f6",
           "lastModifiedDateTime": "2026-03-03T13:30:12Z",
-          "name": "synthetic text 32",
-          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2021/synthetic%20text%2020/synthetic%20text%2032"
+          "name": "synthetic text 30",
+          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2021/synthetic%20text%2020/synthetic%20text%2030"
         },
         {
           "createdDateTime": "2026-02-19T13:50:14Z",
-          "displayName": "synthetic text 33",
+          "displayName": "synthetic text 31",
           "id": "rhkuxosbkqkzgwqgx.ewmeicaiho.wac,00000000-3a63-407c-8b21-12a773cc78e4,00000000-1311-4016-8ce2-8b8b0eb5bb17",
           "lastModifiedDateTime": "2026-02-19T13:50:18Z",
-          "name": "synthetic text 34",
+          "name": "synthetic text 32",
           "webUrl": "https://contoso.sharepoint.com/JlrxfnbqnnpczWoyajwe1"
         },
         {
           "createdDateTime": "2025-10-28T20:53:53Z",
-          "displayName": "synthetic text 35",
+          "displayName": "synthetic text 33",
           "id": "pvhzzystrrdzuvgta.yrvzklzldc.meb,00000000-9b50-4f08-81f0-94121d45dec0,00000000-8165-44f5-84b8-b198cfc0bbb6",
           "lastModifiedDateTime": "2025-10-28T20:54:01Z",
+          "name": "synthetic text 33",
+          "root": {},
+          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2033"
+        },
+        {
+          "createdDateTime": "2026-08-17T08:54:10Z",
+          "displayName": "synthetic text 34",
+          "id": "dgkufxwiytbaksupv.ptoeeqcelk.rrr,00000000-5ba8-4fe6-8ccb-793dc398cb95,00000000-3162-4a2d-8b3f-5795d9bcd71d",
+          "lastModifiedDateTime": "2026-08-15T20:19:18Z",
           "name": "synthetic text 35",
           "root": {},
-          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2035"
+          "webUrl": "https://contoso.sharepoint.com/teams/H7XUqjellFncuoeqBfct-JteajcFPCXN0qnvb"
         },
         {
           "createdDateTime": "2026-03-13T17:37:12Z",
@@ -190,7 +190,7 @@
           "id": "mehkwlrggbivfezlj.exogfhkdcc.jig,00000000-f0bd-4ad6-8820-dd17601ebc92,00000000-5aa4-4bee-889b-433d08d40e53",
           "lastModifiedDateTime": "2026-03-13T17:37:15Z",
           "name": "synthetic text 36",
-          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2015/synthetic%20text%2036"
+          "webUrl": "https://contoso.sharepoint.com/sites/synthetic%20text%2013/synthetic%20text%2036"
         },
         {
           "createdDateTime": "2026-07-08T07:52:02Z",
@@ -232,25 +232,7 @@
   },
   {
     "method": "GET",
-    "path": "/v1.0/sites/contoso.sharepoint.com:/teams/synthetic text 01",
-    "status": 200,
-    "response_headers": {
-      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
-    },
-    "response_json": {
-      "createdDateTime": "2026-10-30T13:12:53.317Z",
-      "description": "The team of the recorder cases.",
-      "displayName": "seed-v1 team",
-      "id": "qwtwkvuabyfwcxxvo.okbidbhjzy.dza,00000000-e263-472b-8fb7-39fbafc89342,00000000-b2dc-4c58-8300-026e8bc8bea1",
-      "lastModifiedDateTime": "2026-11-09T10:35:46Z",
-      "name": "synthetic text 01",
-      "root": {},
-      "webUrl": "https://contoso.sharepoint.com/teams/synthetic%20text%2001"
-    }
-  },
-  {
-    "method": "GET",
-    "path": "/v1.0/sites/qwtwkvuabyfwcxxvo.okbidbhjzy.dza,00000000-e263-472b-8fb7-39fbafc89342,00000000-b2dc-4c58-8300-026e8bc8bea1/drives",
+    "path": "/v1.0/sites/contoso.sharepoint.com:/teams/synthetic text 01:/drives",
     "query": {
       "$select": "id,name,driveType,webUrl,description,owner"
     },

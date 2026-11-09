@@ -22,8 +22,8 @@ _LIST = "/v1.0/sites/?*,*,*/lists/*"  # "?*" keeps the site id out of the seed t
 READ_GETS: Mapping[str, tuple[str, ...]] = {
     "sharepoint_resolve_url": ("GET /v1.0/shares/u!*/driveItem",),
     "sharepoint_list_drives": (
-        "GET /v1.0/sites/*/sites/*",
-        "GET /v1.0/sites/*/teams/*",
+        "GET /v1.0/sites/*/sites/*/drives",
+        "GET /v1.0/sites/*/teams/*/drives",
         "GET /v1.0/sites/*/drives",
     ),
     "sharepoint_search_sites": ("GET /v1.0/sites",),

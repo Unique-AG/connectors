@@ -2,14 +2,14 @@ scenario: sharepoint_list_drives-site
 fixture: rec-tool-sharepoint_list_drives-site
 source: recorded
 target: graph
-recorded_at: '2026-11-09T10:48:35+00:00'
+recorded_at: '2026-11-09T16:10:20+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 33
-  keys dropped: 24
-  response headers dropped: 31
-  text kept: 6
-  text replaced: 76
+  ids mapped: 31
+  keys dropped: 22
+  response headers dropped: 21
+  text kept: 4
+  text replaced: 74
 literals: []
 sdk_versions:
   msgraph-sdk: 1.65.0
