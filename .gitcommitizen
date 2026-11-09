@@ -33,7 +33,6 @@ sharepoint-connector = services/sharepoint-connector/**
 confluence-connector = services/confluence-connector/**
 teams-mcp = services/teams-mcp/**
 temenos-mcp = services/temenos-mcp/**
-hello-mcp = services/hello-mcp/**
 kb-mcp = services/kb-mcp/**
 backstop-mcp = services/backstop-mcp/**
 office-365-mcp = services/office-365-mcp/**
