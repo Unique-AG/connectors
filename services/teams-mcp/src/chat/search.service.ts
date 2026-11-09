@@ -108,9 +108,8 @@ export class SearchService {
   // 1 per second, and several hits from one busy chat are common, so keep this low.
   private static readonly HYDRATION_CONCURRENCY = 3;
 
-  // The client retries a 429 and honours Retry-After, which can take minutes.
-  // Past this budget a hit gives up its body, so the caller still gets the page.
-  // Container names run alongside hydration and share the same budget.
+  // A 429 retry honours Retry-After and can take minutes. Past this budget a hit
+  // or container name is returned without its lookup, so the caller still gets the page.
   private static readonly HYDRATION_BUDGET_MS = 15_000;
 
   private static readonly NAME_LOOKUP_CONCURRENCY = 3;

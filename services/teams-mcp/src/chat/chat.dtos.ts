@@ -67,7 +67,7 @@ function toPreviewText(body: { contentType: string; content: string }): string |
   // Cut by code point, so an emoji at the limit is not split into a lone surrogate.
   const chars = Array.from(text);
   return chars.length > LAST_MESSAGE_PREVIEW_MAX_LENGTH
-    ? `${chars.slice(0, LAST_MESSAGE_PREVIEW_MAX_LENGTH).join('').trimEnd()}…`
+    ? `${chars.slice(0, LAST_MESSAGE_PREVIEW_MAX_LENGTH - 1).join('').trimEnd()}…`
     : text;
 }
 

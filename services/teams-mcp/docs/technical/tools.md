@@ -118,7 +118,7 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
 
 **Returns:** A `chats` array. Each chat has `chatId`, `chatType`, `topic` (nullable), `createdDateTime`, `lastMessageAt`, `lastMessagePreview`, and — for chats without a topic — a `members` array (`displayName`, plus `email` when `includeMemberEmails` is `true`). Pass `chatId` to `get_chat_messages` or `send_chat_message`.
 
-`lastMessagePreview` is the plain text of the last message, with Teams HTML flattened. Text longer than 150 characters is cut to 150 and ends in `…`. It is `null` when the last message is deleted, a system event, or has no text (an attachment alone). It lets the agent tell apart chats that have no topic and no named members.
+`lastMessagePreview` is the plain text of the last message, with Teams HTML flattened. It is at most 150 characters: longer text is cut and ends in `…`, which counts toward the 150. It is `null` when the last message is deleted, a system event, or has no text (an attachment alone). It lets the agent tell apart chats that have no topic and no named members.
 
 **Example:**
 

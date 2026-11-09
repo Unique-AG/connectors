@@ -148,16 +148,16 @@ describe('ChatService listChats lastMessagePreview', () => {
     expect(preview).toBe('See you tomorrow');
   });
 
-  it('cuts a long message to the preview length and marks the cut', async () => {
+  it('cuts a long message to the preview length, ellipsis included', async () => {
     const preview = await previewFor({
       body: { contentType: 'text', content: 'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH + 50) },
     });
 
-    expect(preview).toBe(`${'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH)}…`);
+    expect(preview).toBe(`${'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH - 1)}…`);
   });
 
   it('keeps an emoji whole when it sits at the preview length', async () => {
-    const lead = 'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH - 1);
+    const lead = 'a'.repeat(LAST_MESSAGE_PREVIEW_MAX_LENGTH - 2);
     const preview = await previewFor({
       body: { contentType: 'text', content: `${lead}😄 and more` },
     });
