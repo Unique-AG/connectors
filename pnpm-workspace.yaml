@@ -31,9 +31,9 @@ catalog:
   "@opentelemetry/api": 1.10.0
   "@opentelemetry/instrumentation-pg": 0.77.0
   "@proventuslabs/nestjs-zod": 2.0.0
-  "@suites/di.nestjs": 3.1.0
-  "@suites/doubles.vitest": 3.1.0
-  "@suites/unit": 3.1.1
+  "@suites/di.nestjs": 4.0.3
+  "@suites/doubles.vitest": 4.1.2
+  "@suites/unit": 4.1.2
   "@swc/cli": 0.8.2
   "@swc/core": 1.16.21
   "@types/amqplib": 0.10.8
