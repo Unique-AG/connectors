@@ -286,7 +286,9 @@ def _report(operation: str | None, step: str | None, failure: GraphFailure) -> N
     present = {name: value for name, value in fields.items() if value is not None}
     level = logging.INFO if isinstance(failure, GraphForbidden | GraphNotFound) else logging.WARNING
     logger.log(level, "graph call failed", extra=present)
-    trace.get_current_span().set_attributes(present)
+    trace.get_current_span().set_attributes(
+        {name: value for name, value in present.items() if name != "graph_reason"}
+    )
 
 
 def _status_of(failure: GraphFailure) -> str:

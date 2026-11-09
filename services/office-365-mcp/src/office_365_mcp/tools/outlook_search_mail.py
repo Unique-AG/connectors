@@ -141,6 +141,10 @@ async def search_mail(
                     ("received_after", received_after),
                     ("received_before", received_before),
                     ("importance", importance),
+                    ("flagged", flagged),
+                    ("has_attachments", has_attachments),
+                    ("category", category),
+                    ("mailbox", mailbox),
                 )
                 if value is not None
             ),

@@ -359,7 +359,9 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
         assert record.levelno == logging.WARNING
         assert {name: getattr(record, name) for name in expected} == expected
         [span] = exporter.get_finished_spans()
-        assert dict(span.attributes or {}) == expected
+        assert dict(span.attributes or {}) == {
+            name: value for name, value in expected.items() if name != "graph_reason"
+        }
 
     async def test_a_missing_item_is_logged_below_warning(
         self,

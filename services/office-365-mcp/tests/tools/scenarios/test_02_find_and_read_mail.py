@@ -1002,6 +1002,9 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
             recipient="acme.com",
             query="secret words",
             received_after="2026-01-01",
+            flagged=False,
+            has_attachments=True,
+            category="Red",
             limit=5,
         )
 
@@ -1010,7 +1013,14 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
             for span in recorded_spans.get_finished_spans()
             if span.attributes and "search_mail.arguments" in span.attributes
         ]
-        assert recorded == ("query", "recipient", "received_after")
+        assert recorded == (
+            "query",
+            "recipient",
+            "received_after",
+            "flagged",
+            "has_attachments",
+            "category",
+        )
 
     @pytest.mark.parametrize("person", ["anna@acme.com", "Anna", "J. Smith"])
     async def test_a_person_is_still_searched_with_participants(
@@ -1025,7 +1035,7 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
 
 class TestAPersonIsFoundByTheDomainOfTheirCompany:
     @staticmethod
-    def _serve_an_empty_address_book(graph: respx.MockRouter) -> respx.Route:
+    def _serve_an_empty_address_book(graph: respx.MockRouter, **changes: object) -> respx.Route:
         _ = graph.get("/me").mock(
             return_value=httpx.Response(200, json={"id": "me", "mail": "mia@example.test"})
         )
@@ -1045,7 +1055,9 @@ class TestAPersonIsFoundByTheDomainOfTheirCompany:
                                 {"emailAddress": {"name": "Mia", "address": "mia@example.test"}}
                             ],
                             "ccRecipients": [],
+                            "bccRecipients": [],
                         }
+                        | changes
                     ]
                 },
             )
@@ -1076,6 +1088,24 @@ class TestAPersonIsFoundByTheDomainOfTheirCompany:
             "mailbox",
             True,
         )
+
+    async def test_a_person_who_was_only_on_bcc_is_a_candidate(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = self._serve_an_empty_address_book(
+            graph,
+            **{
+                "from": {"emailAddress": {"name": "Mia", "address": "mia@example.test"}},
+                "bccRecipients": [
+                    {"emailAddress": {"name": "Anna Weiss", "address": "anna@acme.test"}}
+                ],
+            },
+        )
+
+        found = await call("outlook_find_recipient", query="acme.test", limit=5)
+
+        [candidate] = cast("list[dict[str, object]]", found["candidates"])
+        assert candidate["address"] == "anna@acme.test"
 
     async def test_a_name_that_the_address_book_does_not_know_is_still_searched_with_participants(
         self, graph: respx.MockRouter

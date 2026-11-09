@@ -45,7 +45,13 @@ _PERSON_FIELDS = (
     "department",
 )
 
-_PARTICIPANT_FIELDS = ("from", "toRecipients", "ccRecipients", "receivedDateTime")
+_PARTICIPANT_FIELDS = (
+    "from",
+    "toRecipients",
+    "ccRecipients",
+    "bccRecipients",
+    "receivedDateTime",
+)
 
 type MatchKind = Literal["exact", "token", "fuzzy"]
 type RecipientKind = Literal["person", "group", "room"]
@@ -282,6 +288,7 @@ def _participants_of(message: Message) -> list[Recipient]:
             message.from_,
             *(message.to_recipients or []),
             *(message.cc_recipients or []),
+            *(message.bcc_recipients or []),
         )
         if recipient is not None
     ]

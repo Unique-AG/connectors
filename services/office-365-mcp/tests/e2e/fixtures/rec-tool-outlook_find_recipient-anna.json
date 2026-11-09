@@ -44,7 +44,7 @@
     "path": "/v1.0/me/messages",
     "query": {
       "$search": "\"participants:\\\"Anna Meier\\\"\"",
-      "$select": "from,toRecipients,ccRecipients,receivedDateTime",
+      "$select": "from,toRecipients,ccRecipients,bccRecipients,receivedDateTime",
       "$top": "1000"
     },
     "status": 200,
