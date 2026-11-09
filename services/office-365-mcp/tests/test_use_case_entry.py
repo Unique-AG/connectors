@@ -1,10 +1,3 @@
-"""The "Start from what you want to do" table of `docs/README.md`.
-
-Each row names a use case of `docs/use-cases.md` and the presets that a deployment turns on for it.
-These tests check the table against the sidecars of `features/` and against `PRESETS`, so a preset
-that lacks a tool of the use case fails here.
-"""
-
 import pathlib
 import re
 from collections.abc import Mapping, Sequence

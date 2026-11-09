@@ -552,6 +552,7 @@ async def capture(
                 step = mapping(with_personas(written, values))
                 recorder.tool = tool_of(step)
                 who = persona_of(step, plan.persona)
+                guards[who].sent = max(guards[who].sent, recorder.guard.sent)
                 recorder.guard, recorder.token = guards[who], tokens[who]
                 given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
                 try:

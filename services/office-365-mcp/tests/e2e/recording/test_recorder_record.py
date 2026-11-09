@@ -452,3 +452,14 @@ def test_link_refuses_a_scenario_that_has_no_entry_or_no_block(tmp_path: Path) -
 def test_the_cli_refuses_link_for_a_stand_in_recording(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["uc-02-01", "--target", "stand-in", "--link"]) == 2
     assert "--link needs a graph recording" in capsys.readouterr().err
+
+
+def test_the_request_cap_counts_the_steps_of_all_personas_together() -> None:
+    other = "eyJ0eXAiOiJKV1QifQ.eyJ1cG4iOiJhbm5hIn0.b3RoZXItdG9rZW4"
+    steps: tuple[Json, ...] = ({"tool": "get_me"}, {"tool": "get_me", "as": 2}, {"tool": "get_me"})
+    with pytest.raises(Refused, match="cap of 5 requests"):
+        _ = record_on(
+            Plan("as", "rec-as", steps, cap=5),
+            StandIn(others={other: stand_in.UPNS[1]}),
+            others={2: other},
+        )
