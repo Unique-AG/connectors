@@ -47,6 +47,7 @@ mock_provider "azuread" {
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
         "Files.ReadWrite.All"              = "c2222222-2222-2222-2222-222222222222"
         "Sites.Read.All"                   = "c3333333-3333-3333-3333-333333333333"
+        "Sites.ReadWrite.All"              = "c4444444-4444-4444-4444-444444444444"
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
@@ -694,6 +695,54 @@ run "preset_sharepoint_sites" {
   assert {
     condition     = local.admin_consent == ["Files.Read.All", "Sites.Read.All"]
     error_message = "Sites.Read.All needs an administrator, as Files.Read.All does. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_lists" {
+  variables {
+    tools_preset = "sharepoint-lists"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All"
+    error_message = "sharepoint-lists composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All"]
+    error_message = "Sites.Read.All needs an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_lists_write" {
+  variables {
+    tools_preset = "sharepoint-lists-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All,Sites.ReadWrite.All"
+    error_message = "sharepoint-lists-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All", "Sites.ReadWrite.All"]
+    error_message = "Sites.Read.All and Sites.ReadWrite.All need an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_lists_delete" {
+  variables {
+    tools_preset = "sharepoint-lists-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All,Sites.ReadWrite.All"
+    error_message = "sharepoint-lists-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All", "Sites.ReadWrite.All"]
+    error_message = "Sites.Read.All and Sites.ReadWrite.All need an administrator. This preset composed ${join(",", local.admin_consent)}"
   }
 }
 
