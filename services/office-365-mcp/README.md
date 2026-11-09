@@ -211,6 +211,17 @@ lines. The value comes from the first of these that exists:
 When the service knows `trace_id`, `request_id`, `session_id`, or `http_request_id`, these fields
 appear beside `correlation_id`. This service uses an `x-request-id` header from a gateway as-is.
 
+Each failed Microsoft Graph call writes one `graph call failed` line. The line has these fields:
+`graph_operation`, `graph_step`, `graph_remedy`, `graph_status`, `graph_code`, `graph_inner_code`,
+`graph_request_id`, and `graph_reason`. A field that Graph did not send is absent. `graph_reason` is
+the message of Graph, cut to 300 characters. The level is `warning`, or `info` for a 401, 403, or 404.
+The active span carries the same fields as attributes. To find a fault on the side of Microsoft,
+search for `graph_reason`. To report it to Microsoft, give them `graph_request_id`. A metric label
+does not carry these values, because `graph_code` and `graph_reason` have no fixed set.
+
+`outlook_search_mail` also sets the span attribute `search_mail.arguments`. It lists the names of
+the arguments of the call, and never their values.
+
 No secret reaches a log line. Two independent nets remove secrets, because a credential with an
 innocent-sounding field name, and an innocent-looking credential value, are two different failures:
 

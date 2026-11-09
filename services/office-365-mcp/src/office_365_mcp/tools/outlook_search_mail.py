@@ -16,6 +16,7 @@ from msgraph.generated.users.item.translate_exchange_ids.translate_exchange_ids_
 )
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
+from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
@@ -132,6 +133,21 @@ async def search_mail(
         ]
     )
     reached = graph_mailbox(client, mailbox)
+    trace.get_current_span().set_attribute(
+        "search_mail.arguments",
+        [
+            *(field.name for field in fields(criteria) if getattr(criteria, field.name)),
+            *(
+                name
+                for name, value in (
+                    ("received_after", received_after),
+                    ("received_before", received_before),
+                    ("importance", importance),
+                )
+                if value is not None
+            ),
+        ],
+    )
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SEARCH):

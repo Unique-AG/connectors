@@ -1,4 +1,5 @@
 import base64
+from collections.abc import Iterator
 from datetime import date
 from typing import cast
 
@@ -8,6 +9,10 @@ import respx
 from fastmcp.client.client import CallToolResult
 from fastmcp.exceptions import ToolError
 from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, TextResourceContents
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from tests.conftest import RecordedSleeps
 from tests.graph_fixtures import recorded_json, response, serve
@@ -78,6 +83,18 @@ async def _first_attachment(subject: str, limit: int) -> str:
 
 def _attachment_uri(message_id: str = "MSG1") -> str:
     return f"outlook:///messages/{message_id}/attachments/ATT1"
+
+
+@pytest.fixture
+def recorded_spans() -> Iterator[InMemorySpanExporter]:
+    exporter = InMemorySpanExporter()
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    exporter.clear()
+    yield exporter
 
 
 class TestTheAssistantFindsAMessageFromWhatMiaRemembers:
@@ -974,6 +991,26 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
 
         group = " OR ".join(f"{field}:{domain}" for field in ("from", "to", "cc", "bcc"))
         assert search_of(graph) == f"invoice ({group})"
+
+    async def test_a_search_records_which_arguments_it_used_and_none_of_their_values(
+        self, graph: respx.MockRouter, recorded_spans: InMemorySpanExporter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call(
+            "outlook_search_mail",
+            recipient="acme.com",
+            query="secret words",
+            received_after="2026-01-01",
+            limit=5,
+        )
+
+        [recorded] = [
+            span.attributes["search_mail.arguments"]
+            for span in recorded_spans.get_finished_spans()
+            if span.attributes and "search_mail.arguments" in span.attributes
+        ]
+        assert recorded == ("query", "recipient", "received_after")
 
     @pytest.mark.parametrize("person", ["anna@acme.com", "Anna", "J. Smith"])
     async def test_a_person_is_still_searched_with_participants(
