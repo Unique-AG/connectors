@@ -189,6 +189,46 @@ def test_a_token_of_another_user_is_refused() -> None:
     assert graph.seen == ["GET graph.microsoft.com/v1.0/me"]
 
 
+def test_a_step_as_another_persona_without_its_token_is_refused_before_any_request() -> None:
+    graph = StandIn()
+    with pytest.raises(Refused, match="no token for persona 2"):
+        _ = record_on(Plan("as", "rec-as", ({"tool": "get_me", "as": 2},)), graph)
+    assert graph.seen == []
+
+
+def test_a_step_as_a_persona_outside_the_three_is_refused(tmp_path: Path) -> None:
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    _ = (cases / "x.yaml").write_text("x-one:\n  chain:\n    - tool: get_me\n      as: 4\n")
+    with pytest.raises(Refused, match="step 1 runs as a persona outside 1..3"):
+        _ = resolve("x-one", cases=cases)
+
+
+def test_a_token_of_the_wrong_user_for_a_step_persona_is_refused_before_a_step_runs() -> None:
+    graph = StandIn()
+    with pytest.raises(Refused, match="GET /me does not answer SEED_UPNS position 2"):
+        _ = record_on(
+            Plan("as", "rec-as", ({"tool": "get_me"}, {"tool": "get_me", "as": 2})),
+            graph,
+            others={2: stand_in.TOKEN},
+        )
+    assert {seen.rpartition("/")[2] for seen in graph.seen} <= {"me", "organization", "drive"}
+
+
+def test_each_step_runs_with_the_token_of_its_persona() -> None:
+    other = "eyJ0eXAiOiJKV1QifQ.eyJ1cG4iOiJhbm5hIn0.b3RoZXItdG9rZW4"
+    steps: tuple[Json, ...] = ({"tool": "get_me"}, {"tool": "get_me", "as": 2}, {"tool": "get_me"})
+    outcome = record_on(
+        Plan("as", "rec-as", steps),
+        StandIn(others={other: stand_in.UPNS[1]}),
+        others={2: other},
+    )
+    answered = [
+        mapping(one["response_json"])["userPrincipalName"] for one in outcome.fixture.interactions
+    ]
+    assert answered == ["mia@example.test", "anna@example.test", "mia@example.test"]
+
+
 def test_a_transient_answer_is_never_recorded() -> None:
     with pytest.raises(Refused, match=r"transient answers \['503 GET'\]"):
         _ = record_on("uc-02-01", StandIn(frozenset({"retry"})))

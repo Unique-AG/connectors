@@ -217,16 +217,12 @@ uc-15-11:
   note: a file attached to the mail is not copied, which is the gap of uc-10-10.
 
 uc-15-12:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_a_teams_message_links"
     - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_resolves_a_file_that_a_chat_shows_as_a_reference_attachment"
+    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_anna_shared_with_mia_and_posted_in_a_chat"
   ask: "What is in the file that Anna posted in our chat yesterday?"
-  blocker:
-    kind: unknown
-    tool: sharepoint_resolve_url
-    text: A run on 2026-11-09 shows that the address of a file that Mia posted in a chat resolves and reads. No run has used a file that Anna posted, so whether Mia can open that file is not known.
-    user: The assistant may not be able to open a file that someone posted in Teams.
   provenance: drafted
   asks_user: false
   chain:
@@ -238,7 +234,7 @@ uc-15-12:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the lookup or the search}
-  note: sharepoint_resolve_url takes the web address of the attachment. If it fails, sharepoint_search_files finds the file by its name, because the file is shared with Mia.
+  note: sharepoint_resolve_url takes the web address of the attachment. A run on 2026-11-09 shows that Mia resolves and reads a file that Anna posted in a chat, when Anna had shared the file with Mia. No run covers a file that Anna did not share with Mia.
 
 
 uc-15-13:

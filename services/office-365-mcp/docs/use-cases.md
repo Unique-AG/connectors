@@ -9771,10 +9771,7 @@ What happens:
 
 Ask your assistant: "What is in the file that Anna posted in our chat yesterday?"
 
-Tests: 2
-
-!!! warning "Limit"
-    The assistant may not be able to open a file that someone posted in Teams.
+Tests: 3
 
 Situation: Anna posted the file "Offer.docx" in a chat with Mia yesterday.
 

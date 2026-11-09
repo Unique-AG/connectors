@@ -22,7 +22,7 @@ import shutil
 import sys
 import tempfile
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast, override
@@ -130,6 +130,10 @@ class Plan:
     def tokens(self) -> frozenset[str]:
         return frozenset(found[0] for found in _SYMBOL.finditer(json.dumps(self.steps)))
 
+    @property
+    def personas(self) -> frozenset[int]:
+        return frozenset(persona_of(step, self.persona) for step in self.steps)
+
 
 @dataclass(frozen=True, repr=False)
 class Outcome:
@@ -177,6 +181,8 @@ def resolve(
         if not 1 <= int(cast("int", step.get("wait_seconds", 1))) <= _MAX_WAIT
     ]:
         raise Refused(f"{scenario}: step {bad[0]} waits outside 1..{_MAX_WAIT} seconds")
+    if bad := [n for n, step in enumerate(steps, 1) if not 1 <= persona_of(step, 1) <= _PERSONAS]:
+        raise Refused(f"{scenario}: step {bad[0]} runs as a persona outside 1..{_PERSONAS}")
     deferred = spec.get("deferred", "")
     if not isinstance(deferred, str) or ("deferred" in spec and not deferred.strip()):
         raise Refused(f"{scenario}: deferred is a reason in words, not {deferred!r}")
@@ -233,6 +239,10 @@ def guard_for(
         people=frozenset(f"persona:{persona.key}.id" for persona in load_corpus().personas),
         extras=extras or {},
     )
+
+
+def persona_of(step: Json, default: int) -> int:
+    return int(cast("int", step.get("as", default)))
 
 
 def tool_of(step: Json) -> str:
@@ -490,9 +500,13 @@ async def capture(
     server: FastMCP[None],
     stand_in: StandIn | None,
     extras: Mapping[str, str] | None = None,
+    others: Mapping[int, str] | None = None,
 ) -> tuple[Recording, list[object], dict[str, str]]:
     if refusals := check(plan, guard, planned_values(upns, extras)):
         raise Refused(f"{plan.scenario}: refused before any request: " + "; ".join(refusals))
+    tokens = {plan.persona: token} | dict(others or {})
+    if missing := sorted(plan.personas - tokens.keys()):
+        raise Refused(f"{plan.scenario}: no token for persona {missing[0]}; set GRAPH_TOKEN_<n>")
     original = httpx.AsyncHTTPTransport.handle_async_request
     if target == "graph":
         delegate: httpx.AsyncBaseTransport = httpx.AsyncHTTPTransport(http2=True)
@@ -510,6 +524,18 @@ async def capture(
         send = answered
     identities, people = await preflight(send, delegate, guard, token, upns, people=uses_ids(plan))
     extras = extras or {}
+    guards = {plan.persona: guard}
+    for who in sorted(plan.personas - {plan.persona}):
+        guards[who] = guard_for(
+            upns, replace(plan, persona=who), guard.allow_writes, guard.cap, extras
+        )
+        more, _ = await preflight(
+            send, delegate, guards[who], tokens[who], upns, people=uses_ids(plan)
+        )
+        identities = Identities(identities.values | more.values | {more.token}, identities.token)
+    drives = frozenset(drive for one in guards.values() for drive in one.drive_ids)
+    for one in guards.values():
+        one.drive_ids = drives
     identities = Identities(identities.values | frozenset(extras.values()), identities.token)
     values = persona_values(upns, people, synthetic=False, extras=extras)
     secrets = sorted(identities.everything())
@@ -525,6 +551,8 @@ async def capture(
             for number, written in enumerate(plan.steps, 1):
                 step = mapping(with_personas(written, values))
                 recorder.tool = tool_of(step)
+                who = persona_of(step, plan.persona)
+                recorder.guard, recorder.token = guards[who], tokens[who]
                 given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
                 try:
                     bound = {key: resolved(value, results) for key, value in given.items()}
@@ -533,7 +561,7 @@ async def capture(
                         f"{plan.scenario}: step {number} binds a value that the earlier answer"
                         + f" does not have: {unbound(given, results)}"
                     ) from missing
-                if (refusal := guard.refuses_call(recorder.tool, bound)) is not None:
+                if (refusal := recorder.guard.refuses_call(recorder.tool, bound)) is not None:
                     raise Refused(
                         _redacted(
                             f"{plan.scenario}: refused before step {number}: {refusal}", secrets
@@ -749,6 +777,7 @@ async def record(
     stand_in: StandIn | None = None,
     refused: Path | None = None,
     extras: Mapping[str, str] | None = None,
+    others: Mapping[int, str] | None = None,
 ) -> Outcome:
     if not upns:
         raise Refused("SEED_UPNS is not set; the recorder records only its position 1")
@@ -764,6 +793,7 @@ async def record(
         server=server,
         stand_in=stand_in,
         extras=extras,
+        others=others,
     )
     secrets = sorted(recording.identities.everything())
     fixture = scrub(recording)
@@ -964,7 +994,16 @@ def main(argv: list[str] | None = None) -> int:
         token = stand_in_graph.TOKEN if stand_in else os.environ.get("GRAPH_TOKEN", "").strip()
         if not token:
             raise Refused("GRAPH_TOKEN is not set (see tests/e2e/recording/README.md)")
-        secrets.append(token)
+        others = (
+            {}
+            if stand_in
+            else {
+                n: found
+                for n in range(1, _PERSONAS + 1)
+                if (found := os.environ.get(f"GRAPH_TOKEN_{n}", "").strip())
+            }
+        )
+        secrets += [token, *others.values()]
         out = out_dir or (STAND_IN_OUT if stand_in else runner.HERE)
         status = 0
         for plan in plans:
@@ -980,6 +1019,7 @@ def main(argv: list[str] | None = None) -> int:
                     stand_in=graph,
                     refused=REFUSED,
                     extras=extras,
+                    others=others,
                 )
             )
             shutil.rmtree(REFUSED / plan.scenario, ignore_errors=True)

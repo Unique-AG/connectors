@@ -12,7 +12,7 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 | Teams | 0 | 0 | 1 | 145 | 146 |
 | SharePoint | 0 | 0 | 3 | 107 | 110 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
-| Across sources | 0 | 2 | 0 | 24 | 26 |
+| Across sources | 0 | 1 | 0 | 25 | 26 |
 
 Scenarios with an executable run: 19 of 728.
 
@@ -71,7 +71,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-05-03` | Organizing the mailbox | Messages that Mia names by subject are found again and filed | partly | `outlook_move_mail` | the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle, because listings also show folder_id and web_link. The message_refs fields of outlook_move_mail and outlook_mark_mail and the field MailSummary.uri now say that the `uri` is the handle and that folder_id and web_link are not. The cause stays open until the logs show the wrong values. |
-| `uc-15-12` | Working across mail, calendar, files, and Teams | A file that Anna posted in Teams is read | partly | `sharepoint_resolve_url` | A run on 2026-11-09 shows that the address of a file that Mia posted in a chat resolves and reads. No run has used a file that Anna posted, so whether Mia can open that file is not known. |
 
 ## Deferred work
 

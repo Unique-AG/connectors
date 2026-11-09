@@ -227,6 +227,10 @@ def _once(
     before = written.stat().st_mtime_ns if written.is_file() else None
     env = {
         "GRAPH_TOKEN": token(sh, upns[plan.persona - 1], tools, plan.scopes),
+        **{
+            f"GRAPH_TOKEN_{who}": token(sh, upns[who - 1], tools, plan.scopes)
+            for who in sorted(plan.personas - {plan.persona})
+        },
         "SEED_UPNS": ",".join(upns),
     }
     try:

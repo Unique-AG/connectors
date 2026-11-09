@@ -1,0 +1,890 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/drive",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "id": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/root/children",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "\"{00000000-45CB-45EF-8324-816CA00046D3},4\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 01",
+              "id": "00000000-aa7d-4890-8d82-c4181005d0b7"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "createdDateTime": "2025-11-24T13:19:25Z",
+          "folder": {
+            "childCount": 7
+          },
+          "id": "01RDCCRW1IRZPXVHUVBBAIPKAVM5CGCZLL",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 01",
+              "id": "00000000-aa7d-4890-8d82-c4181005d0b7"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "lastModifiedDateTime": "2025-11-24T13:19:25Z",
+          "name": "synthetic text 02",
+          "parentReference": {
+            "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+            "driveType": "business",
+            "id": "01GKEHKV95A7UZQG9418TBG151GVPMUKDQ",
+            "name": "synthetic text 03",
+            "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:",
+            "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+          },
+          "size": 3976353,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/synthetic%20text%2002"
+        },
+        {
+          "@odata.etag": "\"{00000000-DD76-43B5-811A-45042A201DF1},0\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "createdDateTime": "2026-11-04T09:35:08Z",
+          "folder": {
+            "childCount": 0
+          },
+          "id": "01SIPFGS4HRFUZQC9DZ0PKSX8RMFQUFJ4S",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-04T09:35:08Z",
+          "name": "Meetings",
+          "parentReference": {
+            "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+            "driveType": "business",
+            "id": "01GKEHKV95A7UZQG9418TBG151GVPMUKDQ",
+            "name": "synthetic text 03",
+            "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:",
+            "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+          },
+          "size": 0,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/synthetic%20text%2005"
+        },
+        {
+          "@odata.etag": "\"{00000000-4684-4D7D-86BF-962E960A3008},8\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 06",
+              "id": "00000000-741a-4516-8328-94e3b04294e5"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "createdDateTime": "2026-03-12T12:48:28Z",
+          "folder": {
+            "childCount": 3
+          },
+          "id": "01BRHAWS5T0SJDROYC9TSNKIEQE4AOIHAW",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 06",
+              "id": "00000000-741a-4516-8328-94e3b04294e5"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "lastModifiedDateTime": "2026-03-12T12:48:28Z",
+          "name": "synthetic text 07",
+          "parentReference": {
+            "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+            "driveType": "business",
+            "id": "01GKEHKV95A7UZQG9418TBG151GVPMUKDQ",
+            "name": "synthetic text 03",
+            "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:",
+            "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+          },
+          "size": 3025024,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/synthetic%20text%2007"
+        },
+        {
+          "@odata.etag": "\"{00000000-1E46-4D42-887B-25791F830BF2},9\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "createdDateTime": "2026-11-04T09:35:07Z",
+          "folder": {
+            "childCount": 0
+          },
+          "id": "01NPJEGTMPHHRZEWNH8NXAAHQGFL5H418E",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 04",
+              "id": "00000000-a927-41a3-8141-f4b07eb73a02"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "lastModifiedDateTime": "2026-11-04T09:35:07Z",
+          "name": "synthetic text 08",
+          "parentReference": {
+            "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+            "driveType": "business",
+            "id": "01GKEHKV95A7UZQG9418TBG151GVPMUKDQ",
+            "name": "synthetic text 03",
+            "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:",
+            "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+          },
+          "size": 0,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/synthetic%20text%2008"
+        },
+        {
+          "@odata.etag": "\"{00000000-8D1A-4507-84B3-3AF3B30C4164},0\"",
+          "createdBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "createdDateTime": "2026-10-26T12:45:04Z",
+          "folder": {
+            "childCount": 2
+          },
+          "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+          "lastModifiedBy": {
+            "application": {
+              "displayName": "synthetic text 09",
+              "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+            },
+            "user": {
+              "displayName": "Anna Meier",
+              "email": "anna@example.test",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+            }
+          },
+          "lastModifiedDateTime": "2026-10-26T12:45:04Z",
+          "name": "seed-v1 Seed Files",
+          "parentReference": {
+            "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+            "driveType": "business",
+            "id": "01GKEHKV95A7UZQG9418TBG151GVPMUKDQ",
+            "name": "synthetic text 03",
+            "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:",
+            "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+          },
+          "size": 2440,
+          "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference,root"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-8D1A-4507-84B3-3AF3B30C4164},0\"",
+      "createdBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "createdDateTime": "2026-10-26T12:45:04Z",
+      "folder": {
+        "childCount": 2
+      },
+      "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+      "lastModifiedBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "lastModifiedDateTime": "2026-10-26T12:45:04Z",
+      "name": "seed-v1 Seed Files",
+      "parentReference": {
+        "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+        "driveType": "business",
+        "id": "01GKEHKV95A7UZQG9418TBG151GVPMUKDQ",
+        "name": "synthetic text 03",
+        "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:",
+        "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+      },
+      "size": 2440,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files"
+    }
+  },
+  {
+    "method": "PUT",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7:/seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt:/content",
+    "query": {
+      "@microsoft.graph.conflictBehavior": "fail"
+    },
+    "json": "Meeting notes, weekly project sync.\nRedirect test done. Two press pages missing.\nNext: cookie banner text.\n",
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "cTag": "\"o:{00000000-F57B-4E90-8C3B-842284A24C2F},2\"",
+      "createdBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "createdDateTime": "2026-11-09T14:25:03Z",
+      "eTag": "\"{00000000-F57B-4E90-8C3B-842284A24C2F},9\"",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+      "lastModifiedBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "lastModifiedDateTime": "2026-11-09T14:25:03Z",
+      "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+      "parentReference": {
+        "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+        "driveType": "business",
+        "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:/seed-v1 Seed Files",
+        "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+      },
+      "size": 107,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference,root"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-F57B-4E90-8C3B-842284A24C2F},9\"",
+      "createdBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "createdDateTime": "2026-11-09T14:25:03Z",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+      "lastModifiedBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "lastModifiedDateTime": "2026-11-09T14:25:03Z",
+      "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+      "parentReference": {
+        "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+        "driveType": "business",
+        "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:/seed-v1 Seed Files",
+        "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+      },
+      "size": 107,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE/invite",
+    "json": {
+      "recipients": [
+        {
+          "email": "mia@example.test"
+        }
+      ],
+      "requireSignIn": true,
+      "retainInheritedPermissions": true,
+      "roles": [
+        "read"
+      ],
+      "sendInvitation": false
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "value": [
+        {
+          "grantedTo": {
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "grantedToV2": {
+            "user": {
+              "@odata.type": "#microsoft.graph.sharePointIdentity",
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "id": "xAygSu6eaT1rcDGpttSdaIE9vJRchGYkP1Syq6ame61gUeavVWDfeNCjJXK",
+          "roles": [
+            "read"
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "Anna Meier",
+      "givenName": null,
+      "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+      "jobTitle": "synthetic text 11",
+      "mail": "anna@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "anna@example.test"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats",
+    "json": {
+      "chatType": "group",
+      "members": [
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1')",
+          "roles": [
+            "owner"
+          ]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')",
+          "roles": [
+            "owner"
+          ]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-e469-40d3-8f5b-9a7c5dac541e')",
+          "roles": [
+            "owner"
+          ]
+        }
+      ],
+      "topic": "seed-v1 case-teams-chat"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "chatType": "group",
+      "createdDateTime": "2026-11-09T14:25:04.31Z",
+      "id": "19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2",
+      "lastUpdatedDateTime": "2026-11-09T14:25:04.31Z",
+      "onlineMeetingInfo": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "topic": "seed-v1 case-teams-chat",
+      "viewpoint": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2012/synthetic%20text%2013/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/synthetic%20text%2014"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+    "query": {
+      "$select": "id,name,eTag,webDavUrl,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-F57B-4E90-8C3B-842284A24C2F},9\"",
+      "eTag": "\"{00000000-F57B-4E90-8C3B-842284A24C2F},9\"",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+      "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+      "parentReference": {
+        "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+        "driveType": "business",
+        "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:/seed-v1 Seed Files",
+        "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+      },
+      "webDavUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/messages",
+    "json": {
+      "attachments": [
+        {
+          "contentType": "reference",
+          "contentUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010",
+          "id": "00000000-f57b-4e90-8c3b-842284a24c2f",
+          "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt"
+        }
+      ],
+      "body": {
+        "content": "<p>seed-v1 case-sharepoint_read_file-teams-attachment-other-user notes</p> <attachment id=\"00000000-f57b-4e90-8c3b-842284a24c2f\"></attachment>",
+        "contentType": "html"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2015/chats('synthetic%20text%2016')/messages('7768833175433')"
+    },
+    "response_json": {
+      "attachments": [
+        {
+          "content": null,
+          "contentType": "reference",
+          "contentUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010",
+          "id": "00000000-f57b-4e90-8c3b-842284a24c2f",
+          "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+          "teamsAppId": null,
+          "thumbnailUrl": null
+        }
+      ],
+      "body": {
+        "content": "synthetic text 17",
+        "contentType": "html"
+      },
+      "channelIdentity": null,
+      "chatId": "19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2",
+      "createdDateTime": "2026-11-09T14:25:04.981Z",
+      "deletedDateTime": null,
+      "etag": "7768833175433",
+      "eventDetail": null,
+      "from": {
+        "application": null,
+        "device": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "displayName": "Anna Meier",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userIdentityType": "aadUser"
+        }
+      },
+      "id": "7768833175433",
+      "importance": "normal",
+      "lastEditedDateTime": null,
+      "lastModifiedDateTime": "2026-11-09T14:25:04.981Z",
+      "locale": "en-us",
+      "mentions": [],
+      "messageType": "message",
+      "reactions": [],
+      "replyToId": null,
+      "subject": null,
+      "summary": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2012/synthetic%20text%2018/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/7768833175433"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/chats/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/messages",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$orderby": "createdDateTime desc",
+      "$top": "5"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "attachments": [
+            {
+              "content": null,
+              "contentType": "reference",
+              "contentUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010",
+              "id": "00000000-f57b-4e90-8c3b-842284a24c2f",
+              "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+              "teamsAppId": null,
+              "thumbnailUrl": null
+            }
+          ],
+          "body": {
+            "content": "synthetic text 17",
+            "contentType": "html"
+          },
+          "channelIdentity": null,
+          "chatId": "19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2",
+          "createdDateTime": "2026-11-09T14:25:04.981Z",
+          "deletedDateTime": null,
+          "etag": "7768833175433",
+          "eventDetail": null,
+          "from": {
+            "application": null,
+            "device": null,
+            "user": {
+              "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+              "displayName": "Anna Meier",
+              "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userIdentityType": "aadUser"
+            }
+          },
+          "id": "7768833175433",
+          "importance": "normal",
+          "lastEditedDateTime": null,
+          "lastModifiedDateTime": "2026-11-09T14:25:04.981Z",
+          "locale": "en-us",
+          "mentions": [],
+          "messageType": "message",
+          "reactions": [],
+          "replyToId": null,
+          "subject": null,
+          "summary": null,
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2012/synthetic%20text%2018/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/7768833175433"
+        },
+        {
+          "attachments": [],
+          "body": {
+            "content": "synthetic text 19",
+            "contentType": "html"
+          },
+          "channelIdentity": null,
+          "chatId": "19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2",
+          "createdDateTime": "2026-11-09T14:25:04.518Z",
+          "deletedDateTime": null,
+          "etag": "5274291654989",
+          "eventDetail": {
+            "@odata.type": "#microsoft.graph.chatRenamedEventMessageDetail",
+            "chatId": "19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2"
+          },
+          "from": null,
+          "id": "5274291654989",
+          "importance": "normal",
+          "lastEditedDateTime": null,
+          "lastModifiedDateTime": "2026-11-09T14:25:04.518Z",
+          "locale": "en-us",
+          "mentions": [],
+          "messageType": "systemEventMessage",
+          "reactions": [],
+          "replyToId": null,
+          "subject": null,
+          "summary": null,
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2012/synthetic%20text%2018/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/5274291654989"
+        },
+        {
+          "attachments": [],
+          "body": {
+            "content": "synthetic text 19",
+            "contentType": "html"
+          },
+          "channelIdentity": null,
+          "chatId": "19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2",
+          "createdDateTime": "2026-11-09T14:25:04.45Z",
+          "deletedDateTime": null,
+          "etag": "3950440577796",
+          "eventDetail": {
+            "@odata.type": "#microsoft.graph.membersAddedEventMessageDetail",
+            "members": [
+              {
+                "displayName": null,
+                "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              },
+              {
+                "displayName": null,
+                "id": "00000000-aa0f-4286-8305-d989485e14b5",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              },
+              {
+                "displayName": null,
+                "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+                "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+                "userIdentityType": "aadUser"
+              }
+            ],
+            "visibleHistoryStartDateTime": "2026-11-09T14:25:04.31Z"
+          },
+          "from": null,
+          "id": "3950440577796",
+          "importance": "normal",
+          "lastEditedDateTime": null,
+          "lastModifiedDateTime": "2026-11-09T14:25:04.45Z",
+          "locale": "en-us",
+          "mentions": [],
+          "messageType": "systemEventMessage",
+          "reactions": [],
+          "replyToId": null,
+          "subject": null,
+          "summary": null,
+          "webUrl": "https://teams.microsoft.com/synthetic%20text%2012/synthetic%20text%2018/19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2/3950440577796"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/shares/u!aHR0cHM6Ly9jb250b3NvLW15LnNoYXJlcG9pbnQuY29tL3BlcnNvbmFsL2FubmFfZXhhbXBsZV90ZXN0L0RvY3VtZW50cy9zZWVkLXYxJTIwU2VlZCUyMEZpbGVzL3N5bnRoZXRpYyUyMHRleHQlMjAxMA/driveItem",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-F57B-4E90-8C3B-842284A24C2F},9\"",
+      "createdBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test"
+        }
+      },
+      "createdDateTime": "2026-11-09T14:25:03Z",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+      "lastModifiedBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test"
+        }
+      },
+      "lastModifiedDateTime": "2026-11-09T14:25:03Z",
+      "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+      "parentReference": {
+        "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+        "driveType": "business",
+        "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:/seed-v1 Seed Files",
+        "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+      },
+      "size": 107,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+    "query": {
+      "$select": "id,name,size,webUrl,createdDateTime,createdBy,lastModifiedDateTime,lastModifiedBy,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-F57B-4E90-8C3B-842284A24C2F},9\"",
+      "createdBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "createdDateTime": "2026-11-09T14:25:03Z",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE",
+      "lastModifiedBy": {
+        "application": {
+          "displayName": "synthetic text 09",
+          "id": "00000000-2ce7-4cfd-8583-fec34db3be6c"
+        },
+        "user": {
+          "displayName": "Anna Meier",
+          "email": "anna@example.test",
+          "id": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1"
+        }
+      },
+      "lastModifiedDateTime": "2026-11-09T14:25:03Z",
+      "name": "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt",
+      "parentReference": {
+        "driveId": "b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP",
+        "driveType": "business",
+        "id": "01NLLKQY6X3T45WKNQUEZTKV0SVGQSQPD7",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/root:/seed-v1 Seed Files",
+        "siteId": "00000000-9f19-4289-8e6f-950146dd95f5"
+      },
+      "size": 107,
+      "webUrl": "https://contoso-my.sharepoint.com/personal/anna_example_test/Documents/seed-v1%20Seed%20Files/synthetic%20text%2010"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!tixPzLKFaFOv3KLu7nqOr9EIjm8t_qhHbDCgLl7gB4HTygkqp11gGS7S3XUX9vqP/items/01WPGGRS3OIC6KK1WRLYG507J2ETBDQRZE/content",
+    "status": 302,
+    "response_headers": {
+      "content-type": "application/octet-stream",
+      "location": "https://contoso-my.sharepoint.com/personal/anna_example_test/_layouts/15/download.aspx?itemId=00000000-f57b-4e90-8c3b-842284a24c2f&Translate=false&ApiVersion=2.0"
+    }
+  },
+  {
+    "method": "GET",
+    "host": "contoso-my.sharepoint.com",
+    "path": "/personal/anna_example_test/_layouts/15/download.aspx",
+    "query": {
+      "itemId": "00000000-f57b-4e90-8c3b-842284a24c2f",
+      "Translate": "false",
+      "ApiVersion": "2.0"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "text/plain"
+    },
+    "body": "rec-tool-sharepoint_read_file-teams-attachment-other-user.15.txt"
+  }
+]
