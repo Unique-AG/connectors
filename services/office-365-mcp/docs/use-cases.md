@@ -349,6 +349,32 @@ What happens:
 - The assistant tells Mia that it found no message.
 - It does not tell Mia that more messages may match.
 
+**Mail with one company is found by the domain of the company**
+
+Ask your assistant: "Find the mail with acme.com about the invoice."
+
+Tests: 1
+
+Situation: Mia got mail from "acme.com" and sent mail to "acme.com", and she has mail with other companies.
+
+What happens:
+
+- The assistant shows the messages that came from, went to, or were copied to an address at "acme.com".
+- It does not show the mail with other companies.
+
+**A person is found by the domain of their company**
+
+Ask your assistant: "Who do I know at acme.com?"
+
+Tests: 1
+
+Situation: Mia wrote to Tom at "acme.com", and her address book does not list "acme.com".
+
+What happens:
+
+- The assistant shows Tom and his address.
+- It says that Tom is found in Mia's past mail and not in the address book.
+
 #### The assistant reads a message and its attachments
 
 **A message is read in full and its attachments are named**

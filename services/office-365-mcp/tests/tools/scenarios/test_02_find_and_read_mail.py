@@ -93,8 +93,8 @@ def recorded_spans() -> Iterator[InMemorySpanExporter]:
         provider = TracerProvider()
         trace.set_tracer_provider(provider)
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    exporter.clear()
     yield exporter
+    exporter.shutdown()
 
 
 class TestTheAssistantFindsAMessageFromWhatMiaRemembers:
@@ -1021,6 +1021,71 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
         _ = await call("outlook_search_mail", recipient=person, limit=5)
 
         assert search_of(graph).startswith("participants:")
+
+
+class TestAPersonIsFoundByTheDomainOfTheirCompany:
+    @staticmethod
+    def _serve_an_empty_address_book(graph: respx.MockRouter) -> respx.Route:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(200, json={"id": "me", "mail": "mia@example.test"})
+        )
+        _ = graph.get("/me/people").mock(return_value=httpx.Response(200, json={"value": []}))
+        return graph.get("/me/messages").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "id": "m1",
+                            "receivedDateTime": "2026-03-04T09:15:00Z",
+                            "from": {
+                                "emailAddress": {"name": "Tom Brandt", "address": "tom@acme.test"}
+                            },
+                            "toRecipients": [
+                                {"emailAddress": {"name": "Mia", "address": "mia@example.test"}}
+                            ],
+                            "ccRecipients": [],
+                        }
+                    ]
+                },
+            )
+        )
+
+    @pytest.mark.parametrize("domain", ["acme.test", "@acme.test", "Mail.ACME.co.uk"])
+    async def test_a_domain_that_the_address_book_does_not_know_is_searched_in_every_address_field(
+        self, graph: respx.MockRouter, domain: str
+    ) -> None:
+        messages = self._serve_an_empty_address_book(graph)
+
+        _ = await call("outlook_find_recipient", query=domain, limit=5)
+
+        asked = messages.calls.last.request.url.params["$search"]
+        group = " OR ".join(f"{field}:{domain}" for field in ("from", "to", "cc", "bcc"))
+        assert asked.removeprefix('"').removesuffix('"') == f"({group})"
+
+    async def test_the_people_who_wrote_from_that_domain_are_the_candidates(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = self._serve_an_empty_address_book(graph)
+
+        found = await call("outlook_find_recipient", query="acme.test", limit=5)
+
+        [candidate] = cast("list[dict[str, object]]", found["candidates"])
+        assert (candidate["address"], candidate["source"], candidate["external"]) == (
+            "tom@acme.test",
+            "mailbox",
+            True,
+        )
+
+    async def test_a_name_that_the_address_book_does_not_know_is_still_searched_with_participants(
+        self, graph: respx.MockRouter
+    ) -> None:
+        messages = self._serve_an_empty_address_book(graph)
+
+        _ = await call("outlook_find_recipient", query="Tom Brandt", limit=5)
+
+        asked = messages.calls.last.request.url.params["$search"]
+        assert asked.removeprefix('"').removesuffix('"').startswith("participants:")
 
 
 class TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord:

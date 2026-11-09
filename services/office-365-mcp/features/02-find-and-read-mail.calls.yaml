@@ -940,3 +940,27 @@ uc-02-52:
     - tool: outlook_read_thread
       uses: {uri: uri of a message of the conversation}
   note: "tools/outlook_read_thread.py:106-108 and :131-132: a message with no conversation id, and a conversation that Microsoft lists with no message, both give a thread with no message that is complete."
+
+uc-02-53:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment::test_a_domain_is_searched_in_every_address_field_because_graph_fails_on_participants"
+  ask: "Find the mail with acme.com about the invoice."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {recipient: acme.com, query: invoice}
+  note: "shared/mail.py participants_term: Exchange answers 500 to the term participants:<domain>. A domain is searched in from, to, cc, and bcc. Any other value keeps participants."
+
+uc-02-54:
+  status: untested
+  tests:
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAPersonIsFoundByTheDomainOfTheirCompany"
+  ask: "Who do I know at acme.com?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: acme.com}
+  note: "tools/outlook_find_recipient.py: the address book is searched first. When it has no match, the past mail is searched with the same term as uc-02-53, and each row has the source mailbox."
