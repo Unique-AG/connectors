@@ -6,6 +6,7 @@ import html
 import json
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Callable, Iterator, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -157,7 +158,7 @@ class Guard:
     me_id: str = ""
     drive_ids: frozenset[str] = frozenset()
     people: frozenset[str] = frozenset()
-    sent: int = 0
+    counter: Counter[str] = field(default_factory=Counter[str])
     seen_seed: set[str] = field(default_factory=set[str])
     created: set[str] = field(default_factory=set[str])
     default_calendars: set[str] = field(default_factory=set[str])
@@ -202,11 +203,11 @@ class Guard:
         return None
 
     def refuses_request(self, request: httpx.Request, tool: str) -> str | None:
-        if self.sent >= self.cap:
+        if self.counter["sent"] >= self.cap:
             return f"the cap of {self.cap} requests for one run is reached"
         refusal = self._refuses(request, tool)
         if refusal is None:
-            self.sent += 1
+            self.counter["sent"] += 1
         return refusal
 
     def _refuses(self, request: httpx.Request, tool: str) -> str | None:

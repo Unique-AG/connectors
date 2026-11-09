@@ -529,6 +529,7 @@ async def capture(
         guards[who] = guard_for(
             upns, replace(plan, persona=who), guard.allow_writes, guard.cap, extras
         )
+        guards[who].counter = guard.counter
         more, _ = await preflight(
             send, delegate, guards[who], tokens[who], upns, people=uses_ids(plan)
         )
@@ -552,7 +553,6 @@ async def capture(
                 step = mapping(with_personas(written, values))
                 recorder.tool = tool_of(step)
                 who = persona_of(step, plan.persona)
-                guards[who].sent = max(guards[who].sent, recorder.guard.sent)
                 recorder.guard, recorder.token = guards[who], tokens[who]
                 given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
                 try:
