@@ -258,6 +258,24 @@ teams_send_chat_message_with_files-group:
       args: {message: seed-v1 case-teams_send_chat_message_with_files-group notes}
       bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
 
+sharepoint_read_file-teams-attachment:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Meeting Notes, limit: 1}
+    - *new_chat
+    - tool: teams_send_chat_message_with_files
+      args: {message: seed-v1 case-sharepoint_read_file-teams-attachment notes}
+      bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
+    - tool: teams_list_chat_messages
+      args: {limit: 5}
+      bind: {chat_id: "$2.chat_id"}
+    - tool: sharepoint_resolve_url
+      bind: {url: "$prev.messages[0].attachments[0].url"}
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.uri"}
+
 teams_create_meeting-solo:
   chain:
     - tool: teams_create_meeting

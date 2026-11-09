@@ -586,6 +586,20 @@ class TestAFileMovesBetweenMailTeamsAndSharePoint:
         assert isinstance(offer.resource, BlobResourceContents)
         assert offer.resource.mime_type == DOCX
 
+    async def test_it_resolves_a_file_that_a_chat_shows_as_a_reference_attachment(
+        self, graph: MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-sharepoint_read_file-teams-attachment")
+        listed = await call(
+            "teams_list_chat_messages", chat_id="19:5s8q5t4ig507874f4l06948227913531@thread.v2"
+        )
+        (attached,) = _list(_list(listed, "messages")[0], "attachments")
+        resolved = await call("sharepoint_resolve_url", url=attached["url"])
+
+        assert attached["content_type"] == "reference"
+        assert resolved["name"] == "seed-v1 Meeting Notes.txt"
+        assert str(resolved["uri"]).startswith("sharepoint:///files/")
+
 
 class TestABriefSaysWhichPartItCouldNotRead:
     async def test_it_gives_the_meetings_when_the_mail_does_not_answer(

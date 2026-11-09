@@ -220,11 +220,12 @@ uc-15-12:
   status: partly
   tests:
     - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_a_teams_message_links"
+    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_resolves_a_file_that_a_chat_shows_as_a_reference_attachment"
   ask: "What is in the file that Anna posted in our chat yesterday?"
   blocker:
     kind: unknown
     tool: sharepoint_resolve_url
-    text: The description says that Microsoft documents the lookup for sharing links and that another form of web address can fail. Nobody ran it on the web address of a Teams file attachment, so whether it fails is not known.
+    text: A run on 2026-11-09 shows that the address of a file that Mia posted in a chat resolves and reads. No run has used a file that Anna posted, so whether Mia can open that file is not known.
     user: The assistant may not be able to open a file that someone posted in Teams.
   provenance: drafted
   asks_user: false
