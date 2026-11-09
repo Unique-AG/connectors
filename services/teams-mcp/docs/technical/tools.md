@@ -313,7 +313,7 @@ There is no way to scope a Graph search to chats or to channels, and the search 
 Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messages` or `send_*_message`. Show the user `chatName`, or `teamName` and `channelName`, to say where a message was posted, never the ids.
 
 !!! note "How container names are looked up"
-    A page of hits spans many chats and channels, and a hit carries only their ids. Each distinct chat is fetched once (`GET /chats/{id}?$expand=members`), each distinct channel once (`GET /teams/{teamId}/channels/{channelId}`), and every team name comes from one `GET /me/joinedTeams`, made only when the page has a channel hit. At most 3 run at a time, alongside hydration and inside its 15-second budget. A failed lookup leaves the name `null` and logs at `warn`. It never fails the page.
+    A page of hits spans many chats and channels, and a hit carries only their ids. Each distinct chat is fetched at most once (`GET /chats/{id}?$expand=members`), each distinct channel at most once (`GET /teams/{teamId}/channels/{channelId}`), and every team name comes from one `GET /me/joinedTeams`, made only when the page has a channel hit. At most 3 run at a time, alongside hydration and inside its 15-second budget. A lookup still waiting when the budget is spent is skipped without a request. A failed or skipped lookup leaves the name `null`, and a failed one logs at `warn`. Neither fails the page.
 
 !!! note "How hydration behaves"
     A search hit carries no message body, and Graph offers no way to ask for one. So each hit is fetched on its own: one extra Graph call per hit, at most 3 at a time.
