@@ -49,6 +49,7 @@ MAX_WAIT = 300
 BIND_RETRIES = 3
 SLOW_INDEX = {"teams_search_messages": 5}
 TIMEOUT = 600
+REQUEST_TIMEOUT = 60
 MEETING_SUBJECT = "seed-v1 meeting"
 TEAM_PHASES = ("teams", "teams-posts", "teams-chats")
 MEETING_CASES = (
@@ -386,7 +387,7 @@ def probed(token_: str, path: str) -> int:
     guard = Guard("probe", frozenset(), False)
     if guard.refuses_request(request, "discover") is not None:
         return 0
-    with httpx.Client() as client:
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
         answer = client.send(request)
     body = (
         cast("Mapping[str, list[Mapping[str, object]]]", answer.json())
@@ -412,7 +413,7 @@ def graph(
     guard = Guard(upns[0], frozenset(one.casefold() for one in upns), method != "GET")
     if (refusal := guard.refuses_request(request, tool)) is not None:
         raise MeetingFailed(f"the guard refused {method} {path}: {refusal}")
-    with httpx.Client() as client:
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
         answer = client.send(request)
     if not answer.is_success:
         raise MeetingFailed(f"{method} {path} answered {answer.status_code}")

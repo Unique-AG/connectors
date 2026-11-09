@@ -545,6 +545,20 @@ class TestWhereTheFilesAreStored:
         assert str(library["root_uri"]).startswith("sharepoint:///folders/")
         assert (site.call_count, libraries.call_count, len(graph.calls)) == (1, 1, 2)
 
+    async def test_the_library_of_a_recorded_team_site_is_listed(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-sharepoint_list_drives-site")
+
+        listed = await call(
+            "sharepoint_list_drives",
+            site="https://contoso.sharepoint.com/teams/synthetic%20text%2001",
+        )
+
+        [library] = _rows(listed, "drives")
+        assert library["drive_type"] == "documentLibrary"
+        assert str(library["web_url"]).endswith("/Shared%20Documents")
+
     @pytest.mark.parametrize(
         "address",
         ["contoso.sharepoint.com/sites/Sales", "Sales", "https://contoso.sharepoint.com/%2e%2e/x"],
