@@ -241,6 +241,31 @@ def guard_for(
     )
 
 
+def persona_guards(
+    upns: Sequence[str], plan: Plan, guard: Guard, extras: Mapping[str, str] | None = None
+) -> dict[int, Guard]:
+    guards = {plan.persona: guard}
+    for who in sorted(plan.personas - {plan.persona}):
+        guards[who] = guard_for(
+            upns, replace(plan, persona=who), guard.allow_writes, guard.cap, extras
+        )
+        guards[who].counter = guard.counter
+    return guards
+
+
+def dry_run_lines(
+    upns: Sequence[str],
+    plan: Plan,
+    allow_writes: bool,
+    cap: int,
+    extras: Mapping[str, str] | None = None,
+) -> list[str]:
+    guard = guard_for(upns, plan, allow_writes, cap, extras)
+    return describe(
+        plan, guard, planned_values(upns, extras), persona_guards(upns, plan, guard, extras)
+    )
+
+
 def persona_of(step: Json, default: int) -> int:
     return int(cast("int", step.get("as", default)))
 
@@ -316,12 +341,18 @@ def _literal_args(step: Json, values: Mapping[str, str] | None = None) -> dict[s
     }
 
 
-def check(plan: Plan, guard: Guard, values: Mapping[str, str] | None = None) -> list[str]:
+def check(
+    plan: Plan,
+    guard: Guard,
+    values: Mapping[str, str] | None = None,
+    by_persona: Mapping[int, Guard] | None = None,
+) -> list[str]:
     refusals: list[str] = []
     for number, step in enumerate(plan.steps, 1):
         if "fault" in step:
             refusals.append(f"step {number}: a fault is synthetic and is never recorded")
-        refusal = guard.refuses_call(tool_of(step), _literal_args(step, values))
+        one = (by_persona or {}).get(persona_of(step, plan.persona), guard)
+        refusal = one.refuses_call(tool_of(step), _literal_args(step, values))
         refusals += [f"step {number}: {refusal}"] if refusal else []
     replies = [
         mapping(step.get("args", {})).get("status")
@@ -335,11 +366,17 @@ def check(plan: Plan, guard: Guard, values: Mapping[str, str] | None = None) -> 
     return refusals
 
 
-def describe(plan: Plan, guard: Guard, values: Mapping[str, str] | None = None) -> list[str]:
+def describe(
+    plan: Plan,
+    guard: Guard,
+    values: Mapping[str, str] | None = None,
+    by_persona: Mapping[int, Guard] | None = None,
+) -> list[str]:
     lines = [f"{plan.scenario} -> fixture {plan.fixture} (dry run, nothing is sent):"]
     for number, step in enumerate(plan.steps, 1):
         given = {**mapping(step.get("args", {})), **mapping(step.get("bind", {}))}
-        refusal = guard.refuses_call(tool_of(step), _literal_args(step, values))
+        one = (by_persona or {}).get(persona_of(step, plan.persona), guard)
+        refusal = one.refuses_call(tool_of(step), _literal_args(step, values))
         verdict = "allowed" if refusal is None else f"REFUSED: {refusal}"
         if "fault" in step:
             verdict = "REFUSED: a fault is synthetic and is never recorded"
@@ -502,9 +539,11 @@ async def capture(
     extras: Mapping[str, str] | None = None,
     others: Mapping[int, str] | None = None,
 ) -> tuple[Recording, list[object], dict[str, str]]:
-    if refusals := check(plan, guard, planned_values(upns, extras)):
+    extras = extras or {}
+    guards = persona_guards(upns, plan, guard, extras)
+    if refusals := check(plan, guard, planned_values(upns, extras), guards):
         raise Refused(f"{plan.scenario}: refused before any request: " + "; ".join(refusals))
-    tokens = {plan.persona: token} | dict(others or {})
+    tokens = {**dict(others or {}), plan.persona: token}
     if missing := sorted(plan.personas - tokens.keys()):
         raise Refused(f"{plan.scenario}: no token for persona {missing[0]}; set GRAPH_TOKEN_<n>")
     original = httpx.AsyncHTTPTransport.handle_async_request
@@ -523,13 +562,7 @@ async def capture(
 
         send = answered
     identities, people = await preflight(send, delegate, guard, token, upns, people=uses_ids(plan))
-    extras = extras or {}
-    guards = {plan.persona: guard}
     for who in sorted(plan.personas - {plan.persona}):
-        guards[who] = guard_for(
-            upns, replace(plan, persona=who), guard.allow_writes, guard.cap, extras
-        )
-        guards[who].counter = guard.counter
         more, _ = await preflight(
             send, delegate, guards[who], tokens[who], upns, people=uses_ids(plan)
         )
@@ -984,11 +1017,7 @@ def main(argv: list[str] | None = None) -> int:
             lines = [
                 line
                 for plan in plans
-                for line in describe(
-                    plan,
-                    guard_for(upns, plan, allow_writes, cap, extras),
-                    planned_values(upns, extras),
-                )
+                for line in dry_run_lines(upns, plan, allow_writes, cap, extras)
             ]
             print(_redacted("\n".join(lines), secrets))
             return 2 if any("REFUSED" in line for line in lines) else 0

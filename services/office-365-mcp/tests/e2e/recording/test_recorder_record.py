@@ -26,8 +26,11 @@ from tests.e2e.recording.record import (
     RECORDED,
     Plan,
     Recorder,
+    check,
+    guard_for,
     link,
     main,
+    persona_guards,
     preflight,
     replay_check,
     resolve,
@@ -472,3 +475,27 @@ def test_the_request_cap_counts_the_steps_of_all_personas_together() -> None:
             StandIn(others={other: stand_in.UPNS[1]}),
             others={2: other},
         )
+
+
+def test_a_token_for_the_case_persona_in_others_never_replaces_the_validated_token() -> None:
+    other = "eyJ0eXAiOiJKV1QifQ.eyJ1cG4iOiJhbm5hIn0.b3RoZXItdG9rZW4"
+    outcome = record_on(
+        Plan("as", "rec-as", ({"tool": "get_me"},)),
+        StandIn(others={other: stand_in.UPNS[1]}),
+        others={1: other},
+    )
+    answered = [
+        mapping(one["response_json"])["userPrincipalName"] for one in outcome.fixture.interactions
+    ]
+    assert answered == ["mia@example.test"]
+
+
+def test_a_step_is_checked_with_the_guard_of_its_persona() -> None:
+    steps: tuple[Json, ...] = (
+        {"tool": "outlook_list_mail", "as": 2, "args": {"mailbox": stand_in.UPNS[1]}},
+    )
+    plan = Plan("as", "rec-as", steps)
+    guard = guard_for(stand_in.UPNS, plan, True, 40)
+
+    assert check(plan, guard) != []
+    assert check(plan, guard, by_persona=persona_guards(stand_in.UPNS, plan, guard)) == []

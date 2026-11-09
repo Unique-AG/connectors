@@ -28,9 +28,7 @@ from tests.e2e.recording.record import (
     GRAPH,
     Plan,
     catalogs,
-    describe,
-    guard_for,
-    planned_values,
+    dry_run_lines,
     resolve,
     tool_of,
 )
@@ -371,9 +369,7 @@ def check(dry: bool) -> int:
 def dry_results(found: Sequence[Run], upns: Sequence[str]) -> Results:
     results: Results = {}
     for run in found:
-        lines = describe(
-            run.plan, guard_for(upns, run.plan, True, DEFAULT_CAP), planned_values(upns)
-        )
+        lines = dry_run_lines(upns, run.plan, True, DEFAULT_CAP)
         refused = [line.strip() for line in lines if "REFUSED" in line]
         if run.status == "run":
             results[run.plan.scenario] = {
