@@ -10,11 +10,6 @@ variable "secrets_placeholders" {
     expiration_date = optional(string, "2099-12-31T23:59:59Z")
   }))
   default = {
-    /**
-      The LSEG client credentials the MCP exchanges for a bearer token (.env.example):
-      - world-check-mcp-upstream-api-key: the service-account id (UPSTREAM_API_KEY)
-      - world-check-mcp-upstream-api-secret: that account's password (UPSTREAM_API_SECRET)
-    */
     world-check-mcp-upstream-api-key    = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
     world-check-mcp-upstream-api-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
