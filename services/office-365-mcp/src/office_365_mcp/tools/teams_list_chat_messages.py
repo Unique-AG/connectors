@@ -40,8 +40,9 @@ Notes:
 - A file that someone posted shows in `attachments`. Its `url` is the web address of the file. To \
 read the file, give that `url` to a tool of this deployment that opens a SharePoint web address. \
 If none exists, or if it fails, search for the file by the `name` of the attachment with a tool of \
-this deployment that searches files. If there is no such tool, or it finds nothing, tell the \
-user. Never guess what the file says.
+this deployment that searches files. Use a result only if its name is the `name` of the \
+attachment. If there is no such tool, or no result fits, tell the user. Never guess what the \
+file says.
 - To read further back, pass the oldest `created_at` as `sent_before`. The messages from that same \
 second appear again at the top of the list.
 - One call is one request, because a given chat allows this whole connector about one request a \
