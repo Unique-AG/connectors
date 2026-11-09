@@ -1,3 +1,4 @@
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from datetime import date, datetime, timedelta
@@ -44,6 +45,8 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "User.Read", "Mail.Read.Share
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "invoice"}
 
 MAX_RESULTS = 1000
+
+_DOMAIN = re.compile(r"@?(?:[a-z0-9-]+\.)+[a-z]{2,}\.?", re.IGNORECASE)
 
 _KQL_IMPORTANCE: Mapping[MailImportance, str] = {"low": "low", "normal": "medium", "high": "high"}
 
@@ -186,7 +189,7 @@ def _query_string(criteria: SearchCriteria) -> str:
     if criteria.sender:
         terms.append(f"from:{kql.quoted(criteria.sender)}")
     if criteria.recipient:
-        terms.append(f"participants:{kql.quoted(criteria.recipient)}")
+        terms.append(_participants(criteria.recipient))
     if criteria.to:
         terms.append(f"to:{kql.quoted(criteria.to)}")
     if criteria.subject:
@@ -194,6 +197,13 @@ def _query_string(criteria: SearchCriteria) -> str:
     if criteria.attachment_name:
         terms.append(f"attachment:{kql.quoted(criteria.attachment_name)}")
     return " ".join(terms)
+
+
+def _participants(value: str) -> str:
+    quoted = kql.quoted(value)
+    if _DOMAIN.fullmatch(value):
+        return "(" + " OR ".join(f"{role}:{quoted}" for role in ("from", "to", "cc", "bcc")) + ")"
+    return f"participants:{quoted}"
 
 
 def _window_terms(

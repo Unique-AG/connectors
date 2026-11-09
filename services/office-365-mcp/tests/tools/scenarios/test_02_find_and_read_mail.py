@@ -964,6 +964,27 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
 
         assert search_of(graph) == 'participants:"Anna Meier" attachment:"Draft v2.pdf"'
 
+    @pytest.mark.parametrize("domain", ["acme.com", "@acme.com", "Mail.ACME.co.uk"])
+    async def test_a_domain_is_searched_in_every_address_field_because_graph_fails_on_participants(
+        self, graph: respx.MockRouter, domain: str
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call("outlook_search_mail", recipient=domain, query="invoice", limit=5)
+
+        group = " OR ".join(f"{field}:{domain}" for field in ("from", "to", "cc", "bcc"))
+        assert search_of(graph) == f"invoice ({group})"
+
+    @pytest.mark.parametrize("person", ["anna@acme.com", "Anna", "J. Smith"])
+    async def test_a_person_is_still_searched_with_participants(
+        self, graph: respx.MockRouter, person: str
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call("outlook_search_mail", recipient=person, limit=5)
+
+        assert search_of(graph).startswith("participants:")
+
 
 class TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord:
     @pytest.mark.parametrize(
