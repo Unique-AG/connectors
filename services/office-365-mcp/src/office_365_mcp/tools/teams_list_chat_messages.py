@@ -37,6 +37,9 @@ accepts. teams_browse_channel is the sibling tool for a channel, and teams_searc
 message by its text.
 
 Notes:
+- A file that someone posted shows in `attachments`. Its `url` is the web address of the file. To \
+read the file, give that `url` to a tool of this deployment that opens a SharePoint web address. \
+If none exists, or if it fails, tell the user. Never guess what the file says.
 - To read further back, pass the oldest `created_at` as `sent_before`. The messages from that same \
 second appear again at the top of the list.
 - One call is one request, because a given chat allows this whole connector about one request a \

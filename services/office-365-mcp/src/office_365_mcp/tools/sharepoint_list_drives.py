@@ -51,8 +51,9 @@ document libraries of that SharePoint site. Pass `root_uri` as `folder` to \
 sharepoint_browse_folder to see what a drive holds.
 
 Notes:
-- Get `site` from the `web_url` of a row of sharepoint_search_sites. A library is a drive whose \
-`drive_type` is `documentLibrary`.
+- Get `site` from the user. If this deployment exposes sharepoint_search_sites, take the `web_url` \
+of one of its rows. If not, take the `web_url` of a site from sharepoint_search_files. A library \
+is a drive whose `drive_type` is `documentLibrary`.
 """
 
 
@@ -185,9 +186,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "The web address of a SharePoint site, for example "
                     + "`https://contoso.sharepoint.com/sites/Finance`. Copy it from the "
-                    + "`web_url` of a row of sharepoint_search_sites. When you set it, this tool "
-                    + "lists the document libraries of that site. When it is null, this tool "
-                    + "lists the drives of the signed-in user."
+                    + "`web_url` of a row of sharepoint_search_sites, if this deployment "
+                    + "exposes that tool, or from a site of sharepoint_search_files. When you set "
+                    + "it, this tool lists the document libraries of that site. When it is null, "
+                    + "this tool lists the drives of the signed-in user."
                 ),
             ),
         ] = None,

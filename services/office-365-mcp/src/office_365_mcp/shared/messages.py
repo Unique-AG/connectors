@@ -101,7 +101,11 @@ class MessageAttachment(BaseModel):
         description="Microsoft's content type for the attachment, such as a file or card type."
     )
     url: str | None = Field(
-        description="Where the attachment's content lives, when Microsoft provides a URL."
+        description=(
+            "Where the attachment's content lives, when Microsoft provides a URL. For a file, "
+            "this is the web address of the file in SharePoint or OneDrive. A tool that takes a "
+            "SharePoint web address can open it. A card can have no URL."
+        )
     )
 
     @classmethod

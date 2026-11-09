@@ -1419,9 +1419,9 @@ class TestTheToolsThisServerAdvertises:
 
         for name in ("outlook_move_mail", "outlook_mark_mail"):
             message_refs = _object(_properties(tools[name].input_schema)["message_refs"])
-            assert "A `folder_id` and a `web_link` are not handles" in str(
-                message_refs["description"]
-            ), name
+            assert "Never pass a `folder_id` or a `web_link`" in str(message_refs["description"]), (
+                name
+            )
         assert any(
             "`folder_id` and `web_link` are not message handles" in text
             for text in _described(tools["outlook_list_mail"].output_schema)

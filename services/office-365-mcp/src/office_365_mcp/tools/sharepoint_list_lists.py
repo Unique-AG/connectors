@@ -40,7 +40,8 @@ sharepoint_get_list to see its columns, or to sharepoint_list_items to read its 
 
 Notes:
 - Hidden lists and document libraries are left out. If this deployment exposes \
-sharepoint_search_files, use it to find files.
+sharepoint_list_drives, it lists the libraries of a site. If it exposes sharepoint_search_files, \
+use it to find files.
 - This tool does not sort the rows.
 """
 

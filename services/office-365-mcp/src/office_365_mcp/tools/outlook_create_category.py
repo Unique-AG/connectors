@@ -117,8 +117,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 description=(
                     "The new category's name, as the user writes it. The name must be unique in "
-                    "the user's list of categories and cannot change after this call. The "
-                    "answer's `name` is what Microsoft stored."
+                    "the user's list of categories and cannot change after this call. No tool "
+                    "renames or deletes a category. The answer's `name` is what Microsoft "
+                    "stored."
                 ),
             ),
         ],

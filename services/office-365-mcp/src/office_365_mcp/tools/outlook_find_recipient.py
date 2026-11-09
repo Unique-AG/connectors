@@ -62,7 +62,9 @@ _NEVER = datetime.min.replace(tzinfo=UTC)
 
 _DESCRIPTION = (
     "Resolves a name, alias, or partial address to who it can mean; never pick a candidate "
-    "automatically — let the user choose, especially an `ambiguous` or `fuzzy` one."
+    "automatically — let the user choose, especially an `ambiguous` or `fuzzy` one. It gives an "
+    "address, a job title, and a department. It gives no telephone number, and no tool here reads "
+    "other details of a person in the company directory. If the user asks for one, say so."
 )
 
 _NO_QUERY = (

@@ -457,7 +457,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | `teams_send_channel_message_with_files` | 🟠 Add | ✋ Always | Posts a message to a channel with files that are already in SharePoint. Uploads nothing. |
 | `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
 | `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
-| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, or the document libraries of one site, with a handle for each. |
 
 **What it needs**
 
@@ -563,7 +563,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | `teams_get_channel_files_folder` | 🟢 Read | — | Gives the SharePoint folder of one channel. It does not list the files. |
 | `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
 | `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
-| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, or the document libraries of one site, with a handle for each. |
 | `sharepoint_read_file` | 🟢 Read | — | Reads one file of 10 MB or less, in its original format or as PDF. |
 
 **What it needs**
@@ -996,7 +996,7 @@ Files, folders, sharing, sites, and lists.
 | --- | --- | --- | --- |
 | `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
 | `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
-| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, or the document libraries of one site, with a handle for each. |
 
 **What it needs**
 
