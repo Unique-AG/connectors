@@ -1,3 +1,4 @@
+import { convert, type HtmlToTextOptions } from 'html-to-text';
 import * as z from 'zod';
 
 // ─── Teams ────────────────────────────────────────────────────────────────────
@@ -36,25 +37,68 @@ export const MsChatMemberSchema = z.object({
   email: z.string().nullish(),
 });
 
+export const LAST_MESSAGE_PREVIEW_MAX_LENGTH = 150;
+
+// A preview only has to tell chats apart, so Teams HTML is flattened to text
+// rather than passed through. Mentions keep their names; attachments and system
+// event markers carry no text and leave nothing behind. Teams sends emoji as
+// <emoji alt="😄">, whose only text is the alt.
+const PREVIEW_HTML_OPTIONS: HtmlToTextOptions = {
+  wordwrap: false,
+  selectors: [
+    { selector: 'a', options: { ignoreHref: true } },
+    { selector: 'img', format: 'skip' },
+    { selector: 'emoji', format: 'emojiAlt' },
+  ],
+  formatters: {
+    emojiAlt: (elem, _walk, builder) => builder.addInline(elem.attribs?.alt ?? ''),
+  },
+};
+
+function toPreviewText(body: { contentType: string; content: string }): string | null {
+  const text = (
+    body.contentType === 'html' ? convert(body.content, PREVIEW_HTML_OPTIONS) : body.content
+  )
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (text === '') {
+    return null;
+  }
+  return text.length > LAST_MESSAGE_PREVIEW_MAX_LENGTH
+    ? `${text.slice(0, LAST_MESSAGE_PREVIEW_MAX_LENGTH).trimEnd()}…`
+    : text;
+}
+
 // `lastMessagePreview` is a navigation property (chatMessageInfo) only returned
-// when $expanded on the list-chats operation; we keep just its timestamp.
+// when $expanded on the list-chats operation.
 export const MsChatSchema = z
   .object({
     id: z.string(),
     chatType: z.string(),
     topic: z.string().nullish(),
     createdDateTime: z.string().nullish(),
-    lastMessagePreview: z.object({ createdDateTime: z.string().nullish() }).nullish(),
+    lastMessagePreview: z
+      .object({
+        createdDateTime: z.string().nullish(),
+        isDeleted: z.boolean().nullish(),
+        body: z.object({ contentType: z.string(), content: z.string() }).nullish(),
+      })
+      .nullish(),
     members: z.array(MsChatMemberSchema),
   })
-  .transform((chat) => ({
-    id: chat.id,
-    chatType: chat.chatType,
-    topic: chat.topic,
-    createdDateTime: chat.createdDateTime ?? null,
-    lastMessageAt: chat.lastMessagePreview?.createdDateTime ?? null,
-    members: chat.members,
-  }));
+  .transform((chat) => {
+    const preview = chat.lastMessagePreview;
+    return {
+      id: chat.id,
+      chatType: chat.chatType,
+      topic: chat.topic,
+      createdDateTime: chat.createdDateTime ?? null,
+      lastMessageAt: preview?.createdDateTime ?? null,
+      lastMessagePreview: preview?.body && !preview.isDeleted ? toPreviewText(preview.body) : null,
+      members: chat.members,
+    };
+  });
 
 // Modelled on what `chatmessage-get` returns, and shaped to match the fields the
 // Anthropic Office MCP surfaces for the same resource. The body is passed through

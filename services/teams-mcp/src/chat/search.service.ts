@@ -2,7 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span, TraceService } from 'nestjs-otel';
 import pLimit from 'p-limit';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { type MsChatMessage, type MsSearchHit, MsSearchResponseSchema } from './chat.dtos';
+import { ChannelService } from './channel.service';
+import {
+  type MsChat,
+  type MsChatMessage,
+  type MsSearchHit,
+  MsSearchResponseSchema,
+} from './chat.dtos';
 import { ChatService } from './chat.service';
 import { type BuildSearchQueryParams, buildSearchQuery } from './utils/build-search-query';
 
@@ -17,6 +23,10 @@ export interface SearchMessageRow {
   chatId: string | null;
   teamId: string | null;
   channelId: string | null;
+  /** The chat topic, or its members' names when it has none. Null when the lookup failed. */
+  chatName: string | null;
+  teamName: string | null;
+  channelName: string | null;
   senderDisplayName: string | null;
   summary: string | null;
   /**
@@ -50,6 +60,26 @@ function nonEmpty(value: string | null | undefined): string | null {
   return value || null;
 }
 
+interface ContainerNames {
+  chats: Map<string, string | null>;
+  teams: Map<string, string>;
+  channels: Map<string, string | null>;
+}
+
+function channelKey(teamId: string, channelId: string): string {
+  return `${teamId}/${channelId}`;
+}
+
+function chatName(chat: MsChat): string | null {
+  if (chat.topic) {
+    return chat.topic;
+  }
+  const memberNames = chat.members.flatMap((member) =>
+    member.displayName ? [member.displayName] : [],
+  );
+  return memberNames.length > 0 ? memberNames.join(', ') : null;
+}
+
 function withoutContent(row: SearchMessageRow, senderAddress: string | null): SearchMessageRow {
   return { ...row, senderDisplayName: row.senderDisplayName ?? senderAddress };
 }
@@ -80,12 +110,16 @@ export class SearchService {
 
   // The client retries a 429 and honours Retry-After, which can take minutes.
   // Past this budget a hit gives up its body, so the caller still gets the page.
+  // Container names run alongside hydration and share the same budget.
   private static readonly HYDRATION_BUDGET_MS = 15_000;
+
+  private static readonly NAME_LOOKUP_CONCURRENCY = 3;
 
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     private readonly traceService: TraceService,
     private readonly chatService: ChatService,
+    private readonly channelService: ChannelService,
   ) {}
 
   // NOTE: this is the one paginated Graph call site that does NOT use the shared
@@ -137,10 +171,15 @@ export class SearchService {
     // moreResultsAvailable lives on the (first) container, not the hit.
     const moreResultsAvailable = containers[0]?.moreResultsAvailable ?? false;
 
-    const rows = await this.hydrate(
-      userProfileId,
-      hits.map((hit) => this.mapHit(hit)),
-    );
+    const mappedHits = hits.map((hit) => this.mapHit(hit));
+    const [hydratedRows, names] = await Promise.all([
+      this.hydrate(userProfileId, mappedHits),
+      this.lookUpContainerNames(
+        userProfileId,
+        mappedHits.map(({ row }) => row),
+      ),
+    ]);
+    const rows = hydratedRows.map((row) => this.withContainerNames(row, names));
 
     span?.setAttribute('result_count', rows.length);
 
@@ -181,6 +220,9 @@ export class SearchService {
         chatId: isChannel ? null : chatId,
         teamId: isChannel ? teamId : null,
         channelId: isChannel ? channelId : null,
+        chatName: null,
+        teamName: null,
+        channelName: null,
         senderDisplayName,
         summary: hit.summary ?? null,
         createdDateTime: nonEmpty(resource?.createdDateTime),
@@ -190,6 +232,85 @@ export class SearchService {
         webUrl: resource?.webUrl ?? resource?.webLink ?? null,
       },
       senderAddress: nonEmpty(from?.emailAddress?.address),
+    };
+  }
+
+  // One lookup per distinct chat and channel, plus one joinedTeams call for every
+  // team name at once. A name that cannot be fetched stays null and never fails
+  // the page, the same as a hit whose body cannot be fetched.
+  private async lookUpContainerNames(
+    userProfileId: string,
+    rows: SearchMessageRow[],
+  ): Promise<ContainerNames> {
+    const chatIds = new Set(rows.flatMap(({ chatId }) => (chatId ? [chatId] : [])));
+    const channels = new Map(
+      rows.flatMap(({ teamId, channelId }) =>
+        teamId && channelId
+          ? [[channelKey(teamId, channelId), { teamId, channelId }] as const]
+          : [],
+      ),
+    );
+
+    const limit = pLimit(SearchService.NAME_LOOKUP_CONCURRENCY);
+    const deadline = Date.now() + SearchService.HYDRATION_BUDGET_MS;
+    const lookUp = <T>(container: string, work: () => Promise<T>): Promise<T | null> =>
+      limit(async () => {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) {
+          return null;
+        }
+        return withDeadline(work(), remaining);
+      }).catch((error: unknown) => {
+        this.logger.warn(
+          { userProfileId, container, error },
+          'Failed to look up a search hit container name; leaving it null',
+        );
+        return null;
+      });
+
+    const [chatEntries, channelEntries, teams] = await Promise.all([
+      Promise.all(
+        [...chatIds].map(
+          async (chatId) =>
+            [
+              chatId,
+              await lookUp('chat', () => this.chatService.getChat(userProfileId, chatId)),
+            ] as const,
+        ),
+      ),
+      Promise.all(
+        [...channels].map(
+          async ([key, { teamId, channelId }]) =>
+            [
+              key,
+              await lookUp('channel', () =>
+                this.channelService.getChannel(userProfileId, teamId, channelId),
+              ),
+            ] as const,
+        ),
+      ),
+      channels.size > 0
+        ? lookUp('team', () => this.channelService.listTeams(userProfileId))
+        : Promise.resolve(null),
+    ]);
+
+    return {
+      chats: new Map(chatEntries.map(([chatId, chat]) => [chatId, chat ? chatName(chat) : null])),
+      teams: new Map((teams ?? []).map((team) => [team.id, team.displayName])),
+      channels: new Map(
+        channelEntries.map(([key, channel]) => [key, channel?.displayName ?? null]),
+      ),
+    };
+  }
+
+  private withContainerNames(row: SearchMessageRow, names: ContainerNames): SearchMessageRow {
+    const { chatId, teamId, channelId } = row;
+    return {
+      ...row,
+      chatName: chatId ? (names.chats.get(chatId) ?? null) : null,
+      teamName: teamId ? (names.teams.get(teamId) ?? null) : null,
+      channelName:
+        teamId && channelId ? (names.channels.get(channelKey(teamId, channelId)) ?? null) : null,
     };
   }
 

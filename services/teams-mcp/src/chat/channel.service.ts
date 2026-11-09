@@ -59,6 +59,28 @@ export class ChannelService {
   }
 
   @Span()
+  public async getChannel(
+    userProfileId: string,
+    teamId: string,
+    channelId: string,
+  ): Promise<MsChannel> {
+    const span = this.traceService.getSpan();
+    span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('team_id', teamId);
+    span?.setAttribute('channel_id', channelId);
+
+    this.logger.debug({ userProfileId, teamId }, 'Fetching channel from Microsoft Graph');
+
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const response = await client
+      .api(`/teams/${teamId}/channels/${channelId}`)
+      .select('id,displayName,description,createdDateTime,membershipType')
+      .get();
+
+    return MsChannelSchema.parse(response);
+  }
+
+  @Span()
   public async sendChannelMessage(
     userProfileId: string,
     teamId: string,

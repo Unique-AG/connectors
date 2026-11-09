@@ -16,6 +16,8 @@ list_teams / list_chats / list_channels  →  id  →  get_*_messages / send_*_m
 
 The `list_*` tools return distinguishing metadata (creation dates, last-message timestamps, archived/membership flags, member names) so the agent can pick the right id when several teams, chats, or channels share a display name.
 
+The ids are internal. The tool descriptions, output schemas and server instructions tell the agent to pass them between tools unchanged but never show them to the user. A chat list shows the topic or members, the type and the last-message date, numbered so the user can pick an entry by number.
+
 ## Tool Overview
 
 | Tool | Category | Mutating | Description |
@@ -114,7 +116,9 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
 | `limit` | integer (1–25) | No | `25` | Page size: how many chats to return. 25 is the most Graph serves in one response. |
 | `includeMemberEmails` | boolean | No | `false` | Include member email addresses (only for topic-less chats). Useful when two members share a display name. |
 
-**Returns:** A `chats` array. Each chat has `chatId`, `chatType`, `topic` (nullable), `createdDateTime`, `lastMessageAt`, and — for chats without a topic — a `members` array (`displayName`, plus `email` when `includeMemberEmails` is `true`). Pass `chatId` to `get_chat_messages` or `send_chat_message`.
+**Returns:** A `chats` array. Each chat has `chatId`, `chatType`, `topic` (nullable), `createdDateTime`, `lastMessageAt`, `lastMessagePreview`, and — for chats without a topic — a `members` array (`displayName`, plus `email` when `includeMemberEmails` is `true`). Pass `chatId` to `get_chat_messages` or `send_chat_message`.
+
+`lastMessagePreview` is the plain text of the last message, with Teams HTML flattened and cut to 150 characters. It is `null` when the last message is deleted, a system event, or has no text (an attachment alone). It lets the agent tell apart chats that have no topic and no named members.
 
 **Example:**
 
@@ -126,7 +130,8 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
       "chatType": "meeting",
       "topic": "Weekly Sync",
       "createdDateTime": "2024-01-10T08:00:00Z",
-      "lastMessageAt": "2024-06-20T14:32:00Z"
+      "lastMessageAt": "2024-06-20T14:32:00Z",
+      "lastMessagePreview": "Notes from today are in the channel."
     },
     {
       "chatId": "19:1on1@unq.gbl.spaces",
@@ -134,6 +139,7 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
       "topic": null,
       "createdDateTime": "2023-11-02T10:00:00Z",
       "lastMessageAt": "2024-06-19T09:15:00Z",
+      "lastMessagePreview": "See you tomorrow",
       "members": [{ "displayName": "Alice Smith" }]
     }
   ]
@@ -295,13 +301,19 @@ There is no way to scope a Graph search to chats or to channels, and the search 
 | `chatId` | Chat id (populated only for a `chat` hit, else `null`) |
 | `teamId` | Team id (populated only for a `channel` hit, else `null`) |
 | `channelId` | Channel id (populated only for a `channel` hit, else `null`) |
+| `chatName` | For a `chat` hit, the chat's topic, or its members' names when it has none. `null` for other hits or when the lookup failed |
+| `teamName` | For a `channel` hit, the team's display name. `null` otherwise, or when the team is not among the user's joined teams |
+| `channelName` | For a `channel` hit, the channel's display name. `null` otherwise, or when the lookup failed |
 | `senderDisplayName` | Sender name (nullable). Read from the hit's mailbox identity, which is what the search projection carries, then filled from the hydrated message when the hit named nobody, and as a last resort from the sender's bare email address — so this field can hold an address rather than a name |
 | `summary` | Search snippet exactly as Graph returns it, including its `<c0>` hit-highlighting markup (nullable) |
 | `message` | The fetched message, exactly as Graph returns it — `body` (`contentType` + raw `content`), plus `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId` and the rest. Absent for an `unknown` hit, a channel reply, or a failed fetch. The row gives no reason code, so an absent `message` does not say which |
 | `createdDateTime` | Message timestamp (nullable) |
 | `webUrl` | Link to the message (nullable). Observed as a Teams deep link, but Graph documents an Outlook Web link (`webLink`) for this projection, so either can appear — do not label it "open in Teams" |
 
-Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messages` or `send_*_message`.
+Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messages` or `send_*_message`. Show the user `chatName`, or `teamName` and `channelName`, to say where a message was posted, never the ids.
+
+!!! note "How container names are looked up"
+    A page of hits spans many chats and channels, and a hit carries only their ids. Each distinct chat is fetched once (`GET /chats/{id}?$expand=members`), each distinct channel once (`GET /teams/{teamId}/channels/{channelId}`), and every team name comes from one `GET /me/joinedTeams`, made only when the page has a channel hit. At most 3 run at a time, alongside hydration and inside its 15-second budget. A failed lookup leaves the name `null` and logs at `warn`. It never fails the page.
 
 !!! note "How hydration behaves"
     A search hit carries no message body, and Graph offers no way to ask for one. So each hit is fetched on its own: one extra Graph call per hit, at most 3 at a time.
@@ -326,6 +338,9 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
       "chatId": null,
       "teamId": "fbe2bf47-16c8-47cf-b4a5-4b9b187c508b",
       "channelId": "19:ch1...@thread.tacv2",
+      "chatName": null,
+      "teamName": "Engineering",
+      "channelName": "Releases",
       "senderDisplayName": "Carol Lee",
       "summary": "...Deploy is green",
       "content": "Deploy is green. Rollout finished at 13:49.",
