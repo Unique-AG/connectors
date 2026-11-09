@@ -273,11 +273,11 @@ Feature: Finding and reading files in OneDrive and SharePoint
       Then the assistant names her OneDrive
       And it gives the web address that opens the drive in a browser
 
-    @unhappy @uc-01-33
-    Scenario: The libraries of a site are not listed as drives
+    @happy @uc-01-33
+    Scenario: The libraries of a site are listed
       Given the Sales site holds the library "Shared Documents"
       When Mia asks her assistant for the document libraries of the Sales site
-      Then the assistant does not list the libraries of the Sales site
+      Then the assistant lists "Shared Documents" with the web address that opens it
       But it does not present her own drives as libraries of the Sales site
 
   Rule: The assistant finds a site from what Mia remembers about it

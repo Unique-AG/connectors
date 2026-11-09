@@ -715,6 +715,7 @@ GRAPH_STEPS = frozenset(
         "file_search",
         "site_search",
         "site_by_url",
+        "site_drives",
         "site_lists",
         "list_columns",
         "read_list",

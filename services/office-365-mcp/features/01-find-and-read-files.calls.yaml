@@ -600,23 +600,17 @@ uc-01-32:
   note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:64-69)
 
 uc-01-33:
-  status: partly
+  status: untested
   tests:
-    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_tool_has_no_site_to_list_and_says_it_lists_no_site_library"
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_libraries_of_a_site_are_listed_from_its_web_address"
   ask: "Which document libraries does the Sales site have?"
-  blocker:
-    kind: tool
-    tool: sharepoint_list_drives
-    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives says that no tool lists them, and that sharepoint_search_files needs a word to search for and shows files, not libraries.
-    user: The assistant cannot list the document libraries of a site.
   provenance: drafted
   asks_user: false
   chain:
-    - tool: sharepoint_list_drives
-      optional: true
     - tool: sharepoint_search_sites
       args: {query: Sales}
-  note: "expected behaviour from the description of sharepoint_list_drives: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
+    - tool: sharepoint_list_drives
+      uses: {site: web address of the Sales site from sharepoint_search_sites}
 
 uc-01-34:
   status: untested

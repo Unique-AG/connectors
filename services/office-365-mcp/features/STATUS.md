@@ -10,7 +10,7 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 | --- | --- | --- | --- | --- | --- |
 | Outlook | 5 | 4 | 2 | 361 | 372 |
 | Teams | 0 | 0 | 1 | 145 | 146 |
-| SharePoint | 0 | 3 | 3 | 104 | 110 |
+| SharePoint | 0 | 1 | 3 | 106 | 110 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
@@ -38,7 +38,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 | --- | --- | --- | --- |
 | Outlook | 161 | 211 | 372 |
 | Teams | 53 | 93 | 146 |
-| SharePoint | 40 | 70 | 110 |
+| SharePoint | 41 | 69 | 110 |
 | OneNote | 30 | 44 | 74 |
 | Across sources | 12 | 14 | 26 |
 
@@ -46,13 +46,11 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 These causes are in the connector: a tool, a parameter, a description, or a preset.
 
-### A tool is missing (9)
+### A tool is missing (7)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
-| `uc-01-33` | Finding and reading files in OneDrive and SharePoint | The libraries of a site are not listed as drives | partly | `sharepoint_list_drives` | No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives says that no tool lists them, and that sharepoint_search_files needs a word to search for and shows files, not libraries. |
 | `uc-04-11` | Drafting and sending mail | A new file is attached to a draft | gap | `outlook_draft_mail` | the draft tools write text only, and no other tool adds a file to a message |
-| `uc-10-02` | Organizing and sharing files in OneDrive and SharePoint | A folder is copied to another drive | partly | `sharepoint_list_drives` | No tool lists the libraries of a site, so the destination must be a folder, or the parent_uri of an item, that a search on the site returns. The description of sharepoint_copy_item says so. |
 | `uc-10-05` | Organizing and sharing files in OneDrive and SharePoint | The content of an existing file is replaced | gap | `sharepoint_create_text_file` | The tool creates new text files only and cannot replace a file or write a Word file. |
 | `uc-10-08` | Organizing and sharing files in OneDrive and SharePoint | Access is taken back | gap | `sharepoint_invite` | No tool removes a permission, and the description of sharepoint_invite says so. |
 | `uc-10-10` | Organizing and sharing files in OneDrive and SharePoint | A file attached to a mail is saved in a folder | gap | `sharepoint_create_text_file` | No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file. |

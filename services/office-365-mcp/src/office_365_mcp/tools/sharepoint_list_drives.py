@@ -1,42 +1,57 @@
 from collections.abc import Mapping
-from typing import Self
+from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.drive import Drive
+from msgraph.generated.models.drive_collection_response import DriveCollectionResponse
+from msgraph.generated.sites.item.drives.drives_request_builder import (
+    DrivesRequestBuilder as SiteDrivesRequestBuilder,
+)
 from msgraph.generated.users.item.drives.drives_request_builder import DrivesRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    collect_pages,
+    graph_errors,
+    graph_step,
+)
 from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.sites import site_by_path, site_path_of
 
 TOOL_NAME = "sharepoint_list_drives"
 
 STEP = "my_drives"
 
+STEP_SITE_DRIVES = "site_drives"
+
+STEP_SITE = "site_by_url"
+
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)
 
-GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
+GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"site": "https://contoso.sharepoint.com/sites/Finance"}
 
 
 _DRIVE_FIELDS: tuple[str, ...] = ("id", "name", "driveType", "webUrl", "description", "owner")
 
 _DrivesQuery = DrivesRequestBuilder.DrivesRequestBuilderGetQueryParameters
 
+_SiteDrivesQuery = SiteDrivesRequestBuilder.DrivesRequestBuilderGetQueryParameters
+
 _DESCRIPTION = """\
-Lists the drives of the signed-in user, each with a handle for its top folder. Most users have \
-one drive, their own OneDrive. Pass `root_uri` as `folder` to sharepoint_browse_folder to see \
-what a drive holds.
+Lists drives, each with a handle for its top folder. Without `site`, it lists the drives of the \
+signed-in user. Most users have one drive, their own OneDrive. With `site`, it lists the \
+document libraries of that SharePoint site. Pass `root_uri` as `folder` to \
+sharepoint_browse_folder to see what a drive holds.
 
 Notes:
-- This tool does not list the document libraries of SharePoint sites, and no tool lists them. \
-sharepoint_search_files needs a word to search for, and it returns files and folders, not \
-libraries. To find files on a site, give the web address of the site as `path` of \
-sharepoint_search_files.
+- Get `site` from the `web_url` of a row of sharepoint_search_sites. A library is a drive whose \
+`drive_type` is `documentLibrary`.
 """
 
 
@@ -98,8 +113,9 @@ class DriveSummary(BaseModel):
 class DriveList(BaseModel):
     drives: list[DriveSummary] = Field(
         description=(
-            "The drives of the signed-in user, in the order Microsoft returned them. Most users "
-            + "have one. An empty list means that Graph reported no drive. This tool does not list "
+            "The drives that this call listed, in the order Microsoft returned them. Without "
+            + "`site`, these are the drives of the signed-in user, and most users have one. An "
+            + "empty list means that Graph reported no drive. This tool does not list "
             + "a drive that Graph reports with no id, because this tool cannot address that drive."
         )
     )
@@ -111,13 +127,19 @@ class DriveList(BaseModel):
     )
 
 
-async def list_drives(client: GraphServiceClient) -> DriveList:
-    with graph_errors(TOOL_NAME, step=STEP):
-        first_page = await client.me.drives.get(
-            request_configuration=RequestConfiguration[_DrivesQuery](
-                query_parameters=_DrivesQuery(select=list(_DRIVE_FIELDS))
-            )
-        )
+async def list_drives(client: GraphServiceClient, *, site: str | None = None) -> DriveList:
+    site_path = None if site is None else site_path_of(site, TOOL_NAME)
+
+    with graph_errors(TOOL_NAME):
+        if site_path is None:
+            with graph_step(STEP):
+                first_page = await client.me.drives.get(
+                    request_configuration=RequestConfiguration[_DrivesQuery](
+                        query_parameters=_DrivesQuery(select=list(_DRIVE_FIELDS))
+                    )
+                )
+        else:
+            first_page = await _site_drives(client, site_path)
         assert first_page is not None, "Graph answered a drive listing with no collection"
         collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
 
@@ -129,6 +151,20 @@ async def list_drives(client: GraphServiceClient) -> DriveList:
     )
 
 
+async def _site_drives(
+    client: GraphServiceClient, site_path: str
+) -> DriveCollectionResponse | None:
+    with graph_step(STEP_SITE):
+        found = await site_by_path(client, site_path)
+    assert found is not None and found.id is not None, "Graph answered a site lookup with no site"
+    with graph_step(STEP_SITE_DRIVES):
+        return await client.sites.by_site_id(found.id).drives.get(
+            request_configuration=RequestConfiguration[_SiteDrivesQuery](
+                query_parameters=_SiteDrivesQuery(select=list(_DRIVE_FIELDS))
+            )
+        )
+
+
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
@@ -138,5 +174,20 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
-    async def sharepoint_list_drives(client: GraphServiceClient = graph) -> DriveList:
-        return await list_drives(client)
+    async def sharepoint_list_drives(
+        site: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "The web address of a SharePoint site, for example "
+                    + "`https://contoso.sharepoint.com/sites/Finance`. Copy it from the "
+                    + "`web_url` of a row of sharepoint_search_sites. When you set it, this tool "
+                    + "lists the document libraries of that site. When it is null, this tool "
+                    + "lists the drives of the signed-in user."
+                ),
+            ),
+        ] = None,
+        client: GraphServiceClient = graph,
+    ) -> DriveList:
+        return await list_drives(client, site=site)

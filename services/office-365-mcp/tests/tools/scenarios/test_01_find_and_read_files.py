@@ -514,15 +514,48 @@ class TestWhereTheFilesAreStored:
         )
         assert str(mine["root_uri"]).startswith("sharepoint:///folders/")
 
-    async def test_the_tool_has_no_site_to_list_and_says_it_lists_no_site_library(self) -> None:
-        async with Client(FastMCPTransport(_server()), mode="legacy") as client:
-            tools = {tool.name: tool for tool in await client.list_tools()}
-
-        listing = tools["sharepoint_list_drives"]
-        assert listing.input_schema.get("properties", {}) == {}
-        assert "does not list the document libraries of SharePoint sites" in (
-            listing.description or ""
+    async def test_the_libraries_of_a_site_are_listed_from_its_web_address(
+        self, graph: respx.MockRouter
+    ) -> None:
+        site = graph.get("/sites/contoso.sharepoint.com:/sites/Sales").mock(
+            return_value=httpx.Response(200, json={"id": "contoso.sharepoint.com,s1,w1"})
         )
+        libraries = graph.route(method="GET", path__regex=r"/sites/[^/]+/drives$").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "id": "b!SALESLIBRARY",
+                            "name": "Shared Documents",
+                            "driveType": "documentLibrary",
+                            "webUrl": "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents",
+                        }
+                    ]
+                },
+            )
+        )
+
+        listed = await call(
+            "sharepoint_list_drives", site="https://contoso.sharepoint.com/sites/Sales/"
+        )
+
+        [library] = _rows(listed, "drives")
+        assert (library["name"], library["drive_type"]) == ("Shared Documents", "documentLibrary")
+        assert str(library["root_uri"]).startswith("sharepoint:///folders/")
+        assert (site.call_count, libraries.call_count, len(graph.calls)) == (1, 1, 2)
+
+    @pytest.mark.parametrize(
+        "address",
+        ["contoso.sharepoint.com/sites/Sales", "Sales", "https://contoso.sharepoint.com/%2e%2e/x"],
+    )
+    async def test_an_address_that_is_not_a_site_address_is_refused_before_any_request(
+        self, graph: respx.MockRouter, address: str
+    ) -> None:
+        with pytest.raises(ToolError, match="takes the web address of a site"):
+            _ = await call("sharepoint_list_drives", site=address)
+
+        assert not graph.calls
 
 
 class TestFindingASite:

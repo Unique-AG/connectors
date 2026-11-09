@@ -7532,20 +7532,17 @@ What happens:
 - The assistant names her OneDrive.
 - It gives the web address that opens the drive in a browser.
 
-**The libraries of a site are not listed as drives**
+**The libraries of a site are listed**
 
 Ask your assistant: "Which document libraries does the Sales site have?"
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot list the document libraries of a site.
-
 Situation: The Sales site holds the library "Shared Documents".
 
 What happens:
 
-- The assistant does not list the libraries of the Sales site.
+- The assistant lists "Shared Documents" with the web address that opens it.
 - It does not present her own drives as libraries of the Sales site.
 
 #### The assistant finds a site from what Mia remembers about it
@@ -7770,9 +7767,6 @@ What happens:
 Ask your assistant: "Copy my Template folder into the Sales site."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant can copy into the Sales site only when it can find a folder there.
 
 Situation: Mia has the folder "Template" of 20 files in her OneDrive.
 

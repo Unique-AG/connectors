@@ -1442,8 +1442,10 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         tools = _named(await every_tool.list_tools())
 
-        assert "needs a word to search for" in (tools["sharepoint_list_drives"].description or "")
-        assert "No tool lists the libraries of a site" in (
+        assert "document libraries of that SharePoint site" in (
+            tools["sharepoint_list_drives"].description or ""
+        )
+        assert "call sharepoint_list_drives with the web address of the site" in (
             tools["sharepoint_copy_item"].description or ""
         )
 

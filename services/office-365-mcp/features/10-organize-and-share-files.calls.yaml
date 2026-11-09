@@ -16,15 +16,10 @@ uc-10-01:
   note: the folder and each of the 4 moves ask for approval, so 5 approvals are expected
 
 uc-10-02:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_folder_is_copied_into_a_folder_of_another_drive_and_the_original_stays"
   ask: "Copy my Template folder into the Sales site."
-  blocker:
-    kind: tool
-    tool: sharepoint_list_drives
-    text: No tool lists the libraries of a site, so the destination must be a folder, or the parent_uri of an item, that a search on the site returns. The description of sharepoint_copy_item says so.
-    user: The assistant can copy into the Sales site only when it can find a folder there.
   provenance: drafted
   asks_user: true
   chain:
@@ -32,15 +27,14 @@ uc-10-02:
       args: {query: Template}
     - tool: sharepoint_search_sites
       args: {query: Sales}
-    - tool: sharepoint_search_files
-      args: {query: Documents}
-      uses: {path: web address of the Sales site from sharepoint_search_sites}
+    - tool: sharepoint_list_drives
+      uses: {site: web address of the Sales site from sharepoint_search_sites}
     - tool: sharepoint_copy_item
-      uses: {item: handle of the folder Template, to_folder: handle of a folder on the Sales site from the second search}
+      uses: {item: handle of the folder Template, to_folder: root_uri of the library of the Sales site}
     - tool: sharepoint_browse_folder
       optional: true
       uses: {folder: handle of the destination folder}
-  note: the second query is a guess at a folder name of the site, and Microsoft runs the copy after the call returns, so a listing shows the copy only after some time
+  note: Microsoft runs the copy after the call returns, so a listing shows the copy only after some time
 
 uc-10-03:
   status: untested
