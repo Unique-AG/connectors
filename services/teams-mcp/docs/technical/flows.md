@@ -207,28 +207,27 @@ sequenceDiagram
 
     Note over TeamsMCP: Map hits to rows. Container is derived from the ids the hit<br/>carries: teamId AND channelId → channel, chatId → chat,<br/>neither → unknown (logged as a shape, never inferred)
 
-    Note over TeamsMCP: Hydrate every hit — one extra Graph call per hit (N+1),<br/>concurrency capped at 3 (pLimit)
-    loop For each hit (up to 3 in parallel)
-        alt teamId and channelId present
-            TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
-            MSGraph->>TeamsMCP: Full message (body, attachments, ...)
-            Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
-        else chatId present
-            TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
-            MSGraph->>TeamsMCP: Full message (body, attachments, ...)
-            Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
-        else no addressable id
-            Note over TeamsMCP: Skip the call; return the row without content
+    Note over TeamsMCP: Hydration and container names run in parallel,<br/>each capped at 3 calls at a time and bounded at 15 seconds
+    par Hydrate every hit (one extra Graph call per hit)
+        loop For each hit (up to 3 in parallel)
+            alt teamId and channelId present
+                TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
+                MSGraph->>TeamsMCP: Full message (body, attachments, ...)
+                Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
+            else chatId present
+                TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
+                MSGraph->>TeamsMCP: Full message (body, attachments, ...)
+                Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
+            else no addressable id
+                Note over TeamsMCP: Skip the call; return the row without content
+            end
         end
-    end
-
-    Note over TeamsMCP: In parallel with hydration, name each distinct container once<br/>(concurrency capped at 3, same 15-second budget)
-    par Container names
+    and Name each distinct container once
         TeamsMCP->>MSGraph: GET /chats/{chatId}?$expand=members (per distinct chat)
         TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId} (per distinct channel)
         TeamsMCP->>MSGraph: GET /me/joinedTeams (once, only if any channel hit)
+        Note over TeamsMCP: On any failure: leave that name null (no error)
     end
-    Note over TeamsMCP: On any failure: leave that name null (no error)
 
     TeamsMCP->>MCPClient: messages[], returnedCount, moreResultsAvailable
 ```

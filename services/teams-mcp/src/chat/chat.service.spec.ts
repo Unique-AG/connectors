@@ -165,6 +165,18 @@ describe('ChatService listChats lastMessagePreview', () => {
     expect(preview).toBe(`${lead}😄…`);
   });
 
+  it('drops text nested too deep to walk, rather than failing the list', async () => {
+    const depth = 20_000;
+    const preview = await previewFor({
+      body: {
+        contentType: 'html',
+        content: `<p>Hi team ${'<span>'.repeat(depth)}buried${'</span>'.repeat(depth)}</p>`,
+      },
+    });
+
+    expect(preview).toBe('Hi team');
+  });
+
   it('returns null for a deleted last message', async () => {
     const preview = await previewFor({
       isDeleted: true,

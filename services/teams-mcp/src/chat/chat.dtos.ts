@@ -39,12 +39,11 @@ export const MsChatMemberSchema = z.object({
 
 export const LAST_MESSAGE_PREVIEW_MAX_LENGTH = 150;
 
-// A preview only has to tell chats apart, so Teams HTML is flattened to text
-// rather than passed through. Mentions keep their names; attachments and system
-// event markers carry no text and leave nothing behind. Teams sends emoji as
-// <emoji alt="😄">, whose only text is the alt.
+// Teams sends emoji as <emoji alt="😄">, whose only text is the alt. maxDepth stops
+// html-to-text's recursive walk overflowing the stack on deeply nested HTML.
 const PREVIEW_HTML_OPTIONS: HtmlToTextOptions = {
   wordwrap: false,
+  limits: { maxDepth: 50, ellipsis: '' },
   selectors: [
     { selector: 'a', options: { ignoreHref: true } },
     { selector: 'img', format: 'skip' },

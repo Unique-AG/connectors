@@ -235,9 +235,8 @@ export class SearchService {
     };
   }
 
-  // One lookup per distinct chat and channel, plus one joinedTeams call for every
-  // team name at once. A name that cannot be fetched stays null and never fails
-  // the page, the same as a hit whose body cannot be fetched.
+  // One lookup per distinct chat and channel, and one joinedTeams call for all team
+  // names. A failed lookup leaves the name null and never fails the page.
   private async lookUpContainerNames(
     userProfileId: string,
     rows: SearchMessageRow[],
@@ -262,7 +261,7 @@ export class SearchService {
         return withDeadline(work(), remaining);
       }).catch((error: unknown) => {
         this.logger.warn(
-          { userProfileId, container, error },
+          { userProfileId, container, err: error },
           'Failed to look up a search hit container name; leaving it null',
         );
         return null;
