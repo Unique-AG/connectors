@@ -411,9 +411,7 @@
       ],
       "requireSignIn": true,
       "retainInheritedPermissions": true,
-      "roles": [
-        "read"
-      ],
+      "roles": ["read"],
       "sendInvitation": false
     },
     "status": 200,
@@ -440,9 +438,7 @@
             }
           },
           "id": "xAygSu6eaT1rcDGpttSdaIE9vJRchGYkP1Syq6ame61gUeavVWDfeNCjJXK",
-          "roles": [
-            "read"
-          ]
+          "roles": ["read"]
         }
       ]
     }
@@ -480,23 +476,17 @@
         {
           "@odata.type": "#microsoft.graph.aadUserConversationMember",
           "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1')",
-          "roles": [
-            "owner"
-          ]
+          "roles": ["owner"]
         },
         {
           "@odata.type": "#microsoft.graph.aadUserConversationMember",
           "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')",
-          "roles": [
-            "owner"
-          ]
+          "roles": ["owner"]
         },
         {
           "@odata.type": "#microsoft.graph.aadUserConversationMember",
           "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-e469-40d3-8f5b-9a7c5dac541e')",
-          "roles": [
-            "owner"
-          ]
+          "roles": ["owner"]
         }
       ],
       "topic": "seed-v1 case-teams-chat"
