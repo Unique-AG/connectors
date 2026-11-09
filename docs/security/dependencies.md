@@ -76,7 +76,7 @@ flowchart TD
 | Report | One comment that starts with `<!-- vulna-squash-report -->`. A second run updates it. |
 | Slack | The PR run posts no Slack message. |
 | Limits | The agent never merges, never approves, and never edits a lockfile by hand. |
-| Run again | Comment `/recreate`. The job rebuilds the PR and starts a new run. |
+| Run again | Comment `/recreate`. The job rebuilds the PR and starts a new run. It deletes the commits of a person and the agent, so use it only when you can discard them. |
 | Run by hand | Remove the agent label. Start an agent session in this repository and say: "Run the skill `vulna-squash` in mode `pr` for PR <number>". |
 
 Only the event "Label added" starts a run. This table shows when a PR gets a new run.
@@ -172,7 +172,7 @@ Write one of these commands as the first line of a comment on a dependency PR.
 
 | Comment | What happens |
 |---|---|
-| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit. It does nothing if the branch has all of `main`, or if no update targets the PR. |
+| `/rebase` | The job does what it does each night for this PR. It rebuilds the branch from `main`, or merges `main` into a PR that has a commit from a person or the agent. It does nothing if the branch has all of `main`, or if no update targets the PR. |
 | `/recreate` | The job rebuilds the branch from `main`, even if the PR has a commit. It deletes the commits of a person and the agent. If the target versions changed, it closes the PR and opens a new PR. If no update targets the PR, it closes the PR. |
 
 | Rule | Value |
@@ -271,7 +271,7 @@ The job lists each ignored update in its summary. Pins are `override-dependencie
 
 | Problem | What to do |
 |---|---|
-| The agent run crashes. The PR has no agent label. | Comment `/recreate`, or run the agent by hand. |
+| The agent run crashes. The PR has no agent label. | Run the agent by hand. Comment `/recreate` only if you can discard the commits of a person and the agent. |
 | A fix PR from the agent and a nightly PR change the same package. | Merge the PR that has the fix. Then close the other PR. |
 | A handled PR has a conflict with `main`. The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
 | A bump job is red. The job `Bump <slug>` shows the cause as an error annotation. No PR opens. | Read the cause. If a package pins the new version, wait for a release of that package. If other packages move too, put them in one group. |

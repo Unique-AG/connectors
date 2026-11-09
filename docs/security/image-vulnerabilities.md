@@ -169,7 +169,7 @@ The rule "no fixed version, or a fix younger than 3 days" applies to other packa
 | Layer cache | The container build template turns it off for the final stage, so `apt-get upgrade` takes the newest patches. |
 | A rebuild | A normal release. The Rebuild Service workflow opens one PR for each service. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`. |
 | A release | It pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record. |
-| A PR | It builds the image without a push. It does not scan the image. |
+| A PR that is not a release PR | It builds the image without a push. It does not scan the image. |
 
 ## Files
 

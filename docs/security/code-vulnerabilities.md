@@ -11,7 +11,8 @@ CodeQL scans our workflow files, our JavaScript and TypeScript, and our Python. 
 ```mermaid
 flowchart LR
   pr[Pull request] --> codeql[CodeQL scan]
-  codeql -->|no new alert| merge[PR can merge]
+  codeql -->|no new alert| gate[Gatekeeper waits for the other checks]
+  gate -->|all green| merge[PR can merge]
   codeql -->|new alert| fix[Fix the code or dismiss with a reason]
   fix --> codeql
 ```

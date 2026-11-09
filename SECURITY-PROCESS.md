@@ -17,7 +17,7 @@ flowchart LR
   pr -->|merge| main[main branch]
   main --> releasePr[Release PR]
   releasePr --> gate[Release gate]
-  gate -->|fixable critical or high| relStop[Release cannot merge]
+  gate -->|fixable critical or high, fix older than 3 days| relStop[Release cannot merge]
   gate -->|clean| published[Image published]
   published --> nightlyScan["Nightly scan: images, lock files, configuration"]
   nightlyScan -->|Slack report| patchRun[Daily patch run]
@@ -29,8 +29,8 @@ flowchart LR
 | Kind | Tool | What blocks | Read |
 |---|---|---|---|
 | Code | CodeQL | A PR that adds an alert | [Code vulnerabilities](./docs/security/code-vulnerabilities.md) |
-| Dependencies | Nightly update, lock file scan, dependency review | A PR that adds a vulnerable dependency | [Dependencies](./docs/security/dependencies.md) |
-| Images | Trivy | A release PR with a fixable critical or high finding | [Image vulnerabilities](./docs/security/image-vulnerabilities.md) |
+| Dependencies | Nightly update, dependency review, nightly lock file scan (reports only) | A PR that adds a vulnerable dependency | [Dependencies](./docs/security/dependencies.md) |
+| Images | Trivy | A release PR with a fixable critical or high finding whose fix is older than 3 days | [Image vulnerabilities](./docs/security/image-vulnerabilities.md) |
 
 ## The nightly timetable
 
