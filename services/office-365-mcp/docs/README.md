@@ -38,7 +38,6 @@ on fewer to cover part of it.
 | [Organizing the mailbox](use-cases.md#organizing-the-mailbox) | File and mark mail, make folders and categories, and make inbox rules. | `outlook-delete`, `outlook-rules`, `outlook-automate`, `outlook-mailbox` | No |
 | [Mailbox preferences](use-cases.md#mailbox-preferences) | Set the automatic reply and the focused inbox. | `outlook-write`, `outlook-automate`, `outlook-mailbox` | No |
 | [Reading the calendar](use-cases.md#reading-the-calendar) | List events, read an event, and show free time. | `outlook-read`, `outlook-calendar` | No |
-| [Reading the calendar](use-cases.md#reading-the-calendar) | | | |
 | [Scheduling and answering meetings](use-cases.md#scheduling-and-answering-meetings) | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
 | [Sharing and delegating calendars](use-cases.md#sharing-and-delegating-calendars) | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
 | [Managing contacts](use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |

@@ -55,7 +55,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-10-08` | Organizing and sharing files in OneDrive and SharePoint | Access is taken back | gap | `sharepoint_invite` | No tool removes a permission, and the description of sharepoint_invite says so. |
 | `uc-10-10` | Organizing and sharing files in OneDrive and SharePoint | A file attached to a mail is saved in a folder | gap | `sharepoint_create_text_file` | No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file. |
 | `uc-12-02` | Managing contacts | A person who is only in the company directory is found | gap | `outlook_find_recipient` | The tool gives an address, a job title, and a department, and no telephone number. No other tool reads a person of the company directory. |
-| `uc-13-01` | Running Teams chats and online meetings | A group chat is created and named | gap | `teams_create_chat` | No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from get_me, a chat member row, or a message sender. |
+| `uc-13-01` | Running Teams chats and online meetings | A group chat is created and named | gap | `teams_create_chat` | No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from a chat member row or a message sender. |
 | `uc-15-10` | Working across mail, calendar, files, and Teams | A file is sent to a colleague as a link in a mail draft | partly | `outlook_draft_mail` | The draft tools write text only and cannot add a file, so the assistant puts a sharing link in the draft and not the file. |
 
 ## Microsoft Graph cannot do it

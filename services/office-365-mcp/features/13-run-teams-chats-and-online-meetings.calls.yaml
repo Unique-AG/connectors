@@ -6,7 +6,7 @@ uc-13-01:
   blocker:
     kind: tool
     tool: teams_create_chat
-    text: No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from get_me, a chat member row, or a message sender.
+    text: No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from a chat member row or a message sender.
     user: The assistant cannot start a chat with a person it has never chatted with.
   provenance: drafted
   asks_user: true

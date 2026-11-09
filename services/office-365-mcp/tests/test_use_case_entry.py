@@ -53,9 +53,12 @@ def _tools_of(feature: pathlib.Path) -> set[str]:
 
 
 def _rows() -> dict[str, tuple[list[str], str]]:
+    found = [match.groupdict() for match in _ROW.finditer(_README)]
+    anchors = [row["anchor"] for row in found]
+    assert len(anchors) == len(set(anchors)), "the README table repeats a use case"
     return {
         row["anchor"]: (re.findall(r"`([a-z-]+)`", row["presets"]), row["consent"].strip())
-        for row in (match.groupdict() for match in _ROW.finditer(_README))
+        for row in found
     }
 
 

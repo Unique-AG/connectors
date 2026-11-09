@@ -60,7 +60,7 @@ with one other person, or a group chat. This tool adds the signed-in user to the
 posts no message. teams_list_chats shows the new chat.
 
 Notes:
-- Each person needs a Microsoft Entra object id, from get_me, a chat member row, or a message \
+- Each person needs a Microsoft Entra object id, from a chat member row or a message \
 sender. If you have no id for a person, tell the user that you cannot create the chat. Never guess \
 an id.
 - This tool asks the user to agree before it creates a chat, every time. This tool creates \
