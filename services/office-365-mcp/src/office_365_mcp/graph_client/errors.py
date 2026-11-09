@@ -73,9 +73,15 @@ class GraphThrottled(GraphFailure):
         request_id: str | None,
         retry_after_seconds: float | None,
         inner_code: str | None = None,
+        reason: str | None = None,
     ) -> None:
         super().__init__(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=reason,
         )
         self.retry_after_seconds: float | None = retry_after_seconds
 
@@ -343,6 +349,7 @@ def _classify(error: APIError) -> GraphFailure:
             request_id=request_id,
             inner_code=inner_code,
             retry_after_seconds=retry_after_seconds,
+            reason=_reason(error),
         )
     if status in (401, 403):
         return GraphForbidden(

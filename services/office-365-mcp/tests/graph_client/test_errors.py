@@ -307,6 +307,19 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
 
         assert raised.value.reason == _OR_FILTER
 
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_throttled_answer_keeps_the_reason_graph_gave(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me").mock(
+            side_effect=always(503, {"Retry-After": "10"}, error_body("serviceError", _OR_FILTER))
+        )
+
+        with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
+            _ = await client.me.get()
+
+        assert raised.value.reason == _OR_FILTER
+
     async def test_the_log_record_and_the_span_carry_the_same_fields(
         self,
         client: GraphServiceClient,
