@@ -10,7 +10,7 @@ variable "secrets_placeholders" {
     expiration_date = optional(string, "2099-12-31T23:59:59Z")
   }))
   default = {
-    world-check-mcp-upstream-api-key    = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
-    world-check-mcp-upstream-api-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    world-check-mcp-lseg-api-key    = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
+    world-check-mcp-lseg-api-secret = { create = true, expiration_date = "2099-12-31T23:59:59Z" }
   }
 }
