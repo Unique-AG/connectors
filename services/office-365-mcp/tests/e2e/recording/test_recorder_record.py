@@ -387,9 +387,14 @@ def test_a_failed_write_of_one_persona_stops_the_writes_of_the_next() -> None:
     first = Guard(stand_in.UPN, frozenset(stand_in.UPNS), True)
     second = Guard(stand_in.UPNS[1], frozenset(stand_in.UPNS), True, counter=first.counter)
 
+    write = httpx.Request("PATCH", f"{GRAPH}/drives/b!DRIVE/items/ITEM")
+    before = second.refuses_request(write, "sharepoint_rename_item")
     first.write_failed = True
+    after = second.refuses_request(write, "sharepoint_rename_item")
 
-    assert second.write_failed
+    assert "failed or throttled write" not in str(before)
+    assert after is not None
+    assert "failed or throttled write" in after
 
 
 async def test_a_preflight_answers_without_a_drive() -> None:
