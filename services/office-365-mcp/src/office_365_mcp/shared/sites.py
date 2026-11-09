@@ -1,7 +1,6 @@
 import re
 from urllib.parse import quote, unquote, urlsplit
 
-from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
 from msgraph.generated.models.site import Site
 from msgraph.graph_service_client import GraphServiceClient
@@ -16,7 +15,7 @@ _DNS_NAME = re.compile(
 )
 
 
-def site_path_of(site: str, tool: str) -> str:
+def site_path_of(site: str) -> str | None:
     """`{host}` or `{host}:{path}`, the two ways Graph addresses a site by its web address."""
     parts = urlsplit(site)
     decoded = parts.path
@@ -32,12 +31,12 @@ def site_path_of(site: str, tool: str) -> str:
         or encoded_separator
         or {".", ".."} & {*segments}
     ):
-        raise ToolError(_not_a_site(tool))
+        return None
     path = quote(parts.path.rstrip("/"), safe="/%")
     return f"{host}:{path}" if path else host
 
 
-def _not_a_site(tool: str) -> str:
+def not_a_site(tool: str) -> str:
     return (
         f"{tool} takes the web address of a site, such as the `web_url` of a row from "
         + "sharepoint_search_sites. It starts with https://. A site name is not one, nor is a "

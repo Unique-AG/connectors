@@ -3,6 +3,7 @@ from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.drive import Drive
 from msgraph.generated.models.drive_collection_response import DriveCollectionResponse
@@ -22,7 +23,7 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.sites import site_by_path, site_path_of
+from office_365_mcp.shared.sites import not_a_site, site_by_path, site_path_of
 
 TOOL_NAME = "sharepoint_list_drives"
 
@@ -128,7 +129,9 @@ class DriveList(BaseModel):
 
 
 async def list_drives(client: GraphServiceClient, *, site: str | None = None) -> DriveList:
-    site_path = None if site is None else site_path_of(site, TOOL_NAME)
+    site_path = None if site is None else site_path_of(site)
+    if site is not None and site_path is None:
+        raise ToolError(not_a_site(TOOL_NAME))
 
     with graph_errors(TOOL_NAME):
         if site_path is None:

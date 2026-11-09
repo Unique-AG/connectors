@@ -3,6 +3,7 @@ from typing import Annotated, Self
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.list_ import List_
 from msgraph.generated.sites.item.lists.lists_request_builder import ListsRequestBuilder
@@ -16,7 +17,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.handles import ListHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.sites import site_by_path, site_path_of
+from office_365_mcp.shared.sites import not_a_site, site_by_path, site_path_of
 
 TOOL_NAME = "sharepoint_list_lists"
 
@@ -95,7 +96,9 @@ class SiteLists(BaseModel):
 
 async def list_lists(client: GraphServiceClient, *, site: str, limit: int) -> SiteLists:
     assert limit >= 1, f"limit must be at least 1, got {limit}"
-    site_path = site_path_of(site, TOOL_NAME)
+    site_path = site_path_of(site)
+    if site_path is None:
+        raise ToolError(not_a_site(TOOL_NAME))
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SITE):
