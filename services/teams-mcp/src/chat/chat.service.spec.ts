@@ -186,6 +186,15 @@ describe('ChatService listChats lastMessagePreview', () => {
     expect(preview).toBeNull();
   });
 
+  it('returns null for a system event, even one whose body has text', async () => {
+    const preview = await previewFor({
+      messageType: 'systemEventMessage',
+      body: { contentType: 'html', content: '<p>Alice added Bob to the chat.</p>' },
+    });
+
+    expect(preview).toBeNull();
+  });
+
   it('returns null when the last message has no text, such as a system event or an attachment', async () => {
     const systemEvent = await previewFor({
       body: { contentType: 'html', content: '<systemEventMessage/>' },

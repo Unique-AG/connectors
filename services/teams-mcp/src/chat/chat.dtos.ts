@@ -85,6 +85,7 @@ export const MsChatSchema = z
       .object({
         createdDateTime: z.string().nullish(),
         isDeleted: z.boolean().nullish(),
+        messageType: z.string().nullish(),
         body: z.object({ contentType: z.string(), content: z.string() }).nullish(),
       })
       .nullish(),
@@ -92,13 +93,14 @@ export const MsChatSchema = z
   })
   .transform((chat) => {
     const preview = chat.lastMessagePreview;
+    const isUserMessage = !preview?.isDeleted && preview?.messageType !== 'systemEventMessage';
     return {
       id: chat.id,
       chatType: chat.chatType,
       topic: chat.topic,
       createdDateTime: chat.createdDateTime ?? null,
       lastMessageAt: preview?.createdDateTime ?? null,
-      lastMessagePreview: preview?.body && !preview.isDeleted ? toPreviewText(preview.body) : null,
+      lastMessagePreview: preview?.body && isUserMessage ? toPreviewText(preview.body) : null,
       members: chat.members,
     };
   });

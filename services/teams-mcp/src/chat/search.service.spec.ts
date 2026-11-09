@@ -211,6 +211,29 @@ describe('SearchService', () => {
       expect(getChannel).not.toHaveBeenCalled();
     });
 
+    it('skips a queued name lookup once the budget is spent, and still returns the page', async () => {
+      const hitsInFourChats = [1, 2, 3, 4].map((n) => ({
+        ...chatHit,
+        hitId: `hit-${n}`,
+        resource: { ...chatHit.resource, id: `msg-${n}`, chatId: `19:chat-${n}@thread.v2` },
+      }));
+      post.mockResolvedValue(searchResponse(hitsInFourChats));
+      getChat.mockReturnValue(new Promise(() => {}));
+
+      vi.useFakeTimers();
+      try {
+        const pending = unit.searchMessages(userProfileId, searchParams);
+        await vi.advanceTimersByTimeAsync(20_000);
+        const result = await pending;
+
+        expect(getChat).not.toHaveBeenCalledWith(userProfileId, '19:chat-4@thread.v2');
+        expect(result.messages.map((row) => row.chatName)).toEqual([null, null, null, null]);
+        expect(result.messages.every((row) => row.message === hydratedMessage)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('leaves a name null when its lookup fails, without failing the row', async () => {
       post.mockResolvedValue(searchResponse([chatHit, channelHit]));
       getChat.mockRejectedValue(new Error('Forbidden'));
