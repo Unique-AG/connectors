@@ -380,6 +380,15 @@ async def test_a_send_that_raises_stops_every_later_write() -> None:
     assert seen.write_failed
 
 
+def test_a_failed_write_of_one_persona_stops_the_writes_of_the_next() -> None:
+    first = Guard(stand_in.UPN, frozenset(stand_in.UPNS), True)
+    second = Guard(stand_in.UPNS[1], frozenset(stand_in.UPNS), True, counter=first.counter)
+
+    first.write_failed = True
+
+    assert second.write_failed
+
+
 async def test_a_preflight_answers_without_a_drive() -> None:
     bodies = {
         "/v1.0/me": {"id": "u1", "userPrincipalName": stand_in.UPN, "displayName": "Tester"},

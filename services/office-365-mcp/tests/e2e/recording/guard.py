@@ -165,7 +165,6 @@ class Guard:
     well_known: set[str] = field(default_factory=set[str])
     drafted: dict[str, tuple[str, ...]] = field(default_factory=dict[str, tuple[str, ...]])
     redirect: str | None = None
-    write_failed: bool = False
     extras: Mapping[str, str] = field(default_factory=dict[str, str])
     case_chats: set[str] = field(default_factory=set[str])
     shared_calendars: set[str] = field(default_factory=set[str])
@@ -201,6 +200,14 @@ class Guard:
             if (outside := foreign_address(value, self._addresses(tool))) is not None:
                 return f"{tool} {where} holds {outside}"
         return None
+
+    @property
+    def write_failed(self) -> bool:
+        return self.counter["failed"] > 0
+
+    @write_failed.setter
+    def write_failed(self, failed: bool) -> None:
+        self.counter["failed"] = int(failed)
 
     def refuses_request(self, request: httpx.Request, tool: str) -> str | None:
         if self.counter["sent"] >= self.cap:
