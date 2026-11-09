@@ -1,0 +1,1731 @@
+[
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Names, identifiers, countries, risk flags and addresses of an entity",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "The entity's ID (ARDIS ID or pid).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_basic_identifiers",
+    "outputSchema": {
+      "properties": {
+        "addresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "alerts": {
+          "items": {
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "countries": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "dates": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "d": {
+                  "type": "integer"
+                },
+                "m": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "images": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "legalTypes": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "names": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "pid": {
+          "type": "string"
+        },
+        "sanctionStatuses": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "unis": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "BasicIdentifiers"
+    },
+    "title": "Get Basic Identifiers"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Returns the full profile of an organization or person and the parties related to it, such as shareholders, board members, executives, signatories, third parties and subsidiaries, limited to the relation categories requested.\n",
+    "inputSchema": {
+      "properties": {
+        "category": {
+          "description": "Relation categories to include.",
+          "items": {
+            "enum": [
+              "executive",
+              "executiveSenior",
+              "thirdParty",
+              "signature",
+              "ownershipInOtherEntities",
+              "shareholdingInformation",
+              "membership"
+            ],
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_corporate_profile",
+    "outputSchema": {
+      "$defs": {
+        "Address": {
+          "properties": {
+            "address": {
+              "type": "string"
+            },
+            "en": {
+              "type": "string"
+            },
+            "ln": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "CorporateResponse": {
+          "properties": {
+            "root": {
+              "$ref": "#/$defs/Entity"
+            }
+          },
+          "type": "object"
+        },
+        "DatePart": {
+          "properties": {
+            "d": {
+              "type": "integer"
+            },
+            "m": {
+              "type": "integer"
+            },
+            "y": {
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "DatesByType": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/DatePart"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "Entity": {
+          "properties": {
+            "address": {
+              "items": {
+                "$ref": "#/$defs/Address"
+              },
+              "type": "array"
+            },
+            "alerts": {
+              "items": {
+                "$ref": "#/$defs/TypedAlert"
+              },
+              "type": "array"
+            },
+            "ardisId": {
+              "type": "string"
+            },
+            "countries": {
+              "$ref": "#/$defs/StringListMap"
+            },
+            "dates": {
+              "$ref": "#/$defs/DatesByType"
+            },
+            "eac": {
+              "description": "Economic activity categories.",
+              "items": {
+                "$ref": "#/$defs/LocalizedText"
+              },
+              "type": "array"
+            },
+            "flags": {
+              "description": "Such as #PEP, #FORMER_PEP or #SANCTION.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "gender": {
+              "description": "f, m or x.",
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "imageEntries": {
+              "items": {
+                "$ref": "#/$defs/ImageEntry"
+              },
+              "type": "array"
+            },
+            "legalTypes": {
+              "items": {
+                "$ref": "#/$defs/LocalizedText"
+              },
+              "type": "array"
+            },
+            "metadata": {
+              "items": {
+                "$ref": "#/$defs/SourceMetadata"
+              },
+              "type": "array"
+            },
+            "nameRecords": {
+              "items": {
+                "$ref": "#/$defs/NameRecord"
+              },
+              "type": "array"
+            },
+            "names": {
+              "items": {
+                "$ref": "#/$defs/LocalizedText"
+              },
+              "type": "array"
+            },
+            "related": {
+              "items": {
+                "$ref": "#/$defs/RelatedEntity"
+              },
+              "type": "array"
+            },
+            "score": {
+              "type": "integer"
+            },
+            "type": {
+              "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations.",
+              "type": "string"
+            },
+            "uni": {
+              "$ref": "#/$defs/StringListMap"
+            }
+          },
+          "type": "object"
+        },
+        "ImageEntry": {
+          "properties": {
+            "cloudUrl": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "LocalizedText": {
+          "properties": {
+            "en": {
+              "type": "string"
+            },
+            "ln": {
+              "description": "ISO 639-1 code of `original`.",
+              "type": "string"
+            },
+            "original": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "NameRecord": {
+          "properties": {
+            "en": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string"
+            },
+            "original": {
+              "type": "string"
+            },
+            "type": {
+              "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "RelatedEntity": {
+          "properties": {
+            "entity": {
+              "$ref": "#/$defs/Entity"
+            },
+            "relation": {
+              "items": {
+                "$ref": "#/$defs/Relation"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "Relation": {
+          "properties": {
+            "relationProperty": {
+              "items": {
+                "$ref": "#/$defs/RelationProperty"
+              },
+              "type": "array"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "RelationProperty": {
+          "properties": {
+            "dates": {
+              "$ref": "#/$defs/DatesByType"
+            },
+            "former": {
+              "type": "boolean"
+            },
+            "properties": {
+              "$ref": "#/$defs/StringListMap"
+            },
+            "title": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "SourceMetadata": {
+          "properties": {
+            "sourceCode": {
+              "type": "string"
+            },
+            "sourceName": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "StringListMap": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "TypedAlert": {
+          "properties": {
+            "description": {
+              "type": "string"
+            },
+            "type": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "properties": {
+        "root": {
+          "$ref": "#/$defs/Entity"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "CorporateResponse"
+    },
+    "title": "Get Corporate Profile"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Names, name records, identifiers, dates and risk flags of an entity",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "The entity's ID (ARDIS ID or pid).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_key_identifiers",
+    "outputSchema": {
+      "properties": {
+        "addresses": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "alerts": {
+          "items": {
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "countries": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "dates": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "d": {
+                  "type": "integer"
+                },
+                "m": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "images": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "legalTypes": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "nameRecords": {
+          "items": {
+            "properties": {
+              "en": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "original": {
+                "type": "string"
+              },
+              "type": {
+                "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "names": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "pid": {
+          "type": "string"
+        },
+        "sanctionStatuses": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "unis": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "KeyIdentifiers"
+    },
+    "title": "Get Key Identifiers"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Returns only the profile fields named in `fields`; see `list_completion_fields`.",
+    "inputSchema": {
+      "properties": {
+        "fields": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "The entity's ID (ARDIS ID or pid).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "name": "get_profile_fields",
+    "outputSchema": {
+      "properties": {
+        "addressEntries": {
+          "items": {
+            "properties": {
+              "address": {
+                "type": "string"
+              },
+              "en": {
+                "type": "string"
+              },
+              "ln": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "alertlist": {
+          "items": {
+            "properties": {
+              "category": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "countries": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "dates": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "d": {
+                  "type": "integer"
+                },
+                "m": {
+                  "type": "integer"
+                },
+                "y": {
+                  "type": "integer"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "eacEntries": {
+          "items": {
+            "properties": {
+              "en": {
+                "type": "string"
+              },
+              "ln": {
+                "description": "ISO 639-1 code of `original`.",
+                "type": "string"
+              },
+              "original": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "flags": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "imageEntries": {
+          "items": {
+            "properties": {
+              "cloudUrl": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "images": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "legalTypeEntries": {
+          "items": {
+            "properties": {
+              "en": {
+                "type": "string"
+              },
+              "ln": {
+                "description": "ISO 639-1 code of `original`.",
+                "type": "string"
+              },
+              "original": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "legalTypes": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "nameRecords": {
+          "items": {
+            "properties": {
+              "en": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "original": {
+                "type": "string"
+              },
+              "type": {
+                "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "names": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        },
+        "positions": {
+          "items": {
+            "properties": {
+              "endDate": {
+                "properties": {
+                  "d": {
+                    "type": "integer"
+                  },
+                  "m": {
+                    "type": "integer"
+                  },
+                  "y": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              },
+              "institution": {
+                "type": "string"
+              },
+              "position": {
+                "type": "string"
+              },
+              "remark": {
+                "type": "string"
+              },
+              "startDate": {
+                "properties": {
+                  "d": {
+                    "type": "integer"
+                  },
+                  "m": {
+                    "type": "integer"
+                  },
+                  "y": {
+                    "type": "integer"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "sanctionStatuses": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "sanctions": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "country": {
+                  "type": "string"
+                },
+                "details": {
+                  "additionalProperties": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "type": "object"
+                },
+                "source": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                }
+              },
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": "Sanction records per sanctions list.",
+          "type": "object"
+        },
+        "unis": {
+          "additionalProperties": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "Profile"
+    },
+    "title": "Get Profile Fields"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Walks the relationship network out from an entity up to `radius` hops. Leaves out signatory, third-party and historic relations, and returns names and images for each node in `meta` besides any `fields` requested.\n",
+    "inputSchema": {
+      "properties": {
+        "fields": {
+          "description": "Profile fields to return for each node in `meta`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "filter": {
+          "properties": {
+            "rules": {
+              "additionalProperties": {
+                "properties": {
+                  "allowedCtg": {
+                    "description": "Comma-separated relation categories to follow; empty follows all.",
+                    "type": "string"
+                  },
+                  "direction": {
+                    "enum": [
+                      "IN",
+                      "OUT",
+                      "BOTH"
+                    ],
+                    "type": "string"
+                  },
+                  "excludedCtg": {
+                    "description": "Comma-separated relation categories not to follow.",
+                    "type": "string"
+                  },
+                  "onlyActual": {
+                    "type": "boolean"
+                  },
+                  "requireOrg": {
+                    "type": "boolean"
+                  },
+                  "requirePerson": {
+                    "type": "boolean"
+                  },
+                  "requireSanction": {
+                    "type": "boolean"
+                  },
+                  "requireSoe": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "description": "One rule per relation type to follow, keyed by the relation type. Relation types without a rule are not followed. Without a filter the default rules apply.\n",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "id": {
+          "description": "The entity the walk starts from.",
+          "type": "string"
+        },
+        "radius": {
+          "description": "How many hops to walk out from the entity.",
+          "type": "integer"
+        },
+        "truncate": {
+          "description": "Return a reduced graph, recommended for large ones.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_smart_graph",
+    "outputSchema": {
+      "properties": {
+        "edges": {
+          "items": {
+            "properties": {
+              "details": {
+                "items": {
+                  "properties": {
+                    "at": {
+                      "type": "integer"
+                    },
+                    "cShare": {
+                      "type": "number"
+                    },
+                    "ctg": {
+                      "type": "integer"
+                    },
+                    "endDate": {
+                      "type": "integer"
+                    },
+                    "former": {
+                      "type": "boolean"
+                    },
+                    "noi": {
+                      "type": "number"
+                    },
+                    "originalSource": {
+                      "type": "string"
+                    },
+                    "originalTarget": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "share": {
+                      "type": "number"
+                    },
+                    "startDate": {
+                      "type": "integer"
+                    },
+                    "vshare": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "targetId": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "additionalProperties": {
+            "properties": {
+              "alertNames": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "alerts": {
+                "items": {
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "composite": {
+                "type": "boolean"
+              },
+              "flags": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "radii": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "root": {
+          "properties": {
+            "alertNames": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "alerts": {
+              "items": {
+                "properties": {
+                  "category": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "composite": {
+              "type": "boolean"
+            },
+            "flags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "radii": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "GraphResponse"
+    },
+    "title": "Get Smart Graph"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Walks every relation out from an entity up to `radius` hops. `meta` holds only the `fields` requested.\n",
+    "inputSchema": {
+      "properties": {
+        "fields": {
+          "description": "Profile fields to return for each node in `meta`.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "filter": {
+          "properties": {
+            "rules": {
+              "additionalProperties": {
+                "properties": {
+                  "allowedCtg": {
+                    "description": "Comma-separated relation categories to follow; empty follows all.",
+                    "type": "string"
+                  },
+                  "direction": {
+                    "enum": [
+                      "IN",
+                      "OUT",
+                      "BOTH"
+                    ],
+                    "type": "string"
+                  },
+                  "excludedCtg": {
+                    "description": "Comma-separated relation categories not to follow.",
+                    "type": "string"
+                  },
+                  "onlyActual": {
+                    "type": "boolean"
+                  },
+                  "requireOrg": {
+                    "type": "boolean"
+                  },
+                  "requirePerson": {
+                    "type": "boolean"
+                  },
+                  "requireSanction": {
+                    "type": "boolean"
+                  },
+                  "requireSoe": {
+                    "type": "boolean"
+                  }
+                },
+                "type": "object"
+              },
+              "description": "One rule per relation type to follow, keyed by the relation type. Relation types without a rule are not followed. Without a filter the default rules apply.\n",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        },
+        "id": {
+          "description": "The entity the walk starts from.",
+          "type": "string"
+        },
+        "radius": {
+          "description": "How many hops to walk out from the entity.",
+          "type": "integer"
+        },
+        "truncate": {
+          "description": "Return a reduced graph, recommended for large ones.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_subgraph",
+    "outputSchema": {
+      "properties": {
+        "edges": {
+          "items": {
+            "properties": {
+              "details": {
+                "items": {
+                  "properties": {
+                    "at": {
+                      "type": "integer"
+                    },
+                    "cShare": {
+                      "type": "number"
+                    },
+                    "ctg": {
+                      "type": "integer"
+                    },
+                    "endDate": {
+                      "type": "integer"
+                    },
+                    "former": {
+                      "type": "boolean"
+                    },
+                    "noi": {
+                      "type": "number"
+                    },
+                    "originalSource": {
+                      "type": "string"
+                    },
+                    "originalTarget": {
+                      "type": "string"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "share": {
+                      "type": "number"
+                    },
+                    "startDate": {
+                      "type": "integer"
+                    },
+                    "vshare": {
+                      "type": "number"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "sourceId": {
+                "type": "string"
+              },
+              "targetId": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "nodes": {
+          "additionalProperties": {
+            "properties": {
+              "alertNames": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "alerts": {
+                "items": {
+                  "properties": {
+                    "category": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "composite": {
+                "type": "boolean"
+              },
+              "flags": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "radii": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "object"
+        },
+        "root": {
+          "properties": {
+            "alertNames": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "alerts": {
+              "items": {
+                "properties": {
+                  "category": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "composite": {
+              "type": "boolean"
+            },
+            "flags": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "id": {
+              "type": "string"
+            },
+            "radii": {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            "type": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "GraphResponse"
+    },
+    "title": "Get Subgraph"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "The ownership tree below an entity: its subsidiaries and the shares held at each layer. Capped at 300 nodes per level and 5,000 per request; `truncated` says when a cap was hit.\n",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "The entity's ID (ARDIS ID or pid).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_top_down_ownership",
+    "outputSchema": {
+      "properties": {
+        "roots": {
+          "description": "Every node of the tree; `children` links them.",
+          "items": {
+            "properties": {
+              "children": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "flags": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "sharePercent": {
+                "type": "number"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "startId": {
+          "type": "string"
+        },
+        "totalNodes": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "OwnershipTree"
+    },
+    "title": "Get Top Down Ownership"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "The ownership tree above an entity, followed up through its shareholders until the ultimate beneficial owners. Capped at 300 nodes per level and 5,000 per request.\n",
+    "inputSchema": {
+      "properties": {
+        "id": {
+          "description": "The entity's ID (ARDIS ID or pid).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "name": "get_ultimate_beneficial_owners",
+    "outputSchema": {
+      "properties": {
+        "roots": {
+          "description": "Every node of the tree; `children` links them.",
+          "items": {
+            "properties": {
+              "children": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "flags": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "id": {
+                "type": "string"
+              },
+              "role": {
+                "type": "string"
+              },
+              "sharePercent": {
+                "type": "number"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "startId": {
+          "type": "string"
+        },
+        "totalNodes": {
+          "type": "integer"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "OwnershipTree"
+    },
+    "title": "Get Ultimate Beneficial Owners"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Profile fields the completion endpoint can return",
+    "inputSchema": {
+      "properties": {},
+      "required": [],
+      "type": "object"
+    },
+    "name": "list_completion_fields",
+    "outputSchema": {
+      "properties": {
+        "result": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "result"
+      ],
+      "type": "object",
+      "x-fastmcp-wrap-result": true
+    },
+    "title": "List Completion Fields"
+  },
+  {
+    "annotations": {
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Resolve a permanent ID that may have been merged into another",
+    "inputSchema": {
+      "properties": {
+        "pid": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pid"
+      ],
+      "type": "object"
+    },
+    "name": "resolve_permanent_id",
+    "outputSchema": {
+      "properties": {
+        "count": {
+          "type": "integer"
+        },
+        "members": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "pid": {
+          "type": "string"
+        },
+        "redir": {
+          "description": "The pid that replaced this one when it was merged.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "description": "active, merged or unknown.",
+          "type": "string"
+        }
+      },
+      "type": "object",
+      "x-fastmcp-top-level-schema": "PermanentId"
+    },
+    "title": "Resolve Permanent Id"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Find organizations and people in Polixis by name or identifier, with their sanctions and\nPEP flags.\n\nCall it first: every other Polixis tool takes a match's `pid` as its `id`, such as\n`get_corporate_profile`, `get_ultimate_beneficial_owners` or `get_smart_graph`.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "countries": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO 3166-1 alpha-2 country codes, such as `ch`. A match needs only one of them."
+        },
+        "entity_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "ORGANIZATION",
+                "PERSON"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only organizations or only people. Leave it out for both."
+        },
+        "name": {
+          "description": "A name, registration number, LEI or ISIN of an organization or person.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "page": {
+          "default": 1,
+          "description": "The page to return, from 1.",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_size": {
+          "default": 10,
+          "description": "Matches per page.",
+          "maximum": 50,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "name": "search_entities",
+    "outputSchema": {
+      "description": "One page of matches, best first: exact matches, then fuzzy ones.",
+      "properties": {
+        "matches": {
+          "description": "The matches on this page.",
+          "items": {
+            "description": "An organization or person the search matched.",
+            "properties": {
+              "alerts": {
+                "description": "Risk and status alerts, as Polixis words them.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
+              },
+              "identifiers": {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": "Identifiers by type, such as registration numbers, LEIs or tax ids.",
+                "type": "object"
+              },
+              "names": {
+                "description": "Its names, aliases and original-language spellings.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "pid": {
+                "description": "Polixis' permanent id, which every other Polixis tool takes as `id`.",
+                "type": "string"
+              },
+              "politically_exposed": {
+                "description": "Whether Polixis flags it as a PEP.",
+                "type": "boolean"
+              },
+              "sanction_statuses": {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "description": "Sanctions list name to its status, ACTIVE or DELISTED.",
+                "type": "object"
+              },
+              "sanctioned": {
+                "description": "Whether Polixis flags it for sanctions exposure.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "pid",
+              "entity_type",
+              "names",
+              "sanctioned",
+              "politically_exposed",
+              "sanction_statuses",
+              "alerts",
+              "identifiers"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "page": {
+          "description": "The page returned, from 1.",
+          "type": "integer"
+        },
+        "total_matches": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Matches across every page, or null when Polixis does not say."
+        }
+      },
+      "required": [
+        "matches",
+        "page",
+        "total_matches"
+      ],
+      "type": "object"
+    },
+    "title": "Search Entities"
+  }
+]

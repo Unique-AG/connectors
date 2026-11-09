@@ -242,6 +242,31 @@
           "jsonpath": "$.package[?(@.source.editable)].version"
         }
       ]
+    },
+    "services/polixis-mcp": {
+      "release-type": "python",
+      "component": "polixis-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/polixis-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/polixis-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/polixis-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
+        }
+      ]
     }
   }
 }

@@ -1,0 +1,8 @@
+{
+  "$comment": "mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00",
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Polixis MCP Values",
+  "description": "Values for the Polixis MCP Helm chart. A Python FastMCP server on the base chart. Exposure uses base chart Gateway API routes (no custom Ingress).",
+  "type": "object",
+  "properties": {}
+}
