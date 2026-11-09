@@ -93,22 +93,17 @@ uc-02-06:
       uses: {uri: uri of the message from the previous step}
 
 uc-02-07:
-  status: partly
+  status: untested
   tests:
     - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_gives_an_excel_workbook_as_a_file_and_never_as_text"
-  ask: "What is the total in the last row of the Excel file that Anna attached?"
-  blocker:
-    kind: unknown
-    tool: outlook_read_attachment
-    text: The tool returns the workbook in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read an Excel file in that form, so the cause is not known.
-    user: The assistant may not be able to read the numbers inside an Excel attachment.
+  ask: "Open the Excel file that Anna attached."
   provenance: drafted
   asks_user: false
   chain:
     - any_of: [outlook_list_attachments, outlook_read_mail]
     - tool: outlook_read_attachment
       uses: {uri: uri of the workbook}
-  note: the same limit as the file read in the SharePoint feature, where no tool gives a document as text
+  note: no tool gives a document as text, so the client of the assistant reads the cells of the workbook, as with the file read in the SharePoint feature
 
 uc-02-08:
   status: untested

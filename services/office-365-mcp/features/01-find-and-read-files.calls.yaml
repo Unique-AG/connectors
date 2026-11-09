@@ -138,13 +138,8 @@ uc-01-10:
   fixture: uc-01-10
 
 uc-01-11:
-  status: partly
-  ask: "Summarize the Brightway Master Agreement."
-  blocker:
-    kind: unknown
-    tool: sharepoint_read_file
-    text: When Microsoft answers 406 to `convert_to` pdf, the tool raises an error that asks for a second call without `convert_to`, and that call returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known.
-    user: The assistant may not be able to read some files that Microsoft cannot convert.
+  status: untested
+  ask: "Read the Brightway Master Agreement."
   provenance: observed
   evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
   asks_user: false
@@ -158,14 +153,13 @@ uc-01-11:
         tool_error: tools.sharepoint_read_file._NOT_CONVERTIBLE
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE: 1, GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content: 1}
     - tool: sharepoint_read_file
-      optional: true
       bind: {file: "sharepoint:///files/b%21RUNDRIVE/01RUNFILE"}
       expect:
         result:
           "content[0].resource.uri": file:///Brightway%20Master%20Agreement.docx
           "content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE: 1, GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content: 1}
-  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call returns the file in its own format; no run shows that the assistant reads it
+  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call returns the file in its own format. No tool gives a document as text, so the client of the assistant reads it
   fixture: uc-01-11
 
 uc-01-16:

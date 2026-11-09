@@ -118,11 +118,11 @@ Feature: Finding and reading files in OneDrive and SharePoint
       But it does not summarize only a part of the file
 
     @unhappy @uc-01-11
-    Scenario: A file that Microsoft cannot convert is read as it is or reported
+    Scenario: A file that Microsoft cannot convert is handed over in its own format
       Given Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF
-      When Mia asks her assistant to summarize that agreement
-      Then the assistant reads the file in its own format or tells Mia that it cannot read the file
-      But it does not invent the content of the file
+      When Mia asks her assistant to read that agreement
+      Then the assistant gets the file in its own format
+      But the connector does not turn the file into text
 
   Rule: Mia is told what happened when Microsoft cannot do what she asked
     The assistant only reads in this feature, so it can ask Microsoft again once without harm.

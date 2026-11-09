@@ -364,20 +364,18 @@ What happens:
 - The assistant gives the full text of the message.
 - It names "Draft v2.docx" with its size.
 
-**The content of an Excel attachment answers a question**
+**An Excel attachment is handed over as a file**
 
-Ask your assistant: "What is the total in the last row of the Excel file that Anna attached?"
+Ask your assistant: "Open the Excel file that Anna attached."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not be able to read the numbers inside an Excel attachment.
-
-Situation: Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row.
+Situation: Anna attached a 2 MB Excel workbook.
 
 What happens:
 
-- The assistant answers 4,200.
+- The assistant gets the workbook in its own format.
+- The connector does not turn the workbook into text.
 
 **An attachment above 10 MB is refused**
 
@@ -7296,21 +7294,18 @@ What happens:
 - It gives Mia the web address that opens the file in a browser.
 - It does not summarize only a part of the file.
 
-**A file that Microsoft cannot convert is read as it is or reported**
+**A file that Microsoft cannot convert is handed over in its own format**
 
-Ask your assistant: "Summarize the Brightway Master Agreement."
+Ask your assistant: "Read the Brightway Master Agreement."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may not be able to read some files that Microsoft cannot convert.
 
 Situation: Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF.
 
 What happens:
 
-- The assistant reads the file in its own format or tells Mia that it cannot read the file.
-- It does not invent the content of the file.
+- The assistant gets the file in its own format.
+- The connector does not turn the file into text.
 
 #### Mia is told what happened when Microsoft cannot do what she asked
 

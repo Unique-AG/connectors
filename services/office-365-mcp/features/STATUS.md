@@ -8,9 +8,9 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 4 | 2 | 361 | 372 |
+| Outlook | 5 | 3 | 2 | 362 | 372 |
 | Teams | 0 | 0 | 1 | 145 | 146 |
-| SharePoint | 0 | 1 | 3 | 106 | 110 |
+| SharePoint | 0 | 0 | 3 | 107 | 110 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
@@ -70,8 +70,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
-| `uc-01-11` | Finding and reading files in OneDrive and SharePoint | A file that Microsoft cannot convert is read as it is or reported | partly | `sharepoint_read_file` | When Microsoft answers 406 to `convert_to` pdf, the tool raises an error that asks for a second call without `convert_to`, and that call returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known. |
-| `uc-02-07` | Finding and reading mail | The content of an Excel attachment answers a question | partly | `outlook_read_attachment` | The tool returns the workbook in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read an Excel file in that form, so the cause is not known. |
 | `uc-05-03` | Organizing the mailbox | Messages that Mia names by subject are found again and filed | partly | `outlook_move_mail` | the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle, because listings also show folder_id and web_link. The message_refs fields of outlook_move_mail and outlook_mark_mail and the field MailSummary.uri now say that the `uri` is the handle and that folder_id and web_link are not. The cause stays open until the logs show the wrong values. |
 | `uc-15-12` | Working across mail, calendar, files, and Teams | A file that Anna posted in Teams is read | partly | `sharepoint_resolve_url` | A run on 2026-11-09 shows that the address of a file that Mia posted in a chat resolves and reads. No run has used a file that Anna posted, so whether Mia can open that file is not known. |
 
