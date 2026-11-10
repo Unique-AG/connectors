@@ -76,7 +76,7 @@
           (corepack.override { nodejs-slim = pkgs.nodejs-slim_26; }) # pnpm version managed via corepack
         ];
 
-        # Python development (services/backstop-mcp, hello-mcp, kb-mcp, office-365-mcp)
+        # Python development (services/backstop-mcp, kb-mcp, office-365-mcp)
         # uv manages the interpreter and the venv itself — see each service's .python-version
         pythonPkgs = with pkgs; [
           uv

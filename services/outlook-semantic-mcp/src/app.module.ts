@@ -20,6 +20,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
+import { AdminConsentController } from './auth/admin-consent.controller';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import {
@@ -246,7 +247,7 @@ import { deploymentSecrets } from './utils/log-secrets';
     HealthModule,
     registerBackendModule(),
   ],
-  controllers: [ManifestController],
+  controllers: [ManifestController, AdminConsentController],
   providers: [
     { provide: APP_FILTER, useClass: GraphErrorFilter },
     { provide: APP_GUARD, useClass: McpAuthJwtGuard },

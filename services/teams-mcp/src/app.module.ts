@@ -17,6 +17,7 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
+import { AdminConsentController } from './auth/admin-consent.controller';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { registerChatModule } from './chat/chat.module';
@@ -212,7 +213,7 @@ import { deploymentSecrets } from './utils/log-secrets';
     ...registerChatModule(),
     HealthModule,
   ],
-  controllers: [ManifestController],
+  controllers: [ManifestController, AdminConsentController],
   providers: [
     { provide: APP_FILTER, useClass: GraphErrorFilter },
     { provide: APP_GUARD, useClass: McpAuthJwtGuard },

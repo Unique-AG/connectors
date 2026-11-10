@@ -685,6 +685,42 @@
           ]
         },
         {
+          "name": "sharepoint_list_lists",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_get_list",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_list_items",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_update_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_delete_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
           "name": "onenote_list_notebooks",
           "permissions": [
             "Notes.Read"
@@ -910,6 +946,12 @@
         "sharepoint_create_share_link",
         "sharepoint_invite",
         "sharepoint_search_sites",
+        "sharepoint_list_lists",
+        "sharepoint_get_list",
+        "sharepoint_list_items",
+        "sharepoint_create_list_item",
+        "sharepoint_update_list_item",
+        "sharepoint_delete_list_item",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -1305,6 +1347,29 @@
           "sharepoint_read_file",
           "sharepoint_search_sites"
         ],
+        "sharepoint-lists": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items"
+        ],
+        "sharepoint-lists-write": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item"
+        ],
+        "sharepoint-lists-delete": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item",
+          "sharepoint_delete_list_item"
+        ],
         "onenote-read": [
           "onenote_list_notebooks",
           "onenote_list_pages",
@@ -1399,6 +1464,7 @@
         "Contacts.ReadWrite",
         "Files.ReadWrite.All",
         "Sites.Read.All",
+        "Sites.ReadWrite.All",
         "Notes.Read",
         "Notes.Create",
         "Notes.ReadWrite",
@@ -1440,6 +1506,7 @@
         "Files.Read.All": true,
         "Files.ReadWrite.All": true,
         "Sites.Read.All": true,
+        "Sites.ReadWrite.All": true,
         "Notes.Read": false,
         "Notes.Read.All": false,
         "Notes.Create": false,

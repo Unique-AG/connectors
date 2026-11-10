@@ -64,7 +64,7 @@ flowchart LR
 
 ### Unique SaaS
 
-After [granting admin consent](https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a) (see [Authentication](./authentication.md#unique-saas) for why this is needed), provide the following to Unique Support or Solution Engineering:
+After granting admin consent through the `/admin/consent` link of your deployment (see [Authentication](./authentication.md#unique-saas) for why this is needed), provide the following to Unique Support or Solution Engineering:
 
 - [ ] **Backend mode** — controls how email search works; see [Deployment Modes](./configuration.md#Deployment-Modes) for the full trade-offs:
   - `microsoft_graph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment

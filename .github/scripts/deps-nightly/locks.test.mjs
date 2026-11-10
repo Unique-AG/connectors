@@ -60,7 +60,7 @@ version = "${httpx2}"
 source = { registry = "https://pypi.org/simple" }
 
 [[package]]
-name = "hello-mcp"
+name = "backstop-mcp"
 version = "0.1.1"
 source = { virtual = "." }
 `;
