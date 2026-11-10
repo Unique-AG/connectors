@@ -6,7 +6,7 @@
     "noUncheckedIndexedAccess": true,
     /* Modules */
     "module": "commonjs",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "isolatedModules": true,
@@ -14,7 +14,7 @@
     "experimentalDecorators": true,
     /* Emit */
     "target": "ES2023",
-    "baseUrl": ".",
+    "types": ["*"],
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
