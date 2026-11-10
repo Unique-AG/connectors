@@ -72,6 +72,7 @@ from office_365_mcp.shared.calendar import (
     recurrence_refusal,
     transaction_id_for,
     wall_clock,
+    with_default_online_meeting,
     zone_named,
 )
 from office_365_mcp.shared.categories import CategoryName, merged_categories
@@ -388,7 +389,7 @@ async def create_event_on_behalf(
     body_html: str | None = None,
     location: str | None = None,
     all_day: bool = False,
-    online_meeting: bool = False,
+    online_meeting: bool | None = None,
     room_addresses: Sequence[str] = (),
     categories: Sequence[str] = (),
     show_as: ShowAs | None = None,
@@ -440,6 +441,7 @@ async def create_event_on_behalf(
     with graph_errors(TOOL_NAME):
         calendar = await calendar_of(client, calendar_id=handle.calendar_id)
         assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
+        draft = with_default_online_meeting(draft, calendar)
         transaction = transaction_id_for(calendar.id, draft)
         refused = _READ_ONLY_CALENDAR if calendar.can_edit is False else None
         if refused is None and draft.online_meeting:
@@ -475,7 +477,7 @@ def _composed(
     body_html: str | None,
     location: str | None,
     all_day: bool,
-    online_meeting: bool,
+    online_meeting: bool | None,
     room_addresses: Sequence[str],
     categories: Sequence[str],
     show_as: ShowAs | None,
@@ -809,18 +811,22 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = False,
         online_meeting: Annotated[
-            bool,
+            bool | None,
             Field(
                 description=(
-                    "Set this parameter to add a Microsoft Teams meeting, so the invitation "
-                    + "carries a joining link. Once this is set, no tool here can undo it. This "
-                    + "tool reads the calendar's own `online_meeting_providers` field, the field "
-                    + "that outlook_list_calendars reports. If Teams is not among them, this "
-                    + "tool refuses before it asks anybody, and it names the providers that the "
-                    + "calendar allows."
+                    "Leave this parameter unset, and an event with attendees gets a Microsoft "
+                    + "Teams meeting, so the invitation carries a joining link, as Outlook does "
+                    + "when a person invites people. An event with no attendee gets none. Set "
+                    + "this to false only when the user says that the event is not a remote "
+                    + "meeting. Set it to true to add a Teams meeting to an event with no "
+                    + "attendee. Once an event has a Teams meeting, no tool here can undo it. "
+                    + "This tool reads the calendar's own `online_meeting_providers` field, the "
+                    + "field that outlook_list_calendars reports. If Teams is not among them, the "
+                    + "default adds no meeting, and true makes this tool refuse before it asks "
+                    + "anybody, and name the providers that the calendar allows."
                 ),
             ),
-        ] = False,
+        ] = None,
         show_as: Annotated[ShowAs | None, Field(description=SHOW_AS_FIELD)] = None,
         importance: Annotated[EventImportance | None, Field(description=IMPORTANCE_FIELD)] = None,
         sensitivity: Annotated[

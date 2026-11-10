@@ -814,7 +814,7 @@ Calendars, events, availability, rooms, and sharing.
 **You can**
 
 - Do everything in `outlook-calendar`.
-- Create an event, with attendees, rooms, or a series.
+- Create an event, with attendees, rooms, or a series. An event with attendees has a Teams meeting, unless you ask for an event without one.
 - Change an event that you organize, or add a Teams meeting to it.
 - Cancel an event that you organize.
 - Accept, decline, or tentatively accept an invitation.
