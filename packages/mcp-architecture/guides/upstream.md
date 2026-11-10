@@ -29,7 +29,16 @@ two ways:
   its request models from `upstream/__init__.py`, then write a context that calls it and a tool
   over it. `Upstream` is mcp-openapi's `OperationClient`, which parses each response into its
   generated model. On an error status it raises `UpstreamError` with the status, method and URL,
-  followed by the first 200 characters of the error body, which reach the client.
+  followed by the first 200 characters of the error body, which reach the client. When the
+  vendor reports some failures with a success status, such as a 200 whose body is an error,
+  pass `open_upstream`'s `Upstream(..., response_check=...)` a function that raises an
+  `UpstreamError` for them, rather than checking each response in the contexts.
+
+  When the upstream limits concurrent requests, give the client `upstream_http` builds
+  `limits=httpx2.Limits(max_connections=...)` rather than a `LockConfig`: the tools served from
+  the spec send through that client too, and a lock on `Upstream` would not hold them back. A
+  request that finds no free connection within the timeout fails with an `UpstreamError` that
+  says so.
 
   Call an operation with `upstream.call(GET_X, GetXRequest(path=..., query=..., body=...))`.
   The type check verifies every path and query parameter and the body against the spec, so a
