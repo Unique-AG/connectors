@@ -944,14 +944,14 @@ uc-02-52:
 uc-02-53:
   status: untested
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment::test_a_domain_is_searched_in_every_address_field_because_graph_fails_on_participants"
+    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment::test_a_recipient_is_searched_in_every_address_field_not_in_participants"
   ask: "Find the mail with acme.com about the invoice."
   provenance: drafted
   asks_user: false
   chain:
     - tool: outlook_search_mail
       args: {recipient: acme.com, query: invoice}
-  note: "shared/mail.py participants_term: Exchange answers 500 to the term participants:<domain>. A domain is searched in from, to, cc, and bcc. Any other value keeps participants."
+  note: "shared/mail.py participants_term: Exchange answers 500 to the term participants:<domain>, and no rule says which other values fail. A recipient is searched in from, to, cc, and bcc, and the results equal those of participants for a name or an address."
 
 uc-02-54:
   status: untested

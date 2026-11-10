@@ -221,7 +221,7 @@ search for `graph_reason`. To report it to Microsoft, give them `graph_request_i
 does not carry these values, because `graph_code` and `graph_reason` have no fixed set.
 
 `outlook_search_mail` also sets the span attribute `search_mail.arguments`. It lists the names of
-the arguments of the call that have a value, and never the values.
+the arguments of the call that have a value, and never the values. It does not list `mailbox`.
 
 No secret reaches a log line. Two independent nets remove secrets, because a credential with an
 innocent-sounding field name, and an innocent-looking credential value, are two different failures:

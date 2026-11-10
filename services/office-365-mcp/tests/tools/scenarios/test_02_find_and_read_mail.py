@@ -979,17 +979,20 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
             "outlook_search_mail", recipient="Anna Meier", attachment_name="Draft v2.pdf", limit=5
         )
 
-        assert search_of(graph) == 'participants:"Anna Meier" attachment:"Draft v2.pdf"'
+        anna = " OR ".join(f'{field}:"Anna Meier"' for field in ("from", "to", "cc", "bcc"))
+        assert search_of(graph) == f'({anna}) attachment:"Draft v2.pdf"'
 
-    @pytest.mark.parametrize("domain", ["acme.com", "@acme.com", "Mail.ACME.co.uk"])
-    async def test_a_domain_is_searched_in_every_address_field_because_graph_fails_on_participants(
-        self, graph: respx.MockRouter, domain: str
+    @pytest.mark.parametrize(
+        "recipient", ["acme.com", "@acme.com", "Mail.ACME.co.uk", "anna@acme.com", "Anna"]
+    )
+    async def test_a_recipient_is_searched_in_every_address_field_not_in_participants(
+        self, graph: respx.MockRouter, recipient: str
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_search_mail-budget")
 
-        _ = await call("outlook_search_mail", recipient=domain, query="invoice", limit=5)
+        _ = await call("outlook_search_mail", recipient=recipient, query="invoice", limit=5)
 
-        group = " OR ".join(f"{field}:{domain}" for field in ("from", "to", "cc", "bcc"))
+        group = " OR ".join(f"{field}:{recipient}" for field in ("from", "to", "cc", "bcc"))
         assert search_of(graph) == f"invoice ({group})"
 
     async def test_a_search_records_which_arguments_it_used_and_none_of_their_values(
@@ -1021,16 +1024,6 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
             "has_attachments",
             "category",
         )
-
-    @pytest.mark.parametrize("person", ["anna@acme.com", "Anna", "J. Smith"])
-    async def test_a_person_is_still_searched_with_participants(
-        self, graph: respx.MockRouter, person: str
-    ) -> None:
-        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
-
-        _ = await call("outlook_search_mail", recipient=person, limit=5)
-
-        assert search_of(graph).startswith("participants:")
 
 
 class TestAPersonIsFoundByTheDomainOfTheirCompany:
@@ -1106,16 +1099,6 @@ class TestAPersonIsFoundByTheDomainOfTheirCompany:
 
         [candidate] = cast("list[dict[str, object]]", found["candidates"])
         assert candidate["address"] == "anna@acme.test"
-
-    async def test_a_name_that_the_address_book_does_not_know_is_still_searched_with_participants(
-        self, graph: respx.MockRouter
-    ) -> None:
-        messages = self._serve_an_empty_address_book(graph)
-
-        _ = await call("outlook_find_recipient", query="Tom Brandt", limit=5)
-
-        asked = messages.calls.last.request.url.params["$search"]
-        assert asked.removeprefix('"').removesuffix('"').startswith("participants:")
 
 
 class TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord:

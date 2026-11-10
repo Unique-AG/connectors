@@ -88,14 +88,10 @@ _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQuery
 
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
-_DOMAIN = re.compile(r"@?(?:[a-z0-9-]+\.)+[a-z]{2,}\.?", re.IGNORECASE)
-
 
 def participants_term(value: str) -> str:
     quoted = kql.quoted(value)
-    if _DOMAIN.fullmatch(value):
-        return "(" + " OR ".join(f"{role}:{quoted}" for role in ("from", "to", "cc", "bcc")) + ")"
-    return f"participants:{quoted}"
+    return "(" + " OR ".join(f"{role}:{quoted}" for role in ("from", "to", "cc", "bcc")) + ")"
 
 
 type WellKnownFolder = Literal[

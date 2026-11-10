@@ -43,7 +43,7 @@
     "method": "GET",
     "path": "/v1.0/me/messages",
     "query": {
-      "$search": "\"participants:\\\"Anna Meier\\\"\"",
+      "$search": "\"(from:\\\"Anna Meier\\\" OR to:\\\"Anna Meier\\\" OR cc:\\\"Anna Meier\\\" OR bcc:\\\"Anna Meier\\\")\"",
       "$select": "from,toRecipients,ccRecipients,bccRecipients,receivedDateTime",
       "$top": "1000"
     },

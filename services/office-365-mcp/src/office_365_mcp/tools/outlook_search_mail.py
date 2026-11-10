@@ -144,7 +144,6 @@ async def search_mail(
                     ("flagged", flagged),
                     ("has_attachments", has_attachments),
                     ("category", category),
-                    ("mailbox", mailbox),
                 )
                 if value is not None
             ),
