@@ -34,6 +34,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 |----------|-----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `mcpConfig.microsoft.clientId` | (required) | Entra app client ID |
 | `MICROSOFT_SIGN_IN_TENANT_ID` | `mcpConfig.microsoft.signInTenantId` | `common` | Sign-in tenant ID the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as `common` when users choose their directory at login. Independent of `clientId`/`clientSecret`; not the tenant that owns the app registration |
+| `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | `mcpConfig.microsoft.adminConsentRedirectUri` | `https://www.unique.ai/setup/consent-completed/entra-id` | Where Microsoft Entra sends a tenant admin after they grant admin consent through `/admin/consent`. Must be registered as a redirect URI on the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `mcpConfig.microsoft.publicWebhookUrl` | `SELF_URL` | Webhook URL if different from SELF_URL. Only used by transcript capture |
 
 ### Chat Integration

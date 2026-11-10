@@ -2,6 +2,7 @@ import datetime as dt
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import urlsplit
 
 
 class SeedError(Exception):
@@ -22,15 +23,22 @@ class Step:
     body: Any = None  # dict (JSON) or bytes (file upload)
     content_type: str | None = None
     key: str | None = None
-    lookup: str | None = None  # "tagged", "named", "subject", "drive-folder", "drive-children",
-    # "single" (one object, found under `key`),
-    # "attachments" (found under `attachment:<key>:<name>`) or "replies" (found under `reply:<key>:<text>`)
+    lookup: str | None = None  # how a step finds an id, stored under `key`: "tagged", "named",
+    # "subject", "drive-folder", "drive-children", "single", "site", "columns", "attachments", "replies"
     poll: bool = False  # the answer is 202: wait for the operation in its Location header
     learns: str | None = (
-        None  # "team", "drive" or "chat": the id of the found or created item joins the guard
+        None  # "team", "drive", "site" or "chat": the id of the found or created item joins the guard
     )
     payload: bytes | None = None  # the bytes that an "upload" step sends to the uploadUrl in chunks
     generated: tuple[str, int, str] | None = None  # (generator, size, label) of docgen.generate
+
+
+def site_id(drive: Mapping[str, Any]) -> str | None:
+    """The Graph site id (host,SPSite id,SPWeb id) from a drive's SharePoint ids."""
+    ids = drive.get("sharePointIds") or drive.get("sharepointIds")
+    if not ids or not all(ids.get(key) for key in ("siteUrl", "siteId", "webId")):
+        return None
+    return f"{urlsplit(ids['siteUrl']).hostname},{ids['siteId']},{ids['webId']}"
 
 
 @dataclass(frozen=True)

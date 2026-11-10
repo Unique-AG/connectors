@@ -21,15 +21,17 @@ For full justifications, see [Microsoft Graph Permissions](../technical/permissi
 
 ## Unique SaaS
 
-**Recommended for most clients.** When Unique runs Outlook Semantic MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
+**Recommended for most clients.** When Unique runs Outlook Semantic MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent. Open the `/admin/consent` path of your Outlook Semantic MCP server, the same address you connect to with `/mcp` replaced by `/admin/consent`:
 
 ```
-https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a
+https://<your-outlook-mcp-host>/admin/consent
 ```
+
+The link needs no sign-in. It redirects to the Microsoft admin consent page for the app registration and sign-in tenant of that deployment. After approving, you are redirected to a Unique confirmation page.
 
 The consent prompt lists the [Required Permissions](#Required-Permissions) above. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. If calendar is enabled, `Calendars.ReadWrite.Shared` typically requires admin consent.
 
-If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `ba326974-edcf-49ef-bf7a-74b3e0ea450a`.
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. Unless Unique pinned your deployment to one directory, Microsoft opens the directory of the admin account you sign in with. See [Admin consent link](#Admin-consent-link).
 
 ## Self-Hosted
 
@@ -138,9 +140,9 @@ Users from any Microsoft 365 organization can sign in. When a user authenticates
 **Customer onboarding:**
 
 1. Create a single app registration in your own tenant with one `MICROSOFT_CLIENT_ID` and `MICROSOFT_CLIENT_SECRET`.
-2. Each customer tenant admin grants consent for their organization:
+2. Each customer tenant admin grants consent for their organization by opening the [admin consent link](#Admin-consent-link) of your deployment:
    ```
-   https://login.microsoftonline.com/{customer-tenant-id}/adminconsent?client_id={your-client-id}
+   {SELF_URL}/admin/consent
    ```
    When approved, Microsoft creates an Enterprise Application in their tenant and grants the delegated permissions tenant-wide.
 3. After consent, users from that tenant can sign in and connect their mailbox.
@@ -172,6 +174,19 @@ https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
 
 If Microsoft returns **AADSTS50194**, `/common` is not accepted for that Enterprise Application — set `signInTenantId` to the directory that holds it.
 
+
+#### Admin consent link
+
+`GET {SELF_URL}/admin/consent` needs no sign-in and redirects a tenant admin to:
+
+```
+https://login.microsoftonline.com/<tenant>/v2.0/adminconsent?client_id=<MICROSOFT_CLIENT_ID>&scope=https://graph.microsoft.com/.default&redirect_uri=<MICROSOFT_ADMIN_CONSENT_REDIRECT_URI>
+```
+
+- `<tenant>` is `organizations`, so Microsoft opens the directory of the admin's work or school account. When `MICROSOFT_SIGN_IN_TENANT_ID` pins one directory (a GUID or domain), `<tenant>` is that directory instead, and admins can only consent there. The aliases `common` and `consumers` also fall back to `organizations`, because personal Microsoft accounts cannot grant admin consent.
+- `redirect_uri` is `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` (Helm `mcpConfig.microsoft.adminConsentRedirectUri`). It defaults to `https://www.unique.ai/setup/consent-completed/entra-id`, which the Terraform module registers by default through `admin_consent_redirect_uri`. If you change one, change the other: Microsoft rejects a redirect URI that is not registered on the app registration.
+
+Share this link with tenant admins instead of assembling the Microsoft URL by hand.
 ### Secret Management
 
 The service requires four secrets for authentication and data protection. All must be stored in Kubernetes Secrets (not ConfigMaps).

@@ -59,6 +59,9 @@ _NEVER_ASKS_IN_A_CASE = {
             "outlook_create_folder",
             "outlook_rename_folder",
             "outlook_update_mail_rule",
+            "sharepoint_create_list_item",
+            "sharepoint_update_list_item",
+            "sharepoint_delete_list_item",
         )
     },
 }
