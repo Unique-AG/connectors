@@ -143,7 +143,7 @@ export class AddAttachmentsToDraftEmailCommand {
     parentFolderId?: string;
     idIsImmutable?: boolean;
   }): Promise<AttachmentUploadResult> {
-    const parsed = parseAttachmentUri(data);
+    const parsed = await parseAttachmentUri(data);
 
     switch (parsed.type) {
       case 'unique': {

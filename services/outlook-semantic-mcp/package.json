@@ -78,6 +78,7 @@
     "typeid-js": "catalog:",
     "undici": "catalog:",
     "windows-iana": "5.1.0",
+    "yauzl": "3.4.0",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -96,6 +97,8 @@
     "@types/passport-microsoft": "catalog:",
     "@types/pg": "catalog:",
     "@types/supertest": "catalog:",
+    "@types/yauzl": "3.4.0",
+    "@types/yazl": "3.3.1",
     "@vitest/coverage-istanbul": "catalog:",
     "amqplib": "catalog:",
     "istanbul-badges-readme": "catalog:",
@@ -103,7 +106,8 @@
     "type-fest": "catalog:",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "yazl": "3.3.1"
   },
   "packageManager": "pnpm@10.34.5"
 }
