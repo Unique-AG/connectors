@@ -397,6 +397,19 @@ def test_a_failed_write_of_one_persona_stops_the_writes_of_the_next() -> None:
     assert "failed or throttled write" in after
 
 
+@pytest.mark.parametrize(
+    ("status", "stops"), [(404, False), (403, False), (429, True), (503, True)]
+)
+def test_only_a_throttled_or_server_failed_answer_stops_the_later_writes(
+    status: int, stops: bool
+) -> None:
+    seen = Guard(stand_in.UPN, frozenset(stand_in.UPNS), True)
+
+    seen.saw(httpx.Request("PATCH", f"{GRAPH}/drives/b!DRIVE/items/ITEM"), status, None, None)
+
+    assert seen.write_failed is stops
+
+
 async def test_a_preflight_answers_without_a_drive() -> None:
     bodies = {
         "/v1.0/me": {"id": "u1", "userPrincipalName": stand_in.UPN, "displayName": "Tester"},
