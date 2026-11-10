@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared import identity, kql
+from office_365_mcp.shared.mail import participants_term
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_find_recipient"
@@ -44,7 +45,13 @@ _PERSON_FIELDS = (
     "department",
 )
 
-_PARTICIPANT_FIELDS = ("from", "toRecipients", "ccRecipients", "receivedDateTime")
+_PARTICIPANT_FIELDS = (
+    "from",
+    "toRecipients",
+    "ccRecipients",
+    "bccRecipients",
+    "receivedDateTime",
+)
 
 type MatchKind = Literal["exact", "token", "fuzzy"]
 type RecipientKind = Literal["person", "group", "room"]
@@ -194,7 +201,7 @@ async def _correspondents(
 ) -> list[RecipientCandidate]:
     configuration = RequestConfiguration[_MessagesQuery](
         query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-            search=kql.as_search_value(f"participants:{kql.quoted(query)}"),
+            search=kql.as_search_value(participants_term(query)),
             select=list(_PARTICIPANT_FIELDS),
             top=MAX_SCANNED_ITEMS,
         )
@@ -281,6 +288,7 @@ def _participants_of(message: Message) -> list[Recipient]:
             message.from_,
             *(message.to_recipients or []),
             *(message.cc_recipients or []),
+            *(message.bcc_recipients or []),
         )
         if recipient is not None
     ]

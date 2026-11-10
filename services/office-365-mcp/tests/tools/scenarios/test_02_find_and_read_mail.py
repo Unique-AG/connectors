@@ -1,4 +1,5 @@
 import base64
+from collections.abc import Iterator
 from datetime import date
 from typing import cast
 
@@ -8,6 +9,10 @@ import respx
 from fastmcp.client.client import CallToolResult
 from fastmcp.exceptions import ToolError
 from mcp.types import BlobResourceContents, EmbeddedResource, TextContent, TextResourceContents
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from tests.conftest import RecordedSleeps
 from tests.graph_fixtures import recorded_json, response, serve
@@ -78,6 +83,18 @@ async def _first_attachment(subject: str, limit: int) -> str:
 
 def _attachment_uri(message_id: str = "MSG1") -> str:
     return f"outlook:///messages/{message_id}/attachments/ATT1"
+
+
+@pytest.fixture
+def recorded_spans() -> Iterator[InMemorySpanExporter]:
+    exporter = InMemorySpanExporter()
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    yield exporter
+    exporter.shutdown()
 
 
 class TestTheAssistantFindsAMessageFromWhatMiaRemembers:
@@ -962,7 +979,126 @@ class TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment:
             "outlook_search_mail", recipient="Anna Meier", attachment_name="Draft v2.pdf", limit=5
         )
 
-        assert search_of(graph) == 'participants:"Anna Meier" attachment:"Draft v2.pdf"'
+        anna = " OR ".join(f'{field}:"Anna Meier"' for field in ("from", "to", "cc", "bcc"))
+        assert search_of(graph) == f'({anna}) attachment:"Draft v2.pdf"'
+
+    @pytest.mark.parametrize(
+        "recipient", ["acme.com", "@acme.com", "Mail.ACME.co.uk", "anna@acme.com", "Anna"]
+    )
+    async def test_a_recipient_is_searched_in_every_address_field_not_in_participants(
+        self, graph: respx.MockRouter, recipient: str
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call("outlook_search_mail", recipient=recipient, query="invoice", limit=5)
+
+        group = " OR ".join(f"{field}:{recipient}" for field in ("from", "to", "cc", "bcc"))
+        assert search_of(graph) == f"invoice ({group})"
+
+    async def test_a_search_records_which_arguments_it_used_and_none_of_their_values(
+        self, graph: respx.MockRouter, recorded_spans: InMemorySpanExporter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_search_mail-budget")
+
+        _ = await call(
+            "outlook_search_mail",
+            recipient="acme.com",
+            query="secret words",
+            received_after="2026-01-01",
+            flagged=False,
+            has_attachments=True,
+            category="Red",
+            limit=5,
+        )
+
+        [recorded] = [
+            span.attributes["search_mail.arguments"]
+            for span in recorded_spans.get_finished_spans()
+            if span.attributes and "search_mail.arguments" in span.attributes
+        ]
+        assert recorded == (
+            "query",
+            "recipient",
+            "received_after",
+            "flagged",
+            "has_attachments",
+            "category",
+        )
+
+
+class TestAPersonIsFoundByTheDomainOfTheirCompany:
+    @staticmethod
+    def _serve_an_empty_address_book(graph: respx.MockRouter, **changes: object) -> respx.Route:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(200, json={"id": "me", "mail": "mia@example.test"})
+        )
+        _ = graph.get("/me/people").mock(return_value=httpx.Response(200, json={"value": []}))
+        return graph.get("/me/messages").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "value": [
+                        {
+                            "id": "m1",
+                            "receivedDateTime": "2026-03-04T09:15:00Z",
+                            "from": {
+                                "emailAddress": {"name": "Tom Brandt", "address": "tom@acme.test"}
+                            },
+                            "toRecipients": [
+                                {"emailAddress": {"name": "Mia", "address": "mia@example.test"}}
+                            ],
+                            "ccRecipients": [],
+                            "bccRecipients": [],
+                        }
+                        | changes
+                    ]
+                },
+            )
+        )
+
+    @pytest.mark.parametrize("domain", ["acme.test", "@acme.test", "Mail.ACME.co.uk"])
+    async def test_a_domain_that_the_address_book_does_not_know_is_searched_in_every_address_field(
+        self, graph: respx.MockRouter, domain: str
+    ) -> None:
+        messages = self._serve_an_empty_address_book(graph)
+
+        _ = await call("outlook_find_recipient", query=domain, limit=5)
+
+        asked = messages.calls.last.request.url.params["$search"]
+        group = " OR ".join(f"{field}:{domain}" for field in ("from", "to", "cc", "bcc"))
+        assert asked.removeprefix('"').removesuffix('"') == f"({group})"
+
+    async def test_the_people_who_wrote_from_that_domain_are_the_candidates(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = self._serve_an_empty_address_book(graph)
+
+        found = await call("outlook_find_recipient", query="acme.test", limit=5)
+
+        [candidate] = cast("list[dict[str, object]]", found["candidates"])
+        assert (candidate["address"], candidate["source"], candidate["external"]) == (
+            "tom@acme.test",
+            "mailbox",
+            True,
+        )
+
+    async def test_a_person_who_was_only_on_bcc_is_a_candidate(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = self._serve_an_empty_address_book(
+            graph,
+            **{
+                "from": {"emailAddress": {"name": "Mia", "address": "mia@example.test"}},
+                "bccRecipients": [
+                    {"emailAddress": {"name": "Anna Weiss", "address": "anna@acme.test"}}
+                ],
+            },
+        )
+
+        found = await call("outlook_find_recipient", query="acme.test", limit=5)
+
+        [candidate] = cast("list[dict[str, object]]", found["candidates"])
+        assert candidate["address"] == "anna@acme.test"
 
 
 class TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord:
