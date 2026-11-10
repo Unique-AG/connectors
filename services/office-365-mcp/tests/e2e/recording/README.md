@@ -80,7 +80,8 @@ The recorder prints the counts of each replacement. It refuses to write when the
   so `id` names the top-level `id` only, and the `id` of an attachment is no destination. A value under a `FORBIDDEN` key is
   refused. A write glob with no `*` outside `/v1.0/me/` needs a `seed-v1 case-` name in the body.
   An event of the default calendar passes when the run read the event as seed data or created it.
-  After any 429 or 5xx answer, or a send that raises, no write is sent.
+  After a request of a step gets a 429 or 5xx answer, or its send raises, no later write is sent.
+  A preflight request that fails refuses the case, as the cap item below says.
 - A write of a tool in `CREATED_ONLY` must name an item that the same run created. The number is
   the position of the `*` that holds that item. A chat is created by `POST /v1.0/chats`, and its
   topic must hold `seed-v1 case-`.
