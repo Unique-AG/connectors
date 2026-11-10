@@ -69,7 +69,7 @@ sequenceDiagram
     KB-->>Server: Results
     Server-->>Client: Search results
 
-    Client->>Server: Opaque MCP token + create_draft_email
+    Client->>Server: Opaque MCP token + draft_email
     Server->>Graph: Create draft (using stored MS token)
     Graph-->>Server: Draft created
     Server-->>Client: Draft link

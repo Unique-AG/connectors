@@ -24,6 +24,8 @@ export interface MessageMetadata {
   isRead: 'true' | 'false';
   isDraft: 'true' | 'false';
   hasAttachments: 'true' | 'false';
+  attachmentNames: string[];
+  inlineAttachmentNames: string[];
   importance: string;
   inferenceClassification: string;
   webLink: string;
@@ -86,6 +88,11 @@ export const getMetadataFromMessage = (message: GraphMessage): MessageMetadata =
     isRead: booleanToString(message.isRead),
     isDraft: booleanToString(message.isDraft),
     hasAttachments: booleanToString(message.hasAttachments),
+    attachmentNames: filterOutNilOrEmptyValues(message.attachments?.map(({ name }) => name)),
+    // Metadata is flat, so the inline flag is kept as the subset of names that are inline.
+    inlineAttachmentNames: filterOutNilOrEmptyValues(
+      message.attachments?.filter(({ isInline }) => isInline).map(({ name }) => name),
+    ),
     webLink: message.webLink ?? '',
     importance: message.importance ?? '',
     inferenceClassification: message.inferenceClassification ?? '',
@@ -118,6 +125,8 @@ export const extractMetadataKeys = (data: Record<string, unknown>) =>
       `isDraft`,
       `webLink`,
       `hasAttachments`,
+      `attachmentNames`,
+      `inlineAttachmentNames`,
       `importance`,
       `inferenceClassification`,
       `flagStatus`,

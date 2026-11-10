@@ -12,31 +12,17 @@ export type WriteConfirmation<T> =
   | { status: 'unavailable'; message: string };
 
 const TIMED_OUT =
-  'The confirmation prompt timed out, so nothing was sent. Ask the user whether they still want this, then call the tool again.';
+  'The confirmation prompt timed out, so nothing was changed. Ask the user whether they still want this, then call the tool again.';
 const UNSUPPORTED =
-  'This client cannot show a confirmation prompt, and calendar writes are not performed without one. Tell the user to run this from a client that supports confirmations.';
+  'This client cannot show a confirmation prompt, and this change is not performed without one. Tell the user to run this from a client that supports confirmations.';
 const INVALID_RESPONSE =
-  'The confirmation response was invalid, so nothing was sent. Ask the user to try the confirmation again.';
+  'The confirmation response was invalid, so nothing was changed. Ask the user to try the confirmation again.';
 const FAILED =
-  'The confirmation prompt failed, so nothing was sent. Ask the user whether they still want this, then call the tool again.';
+  'The confirmation prompt failed, so nothing was changed. Ask the user whether they still want this, then call the tool again.';
 
 /**
- * Runs the confirmation gate for a calendar write.
- *
- * Every outcome other than an explicit accept means no Graph write happens. That includes the
- * failure modes: a write tool here sends mail to third parties and cannot be undone, so a
- * confirmation we did not get is treated as a confirmation the user did not give. The failures are
- * turned into a typed result rather than propagating as a raw MCP error, so the model can relay
- * something useful and retry instead of surfacing a protocol error to the user.
- *
- * Deliberately not offered: a tool parameter that lets the model skip the prompt when elicitation
- * is unavailable. Tool descriptions are not a security boundary — these tools read meeting and
- * email text, which is attacker-controlled, so any bypass reachable by instruction is reachable by
- * injection. If a deployment needs unattended writes, that belongs in server config next to
- * CALENDAR_INTEGRATION, where an operator owns it and it can be audited.
- *
- * The schema should not include a confirmation boolean. Unique Chat already puts Accept / Decline
- * on the prompt; a boolean field is a second checkbox the user has to tick as well.
+ * Gates a write that cannot be undone: anything but an explicit accept, a failed prompt included,
+ * means no write. There is no tool parameter to skip it, since injected email text could set one.
  */
 export async function confirmWrite<T extends z.ZodRawShape>(input: {
   context: Context;
