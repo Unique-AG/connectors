@@ -56,7 +56,7 @@ one) containers.
 {{- end }}
 {{- if .Values.mcpConfig.tools.preset }}
 - name: TOOLS_PRESET
-  value: {{ .Values.mcpConfig.tools.preset | quote }}
+  value: {{ ternary (join "," .Values.mcpConfig.tools.preset) .Values.mcpConfig.tools.preset (kindIs "slice" .Values.mcpConfig.tools.preset) | quote }}
 {{- end }}
 {{- if .Values.mcpConfig.tools.enabled }}
 - name: TOOLS_ENABLED

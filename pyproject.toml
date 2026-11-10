@@ -17,7 +17,7 @@ help = "re-lock every project at the newest versions its pins allow, which align
 sequence = [{ cmd = "bash scripts/each-python-project.sh uv lock --upgrade" }, { ref = "drift" }]
 
 [tool.poe.tasks.ci]
-help = "every check CI runs, in the projects named (e.g. services/hello-mcp) or in all of them"
+help = "every check CI runs, in the projects named (e.g. services/kb-mcp) or in all of them"
 shell = 'PROJECTS="${projects:-}" bash scripts/each-python-project.sh uv run --locked poe ci'
 args = [{ name = "projects", positional = true, multiple = true, help = "project folders, all of them when none is named" }]
 

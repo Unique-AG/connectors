@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 123 tools in total.
+- **Size:** 129 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -38,17 +38,17 @@ Rules for the selection:
   neither. The Helm chart schema, the Terraform module, and the startup check of the server enforce
   this rule.
 - A deployment can name several presets in a comma-separated list, for example
-  `teams-write,outlook-read`. It gets the union of their tools and of their permissions. The union
-  needs admin consent when at least one of the presets needs it.
+  `teams-write,outlook-read`, or in a YAML list. It gets the union of their tools and of their
+  permissions. The union needs admin consent when at least one of the presets needs it.
 - Two presets can hold the tools of one task. For example, `outlook-write,outlook-automate` lets the
   assistant create a category and put it on mail. `outlook-read,outlook-rules` lets it find a
   folder and make a rule that files mail into it.
 - A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
   preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
-- Four presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`, and
-  `onenote-delete`. Each one is a base preset plus the tools that remove an item, write an inbox
-  rule, forward an event, or share a calendar. No other preset holds these tools. A list of presets
-  gets them only when the list names one of these four.
+- Five presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`,
+  `sharepoint-lists-delete`, and `onenote-delete`. Each one is a base preset plus the tools that
+  remove an item, write an inbox rule, forward an event, or share a calendar. No other preset holds
+  these tools. A list of presets gets them only when the list names one of these five.
 
 ## Preset index
 
@@ -108,7 +108,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`outlook-contacts`](#outlook-contacts) | Read your contacts. | 2 | No |
 | [`outlook-contacts-write`](#outlook-contacts-write) | Create and change contacts. | 4 | No |
 
-**SharePoint and OneDrive.** Files, folders, sharing, and sites.
+**SharePoint and OneDrive.** Files, folders, sharing, sites, and lists.
 
 | Preset | Use it to | Tools | Admin consent |
 | --- | --- | --- | --- |
@@ -117,6 +117,9 @@ Each row links to the section of that preset. The count of tools does not includ
 | [`sharepoint-write`](#sharepoint-write) | Create, rename, move, copy, and delete files and folders. | 11 | ⚠️ Yes |
 | [`sharepoint-share`](#sharepoint-share) | `sharepoint-write`, plus sharing links and invitations. | 13 | ⚠️ Yes |
 | [`sharepoint-sites`](#sharepoint-sites) | `sharepoint-read`, plus finding SharePoint sites. | 5 | ⚠️ Yes |
+| [`sharepoint-lists`](#sharepoint-lists) | Find a site and read its lists, columns, and items. | 4 | ⚠️ Yes |
+| [`sharepoint-lists-write`](#sharepoint-lists-write) | `sharepoint-lists`, plus adding and changing list items. | 6 | ⚠️ Yes |
+| [`sharepoint-lists-delete`](#sharepoint-lists-delete) | `sharepoint-lists-write`, plus moving list items to the recycle bin. | 7 | ⚠️ Yes |
 
 **OneNote.** Notebooks, sections, and pages.
 
@@ -947,7 +950,7 @@ The default Contacts folder.
 
 ## SharePoint and OneDrive presets
 
-Files, folders, sharing, and sites.
+Files, folders, sharing, sites, and lists.
 
 ### `sharepoint-search`
 
@@ -1056,7 +1059,9 @@ Files, folders, sharing, and sites.
 - Do everything in `sharepoint-read`.
 - Find a SharePoint site by free text.
 
-**Note:** This preset adds the permission `Sites.Read.All`. No other `sharepoint-` preset needs it.
+**Note:** This preset adds the permission `Sites.Read.All`. Of the other `sharepoint-` presets, only
+[`sharepoint-lists`](#sharepoint-lists), [`sharepoint-lists-write`](#sharepoint-lists-write), and
+[`sharepoint-lists-delete`](#sharepoint-lists-delete) need it.
 
 **Tools added by this preset**
 
@@ -1069,6 +1074,83 @@ Files, folders, sharing, and sites.
 - **Graph permissions (3):** `Files.Read.All`, `Sites.Read.All`, `User.Read`
 - **Admin consent:** ⚠️ Required for `Files.Read.All`, `Sites.Read.All`. A tenant administrator must grant consent before any user signs in.
 - **User approval:** None. No tool of this preset asks the user.
+
+### `sharepoint-lists`
+
+**4 tools** · Admin consent: ⚠️ **required**
+
+**You can**
+
+- Find a SharePoint site by free text.
+- List the lists of a site.
+- Read the columns of a list.
+- Read the items of a list, optionally filtered on one indexed column.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_search_sites` | 🟢 Read | — | Finds SharePoint sites by free text. It does not find files. |
+| `sharepoint_list_lists` | 🟢 Read | — | Lists the visible lists of one site, with a handle for each. Leaves out document libraries. |
+| `sharepoint_get_list` | 🟢 Read | — | Describes the columns of one list: name, type, and whether each is required, read-only, or indexed. |
+| `sharepoint_list_items` | 🟢 Read | — | Reads the items of one list, optionally filtered on one indexed column. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Sites.Read.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Sites.Read.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `sharepoint-lists-write`
+
+**6 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-lists`](#sharepoint-lists)
+
+**You can**
+
+- Do everything in `sharepoint-lists`.
+- Add an item to a list.
+- Change the columns of an item.
+
+**Note:** These tools write text, choice, date, number, currency, and yes or no columns. They
+refuse a person, lookup, managed metadata, or multi-value column, and a read-only or hidden one.
+Neither tool deletes an item. [`sharepoint-lists-delete`](#sharepoint-lists-delete) does.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_create_list_item` | 🟠 Add | ✋ Always | Adds one item to a list with the given column values. |
+| `sharepoint_update_list_item` | 🔴 Change | ✋ Always | Changes the given columns of one item. Refuses if somebody changed the item since it was read. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Sites.Read.All`, `Sites.ReadWrite.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Sites.Read.All`, `Sites.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `sharepoint_create_list_item`, `sharepoint_update_list_item`.
+
+### `sharepoint-lists-delete`
+
+**7 tools** · Admin consent: ⚠️ **required** · Builds on [`sharepoint-lists-write`](#sharepoint-lists-write)
+
+**You can**
+
+- Do everything in `sharepoint-lists-write`.
+- Move an item of a list to the recycle bin of its site.
+
+**Note:** Opt-in preset. It adds no permission to `sharepoint-lists-write`. The tool never erases an
+item permanently.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `sharepoint_delete_list_item` | 🔴 Change | ✋ Always | Moves one item to the recycle bin of its site. Never erases it permanently. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Sites.Read.All`, `Sites.ReadWrite.All`, `User.Read`
+- **Admin consent:** ⚠️ Required for `Sites.Read.All`, `Sites.ReadWrite.All`. A tenant administrator must grant consent before any user signs in.
+- **User approval:** Asks ✋ every time for `sharepoint_create_list_item`, `sharepoint_update_list_item`, `sharepoint_delete_list_item`.
 
 ## OneNote presets
 
@@ -1238,10 +1320,12 @@ mcpConfig:
     preset: teams        # or: enabled: [get_me, teams_list_chats]
 ```
 
-The `preset` key names one of the 37 presets in the [preset index](#preset-index), or several of
-them in a comma-separated list, for example `teams-write,outlook-read`. The `enabled` key names an
-exact list of tool names instead. Write that list as a YAML list or as one comma-separated string.
-The `tools_preset` input of the Terraform module takes the same comma-separated string. A deployment
+The `preset` key names one of the 40 presets in the [preset index](#preset-index), or several of
+them. Write several presets as a YAML list or as one comma-separated string, for example
+`teams-write,outlook-read`. The chart gives the pod one comma-separated `TOOLS_PRESET`
+in each case. The `enabled` key names an exact list of tool names instead. Write that list in the
+same two ways. The `tools_preset` input of the Terraform module takes the same two forms: a list of
+strings or one comma-separated string. Both forms resolve to the same tools. A deployment
 that needs a mix that no presets cover uses `enabled`, and names every wanted tool. Granting admin
 consent is a separate step, covered in [Admin consent](#admin-consent).
 
@@ -1269,7 +1353,7 @@ Two things can go wrong:
 
 ## Reference: every tool
 
-This reference lists all 123 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 129 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1403,6 +1487,12 @@ This reference lists all 123 tools. Use it to build an `enabled` list, or to fin
 | `sharepoint_create_share_link` | 🟠 Write, safe to repeat | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 | `sharepoint_invite` | 🟠 Write, adds | `Files.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 | `sharepoint_search_sites` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_list_lists` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_get_list` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_list_items` | 🟢 Read | `Sites.Read.All` | ⚠️ Yes | — |
+| `sharepoint_create_list_item` | 🟠 Write, adds | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_update_list_item` | 🔴 Write, changes or removes, safe to repeat | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
+| `sharepoint_delete_list_item` | 🔴 Write, changes or removes, safe to repeat | `Sites.ReadWrite.All` | ⚠️ Yes | ✋ Always |
 
 ### OneNote
 

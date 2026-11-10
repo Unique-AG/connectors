@@ -10,7 +10,6 @@ on:
         options:
           - backstop-mcp
           - confluence-connector
-          - hello-mcp
           - kb-mcp
           - office-365-mcp
           - outlook-semantic-mcp
