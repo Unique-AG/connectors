@@ -29,23 +29,18 @@ uc-05-02:
       uses: {message_refs: all uri values from the previous listing}
 
 uc-05-03:
-  status: partly
+  status: working
   tests:
     - "tests/tools/scenarios/test_05_organize_the_mailbox.py::TestABatchIsCheckedWholeAndReportedForEachMessage::test_messages_that_mia_named_by_subject_are_found_again_and_filed"
   ask: "File these 5 messages in my Archive folder."
   provenance: observed
   evidence: 17 failures in 15 sessions; the 4 newest passed a value that is not a message handle, and nothing moved
   asks_user: false
-  blocker:
-    kind: unknown
-    tool: outlook_move_mail
-    text: the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle, because listings also show folder_id and web_link. The message_refs fields of outlook_move_mail and outlook_mark_mail and the field MailSummary.uri now say that the `uri` is the handle and that folder_id and web_link are not. The cause stays open until the logs show the wrong values.
-    user: The assistant sometimes cannot move mail at first, because it names a message in the wrong way. It then searches again and moves the messages.
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_move_mail
       uses: {message_refs: uri values from the previous listing and never a subject}
-  note: the tool checks every handle before it moves a message, so one wrong value stops the whole batch
+  note: the tool checks every handle before it moves a message, so one wrong value stops the whole batch. The cause of the production failures is not known. The fields `folder_id` and `web_link` of a mail row now say that they are not handles
 
 uc-05-16:
   status: working

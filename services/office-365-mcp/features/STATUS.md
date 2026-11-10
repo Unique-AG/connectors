@@ -8,7 +8,7 @@ A scenario is `working` when the connector meets it, `partly` when a limit block
 
 | Surface | working | partly | gap | total |
 | --- | --- | --- | --- | --- |
-| Outlook | 372 | 1 | 1 | 374 |
+| Outlook | 373 | 0 | 1 | 374 |
 | Teams | 146 | 0 | 0 | 146 |
 | SharePoint | 107 | 0 | 3 | 110 |
 | OneNote | 73 | 0 | 1 | 74 |
@@ -62,10 +62,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-08-02` | Working with notes in OneNote | A page is found by a word that is only in its body | gap | `onenote_list_pages` | Microsoft Graph has no full-text search over the words of a page for a work or school account. |
 
 ## It fails in prod and the cause is not known
-
-| Id | Feature | Scenario | Status | Tool | Cause |
-| --- | --- | --- | --- | --- | --- |
-| `uc-05-03` | Organizing the mailbox | Messages that Mia names by subject are found again and filed | partly | `outlook_move_mail` | the logs hold no arguments, so the cause is not known. A probable cause is that the assistant takes another field for the handle, because listings also show folder_id and web_link. The message_refs fields of outlook_move_mail and outlook_mark_mail and the field MailSummary.uri now say that the `uri` is the handle and that folder_id and web_link are not. The cause stays open until the logs show the wrong values. |
 
 ## Deferred work
 

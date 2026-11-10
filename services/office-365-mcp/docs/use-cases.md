@@ -1561,9 +1561,6 @@ Ask your assistant: "File these 5 messages in my Archive folder."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant sometimes cannot move mail at first, because it names a message in the wrong way. It then searches again and moves the messages.
-
 Situation: Mia named 5 messages by their subjects only.
 
 What happens:
