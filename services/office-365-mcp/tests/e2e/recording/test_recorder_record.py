@@ -460,7 +460,7 @@ uc-01-01:
     expect:
       result: {capped: false}
 """
-_NEXT = "\nuc-01-02:\n  status: untested\n"
+_NEXT = "\nuc-01-02:\n  status: working\n"
 _SIDECARS = {
     "no variants": "uc-01-01:\n  chain:\n    - tool: t\n" + _NEXT,
     "other variants": "uc-01-01:\n  variants:\n    busy:\n      1: {fault: {transport: timeout}}\n"
@@ -486,7 +486,7 @@ def test_link_puts_the_recorded_block_in_the_sidecar_entry(sidecar: str, tmp_pat
     wanted = mapping(mapping(cast("object", yaml.safe_load(_RECORDED_BLOCK)))["uc-01-01"])
     assert mapping(variants["recorded"]) == wanted
     assert ("busy" in variants) == (sidecar == "other variants")
-    assert loaded["uc-01-02"] == {"status": "untested"}
+    assert loaded["uc-01-02"] == {"status": "working"}
 
 
 def test_link_twice_changes_nothing(tmp_path: Path) -> None:

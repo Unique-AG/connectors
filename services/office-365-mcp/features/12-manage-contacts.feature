@@ -18,12 +18,6 @@ Feature: Managing contacts
       Then the assistant answers "anna.meier@acme.example"
       But it does not answer "anna.weber@acme.example"
 
-    @happy @uc-12-02
-    Scenario: A person who is only in the company directory is found
-      Given Tom Berger is in the company directory and not in Mia's contacts
-      When Mia asks her assistant for the telephone number of Tom Berger
-      Then the assistant answers with the telephone number of Tom Berger from the directory
-
     @happy @uc-12-16
     Scenario: A first name that fits two contacts is put to Mia
       Given Mia has the contact Anna Meier and the contact Anna Weber

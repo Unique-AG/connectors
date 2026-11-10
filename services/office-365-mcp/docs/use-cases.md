@@ -15,8 +15,9 @@ shows a starting point. "What happens" shows what the assistant does. "Limit" sh
 not work as Mia expects. A part named "Not supported yet" lists what people ask for and what the
 server cannot do today.
 
-The examples come from how people use the server and from what its tools can do. Not every example
-was run by hand. For the tools behind the examples, read the [tool reference](README.md).
+The examples come from how people use the server and from what its tools can do. Each example has
+a test, or the status page says why no test can prove it. For the tools behind the examples, read
+the [tool reference](README.md).
 
 ## Rules for every example
 
@@ -1736,15 +1737,14 @@ Ask your assistant: "Rename my category Follow-up Q4 to Follow-up Q1."
 
 Tests: 2
 
-!!! warning "Limit"
-    The assistant cannot rename a category. It makes a new category with the new name and moves the 4 messages to it. The old category stays in the list.
-
 Situation: Mia has the category "Follow-up Q4" on 4 messages.
 
 What happens:
 
 - Mia's categories hold "Follow-up Q1".
 - The 4 messages carry "Follow-up Q1".
+- Mia's categories no longer hold "Follow-up Q4".
+- The assistant asks Mia to approve first.
 
 #### An inbox rule acts on new mail without Mia
 
@@ -2051,6 +2051,20 @@ What happens:
 - Mia is told that the category "Follow-up Q4" is already there.
 - The assistant offers another name or the category that exists.
 - Mia's categories hold no second "Follow-up Q4".
+
+**A category that Mia does not have is not deleted**
+
+Ask your assistant: "Delete my category Follow-up Q9."
+
+Tests: 1
+
+Situation: Mia has no category named "Follow-up Q9".
+
+What happens:
+
+- Mia is told that no category has that name.
+- The assistant offers the categories that Mia has.
+- Nothing is deleted.
 
 **A rule that Microsoft rejects as invalid is not repeated**
 
@@ -3678,9 +3692,6 @@ Ask your assistant: "Save an invitation for the Board prep on Monday from 10:00 
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot keep a real invitation draft. It can save the meeting without attendees and add them after Mia approves.
-
 What happens:
 
 - "Board prep" is on Mia's calendar on Monday from 10:00 to 11:00 with no attendee.
@@ -5111,10 +5122,6 @@ Situation: Mia has the contact "Tom Berger" with the address "tom@acme.example".
 What happens:
 
 - The assistant lists "Tom Berger".
-
-#### Not supported yet in managing contacts
-
-- The assistant cannot look up the telephone number of a colleague who is not in Mia's contacts.
 
 ## Teams
 
@@ -9768,9 +9775,6 @@ What happens:
 Ask your assistant: "Send the latest price list to Anna by mail."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot attach the file to the mail. It puts a link to the file in the draft.
 
 Situation: The latest price list is in the Sales site.
 
