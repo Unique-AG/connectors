@@ -26,6 +26,7 @@ from msgraph.generated.users.item.user_item_request_builder import UserItemReque
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, GraphNotFound, graph_step
+from office_365_mcp.shared import kql
 from office_365_mcp.shared.handles import (
     MailFolderHandle,
     MailMessageHandle,
@@ -86,6 +87,11 @@ OUTLOOK_FOLDER_NAMES: tuple[str, ...] = (*_PARENT_NAMES, *_CHILD_NAMES)
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
+
+
+def participants_term(value: str) -> str:
+    quoted = kql.quoted(value)
+    return "(" + " OR ".join(f"{role}:{quoted}" for role in ("from", "to", "cc", "bcc")) + ")"
 
 
 type WellKnownFolder = Literal[

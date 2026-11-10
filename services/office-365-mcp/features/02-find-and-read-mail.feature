@@ -188,6 +188,20 @@ Feature: Finding and reading mail
       Then the assistant tells Mia that it found no message
       But it does not tell Mia that more messages may match
 
+    @happy @uc-02-53
+    Scenario: Mail with one company is found by the domain of the company
+      Given Mia got mail from "acme.com" and sent mail to "acme.com", and she has mail with other companies
+      When Mia asks her assistant for the mail with "acme.com" about an invoice
+      Then the assistant shows the messages that came from, went to, or were copied to an address at "acme.com"
+      But it does not show the mail with other companies
+
+    @happy @uc-02-54
+    Scenario: A person is found by the domain of their company
+      Given Mia wrote to Tom at "acme.com", and her address book does not list "acme.com"
+      When Mia asks her assistant who she knows at "acme.com"
+      Then the assistant shows Tom and his address
+      And it says that Tom is found in Mia's past mail and not in the address book
+
   Rule: The assistant reads a message and its attachments
 
     @happy @uc-02-06
