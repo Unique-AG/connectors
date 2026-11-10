@@ -144,7 +144,7 @@
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
-    "json": {},
+    "json": { "Comment": "<p>Thanks for the note.</p>" },
     "status": 201,
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
@@ -209,11 +209,7 @@
     },
     "json": {
       "@odata.type": "#microsoft.graph.message",
-      "categories": ["seed-v1 case-outlook_draft_reply-reply"],
-      "body": {
-        "content": "<p>Thanks for the note.</p>",
-        "contentType": "html"
-      }
+      "categories": ["seed-v1 case-outlook_draft_reply-reply"]
     },
     "status": 200,
     "response_headers": {

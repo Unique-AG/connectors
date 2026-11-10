@@ -172,7 +172,8 @@
             "address": "tom@example.test"
           }
         }
-      ]
+      ],
+      "Comment": "<p>Please read this workbook.</p>"
     },
     "status": 201,
     "response_headers": {
@@ -238,11 +239,7 @@
     },
     "json": {
       "@odata.type": "#microsoft.graph.message",
-      "categories": ["seed-v1 case-outlook_draft_reply-forward-workbook"],
-      "body": {
-        "content": "<p>Please read this workbook.</p>",
-        "contentType": "html"
-      }
+      "categories": ["seed-v1 case-outlook_draft_reply-forward-workbook"]
     },
     "status": 200,
     "response_headers": {

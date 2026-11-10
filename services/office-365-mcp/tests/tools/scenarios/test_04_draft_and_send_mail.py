@@ -513,10 +513,8 @@ class TestAReplyKeepsTheConversation:
 
         assert _addresses(draft) == [_ANNA]
         assert _addresses(draft, "cc") == []
-        assert sent_json(graph, "PATCH", "")["body"] == {
-            "contentType": "html",
-            "content": "<p>Friday works.</p>",
-        }
+        assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
+        assert times_asked(graph, "PATCH", "") == 0
         assert (
             times_asked(graph, "POST", "/createReply"),
             times_asked(graph, "POST", "/createReplyAll"),
@@ -533,6 +531,11 @@ class TestAReplyKeepsTheConversation:
             to=["tom@example.test"],
             body="Please read this.",
         )
+        assert sent_json(graph, "POST", "/createForward") == {
+            "ToRecipients": [_recipient("tom@example.test")],
+            "Comment": "<p>Please read this.</p>",
+        }
+        assert times_asked(graph, "PATCH", "") == 0
         forward_id = cast("str", forward["uri"]).removeprefix("outlook:///messages/")
         _ = graph.get(f"/me/messages/{forward_id}/attachments").mock(
             return_value=httpx.Response(
@@ -1271,9 +1274,13 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
 
 def _draft_shared(tool: str) -> tuple[dict[str, object], str]:
     if tool == "outlook_draft_reply":
-        return {"message_ref": _Q3_MESSAGE, "mode": "forward", "to": [_ANNA], "body": "Hi"}, (
-            "Create a forward draft"
-        )
+        return {
+            "message_ref": _Q3_MESSAGE,
+            "mode": "forward",
+            "to": [_ANNA],
+            "cc": ["nina@example.test"],
+            "body": "Hi",
+        }, "Create a forward draft"
     if tool == "outlook_draft_reply_all":
         return {"message_ref": _Q3_MESSAGE, "body": "Hi", "cc": ["nina@example.test"]}, (
             "Create a reply-all draft"
@@ -1421,11 +1428,12 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
         assert "an address that Microsoft chooses" in person.asked[0]
 
 
-class TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved:
-    async def test_a_reply_keeps_the_draft_and_says_the_text_is_missing(
+class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:
+    async def test_a_reply_keeps_the_draft_and_says_the_blind_copy_is_missing(
         self, graph: respx.MockRouter
     ) -> None:
         routes = serve(graph, "rec-tool-outlook_draft_reply-reply")
+        _ = _the_original(graph)
         patch = next(route for key, route in routes.items() if key[0] == "PATCH")
         _ = patch.mock(
             return_value=httpx.Response(
@@ -1435,11 +1443,15 @@ class TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved:
         )
 
         draft = await call(
-            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", body="Friday works."
+            "outlook_draft_reply",
+            message_ref=_Q3_MESSAGE,
+            mode="reply",
+            bcc=[_PRIYA],
+            body="Friday works.",
         )
 
         assert draft["body_written"] is False
-        assert draft["body"] is None
+        assert draft["body"] is not None
         assert draft["failure"] == "Microsoft Graph returned 400 (ErrorBodyTooLarge)"
         assert draft["uri"]
 

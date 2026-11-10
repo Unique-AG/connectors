@@ -197,8 +197,12 @@ async def _read_file(uri: str) -> EmbeddedResource:
     return block
 
 
-def _patched(routes: Mapping[tuple[str, str], Route]) -> Route:
-    return next(route for (method, _), route in routes.items() if method == "PATCH")
+def _reply_created(routes: Mapping[tuple[str, str], Route]) -> Route:
+    return next(
+        route
+        for (method, path), route in routes.items()
+        if method == "POST" and path.endswith("/createReply")
+    )
 
 
 def _draft(graph: MockRouter) -> Route:
@@ -313,8 +317,9 @@ class TestAReplyUsesADocumentFromSharePoint:
         assert _list(question, "messages")[0]["uri"] == mail["uri"]
         assert isinstance(price_list.resource, BlobResourceContents)
         assert price_list.resource.mime_type == DOCX
-        written = cast("Mapping[str, Mapping[str, str]]", _sent_json(_patched(routes)))
-        assert "The Standard list price is 100." in written["body"]["content"]
+        assert _sent_json(_reply_created(routes)) == {
+            "Comment": "<p>The Standard list price is 100.</p>"
+        }
         assert draft["mode"] == "reply"
         assert draft["to"] == [{"name": "Anna Meier", "address": ANNA}]
         assert _nothing_was_sent(graph)

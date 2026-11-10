@@ -1148,9 +1148,8 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
         moved = await call("outlook_move_mail", message_refs=[_Q3_MESSAGE], destination="archive")
 
         assert _rows(draft, "to", "address") == ["anna@example.test"]
-        assert sent_json(graph, "PATCH", "")["body"] == {
-            "contentType": "html",
-            "content": "<p>I will sign it on Friday.</p>",
+        assert sent_json(graph, "POST", "/createReply") == {
+            "Comment": "<p>I will sign it on Friday.</p>"
         }
         assert (moved["moved_count"], _rows(moved, "messages", "new_uri")) == (1, [_Q3_MESSAGE])
         assert not [path for path in paths_asked(graph) if path.endswith("/send")]

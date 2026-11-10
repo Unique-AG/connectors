@@ -761,7 +761,7 @@ uc-04-52:
 uc-04-53:
   status: untested
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved"
+    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved"
   ask: "Reply to Anna that Friday works."
   provenance: drafted
   asks_user: false
