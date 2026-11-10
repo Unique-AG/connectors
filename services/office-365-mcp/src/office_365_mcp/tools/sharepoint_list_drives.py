@@ -132,6 +132,22 @@ class DriveList(BaseModel):
     )
 
 
+async def _site_drives(
+    client: GraphServiceClient, site_path: str
+) -> DriveCollectionResponse | None:
+    drives_path = f"{site_path}:/drives" if ":" in site_path else f"{site_path}/drives"
+    request = request_with_query(
+        Method.GET,
+        _SITE_DRIVES,
+        {**client.sites.path_parameters, "site_path": drives_path},
+        query={},
+        typed=_SiteDrivesQuery(select=list(_DRIVE_FIELDS)),
+    )
+    request.headers.try_add("Accept", "application/json")
+    with graph_step(STEP_SITE_DRIVES):
+        return await send_parsed(client, request, DriveCollectionResponse)
+
+
 async def list_drives(client: GraphServiceClient, *, site: str | None = None) -> DriveList:
     site_path = None if site is None else site_path_of(site)
     if site is not None and site_path is None:
@@ -156,22 +172,6 @@ async def list_drives(client: GraphServiceClient, *, site: str | None = None) ->
         ],
         capped=collected.capped,
     )
-
-
-async def _site_drives(
-    client: GraphServiceClient, site_path: str
-) -> DriveCollectionResponse | None:
-    drives_path = f"{site_path}:/drives" if ":" in site_path else f"{site_path}/drives"
-    request = request_with_query(
-        Method.GET,
-        _SITE_DRIVES,
-        {**client.sites.path_parameters, "site_path": drives_path},
-        query={},
-        typed=_SiteDrivesQuery(select=list(_DRIVE_FIELDS)),
-    )
-    request.headers.try_add("Accept", "application/json")
-    with graph_step(STEP_SITE_DRIVES):
-        return await send_parsed(client, request, DriveCollectionResponse)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
