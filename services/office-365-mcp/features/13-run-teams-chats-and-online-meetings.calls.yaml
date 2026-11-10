@@ -1,17 +1,20 @@
 uc-13-01:
-  status: gap
+  status: working
   tests:
+    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_creates_a_group_chat_from_the_addresses_of_people_mia_never_chatted_with"
     - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_refuses_a_display_name_because_only_entra_ids_name_a_person"
   ask: "Start a group chat named Launch with Anna and Tom."
-  blocker:
-    kind: tool
-    tool: teams_create_chat
-    text: No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from a chat member row, a message sender, or a message mention.
-    user: The assistant cannot start a chat with a person it has never chatted with.
   provenance: drafted
   asks_user: true
-  chain: []
-  note: outlook_find_recipient gives an address and no id.
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna}
+    - tool: outlook_find_recipient
+      args: {query: Tom}
+    - tool: teams_create_chat
+      args: {chat_type: group, topic: Launch}
+      uses: {member_emails: address of Anna and address of Tom from outlook_find_recipient}
+  note: a name is never an id, so the assistant finds each address first and passes it in member_emails. Microsoft must know the address as the sign-in name or the primary address of a person in the tenant.
 
 uc-13-07:
   status: working
@@ -43,7 +46,7 @@ uc-13-02:
     - tool: teams_add_chat_member
       args: {share_history: true}
       uses: {chat_id: id of the chat, member: user id and name of Priya from her chat}
-  note: with share_history true, the question states that the new member sees all earlier messages. A person with no shared chat is the gap of uc-13-01.
+  note: with share_history true, the question states that the new member sees all earlier messages. A person with no shared chat is met by uc-13-01.
 
 uc-13-08:
   status: working

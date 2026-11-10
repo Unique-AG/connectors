@@ -206,6 +206,15 @@ teams_create_chat-group:
           - {user_id: persona:anna.id, name: persona:anna.name}
           - {user_id: persona:tom.id, name: persona:tom.name}
 
+teams_create_chat-by-email:
+  external: true
+  chain:
+    - tool: teams_create_chat
+      args:
+        chat_type: group
+        topic: seed-v1 case-teams-chat
+        member_emails: [persona:anna, persona:tom]
+
 teams_rename_chat-group:
   external: true
   chain:

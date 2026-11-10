@@ -43,7 +43,7 @@ on fewer to cover part of it.
 | [Managing contacts](use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
 | [Catching up on Teams](use-cases.md#catching-up-on-teams) | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
 | [Posting in Teams](use-cases.md#posting-in-teams) | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
-| [Running Teams chats and online meetings](use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write` | ⚠️ Yes |
+| [Running Teams chats and online meetings](use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
 | [Finding and reading files in OneDrive and SharePoint](use-cases.md#finding-and-reading-files-in-onedrive-and-sharepoint) | Find a file, open a folder, and read a file. | `sharepoint-write`, `sharepoint-sites`, `teams-files`, `teams-channels` | ⚠️ Yes |
 | [Organizing and sharing files in OneDrive and SharePoint](use-cases.md#organizing-and-sharing-files-in-onedrive-and-sharepoint) | Move, copy, and rename files, and share them. | `sharepoint-share`, `sharepoint-sites`, `teams-write-files`, `outlook-read` | ⚠️ Yes |
 | [Finding and reading SharePoint lists](use-cases.md#finding-and-reading-sharepoint-lists) | Find a site, read its lists and columns, and add, change, or erase list items. | `sharepoint-lists-delete` | ⚠️ Yes |
@@ -532,7 +532,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `teams_create_chat` | 🟠 Add | ✋ Always | Creates a one-to-one chat or a group chat. It posts no message. |
+| `teams_create_chat` | 🟠 Add | ✋ Always | Creates a one-to-one chat or a group chat. It takes each person by Entra id or by email address. It posts no message. |
 | `teams_add_chat_member` | 🟠 Add | ✋ Always | Adds one person to a chat, with the `owner` role. Microsoft refuses this for a one-to-one chat. |
 | `teams_remove_chat_member` | 🔴 Change | ✋ Always | Removes one member from a chat. Microsoft refuses this for a one-to-one chat. |
 | `teams_rename_chat` | 🔴 Change | ✋ Always | Changes the topic of a group chat. |
@@ -1676,7 +1676,7 @@ model then tells the user.
 | --- | --- |
 | A channel has more than 50 posts | The tool reads one page of 50 posts at most, ordered by reply activity. A token reads the next page. Microsoft limits channel reads to about one request each second. |
 | A post has more than 50 replies | The tool reads 50 replies and marks the list as incomplete. The rest is out of reach. |
-| A user asks to start a chat with a person by name | `teams_create_chat` needs the Microsoft Entra id of the person. No tool turns a name or an email address into an id. |
+| A user asks to start a chat with a person by name | `teams_create_chat` needs the Microsoft Entra id or the email address of the person. A name alone is not enough, so the assistant finds the address with a recipient lookup tool, if the deployment has one. Microsoft must know the address as the sign-in name or primary address of a person in the tenant. |
 | A user sends a file in a message | The file must already be in SharePoint. No tool uploads a file. |
 | A meeting is old | Microsoft erases the transcripts of a one-off meeting about 60 days after the meeting. |
 | A tenant turns off transcripts | The tool cannot read them. A Teams administrator must turn them on. |

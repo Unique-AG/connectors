@@ -6469,6 +6469,19 @@ Mia leads projects and starts group chats and online meetings for them. Mia asks
 
 #### Mia controls who is in a group chat
 
+**A group chat is created and named**
+
+Ask your assistant: "Start a group chat named Launch with Anna and Tom."
+
+Tests: 2
+
+Situation: Mia has never chatted with Anna or Tom.
+
+What happens:
+
+- Mia is asked to approve the chat first.
+- After she approves, the chat "Launch" has Mia, Anna, and Tom as members.
+
 **A group chat is created from people Mia already chats with**
 
 Ask your assistant: "Start a group chat named Launch with Anna and Tom."
@@ -7132,10 +7145,6 @@ What happens:
 
 - Mia is asked to approve the chat first.
 - After she approves, Mia has a one-to-one chat with Tom that has no title.
-
-#### Not supported yet in running teams chats and online meetings
-
-- The assistant cannot start a chat with a person it has never chatted with.
 
 ## SharePoint
 

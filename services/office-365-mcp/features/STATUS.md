@@ -9,7 +9,7 @@ A scenario is `working` when the connector meets it, `partly` when a limit block
 | Surface | working | partly | gap | total |
 | --- | --- | --- | --- | --- |
 | Outlook | 372 | 1 | 1 | 374 |
-| Teams | 145 | 0 | 1 | 146 |
+| Teams | 146 | 0 | 0 | 146 |
 | SharePoint | 107 | 0 | 3 | 110 |
 | OneNote | 73 | 0 | 1 | 74 |
 | Across sources | 26 | 0 | 0 | 26 |
@@ -46,7 +46,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 These causes are in the connector: a tool, a parameter, a description, or a preset.
 
-### A tool is missing (5)
+### A tool is missing (4)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
@@ -54,7 +54,6 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-10-05` | Organizing and sharing files in OneDrive and SharePoint | The content of an existing file is replaced | gap | `sharepoint_create_text_file` | The tool creates new text files only and cannot replace a file or write a Word file. |
 | `uc-10-08` | Organizing and sharing files in OneDrive and SharePoint | Access is taken back | gap | `sharepoint_invite` | The connector does not take access back. No tool removes a permission, and the description of sharepoint_invite says so. |
 | `uc-10-10` | Organizing and sharing files in OneDrive and SharePoint | A file attached to a mail is saved in a folder | gap | `sharepoint_create_text_file` | No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file. |
-| `uc-13-01` | Running Teams chats and online meetings | A group chat is created and named | gap | `teams_create_chat` | No tool turns a name into the Entra id that teams_create_chat needs, and the id comes only from a chat member row, a message sender, or a message mention. |
 
 ## Microsoft Graph cannot do it
 
