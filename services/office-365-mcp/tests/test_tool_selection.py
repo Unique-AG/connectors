@@ -480,6 +480,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_delete_mail_rule": {
         "rule_ref": ("outlook_get_mailbox_settings", "outlook_create_mail_rule")
     },
+    "outlook_delete_category": {"name": ("outlook_list_categories", "outlook_create_category")},
     "outlook_list_calendar_shares": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_list_events": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_list_event_instances": {"uri": ("outlook_list_events", "outlook_read_event")},
@@ -798,7 +799,12 @@ _OPT_IN: tuple[tuple[ToolsPreset, ToolsPreset, frozenset[str]], ...] = (
         ToolsPreset.OUTLOOK_RULES,
         ToolsPreset.OUTLOOK_AUTOMATE,
         frozenset(
-            {"outlook_create_mail_rule", "outlook_update_mail_rule", "outlook_delete_mail_rule"}
+            {
+                "outlook_create_mail_rule",
+                "outlook_update_mail_rule",
+                "outlook_delete_mail_rule",
+                "outlook_delete_category",
+            }
         ),
     ),
     (
@@ -1127,7 +1133,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ToolsPreset.OUTLOOK_RULES,
         ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite", "Mail.ReadBasic"),
         0,
-        10,
+        11,
     ),
     (
         ToolsPreset.OUTLOOK_CALENDAR,

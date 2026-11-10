@@ -212,10 +212,11 @@ Feature: Finding and reading mail
       And it names "Draft v2.docx" with its size
 
     @happy @uc-02-07
-    Scenario: The content of an Excel attachment answers a question
-      Given Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row
-      When Mia asks her assistant for the total in the last row of that workbook
-      Then the assistant answers 4,200
+    Scenario: An Excel attachment is handed over as a file
+      Given Anna attached a 2 MB Excel workbook
+      When Mia asks her assistant to open that workbook
+      Then the assistant gets the workbook in its own format
+      But the connector does not turn the workbook into text
 
     @unhappy @uc-02-08
     Scenario: An attachment above 10 MB is refused

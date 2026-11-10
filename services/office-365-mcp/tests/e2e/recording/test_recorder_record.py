@@ -26,8 +26,11 @@ from tests.e2e.recording.record import (
     RECORDED,
     Plan,
     Recorder,
+    check,
+    guard_for,
     link,
     main,
+    persona_guards,
     preflight,
     replay_check,
     resolve,
@@ -189,6 +192,46 @@ def test_a_token_of_another_user_is_refused() -> None:
     assert graph.seen == ["GET graph.microsoft.com/v1.0/me"]
 
 
+def test_a_step_as_another_persona_without_its_token_is_refused_before_any_request() -> None:
+    graph = StandIn()
+    with pytest.raises(Refused, match="no token for persona 2"):
+        _ = record_on(Plan("as", "rec-as", ({"tool": "get_me", "as": 2},)), graph)
+    assert graph.seen == []
+
+
+def test_a_step_as_a_persona_outside_the_three_is_refused(tmp_path: Path) -> None:
+    cases = tmp_path / "cases"
+    cases.mkdir()
+    _ = (cases / "x.yaml").write_text("x-one:\n  chain:\n    - tool: get_me\n      as: 4\n")
+    with pytest.raises(Refused, match="step 1 runs as a persona outside 1..3"):
+        _ = resolve("x-one", cases=cases)
+
+
+def test_a_token_of_the_wrong_user_for_a_step_persona_is_refused_before_a_step_runs() -> None:
+    graph = StandIn()
+    with pytest.raises(Refused, match="GET /me does not answer SEED_UPNS position 2"):
+        _ = record_on(
+            Plan("as", "rec-as", ({"tool": "get_me"}, {"tool": "get_me", "as": 2})),
+            graph,
+            others={2: stand_in.TOKEN},
+        )
+    assert {seen.rpartition("/")[2] for seen in graph.seen} <= {"me", "organization", "drive"}
+
+
+def test_each_step_runs_with_the_token_of_its_persona() -> None:
+    other = "eyJ0eXAiOiJKV1QifQ.eyJ1cG4iOiJhbm5hIn0.b3RoZXItdG9rZW4"
+    steps: tuple[Json, ...] = ({"tool": "get_me"}, {"tool": "get_me", "as": 2}, {"tool": "get_me"})
+    outcome = record_on(
+        Plan("as", "rec-as", steps),
+        StandIn(others={other: stand_in.UPNS[1]}),
+        others={2: other},
+    )
+    answered = [
+        mapping(one["response_json"])["userPrincipalName"] for one in outcome.fixture.interactions
+    ]
+    assert answered == ["mia@example.test", "anna@example.test", "mia@example.test"]
+
+
 def test_a_transient_answer_is_never_recorded() -> None:
     with pytest.raises(Refused, match=r"transient answers \['503 GET'\]"):
         _ = record_on("uc-02-01", StandIn(frozenset({"retry"})))
@@ -340,6 +383,33 @@ async def test_a_send_that_raises_stops_every_later_write() -> None:
     assert seen.write_failed
 
 
+def test_a_failed_write_of_one_persona_stops_the_writes_of_the_next() -> None:
+    first = Guard(stand_in.UPN, frozenset(stand_in.UPNS), True)
+    second = Guard(stand_in.UPNS[1], frozenset(stand_in.UPNS), True, counter=first.counter)
+
+    write = httpx.Request("PATCH", f"{GRAPH}/drives/b!DRIVE/items/ITEM")
+    before = second.refuses_request(write, "sharepoint_rename_item")
+    first.write_failed = True
+    after = second.refuses_request(write, "sharepoint_rename_item")
+
+    assert "failed or throttled write" not in str(before)
+    assert after is not None
+    assert "failed or throttled write" in after
+
+
+@pytest.mark.parametrize(
+    ("status", "stops"), [(404, False), (403, False), (429, True), (503, True)]
+)
+def test_only_a_throttled_or_server_failed_answer_stops_the_later_writes(
+    status: int, stops: bool
+) -> None:
+    seen = Guard(stand_in.UPN, frozenset(stand_in.UPNS), True)
+
+    seen.saw(httpx.Request("PATCH", f"{GRAPH}/drives/b!DRIVE/items/ITEM"), status, None, None)
+
+    assert seen.write_failed is stops
+
+
 async def test_a_preflight_answers_without_a_drive() -> None:
     bodies = {
         "/v1.0/me": {"id": "u1", "userPrincipalName": stand_in.UPN, "displayName": "Tester"},
@@ -356,6 +426,33 @@ async def test_a_preflight_answers_without_a_drive() -> None:
     assert seen.me_id == "u1"
 
 
+@pytest.mark.parametrize(
+    ("failing", "refused"),
+    [("/v1.0/me", True), ("/v1.0/organization", True), ("/v1.0/me/drive", False)],
+)
+async def test_a_preflight_request_that_gets_a_503_refuses_the_case_except_the_drive(
+    failing: str, refused: bool
+) -> None:
+    bodies = {
+        "/v1.0/me": {"id": "u1", "userPrincipalName": stand_in.UPN, "displayName": "Tester"},
+        "/v1.0/organization": {"value": [{"id": "o1", "displayName": "Org"}]},
+        "/v1.0/me/drive": {"id": "d1"},
+    }
+
+    async def send(_: httpx.AsyncBaseTransport, request: httpx.Request) -> httpx.Response:
+        if request.url.path == failing:
+            return httpx.Response(503, json={}, request=request)
+        return httpx.Response(200, json=bodies[request.url.path], request=request)
+
+    seen = Guard(stand_in.UPN, frozenset(stand_in.UPNS), False)
+    if refused:
+        with pytest.raises(Refused, match="answered 503"):
+            _ = await preflight(send, httpx.AsyncBaseTransport(), seen, "t", (stand_in.UPN,))
+    else:
+        _ = await preflight(send, httpx.AsyncBaseTransport(), seen, "t", (stand_in.UPN,))
+        assert seen.drive_ids == frozenset()
+
+
 _RECORDED_BLOCK = """\
 uc-01-01:
   fixture: rec-uc-01-01
@@ -363,7 +460,7 @@ uc-01-01:
     expect:
       result: {capped: false}
 """
-_NEXT = "\nuc-01-02:\n  status: untested\n"
+_NEXT = "\nuc-01-02:\n  status: working\n"
 _SIDECARS = {
     "no variants": "uc-01-01:\n  chain:\n    - tool: t\n" + _NEXT,
     "other variants": "uc-01-01:\n  variants:\n    busy:\n      1: {fault: {transport: timeout}}\n"
@@ -389,7 +486,7 @@ def test_link_puts_the_recorded_block_in_the_sidecar_entry(sidecar: str, tmp_pat
     wanted = mapping(mapping(cast("object", yaml.safe_load(_RECORDED_BLOCK)))["uc-01-01"])
     assert mapping(variants["recorded"]) == wanted
     assert ("busy" in variants) == (sidecar == "other variants")
-    assert loaded["uc-01-02"] == {"status": "untested"}
+    assert loaded["uc-01-02"] == {"status": "working"}
 
 
 def test_link_twice_changes_nothing(tmp_path: Path) -> None:
@@ -412,3 +509,38 @@ def test_link_refuses_a_scenario_that_has_no_entry_or_no_block(tmp_path: Path) -
 def test_the_cli_refuses_link_for_a_stand_in_recording(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["uc-02-01", "--target", "stand-in", "--link"]) == 2
     assert "--link needs a graph recording" in capsys.readouterr().err
+
+
+def test_the_request_cap_counts_the_steps_of_all_personas_together() -> None:
+    other = "eyJ0eXAiOiJKV1QifQ.eyJ1cG4iOiJhbm5hIn0.b3RoZXItdG9rZW4"
+    steps: tuple[Json, ...] = ({"tool": "get_me"}, {"tool": "get_me", "as": 2}, {"tool": "get_me"})
+    with pytest.raises(Refused, match="cap of 8 requests"):
+        _ = record_on(
+            Plan("as", "rec-as", steps, cap=8),
+            StandIn(others={other: stand_in.UPNS[1]}),
+            others={2: other},
+        )
+
+
+def test_a_token_for_the_case_persona_in_others_never_replaces_the_validated_token() -> None:
+    other = "eyJ0eXAiOiJKV1QifQ.eyJ1cG4iOiJhbm5hIn0.b3RoZXItdG9rZW4"
+    outcome = record_on(
+        Plan("as", "rec-as", ({"tool": "get_me"},)),
+        StandIn(others={other: stand_in.UPNS[1]}),
+        others={1: other},
+    )
+    answered = [
+        mapping(one["response_json"])["userPrincipalName"] for one in outcome.fixture.interactions
+    ]
+    assert answered == ["mia@example.test"]
+
+
+def test_a_step_is_checked_with_the_guard_of_its_persona() -> None:
+    steps: tuple[Json, ...] = (
+        {"tool": "outlook_list_mail", "as": 2, "args": {"mailbox": stand_in.UPNS[1]}},
+    )
+    plan = Plan("as", "rec-as", steps)
+    guard = guard_for(stand_in.UPNS, plan, True, 40)
+
+    assert check(plan, guard) != []
+    assert check(plan, guard, by_persona=persona_guards(stand_in.UPNS, plan, guard)) == []

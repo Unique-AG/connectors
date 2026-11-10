@@ -2527,10 +2527,7 @@ class TestHowItDeclaresItself:
         assert "to make the event repeat, set `recurrence`" in lowered
         assert "no way to hide" not in lowered, "the description says the list cannot be hidden"
         assert "default calendar" in lowered
-        assert (
-            "outlook_create_event_on_behalf is the tool for a calendar that somebody else shared"
-            in lowered
-        )
+        assert "exposes outlook_create_event_on_behalf, use it for a calendar" in lowered
 
         body_html = cast("str", _object(_object(parameters["properties"])["body"])["description"])
         assert "attach anything to this event" in body_html.casefold()
