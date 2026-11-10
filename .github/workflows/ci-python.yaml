@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       packages:
-        description: 'Python packages to run CI for (comma-separated, e.g., "hello-mcp" or "all")'
+        description: 'Python packages to run CI for (comma-separated, e.g., "kb-mcp" or "all")'
         required: true
         default: "all"
 

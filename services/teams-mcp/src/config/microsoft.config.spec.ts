@@ -37,3 +37,38 @@ describe('microsoft.allowedTenantIds', () => {
     await expect(microsoftConfig()).rejects.toThrow('Invalid GUID');
   });
 });
+
+describe('microsoft.adminConsentRedirectUri', () => {
+  beforeEach(() => {
+    vi.stubEnv('MICROSOFT_CLIENT_ID', 'c4b2a7d1-5e3f-4a6b-9c8d-0e1f2a3b4c5d');
+    vi.stubEnv('MICROSOFT_CLIENT_SECRET', 'client-secret');
+    vi.stubEnv('MICROSOFT_WEBHOOK_SECRET', 'w'.repeat(128));
+    vi.stubEnv('MICROSOFT_PUBLIC_WEBHOOK_URL', 'https://mcp.example.com');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('defaults to the landing page the Terraform module registers', async () => {
+    const config = await microsoftConfig();
+
+    expect(config.adminConsentRedirectUri).toBe(
+      'https://www.unique.ai/setup/consent-completed/entra-id',
+    );
+  });
+
+  it('reads MICROSOFT_ADMIN_CONSENT_REDIRECT_URI', async () => {
+    vi.stubEnv('MICROSOFT_ADMIN_CONSENT_REDIRECT_URI', 'https://consent.example.com/done');
+
+    const config = await microsoftConfig();
+
+    expect(config.adminConsentRedirectUri).toBe('https://consent.example.com/done');
+  });
+
+  it('rejects a redirect URI that is not http or https', async () => {
+    vi.stubEnv('MICROSOFT_ADMIN_CONSENT_REDIRECT_URI', 'javascript:alert(1)');
+
+    await expect(microsoftConfig()).rejects.toThrow();
+  });
+});

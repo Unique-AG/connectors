@@ -40,6 +40,7 @@ Copy `.env.example` to `.env` and configure the following:
 | `AMQP_URL` | RabbitMQ connection string |
 | `MICROSOFT_CLIENT_ID` | Azure AD application client ID |
 | `MICROSOFT_SIGN_IN_TENANT_ID` | Optional. Sign-in tenant ID the OAuth login should open (`common` by default; set a GUID to pin a foreign tenant's service principal) |
+| `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | Optional. Where Entra sends a tenant admin after admin consent through `/admin/consent` (`https://www.unique.ai/setup/consent-completed/entra-id` by default; must be registered on the app registration) |
 | `MICROSOFT_CLIENT_SECRET` | Azure AD application client secret |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-char hex secret used as `clientState` for webhook validation |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Publicly reachable URL for Microsoft webhooks |
