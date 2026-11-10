@@ -426,6 +426,33 @@ async def test_a_preflight_answers_without_a_drive() -> None:
     assert seen.me_id == "u1"
 
 
+@pytest.mark.parametrize(
+    ("failing", "refused"),
+    [("/v1.0/me", True), ("/v1.0/organization", True), ("/v1.0/me/drive", False)],
+)
+async def test_a_preflight_request_that_gets_a_503_refuses_the_case_except_the_drive(
+    failing: str, refused: bool
+) -> None:
+    bodies = {
+        "/v1.0/me": {"id": "u1", "userPrincipalName": stand_in.UPN, "displayName": "Tester"},
+        "/v1.0/organization": {"value": [{"id": "o1", "displayName": "Org"}]},
+        "/v1.0/me/drive": {"id": "d1"},
+    }
+
+    async def send(_: httpx.AsyncBaseTransport, request: httpx.Request) -> httpx.Response:
+        if request.url.path == failing:
+            return httpx.Response(503, json={}, request=request)
+        return httpx.Response(200, json=bodies[request.url.path], request=request)
+
+    seen = Guard(stand_in.UPN, frozenset(stand_in.UPNS), False)
+    if refused:
+        with pytest.raises(Refused, match="answered 503"):
+            _ = await preflight(send, httpx.AsyncBaseTransport(), seen, "t", (stand_in.UPN,))
+    else:
+        _ = await preflight(send, httpx.AsyncBaseTransport(), seen, "t", (stand_in.UPN,))
+        assert seen.drive_ids == frozenset()
+
+
 _RECORDED_BLOCK = """\
 uc-01-01:
   fixture: rec-uc-01-01

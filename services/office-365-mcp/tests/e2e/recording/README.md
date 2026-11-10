@@ -100,9 +100,11 @@ The recorder prints the counts of each replacement. It refuses to write when the
 - The preflight reads `/me/drive` for the drive id. A token with no Files scope gets no drive id,
   and the run goes on without the drive.
 - A cap of 40 requests per run (`--max-requests`, at most 100). The cap counts the requests of
-  all steps together, also when the steps run as different users. An answer 429 or 5xx, or an
-  error of the transport, also stops the writes of every later step, whoever runs it. Another 4xx
-  answer does not, because Microsoft did not apply that write.
+  all steps together, also when the steps run as different users. A request of a step that gets an
+  answer 429 or 5xx, or an error of the transport, also stops the writes of every later step,
+  whoever runs it. Another 4xx answer does not, because Microsoft did not apply that write. A
+  preflight request that gets any answer but 200 refuses the case before a step runs. Only the
+  read of `/me/drive` may fail, and the run goes on without the drive.
 - An extra address is open only for the tools that a family names in `ADDRESSES`, and only when its
   variable is set: `SEED_DIRECTORY_UPN`, `SEED_GUEST_UPN`, `SEED_ROOM_UPN` and `SEED_SHARED_UPN`. A
   case writes `env:SEED_ROOM_UPN`. The fixture holds `room@example.test`. Put these addresses into
