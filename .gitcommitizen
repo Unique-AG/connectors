@@ -62,7 +62,7 @@ docs = docs/**, *.md
 agentic = agentic/**, .claude/**, .cursor/**
 
 # Special scopes
-ci = .github/**, .gitcommitizen, biome.json, turbo.json, tsconfig.json, vitest.config.ts, pnpm-workspace.yaml, docker-compose.yaml, flake.nix, flake.lock, .dockerignore, release-please-config.json, .release-please-manifest.json, .syncpackrc.json
+ci = .github/**, .gitcommitizen, biome.json, turbo.json, tsconfig.json, vitest.config.ts, pnpm-workspace.yaml, docker-compose.yaml, flake.nix, flake.lock, .dockerignore, release-please-config.json, .release-please-manifest.json, .syncpackrc.json, .coderabbit.yaml
 scripts = scripts/**
 main = *, .*
 deps = package.json, **/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, **/uv.lock, **/pyproject.toml, **/Dockerfile, **/*.tf, **/.terraform.lock.hcl, .github/workflows/**, .github/actions/**
