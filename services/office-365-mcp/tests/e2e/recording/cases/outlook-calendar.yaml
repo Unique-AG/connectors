@@ -388,6 +388,7 @@ outlook_update_event-occurrence:
         ends_at: "~nextTuesdayT09:30:00"
         time_zone: Europe/Zurich
         attendees: [persona:anna]
+        online_meeting: false
         categories: [seed-v1]
         recurrence: {pattern_type: weekly, days_of_week: [tuesday], range_type: numbered, number_of_occurrences: 8}
     - tool: outlook_list_event_instances
@@ -422,6 +423,7 @@ outlook_delete_event-with-attendee:
         ends_at: "~tomorrowT14:30:00"
         time_zone: Europe/Zurich
         attendees: [persona:anna]
+        online_meeting: false
     - tool: outlook_delete_event
       bind: {uri: "$prev.uri"}
 
@@ -487,6 +489,7 @@ outlook_cancel_event-occurrence:
         ends_at: "~nextTuesdayT11:30:00"
         time_zone: Europe/Zurich
         attendees: [persona:anna]
+        online_meeting: false
         categories: [seed-v1]
         recurrence: {pattern_type: weekly, days_of_week: [tuesday], range_type: numbered, number_of_occurrences: 8}
     - tool: outlook_list_event_instances

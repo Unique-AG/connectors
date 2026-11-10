@@ -228,7 +228,7 @@ async def _create(
     body_html: str | None = None,
     location: str | None = None,
     all_day: bool = False,
-    online_meeting: bool = False,
+    online_meeting: bool | None = None,
     confirm: Confirm = _agrees,
     **options: Unpack[_Options],
 ) -> CreatedEvent:
@@ -651,6 +651,71 @@ class TestWhatItSendsToGraph:
         assert asked["isOnlineMeeting"] is True
         assert asked["onlineMeetingProvider"] == "teamsForBusiness"
 
+    async def test_an_event_with_attendees_gets_a_teams_meeting_unless_told_otherwise(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA])
+        by_default = _sent(create)
+        _ = await _create(client, attendees=[_ADA], online_meeting=False)
+        declined = _sent(create)
+
+        assert by_default["isOnlineMeeting"] is True
+        assert by_default["onlineMeetingProvider"] == "teamsForBusiness"
+        assert "isOnlineMeeting" not in declined
+
+    async def test_a_teams_meeting_with_no_body_sends_an_empty_body_for_the_native_block(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA])
+
+        assert _sent(create)["body"] == {"contentType": "html", "content": ""}
+
+    async def test_a_teams_meeting_keeps_the_body_the_caller_wrote(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA], body_html="<p>Agenda</p>")
+
+        assert _sent(create)["body"] == {"contentType": "html", "content": "<p>Agenda</p>"}
+
+    async def test_an_event_with_no_teams_meeting_and_no_body_sends_no_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client, attendees=[_ADA], online_meeting=False)
+
+        assert "body" not in _sent(create)
+
+    async def test_an_event_with_nobody_invited_gets_no_teams_meeting_by_default(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        create = _ready(graph)
+
+        _ = await _create(client)
+
+        assert "isOnlineMeeting" not in _sent(create)
+
+    async def test_the_default_teams_meeting_is_named_in_the_question(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(graph)
+        asked: list[str] = []
+
+        async def recording(question: str, about: str) -> str | None:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await _create(client, attendees=[_ADA], confirm=recording)
+
+        assert "as a Teams meeting" in asked[0]
+
     async def test_the_body_and_the_location_are_omitted_rather_than_sent_empty(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -914,7 +979,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
             asked.append(question)
             return None
 
-        _ = await _create(client, attendees=[_ADA], confirm=capturing)
+        _ = await _create(client, attendees=[_ADA], online_meeting=False, confirm=capturing)
 
         question = asked[0]
         assert "as an all-day event" not in question
@@ -1641,7 +1706,13 @@ class TestASeries:
             asked.append(question)
             return None
 
-        _ = await _create(client, attendees=[_ADA], recurrence=_TEN_MONDAYS, confirm=capturing)
+        _ = await _create(
+            client,
+            attendees=[_ADA],
+            online_meeting=False,
+            recurrence=_TEN_MONDAYS,
+            confirm=capturing,
+        )
 
         assert asked[0].startswith(
             f"Create 'Pricing review' from {_STARTS} to {_ENDS} UTC, repeating every week on "
@@ -1820,6 +1891,17 @@ class TestTheTeamsMeetingACalendarDoesNotTake:
         _ = await _create(client, online_meeting=True)
 
         assert create.call_count == 1
+
+    async def test_the_default_teams_meeting_is_dropped_on_a_calendar_that_takes_none(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _calendar(providers=["skypeForBusiness"]))
+        create = _creates(graph)
+
+        _ = await _create(client, attendees=[_ADA])
+
+        assert create.call_count == 1
+        assert "isOnlineMeeting" not in _sent(create)
 
     async def test_an_event_with_no_online_meeting_is_created_whatever_the_calendar_allows(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -2428,19 +2510,20 @@ class TestTheSchemaItPublishes:
             "str", _object(_object(parameters["properties"])["online_meeting"])["description"]
         )
         assert (
-            "this tool refuses and names the allowed providers, before it asks anybody to agree"
+            "true makes this tool refuse and name the allowed providers, before it asks anybody to "
+            + "agree"
             in described
         )
         assert "If Teams is not among them" in described
 
-    async def test_neither_switch_is_on_unless_it_is_asked_for(
+    async def test_the_online_meeting_switch_is_left_for_the_attendees_to_decide(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = _object(parameters["properties"])
         assert _object(properties["all_day"])["default"] is False
-        assert _object(properties["online_meeting"])["default"] is False
+        assert _object(properties["online_meeting"])["default"] is None
 
     async def test_the_category_argument_promises_the_lister_only_where_it_exists(
         self, transport: httpx.AsyncClient

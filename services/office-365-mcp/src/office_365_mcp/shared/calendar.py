@@ -1,7 +1,7 @@
 import re
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta
 from typing import ClassVar, Literal, Self, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -936,7 +936,7 @@ class EventDraft:
     body_html: str | None
     location: str | None
     all_day: bool
-    online_meeting: bool
+    online_meeting: bool | None
     room_addresses: tuple[str, ...] = ()
     categories: tuple[str, ...] = ()
     show_as: ShowAs | None = None
@@ -948,6 +948,13 @@ class EventDraft:
     response_requested: bool | None = None
     allow_new_time_proposals: bool | None = None
     recurrence: RecurrenceRule | None = None
+
+
+def with_default_online_meeting(draft: EventDraft, calendar: Calendar) -> EventDraft:
+    if draft.online_meeting is not None:
+        return draft
+    invited = bool(draft.attendees or draft.optional_attendees)
+    return replace(draft, online_meeting=invited and providers_without_teams(calendar) is None)
 
 
 def recurrence_refusal(tool: str, rule: RecurrenceRule | None, *, starts_on: date) -> str | None:
@@ -1161,13 +1168,10 @@ def _body_described(body_html: str) -> str:
 
 
 def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
+    html = "" if draft.body_html is None and draft.online_meeting else draft.body_html
     return Event(
         subject=draft.subject,
-        body=(
-            None
-            if draft.body_html is None
-            else ItemBody(content=draft.body_html, content_type=BodyType.Html)
-        ),
+        body=None if html is None else ItemBody(content=html, content_type=BodyType.Html),
         start=DateTimeTimeZone(date_time=draft.starts_at, time_zone=draft.time_zone),
         end=DateTimeTimeZone(date_time=draft.ends_at, time_zone=draft.time_zone),
         is_all_day=draft.all_day,
