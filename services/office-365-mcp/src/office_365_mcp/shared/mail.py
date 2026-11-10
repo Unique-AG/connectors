@@ -255,7 +255,8 @@ class MailSummary(BaseModel):
     web_link: str | None = Field(
         description=(
             "A link that opens the message in Outlook on the web. It is not a handle. Never "
-            "pass it to a tool. Give it to the user when they ask where the message is."
+            "pass it to a tool as a message handle. Give it to the user when they ask where the "
+            "message is."
         )
     )
 
