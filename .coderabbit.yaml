@@ -1,0 +1,150 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+inheritance: true
+enable_free_tier: false
+language: en-US
+
+tone_instructions: >-
+  Be direct and concise: state the issue, impact, and fix with no preamble, praise,
+  or repetition. Never reply with agreement alone or restate the author's explanation.
+  When a repository rule backs a finding, name the file and the rule.
+
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  review_progress: false
+  commit_status: false
+  fail_commit_status: false
+  review_status: false
+  review_info: false
+  review_details: false
+  high_level_summary: false
+  changed_files_summary: false
+  sequence_diagrams: false
+  estimate_code_review_effort: false
+  poem: false
+  in_progress_fortune: false
+  slop_detection:
+    enabled: false
+  enable_prompt_for_ai_agents: false
+  assess_linked_issues: false
+  related_issues: false
+  related_prs: false
+  suggested_reviewers: false
+  suggested_labels: false
+
+  auto_review:
+    enabled: true
+    auto_incremental_review: true
+    drafts: false
+    labels:
+      - "!dependencies"
+    ignore_title_keywords:
+      - WIP
+      - DO NOT MERGE
+    ignore_usernames:
+      - "github-actions[bot]"
+      - "gh-workflow-automations[bot]"
+      - "cursor[bot]"
+
+  path_filters:
+    - "!**/pnpm-lock.yaml"
+    - "!**/uv.lock"
+    - "!**/dist/**"
+    - "!**/generated/**"
+    - "!**/*.generated.*"
+    - "!**/values.schema.json"
+    - "!.changelog/**"
+
+  path_instructions:
+    - path: "**/*"
+      instructions: >-
+        Do not comment on formatting, import order, or naming that biome or ruff already
+        enforce. Surface only issues tied to changed code and name the repository rule
+        or the concrete bug.
+    - path: "services/**/src/**/*.py"
+      instructions: >-
+        MCP server code. Flag a tool that returns untyped data, a Graph or upstream
+        error that reaches the model unredacted, and a secret or token that reaches a log.
+    - path: "**/deploy/helm-charts/**"
+      instructions: >-
+        Helm charts. The `base` dependency version must match every other chart and the
+        mcp-scaffold skeleton chart. A changed values key needs a matching change in
+        values.schema.json inputs.
+
+  tools:
+    gitleaks:
+      enabled: true
+    semgrep:
+      enabled: true
+    osvScanner:
+      enabled: true
+    hadolint:
+      enabled: true
+    checkov:
+      enabled: true
+    tflint:
+      enabled: true
+    github-checks:
+      enabled: true
+    eslint:
+      enabled: false
+    biome:
+      enabled: false
+    oxc:
+      enabled: false
+    ruff:
+      enabled: false
+    pylint:
+      enabled: false
+    flake8:
+      enabled: false
+    markdownlint:
+      enabled: false
+    languagetool:
+      enabled: false
+    yamllint:
+      enabled: false
+    actionlint:
+      enabled: false
+    shellcheck:
+      enabled: false
+
+  pre_merge_checks:
+    title:
+      mode: "off"
+    description:
+      mode: "off"
+    issue_assessment:
+      mode: "off"
+    docstrings:
+      mode: "off"
+
+  finishing_touches:
+    docstrings:
+      enabled: false
+    unit_tests:
+      enabled: false
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+    simplify:
+      enabled: false
+
+chat:
+  auto_reply: false
+  art: false
+
+issue_enrichment:
+  auto_enrich:
+    enabled: false
+  planning:
+    enabled: false
+    auto_planning:
+      enabled: false
+
+knowledge_base:
+  web_search:
+    enabled: false
