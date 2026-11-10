@@ -60,6 +60,7 @@ architecture = { script = "mcp_architecture.check:main" }
 surface = { script = "mcp_architecture.check:main(update=True)", help = "record what a client sees in tests/tool_surface.generated.json" }
 test = "pytest"
 codegen = "mcp-openapi-codegen"
+merge-spec = { cmd = "python spec/merge_spec.py", help = "rebuild upstream/openapi.yml from Polixis's spec in spec/, before codegen" }
 ci = { cmd = "bash ../../scripts/check-python-service.sh .", help = "every check CI runs, in its order" }
 
 [tool.ruff]
@@ -72,7 +73,7 @@ extends = "../../packages/mcp-architecture/src/mcp_architecture/type_check.json"
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.14"
-include = ["src", "tests"]
+include = ["src", "tests", "spec"]
 # A test may reach a private name of the code it tests. Here and not in the shared type check,
 # since basedpyright reads a root there from the folder of that file. `.` resolves `tests.*`.
 executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsage = false }]
@@ -93,9 +94,10 @@ operation-ids = [
     "getTopDownOwnership",
     "getUltimateBeneficialOwners",
     "getProfileFields",
-    "getBasicIdentifiers",
-    "getKeyIdentifiers",
     "resolvePermanentId",
+    "getSanctionExposure",
+    "findPaths",
+    "getJudicialRecords",
 ]
 operation-module = "mcp_openapi.upstream"
 models-module = "polixis_mcp.upstream.generated.vendor_responses"

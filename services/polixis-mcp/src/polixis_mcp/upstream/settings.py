@@ -28,5 +28,11 @@ class UpstreamSettings(BaseSettings):
         "https://auth.polixis.com/realms/plx-prod/protocol/openid-connect/token"
     )
     timeout_seconds: float = Field(default=30, gt=0, le=120)
+    # At most this many requests to Polixis at once from one process; the others wait for a free
+    # connection, within `timeout_seconds`. Polixis throttles bursts and trips a circuit breaker
+    # on many large graphs at once.
+    max_concurrent_requests: int = Field(default=4, ge=1, le=20)
+    # How long a process stops calling Polixis after it answers that the quota is spent.
+    quota_cooldown_seconds: float = Field(default=15 * 60, ge=0)
     # Read from UPSTREAM_RETRY_*, with the defaults every MCP shares.
     retry: RetrySettings = Field(default_factory=RetrySettings)

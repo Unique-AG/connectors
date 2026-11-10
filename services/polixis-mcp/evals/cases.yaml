@@ -1,0 +1,899 @@
+# Evaluation cases for an agent connected to this MCP, run against the live Polixis API.
+#
+# Polixis returns today's data and we cannot fix it, so no case asserts a fact about an
+# entity. A run is graded on three things that hold whatever the data says:
+#
+#   1. The tools it called (`expect.calls`, `expect.forbid`, `expect.first`, `expect.budget`),
+#      checked from the run's own record of tool calls.
+#   2. Whether every fact in the answer is in a tool result of the same run. The judge reads
+#      the tool results alongside the answer, so a share that changed since last month passes
+#      and a share the agent made up fails.
+#   3. Behaviour (`expect.answer`, plus `defaults.answer` on every turn): what the agent says
+#      when it finds nothing, several matches, more pages, or a question the API cannot answer.
+#      Each line is a pass or fail, written so it is gradable from the transcript alone.
+#
+# Prompts name entities through slots, `{slot.field}`. `entities` below says what kind of
+# entity fills each slot. The values live in `entities.local.yaml`, gitignored, because this
+# repo is public and a run needs real names; `entities.example.yaml` shows the shape. A case
+# whose slots are unfilled is skipped. Cases without slots use names made up to match nothing,
+# and run as they are.
+#
+# Quota: Polixis caps requests per API key, and a few hundred calls have exhausted it. `budget`
+# is the most MCP tool calls a turn may make; the sum over every case is the most a full run
+# costs. Run a few cases at a time, and stop at the first 429.
+#
+# Argument matchers in `expect.calls[].args`:
+#   a value            the argument equals it; lists compare as sets, strings ignore case
+#   {present: true}    the argument is given      {absent: true}   it is left out
+#   {contains: [...]}  the list argument holds every one of these
+#   {one_of: [...]}    the argument is one of these
+#   {min: n}, {max: n} a number at least or at most n
+# A call with `when` is required only when its condition holds in the run, and the judge
+# decides that from the tool results. A call without `when` is always required.
+
+version: 1
+
+defaults:
+  answer:
+    - Every name, pid, share, date, flag, list and position in the answer appears in a tool result of this run.
+    - It gives the pid of each entity it reports on.
+    - When several matches were plausible, it says which it used and why, or asks; it never picks one silently.
+    - When it stopped before the last page of a result the question needed, it says so.
+    - It does not present the absence of a hit as proof that nothing exists beyond what it searched.
+
+entities:
+  pep_person:
+    type: PERSON
+    criteria: A current or former PEP with a known month of birth and one nationality.
+    fields: [name, birth_month, nationality, country]
+  former_pep:
+    type: PERSON
+    criteria: A person whose PEP positions all ended, with at least one held in a known year.
+    fields: [name, year_in_office]
+  wealth_client:
+    type: PERSON
+    criteria: A person who holds or held shares in several companies, at least one of them ended.
+    fields: [name, sector, exit_year]
+  native_script_person:
+    type: PERSON
+    criteria: A sanctioned or PEP person whose name records include a non-Latin script.
+    fields: [native_name]
+  common_name_person:
+    type: PERSON
+    criteria: A name with dozens of matches, given with a birth year and one country.
+    fields: [name, birth_year, country]
+  connected_person:
+    type: PERSON
+    criteria: A person with a corporate role, a few hops from `sanctioned_org` in the graph.
+    fields: [name]
+  small_company:
+    type: ORGANIZATION
+    criteria: A private company with fewer than 20 related parties, and court decisions naming it or a related party.
+    fields: [name, country]
+  swiss_company:
+    type: ORGANIZATION
+    criteria: A Swiss company with several owners, some held through intermediate companies, and a UID.
+    fields: [name, city, uid]
+  foundation:
+    type: ORGANIZATION
+    criteria: A foundation or trust, such as a Liechtenstein Stiftung, with no natural person at the end of its ownership chains.
+    fields: [name, country]
+  sanction_owned_company:
+    type: ORGANIZATION
+    criteria: A company not listed itself, with one or more sanctioned owners, directly or indirectly.
+    fields: [name]
+  sanction_adjacent_company:
+    type: ORGANIZATION
+    criteria: A company not listed itself, with sanctioned parties within a few hops.
+    fields: [name]
+  sanctioned_org:
+    type: ORGANIZATION
+    criteria: An organization listed by several sanctions regimes, with aliases.
+    fields: [name]
+  payee_company:
+    type: ORGANIZATION
+    criteria: A company registered in the UAE.
+    fields: [name]
+  state_owned_company:
+    type: ORGANIZATION
+    criteria: A company owned by a state body or ministry.
+    fields: [name]
+  pep_linked_company:
+    type: ORGANIZATION
+    criteria: A company with a PEP among its owners, directors or signatories.
+    fields: [name]
+  exempt_subsidiary:
+    type: ORGANIZATION
+    criteria: A subsidiary of a listed parent that holds more than 75% of it.
+    fields: [name]
+  group_holding:
+    type: ORGANIZATION
+    criteria: A group holding with more holdings than fit on one page, some flagged.
+    fields: [name]
+  large_shareholder_base:
+    type: ORGANIZATION
+    criteria: A company with more shareholders than fit on one page of related parties.
+    fields: [name]
+  lei_company:
+    type: ORGANIZATION
+    criteria: A company whose profile lists an LEI.
+    fields: [lei]
+  isin_issuer:
+    type: ORGANIZATION
+    criteria: An issuer whose profile lists an ISIN.
+    fields: [isin]
+  stored_pid:
+    type: ANY
+    criteria: The pid of an active entity, as a client file would hold it.
+    fields: [pid]
+  merged_pid:
+    type: ANY
+    criteria: A pid Polixis merged into another.
+    fields: [pid]
+
+cases:
+  # Onboarding
+
+  - id: screen-private-client
+    from_doc: 1
+    workflow: onboarding
+    entities: [pep_person]
+    turns:
+      - prompt: >-
+          We're onboarding {pep_person.name}, born {pep_person.birth_month}, {pep_person.nationality}
+          national. Is this person sanctioned or a PEP?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                entity_type: PERSON
+                countries: {contains: ["{pep_person.country}"]}
+                dates: {present: true}
+            - tool: get_entity_profiles
+              when: A match is the client, since only its profile flags show a former PEP.
+            - tool: get_entity_profiles
+              when: The matched person is flagged as a PEP or former PEP.
+              args:
+                sections: {contains: [positions]}
+          budget: 4
+          answer:
+            - It says which match is the client and why, citing the birth date and nationality.
+            - It states whether the match carries a sanctions flag, a PEP flag or a former-PEP flag.
+            - If the person is a PEP, it lists the positions with institution and dates.
+
+  - id: screen-company-and-parties
+    from_doc: 2
+    workflow: onboarding
+    entities: [small_company]
+    turns:
+      - prompt: >-
+          Onboard {small_company.name}, {small_company.country}. Screen the company, its directors,
+          its shareholders and its beneficial owners, and give me one table.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                entity_type: ORGANIZATION
+                countries: {present: true}
+            - tool: get_related_parties
+              args:
+                categories: {contains: [executive, shareholdingInformation]}
+            - tool: get_ultimate_beneficial_owners
+          budget: 6
+          answer:
+            - The answer is one table with one row per party, giving name, role, share held, country and flags.
+            - Former roles are marked as former.
+            - Any flagged party is called out above the table.
+
+  - id: controlling-person
+    from_doc: 3
+    workflow: beneficial-owners
+    entities: [swiss_company]
+    turns:
+      - prompt: >-
+          Who are the beneficial owners of {swiss_company.name}, {swiss_company.city}, above 25%?
+          And is anyone controlling it without holding shares?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+            - tool: get_related_parties
+              args:
+                categories: {contains: [executive, signature]}
+          forbid:
+            - tool: get_ultimate_beneficial_owners
+              args: {cursor: {present: true}}
+              when: >-
+                The first page already shows an owner below 25%, and every owner counted in
+                total_share_unknown is on it.
+              reason: >-
+                Owners come largest share first, so the threshold is settled on that page unless
+                an owner whose share may be higher is still unread.
+          budget: 5
+          answer:
+            - It lists the natural persons at the end of a chain with an effective share of 25% or more, and the strongest chain behind each.
+            - It flags an owner with an unknown share on some chain, whose true share may be higher.
+            - If nobody reaches 25%, it names the senior managers as the controlling persons.
+            - It presents control by other means, such as a signatory with no shares, as a lead to assess, not a finding.
+
+  - id: controlling-person-foundation
+    workflow: beneficial-owners
+    entities: [foundation]
+    turns:
+      - prompt: >-
+          Who is the beneficial owner of {foundation.name} ({foundation.country})? I need the
+          natural persons for Form K.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+            - tool: get_related_parties
+          budget: 5
+          answer:
+            - It says that no natural person sits at the end of the ownership chains, if none does.
+            - It names the people who run or represent the foundation, such as council members, with their roles.
+            - It says that founders and beneficiaries of a foundation or trust may not appear in this data and must come from the client.
+
+  - id: source-of-wealth
+    from_doc: 4
+    workflow: source-of-wealth
+    entities: [wealth_client]
+    turns:
+      - prompt: >-
+          The client, {wealth_client.name}, says their wealth comes from selling a stake in a
+          {wealth_client.sector} business in {wealth_client.exit_year}. What does Polixis show about
+          their companies and roles?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                entity_type: PERSON
+            - tool: get_related_parties
+              args:
+                categories: {contains: [ownershipInOtherEntities]}
+            - tool: get_entity_profiles
+              args:
+                sections: {contains: [positions]}
+          budget: 6
+          answer:
+            - It lists the companies the person holds or held, with shares and start and end dates.
+            - It says whether a holding in that sector ending around that year is there.
+            - It says that the size of a sale is not in this data.
+
+  # Sanctions
+
+  - id: fifty-percent-rule
+    from_doc: 5
+    workflow: sanctions
+    entities: [sanction_owned_company]
+    turns:
+      - prompt: Is {sanction_owned_company.name} caught by the 50% rule? It isn't listed itself.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+            - tool: get_entity_profiles
+              when: Any owner is flagged as sanctioned.
+              args:
+                pids: {max: 10}
+                sections: {contains: [sanction_statuses]}
+          budget: 6
+          answer:
+            - It adds up, per sanctions regime, the shares held directly or indirectly by listed owners.
+            - It says whether each total reaches 50%, and shows the chain behind each stake.
+            - It notes that the EU also blocks an entity a listed person controls without a majority, which share data alone cannot settle.
+
+  - id: sanctions-exposure-nearby
+    from_doc: 6
+    workflow: sanctions
+    entities: [sanction_adjacent_company]
+    turns:
+      - prompt: Is there any sanctioned person or company connected to {sanction_adjacent_company.name}?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_sanctions_exposure
+          budget: 5
+          answer:
+            - For each sanctioned party it gives the path from the client with the role at every hop, and the lists that sanction it.
+            - It says whether each relation is current or former.
+            - It ranks a current majority owner above a former director several hops away.
+            - It says what it found rather than claiming nothing else exists.
+
+  - id: which-lists-since-when
+    from_doc: 7
+    workflow: sanctions
+    entities: [sanctioned_org]
+    turns:
+      - prompt: Pull the sanctions detail for {sanctioned_org.name}. Which regimes list it and since when?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_entity_profiles
+              args:
+                sections: {contains: [sanctions, name_records]}
+          budget: 4
+          answer:
+            - It gives one row per list with regime, country, status, dates and source.
+            - It lists the aliases and former names, and says the bank's screening must match on them too.
+
+  - id: payment-counterparty
+    from_doc: 8
+    workflow: payments
+    entities: [payee_company]
+    turns:
+      - prompt: >-
+          We have an outgoing payment to {payee_company.name} in the UAE. Screen the beneficiary and
+          its owners before we release it.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                countries: {contains: [ae]}
+            - tool: get_ultimate_beneficial_owners
+          budget: 4
+          answer:
+            - It gives a clear result, no hit, hit or possible hit, with the evidence.
+            - It gives the owners' flags.
+            - On a possible hit it says what would settle it, such as a registration number, and does not decide.
+            - It does not tell the user to release or block the payment.
+
+  - id: native-script-name
+    workflow: onboarding
+    entities: [native_script_person]
+    turns:
+      - prompt: Screen {native_script_person.native_name}.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+          budget: 4
+          answer:
+            - It finds the person from the name as written, or says it searched the name as given and in which transliteration.
+            - It gives the person's Latin-script names alongside the original one.
+            - It states the person's sanctions and PEP flags.
+
+  # PEP and state ownership
+
+  - id: state-owned
+    from_doc: 9
+    workflow: soe
+    entities: [state_owned_company]
+    turns:
+      - prompt: Is {state_owned_company.name} a state-owned enterprise, and which state?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+            - tool: find_flagged_parties
+              when: The ownership tree does not show a state body or a state-owned marker.
+          budget: 5
+          answer:
+            - It names the state owner and its share.
+            - It says what state ownership implies, corruption risk and sanctions on state-owned companies of some countries.
+
+  - id: state-owned-in-french
+    workflow: soe
+    entities: [state_owned_company]
+    turns:
+      - prompt: >-
+          Est-ce que {state_owned_company.name} est détenue par un État ? Si oui, lequel et à
+          quelle hauteur ?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+          budget: 5
+          answer:
+            - The answer is in French.
+            - It names the state owner and its share, or says none was found.
+
+  - id: peps-behind-company
+    from_doc: 10
+    workflow: pep
+    entities: [pep_linked_company]
+    turns:
+      - prompt: >-
+          Are there politically exposed persons among the owners, directors or signatories of
+          {pep_linked_company.name}?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: find_flagged_parties
+              args:
+                radius: 1
+            - tool: get_entity_profiles
+              args:
+                pids: {max: 10}
+                sections: {contains: [positions]}
+          forbid:
+            - tool: get_related_parties
+              reason: find_flagged_parties at radius 1 already gives every flagged owner, director and signatory.
+          budget: 5
+          answer:
+            - It lists each PEP with function, institution and dates.
+            - It says whether each is current or former.
+            - It gives the relation each holds to the company.
+
+  - id: former-pep-history
+    workflow: pep
+    entities: [former_pep]
+    turns:
+      - prompt: Was {former_pep.name} a PEP in {former_pep.year_in_office}, and are they still one?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                entity_type: PERSON
+            - tool: get_entity_profiles
+              args:
+                sections: {contains: [positions]}
+          budget: 4
+          answer:
+            - It gives the positions held in that year, with their start and end dates.
+            - It says whether any position is current, and that the bank's own rule decides how long a former PEP stays one.
+
+  - id: family-and-associates
+    from_doc: 11
+    workflow: pep
+    entities: [pep_person]
+    turns:
+      - prompt: >-
+          {pep_person.name} is a PEP. Which companies is this person connected to, directly or
+          through people around them?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: find_linked_companies
+              args:
+                radius: 2
+          budget: 5
+          answer:
+            - It lists the companies the person owns or runs, and those of the people linked to them, with the relation at each step.
+            - It reports the relation types the data holds rather than assuming a family tie.
+      - prompt: Now include historic ties and signatory roles, not only owners and directors.
+        expect:
+          calls:
+            - tool: find_linked_companies
+              args:
+                scope: all
+          forbid:
+            - tool: search_entities
+              reason: The pid is already known from the previous turn.
+          budget: 2
+          answer:
+            - It marks historic ties as historic.
+            - It says when a linked company comes without a name, rather than leaving it out silently.
+
+  # Periodic review and monitoring
+
+  - id: annual-review
+    from_doc: 12
+    workflow: periodic-review
+    entities: [stored_pid]
+    turns:
+      - prompt: Annual review for client file pid {stored_pid.pid}. What changed? Flags, owners, directors.
+        expect:
+          first: resolve_permanent_id
+          calls:
+            - tool: resolve_permanent_id
+              args:
+                pid: "{stored_pid.pid}"
+            - tool: get_entity_profiles
+            - tool: get_related_parties
+            - tool: get_ultimate_beneficial_owners
+          forbid:
+            - tool: search_entities
+              reason: The pid is given, so no name search is needed.
+          budget: 6
+          answer:
+            - It first says whether the stored pid is still active, or which pid replaced it.
+            - It gives the current flags, owners and directors, and points out ended relations and former roles.
+            - It says that Polixis gives the present state, not a diff, and asks for or uses the last review to compare.
+
+  - id: exemption-threshold
+    from_doc: 13
+    workflow: periodic-review
+    entities: [exempt_subsidiary]
+    turns:
+      - prompt: >-
+          Our client is exempt because its listed parent owns more than 75% of it. Check that still
+          holds for {exempt_subsidiary.name}.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+            - tool: get_related_parties
+              args:
+                categories: {contains: [shareholdingInformation]}
+            - tool: get_entity_profiles
+          budget: 5
+          answer:
+            - It gives the parent's current stake and its dates.
+            - It says plainly whether the stake is above 75%, and that 75% or below ends the exemption and calls for a review of the controlling person.
+
+  - id: merged-pid
+    from_doc: 14
+    workflow: periodic-review
+    entities: [merged_pid]
+    turns:
+      - prompt: Our system still holds pid {merged_pid.pid} for a client. Is it still valid?
+        expect:
+          first: resolve_permanent_id
+          calls:
+            - tool: resolve_permanent_id
+              args:
+                pid: "{merged_pid.pid}"
+          budget: 2
+          answer:
+            - It says the pid was merged, gives the pid that replaced it, and tells the user to update the stored pid.
+
+  - id: never-minted-pid
+    workflow: periodic-review
+    turns:
+      - prompt: Our system still holds pid O00000000000000000000000000000000 for a client. Is it still valid?
+        expect:
+          first: resolve_permanent_id
+          calls:
+            - tool: resolve_permanent_id
+              args:
+                pid: O00000000000000000000000000000000
+          budget: 2
+          answer:
+            - It says Polixis does not know this pid, and does not describe any entity.
+            - It suggests finding the client again by name or identifier.
+
+  - id: malformed-pid
+    workflow: periodic-review
+    turns:
+      - prompt: Pull the profile for pid O123.
+        expect:
+          budget: 2
+          answer:
+            - It says the pid is not valid, from the tool's rejection or because a pid is a letter and 32 hex digits.
+            - It describes no entity.
+            - It asks for the name or a full pid.
+
+  # Group and investigation
+
+  - id: map-group
+    from_doc: 15
+    workflow: investigation
+    entities: [group_holding]
+    turns:
+      - prompt: >-
+          Map everything {group_holding.name} owns, with percentages, and flag anything sanctioned or
+          state-owned.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_top_down_ownership
+          budget: 5
+          answer:
+            - It gives the holdings with the share the group carries in each, and the chain behind the main ones.
+            - It calls out the flagged holdings.
+            - If the result was truncated, it says the group is larger than one request returns and suggests starting from a sub-holding.
+
+  - id: page-through-shareholders
+    workflow: investigation
+    entities: [large_shareholder_base]
+    turns:
+      - prompt: List the shareholders of {large_shareholder_base.name}.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_related_parties
+              args:
+                categories: {contains: [shareholdingInformation]}
+          budget: 3
+          answer:
+            - It says how many shareholders there are and that more pages remain.
+      - prompt: Show me the rest.
+        expect:
+          calls:
+            - tool: get_related_parties
+              args:
+                cursor: {present: true}
+                pid: {absent: true}
+                categories: {absent: true}
+          forbid:
+            - tool: search_entities
+              reason: The pid and the cursor are already known from the previous turn.
+          budget: 3
+          answer:
+            - It lists shareholders that were not on the first page, without repeating the first page.
+      - prompt: Screen the largest one of those for sanctions and PEP status.
+        expect:
+          calls:
+            - tool: get_entity_profiles
+          forbid:
+            - tool: search_entities
+              reason: Its pid is already in the related parties.
+          budget: 2
+          answer:
+            - It screens the shareholder with the largest share across both pages, by pid.
+
+  - id: how-connected
+    from_doc: 16
+    workflow: investigation
+    entities: [connected_person, sanctioned_org]
+    turns:
+      - prompt: Is there any link between our client {connected_person.name} and {sanctioned_org.name}?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: find_connections
+          budget: 5
+          answer:
+            - It shows the path between the two with the roles, shares and flags along it, or says Polixis found none.
+            - If it found none, it says that does not prove there is no link.
+
+  - id: common-name
+    from_doc: 17
+    workflow: onboarding
+    entities: [common_name_person]
+    turns:
+      - prompt: >-
+          Screen {common_name_person.name}, born {common_name_person.birth_year},
+          {common_name_person.country}. There will be many hits.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                entity_type: PERSON
+                countries: {contains: ["{common_name_person.country}"]}
+                dates: {contains: ["{common_name_person.birth_year}"]}
+            - tool: get_entity_profiles
+              when: More than one candidate remains after the birth date and country.
+              args:
+                pids: {max: 10}
+          budget: 8
+          answer:
+            - It narrows the hits with evidence, birth date first, then nationality and the original-script name.
+            - It lists the candidates it could not rule out, with the reason.
+            - It gives the total number of hits, not only those on the first page.
+
+  - id: ambiguous-company
+    workflow: onboarding
+    turns:
+      - prompt: Screen Global Trading Ltd.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+          budget: 3
+          answer:
+            - If several companies match, it does not screen one of them as the client; it shows a few with country and identifiers and asks which, or for a country or registration number.
+
+  - id: no-match
+    workflow: onboarding
+    turns:
+      - prompt: Screen Thaddeus Quorvin-Belmarsh, born 1962, British national.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                entity_type: PERSON
+          forbid:
+            - tool: get_entity_profiles
+              reason: There is no match to profile.
+          budget: 3
+          answer:
+            - It says plainly that there is no match.
+            - It states what was searched, the name, birth year and country, as the record the bank files.
+            - It does not offer a near miss as the client.
+
+  - id: identify-by-lei
+    from_doc: 18
+    workflow: onboarding
+    entities: [lei_company]
+    turns:
+      - prompt: Look up LEI {lei_company.lei} and tell me who owns it.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                name: "{lei_company.lei}"
+            - tool: get_ultimate_beneficial_owners
+          budget: 4
+          answer:
+            - It confirms that the LEI on the profile matches the one asked for before using the match.
+
+  - id: identify-by-uid
+    workflow: onboarding
+    entities: [swiss_company]
+    turns:
+      - prompt: Who is behind {swiss_company.uid}?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+          budget: 5
+          answer:
+            - It confirms that the UID on the profile matches the one asked for before using the match.
+            - It gives the owners with their effective shares.
+
+  - id: identify-by-isin
+    workflow: onboarding
+    entities: [isin_issuer]
+    turns:
+      - prompt: Which company issued {isin_issuer.isin}, and is it sanctioned?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+              args:
+                name: "{isin_issuer.isin}"
+          budget: 3
+          answer:
+            - It confirms that the ISIN on the profile matches the one asked for.
+            - It states the issuer's sanctions flag.
+
+  - id: same-entity
+    workflow: investigation
+    entities: [common_name_person]
+    turns:
+      - prompt: >-
+          Search {common_name_person.name} born {common_name_person.birth_year}. Could the first two
+          matches be the same person?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_entity_profiles
+              args:
+                pids: {min: 2}
+          budget: 3
+          answer:
+            - It compares the two on dates, countries, identifiers and name records, and says what supports or rules out one person.
+            - It fetches both profiles in one call.
+
+  - id: court-decisions
+    from_doc: 19
+    workflow: investigation
+    entities: [small_company]
+    turns:
+      - prompt: Has {small_company.name} or anyone around it been named in a court decision?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: find_court_decisions
+            - tool: get_court_decision
+              when: A decision's snippets do not show what it is about.
+          budget: 6
+          answer:
+            - It lists the decisions naming the company with what each concerns, then those naming related parties.
+            - It reads a full text only where the snippet leaves the subject unclear.
+            - If there are none, it says so and that a wrong pid also returns none.
+
+  # Front office
+
+  - id: rm-brief
+    from_doc: 20
+    workflow: front-office
+    entities: [small_company]
+    turns:
+      - prompt: >-
+          I'm meeting the CFO of {small_company.name} tomorrow. Give me a one-page risk brief on the
+          company, including any bad press.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_related_parties
+            - tool: get_ultimate_beneficial_owners
+            - tool: get_sanctions_exposure
+            - tool: find_court_decisions
+          forbid:
+            - tool: get_related_parties
+              args: {cursor: {present: true}}
+              reason: A brief needs the first page of each result only.
+          budget: 7
+          answer:
+            - It is short, covering who owns and runs the company, the flags on any of them, the nearest sanctioned or state-owned link and any court decision naming the company.
+            - It says that adverse media is not covered and does not call the press clean.
+
+  - id: ownership-question-in-german
+    workflow: beneficial-owners
+    entities: [swiss_company]
+    turns:
+      - prompt: >-
+          Wer sind die wirtschaftlich Berechtigten von {swiss_company.name} in {swiss_company.city}
+          mit mehr als 25 %?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+            - tool: get_ultimate_beneficial_owners
+          budget: 4
+          answer:
+            - The answer is in German.
+            - It lists the natural persons with 25% or more, with the strongest chain behind each, or says nobody reaches 25%.
+
+  # What the agent should decline or qualify
+
+  - id: decline-adverse-media
+    workflow: decline
+    entities: [small_company]
+    turns:
+      - prompt: Is there any negative news about {small_company.name}?
+        expect:
+          budget: 3
+          answer:
+            - It says that adverse media is not in Polixis and that this check cannot answer the question.
+            - It does not report the press as clean.
+            - It may offer what Polixis does cover, such as flags or court decisions, as something other than a press check.
+
+  - id: decline-batch-screening
+    workflow: decline
+    turns:
+      - prompt: >-
+          Screen this list for sanctions and PEPs: Aurelio Fenwick, Brannagh Solvik, Corvin Ostrander,
+          Delphine Marrow, Emeric Taavetti, Fiorella Quist, Gunnar Haldane-Ruiz, Hesper Valcourt,
+          Ignatius Morrow-Lind, Jessamy Corwen, Kasimir Elbrand, Leontyne Prask, Mattias Oyelaran,
+          Noor Vellacott, Osric Thane, Perpetua Ilves, Quentin Abaroa, Rosalind Achterberg,
+          Sebastien Kjell, Tamsin Ollerenshaw. That's the first 20 of our 400 clients.
+        expect:
+          budget: 20
+          answer:
+            - It says that screening a whole client book one search at a time is slow and belongs in a bulk screening product or feed.
+            - If it screens the 20, it reports a result for every name, including those with no match, and does not offer to do all 400 this way.
+
+  - id: decline-final-decision
+    workflow: decline
+    entities: [sanctioned_org]
+    turns:
+      - prompt: Can we onboard {sanctioned_org.name}? Just give me a yes or no.
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+          budget: 4
+          answer:
+            - It does not answer yes or no.
+            - It gives the evidence, such as the sanctions listings, and says the decision belongs to the compliance officer.
+
+  - id: decline-vessel
+    workflow: decline
+    turns:
+      - prompt: Is the vessel with IMO number 9123456 under sanctions?
+        expect:
+          budget: 2
+          answer:
+            - It says that Polixis covers organizations and people, so it cannot check a vessel by IMO number.
+            - It may offer to screen the vessel's owner or operator by name.
+            - It does not report the vessel as clean.
+
+  - id: decline-market-data
+    workflow: decline
+    entities: [sanctioned_org]
+    turns:
+      - prompt: What is the credit rating and current share price of {sanctioned_org.name}?
+        expect:
+          budget: 1
+          answer:
+            - It says that this MCP has no credit ratings or market prices.
+            - It does not make up either.

@@ -96,16 +96,19 @@ The MCP serves the Corporate Data and Graph API (spec v3), not the whole product
 
 | Workflow | Covered | How |
 |---|---|---|
-| Name screening, sanctions and PEP flags | Yes | `search_entities`, then `get_key_identifiers` or `get_profile_fields` |
-| Which lists sanction an entity, and since when | Yes | `get_profile_fields` with `sanctions` and `sanctionStatuses` |
-| PEP positions held | Yes | `get_profile_fields` with `positions` |
-| Beneficial owners | Yes | `get_ultimate_beneficial_owners` |
-| Subsidiaries and what an entity owns | Yes | `get_top_down_ownership` |
-| Directors, executives, signatories, shareholders | Yes | `get_corporate_profile` with `category` |
-| Indirect sanctions and SOE exposure | Yes | `get_subgraph` with `requireSanction` or `requireSoe` rules |
-| How two parties connect | Partly | `get_subgraph` around one of them, looking for the other |
+| Name screening, sanctions and PEP flags | Yes | `search_entities`, then `get_entity_profiles` |
+| Which lists sanction an entity, and since when | Yes | `get_entity_profiles` with `sanctions` and `sanction_statuses` |
+| PEP positions held | Yes | `get_entity_profiles` with `positions` |
+| Beneficial owners | Yes | `get_ultimate_beneficial_owners`, one row per owner with the share summed over every chain |
+| Subsidiaries and what an entity owns | Yes | `get_top_down_ownership`, one row per holding |
+| Companies linked to a person or company | Yes | `find_linked_companies`, directly or through one person, or two at `radius` 3 |
+| Directors, executives, signatories, shareholders | Yes | `get_related_parties` with `categories` |
+| Indirect sanctions exposure | Yes, on an undocumented route | `get_sanctions_exposure`, at any distance, with the path to each sanctioned party |
+| PEP and SOE exposure nearby | Yes | `find_flagged_parties`, with the path to each flagged party |
+| How two parties connect | Yes, on an undocumented route | `find_connections`, the shortest path Polixis finds across its whole graph |
 | Stale IDs in a stored client file | Yes | `resolve_permanent_id` |
-| Adverse media, court decisions | No | Not in the documented API |
+| Court decisions | Yes, on an undocumented route | `find_court_decisions`, then `get_court_decision` for one text |
+| Adverse media | No | Not in the API |
 | Batch screening of a whole client book | No | One search per name; CheckMate or bulk feeds do this |
 | RCA as a separate category | Unknown | The documentation does not say how relatives are marked; check the live `flags` and relations |
 

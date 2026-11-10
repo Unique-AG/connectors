@@ -1,1526 +1,3134 @@
 [
   {
     "annotations": {
+      "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Names, identifiers, countries, risk flags and addresses of an entity",
+    "description": "How two organizations or people are connected: the shortest path Polixis finds between\nthem across its whole graph, with no hop limit, and the role, share and dates of each link\nalong it, and the flags of every party on it.\n\nPolixis does not document this route yet, so its answers may change without notice.",
     "inputSchema": {
+      "additionalProperties": false,
       "properties": {
-        "id": {
-          "description": "The entity's ID (ARDIS ID or pid).",
+        "from_pid": {
+          "description": "The pid to start from, such as the client.",
+          "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+          "type": "string"
+        },
+        "to_pid": {
+          "description": "The pid to look for, such as a sanctioned party.",
+          "pattern": "^[POUpou][0-9a-fA-F]{32}$",
           "type": "string"
         }
       },
       "required": [
-        "id"
+        "from_pid",
+        "to_pid"
       ],
       "type": "object"
     },
-    "name": "get_basic_identifiers",
+    "name": "find_connections",
     "outputSchema": {
+      "description": "The paths Polixis finds between two entities.",
       "properties": {
-        "addresses": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+        "connected": {
+          "description": "Whether Polixis found a path. False is not proof there is none: a relation Polixis lacks can still connect them.",
+          "type": "boolean"
         },
-        "alerts": {
-          "items": {
-            "properties": {
-              "category": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "countries": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "dates": {
-          "additionalProperties": {
-            "items": {
-              "properties": {
-                "d": {
-                  "type": "integer"
-                },
-                "m": {
-                  "type": "integer"
-                },
-                "y": {
-                  "type": "integer"
-                }
-              },
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "flags": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "images": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "legalTypes": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "names": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "pid": {
+        "from_pid": {
+          "description": "The entity the path starts at.",
           "type": "string"
         },
-        "sanctionStatuses": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
-        "unis": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        }
-      },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "BasicIdentifiers"
-    },
-    "title": "Get Basic Identifiers"
-  },
-  {
-    "annotations": {
-      "openWorldHint": true,
-      "readOnlyHint": true
-    },
-    "description": "Returns the full profile of an organization or person and the parties related to it, such as shareholders, board members, executives, signatories, third parties and subsidiaries, limited to the relation categories requested.\n",
-    "inputSchema": {
-      "properties": {
-        "category": {
-          "description": "Relation categories to include.",
-          "items": {
-            "enum": [
-              "executive",
-              "executiveSenior",
-              "thirdParty",
-              "signature",
-              "ownershipInOtherEntities",
-              "shareholdingInformation",
-              "membership"
-            ],
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "id": {
-          "description": "The entity's ID (ARDIS ID or pid).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "name": "get_corporate_profile",
-    "outputSchema": {
-      "$defs": {
-        "Address": {
-          "properties": {
-            "address": {
-              "type": "string"
-            },
-            "en": {
-              "type": "string"
-            },
-            "ln": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "CorporateResponse": {
-          "properties": {
-            "root": {
-              "$ref": "#/$defs/Entity"
-            }
-          },
-          "type": "object"
-        },
-        "DatePart": {
-          "properties": {
-            "d": {
+        "hops": {
+          "anyOf": [
+            {
               "type": "integer"
             },
-            "m": {
-              "type": "integer"
-            },
-            "y": {
-              "type": "integer"
+            {
+              "type": "null"
             }
-          },
-          "type": "object"
+          ],
+          "description": "Links on the shortest path; null when not connected."
         },
-        "DatesByType": {
-          "additionalProperties": {
-            "items": {
-              "$ref": "#/$defs/DatePart"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "Entity": {
-          "properties": {
-            "address": {
-              "items": {
-                "$ref": "#/$defs/Address"
-              },
-              "type": "array"
-            },
-            "alerts": {
-              "items": {
-                "$ref": "#/$defs/TypedAlert"
-              },
-              "type": "array"
-            },
-            "ardisId": {
-              "type": "string"
-            },
-            "countries": {
-              "$ref": "#/$defs/StringListMap"
-            },
-            "dates": {
-              "$ref": "#/$defs/DatesByType"
-            },
-            "eac": {
-              "description": "Economic activity categories.",
-              "items": {
-                "$ref": "#/$defs/LocalizedText"
-              },
-              "type": "array"
-            },
-            "flags": {
-              "description": "Such as #PEP, #FORMER_PEP or #SANCTION.",
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "gender": {
-              "description": "f, m or x.",
-              "type": "string"
-            },
-            "id": {
-              "type": "string"
-            },
-            "imageEntries": {
-              "items": {
-                "$ref": "#/$defs/ImageEntry"
-              },
-              "type": "array"
-            },
-            "legalTypes": {
-              "items": {
-                "$ref": "#/$defs/LocalizedText"
-              },
-              "type": "array"
-            },
-            "metadata": {
-              "items": {
-                "$ref": "#/$defs/SourceMetadata"
-              },
-              "type": "array"
-            },
-            "nameRecords": {
-              "items": {
-                "$ref": "#/$defs/NameRecord"
-              },
-              "type": "array"
-            },
-            "names": {
-              "items": {
-                "$ref": "#/$defs/LocalizedText"
-              },
-              "type": "array"
-            },
-            "related": {
-              "items": {
-                "$ref": "#/$defs/RelatedEntity"
-              },
-              "type": "array"
-            },
-            "score": {
-              "type": "integer"
-            },
-            "type": {
-              "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations.",
-              "type": "string"
-            },
-            "uni": {
-              "$ref": "#/$defs/StringListMap"
-            }
-          },
-          "type": "object"
-        },
-        "ImageEntry": {
-          "properties": {
-            "cloudUrl": {
-              "type": "string"
-            },
-            "url": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "LocalizedText": {
-          "properties": {
-            "en": {
-              "type": "string"
-            },
-            "ln": {
-              "description": "ISO 639-1 code of `original`.",
-              "type": "string"
-            },
-            "original": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "NameRecord": {
-          "properties": {
-            "en": {
-              "type": "string"
-            },
-            "language": {
-              "type": "string"
-            },
-            "original": {
-              "type": "string"
-            },
-            "type": {
-              "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.",
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "RelatedEntity": {
-          "properties": {
-            "entity": {
-              "$ref": "#/$defs/Entity"
-            },
-            "relation": {
-              "items": {
-                "$ref": "#/$defs/Relation"
-              },
-              "type": "array"
-            }
-          },
-          "type": "object"
-        },
-        "Relation": {
-          "properties": {
-            "relationProperty": {
-              "items": {
-                "$ref": "#/$defs/RelationProperty"
-              },
-              "type": "array"
-            },
-            "type": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "RelationProperty": {
-          "properties": {
-            "dates": {
-              "$ref": "#/$defs/DatesByType"
-            },
-            "former": {
-              "type": "boolean"
-            },
+        "parties": {
+          "description": "Every party on the paths, with its flags; `distance` is null here.",
+          "items": {
+            "description": "An organization or person in the network.",
             "properties": {
-              "$ref": "#/$defs/StringListMap"
-            },
-            "title": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "SourceMetadata": {
-          "properties": {
-            "sourceCode": {
-              "type": "string"
-            },
-            "sourceName": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        },
-        "StringListMap": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "TypedAlert": {
-          "properties": {
-            "description": {
-              "type": "string"
-            },
-            "type": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            }
-          },
-          "type": "object"
-        }
-      },
-      "properties": {
-        "root": {
-          "$ref": "#/$defs/Entity"
-        }
-      },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "CorporateResponse"
-    },
-    "title": "Get Corporate Profile"
-  },
-  {
-    "annotations": {
-      "openWorldHint": true,
-      "readOnlyHint": true
-    },
-    "description": "Names, name records, identifiers, dates and risk flags of an entity",
-    "inputSchema": {
-      "properties": {
-        "id": {
-          "description": "The entity's ID (ARDIS ID or pid).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "name": "get_key_identifiers",
-    "outputSchema": {
-      "properties": {
-        "addresses": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "alerts": {
-          "items": {
-            "properties": {
-              "category": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "countries": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "dates": {
-          "additionalProperties": {
-            "items": {
-              "properties": {
-                "d": {
-                  "type": "integer"
-                },
-                "m": {
-                  "type": "integer"
-                },
-                "y": {
-                  "type": "integer"
-                }
-              },
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "flags": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "images": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "legalTypes": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "nameRecords": {
-          "items": {
-            "properties": {
-              "en": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "original": {
-                "type": "string"
-              },
-              "type": {
-                "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "names": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "pid": {
-          "type": "string"
-        },
-        "sanctionStatuses": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
-        "unis": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        }
-      },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "KeyIdentifiers"
-    },
-    "title": "Get Key Identifiers"
-  },
-  {
-    "annotations": {
-      "openWorldHint": true,
-      "readOnlyHint": true
-    },
-    "description": "Returns only the profile fields named in `fields`; see `list_completion_fields`.",
-    "inputSchema": {
-      "properties": {
-        "fields": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "id": {
-          "description": "The entity's ID (ARDIS ID or pid).",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "fields"
-      ],
-      "type": "object"
-    },
-    "name": "get_profile_fields",
-    "outputSchema": {
-      "properties": {
-        "addressEntries": {
-          "items": {
-            "properties": {
-              "address": {
-                "type": "string"
-              },
-              "en": {
-                "type": "string"
-              },
-              "ln": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "alertlist": {
-          "items": {
-            "properties": {
-              "category": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "countries": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "dates": {
-          "additionalProperties": {
-            "items": {
-              "properties": {
-                "d": {
-                  "type": "integer"
-                },
-                "m": {
-                  "type": "integer"
-                },
-                "y": {
-                  "type": "integer"
-                }
-              },
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "eacEntries": {
-          "items": {
-            "properties": {
-              "en": {
-                "type": "string"
-              },
-              "ln": {
-                "description": "ISO 639-1 code of `original`.",
-                "type": "string"
-              },
-              "original": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "flags": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "gender": {
-          "type": "string"
-        },
-        "imageEntries": {
-          "items": {
-            "properties": {
-              "cloudUrl": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "images": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "legalTypeEntries": {
-          "items": {
-            "properties": {
-              "en": {
-                "type": "string"
-              },
-              "ln": {
-                "description": "ISO 639-1 code of `original`.",
-                "type": "string"
-              },
-              "original": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "legalTypes": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "nameRecords": {
-          "items": {
-            "properties": {
-              "en": {
-                "type": "string"
-              },
-              "language": {
-                "type": "string"
-              },
-              "original": {
-                "type": "string"
-              },
-              "type": {
-                "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.",
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "names": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        },
-        "positions": {
-          "items": {
-            "properties": {
-              "endDate": {
-                "properties": {
-                  "d": {
-                    "type": "integer"
-                  },
-                  "m": {
-                    "type": "integer"
-                  },
-                  "y": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              },
-              "institution": {
-                "type": "string"
-              },
-              "position": {
-                "type": "string"
-              },
-              "remark": {
-                "type": "string"
-              },
-              "startDate": {
-                "properties": {
-                  "d": {
-                    "type": "integer"
-                  },
-                  "m": {
-                    "type": "integer"
-                  },
-                  "y": {
-                    "type": "integer"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "sanctionStatuses": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "type": "object"
-        },
-        "sanctions": {
-          "additionalProperties": {
-            "items": {
-              "properties": {
-                "country": {
+              "alerts": {
+                "description": "Alert categories of the party itself, such as STATECO or RESTRICTION.",
+                "items": {
                   "type": "string"
                 },
-                "details": {
-                  "additionalProperties": {
+                "type": "array"
+              },
+              "distance": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Links from the entity asked about."
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "PERSON or ORGANIZATION."
+              },
+              "flags": {
+                "description": "Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name; null for a party only the full graph has, which `get_entity_profiles` can name."
+              },
+              "pid": {
+                "description": "Its pid, for the other Polixis tools.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "pid",
+              "name",
+              "entity_type",
+              "flags",
+              "alerts",
+              "distance"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "paths": {
+          "description": "The paths found, usually one: the shortest Polixis knows.",
+          "items": {
+            "description": "One path from the first entity to the second.",
+            "properties": {
+              "ordered": {
+                "description": "Whether the steps run in order from the first entity to the second. False when Polixis's links do not lead from one to the other, such as for a merged pid: the steps then come as Polixis gives them, and still show the link it found.",
+                "type": "boolean"
+              },
+              "steps": {
+                "description": "The steps, in order when `ordered` is true.",
+                "items": {
+                  "description": "One step of a path, with every link between its two parties, whichever way they point.",
+                  "properties": {
+                    "from_name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Its name, null when Polixis gives none."
+                    },
+                    "from_pid": {
+                      "description": "The pid the step leaves.",
+                      "type": "string"
+                    },
+                    "links": {
+                      "description": "The links joining the two, in their own direction.",
+                      "items": {
+                        "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                        "properties": {
+                          "relations": {
+                            "description": "Every role the source holds in the target.",
+                            "items": {
+                              "description": "One role the link's source holds in its target.",
+                              "properties": {
+                                "end_date": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "YYYY-MM-DD, null if unknown or current."
+                                },
+                                "former": {
+                                  "description": "Whether the relation has ended.",
+                                  "type": "boolean"
+                                },
+                                "role": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                                },
+                                "share_percent": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "The share held; null when not reported."
+                                },
+                                "start_date": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "YYYY-MM-DD, null if unknown."
+                                }
+                              },
+                              "required": [
+                                "role",
+                                "share_percent",
+                                "former",
+                                "start_date",
+                                "end_date"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "source_pid": {
+                            "description": "The pid of the party holding the role.",
+                            "type": "string"
+                          },
+                          "target_pid": {
+                            "description": "The pid of the party the role is held in.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source_pid",
+                          "target_pid",
+                          "relations"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "to_name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Its name, null when Polixis gives none."
+                    },
+                    "to_pid": {
+                      "description": "The pid the step reaches.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from_pid",
+                    "from_name",
+                    "to_pid",
+                    "to_name",
+                    "links"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "ordered",
+              "steps"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "to_pid": {
+          "description": "The entity looked for.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_pid",
+        "to_pid",
+        "connected",
+        "hops",
+        "paths",
+        "parties"
+      ],
+      "type": "object"
+    },
+    "title": "Find Connections"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Court decisions that name an organization or person, or one of its related parties:\ncourt, country, year and the passages naming them, without the full text, which\n`get_court_decision` returns for one decision.\n\nThose naming the entity itself come first, then the newest. When `next_cursor` is set,\npass it back as `cursor`. A wrong pid also returns no decisions, so check the pid before\nreporting a clean result.\nPolixis does not document this route yet, so its answers may change without notice.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        }
+      },
+      "type": "object"
+    },
+    "name": "find_court_decisions",
+    "outputSchema": {
+      "description": "Court decisions naming an entity or its related parties, one page of them.",
+      "properties": {
+        "decisions": {
+          "description": "The decisions of this page: those naming the entity first, then the newest.",
+          "items": {
+            "description": "A court decision, without its text.",
+            "properties": {
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ISO 3166-1 alpha-2 code of the court's country."
+              },
+              "court_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Such as General Instance Court."
+              },
+              "decision_id": {
+                "description": "Its id, for `get_court_decision`.",
+                "type": "string"
+              },
+              "snippets": {
+                "description": "The passages where the name appears, in the decision's own language.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "subject": {
+                "description": "`entity` when it names the entity asked about, `related_party` when it names one of its related parties.",
+                "enum": [
+                  "entity",
+                  "related_party"
+                ],
+                "type": "string"
+              },
+              "text_characters": {
+                "description": "The length of its full text, in characters.",
+                "type": "integer"
+              },
+              "year": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The year of the decision."
+              }
+            },
+            "required": [
+              "decision_id",
+              "subject",
+              "court_type",
+              "country",
+              "year",
+              "snippets",
+              "text_characters"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "total_decisions": {
+          "description": "Decisions across every page. Polixis answers an id it does not know as one without decisions, so 0 also follows a wrong pid.",
+          "type": "integer"
+        },
+        "total_naming_entity": {
+          "description": "Decisions naming the entity itself.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "pid",
+        "total_decisions",
+        "total_naming_entity",
+        "decisions",
+        "next_cursor"
+      ],
+      "type": "object"
+    },
+    "title": "Find Court Decisions"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Sanctioned, PEP, state-owned and restricted parties near an organization or person,\neach with its markers and the path to it: who holds what in whom at every step.\n\nUse it for PEP and state-ownership exposure nearby; for sanctions at any distance use\n`get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker on each\npage, so a question such as \"is any of them state-owned?\" is settled by a 0 there. The\nnearest come first, the sanctioned before the others at the same distance, so stop once\nthey are farther than the question cares about. When `truncated_by_polixis` is true,\nPolixis cut the network short: do not report that none was found. When `next_cursor` is\nset, pass it back as `cursor` for the next page.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        },
+        "radius": {
+          "default": 2,
+          "description": "Hops to look out from the entity. Polixis documents no maximum and stopped at 2 in every walk we tried, so 3 may find nothing more, from a much larger graph.",
+          "maximum": 3,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "type": "object"
+    },
+    "name": "find_flagged_parties",
+    "outputSchema": {
+      "description": "The flagged parties in the network around an entity, one page of them.",
+      "properties": {
+        "flagged": {
+          "description": "The flagged parties of this page.",
+          "items": {
+            "description": "A party near the entity that carries a sanctions, PEP or state-ownership marker.",
+            "properties": {
+              "party": {
+                "description": "The flagged party.",
+                "properties": {
+                  "alerts": {
+                    "description": "Alert categories of the party itself, such as STATECO or RESTRICTION.",
                     "items": {
                       "type": "string"
                     },
                     "type": "array"
                   },
+                  "distance": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Links from the entity asked about."
+                  },
+                  "entity_type": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "PERSON or ORGANIZATION."
+                  },
+                  "flags": {
+                    "description": "Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Its name; null for a party only the full graph has, which `get_entity_profiles` can name."
+                  },
+                  "pid": {
+                    "description": "Its pid, for the other Polixis tools.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pid",
+                  "name",
+                  "entity_type",
+                  "flags",
+                  "alerts",
+                  "distance"
+                ],
+                "type": "object"
+              },
+              "path": {
+                "description": "One shortest path from the entity to the party, with the roles at each step.",
+                "items": {
+                  "description": "One step of a path, with every link between its two parties, whichever way they point.",
+                  "properties": {
+                    "from_name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Its name, null when Polixis gives none."
+                    },
+                    "from_pid": {
+                      "description": "The pid the step leaves.",
+                      "type": "string"
+                    },
+                    "links": {
+                      "description": "The links joining the two, in their own direction.",
+                      "items": {
+                        "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                        "properties": {
+                          "relations": {
+                            "description": "Every role the source holds in the target.",
+                            "items": {
+                              "description": "One role the link's source holds in its target.",
+                              "properties": {
+                                "end_date": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "YYYY-MM-DD, null if unknown or current."
+                                },
+                                "former": {
+                                  "description": "Whether the relation has ended.",
+                                  "type": "boolean"
+                                },
+                                "role": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                                },
+                                "share_percent": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "The share held; null when not reported."
+                                },
+                                "start_date": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "YYYY-MM-DD, null if unknown."
+                                }
+                              },
+                              "required": [
+                                "role",
+                                "share_percent",
+                                "former",
+                                "start_date",
+                                "end_date"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "source_pid": {
+                            "description": "The pid of the party holding the role.",
+                            "type": "string"
+                          },
+                          "target_pid": {
+                            "description": "The pid of the party the role is held in.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source_pid",
+                          "target_pid",
+                          "relations"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "to_name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Its name, null when Polixis gives none."
+                    },
+                    "to_pid": {
+                      "description": "The pid the step reaches.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "from_pid",
+                    "from_name",
+                    "to_pid",
+                    "to_name",
+                    "links"
+                  ],
                   "type": "object"
                 },
-                "source": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                }
+                "type": "array"
               },
-              "type": "object"
+              "risks": {
+                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
             },
-            "type": "array"
-          },
-          "description": "Sanction records per sanctions list.",
-          "type": "object"
-        },
-        "unis": {
-          "additionalProperties": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "type": "object"
-        }
-      },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "Profile"
-    },
-    "title": "Get Profile Fields"
-  },
-  {
-    "annotations": {
-      "openWorldHint": true,
-      "readOnlyHint": true
-    },
-    "description": "Walks the relationship network out from an entity up to `radius` hops. Leaves out signatory, third-party and historic relations, and returns names and images for each node in `meta` besides any `fields` requested.\n",
-    "inputSchema": {
-      "properties": {
-        "fields": {
-          "description": "Profile fields to return for each node in `meta`.",
-          "items": {
-            "type": "string"
+            "required": [
+              "party",
+              "risks",
+              "path"
+            ],
+            "type": "object"
           },
           "type": "array"
         },
-        "filter": {
-          "properties": {
-            "rules": {
-              "additionalProperties": {
-                "properties": {
-                  "allowedCtg": {
-                    "description": "Comma-separated relation categories to follow; empty follows all.",
-                    "type": "string"
-                  },
-                  "direction": {
-                    "enum": [
-                      "IN",
-                      "OUT",
-                      "BOTH"
-                    ],
-                    "type": "string"
-                  },
-                  "excludedCtg": {
-                    "description": "Comma-separated relation categories not to follow.",
-                    "type": "string"
-                  },
-                  "onlyActual": {
-                    "type": "boolean"
-                  },
-                  "requireOrg": {
-                    "type": "boolean"
-                  },
-                  "requirePerson": {
-                    "type": "boolean"
-                  },
-                  "requireSanction": {
-                    "type": "boolean"
-                  },
-                  "requireSoe": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              "description": "One rule per relation type to follow, keyed by the relation type. Relation types without a rule are not followed. Without a filter the default rules apply.\n",
-              "type": "object"
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
-          },
-          "type": "object"
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
         },
-        "id": {
-          "description": "The entity the walk starts from.",
-          "type": "string"
-        },
-        "radius": {
-          "description": "How many hops to walk out from the entity.",
+        "parties_checked": {
+          "description": "Parties in the network, the entity left out.",
           "type": "integer"
         },
-        "truncate": {
-          "description": "Return a reduced graph, recommended for large ones.",
+        "pid": {
+          "description": "The entity the walk started at.",
+          "type": "string"
+        },
+        "total_by_risk": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "type": "object"
+        },
+        "total_flagged": {
+          "description": "Flagged parties across every page.",
+          "type": "integer"
+        },
+        "truncated_by_polixis": {
+          "description": "Whether Polixis cut the network short, so parties beyond what it returned are missing. When true, a count of 0 does not show that none exists: say the network was cut, rather than that none was found.",
           "type": "boolean"
         }
       },
       "required": [
-        "id"
+        "pid",
+        "parties_checked",
+        "truncated_by_polixis",
+        "total_flagged",
+        "total_by_risk",
+        "flagged",
+        "next_cursor"
       ],
       "type": "object"
     },
-    "name": "get_smart_graph",
-    "outputSchema": {
-      "properties": {
-        "edges": {
-          "items": {
-            "properties": {
-              "details": {
-                "items": {
-                  "properties": {
-                    "at": {
-                      "type": "integer"
-                    },
-                    "cShare": {
-                      "type": "number"
-                    },
-                    "ctg": {
-                      "type": "integer"
-                    },
-                    "endDate": {
-                      "type": "integer"
-                    },
-                    "former": {
-                      "type": "boolean"
-                    },
-                    "noi": {
-                      "type": "number"
-                    },
-                    "originalSource": {
-                      "type": "string"
-                    },
-                    "originalTarget": {
-                      "type": "string"
-                    },
-                    "role": {
-                      "type": "string"
-                    },
-                    "share": {
-                      "type": "number"
-                    },
-                    "startDate": {
-                      "type": "integer"
-                    },
-                    "vshare": {
-                      "type": "number"
-                    }
-                  },
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "sourceId": {
-                "type": "string"
-              },
-              "targetId": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "nodes": {
-          "additionalProperties": {
-            "properties": {
-              "alertNames": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "alerts": {
-                "items": {
-                  "properties": {
-                    "category": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              "composite": {
-                "type": "boolean"
-              },
-              "flags": {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "id": {
-                "type": "string"
-              },
-              "radii": {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              "type": {
-                "type": "string"
-              }
-            },
-            "type": "object"
-          },
-          "type": "object"
-        },
-        "root": {
-          "properties": {
-            "alertNames": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "alerts": {
-              "items": {
-                "properties": {
-                  "category": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "composite": {
-              "type": "boolean"
-            },
-            "flags": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "id": {
-              "type": "string"
-            },
-            "radii": {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
-            },
-            "type": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        }
-      },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "GraphResponse"
-    },
-    "title": "Get Smart Graph"
+    "title": "Find Flagged Parties"
   },
   {
     "annotations": {
+      "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Walks every relation out from an entity up to `radius` hops. `meta` holds only the `fields` requested.\n",
+    "description": "Companies an organization or person is tied to: directly, as owner, director, signatory\nor subsidiary, or through people in between, such as a PEP's relative or associate, or a\ndirector or owner the company shares with it. Each comes with the chains of people and the\nlinks that tie it, and its flags.\n\nThe nearest come first, then the flagged, then those tied through the most people, so the\nfirst page usually answers the question, and `total_by_risk` counts the flagged companies\nby marker. When `truncated_by_polixis` is true, Polixis cut the network short, so more\ncompanies may exist. Start with `radius` 2 and widen to 3 only when the\nquestion needs ties further out. For what an entity owns down the chain use\n`get_top_down_ownership`; for sanctioned, PEP or state-owned parties\n`find_flagged_parties`. When `next_cursor` is set, pass it back as `cursor`.",
     "inputSchema": {
+      "additionalProperties": false,
       "properties": {
-        "fields": {
-          "description": "Profile fields to return for each node in `meta`.",
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        },
+        "radius": {
+          "default": 2,
+          "description": "Links out from the entity to look. 2 finds the companies tied to it directly or through one person; 3 also those tied through two people in a row, such as a relative's business partner. Polixis documents no maximum and stopped at 2 in every walk we tried, so 3 may find nothing more, from a much larger graph.",
+          "maximum": 3,
+          "minimum": 2,
+          "type": "integer"
+        },
+        "scope": {
+          "default": "key",
+          "description": "`key` for ownership, management and family ties, with every company named; `all` adds signatories, third parties and historic ties, whose companies may come without a name.",
+          "enum": [
+            "key",
+            "all"
+          ],
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": "find_linked_companies",
+    "outputSchema": {
+      "description": "The companies tied to an entity, one page of them.",
+      "properties": {
+        "companies": {
+          "description": "The companies of this page: the nearest first, then the flagged, then those tied through the most people.",
           "items": {
-            "type": "string"
+            "description": "A company tied to the entity, and how.",
+            "properties": {
+              "company": {
+                "description": "The company, with its flags and distance.",
+                "properties": {
+                  "alerts": {
+                    "description": "Alert categories of the party itself, such as STATECO or RESTRICTION.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "distance": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Links from the entity asked about."
+                  },
+                  "entity_type": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "PERSON or ORGANIZATION."
+                  },
+                  "flags": {
+                    "description": "Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.",
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "name": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Its name; null for a party only the full graph has, which `get_entity_profiles` can name."
+                  },
+                  "pid": {
+                    "description": "Its pid, for the other Polixis tools.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pid",
+                  "name",
+                  "entity_type",
+                  "flags",
+                  "alerts",
+                  "distance"
+                ],
+                "type": "object"
+              },
+              "direct_links": {
+                "description": "The links between the entity and the company; empty when they are tied only through people.",
+                "items": {
+                  "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                  "properties": {
+                    "relations": {
+                      "description": "Every role the source holds in the target.",
+                      "items": {
+                        "description": "One role the link's source holds in its target.",
+                        "properties": {
+                          "end_date": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "YYYY-MM-DD, null if unknown or current."
+                          },
+                          "former": {
+                            "description": "Whether the relation has ended.",
+                            "type": "boolean"
+                          },
+                          "role": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                          },
+                          "share_percent": {
+                            "anyOf": [
+                              {
+                                "type": "number"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The share held; null when not reported."
+                          },
+                          "start_date": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "YYYY-MM-DD, null if unknown."
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "share_percent",
+                          "former",
+                          "start_date",
+                          "end_date"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "source_pid": {
+                      "description": "The pid of the party holding the role.",
+                      "type": "string"
+                    },
+                    "target_pid": {
+                      "description": "The pid of the party the role is held in.",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source_pid",
+                    "target_pid",
+                    "relations"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "hops": {
+                "description": "Links between the entity and the company: 1 is direct.",
+                "type": "integer"
+              },
+              "risks": {
+                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "through": {
+                "description": "The shortest 5 chains of people, with the links along each.",
+                "items": {
+                  "description": "People in a row through whom the entity is tied to the company.",
+                  "properties": {
+                    "links": {
+                      "description": "The links along the chain in order, from the entity to the company, each in its own direction.",
+                      "items": {
+                        "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                        "properties": {
+                          "relations": {
+                            "description": "Every role the source holds in the target.",
+                            "items": {
+                              "description": "One role the link's source holds in its target.",
+                              "properties": {
+                                "end_date": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "YYYY-MM-DD, null if unknown or current."
+                                },
+                                "former": {
+                                  "description": "Whether the relation has ended.",
+                                  "type": "boolean"
+                                },
+                                "role": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                                },
+                                "share_percent": {
+                                  "anyOf": [
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "The share held; null when not reported."
+                                },
+                                "start_date": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ],
+                                  "description": "YYYY-MM-DD, null if unknown."
+                                }
+                              },
+                              "required": [
+                                "role",
+                                "share_percent",
+                                "former",
+                                "start_date",
+                                "end_date"
+                              ],
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "source_pid": {
+                            "description": "The pid of the party holding the role.",
+                            "type": "string"
+                          },
+                          "target_pid": {
+                            "description": "The pid of the party the role is held in.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "source_pid",
+                          "target_pid",
+                          "relations"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "people": {
+                      "description": "The people in order, from the one tied to the entity to the one tied to the company.",
+                      "items": {
+                        "description": "A person on the way from the entity to the company.",
+                        "properties": {
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Their name, null when Polixis gives none."
+                          },
+                          "pid": {
+                            "description": "The person's pid.",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "pid",
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "people",
+                    "links"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "through_total": {
+                "description": "How many people next to the company tie it to the entity.",
+                "type": "integer"
+              }
+            },
+            "required": [
+              "company",
+              "risks",
+              "hops",
+              "direct_links",
+              "through_total",
+              "through"
+            ],
+            "type": "object"
           },
           "type": "array"
         },
-        "filter": {
-          "properties": {
-            "rules": {
-              "additionalProperties": {
-                "properties": {
-                  "allowedCtg": {
-                    "description": "Comma-separated relation categories to follow; empty follows all.",
-                    "type": "string"
-                  },
-                  "direction": {
-                    "enum": [
-                      "IN",
-                      "OUT",
-                      "BOTH"
-                    ],
-                    "type": "string"
-                  },
-                  "excludedCtg": {
-                    "description": "Comma-separated relation categories not to follow.",
-                    "type": "string"
-                  },
-                  "onlyActual": {
-                    "type": "boolean"
-                  },
-                  "requireOrg": {
-                    "type": "boolean"
-                  },
-                  "requirePerson": {
-                    "type": "boolean"
-                  },
-                  "requireSanction": {
-                    "type": "boolean"
-                  },
-                  "requireSoe": {
-                    "type": "boolean"
-                  }
-                },
-                "type": "object"
-              },
-              "description": "One rule per relation type to follow, keyed by the relation type. Relation types without a rule are not followed. Without a filter the default rules apply.\n",
-              "type": "object"
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
             }
-          },
-          "type": "object"
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
         },
-        "id": {
-          "description": "The entity the walk starts from.",
+        "pid": {
+          "description": "The entity asked about.",
           "type": "string"
         },
-        "radius": {
-          "description": "How many hops to walk out from the entity.",
+        "total_by_risk": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "type": "object"
+        },
+        "total_companies": {
+          "description": "Companies across every page.",
           "type": "integer"
         },
-        "truncate": {
-          "description": "Return a reduced graph, recommended for large ones.",
+        "total_direct": {
+          "description": "Companies tied to the entity directly.",
+          "type": "integer"
+        },
+        "total_flagged": {
+          "description": "Companies with a risk marker.",
+          "type": "integer"
+        },
+        "truncated_by_polixis": {
+          "description": "Whether Polixis cut the network short, so companies beyond what it returned are missing. When true, a count of 0 does not show that none exists: say the network was cut, rather than that none was found.",
           "type": "boolean"
         }
       },
       "required": [
-        "id"
+        "pid",
+        "total_companies",
+        "total_direct",
+        "total_flagged",
+        "total_by_risk",
+        "truncated_by_polixis",
+        "companies",
+        "next_cursor"
       ],
       "type": "object"
     },
-    "name": "get_subgraph",
-    "outputSchema": {
+    "title": "Find Linked Companies"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "The full text of one court decision, in its own language, one part of about 8,000\ntokens at a time. A decision runs to about 60,000 characters at most.\n\nRead it only when the snippets of `find_court_decisions` do not settle the question. When\n`next_cursor` is set, pass it back as `cursor` for the next part.\nPolixis does not document this route yet, so its answers may change without notice.",
+    "inputSchema": {
+      "additionalProperties": false,
       "properties": {
-        "edges": {
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "decision_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The decision's id, from `find_court_decisions` on the same pid. Required unless `cursor` is."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_court_decision",
+    "outputSchema": {
+      "description": "The text of one court decision, one part of it.",
+      "properties": {
+        "country": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "ISO 3166-1 alpha-2 code of the court's country."
+        },
+        "court_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Such as General Instance Court."
+        },
+        "decision_id": {
+          "description": "The decision's id.",
+          "type": "string"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next part; null on the last."
+        },
+        "pid": {
+          "description": "The entity the decision was found for.",
+          "type": "string"
+        },
+        "subject": {
+          "description": "`entity` when it names the entity, `related_party` when a related party.",
+          "enum": [
+            "entity",
+            "related_party"
+          ],
+          "type": "string"
+        },
+        "text": {
+          "description": "This part of the text, in the decision's own language.",
+          "type": "string"
+        },
+        "total_characters": {
+          "description": "The length of the whole text, in characters.",
+          "type": "integer"
+        },
+        "year": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The year of the decision."
+        }
+      },
+      "required": [
+        "pid",
+        "decision_id",
+        "subject",
+        "court_type",
+        "country",
+        "year",
+        "total_characters",
+        "text",
+        "next_cursor"
+      ],
+      "type": "object"
+    },
+    "title": "Get Court Decision"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Profiles of up to 10 organizations or people at once: names, identifiers, dates,\ncountries, sanctions and PEP flags, alerts, sanctions listings and positions held.\n\nUse it to screen or tell apart entities another tool returned by `pid`, in one call\nrather than one per entity. A pid Polixis does not know comes back with `rejected` set.\n`sanctions` and `positions` make each profile several times larger, so ask for fewer pids\nwith them.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "pids": {
+          "description": "The pids to look up, up to 10, such as every owner in a tree at once. A pid the user gave goes to `resolve_permanent_id` first.",
           "items": {
+            "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+            "type": "string"
+          },
+          "maxItems": 10,
+          "minItems": 1,
+          "type": "array"
+        },
+        "sections": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "names",
+                  "name_records",
+                  "identifiers",
+                  "countries",
+                  "dates",
+                  "gender",
+                  "legal_forms",
+                  "economic_activities",
+                  "addresses",
+                  "flags",
+                  "alerts",
+                  "sanction_statuses",
+                  "sanctions",
+                  "positions"
+                ],
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The parts of each profile to return. Leave it out for the key identifiers: name records, identifiers, countries, dates, flags, alerts and sanction statuses. Ask for `sanctions` for each listing's programme and justification, and `positions` for the offices a PEP holds or held."
+        }
+      },
+      "required": [
+        "pids"
+      ],
+      "type": "object"
+    },
+    "name": "get_entity_profiles",
+    "outputSchema": {
+      "description": "The profiles of the entities asked for, in the order asked.",
+      "properties": {
+        "profiles": {
+          "description": "One profile per distinct pid.",
+          "items": {
+            "description": "The requested sections of one entity's profile. A section not requested is null.",
             "properties": {
-              "details": {
-                "items": {
-                  "properties": {
-                    "at": {
-                      "type": "integer"
-                    },
-                    "cShare": {
-                      "type": "number"
-                    },
-                    "ctg": {
-                      "type": "integer"
-                    },
-                    "endDate": {
-                      "type": "integer"
-                    },
-                    "former": {
-                      "type": "boolean"
-                    },
-                    "noi": {
-                      "type": "number"
-                    },
-                    "originalSource": {
+              "addresses": {
+                "anyOf": [
+                  {
+                    "items": {
                       "type": "string"
                     },
-                    "originalTarget": {
-                      "type": "string"
-                    },
-                    "role": {
-                      "type": "string"
-                    },
-                    "share": {
-                      "type": "number"
-                    },
-                    "startDate": {
-                      "type": "integer"
-                    },
-                    "vshare": {
-                      "type": "number"
-                    }
+                    "type": "array"
                   },
-                  "type": "object"
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Every address."
+              },
+              "alerts": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "description": "A risk or status alert on the entity.",
+                      "properties": {
+                        "category": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Such as SANCTION, RESTRICTION, STATECO, REGULATORY or LISTED."
+                        },
+                        "message": {
+                          "description": "The alert, as Polixis words it.",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "category",
+                        "message"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Risk and status alerts."
+              },
+              "countries": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "ISO 3166-1 alpha-2 codes by relation, such as country, countryCitizenship or countryJurisdiction."
+              },
+              "dates": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Dates by kind, such as Date of Birth or Registration Date, as YYYY-MM-DD, YYYY-MM or YYYY."
+              },
+              "economic_activities": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Economic activity categories, in English."
+              },
+              "flags": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Such as SANCTION, PEP, FORMER_PEP or REP."
+              },
+              "gender": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "f, m or x, for a person."
+              },
+              "identifiers": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Identifiers by type, such as LEI, TIN or registration number."
+              },
+              "legal_forms": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Legal forms, in English."
+              },
+              "name_records": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "description": "A name the entity is known by, with its kind and original script.",
+                      "properties": {
+                        "kind": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS."
+                        },
+                        "language": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "ISO 639-1 code of the original name."
+                        },
+                        "name": {
+                          "description": "The name in Latin script.",
+                          "type": "string"
+                        },
+                        "original": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "The name as written in its own script; null when it is `name` itself."
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "original",
+                        "language",
+                        "kind"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Typed names, current, former and aliases."
+              },
+              "names": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Every name and spelling."
+              },
+              "pid": {
+                "description": "The pid looked up.",
+                "type": "string"
+              },
+              "positions": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "description": "A public or political position the person holds or held.",
+                      "properties": {
+                        "end_date": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "YYYY-MM-DD, YYYY-MM or YYYY; null if current or unknown."
+                        },
+                        "institution": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "Where the position is held."
+                        },
+                        "position": {
+                          "description": "The position.",
+                          "type": "string"
+                        },
+                        "remark": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "A note Polixis adds, if any."
+                        },
+                        "start_date": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "YYYY-MM-DD, YYYY-MM or YYYY, null if unknown."
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "institution",
+                        "start_date",
+                        "end_date",
+                        "remark"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Public and political positions held, for a PEP."
+              },
+              "rejected": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Why Polixis rejected the pid, such as an unknown id; null when it did not."
+              },
+              "sanction_statuses": {
+                "anyOf": [
+                  {
+                    "additionalProperties": {
+                      "type": "string"
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Sanctions list name to its status, ACTIVE or DELISTED."
+              },
+              "sanctions": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "description": "One record of the entity on one sanctions list.",
+                      "properties": {
+                        "country": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "ISO 3166-1 alpha-2 code of the listing authority."
+                        },
+                        "details": {
+                          "additionalProperties": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "description": "Every detail of the record, such as Program, Justification and Source.",
+                          "type": "object"
+                        },
+                        "list_name": {
+                          "description": "The sanctions list.",
+                          "type": "string"
+                        },
+                        "status": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "ACTIVE or DELISTED, as the record gives it."
+                        }
+                      },
+                      "required": [
+                        "list_name",
+                        "country",
+                        "status",
+                        "details"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Every sanctions record, one per list and listing."
+              }
+            },
+            "required": [
+              "pid"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "profiles"
+      ],
+      "type": "object"
+    },
+    "title": "Get Entity Profiles"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "The directors, executives, signatories, shareholders, holdings and other parties\nrelated to an organization or person, with their roles, shares, dates, sources and flags.\n\nPolixis pages them itself: when `next_cursor` is set, pass it back as `cursor` for the\nnext page. For the shares carried through several layers of owners, use\n`get_ultimate_beneficial_owners` instead.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "categories": {
+          "anyOf": [
+            {
+              "items": {
+                "enum": [
+                  "executive",
+                  "executiveSenior",
+                  "thirdParty",
+                  "signature",
+                  "ownershipInOtherEntities",
+                  "shareholdingInformation",
+                  "membership"
+                ],
+                "type": "string"
+              },
+              "minItems": 1,
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The kinds of relation to return: executive (directors and officers), executiveSenior, signature (signatories), shareholdingInformation (its shareholders), ownershipInOtherEntities (what it holds), thirdParty and membership. Leave it out for all of them."
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "default": 40,
+          "description": "Related parties per page, at most 45. Polixis pages them itself; the default of 40 comes to about 7,000 tokens.",
+          "maximum": 45,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_related_parties",
+    "outputSchema": {
+      "description": "One page of the parties related to an entity.",
+      "properties": {
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "parties": {
+          "description": "The parties of this page.",
+          "items": {
+            "description": "An organization or person related to the entity, with how.",
+            "properties": {
+              "alerts": {
+                "description": "Risk and status alerts, as Polixis words them.",
+                "items": {
+                  "type": "string"
                 },
                 "type": "array"
               },
-              "sourceId": {
-                "type": "string"
+              "countries": {
+                "description": "ISO 3166-1 alpha-2 codes of its countries.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
-              "targetId": {
-                "type": "string"
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "PERSON or ORGANIZATION."
+              },
+              "flags": {
+                "description": "Such as SANCTION, PEP or REP.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, in English where Polixis has one."
+              },
+              "pid": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The party's pid, for the other Polixis tools; null when Polixis gives none, so no other tool can look the party up."
+              },
+              "relations": {
+                "description": "Every relation to the entity, one per source that reports it.",
+                "items": {
+                  "description": "One relation of the party to the entity, as one source reports it.",
+                  "properties": {
+                    "end_date": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "YYYY-MM-DD, YYYY-MM or YYYY, null if unknown."
+                    },
+                    "former": {
+                      "description": "Whether the relation has ended.",
+                      "type": "boolean"
+                    },
+                    "information_date": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "When the source reported it, YYYY-MM-DD, YYYY-MM or YYYY."
+                    },
+                    "relation_type": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Polixis' kind of relation, such as executive, shareholding_ownership (the party holds shares in the entity) or shareholding_ownership_reverse (the entity holds shares in the party)."
+                    },
+                    "share_percent": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The share held; null when not reported."
+                    },
+                    "source": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The register or list that reports the relation."
+                    },
+                    "start_date": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "YYYY-MM-DD, YYYY-MM or YYYY, null if unknown."
+                    },
+                    "title": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The party's role, such as director, investor or ultimately consolidated by."
+                    }
+                  },
+                  "required": [
+                    "relation_type",
+                    "title",
+                    "share_percent",
+                    "former",
+                    "start_date",
+                    "end_date",
+                    "information_date",
+                    "source"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               }
             },
+            "required": [
+              "pid",
+              "name",
+              "entity_type",
+              "countries",
+              "flags",
+              "alerts",
+              "relations"
+            ],
             "type": "object"
           },
           "type": "array"
         },
-        "nodes": {
-          "additionalProperties": {
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "total_parties": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Related parties across every page, or null when Polixis does not say. It counts the parties with neither a pid nor a name, which the pages leave out."
+        }
+      },
+      "required": [
+        "pid",
+        "total_parties",
+        "parties",
+        "next_cursor"
+      ],
+      "type": "object"
+    },
+    "title": "Get Related Parties"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "An organization's or person's own sanctions listings, and every sanctioned party\nPolixis relates to it at any distance, each with its lists, programmes and the relations\nthat lead to it: who holds what in whom at every step.\n\nUse it for direct and indirect sanctions exposure; for PEP or state-owned parties nearby\nuse `find_flagged_parties`. The nearest come first. When `next_cursor` is set, pass it\nback as `cursor`.\nPolixis does not document this route yet, so its answers may change without notice.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        }
+      },
+      "type": "object"
+    },
+    "name": "get_sanctions_exposure",
+    "outputSchema": {
+      "description": "An entity's own sanctions listings and the sanctioned parties related to it, one page of\nthe latter.",
+      "properties": {
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "own_listings": {
+          "description": "The entity's own records on sanctions lists; empty when it is not listed.",
+          "items": {
+            "description": "One record on one sanctions list.",
             "properties": {
-              "alertNames": {
+              "country": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ISO 3166-1 alpha-2 code of the listing authority."
+              },
+              "list_name": {
+                "description": "The sanctions list.",
+                "type": "string"
+              },
+              "listed_on": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The listing date as YYYY-MM-DD, or as the record writes it when in no form we know; null when the record gives none."
+              },
+              "programs": {
+                "description": "The sanctions programmes, such as UKRAINE-EO13662.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
-              "alerts": {
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "ACTIVE or DELISTED, as the record gives it."
+              }
+            },
+            "required": [
+              "list_name",
+              "country",
+              "status",
+              "programs",
+              "listed_on"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "related": {
+          "description": "The sanctioned related parties of this page, the nearest first.",
+          "items": {
+            "description": "A sanctioned party related to the entity, and the relations that lead to it.",
+            "properties": {
+              "countries": {
+                "description": "ISO 3166-1 alpha-2 codes it is tied to.",
                 "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "hops": {
+                "description": "Links between the entity and it: 1 is a direct relation.",
+                "type": "integer"
+              },
+              "listings": {
+                "description": "Its records on sanctions lists.",
+                "items": {
+                  "description": "One record on one sanctions list.",
                   "properties": {
-                    "category": {
+                    "country": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "ISO 3166-1 alpha-2 code of the listing authority."
+                    },
+                    "list_name": {
+                      "description": "The sanctions list.",
                       "type": "string"
                     },
-                    "message": {
-                      "type": "string"
+                    "listed_on": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The listing date as YYYY-MM-DD, or as the record writes it when in no form we know; null when the record gives none."
+                    },
+                    "programs": {
+                      "description": "The sanctions programmes, such as UKRAINE-EO13662.",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "status": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "ACTIVE or DELISTED, as the record gives it."
                     }
                   },
+                  "required": [
+                    "list_name",
+                    "country",
+                    "status",
+                    "programs",
+                    "listed_on"
+                  ],
                   "type": "object"
                 },
                 "type": "array"
               },
-              "composite": {
-                "type": "boolean"
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its English name."
               },
-              "flags": {
+              "path": {
+                "description": "The relations from the entity to it, in order. Two parties joined by several relations have one entry for each.",
                 "items": {
-                  "type": "string"
+                  "description": "One relation on the way to a sanctioned party: the source holds the role in the target.\nPolixis names the two ends but gives no pid.",
+                  "properties": {
+                    "end_date": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "YYYY-MM-DD, null if unknown or current."
+                    },
+                    "former": {
+                      "description": "Whether the relation has ended.",
+                      "type": "boolean"
+                    },
+                    "role": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Such as shareholder, director or nephew."
+                    },
+                    "share_percent": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The share held; null when not reported."
+                    },
+                    "source_name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The party holding the role."
+                    },
+                    "start_date": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "YYYY-MM-DD, null if unknown."
+                    },
+                    "target_name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The party the role is held in."
+                    }
+                  },
+                  "required": [
+                    "source_name",
+                    "target_name",
+                    "role",
+                    "share_percent",
+                    "former",
+                    "start_date",
+                    "end_date"
+                  ],
+                  "type": "object"
                 },
                 "type": "array"
               },
-              "id": {
-                "type": "string"
-              },
-              "radii": {
-                "items": {
-                  "type": "integer"
-                },
-                "type": "array"
-              },
-              "type": {
+              "pid": {
+                "description": "Its pid, for the other Polixis tools.",
                 "type": "string"
               }
             },
+            "required": [
+              "pid",
+              "name",
+              "countries",
+              "listings",
+              "hops",
+              "path"
+            ],
             "type": "object"
           },
-          "type": "object"
+          "type": "array"
         },
-        "root": {
-          "properties": {
-            "alertNames": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "alerts": {
-              "items": {
-                "properties": {
-                  "category": {
-                    "type": "string"
-                  },
-                  "message": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              },
-              "type": "array"
-            },
-            "composite": {
-              "type": "boolean"
-            },
-            "flags": {
-              "items": {
-                "type": "string"
-              },
-              "type": "array"
-            },
-            "id": {
-              "type": "string"
-            },
-            "radii": {
-              "items": {
-                "type": "integer"
-              },
-              "type": "array"
-            },
-            "type": {
-              "type": "string"
-            }
-          },
-          "type": "object"
-        }
-      },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "GraphResponse"
-    },
-    "title": "Get Subgraph"
-  },
-  {
-    "annotations": {
-      "openWorldHint": true,
-      "readOnlyHint": true
-    },
-    "description": "The ownership tree below an entity: its subsidiaries and the shares held at each layer. Capped at 300 nodes per level and 5,000 per request; `truncated` says when a cap was hit.\n",
-    "inputSchema": {
-      "properties": {
-        "id": {
-          "description": "The entity's ID (ARDIS ID or pid).",
-          "type": "string"
+        "total_related": {
+          "description": "Sanctioned related parties across every page. Polixis has returned different counts for the same entity on two calls, so say when a count matters.",
+          "type": "integer"
         }
       },
       "required": [
-        "id"
+        "pid",
+        "own_listings",
+        "total_related",
+        "related",
+        "next_cursor"
       ],
+      "type": "object"
+    },
+    "title": "Get Sanctions Exposure"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "openWorldHint": true,
+      "readOnlyHint": true
+    },
+    "description": "What an organization or person owns: one row per holding, however many chains of\nshareholdings reach it, with the share the entity carries in it summed over every chain,\nthe chain carrying the most, and its flags. Polixis reports only the share on each link:\nthis MCP computes the effective share from them. `total_by_risk` counts the flagged holdings of\nthe whole group by marker, and the first page lists up to 25 of them, the sanctioned first;\nthe others carry their flags on their own rows.\n\nRows come largest effective share first, so the controlled subsidiaries lead and the\nminority stakes trail: stop once you have what the question needs. When `next_cursor`\nis set, pass it back as `cursor` for the next page.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
+        }
+      },
       "type": "object"
     },
     "name": "get_top_down_ownership",
     "outputSchema": {
+      "description": "The entities of an ownership tree, the largest effective share first, one page of them.",
       "properties": {
-        "roots": {
-          "description": "Every node of the tree; `children` links them.",
+        "entities": {
+          "description": "The entities of this page.",
           "items": {
+            "description": "An entity in the ownership tree, with every chain that reaches it added up.",
             "properties": {
-              "children": {
+              "alerts": {
+                "description": "Alert categories, such as STATECO or RESTRICTION.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              "chains": {
+                "description": "How many distinct chains of links reach it.",
+                "type": "integer"
+              },
+              "depth": {
+                "description": "Fewest links from the entity asked about: 1 is direct.",
+                "type": "integer"
+              },
+              "direct_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The share across its own direct link with the entity asked about; null when it has none or Polixis reports no share."
+              },
+              "effective_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Computed by this MCP, not sent by Polixis, which reports only the share on each link: the shares along each chain between it and the entity asked about multiplied together (50% of 60% is 30%), then summed over the chains. A chain with a link that reports no share is left out. For owners it is the share it holds, for holdings the share held in it. Null when no chain reports a share on every link. Call it a figure derived from Polixis's link shares, not Polixis's own."
+              },
+              "end_of_chain": {
+                "description": "Whether nothing lies beyond it: for owners, no owner of its own is known, as for an ultimate beneficial owner; for holdings, it holds nothing further. A tree cut short by Polixis may hide more.",
+                "type": "boolean"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "PERSON or ORGANIZATION."
               },
               "flags": {
+                "description": "Such as SANCTION, PEP or REP.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
-              "id": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, in English where Polixis has one."
+              },
+              "pid": {
+                "description": "The entity's pid.",
                 "type": "string"
               },
-              "role": {
-                "type": "string"
+              "roles": {
+                "description": "Its roles across its links, such as shareholder.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
-              "sharePercent": {
-                "type": "number"
+              "share_unknown_on_some_chain": {
+                "description": "Whether a chain to it has a link without a share, so the true effective share may be higher.",
+                "type": "boolean"
               },
-              "type": {
-                "type": "string"
+              "strongest_chain": {
+                "description": "The chain carrying the largest share, from the link next to the entity asked about to this entity.",
+                "items": {
+                  "description": "One link of an ownership chain.",
+                  "properties": {
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Its name, null when Polixis gives none."
+                    },
+                    "pid": {
+                      "description": "The entity at this link.",
+                      "type": "string"
+                    },
+                    "share_percent": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The share across this link, with the link before it or, for the first, with the entity asked about; null when Polixis reports none."
+                    }
+                  },
+                  "required": [
+                    "pid",
+                    "name",
+                    "share_percent"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               }
             },
+            "required": [
+              "pid",
+              "name",
+              "entity_type",
+              "effective_share_percent",
+              "share_unknown_on_some_chain",
+              "direct_share_percent",
+              "depth",
+              "chains",
+              "roles",
+              "end_of_chain",
+              "flags",
+              "alerts",
+              "strongest_chain"
+            ],
             "type": "object"
           },
           "type": "array"
         },
-        "startId": {
+        "flagged": {
+          "description": "At most 25 flagged entities of the whole tree, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
+          "items": {
+            "description": "A flagged entity of the tree, wherever its rows fall.",
+            "properties": {
+              "depth": {
+                "description": "Fewest links from the entity asked about.",
+                "type": "integer"
+              },
+              "effective_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "As on its entity row: computed by this MCP from the link shares, not sent by Polixis; null when no chain reports a share on every link."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, null when Polixis gives none."
+              },
+              "pid": {
+                "description": "The entity's pid.",
+                "type": "string"
+              },
+              "risks": {
+                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pid",
+              "name",
+              "effective_share_percent",
+              "depth",
+              "risks"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
           "type": "string"
         },
-        "totalNodes": {
+        "total_by_risk": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "type": "object"
+        },
+        "total_entities": {
+          "description": "Entities across every page.",
           "type": "integer"
         },
-        "truncated": {
+        "total_flagged": {
+          "description": "Flagged entities in the whole tree.",
+          "type": "integer"
+        },
+        "total_share_unknown": {
+          "description": "Entities across every page with `share_unknown_on_some_chain`, whose true share may be higher than shown. Those with no known share at all come last, so shares falling below a threshold settle it only once every one of these has been read.",
+          "type": "integer"
+        },
+        "truncated_by_polixis": {
+          "description": "Whether Polixis cut the tree at its cap of 300 nodes per level or 5,000 in all, so even every page together is not the whole tree. Start again from a sub-holding.",
           "type": "boolean"
         }
       },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "OwnershipTree"
+      "required": [
+        "pid",
+        "total_entities",
+        "total_share_unknown",
+        "truncated_by_polixis",
+        "total_flagged",
+        "total_by_risk",
+        "flagged",
+        "entities",
+        "next_cursor"
+      ],
+      "type": "object"
     },
-    "title": "Get Top Down Ownership"
+    "title": "Get Top-Down Ownership"
   },
   {
     "annotations": {
+      "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "The ownership tree above an entity, followed up through its shareholders until the ultimate beneficial owners. Capped at 300 nodes per level and 5,000 per request.\n",
+    "description": "Who owns an organization: one row per owner, however many chains of shareholdings\nreach it, with the share it carries in the organization summed over every chain, the\nchain carrying the most, and its flags. Polixis reports only the share on each link: this\nMCP computes the effective share from them. `total_by_risk` counts the flagged owners of the\nwhole tree by marker, and the first page lists up to 25 of them, the sanctioned first; the\nothers carry their flags on their own rows.\n\nRows come largest effective share first, so a threshold question such as \"who holds 25%\nor more\" is settled once the shares fall below it: stop there rather than reading every\npage, unless `total_share_unknown` counts owners not yet read, whose share may be higher.\nWhen `next_cursor` is set, pass it back as `cursor` for the next page.",
     "inputSchema": {
+      "additionalProperties": false,
       "properties": {
-        "id": {
-          "description": "The entity's ID (ARDIS ID or pid).",
-          "type": "string"
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "page_size": {
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
+        },
+        "pid": {
+          "anyOf": [
+            {
+              "pattern": "^[POUpou][0-9a-fA-F]{32}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
         }
       },
-      "required": [
-        "id"
-      ],
       "type": "object"
     },
     "name": "get_ultimate_beneficial_owners",
     "outputSchema": {
+      "description": "The entities of an ownership tree, the largest effective share first, one page of them.",
       "properties": {
-        "roots": {
-          "description": "Every node of the tree; `children` links them.",
+        "entities": {
+          "description": "The entities of this page.",
           "items": {
+            "description": "An entity in the ownership tree, with every chain that reaches it added up.",
             "properties": {
-              "children": {
+              "alerts": {
+                "description": "Alert categories, such as STATECO or RESTRICTION.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              "chains": {
+                "description": "How many distinct chains of links reach it.",
+                "type": "integer"
+              },
+              "depth": {
+                "description": "Fewest links from the entity asked about: 1 is direct.",
+                "type": "integer"
+              },
+              "direct_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The share across its own direct link with the entity asked about; null when it has none or Polixis reports no share."
+              },
+              "effective_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Computed by this MCP, not sent by Polixis, which reports only the share on each link: the shares along each chain between it and the entity asked about multiplied together (50% of 60% is 30%), then summed over the chains. A chain with a link that reports no share is left out. For owners it is the share it holds, for holdings the share held in it. Null when no chain reports a share on every link. Call it a figure derived from Polixis's link shares, not Polixis's own."
+              },
+              "end_of_chain": {
+                "description": "Whether nothing lies beyond it: for owners, no owner of its own is known, as for an ultimate beneficial owner; for holdings, it holds nothing further. A tree cut short by Polixis may hide more.",
+                "type": "boolean"
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "PERSON or ORGANIZATION."
               },
               "flags": {
+                "description": "Such as SANCTION, PEP or REP.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
-              "id": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, in English where Polixis has one."
+              },
+              "pid": {
+                "description": "The entity's pid.",
                 "type": "string"
               },
-              "role": {
-                "type": "string"
+              "roles": {
+                "description": "Its roles across its links, such as shareholder.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
               },
-              "sharePercent": {
-                "type": "number"
+              "share_unknown_on_some_chain": {
+                "description": "Whether a chain to it has a link without a share, so the true effective share may be higher.",
+                "type": "boolean"
               },
-              "type": {
-                "type": "string"
+              "strongest_chain": {
+                "description": "The chain carrying the largest share, from the link next to the entity asked about to this entity.",
+                "items": {
+                  "description": "One link of an ownership chain.",
+                  "properties": {
+                    "name": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Its name, null when Polixis gives none."
+                    },
+                    "pid": {
+                      "description": "The entity at this link.",
+                      "type": "string"
+                    },
+                    "share_percent": {
+                      "anyOf": [
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The share across this link, with the link before it or, for the first, with the entity asked about; null when Polixis reports none."
+                    }
+                  },
+                  "required": [
+                    "pid",
+                    "name",
+                    "share_percent"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
               }
             },
+            "required": [
+              "pid",
+              "name",
+              "entity_type",
+              "effective_share_percent",
+              "share_unknown_on_some_chain",
+              "direct_share_percent",
+              "depth",
+              "chains",
+              "roles",
+              "end_of_chain",
+              "flags",
+              "alerts",
+              "strongest_chain"
+            ],
             "type": "object"
           },
           "type": "array"
         },
-        "startId": {
+        "flagged": {
+          "description": "At most 25 flagged entities of the whole tree, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
+          "items": {
+            "description": "A flagged entity of the tree, wherever its rows fall.",
+            "properties": {
+              "depth": {
+                "description": "Fewest links from the entity asked about.",
+                "type": "integer"
+              },
+              "effective_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "As on its entity row: computed by this MCP from the link shares, not sent by Polixis; null when no chain reports a share on every link."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, null when Polixis gives none."
+              },
+              "pid": {
+                "description": "The entity's pid.",
+                "type": "string"
+              },
+              "risks": {
+                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pid",
+              "name",
+              "effective_share_percent",
+              "depth",
+              "risks"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
           "type": "string"
         },
-        "totalNodes": {
+        "total_by_risk": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "type": "object"
+        },
+        "total_entities": {
+          "description": "Entities across every page.",
           "type": "integer"
         },
-        "truncated": {
+        "total_flagged": {
+          "description": "Flagged entities in the whole tree.",
+          "type": "integer"
+        },
+        "total_share_unknown": {
+          "description": "Entities across every page with `share_unknown_on_some_chain`, whose true share may be higher than shown. Those with no known share at all come last, so shares falling below a threshold settle it only once every one of these has been read.",
+          "type": "integer"
+        },
+        "truncated_by_polixis": {
+          "description": "Whether Polixis cut the tree at its cap of 300 nodes per level or 5,000 in all, so even every page together is not the whole tree. Start again from a sub-holding.",
           "type": "boolean"
         }
       },
-      "type": "object",
-      "x-fastmcp-top-level-schema": "OwnershipTree"
+      "required": [
+        "pid",
+        "total_entities",
+        "total_share_unknown",
+        "truncated_by_polixis",
+        "total_flagged",
+        "total_by_risk",
+        "flagged",
+        "entities",
+        "next_cursor"
+      ],
+      "type": "object"
     },
     "title": "Get Ultimate Beneficial Owners"
   },
   {
+    "_meta": {
+      "fastmcp": {
+        "tags": [
+          "PID"
+        ]
+      }
+    },
     "annotations": {
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Profile fields the completion endpoint can return",
-    "inputSchema": {
-      "properties": {},
-      "required": [],
-      "type": "object"
-    },
-    "name": "list_completion_fields",
-    "outputSchema": {
-      "properties": {
-        "result": {
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "result"
-      ],
-      "type": "object",
-      "x-fastmcp-wrap-result": true
-    },
-    "title": "List Completion Fields"
-  },
-  {
-    "annotations": {
-      "openWorldHint": true,
-      "readOnlyHint": true
-    },
-    "description": "Resolve a permanent ID that may have been merged into another",
+    "description": "Checks a pid the user already holds, such as one stored in a client file. Call it first whenever the user gives a pid rather than a name. `status` is `active` when the pid is current: use it as it is. It is `merged` when Polixis merged the entity into another, whose pid is `redir`: use that one, and tell the user to update their records. It is `never minted` when Polixis does not know the pid: say so, describe no entity, and find the client again by name or identifier. A 410 error means the pid named a group Polixis dissolved, and lists its former members.",
     "inputSchema": {
       "properties": {
         "pid": {
+          "description": "The pid to check: P, O or U, then 32 hex digits.",
+          "pattern": "^[POUpou][0-9a-fA-F]{32}$",
           "type": "string"
         }
       },
@@ -1533,9 +3141,12 @@
     "outputSchema": {
       "properties": {
         "count": {
+          "description": "The number of members.",
+          "format": "int32",
           "type": "integer"
         },
         "members": {
+          "description": "The member record ids.",
           "items": {
             "type": "string"
           },
@@ -1545,19 +3156,19 @@
           "type": "string"
         },
         "redir": {
-          "description": "The pid that replaced this one when it was merged.",
+          "description": "The pid a merged pid now points to.",
           "type": [
             "string",
             "null"
           ]
         },
         "status": {
-          "description": "active, merged or unknown.",
+          "description": "active, merged, or never minted.",
           "type": "string"
         }
       },
       "type": "object",
-      "x-fastmcp-top-level-schema": "PermanentId"
+      "x-fastmcp-top-level-schema": "PidMembers"
     },
     "title": "Resolve Permanent Id"
   },
@@ -1567,7 +3178,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Find organizations and people in Polixis by name or identifier, with their sanctions and\nPEP flags.\n\nCall it first: every other Polixis tool takes a match's `pid` as its `id`, such as\n`get_corporate_profile`, `get_ultimate_beneficial_owners` or `get_smart_graph`.",
+    "description": "Find organizations and people in Polixis by name or identifier, with their sanctions and\nPEP flags, dates, countries and identifiers to tell matches apart.\n\nCall it first when you have a name or identifier: every other Polixis tool takes a match's\n`pid`. When the user gives a pid instead, call `resolve_permanent_id` with it. A match may\nnot show that a person is a former PEP: before saying a person is not a PEP, read the\n`flags` of `get_entity_profiles`, which show FORMER_PEP. When `next_cursor` is set, more\nmatches exist: pass it back as `cursor` to page through them.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1586,6 +3197,34 @@
           "default": null,
           "description": "ISO 3166-1 alpha-2 country codes, such as `ch`. A match needs only one of them."
         },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
+        },
+        "dates": {
+          "anyOf": [
+            {
+              "items": {
+                "pattern": "^\\d{4}(-\\d{2}(-\\d{2})?)?$",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Dates such as a birth or registration date, as YYYY-MM-DD, YYYY-MM or YYYY. A match needs one of its dates within one of them. Polixis filters on it, so it narrows a common name better than comparing the matches yourself."
+        },
         "entity_type": {
           "anyOf": [
             {
@@ -1603,27 +3242,26 @@
           "description": "Only organizations or only people. Leave it out for both."
         },
         "name": {
-          "description": "A name, registration number, LEI or ISIN of an organization or person.",
-          "minLength": 1,
-          "type": "string"
-        },
-        "page": {
-          "default": 1,
-          "description": "The page to return, from 1.",
-          "minimum": 1,
-          "type": "integer"
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A name, registration number, LEI or ISIN of an organization or person. Required unless `cursor` is given."
         },
         "page_size": {
           "default": 10,
-          "description": "Matches per page.",
-          "maximum": 50,
+          "description": "Matches per page, at most 10, which come to about 8,000 tokens. Polixis pages them itself.",
+          "maximum": 10,
           "minimum": 1,
           "type": "integer"
         }
       },
-      "required": [
-        "name"
-      ],
       "type": "object"
     },
     "name": "search_entities",
@@ -1635,12 +3273,36 @@
           "items": {
             "description": "An organization or person the search matched.",
             "properties": {
+              "addresses": {
+                "description": "Its first three addresses.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
               "alerts": {
                 "description": "Risk and status alerts, as Polixis words them.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
+              },
+              "countries": {
+                "description": "ISO 3166-1 alpha-2 codes of its countries.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "dates": {
+                "additionalProperties": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "description": "Dates by kind, such as Date of Birth or Registration Date, as YYYY-MM-DD, YYYY-MM or YYYY when that is all Polixis knows.",
+                "type": "object"
               },
               "entity_type": {
                 "anyOf": [
@@ -1663,19 +3325,87 @@
                 "description": "Identifiers by type, such as registration numbers, LEIs or tax ids.",
                 "type": "object"
               },
-              "names": {
-                "description": "Its names, aliases and original-language spellings.",
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its current name, in English where Polixis has one."
+              },
+              "name_count": {
+                "description": "How many distinct names and spellings Polixis holds for it, of which `name_records` and `other_names` list ten at most.",
+                "type": "integer"
+              },
+              "name_records": {
+                "description": "Its first ten typed names, with the original script.",
+                "items": {
+                  "description": "A name the entity is known by, with its kind and original script.",
+                  "properties": {
+                    "kind": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS."
+                    },
+                    "language": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "ISO 639-1 code of the original name."
+                    },
+                    "name": {
+                      "description": "The name in Latin script.",
+                      "type": "string"
+                    },
+                    "original": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "The name as written in its own script; null when it is `name` itself."
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "original",
+                    "language",
+                    "kind"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "other_names": {
+                "description": "Spellings Polixis lists that no name record holds, as many as fit in the ten names listed.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "pid": {
-                "description": "Polixis' permanent id, which every other Polixis tool takes as `id`.",
+                "description": "Polixis' permanent id, which every other Polixis tool takes as `pid`.",
                 "type": "string"
               },
               "politically_exposed": {
-                "description": "Whether Polixis flags it as a PEP.",
+                "description": "Whether Polixis flags it as a PEP. It may be false for a former PEP, whom the `flags` of `get_entity_profiles` mark FORMER_PEP.",
                 "type": "boolean"
               },
               "sanction_statuses": {
@@ -1693,7 +3423,13 @@
             "required": [
               "pid",
               "entity_type",
-              "names",
+              "name",
+              "name_count",
+              "name_records",
+              "other_names",
+              "dates",
+              "countries",
+              "addresses",
               "sanctioned",
               "politically_exposed",
               "sanction_statuses",
@@ -1704,9 +3440,16 @@
           },
           "type": "array"
         },
-        "page": {
-          "description": "The page returned, from 1.",
-          "type": "integer"
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
         },
         "total_matches": {
           "anyOf": [
@@ -1722,8 +3465,8 @@
       },
       "required": [
         "matches",
-        "page",
-        "total_matches"
+        "total_matches",
+        "next_cursor"
       ],
       "type": "object"
     },

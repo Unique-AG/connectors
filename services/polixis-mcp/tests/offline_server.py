@@ -39,10 +39,19 @@ def unanswered_upstream() -> httpx2.MockTransport:
     return httpx2.MockTransport(lambda _request: httpx2.Response(404))
 
 
+class FakeStore(MemoryStore):
+    """`MemoryStore` drops an entry past its TTL when it is read, so a cull only counts."""
+
+    culls: int = 0
+
+    async def cull(self) -> None:
+        self.culls += 1
+
+
 @asynccontextmanager
 async def open_fake_persistence() -> AsyncGenerator[Persistence]:
     """An in-memory store in place of Postgres, which CI does not run."""
-    yield Persistence(store=MemoryStore())
+    yield Persistence(store=FakeStore())
 
 
 def build_server(

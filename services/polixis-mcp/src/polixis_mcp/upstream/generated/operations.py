@@ -2,52 +2,56 @@
 from mcp_openapi.upstream import Operation
 from pydantic import TypeAdapter
 
-from polixis_mcp.upstream.generated.vendor_requests import GetBasicIdentifiersRequest
+from polixis_mcp.upstream.generated.vendor_requests import FindPathsRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetCorporateProfileRequest
-from polixis_mcp.upstream.generated.vendor_requests import GetKeyIdentifiersRequest
+from polixis_mcp.upstream.generated.vendor_requests import GetJudicialRecordsRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetProfileFieldsRequest
+from polixis_mcp.upstream.generated.vendor_requests import GetSanctionExposureRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetSmartGraphRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetSubgraphRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetTopDownOwnershipRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetUltimateBeneficialOwnersRequest
 from polixis_mcp.upstream.generated.vendor_requests import ResolvePermanentIdRequest
 from polixis_mcp.upstream.generated.vendor_requests import SearchEntitiesRequest
-from polixis_mcp.upstream.generated.vendor_responses import BasicIdentifiers
-from polixis_mcp.upstream.generated.vendor_responses import CorporateResponse
-from polixis_mcp.upstream.generated.vendor_responses import GraphResponse
-from polixis_mcp.upstream.generated.vendor_responses import KeyIdentifiers
-from polixis_mcp.upstream.generated.vendor_responses import OwnershipTree
-from polixis_mcp.upstream.generated.vendor_responses import PermanentId
+from polixis_mcp.upstream.generated.vendor_responses import CorporateProfileResponse
+from polixis_mcp.upstream.generated.vendor_responses import JudicialRecords
+from polixis_mcp.upstream.generated.vendor_responses import PathResponse
+from polixis_mcp.upstream.generated.vendor_responses import PidMembers
 from polixis_mcp.upstream.generated.vendor_responses import Profile
+from polixis_mcp.upstream.generated.vendor_responses import SanctionExposure
 from polixis_mcp.upstream.generated.vendor_responses import SearchResponse
+from polixis_mcp.upstream.generated.vendor_responses import SmartGraphResponse
+from polixis_mcp.upstream.generated.vendor_responses import UboResult
+from polixis_mcp.upstream.generated.vendor_responses import VirtualSubgraph
 
 SEARCH_ENTITIES = Operation[SearchResponse, SearchEntitiesRequest](
     "searchEntities", TypeAdapter(SearchResponse)
 )
-GET_CORPORATE_PROFILE = Operation[CorporateResponse, GetCorporateProfileRequest](
-    "getCorporateProfile", TypeAdapter(CorporateResponse)
+GET_CORPORATE_PROFILE = Operation[CorporateProfileResponse, GetCorporateProfileRequest](
+    "getCorporateProfile", TypeAdapter(CorporateProfileResponse)
 )
-GET_SMART_GRAPH = Operation[GraphResponse, GetSmartGraphRequest](
-    "getSmartGraph", TypeAdapter(GraphResponse)
+GET_SMART_GRAPH = Operation[SmartGraphResponse, GetSmartGraphRequest](
+    "getSmartGraph", TypeAdapter(SmartGraphResponse)
 )
-GET_SUBGRAPH = Operation[GraphResponse, GetSubgraphRequest](
-    "getSubgraph", TypeAdapter(GraphResponse)
+GET_SUBGRAPH = Operation[VirtualSubgraph, GetSubgraphRequest](
+    "getSubgraph", TypeAdapter(VirtualSubgraph)
 )
-GET_TOP_DOWN_OWNERSHIP = Operation[OwnershipTree, GetTopDownOwnershipRequest](
-    "getTopDownOwnership", TypeAdapter(OwnershipTree)
+GET_TOP_DOWN_OWNERSHIP = Operation[UboResult, GetTopDownOwnershipRequest](
+    "getTopDownOwnership", TypeAdapter(UboResult)
 )
-GET_ULTIMATE_BENEFICIAL_OWNERS = Operation[OwnershipTree, GetUltimateBeneficialOwnersRequest](
-    "getUltimateBeneficialOwners", TypeAdapter(OwnershipTree)
+GET_ULTIMATE_BENEFICIAL_OWNERS = Operation[UboResult, GetUltimateBeneficialOwnersRequest](
+    "getUltimateBeneficialOwners", TypeAdapter(UboResult)
 )
 GET_PROFILE_FIELDS = Operation[Profile, GetProfileFieldsRequest](
     "getProfileFields", TypeAdapter(Profile)
 )
-GET_BASIC_IDENTIFIERS = Operation[BasicIdentifiers, GetBasicIdentifiersRequest](
-    "getBasicIdentifiers", TypeAdapter(BasicIdentifiers)
+RESOLVE_PERMANENT_ID = Operation[PidMembers, ResolvePermanentIdRequest](
+    "resolvePermanentId", TypeAdapter(PidMembers)
 )
-GET_KEY_IDENTIFIERS = Operation[KeyIdentifiers, GetKeyIdentifiersRequest](
-    "getKeyIdentifiers", TypeAdapter(KeyIdentifiers)
+GET_SANCTION_EXPOSURE = Operation[SanctionExposure, GetSanctionExposureRequest](
+    "getSanctionExposure", TypeAdapter(SanctionExposure)
 )
-RESOLVE_PERMANENT_ID = Operation[PermanentId, ResolvePermanentIdRequest](
-    "resolvePermanentId", TypeAdapter(PermanentId)
+FIND_PATHS = Operation[PathResponse, FindPathsRequest]("findPaths", TypeAdapter(PathResponse))
+GET_JUDICIAL_RECORDS = Operation[JudicialRecords, GetJudicialRecordsRequest](
+    "getJudicialRecords", TypeAdapter(JudicialRecords)
 )

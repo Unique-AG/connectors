@@ -3,6 +3,7 @@
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from datetime import timedelta
 from datetime import UTC
 from pathlib import Path
 from typing import cast
@@ -21,6 +22,9 @@ from mcp_openapi.upstream import OperationClient
 from mcp_types import ToolAnnotations
 import yaml
 
+from polixis_mcp.upstream.quota import QuotaAwareRetryPolicy
+from polixis_mcp.upstream.quota import QuotaGate
+from polixis_mcp.upstream.rejections import reject_error_body
 from polixis_mcp.upstream.routes import EXPOSED
 from polixis_mcp.upstream.settings import UpstreamSettings
 from polixis_mcp.upstream.token import ClientCredentialsAuth
@@ -41,13 +45,21 @@ def upstream_http(
     *,
     now: Callable[[], datetime] | None = None,
 ) -> httpx2.AsyncClient:
-    """Every request to the upstream goes through it, from `Upstream` and the generated tools.
+    """Every request to the upstream goes through it, from `Upstream` and the generated tools,
+    so its connection limit caps the requests in flight and its quota gate stops them all once
+    Polixis says the quota is spent. `limits` applies to the default transport only, not to one
+    a test passes.
 
-    `now` is the clock the client-credentials token's expiry is read against.
+    `now` is the clock the client-credentials token's expiry and the quota cooldown are read
+    against.
     """
+    clock = now or _utc_now
+    quota = QuotaGate(cooldown=timedelta(seconds=settings.quota_cooldown_seconds), now=clock)
     return httpx2.AsyncClient(
         base_url=str(settings.api_url).rstrip("/"),
         timeout=settings.timeout_seconds,
+        limits=httpx2.Limits(max_connections=settings.max_concurrent_requests),
+        event_hooks={"request": [quota.refuse_while_spent], "response": [quota.record]},
         transport=transport,
         auth=ClientCredentialsAuth(
             client_id=settings.client_id,
@@ -56,7 +68,7 @@ def upstream_http(
             token_url=str(settings.token_url),
             timeout=settings.timeout_seconds,
             transport=transport,
-            now=now or _utc_now,
+            now=clock,
         ),
         headers={"Accept": "application/json"},
     )
@@ -72,12 +84,14 @@ async def open_upstream(
     while every in-memory client enters the lifespan again.
     """
     retry = settings.retry
-    policy = RetryAfterPolicy(
-        max_attempts=retry.max_attempts,
-        max_wait_seconds=retry.max_wait_seconds,
-        statuses=retry.statuses,
+    policy = QuotaAwareRetryPolicy(
+        retry_after=RetryAfterPolicy(
+            max_attempts=retry.max_attempts,
+            max_wait_seconds=retry.max_wait_seconds,
+            statuses=retry.statuses,
+        )
     )
-    yield Upstream(SPEC, http, retry_policy=policy)
+    yield Upstream(SPEC, http, retry_policy=policy, response_check=reject_error_body)
 
 
 def upstream_tools(http: httpx2.AsyncClient) -> OpenAPIProvider:

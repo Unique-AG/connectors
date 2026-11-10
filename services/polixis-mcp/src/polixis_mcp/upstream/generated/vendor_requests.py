@@ -12,49 +12,63 @@ from pydantic import Field
 
 
 class CompletionRequestInput(RequestModel):
-    fields: list[str]
+    fields: list[str] = Field(
+        ...,
+        description="The field names to include (see GET /api/completion/fields for valid values).",
+    )
 
 
 class CorporateRequestInput(RequestModel):
-    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
-    category: (
-        list[
-            Literal[
-                "executive",
-                "executiveSenior",
-                "thirdParty",
-                "signature",
-                "ownershipInOtherEntities",
-                "shareholdingInformation",
-                "membership",
-            ]
+    id: str = Field(
+        ...,
+        description="Required. Identifier of the entity to look up (resolved to an internal node id).",
+    )
+    category: list[
+        Literal[
+            "executive",
+            "executiveSenior",
+            "board",
+            "political",
+            "signature",
+            "thirdParty",
+            "membership",
+            "shareholdingInformation",
+            "ownershipInOtherEntities",
         ]
-        | None
-    ) = Field(default=None, description="Relation categories to include.")
+    ] = Field(
+        ...,
+        description="The corporate relation categories to include in the response. Required: Polixis answers a 500 without it.",
+    )
 
 
-class GetBasicIdentifiersPath(RequestModel):
-    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
-
-
-class GetBasicIdentifiersRequest(RequestModel):
-    path: GetBasicIdentifiersPath
+class GetCorporateProfileQuery(RequestModel):
+    page: int = Field(
+        ...,
+        description="Zero-based page index. Omit for the full per-publisher grouped response; provide it for a flat paginated response across publishers. Required here: the tools use the flat page. Without it the response is a CorporateProfilesResponse instead.",
+        ge=0,
+    )
+    publisher: str | None = Field(
+        default=None,
+        description="Optional publisher (data-source) filter. With paging, restricts results to this publisher's related entities.",
+    )
+    size: int | None = Field(default=10, description="Page size (default 10).")
 
 
 class GetCorporateProfileRequest(RequestModel):
+    query: GetCorporateProfileQuery
     body: CorporateRequestInput
 
 
-class GetKeyIdentifiersPath(RequestModel):
-    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
+class GetJudicialRecordsPath(RequestModel):
+    id: str = Field(..., description="Entity identifier (resolved to an internal node id).")
 
 
-class GetKeyIdentifiersRequest(RequestModel):
-    path: GetKeyIdentifiersPath
+class GetJudicialRecordsRequest(RequestModel):
+    path: GetJudicialRecordsPath
 
 
 class GetProfileFieldsPath(RequestModel):
-    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
+    id: str = Field(..., description="Entity identifier (resolved to an internal node id).")
 
 
 class GetProfileFieldsRequest(RequestModel):
@@ -62,8 +76,16 @@ class GetProfileFieldsRequest(RequestModel):
     body: CompletionRequestInput
 
 
+class GetSanctionExposurePath(RequestModel):
+    id: str = Field(..., description="Entity identifier (resolved to an internal node id).")
+
+
+class GetSanctionExposureRequest(RequestModel):
+    path: GetSanctionExposurePath
+
+
 class GetTopDownOwnershipPath(RequestModel):
-    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
+    id: str = Field(..., description="Entity identifier (resolved to an internal node id).")
 
 
 class GetTopDownOwnershipRequest(RequestModel):
@@ -71,34 +93,24 @@ class GetTopDownOwnershipRequest(RequestModel):
 
 
 class GetUltimateBeneficialOwnersPath(RequestModel):
-    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
+    id: str = Field(..., description="Entity identifier (resolved to an internal node id).")
 
 
 class GetUltimateBeneficialOwnersRequest(RequestModel):
     path: GetUltimateBeneficialOwnersPath
 
 
-class GraphRuleInput(RequestModel):
-    direction: Literal["IN", "OUT", "BOTH"] | None = None
-    allowed_ctg: str | None = Field(
-        default=None,
-        description="Comma-separated relation categories to follow; empty follows all.",
-        serialization_alias="allowedCtg",
-    )
-    excluded_ctg: str | None = Field(
-        default=None,
-        description="Comma-separated relation categories not to follow.",
-        serialization_alias="excludedCtg",
-    )
-    only_actual: bool | None = Field(default=None, serialization_alias="onlyActual")
-    require_sanction: bool | None = Field(default=None, serialization_alias="requireSanction")
-    require_soe: bool | None = Field(default=None, serialization_alias="requireSoe")
-    require_person: bool | None = Field(default=None, serialization_alias="requirePerson")
-    require_org: bool | None = Field(default=None, serialization_alias="requireOrg")
+class PathRequestInput(RequestModel):
+    source_id: str = Field(..., serialization_alias="sourceId")
+    target_id: str = Field(..., serialization_alias="targetId")
 
 
 class ResolvePermanentIdPath(RequestModel):
-    pid: str
+    pid: str = Field(
+        ...,
+        description="The pid to check: P, O or U, then 32 hex digits.",
+        pattern="^[POUpou][0-9a-fA-F]{32}$",
+    )
 
 
 class ResolvePermanentIdRequest(RequestModel):
@@ -118,35 +130,72 @@ class SearchRequestInput(RequestModel):
     )
     dates: list[int] | None = Field(
         default=None,
-        description="Dates as yyyyMMdd integers, with 00 for an unknown month or day (19780200 is February 1978, 19780000 the year 1978).\n",
+        description="Dates as yyyyMMdd integers, with 00 for an unknown month or day (19780200 is February 1978, 19780000 the year 1978). A hit matches when one of its dates falls within one.",
     )
     adaptive_legal_forms: bool | None = Field(
         default=None,
-        description="Also match translations and variants of legal forms in names.",
+        description="Also match translations and variants of legal forms in names. On by default; off cut one search from 1,010 hits to 153.",
         serialization_alias="adaptiveLegalForms",
     )
-    size: int | None = Field(default=None, ge=1, le=50)
-    page: int | None = None
-
-
-class GraphFilterInput(RequestModel):
-    rules: dict[str, GraphRuleInput] | None = Field(
+    sanction: bool | None = Field(
+        default=None, description="Accepted live; its effect is unconfirmed."
+    )
+    pep: bool | None = Field(default=None, description="Accepted live; its effect is unconfirmed.")
+    former_pep: bool | None = Field(
         default=None,
-        description="One rule per relation type to follow, keyed by the relation type. Relation types without a rule are not followed. Without a filter the default rules apply.\n",
+        description="Accepted live; its effect is unconfirmed.",
+        serialization_alias="formerPep",
     )
+    unis: list[str] | None = Field(
+        default=None,
+        description="Identifier strings. Accepted live and narrows the hits (1,010 to 113 in one search), but what it matches is unconfirmed.",
+    )
+    size: int | None = Field(default=None, ge=1, le=50)
+    page: int | None = Field(default=None, ge=1)
 
 
-class GraphRequestInput(RequestModel):
-    id: str = Field(..., description="The entity the walk starts from.")
-    radius: int | None = Field(
-        default=None, description="How many hops to walk out from the entity."
+class FindPathsRequest(RequestModel):
+    body: PathRequestInput
+
+
+class RadiusFilterInput(RequestModel):
+    direction: Literal["IN", "OUT", "BOTH"] | None = Field(
+        default=None, description="The edge direction to traverse (IN, OUT, or BOTH)."
     )
-    filter: GraphFilterInput | None = None
-    fields: list[str] | None = Field(
-        default=None, description="Profile fields to return for each node in `meta`."
+    allowed_ctg: bytes | None = Field(
+        default=None,
+        description="Relation category codes to include; empty means all categories are allowed. The encoding behind string/binary is unconfirmed: a list of ctg codes, as bytes.",
+        serialization_alias="allowedCtg",
     )
-    truncate: bool | None = Field(
-        default=None, description="Return a reduced graph, recommended for large ones."
+    excluded_ctg: bytes | None = Field(
+        default=None,
+        description="Relation category codes to exclude from the traversal. The encoding behind string/binary is unconfirmed: a list of ctg codes, as bytes.",
+        serialization_alias="excludedCtg",
+    )
+    only_actual: bool | None = Field(
+        default=None,
+        description="Whether to exclude former or historical relations.",
+        serialization_alias="onlyActual",
+    )
+    require_sanction: bool | None = Field(
+        default=None,
+        description="Whether to keep only sanctioned entities.",
+        serialization_alias="requireSanction",
+    )
+    require_soe: bool | None = Field(
+        default=None,
+        description="Whether to keep only state-owned entities.",
+        serialization_alias="requireSoe",
+    )
+    require_person: bool | None = Field(
+        default=None,
+        description="Whether to keep only persons.",
+        serialization_alias="requirePerson",
+    )
+    require_org: bool | None = Field(
+        default=None,
+        description="Whether to keep only organizations.",
+        serialization_alias="requireOrg",
     )
 
 
@@ -154,9 +203,35 @@ class SearchEntitiesRequest(RequestModel):
     body: SearchRequestInput
 
 
+class HopFilterMapInput(RequestModel):
+    rules: dict[str, RadiusFilterInput] | None = Field(
+        default=None, description="Map of hop index to the filter applied at that hop."
+    )
+
+
+class SubgraphRequestInput(RequestModel):
+    id: str | None = Field(
+        default=None, description="The identifier of the root entity at the centre of the subgraph."
+    )
+    radius: int | None = Field(
+        default=None, description="The hop depth (radius) of the traversal around the root entity."
+    )
+    filter: HopFilterMapInput | None = Field(
+        default=None,
+        description="Optional per-hop traversal filters applied during the subgraph expansion.",
+    )
+    fields: list[str] | None = Field(
+        default=None, description="Optional list of node field names to include in the response."
+    )
+    truncate: bool | None = Field(
+        default=None,
+        description="Whether to cap large neighbourhoods by truncating the returned graph.",
+    )
+
+
 class GetSmartGraphRequest(RequestModel):
-    body: GraphRequestInput
+    body: SubgraphRequestInput
 
 
 class GetSubgraphRequest(RequestModel):
-    body: GraphRequestInput
+    body: SubgraphRequestInput
