@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 129 tools in total.
+- **Size:** 130 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -115,7 +115,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | --- | --- | --- | --- |
 | [`outlook-mailbox`](#outlook-mailbox) | Read inbox rules, the automatic reply, and categories. | 3 | No |
 | [`outlook-automate`](#outlook-automate) | Set the automatic reply, turn off a rule, create a category. | 6 | No |
-| [`outlook-rules`](#outlook-rules) | Create, change, and erase inbox rules. | 9 | No |
+| [`outlook-rules`](#outlook-rules) | Create, change, and erase inbox rules, and erase a category. | 10 | No |
 
 **Outlook calendar.** Calendars, events, availability, rooms, and sharing.
 
@@ -743,12 +743,13 @@ Inbox rules, the automatic reply, and categories.
 
 ### `outlook-rules`
 
-**9 tools** · Admin consent: **not required** · Builds on [`outlook-automate`](#outlook-automate)
+**10 tools** · Admin consent: **not required** · Builds on [`outlook-automate`](#outlook-automate)
 
 **You can**
 
 - Do everything in `outlook-automate`.
 - Create, change, and erase an inbox rule.
+- Erase a category. With `outlook-write`, this also renames a category.
 
 **Note:** A rule can forward or redirect mail to other people. The tools ask the user to approve such a rule, and every erasure. Opt-in preset.
 
@@ -759,12 +760,13 @@ Inbox rules, the automatic reply, and categories.
 | `outlook_create_mail_rule` | 🟠 Add | 🤝 A forward or redirect rule | Creates one inbox rule. The delete action of a rule moves mail to Deleted Items. |
 | `outlook_update_mail_rule` | 🟠 Add | 🤝 An enabled forward or redirect rule | Changes the name, order, state, conditions, exceptions, or actions of one inbox rule. |
 | `outlook_delete_mail_rule` | 🔴 Change | ✋ Always | Erases one inbox rule. This connector cannot restore it. No mail is erased. |
+| `outlook_delete_category` | 🔴 Change | ✋ Always | Erases one category from the list. Mail that carries it keeps the name, with no color. |
 
 **What it needs**
 
 - **Graph permissions (4):** `Mail.ReadBasic`, `MailboxSettings.Read`, `MailboxSettings.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
-- **User approval:** Asks ✋ every time for `outlook_delete_mail_rule`. Asks 🤝 in some cases for `outlook_set_automatic_reply`, `outlook_create_mail_rule`, `outlook_update_mail_rule`.
+- **User approval:** Asks ✋ every time for `outlook_delete_mail_rule`, `outlook_delete_category`. Asks 🤝 in some cases for `outlook_set_automatic_reply`, `outlook_create_mail_rule`, `outlook_update_mail_rule`.
 
 ## Outlook calendar presets
 
@@ -1457,6 +1459,7 @@ This reference lists all 129 tools. Use it to build an `enabled` list, or to fin
 | `outlook_delete_mail_rule` | 🔴 Write, changes or removes, safe to repeat | `MailboxSettings.ReadWrite` | No | ✋ Always |
 | `outlook_list_categories` | 🟢 Read | `MailboxSettings.Read` | No | — |
 | `outlook_create_category` | 🟠 Write, adds | `MailboxSettings.ReadWrite` | No | — |
+| `outlook_delete_category` | 🔴 Write, changes or removes, safe to repeat | `MailboxSettings.ReadWrite` | No | ✋ Always |
 | `outlook_list_time_zones` | 🟢 Read | `User.Read` | No | — |
 
 ### Outlook calendar

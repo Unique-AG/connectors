@@ -795,6 +795,7 @@ GRAPH_STEPS = frozenset(
         "mail_categories",
         "categories",
         "create_category",
+        "delete_category",
         "time_zones",
         "mark_message",
         "move_message",

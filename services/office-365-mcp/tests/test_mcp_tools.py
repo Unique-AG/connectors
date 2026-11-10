@@ -654,6 +654,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_update_mail_rule",
         "outlook_delete_mail_rule",
         "outlook_create_category",
+        "outlook_delete_category",
         "outlook_create_event",
         "outlook_create_event_on_behalf",
         "outlook_update_event",
