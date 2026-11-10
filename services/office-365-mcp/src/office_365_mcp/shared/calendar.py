@@ -858,11 +858,15 @@ class WorkingHoursSummary(BaseModel):
 _TEAMS_FOR_BUSINESS = spelled(OnlineMeetingProviderType.TeamsForBusiness)
 
 
-def providers_without_teams(calendar: Calendar) -> list[str] | None:
+def _allowed_providers(calendar: Calendar) -> list[str]:
     providers: Sequence[OnlineMeetingProviderType | None] = (
         calendar.allowed_online_meeting_providers or []
     )
-    allowed = [spelled(provider) for provider in providers if provider is not None]
+    return [spelled(provider) for provider in providers if provider is not None]
+
+
+def providers_without_teams(calendar: Calendar) -> list[str] | None:
+    allowed = _allowed_providers(calendar)
     if not allowed or _TEAMS_FOR_BUSINESS in allowed:
         return None
     return allowed
@@ -954,7 +958,9 @@ def with_default_online_meeting(draft: EventDraft, calendar: Calendar) -> EventD
     if draft.online_meeting is not None:
         return draft
     invited = bool(draft.attendees or draft.optional_attendees)
-    return replace(draft, online_meeting=invited and providers_without_teams(calendar) is None)
+    return replace(
+        draft, online_meeting=invited and _TEAMS_FOR_BUSINESS in _allowed_providers(calendar)
+    )
 
 
 def recurrence_refusal(tool: str, rule: RecurrenceRule | None, *, starts_on: date) -> str | None:

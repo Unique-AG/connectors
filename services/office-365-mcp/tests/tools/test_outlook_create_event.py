@@ -1903,6 +1903,21 @@ class TestTheTeamsMeetingACalendarDoesNotTake:
         assert create.call_count == 1
         assert "isOnlineMeeting" not in _sent(create)
 
+    @pytest.mark.parametrize("providers", [(), None], ids=["empty", "absent"])
+    async def test_the_default_adds_no_teams_meeting_unless_the_calendar_lists_teams(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        providers: Sequence[str] | None,
+    ) -> None:
+        _ = _reads(graph, _calendar(providers=providers))
+        create = _creates(graph)
+
+        _ = await _create(client, attendees=[_ADA])
+
+        assert create.call_count == 1
+        assert "isOnlineMeeting" not in _sent(create)
+
     async def test_an_event_with_no_online_meeting_is_created_whatever_the_calendar_allows(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
