@@ -11,8 +11,8 @@ covered() {
   exit 10
 }
 
-jq -e --arg path "services/${service}" 'has($path)' .release-please-manifest.json > /dev/null \
-  || covered "${service} is not a released service."
+released=$(jq --arg path "services/${service}" 'has($path)' .release-please-manifest.json)
+[ "$released" = true ] || covered "${service} is not a released service."
 
 release_pr=$(gh pr list --state open --limit 200 --label "autorelease: pending" --json number,headRefName,isCrossRepository \
   --jq "map(select(.headRefName == \"${branch}\" and (.isCrossRepository | not))) | .[0].number // empty")

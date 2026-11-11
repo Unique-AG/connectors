@@ -97,7 +97,7 @@ After attempt 2, go to Part E.
 
 ## Part E: Verdict, report and hand-off
 
-1. If the bump caused a breaking change that we use, or CI is red after the attempts, or CI timed out, or the cause is unclear, or a fix is outside the PR scope, or the script in step 5 of Part D failed, or a run is held in `action_required` (reason: "a maintainer must approve the run"): the agent could not finish. The result is `human-required`.
+1. If the bump caused a breaking change that we use, or CI is red after the attempts, or CI timed out, or the cause is unclear, or a fix is outside the PR scope, or the script in step 5 of Part D failed, or a run is held in `action_required` (reason: "a maintainer must approve the run"), or only `gatekeeper` failed (reason: "a maintainer must rerun gatekeeper"): the agent could not finish. The result is `human-required`.
 2. In all other cases, the result is `ai-assisted`.
 3. Run `bash agentic/skills/vulna-squash/scripts/set-result-label.sh <n> <result>`. It sets the result label and removes the other one.
 4. Write the report with the shape of `dependency-pr-review`. Start it with `<!-- vulna-squash-report -->`. Add the sections `What CI shows` and `What the agent changed`. Use the verdict that `dependency-pr-review` gives. A red CI that the bump caused means `do not merge`.
