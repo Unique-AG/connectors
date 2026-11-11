@@ -151,12 +151,8 @@ prometheus:
           2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
-      # Requests only happen during a sync, so the 75m window must be longer than the sync interval
-      # (scanIntervalCron). Otherwise an error that repeats on every sync resolves the alert between
-      # syncs. Widen it for schedules slower than hourly.
-      # A counter series for a new operation or status is created by its first request, and
-      # increase() does not count that first value. Adding the first value of every series that
-      # did not exist 75m ago counts it, for example the first error after a pod start.
+      # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
+      # The "unless ... offset 75m" terms add the first value of new series, which increase() skips.
       expr: |
         (
           sum by (namespace) (
