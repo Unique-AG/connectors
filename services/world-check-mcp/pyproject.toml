@@ -19,7 +19,7 @@ dependencies = [
     "pyyaml==6.0.3",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.44.2",
+    "unique-mcp==2026.46.0",
     "uvicorn[standard]==0.54.0",
 ]
 
