@@ -64,10 +64,11 @@ For each approved service:
    gh workflow run release-dev.yaml --repo Unique-AG/connectors --ref main -f service=<service>
    ```
 
-3. Wait until the same query returns a larger ID. Then read the service of that run. The log of the job `dev / plan` is ready after a few seconds:
+3. Wait until the same query returns a larger ID. Then read the job ID of `dev / plan` and its log. The log is ready when this job ends, which is a few seconds after the start. Do not use `gh run view --log`. It refuses a run that is in progress.
 
    ```bash
-   gh run view <run id> --repo Unique-AG/connectors --log | grep -m1 'SERVICE:'
+   job=$(gh run view <run id> --repo Unique-AG/connectors --json jobs --jq '.jobs[] | select(.name == "dev / plan") | .databaseId')
+   gh api --allow-escape-sequences repos/Unique-AG/connectors/actions/jobs/"$job"/logs | grep -m1 'SERVICE:'
    ```
 
 4. If the line names the service, write down the pair of service and run ID. If it names another service, or the log is not ready, report the run as unconfirmed. Do not give its URL as the build of this service.
@@ -76,7 +77,7 @@ Give the user each confirmed pair with the run URL. Check the result when the us
 
 If a run fails, read the failed step before you do anything else:
 
-- The step `Look for an existing image` reports that the image comes from another commit: do not start a new run. Every run fails the same way until someone deletes the tag by hand. Tell the user.
+- The step `Look for an existing image` reports that the image comes from another commit, or that the two registries hold different images for the version: do not start a new run. Every run fails the same way until someone deletes the tag by hand. Tell the user.
 - Another failure before the step that pushes the image: start a new run. Do not re-run the old one.
 - The image push worked, but a later step failed (for example the push of the branch `dev/<service>/main`): do not start a new run. A new run can choose the same version. It stops when `main` moved, because the revision of the existing image differs. Tell the user which step failed. The user decides how to fix the tag or the branch.
 
