@@ -552,7 +552,7 @@ run "preset_outlook_rules" {
   }
 
   assert {
-    condition     = length(local.tools) == 10
+    condition     = length(local.tools) == 11
     error_message = "outlook-rules resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }

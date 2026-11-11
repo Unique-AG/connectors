@@ -251,6 +251,7 @@ def _foreign_item() -> dict[str, object]:
 class StandIn:
     variants: frozenset[str] = frozenset()
     token: str = field(default=TOKEN, repr=False)
+    others: Mapping[str, str] = field(default_factory=dict[str, str], repr=False)
     today: date = field(default_factory=lambda: datetime.now(UTC).date())
     seen: list[str] = field(default_factory=list[str])
     failed_once: bool = False
@@ -265,7 +266,9 @@ class StandIn:
         self.seen.append(f"{request.method} {host}{path}")
         if host == MY_HOST:
             return self._download(request)
-        if request.headers.get("authorization") != f"Bearer {self.token}":
+        if request.headers.get("authorization") not in {
+            f"Bearer {one}" for one in (self.token, *self.others)
+        }:
             return _error(401, "InvalidAuthenticationToken", "Access token is empty.")
         if "retry" in self.variants and path.endswith("/inbox") and not self.failed_once:
             self.failed_once = True
@@ -281,10 +284,11 @@ class StandIn:
     ) -> dict[str, object] | Response:
         match method, path.split("/")[1:]:
             case "GET", ["me"]:
+                who = self.others.get(request.headers["authorization"].removeprefix("Bearer "), UPN)
                 return {
                     "id": USER_ID,
-                    "userPrincipalName": UPN,
-                    "mail": UPN,
+                    "userPrincipalName": who,
+                    "mail": who,
                     "displayName": USER_NAME,
                 }
             case "GET", ["organization"]:

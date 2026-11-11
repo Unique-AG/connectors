@@ -15,8 +15,9 @@ shows a starting point. "What happens" shows what the assistant does. "Limit" sh
 not work as Mia expects. A part named "Not supported yet" lists what people ask for and what the
 server cannot do today.
 
-The examples come from how people use the server and from what its tools can do. Not every example
-was run by hand. For the tools behind the examples, read the [tool reference](README.md).
+The examples come from how people use the server and from what its tools can do. Each example has
+a test, or the status page says why no test can prove it. For the tools behind the examples, read
+the [tool reference](README.md).
 
 ## Rules for every example
 
@@ -349,6 +350,32 @@ What happens:
 - The assistant tells Mia that it found no message.
 - It does not tell Mia that more messages may match.
 
+**Mail with one company is found by the domain of the company**
+
+Ask your assistant: "Find the mail with acme.com about the invoice."
+
+Tests: 1
+
+Situation: Mia got mail from "acme.com" and sent mail to "acme.com", and she has mail with other companies.
+
+What happens:
+
+- The assistant shows the messages that came from, went to, or were copied to an address at "acme.com".
+- It does not show the mail with other companies.
+
+**A person is found by the domain of their company**
+
+Ask your assistant: "Who do I know at acme.com?"
+
+Tests: 1
+
+Situation: Mia wrote to Tom at "acme.com", and her address book does not list "acme.com".
+
+What happens:
+
+- The assistant shows Tom and his address.
+- It says that Tom is found in Mia's past mail and not in the address book.
+
 #### The assistant reads a message and its attachments
 
 **A message is read in full and its attachments are named**
@@ -364,20 +391,18 @@ What happens:
 - The assistant gives the full text of the message.
 - It names "Draft v2.docx" with its size.
 
-**The content of an Excel attachment answers a question**
+**An Excel attachment is handed over as a file**
 
-Ask your assistant: "What is the total in the last row of the Excel file that Anna attached?"
+Ask your assistant: "Open the Excel file that Anna attached."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not be able to read the numbers inside an Excel attachment.
-
-Situation: Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row.
+Situation: Anna attached a 2 MB Excel workbook.
 
 What happens:
 
-- The assistant answers 4,200.
+- The assistant gets the workbook in its own format.
+- The connector does not turn the workbook into text.
 
 **An attachment above 10 MB is refused**
 
@@ -1536,9 +1561,6 @@ Ask your assistant: "File these 5 messages in my Archive folder."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant sometimes cannot move mail at first, because it names a message in the wrong way. It then searches again and moves the messages.
-
 Situation: Mia named 5 messages by their subjects only.
 
 What happens:
@@ -1712,15 +1734,14 @@ Ask your assistant: "Rename my category Follow-up Q4 to Follow-up Q1."
 
 Tests: 2
 
-!!! warning "Limit"
-    The assistant cannot rename a category. It makes a new category with the new name and moves the 4 messages to it. The old category stays in the list.
-
 Situation: Mia has the category "Follow-up Q4" on 4 messages.
 
 What happens:
 
 - Mia's categories hold "Follow-up Q1".
 - The 4 messages carry "Follow-up Q1".
+- Mia's categories no longer hold "Follow-up Q4".
+- The assistant asks Mia to approve first.
 
 #### An inbox rule acts on new mail without Mia
 
@@ -2027,6 +2048,20 @@ What happens:
 - Mia is told that the category "Follow-up Q4" is already there.
 - The assistant offers another name or the category that exists.
 - Mia's categories hold no second "Follow-up Q4".
+
+**A category that Mia does not have is not deleted**
+
+Ask your assistant: "Delete my category Follow-up Q9."
+
+Tests: 1
+
+Situation: Mia has no category named "Follow-up Q9".
+
+What happens:
+
+- Mia is told that no category has that name.
+- The assistant offers the categories that Mia has.
+- Nothing is deleted.
 
 **A rule that Microsoft rejects as invalid is not repeated**
 
@@ -3654,9 +3689,6 @@ Ask your assistant: "Save an invitation for the Board prep on Monday from 10:00 
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot keep a real invitation draft. It can save the meeting without attendees and add them after Mia approves.
-
 What happens:
 
 - "Board prep" is on Mia's calendar on Monday from 10:00 to 11:00 with no attendee.
@@ -5088,10 +5120,6 @@ What happens:
 
 - The assistant lists "Tom Berger".
 
-#### Not supported yet in managing contacts
-
-- The assistant cannot look up the telephone number of a colleague who is not in Mia's contacts.
-
 ## Teams
 
 ### Catching up on Teams
@@ -6438,6 +6466,19 @@ Mia leads projects and starts group chats and online meetings for them. Mia asks
 
 #### Mia controls who is in a group chat
 
+**A group chat is created and named**
+
+Ask your assistant: "Start a group chat named Launch with Anna and Tom."
+
+Tests: 2
+
+Situation: Mia has never chatted with Anna or Tom.
+
+What happens:
+
+- Mia is asked to approve the chat first.
+- After she approves, the chat "Launch" has Mia, Anna, and Tom as members.
+
 **A group chat is created from people Mia already chats with**
 
 Ask your assistant: "Start a group chat named Launch with Anna and Tom."
@@ -7102,10 +7143,6 @@ What happens:
 - Mia is asked to approve the chat first.
 - After she approves, Mia has a one-to-one chat with Tom that has no title.
 
-#### Not supported yet in running teams chats and online meetings
-
-- The assistant cannot start a chat with a person it has never chatted with.
-
 ## SharePoint
 
 ### Finding and reading files in OneDrive and SharePoint
@@ -7296,21 +7333,18 @@ What happens:
 - It gives Mia the web address that opens the file in a browser.
 - It does not summarize only a part of the file.
 
-**A file that Microsoft cannot convert is read as it is or reported**
+**A file that Microsoft cannot convert is handed over in its own format**
 
-Ask your assistant: "Summarize the Brightway Master Agreement."
+Ask your assistant: "Read the Brightway Master Agreement."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may not be able to read some files that Microsoft cannot convert.
 
 Situation: Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF.
 
 What happens:
 
-- The assistant reads the file in its own format or tells Mia that it cannot read the file.
-- It does not invent the content of the file.
+- The assistant gets the file in its own format.
+- The connector does not turn the file into text.
 
 #### Mia is told what happened when Microsoft cannot do what she asked
 
@@ -7532,20 +7566,17 @@ What happens:
 - The assistant names her OneDrive.
 - It gives the web address that opens the drive in a browser.
 
-**The libraries of a site are not listed as drives**
+**The libraries of a site are listed**
 
 Ask your assistant: "Which document libraries does the Sales site have?"
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot list the document libraries of a site.
-
 Situation: The Sales site holds the library "Shared Documents".
 
 What happens:
 
-- The assistant does not list the libraries of the Sales site.
+- The assistant lists "Shared Documents" with the web address that opens it.
 - It does not present her own drives as libraries of the Sales site.
 
 #### The assistant finds a site from what Mia remembers about it
@@ -7770,9 +7801,6 @@ What happens:
 Ask your assistant: "Copy my Template folder into the Sales site."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant can copy into the Sales site only when it can find a folder there.
 
 Situation: Mia has the folder "Template" of 20 files in her OneDrive.
 
@@ -9754,9 +9782,6 @@ Ask your assistant: "Send the latest price list to Anna by mail."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot attach the file to the mail. It puts a link to the file in the draft.
-
 Situation: The latest price list is in the Sales site.
 
 What happens:
@@ -9782,10 +9807,7 @@ What happens:
 
 Ask your assistant: "What is in the file that Anna posted in our chat yesterday?"
 
-Tests: 1
-
-!!! warning "Limit"
-    The assistant may not be able to open a file that someone posted in Teams.
+Tests: 3
 
 Situation: Anna posted the file "Offer.docx" in a chat with Mia yesterday.
 

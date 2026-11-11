@@ -68,6 +68,10 @@ def person_in_question(user_id: str, name: str) -> str:
     )
 
 
+def address_in_question(address: str) -> str:
+    return f"the person with the email address {cut_for_a_question(address)!r}"
+
+
 def member_in_question(user_id: str, name: str) -> str:
     return _with_object_id(
         user_id, f"the name {cut_for_a_question(name)!r} comes from Microsoft 365"

@@ -1,7 +1,7 @@
 import re
 import uuid
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta
 from typing import ClassVar, Literal, Self, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -858,11 +858,15 @@ class WorkingHoursSummary(BaseModel):
 _TEAMS_FOR_BUSINESS = spelled(OnlineMeetingProviderType.TeamsForBusiness)
 
 
-def providers_without_teams(calendar: Calendar) -> list[str] | None:
+def _allowed_providers(calendar: Calendar) -> list[str]:
     providers: Sequence[OnlineMeetingProviderType | None] = (
         calendar.allowed_online_meeting_providers or []
     )
-    allowed = [spelled(provider) for provider in providers if provider is not None]
+    return [spelled(provider) for provider in providers if provider is not None]
+
+
+def providers_without_teams(calendar: Calendar) -> list[str] | None:
+    allowed = _allowed_providers(calendar)
     if not allowed or _TEAMS_FOR_BUSINESS in allowed:
         return None
     return allowed
@@ -936,7 +940,7 @@ class EventDraft:
     body_html: str | None
     location: str | None
     all_day: bool
-    online_meeting: bool
+    online_meeting: bool | None
     room_addresses: tuple[str, ...] = ()
     categories: tuple[str, ...] = ()
     show_as: ShowAs | None = None
@@ -948,6 +952,15 @@ class EventDraft:
     response_requested: bool | None = None
     allow_new_time_proposals: bool | None = None
     recurrence: RecurrenceRule | None = None
+
+
+def with_default_online_meeting(draft: EventDraft, calendar: Calendar) -> EventDraft:
+    if draft.online_meeting is not None:
+        return draft
+    invited = bool(draft.attendees or draft.optional_attendees)
+    return replace(
+        draft, online_meeting=invited and _TEAMS_FOR_BUSINESS in _allowed_providers(calendar)
+    )
 
 
 def recurrence_refusal(tool: str, rule: RecurrenceRule | None, *, starts_on: date) -> str | None:
@@ -1161,13 +1174,10 @@ def _body_described(body_html: str) -> str:
 
 
 def event_body(draft: EventDraft, *, transaction_id: str) -> Event:
+    html = "" if draft.body_html is None and draft.online_meeting else draft.body_html
     return Event(
         subject=draft.subject,
-        body=(
-            None
-            if draft.body_html is None
-            else ItemBody(content=draft.body_html, content_type=BodyType.Html)
-        ),
+        body=None if html is None else ItemBody(content=html, content_type=BodyType.Html),
         start=DateTimeTimeZone(date_time=draft.starts_at, time_zone=draft.time_zone),
         end=DateTimeTimeZone(date_time=draft.ends_at, time_zone=draft.time_zone),
         is_all_day=draft.all_day,

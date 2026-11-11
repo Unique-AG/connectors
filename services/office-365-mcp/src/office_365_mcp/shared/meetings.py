@@ -35,7 +35,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
 from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import MeetingHandle
-from office_365_mcp.shared.identity import Person, person_in_question
+from office_365_mcp.shared.identity import Person, address_in_question, person_in_question
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.window import as_utc
 
@@ -157,8 +157,11 @@ def distinct_people(people: Sequence[Person]) -> tuple[Person, ...]:
     )
 
 
-def named_people(people: Sequence[Person]) -> str:
-    named = [person_in_question(person.user_id, person.name) for person in people]
+def named_people(people: Sequence[Person], addresses: Sequence[str] = ()) -> str:
+    named = [
+        *(person_in_question(person.user_id, person.name) for person in people),
+        *(address_in_question(address) for address in addresses),
+    ]
     return f"{counted_people(named)}: {', '.join(named)}"
 
 

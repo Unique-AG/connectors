@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 129 tools in total.
+- **Size:** 130 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -22,6 +22,33 @@ through the Microsoft Graph API.
   show what people ask an assistant to do, and what the tools do for each request.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
+
+## Start from what you want to do
+
+Find the use case in the table. Each use case has a section in the
+[use cases](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md)
+page. That section shows what users ask and what the assistant does. The Presets column lists the
+presets that hold every tool of the use case. Turn on all of them to cover the whole use case. Turn
+on fewer to cover part of it.
+
+| Use case | Ask your assistant to | Presets | Admin consent |
+| --- | --- | --- | --- |
+| [Finding and reading mail](use-cases.md#finding-and-reading-mail) | Find a message, read it with its attachments, and follow a conversation. | `outlook-read` | No |
+| [Drafting and sending mail](use-cases.md#drafting-and-sending-mail) | Write a draft, change it, and send it after you approve it. | `outlook-send` | No |
+| [Organizing the mailbox](use-cases.md#organizing-the-mailbox) | File and mark mail, make folders and categories, and make inbox rules. | `outlook-delete`, `outlook-rules`, `outlook-automate`, `outlook-mailbox` | No |
+| [Mailbox preferences](use-cases.md#mailbox-preferences) | Set the automatic reply and the focused inbox. | `outlook-write`, `outlook-automate`, `outlook-mailbox` | No |
+| [Reading the calendar](use-cases.md#reading-the-calendar) | List events, read an event, and show free time. | `outlook-read`, `outlook-calendar` | No |
+| [Scheduling and answering meetings](use-cases.md#scheduling-and-answering-meetings) | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
+| [Sharing and delegating calendars](use-cases.md#sharing-and-delegating-calendars) | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
+| [Managing contacts](use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
+| [Catching up on Teams](use-cases.md#catching-up-on-teams) | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
+| [Posting in Teams](use-cases.md#posting-in-teams) | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
+| [Running Teams chats and online meetings](use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
+| [Finding and reading files in OneDrive and SharePoint](use-cases.md#finding-and-reading-files-in-onedrive-and-sharepoint) | Find a file, open a folder, and read a file. | `sharepoint-write`, `sharepoint-sites`, `teams-files`, `teams-channels` | ⚠️ Yes |
+| [Organizing and sharing files in OneDrive and SharePoint](use-cases.md#organizing-and-sharing-files-in-onedrive-and-sharepoint) | Move, copy, and rename files, and share them. | `sharepoint-share`, `sharepoint-sites`, `teams-write-files`, `outlook-read` | ⚠️ Yes |
+| [Finding and reading SharePoint lists](use-cases.md#finding-and-reading-sharepoint-lists) | Find a site, read its lists and columns, and add, change, or erase list items. | `sharepoint-lists-delete` | ⚠️ Yes |
+| [Working with notes in OneNote](use-cases.md#working-with-notes-in-onenote) | Find, read, write, and copy notes. | `onenote-delete`, `sharepoint-sites`, `teams-channels` | ⚠️ Yes |
+| [Working across mail, calendar, files, and Teams](use-cases.md#working-across-mail-calendar-files-and-teams) | Join the work of the areas above in one request. | `teams`, `outlook-write`, `outlook-calendar`, `outlook-read`, `sharepoint-share`, `sharepoint-sites` | ⚠️ Yes |
 
 ## Choose a preset
 
@@ -88,7 +115,7 @@ Each row links to the section of that preset. The count of tools does not includ
 | --- | --- | --- | --- |
 | [`outlook-mailbox`](#outlook-mailbox) | Read inbox rules, the automatic reply, and categories. | 3 | No |
 | [`outlook-automate`](#outlook-automate) | Set the automatic reply, turn off a rule, create a category. | 6 | No |
-| [`outlook-rules`](#outlook-rules) | Create, change, and erase inbox rules. | 9 | No |
+| [`outlook-rules`](#outlook-rules) | Create, change, and erase inbox rules, and erase a category. | 10 | No |
 
 **Outlook calendar.** Calendars, events, availability, rooms, and sharing.
 
@@ -429,7 +456,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | `teams_send_channel_message_with_files` | 🟠 Add | ✋ Always | Posts a message to a channel with files that are already in SharePoint. Uploads nothing. |
 | `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
 | `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
-| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, or the document libraries of one site, with a handle for each. |
 
 **What it needs**
 
@@ -505,7 +532,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `teams_create_chat` | 🟠 Add | ✋ Always | Creates a one-to-one chat or a group chat. It posts no message. |
+| `teams_create_chat` | 🟠 Add | ✋ Always | Creates a one-to-one chat or a group chat. It takes each person by Entra id or by email address. It posts no message. |
 | `teams_add_chat_member` | 🟠 Add | ✋ Always | Adds one person to a chat, with the `owner` role. Microsoft refuses this for a one-to-one chat. |
 | `teams_remove_chat_member` | 🔴 Change | ✋ Always | Removes one member from a chat. Microsoft refuses this for a one-to-one chat. |
 | `teams_rename_chat` | 🔴 Change | ✋ Always | Changes the topic of a group chat. |
@@ -535,7 +562,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | `teams_get_channel_files_folder` | 🟢 Read | — | Gives the SharePoint folder of one channel. It does not list the files. |
 | `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
 | `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
-| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, or the document libraries of one site, with a handle for each. |
 | `sharepoint_read_file` | 🟢 Read | — | Reads one file of 10 MB or less, in its original format or as PDF. |
 
 **What it needs**
@@ -716,12 +743,13 @@ Inbox rules, the automatic reply, and categories.
 
 ### `outlook-rules`
 
-**9 tools** · Admin consent: **not required** · Builds on [`outlook-automate`](#outlook-automate)
+**10 tools** · Admin consent: **not required** · Builds on [`outlook-automate`](#outlook-automate)
 
 **You can**
 
 - Do everything in `outlook-automate`.
 - Create, change, and erase an inbox rule.
+- Erase a category. With `outlook-write`, this also renames a category.
 
 **Note:** A rule can forward or redirect mail to other people. The tools ask the user to approve such a rule, and every erasure. Opt-in preset.
 
@@ -732,12 +760,13 @@ Inbox rules, the automatic reply, and categories.
 | `outlook_create_mail_rule` | 🟠 Add | 🤝 A forward or redirect rule | Creates one inbox rule. The delete action of a rule moves mail to Deleted Items. |
 | `outlook_update_mail_rule` | 🟠 Add | 🤝 An enabled forward or redirect rule | Changes the name, order, state, conditions, exceptions, or actions of one inbox rule. |
 | `outlook_delete_mail_rule` | 🔴 Change | ✋ Always | Erases one inbox rule. This connector cannot restore it. No mail is erased. |
+| `outlook_delete_category` | 🔴 Change | ✋ Always | Erases one category from the list. Mail that carries it keeps the name, with no color. |
 
 **What it needs**
 
 - **Graph permissions (4):** `Mail.ReadBasic`, `MailboxSettings.Read`, `MailboxSettings.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
-- **User approval:** Asks ✋ every time for `outlook_delete_mail_rule`. Asks 🤝 in some cases for `outlook_set_automatic_reply`, `outlook_create_mail_rule`, `outlook_update_mail_rule`.
+- **User approval:** Asks ✋ every time for `outlook_delete_mail_rule`, `outlook_delete_category`. Asks 🤝 in some cases for `outlook_set_automatic_reply`, `outlook_create_mail_rule`, `outlook_update_mail_rule`.
 
 ## Outlook calendar presets
 
@@ -785,7 +814,7 @@ Calendars, events, availability, rooms, and sharing.
 **You can**
 
 - Do everything in `outlook-calendar`.
-- Create an event, with attendees, rooms, or a series.
+- Create an event, with attendees, rooms, or a series. An event with attendees has a Teams meeting, unless you ask for an event without one.
 - Change an event that you organize, or add a Teams meeting to it.
 - Cancel an event that you organize.
 - Accept, decline, or tentatively accept an invitation.
@@ -968,7 +997,7 @@ Files, folders, sharing, sites, and lists.
 | --- | --- | --- | --- |
 | `sharepoint_search_files` | 🟢 Read | — | Searches the files and folders that you can see, across OneDrive and SharePoint. |
 | `sharepoint_browse_folder` | 🟢 Read | — | Lists one level of one folder, sorted by name, date, or size. |
-| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, with a handle for each. |
+| `sharepoint_list_drives` | 🟢 Read | — | Lists your drives, or the document libraries of one site, with a handle for each. |
 
 **What it needs**
 
@@ -1430,6 +1459,7 @@ This reference lists all 129 tools. Use it to build an `enabled` list, or to fin
 | `outlook_delete_mail_rule` | 🔴 Write, changes or removes, safe to repeat | `MailboxSettings.ReadWrite` | No | ✋ Always |
 | `outlook_list_categories` | 🟢 Read | `MailboxSettings.Read` | No | — |
 | `outlook_create_category` | 🟠 Write, adds | `MailboxSettings.ReadWrite` | No | — |
+| `outlook_delete_category` | 🔴 Write, changes or removes, safe to repeat | `MailboxSettings.ReadWrite` | No | ✋ Always |
 | `outlook_list_time_zones` | 🟢 Read | `User.Read` | No | — |
 
 ### Outlook calendar
@@ -1612,7 +1642,6 @@ model then tells the user.
 | A file is larger than 10 MB | The tool refuses the file. It never sends part of a file. The model gives the user a link to open the file. |
 | A user wants a file that is not plain text | The tool creates only text files, such as `txt`, `md`, `csv`, `json`, and `html`. It cannot create a Word, Excel, PowerPoint, or PDF file. |
 | A file with the same name exists | The tool cannot replace a file. No tool uploads a file. |
-| A user wants the document libraries of a site | No tool lists them. `sharepoint_list_drives` lists only the drives of the signed-in user. |
 | A user shares a file | A link gives view access or edit access, to the organization or to anyone. The tool sets no expiry and no password. No tool removes a link or an invitation. |
 
 #### Outlook mail
@@ -1647,7 +1676,7 @@ model then tells the user.
 | --- | --- |
 | A channel has more than 50 posts | The tool reads one page of 50 posts at most, ordered by reply activity. A token reads the next page. Microsoft limits channel reads to about one request each second. |
 | A post has more than 50 replies | The tool reads 50 replies and marks the list as incomplete. The rest is out of reach. |
-| A user asks to start a chat with a person by name | `teams_create_chat` needs the Microsoft Entra id of the person. No tool turns a name or an email address into an id. |
+| A user asks to start a chat with a person by name | `teams_create_chat` needs the Microsoft Entra id or the email address of the person. A name alone is not enough, so the assistant finds the address with a recipient lookup tool, if the deployment has one. Microsoft must know the address as the sign-in name or primary address of a person in the tenant. |
 | A user sends a file in a message | The file must already be in SharePoint. No tool uploads a file. |
 | A meeting is old | Microsoft erases the transcripts of a one-off meeting about 60 days after the meeting. |
 | A tenant turns off transcripts | The tool cannot read them. A Teams administrator must turn them on. |

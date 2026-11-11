@@ -26,6 +26,7 @@ from msgraph.generated.users.item.user_item_request_builder import UserItemReque
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, GraphNotFound, graph_step
+from office_365_mcp.shared import kql
 from office_365_mcp.shared.handles import (
     MailFolderHandle,
     MailMessageHandle,
@@ -86,6 +87,11 @@ OUTLOOK_FOLDER_NAMES: tuple[str, ...] = (*_PARENT_NAMES, *_CHILD_NAMES)
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
 
 ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
+
+
+def participants_term(value: str) -> str:
+    quoted = kql.quoted(value)
+    return "(" + " OR ".join(f"{role}:{quoted}" for role in ("from", "to", "cc", "bcc")) + ")"
 
 
 type WellKnownFolder = Literal[
@@ -189,7 +195,8 @@ class MailSummary(BaseModel):
     uri: str = Field(
         description=(
             "The handle of this message. Copy it word for word wherever a tool asks for a "
-            "message handle. `folder_id` and `web_link` are not message handles."
+            "message handle, in `message_ref`, `message_refs` or `uri`. `folder_id` and "
+            "`web_link` are not message handles."
         )
     )
     subject: str | None = Field(description="The subject line, or null if none was set.")
@@ -239,8 +246,19 @@ class MailSummary(BaseModel):
             "value is null if Microsoft 365 reports none."
         )
     )
-    folder_id: str | None = Field(description="The Graph id of the folder holding the message.")
-    web_link: str | None = Field(description="A link that opens the message in Outlook on the web.")
+    folder_id: str | None = Field(
+        description=(
+            "The id of the folder holding the message. It is not a handle. Never pass it to a "
+            "tool as a message handle or as `folder_ref`."
+        )
+    )
+    web_link: str | None = Field(
+        description=(
+            "A link that opens the message in Outlook on the web. It is not a handle. Never "
+            "pass it to a tool as a message handle. Give it to the user when they ask where the "
+            "message is."
+        )
+    )
 
     @classmethod
     def from_message(cls, message: Message, *, message_id: str) -> Self:

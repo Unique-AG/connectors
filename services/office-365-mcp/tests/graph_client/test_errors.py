@@ -1,5 +1,6 @@
 """Every Graph failure a caller has to answer differently, from the status that produces it."""
 
+import logging
 from asyncio import CancelledError
 from collections.abc import Callable
 
@@ -7,6 +8,9 @@ import httpx
 import pytest
 import respx
 from msgraph.graph_service_client import GraphServiceClient
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from office_365_mcp.graph_client import (
     GraphFailure,
@@ -281,3 +285,119 @@ async def test_graph_failures_keep_graphs_reason_out_of_their_logged_message(
 
     assert raised.value.reason == reason
     assert "Invalid filter clause" not in str(raised.value)
+
+
+_OR_FILTER = "An internal server error occurred. The operation failed., Unrecognized filter"
+
+
+class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
+    async def test_a_server_error_keeps_the_reason_graph_gave(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me").mock(
+            return_value=httpx.Response(
+                500,
+                headers={"request-id": REQUEST_ID},
+                json=error_body("ErrorInternalServerError", _OR_FILTER),
+            )
+        )
+
+        with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+            _ = await client.me.get()
+
+        assert raised.value.reason == _OR_FILTER
+
+    @pytest.mark.usefixtures("retry_sleeps")
+    async def test_a_throttled_answer_keeps_the_reason_graph_gave(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        graph.get("/me").mock(
+            side_effect=always(503, {"Retry-After": "10"}, error_body("serviceError", _OR_FILTER))
+        )
+
+        with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
+            _ = await client.me.get()
+
+        assert raised.value.reason == _OR_FILTER
+
+    async def test_the_log_record_and_the_span_carry_the_same_fields(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        graph.get("/me").mock(
+            return_value=httpx.Response(
+                500,
+                headers={"request-id": REQUEST_ID},
+                json=error_body("ErrorInternalServerError", _OR_FILTER),
+            )
+        )
+        exporter = InMemorySpanExporter()
+        provider = TracerProvider()
+        provider.add_span_processor(SimpleSpanProcessor(exporter))
+
+        with (
+            caplog.at_level(logging.INFO, logger="office_365_mcp.graph_client.errors"),
+            provider.get_tracer("test").start_as_current_span("tool"),
+            pytest.raises(GraphUnavailable),
+            graph_errors("a_test", step="a_step"),
+        ):
+            _ = await client.me.get()
+
+        [record] = [r for r in caplog.records if r.getMessage() == "graph call failed"]
+        expected = {
+            "graph_operation": "a_test",
+            "graph_step": "a_step",
+            "graph_remedy": "unavailable",
+            "graph_status": 500,
+            "graph_code": "ErrorInternalServerError",
+            "graph_inner_code": "ErrorInternalServerError",
+            "graph_request_id": REQUEST_ID,
+            "graph_reason": _OR_FILTER,
+        }
+        assert record.levelno == logging.WARNING
+        assert {name: getattr(record, name) for name in expected} == expected
+        [span] = exporter.get_finished_spans()
+        assert dict(span.attributes or {}) == {
+            name: value for name, value in expected.items() if name != "graph_reason"
+        }
+
+    async def test_a_missing_item_is_logged_below_warning(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        graph.get("/me").mock(
+            return_value=httpx.Response(404, json=error_body("itemNotFound", "not here"))
+        )
+
+        with (
+            caplog.at_level(logging.INFO, logger="office_365_mcp.graph_client.errors"),
+            pytest.raises(GraphNotFound),
+            graph_errors("a_test"),
+        ):
+            _ = await client.me.get()
+
+        [record] = [r for r in caplog.records if r.getMessage() == "graph call failed"]
+        assert record.levelno == logging.INFO
+
+    async def test_an_unreachable_graph_is_logged_without_a_code(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        graph.get("/me").mock(side_effect=httpx.ConnectError("no route"))
+
+        with (
+            caplog.at_level(logging.INFO, logger="office_365_mcp.graph_client.errors"),
+            pytest.raises(GraphUnavailable),
+            graph_errors("a_test"),
+        ):
+            _ = await client.me.get()
+
+        [record] = [r for r in caplog.records if r.getMessage() == "graph call failed"]
+        assert record.__dict__["graph_remedy"] == "unavailable"
+        assert "graph_code" not in record.__dict__

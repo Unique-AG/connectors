@@ -26,11 +26,14 @@
           "type": "required"
         }
       ],
+      "body": { "content": "", "contentType": "html" },
       "end": { "dateTime": "2026-11-02T14:30", "timeZone": "UTC" },
       "isAllDay": false,
+      "isOnlineMeeting": true,
+      "onlineMeetingProvider": "teamsForBusiness",
       "start": { "dateTime": "2026-11-02T14:00", "timeZone": "UTC" },
       "subject": "Launch review",
-      "transactionId": "9ff95ffe-db03-5665-8c4a-a68744b42f72"
+      "transactionId": "368af386-cece-5aaf-94e6-e2da9ea2f0dd"
     },
     "status": 201
   },
