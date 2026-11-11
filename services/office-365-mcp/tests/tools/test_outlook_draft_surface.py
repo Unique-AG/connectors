@@ -79,6 +79,11 @@ _COPIED_AND_MARKED: Mapping[str, object] = {
     "categories": ["Finance"],
 }
 
+_WRITES_OF_A_DRAFT_WITH_COPIES = {
+    outlook_draft_mail.TOOL_NAME: ["POST"],
+    outlook_draft_reply.TOOL_NAME: ["POST", "PATCH"],
+}
+
 _EACH_TOOL = pytest.mark.parametrize(
     ("tool", "arguments", "methods"),
     [
@@ -88,7 +93,7 @@ _EACH_TOOL = pytest.mark.parametrize(
         pytest.param(
             outlook_draft_reply.TOOL_NAME,
             _REPLY_ARGUMENTS,
-            ["POST", "PATCH"],
+            ["POST"],
             id="outlook_draft_reply",
         ),
     ],
@@ -336,16 +341,18 @@ class TestTheWholeConfirmationOverARealClient:
         arguments: Mapping[str, object],
         methods: list[str],
     ) -> None:
+        _ = methods
         result = await an_agreeing_client.call_tool(
             tool, {**arguments, **_COPIED_AND_MARKED, "mailbox": _SHARED_MAILBOX}
         )
 
         assert result.structured_content is not None, "the agreed draft answered nothing"
+        assert _writes(graph) == _WRITES_OF_A_DRAFT_WITH_COPIES[tool]
         carrying = [
             call for call in _made(graph) if "ccRecipients" in call.request.content.decode()
         ]
         (write,) = carrying
-        assert write.request.method == methods[-1]
+        assert write.request.method == _WRITES_OF_A_DRAFT_WITH_COPIES[tool][-1]
         sent = _body_of(write)
         copied = cast("Sequence[Mapping[str, Mapping[str, object]]]", sent["ccRecipients"])
         assert [one["emailAddress"]["address"] for one in copied] == ["pam@example.invalid"]

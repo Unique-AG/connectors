@@ -8,10 +8,8 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
 from msgraph.generated.models.importance import Importance
-from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.users.item.messages.item.create_forward.create_forward_post_request_body import (  # noqa: E501
@@ -219,8 +217,8 @@ class MailReplyDraft(BaseModel):
     )
     body: str | None = Field(
         description=(
-            "The body as Microsoft stored it (HTML), once written; null when `body_written` is "
-            + "false."
+            "The body as Microsoft stored it, as HTML: the text of the `body` argument, then the "
+            + "quoted original message. The value is null if Microsoft returned no body."
         )
     )
     importance: str | None = Field(
@@ -237,13 +235,17 @@ class MailReplyDraft(BaseModel):
     )
     body_written: bool = Field(
         description=(
-            "Whether the second write landed. That write puts the text, the Cc and Bcc "
-            + "recipients, the importance and the categories on the draft. If it did not land, "
-            + "`failure` says why."
+            "True when Microsoft saved the second write, or when there is nothing to write. That "
+            + "write puts the Cc and Bcc recipients, the importance and the categories on the "
+            + "draft. The text is on the draft before this write. If Microsoft did not save the "
+            + "write, `failure` says why."
         )
     )
     failure: str | None = Field(
-        description="What Microsoft said when this tool did not write the text; null otherwise."
+        description=(
+            "What Microsoft said when it did not save the second write. The value is null when "
+            + "`body_written` is true."
+        )
     )
 
 
@@ -317,7 +319,11 @@ async def draft_reply(
                     )
         if answer is None:
             created = await _create(
-                reached, handle=handle, mode=mode, recipients=_recipients(forwarded_to)
+                reached,
+                handle=handle,
+                mode=mode,
+                recipients=_recipients(forwarded_to),
+                body_html=body_html,
             )
             assert created.id is not None, (
                 "Graph created a draft it gave no id, which cannot be filled"
@@ -325,9 +331,7 @@ async def draft_reply(
             fill = await _fill(
                 reached,
                 draft_id=created.id,
-                body=_fill_body(
-                    body_html, cc=copied, bcc=blind, importance=importance, categories=named
-                ),
+                body=_fill_body(cc=copied, bcc=blind, importance=importance, categories=named),
             )
 
     if isinstance(answer, InputRequiredResult):
@@ -461,32 +465,33 @@ async def _create(
     handle: MailMessageHandle,
     mode: MailReplyMode,
     recipients: list[Recipient],
+    body_html: str,
 ) -> Message:
     message = reached.messages.by_message_id(handle.message_id)
     with graph_step(STEP_CREATE_REPLY):
         if mode == "forward":
             draft = await message.create_forward.post(
-                CreateForwardPostRequestBody(to_recipients=recipients),
+                CreateForwardPostRequestBody(to_recipients=recipients, comment=body_html),
                 request_configuration=_request(),
             )
         else:
             draft = await message.create_reply.post(
-                CreateReplyPostRequestBody(), request_configuration=_request()
+                CreateReplyPostRequestBody(comment=body_html), request_configuration=_request()
             )
     assert draft is not None, "Graph answered a reply draft create with no message"
     return draft
 
 
 def _fill_body(
-    body_html: str,
     *,
     cc: Sequence[str],
     bcc: Sequence[str],
     importance: MailImportance | None,
     categories: Sequence[str],
-) -> Message:
+) -> Message | None:
+    if not (cc or bcc or importance or categories):
+        return None
     return Message(
-        body=ItemBody(content_type=BodyType.Html, content=body_html),
         cc_recipients=_recipients(cc) or None,
         bcc_recipients=_recipients(bcc) or None,
         importance=None if importance is None else Importance(importance),
@@ -494,7 +499,9 @@ def _fill_body(
     )
 
 
-async def _fill(reached: UserItemRequestBuilder, *, draft_id: str, body: Message) -> _Fill:
+async def _fill(reached: UserItemRequestBuilder, *, draft_id: str, body: Message | None) -> _Fill:
+    if body is None:
+        return _Fill(message=None, failure=None)
     try:
         with graph_step(STEP_FILL_REPLY):
             filled = await reached.messages.by_message_id(draft_id).patch(
@@ -512,7 +519,7 @@ def _request() -> RequestConfiguration[QueryParameters]:
 def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyDraft:
     assert created.id is not None, "Graph created a draft it gave no id, which cannot be addressed"
     stored = created if fill.message is None else fill.message
-    body = None if fill.message is None or fill.message.body is None else fill.message.body.content
+    body = None if stored.body is None else stored.body.content
     return MailReplyDraft(
         uri=MailMessageHandle(created.id).uri,
         mode=mode,
@@ -524,7 +531,7 @@ def _answer(mode: MailReplyMode, *, created: Message, fill: _Fill) -> MailReplyD
         body=body,
         importance=spelled(stored.importance),
         categories=list(stored.categories or []),
-        body_written=fill.message is not None,
+        body_written=fill.failure is None,
         failure=None if fill.failure is None else str(fill.failure),
     )
 
@@ -563,7 +570,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                description="What to say, as Markdown. This tool turns it into HTML.",
+                description=(
+                    "What to say, as Markdown. This tool turns it into HTML and puts it above "
+                    + "the quoted original message."
+                ),
             ),
         ],
         to: Annotated[

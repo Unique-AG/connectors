@@ -153,6 +153,20 @@ Feature: Drafting and sending mail
       Then the draft is addressed to Anna
       But it is not addressed to Tom
 
+    @happy @uc-04-60
+    Scenario: The text of a reply goes above the quoted message
+      Given Anna wrote to Mia and Tom
+      When Mia asks her assistant for a reply to the message of Anna that says "Friday works"
+      Then the draft starts with "Friday works"
+      And the message of Anna is quoted below it
+
+    @happy @uc-04-61
+    Scenario: The text of a forward goes above the quoted message
+      Given Anna sent Mia "Contract draft" with the attachment "Draft v2.docx"
+      When Mia asks her assistant to forward "Contract draft" to Tom with a short note
+      Then the draft to Tom starts with the note
+      And "Contract draft" is quoted below it
+
     @happy @uc-04-10
     Scenario: A forward carries the original attachments
       Given Anna sent Mia "Contract draft" with the attachment "Draft v2.docx"
@@ -527,14 +541,14 @@ Feature: Drafting and sending mail
       Then the question says that the message has no subject
       And the question says that Microsoft chooses the address
 
-  Rule: A reply whose text cannot be saved is reported
+  Rule: A reply whose copies cannot be saved is reported
 
     @unhappy @uc-04-53
-    Scenario: A reply whose text Microsoft cannot save is reported as not saved
-      Given Mia asks her assistant to reply to Anna with a text that Microsoft refuses
-      When the assistant makes the reply
-      Then the draft exists without the text
-      And the assistant tells Mia that the text is not saved
+    Scenario: A reply whose blind copy Microsoft cannot save is reported as not saved
+      Given Mia asks her assistant to reply to Anna with a blind copy to Priya
+      When Microsoft makes the draft but refuses the blind copy
+      Then the draft holds the text of the reply without the blind copy
+      And the assistant tells Mia that the blind copy is not saved
 
   Rule: A person is found in the mail of Mia when the directory does not list her
 

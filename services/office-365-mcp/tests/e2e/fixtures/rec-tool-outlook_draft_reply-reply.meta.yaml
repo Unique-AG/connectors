@@ -2,25 +2,25 @@ scenario: outlook_draft_reply-reply
 fixture: rec-tool-outlook_draft_reply-reply
 source: recorded
 target: graph
-recorded_at: '2026-10-29T15:10:25+00:00'
+recorded_at: '2026-11-11T15:05:46+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 24
-  keys dropped: 15
-  persona addresses: 12
-  persona names: 12
-  response headers dropped: 35
-  text kept: 14
-  text replaced: 2
+  ids mapped: 62
+  keys dropped: 16
+  persona addresses: 24
+  persona names: 24
+  response headers dropped: 42
+  text kept: 29
+  text replaced: 4
 literals:
-- <p>Thanks for the note.</p>
-- inbox
+- Q3 budget review
+- Thanks for the note.
+- q3-numbers.csv
 - reply
-- seed-v1
 - seed-v1 case-outlook_draft_reply-reply
 sdk_versions:
-  msgraph-sdk: 1.62.0
+  msgraph-sdk: 1.65.0
   msgraph-core: 1.5.2
   microsoft-kiota-http: 1.14.2
   httpx: 0.28.1
-  fastmcp: 4.1.3
+  fastmcp: 4.1.5
