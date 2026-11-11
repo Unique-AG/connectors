@@ -34,7 +34,7 @@ catalog:
   "@suites/doubles.vitest": 4.1.2
   "@suites/unit": 4.1.2
   "@swc/cli": 0.8.2
-  "@swc/core": 1.16.21
+  "@swc/core": 1.16.22
   "@types/amqplib": 0.10.8
   "@types/express": 5.0.6
   "@types/node": 26.6.6
