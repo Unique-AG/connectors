@@ -7,6 +7,7 @@ from world_check_mcp.contexts.passport.payload import passport_arguments
 from world_check_mcp.contexts.screening import FieldValue
 from world_check_mcp.contexts.screening import match_from_result
 from world_check_mcp.contexts.screening import refuse_existing_case
+from world_check_mcp.contexts.screening import watchlist_results
 from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
 from world_check_mcp.upstream import GET_COUNTRIES
 from world_check_mcp.upstream import GET_NATIONALITIES
@@ -65,7 +66,7 @@ async def passport_check(
             "LSEG completed the passport check but returned no caseSystemId. "
             "Inspect the case before retrying."
         )
-    watchlist = [item for item in saved.results if item.provider_type == "WATCHLIST"]
+    watchlist = watchlist_results(saved.results)
     passport_results = [item for item in saved.results if item.provider_type == "PASSPORT_CHECK"]
     return PassportCheck(
         case_id=saved.case_id,
