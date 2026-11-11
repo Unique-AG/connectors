@@ -8,13 +8,13 @@ A scenario is `working` when a person ran it by hand, `partly` when a limit bloc
 
 | Surface | working | partly | gap | untested | total |
 | --- | --- | --- | --- | --- | --- |
-| Outlook | 5 | 4 | 2 | 363 | 374 |
+| Outlook | 5 | 4 | 2 | 365 | 376 |
 | Teams | 0 | 0 | 1 | 145 | 146 |
 | SharePoint | 0 | 3 | 3 | 104 | 110 |
 | OneNote | 0 | 0 | 1 | 73 | 74 |
 | Across sources | 0 | 2 | 0 | 24 | 26 |
 
-Scenarios with an executable run: 19 of 730.
+Scenarios with an executable run: 19 of 732.
 
 ## Tests by surface
 
@@ -22,13 +22,13 @@ A scenario has `tests` (node ids of pytest tests), or `no_test` (a kind and a re
 
 | Surface | tests | no test | pending | total |
 | --- | --- | --- | --- | --- |
-| Outlook | 364 | 10 | 0 | 374 |
+| Outlook | 366 | 10 | 0 | 376 |
 | Teams | 142 | 4 | 0 | 146 |
 | SharePoint | 109 | 1 | 0 | 110 |
 | OneNote | 73 | 1 | 0 | 74 |
 | Across sources | 25 | 1 | 0 | 26 |
 
-Scenarios with an executable test: 713 of 730 (17 with an explained reason, 0 pending).
+Scenarios with an executable test: 715 of 732 (17 with an explained reason, 0 pending).
 
 ## Happy and unhappy paths by surface
 
@@ -36,7 +36,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 | Surface | happy | unhappy | total |
 | --- | --- | --- | --- |
-| Outlook | 163 | 211 | 374 |
+| Outlook | 165 | 211 | 376 |
 | Teams | 53 | 93 | 146 |
 | SharePoint | 40 | 70 | 110 |
 | OneNote | 30 | 44 | 74 |
@@ -79,7 +79,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 14 of 730. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 14 of 732. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |

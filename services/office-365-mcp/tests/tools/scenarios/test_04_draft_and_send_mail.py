@@ -515,12 +515,41 @@ class TestAReplyKeepsTheConversation:
 
         assert _addresses(draft) == [_ANNA]
         assert _addresses(draft, "cc") == []
-        assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
-        assert times_asked(graph, "PATCH", "") == 0
         assert (
             times_asked(graph, "POST", "/createReply"),
             times_asked(graph, "POST", "/createReplyAll"),
         ) == (1, 0)
+
+    async def test_the_text_of_a_reply_goes_above_the_quoted_message(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
+
+        _ = await call(
+            "outlook_draft_reply", message_ref=_REPLIED, mode="reply", body="Friday works."
+        )
+
+        assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
+        assert times_asked(graph, "PATCH", "") == 0
+
+    async def test_the_text_of_a_forward_goes_above_the_quoted_message(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-forward")
+
+        _ = await call(
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="forward",
+            to=["tom@example.test"],
+            body="Please read this.",
+        )
+
+        assert sent_json(graph, "POST", "/createForward") == {
+            "ToRecipients": [_recipient("tom@example.test")],
+            "Comment": "<p>Please read this.</p>",
+        }
+        assert times_asked(graph, "PATCH", "") == 0
 
     async def test_a_forward_is_made_from_the_message_and_so_carries_its_attachments(
         self, graph: respx.MockRouter
@@ -533,11 +562,6 @@ class TestAReplyKeepsTheConversation:
             to=["tom@example.test"],
             body="Please read this.",
         )
-        assert sent_json(graph, "POST", "/createForward") == {
-            "ToRecipients": [_recipient("tom@example.test")],
-            "Comment": "<p>Please read this.</p>",
-        }
-        assert times_asked(graph, "PATCH", "") == 0
         forward_id = cast("str", forward["uri"]).removeprefix("outlook:///messages/")
         _ = graph.get(f"/me/messages/{forward_id}/attachments").mock(
             return_value=httpx.Response(
