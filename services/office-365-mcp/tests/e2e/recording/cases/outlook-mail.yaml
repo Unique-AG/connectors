@@ -260,7 +260,7 @@ outlook_update_draft-basic:
 outlook_draft_reply-reply:
   chain:
     - tool: outlook_list_mail
-      args: {folder: inbox, category: seed-v1, limit: 1}
+      args: {folder: inbox, category: seed-v1, has_attachments: true, received_before: "2026-11-01", limit: 1}
     - tool: outlook_draft_reply
       args:
         mode: reply
@@ -271,7 +271,7 @@ outlook_draft_reply-reply:
 outlook_draft_reply-forward:
   chain:
     - tool: outlook_list_mail
-      args: {folder: inbox, category: seed-v1, limit: 2}
+      args: {folder: inbox, category: seed-v1, has_attachments: true, received_before: "2026-11-01", limit: 2}
     - tool: outlook_draft_reply
       args:
         mode: forward

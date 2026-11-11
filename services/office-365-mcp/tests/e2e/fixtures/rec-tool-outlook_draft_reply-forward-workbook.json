@@ -12,12 +12,14 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
     "response_json": {
-      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$search=%22subject:%5C%22Budget%20workbook%5C%22%22&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skiptoken=WUMRSmM7RZGuOIPSNq3syaQ2LX9ub6TXUQIESKuBPmFRGQCaPO1hKvnmNH61ZbG3PEkADFMhOJfvkAsrrUYkJBE2J2bYJmOJDnEWQLb5",
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$search=%22subject:%5C%22Budget%20workbook%5C%22%22&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skiptoken=RJIEQcF7SSZfaPGPJc5rcDMdHIHWr9WNNEjKUUWPMxSSqVSkKq8fEBqHEK52OLBCKm0IDKJlVLj8MBz1FiHPO69nF23vWjPVPfVFYCd5",
       "value": [
         {
-          "@odata.etag": "W/\"RFUHCFNDVEHwyButUwlrBQEdJtVx/IeaDOLab+gf\"",
+          "@odata.etag": "W/\"OLSAVUWLDSFxhFpkEoycCBUrOvSd/QtnFGAntQg7\"",
           "bodyPreview": "Here is the budget workbook for the relaunch. Please check the actual costs.",
-          "categories": ["seed-v1"],
+          "categories": [
+            "seed-v1"
+          ],
           "flag": {
             "flagStatus": "notFlagged"
           },
@@ -28,7 +30,7 @@
             }
           },
           "hasAttachments": true,
-          "id": "AAMkESumASD8PKE1UHAlUWuuRNX5IH82Pms9YID9LIRaMBMbS5GqUGAZCFCKKWGzizwXQOloMCsiL6k6AVD8HrCynQxtQtfjQPWlKlEu-ObeZVQSCPSPGCGwnFjbAcspCDCyBhPe-LtxJRDqnj_qBMT=",
+          "id": "AAMkGVhkMYS9QBD1BKKeSKpjIFF0OE95Nvh6CRE5HDFyOPWfW0WcNRACKTVTMVSpwwcSVAgcNKmeO2r5PRP3ClRwvYwhFxmvPTCyLdIy-RsxFBPJWWMRFRAudGfeKwdqSKTcIkAb-TbcAMNtduC7JYP=",
           "importance": "normal",
           "isDraft": false,
           "isRead": false,
@@ -50,7 +52,7 @@
               }
             }
           ],
-          "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkGPseILS9WKG5QFQnMStuARJ0PQ24Kim4QZG0TOOyJHTeA5BwMLMXKHJGPIClwewHLChuZWioP6a3NSX9CqZfhVhpAobmAHYbLyXw%2FRjmBHFGRCABCTFadRccSnqiPFGdIgDl%2FKetRECsdd%2BsKWF%3D&exvsurl=1&viewmodel=ReadMessageItem"
+          "webLink": "https://outlook.office365.com/owa/?ItemID=AAMkGPseILS9WKG5QFQnMStuARJ0PQ24Kim4QZG0TOOyJHTeA5BwMLMXKHJGPIClwewHLChuZWioP6a3NSX9CqZfhVhpAobmAHYbLyXw%2FRjmBHFGRCABCTFadRccSnqiPFGdIgDl%2FTimPNJuqaN2SSS%3D&exvsurl=1&viewmodel=ReadMessageItem"
         }
       ]
     }
@@ -60,7 +62,7 @@
     "path": "/v1.0/me/translateExchangeIds",
     "json": {
       "InputIds": [
-        "AAMkESumASD8PKE1UHAlUWuuRNX5IH82Pms9YID9LIRaMBMbS5GqUGAZCFCKKWGzizwXQOloMCsiL6k6AVD8HrCynQxtQtfjQPWlKlEu-ObeZVQSCPSPGCGwnFjbAcspCDCyBhPe-LtxJRDqnj_qBMT="
+        "AAMkGVhkMYS9QBD1BKKeSKpjIFF0OE95Nvh6CRE5HDFyOPWfW0WcNRACKTVTMVSpwwcSVAgcNKmeO2r5PRP3ClRwvYwhFxmvPTCyLdIy-RsxFBPJWWMRFRAudGfeKwdqSKTcIkAb-TbcAMNtduC7JYP="
       ],
       "SourceIdType": "restId",
       "TargetIdType": "restImmutableEntryId"
@@ -72,15 +74,15 @@
     "response_json": {
       "value": [
         {
-          "sourceId": "AAMkESumASD8PKE1UHAlUWuuRNX5IH82Pms9YID9LIRaMBMbS5GqUGAZCFCKKWGzizwXQOloMCsiL6k6AVD8HrCynQxtQtfjQPWlKlEu-ObeZVQSCPSPGCGwnFjbAcspCDCyBhPe-LtxJRDqnj_qBMT=",
-          "targetId": "ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ"
+          "sourceId": "AAMkGVhkMYS9QBD1BKKeSKpjIFF0OE95Nvh6CRE5HDFyOPWfW0WcNRACKTVTMVSpwwcSVAgcNKmeO2r5PRP3ClRwvYwhFxmvPTCyLdIy-RsxFBPJWWMRFRAudGfeKwdqSKTcIkAb-TbcAMNtduC7JYP=",
+          "targetId": "VEkMLpRXOQFTHIUCDnlmEq7pyHCuLK-FWz1Ya1Fxpg30TwLBFg2B7ujxagBC1oT4ClLK"
         }
       ]
     }
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/messages/ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ",
+    "path": "/v1.0/me/messages/VEkMLpRXOQFTHIUCDnlmEq7pyHCuLK-FWz1Ya1Fxpg30TwLBFg2B7ujxagBC1oT4ClLK",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
@@ -93,9 +95,9 @@
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"RFUHCFNDVEHwyButUwlrBQEdJtVx/IeaDOLab+gf\"",
-      "conversationId": "AAQkVXyqFRW9XOB9RMDoPEjxOEV8UL32Bsf0OZM6SBKfDUCeR0ClWBULJNfgB7eWuKaMcFezNLCPCJe=",
-      "id": "ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ"
+      "@odata.etag": "W/\"OLSAVUWLDSFxhFpkEoycCBUrOvSd/QtnFGAntQg7\"",
+      "conversationId": "AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo=",
+      "id": "VEkMLpRXOQFTHIUCDnlmEq7pyHCuLK-FWz1Ya1Fxpg30TwLBFg2B7ujxagBC1oT4ClLK"
     }
   },
   {
@@ -105,7 +107,7 @@
       "prefer": "IdType=\"ImmutableId\""
     },
     "query": {
-      "$filter": "conversationId eq 'AAQkVXyqFRW9XOB9RMDoPEjxOEV8UL32Bsf0OZM6SBKfDUCeR0ClWBULJNfgB7eWuKaMcFezNLCPCJe='",
+      "$filter": "conversationId eq 'AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo='",
       "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo,conversationId,sentDateTime",
       "$top": "1000"
     },
@@ -117,10 +119,12 @@
     "response_json": {
       "value": [
         {
-          "@odata.etag": "W/\"RFUHCFNDVEHwyButUwlrBQEdJtVx/IeaDOLab+gf\"",
+          "@odata.etag": "W/\"OLSAVUWLDSFxhFpkEoycCBUrOvSd/QtnFGAntQg7\"",
           "bodyPreview": "Here is the budget workbook for the relaunch. Please check the actual costs.",
-          "categories": ["seed-v1"],
-          "conversationId": "AAQkVXyqFRW9XOB9RMDoPEjxOEV8UL32Bsf0OZM6SBKfDUCeR0ClWBULJNfgB7eWuKaMcFezNLCPCJe=",
+          "categories": [
+            "seed-v1"
+          ],
+          "conversationId": "AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo=",
           "flag": {
             "flagStatus": "notFlagged"
           },
@@ -131,7 +135,7 @@
             }
           },
           "hasAttachments": true,
-          "id": "ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ",
+          "id": "VEkMLpRXOQFTHIUCDnlmEq7pyHCuLK-FWz1Ya1Fxpg30TwLBFg2B7ujxagBC1oT4ClLK",
           "importance": "normal",
           "isDraft": false,
           "isRead": false,
@@ -154,46 +158,46 @@
               }
             }
           ],
-          "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FOWi9Hu4Vmzw95GjDIQs7S0kemgeWM1vPxqeCR&exvsurl=1&viewmodel=ReadMessageItem"
+          "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FUZo2In5Azsg70QaXPTn2A5vvgfgVU2qS5SiMK&exvsurl=1&viewmodel=ReadMessageItem"
         }
       ]
     }
   },
   {
     "method": "POST",
-    "path": "/v1.0/me/messages/ZUyXRkYPLQXXAYYCNfdsFa7jtFQyYG-PMb1Hc4Hnmv88AwDOUq2D9ciohjVY3mOtubDZ/createForward",
+    "path": "/v1.0/me/messages/VEkMLpRXOQFTHIUCDnlmEq7pyHCuLK-FWz1Ya1Fxpg30TwLBFg2B7ujxagBC1oT4ClLK/createForward",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
     "json": {
+      "Comment": "<p>Please read this workbook.</p>",
       "ToRecipients": [
         {
           "emailAddress": {
             "address": "tom@example.test"
           }
         }
-      ],
-      "Comment": "<p>Please read this workbook.</p>"
+      ]
     },
     "status": 201,
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
-      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('DCtALsKIZVFTLOGQMpxfHw1zwUHsUM-IAh0Rz7Fonp07EuYCXr7S8gqtqjNN1wLoYYDW')",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('CQkFDxMEBOZEJNWSOynoTa3nzYEoAU-VGi4Of7Muxr12GaUAUb8R2abcfgKU61sYphKU')",
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"IOWFWRXFVVClfTirUyfvFMIhXyEw/YbvXQAjeRcs\"",
+      "@odata.etag": "W/\"FPVHKTYQJUHdqTqzKbtbWZSzPyRr/CwrVLGeqoov\"",
       "bccRecipients": [],
       "body": {
         "content": "synthetic text 01",
-        "contentType": "text"
+        "contentType": "html"
       },
       "bodyPreview": "synthetic text 02",
       "categories": [],
       "ccRecipients": [],
-      "changeKey": "CYMUOKFVNIBqiItcEltyKQOiZmNh/AzkJMFjbIwc",
-      "conversationId": "AAQkVXyqFRW9XOB9RMDoPEjxOEV8UL32Bsf0OZM6SBKfDUCeR0ClWBULJNfgB7eWuKaMcFezNLCPCJe=",
-      "createdDateTime": "2026-11-02T22:30:14Z",
+      "changeKey": "TCYZURNMAONmyBcaPsniEPIpNkRv/PtoVFIrrcqr",
+      "conversationId": "AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo=",
+      "createdDateTime": "2026-11-11T13:38:58Z",
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -204,13 +208,13 @@
         }
       },
       "hasAttachments": true,
-      "id": "DCtALsKIZVFTLOGQMpxfHw1zwUHsUM-IAh0Rz7Fonp07EuYCXr7S8gqtqjNN1wLoYYDW",
+      "id": "CQkFDxMEBOZEJNWSOynoTa3nzYEoAU-VGi4Of7Muxr12GaUAUb8R2abcfgKU61sYphKU",
       "importance": "normal",
       "isDraft": true,
       "isRead": true,
-      "lastModifiedDateTime": "2026-11-02T22:30:15Z",
+      "lastModifiedDateTime": "2026-11-11T13:38:58Z",
       "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
-      "receivedDateTime": "2026-11-02T22:30:15Z",
+      "receivedDateTime": "2026-11-11T13:38:58Z",
       "replyTo": [],
       "sender": {
         "emailAddress": {
@@ -218,7 +222,7 @@
           "name": "Mia Keller"
         }
       },
-      "sentDateTime": "2026-11-02T22:30:15Z",
+      "sentDateTime": "2026-11-11T13:38:58Z",
       "subject": "synthetic text 03",
       "toRecipients": [
         {
@@ -228,18 +232,20 @@
           }
         }
       ],
-      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FZOf7Ts0Tlzd28OpAMPq1X3dlbpqID1sMqKFVY&exvsurl=1&viewmodel=ReadMessageItem"
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FWYu2Jt2Tgux92IwPFGn9M8vihggNA01xOnwZP&exvsurl=1&viewmodel=ReadMessageItem"
     }
   },
   {
     "method": "PATCH",
-    "path": "/v1.0/me/messages/DCtALsKIZVFTLOGQMpxfHw1zwUHsUM-IAh0Rz7Fonp07EuYCXr7S8gqtqjNN1wLoYYDW",
+    "path": "/v1.0/me/messages/CQkFDxMEBOZEJNWSOynoTa3nzYEoAU-VGi4Of7Muxr12GaUAUb8R2abcfgKU61sYphKU",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
     "json": {
       "@odata.type": "#microsoft.graph.message",
-      "categories": ["seed-v1 case-outlook_draft_reply-forward-workbook"]
+      "categories": [
+        "seed-v1 case-outlook_draft_reply-forward-workbook"
+      ]
     },
     "status": 200,
     "response_headers": {
@@ -247,18 +253,20 @@
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"HSNHFPUTLOSvpXrwFlppUZGsSiSh/MnqJQBcsHpe\"",
+      "@odata.etag": "W/\"YEZPXMBOPBAajYrcImmvCUAnVpUl/DmrMVDiqvbv\"",
       "bccRecipients": [],
       "body": {
-        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Please read this workbook.</p></body></html>",
+        "content": "synthetic text 01",
         "contentType": "html"
       },
-      "bodyPreview": "Please read this workbook.",
-      "categories": ["seed-v1 case-outlook_draft_reply-forward-workbook"],
+      "bodyPreview": "synthetic text 02",
+      "categories": [
+        "seed-v1 case-outlook_draft_reply-forward-workbook"
+      ],
       "ccRecipients": [],
-      "changeKey": "XKFIUSVUTMVdbJzvRwjqOHBbZiNt/VwbMTCayYca",
-      "conversationId": "AAQkVXyqFRW9XOB9RMDoPEjxOEV8UL32Bsf0OZM6SBKfDUCeR0ClWBULJNfgB7eWuKaMcFezNLCPCJe=",
-      "createdDateTime": "2026-11-02T22:30:14Z",
+      "changeKey": "JRPKFFVDSUCelZucLgthPRCtNsCm/RqiPIGnnubj",
+      "conversationId": "AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo=",
+      "createdDateTime": "2026-11-11T13:38:58Z",
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -269,13 +277,13 @@
         }
       },
       "hasAttachments": true,
-      "id": "DCtALsKIZVFTLOGQMpxfHw1zwUHsUM-IAh0Rz7Fonp07EuYCXr7S8gqtqjNN1wLoYYDW",
+      "id": "CQkFDxMEBOZEJNWSOynoTa3nzYEoAU-VGi4Of7Muxr12GaUAUb8R2abcfgKU61sYphKU",
       "importance": "normal",
       "isDraft": true,
       "isRead": true,
-      "lastModifiedDateTime": "2026-11-02T22:30:15Z",
+      "lastModifiedDateTime": "2026-11-11T13:38:58Z",
       "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
-      "receivedDateTime": "2026-11-02T22:30:15Z",
+      "receivedDateTime": "2026-11-11T13:38:58Z",
       "replyTo": [],
       "sender": {
         "emailAddress": {
@@ -283,7 +291,7 @@
           "name": "Mia Keller"
         }
       },
-      "sentDateTime": "2026-11-02T22:30:15Z",
+      "sentDateTime": "2026-11-11T13:38:58Z",
       "subject": "synthetic text 03",
       "toRecipients": [
         {
@@ -293,7 +301,7 @@
           }
         }
       ],
-      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FZOf7Ts0Tlzd28OpAMPq1X3dlbpqID1sMqKFVY&exvsurl=1&viewmodel=ReadMessageItem"
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FWYu2Jt2Tgux92IwPFGn9M8vihggNA01xOnwZP&exvsurl=1&viewmodel=ReadMessageItem"
     }
   }
 ]

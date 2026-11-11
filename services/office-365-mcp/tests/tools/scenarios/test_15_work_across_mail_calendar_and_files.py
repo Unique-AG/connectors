@@ -67,6 +67,11 @@ DESIGN_REVIEW = "WEBVTT\n\n" + "\n\n".join(
 )
 
 
+_REPLIED = (
+    "outlook:///messages/HBgJVrRVMIFBPGFTQleeAf2pyPDcHG-TGu6Hi3Wurp81EyNDPh9A7luhgjZK8bEygUPD"
+)
+
+
 def _fault(status: int, body: str, **headers: str) -> httpx.Response:
     return response({"status": status, "body": body, "headers": headers})
 
@@ -308,7 +313,7 @@ class TestAReplyUsesADocumentFromSharePoint:
         routes = _fresh(graph, "outlook_draft_reply-reply")
         draft = await call(
             "outlook_draft_reply",
-            message_ref=mail["uri"],
+            message_ref=_REPLIED,
             mode="reply",
             body="The Standard list price is 100.",
             categories=["seed-v1 case-outlook_draft_reply-reply"],

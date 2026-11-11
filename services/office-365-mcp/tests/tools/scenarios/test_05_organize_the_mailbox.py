@@ -38,6 +38,9 @@ from tests.tools.scenarios.support import call
 _Q3_MESSAGE = (
     "outlook:///messages/UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW"
 )
+_REPLIED = (
+    "outlook:///messages/HBgJVrRVMIFBPGFTQleeAf2pyPDcHG-TGu6Hi3Wurp81EyNDPh9A7luhgjZK8bEygUPD"
+)
 _FOLDERS = "/me/mailFolders"
 _FORWARDING = {"forward_to": ["anna@example.test"]}
 _OUTCOME_UNKNOWN = "does not know if Microsoft 365 made the change"
@@ -1141,7 +1144,7 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
 
         draft = await call(
             "outlook_draft_reply",
-            message_ref=_Q3_MESSAGE,
+            message_ref=_REPLIED,
             mode="reply",
             body="I will sign it on Friday.",
         )
