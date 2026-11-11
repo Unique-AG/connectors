@@ -8,7 +8,6 @@ import {
 } from './locks.mjs';
 import { readFiles, trackedFiles } from './repo.mjs';
 import { runOrThrow } from './run.mjs';
-import { commitScope } from './scope.mjs';
 
 export function lockFiles(ecosystem) {
   if (ecosystem === 'npm') {
@@ -41,7 +40,7 @@ function lockChanges({ ecosystem, before, after }) {
   };
 }
 
-export function renderPr({ entry, files, before, after, gitcommitizen, cooldownDays }) {
+export function renderPr({ entry, files, before, after, cooldownDays }) {
   const { changes, projects } =
     entry.ecosystem === 'npm' || entry.ecosystem === 'uv'
       ? lockChanges({ ecosystem: entry.ecosystem, before, after })
@@ -50,7 +49,7 @@ export function renderPr({ entry, files, before, after, gitcommitizen, cooldownD
           projects: files,
         };
   return {
-    title: renderTitle(entry, commitScope(files, gitcommitizen)),
+    title: renderTitle(entry),
     body: renderBody({ entry, changes, projects, cooldownDays }),
   };
 }

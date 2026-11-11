@@ -16,12 +16,8 @@ VALID_ARGUMENTS = ["--description", "Probes.", "--upstream", "custom"]
 @pytest.fixture
 def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A clean git repository with the registries, the shared packages, a package named like an
-    MCP and a non-service scope."""
+    MCP."""
     copy_registries(tmp_path)
-    gitcommitizen = tmp_path / ".gitcommitizen"
-    gitcommitizen.write_text(
-        gitcommitizen.read_text().replace("# Docs\n", "# Docs\nguides-mcp = docs/guides-mcp/**\n")
-    )
     (tmp_path / "packages").mkdir()
     for package in (REPO / "packages").iterdir():
         if package.is_dir():
@@ -64,7 +60,6 @@ def refusal(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
         ("Weather-mcp", "name: must be kebab-case and end in -mcp"),
         ("weather--mcp", "name: must be kebab-case and end in -mcp"),
         ("shared-mcp", "shared-mcp would shadow the package of that name"),
-        ("guides-mcp", "guides-mcp is already the commit scope of docs/guides-mcp/**"),
         ("taken-mcp", "services/taken-mcp already exists"),
         ("taken-mcp", "`git clean -fdx services/taken-mcp` removes"),
         (f"{'a' * 30}-mcp", "name: must be at most 33 characters"),
@@ -310,7 +305,6 @@ def test_a_run_without_a_release_registers_the_mcp_but_no_release(
     assert {registry: after[registry] for registry in releases} == {
         registry: before[registry] for registry in releases
     }
-    assert "probe-cli-mcp = services/probe-cli-mcp/**" in after[".gitcommitizen"]
     assert '"!services/probe-cli-mcp"' in after["pnpm-workspace.yaml"]
     head = subprocess.run(
         ["git", "rev-parse", "--short=12", "HEAD"],

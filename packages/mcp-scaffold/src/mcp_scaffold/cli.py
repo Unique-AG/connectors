@@ -107,7 +107,7 @@ def _repository(parser: argparse.ArgumentParser) -> Path:
         parser.error("git is not installed, and the run needs it to find the repository")
     except subprocess.CalledProcessError as error:
         parser.error(f"run mcp-scaffold inside the repository: {cast(str, error.stderr).strip()}")
-    if not (root / ".gitcommitizen").is_file():
+    if not (root / "release-please-config.json").is_file():
         parser.error(f"run mcp-scaffold inside the connectors repository, not {root}")
     return root
 

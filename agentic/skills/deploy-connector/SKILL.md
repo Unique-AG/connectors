@@ -122,7 +122,7 @@ Verify that:
 
 ### 2.3 Review and merge
 
-- Name the PR `chore(<scope>): bump unique qa, uat01 and prod [UN-xxxxx]`.
+- Name the PR `chore: bump unique qa, uat01 and prod [UN-xxxxx]`.
 - Request review from a teammate in `#pod-connectors` (and check with the service owner if a chart migration is non-trivial).
 
 ---

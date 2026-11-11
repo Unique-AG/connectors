@@ -154,8 +154,8 @@ the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs`,
 `packages/mcp-scaffold` also runs for a change to `packages/mcp-configs`,
 `packages/mcp-observability`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the
 MCPs its tests generate use all four: the last for an OpenAPI upstream. It runs as well for a change to a
-file it registers a new MCP in by matching its text: `.gitcommitizen`,
-`release-please-config.json`, `.github/workflows/release-rerun.yaml` and `pnpm-workspace.yaml`,
+file it registers a new MCP in by matching its text: `release-please-config.json`,
+`.github/workflows/release-rerun.yaml` and `pnpm-workspace.yaml`,
 and for a change to the workflow files that list every service.
 
 `ruff` owns `.py`. The biome step covers the JSON a Python service also ships, mostly its Helm

@@ -10,19 +10,16 @@ concurrency:
 
 jobs:
   conventional-pr-title:
-    name: Validate PR title and scope
+    name: Validate PR title
     # These labels skip the job: the two release-please labels and the title exception.
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&
       !contains(github.event.pull_request.labels.*.name, 'title-exception')
-    permissions:
-      pull-requests: read # to list the files of the pull request
+    permissions: {}
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
-      GH_TOKEN: ${{ github.token }}
-      PR_NUMBER: ${{ github.event.number }}
       PR_TITLE: ${{ github.event.pull_request.title }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -37,28 +34,9 @@ jobs:
       - name: Validate PR title
         shell: nix shell github:proventuslabs/scriptorium/db7be54d3f1b10f77e96f20694f4bcf9799de19e#cz -c bash -e {0}
         run: |
-          FILES=$(gh pr view "$PR_NUMBER" --json files -q '.files[].path')
-          export FILES
-          if ! OUTPUT=$(printenv PR_TITLE | cz --no-breaking-footer lint --paths "$(printenv FILES)" 2>&1); then
+          if ! OUTPUT=$(printenv PR_TITLE | cz --no-breaking-footer lint 2>&1); then
             echo "::error title=Invalid PR Title::$OUTPUT"
             exit 1
-          fi
-
-      - name: Validate single-service scope
-        run: |
-          SCOPE=$(printenv PR_TITLE | grep -oP '^[a-z]+\(\K[^)]+' || true)
-
-          SERVICES=$(jq -r '.packages | keys[] | ltrimstr("services/")' release-please-config.json)
-
-          COUNT=0
-          for service in $SERVICES; do
-            if echo "$SCOPE" | tr ',' '\n' | tr -d ' ' | grep -qx "$service"; then
-              COUNT=$((COUNT + 1))
-            fi
-          done
-
-          if [ "$COUNT" -gt 1 ]; then
-            echo "::warning title=Too many service scopes::This pull request declares $COUNT service scopes. Keep a pull request to one service. Add the title-exception label to waive this warning."
           fi
 
   gatekeeper:

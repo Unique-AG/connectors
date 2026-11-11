@@ -1,7 +1,7 @@
 # mcp-scaffold
 
 Generates a new Python MCP service, once: the shared skeleton, the layers it asks for, its
-Dockerfile and Helm chart, and its commit scope, release and pnpm registration. The `new-mcp`
+Dockerfile and Helm chart, and its release and pnpm registration. The `new-mcp`
 skill asks what the MCP needs and runs it. From the repository root, with no uncommitted or
 untracked changes, so git can undo a failed run:
 
