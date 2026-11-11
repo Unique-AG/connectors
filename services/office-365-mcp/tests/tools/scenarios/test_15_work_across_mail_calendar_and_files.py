@@ -67,9 +67,7 @@ DESIGN_REVIEW = "WEBVTT\n\n" + "\n\n".join(
 )
 
 
-_REPLIED = (
-    "outlook:///messages/HBgJVrRVMIFBPGFTQleeAf2pyPDcHG-TGu6Hi3Wurp81EyNDPh9A7luhgjZK8bEygUPD"
-)
+_REPLIED_ID = "HBgJVrRVMIFBPGFTQleeAf2pyPDcHG-TGu6Hi3Wurp81EyNDPh9A7luhgjZK8bEygUPD"
 
 
 def _fault(status: int, body: str, **headers: str) -> httpx.Response:
@@ -103,9 +101,11 @@ def _failure(kind: str) -> httpx.Response | Exception:
 THREE_FAILURES = ["fails-with-an-internal-error", "no-answer-in-time", "unreadable-answer"]
 
 
-def _fresh(graph: MockRouter, name: str) -> dict[tuple[str, str], Route]:
+def _fresh(
+    graph: MockRouter, name: str, renamed: Mapping[str, str] | None = None
+) -> dict[tuple[str, str], Route]:
     graph.routes.clear()
-    return serve(graph, f"rec-tool-{name}")
+    return serve(graph, f"rec-tool-{name}", renamed)
 
 
 def _requests(graph: MockRouter) -> list[tuple[str, str]]:
@@ -310,10 +310,14 @@ class TestAReplyUsesADocumentFromSharePoint:
         mail = await _read_mail(graph, _list(question, "messages")[0]["uri"])
         plan = await _plan_file(graph)
         price_list = await _read_file(cast("str", plan["uri"]))
-        routes = _fresh(graph, "outlook_draft_reply-reply")
+        routes = _fresh(
+            graph,
+            "outlook_draft_reply-reply",
+            {_REPLIED_ID: cast("str", mail["uri"]).removeprefix("outlook:///messages/")},
+        )
         draft = await call(
             "outlook_draft_reply",
-            message_ref=_REPLIED,
+            message_ref=mail["uri"],
             mode="reply",
             body="The Standard list price is 100.",
             categories=["seed-v1 case-outlook_draft_reply-reply"],

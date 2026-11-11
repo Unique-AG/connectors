@@ -2,22 +2,21 @@ scenario: outlook_draft_reply-forward
 fixture: rec-tool-outlook_draft_reply-forward
 source: recorded
 target: graph
-recorded_at: '2026-11-11T14:01:22+00:00'
+recorded_at: '2026-11-11T14:38:34+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 88
-  keys dropped: 20
-  persona addresses: 52
-  persona names: 51
-  response headers dropped: 70
-  text kept: 55
+  ids mapped: 62
+  keys dropped: 16
+  persona addresses: 25
+  persona names: 24
+  response headers dropped: 42
+  text kept: 27
   text replaced: 6
 literals:
-- '2026-11-01'
 - Please read this.
+- Q3 budget review
 - forward
-- inbox
-- seed-v1
+- persona:tom
 - seed-v1 case-outlook_draft_reply-forward
 sdk_versions:
   msgraph-sdk: 1.65.0
