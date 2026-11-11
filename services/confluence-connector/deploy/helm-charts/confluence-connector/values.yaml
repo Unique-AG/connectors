@@ -145,7 +145,7 @@ prometheus:
       alert: ConfluenceConnectorUniqueAPIErrors
       annotations:
         summary: "Confluence Connector Unique API errors detected"
-        description: "More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ $value | humanizePercentage }}."
+        description: "More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ humanizePercentage $value }}."
         runbook: |
           1. Inspect application logs for specific error messages
           2. Check for recent deployments or configuration changes (both the connector and the Unique Services)

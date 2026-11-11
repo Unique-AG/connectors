@@ -137,7 +137,7 @@ spec:
 | probes.startup.initialDelaySeconds | int | `10` |  |
 | probes.startup.periodSeconds | int | `10` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorUniqueAPIErrors.alert | string | `"ConfluenceConnectorUniqueAPIErrors"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorUniqueAPIErrors.annotations.description | string | `"More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ $value | humanizePercentage }}."` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorUniqueAPIErrors.annotations.description | string | `"More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ humanizePercentage $value }}."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorUniqueAPIErrors.annotations.runbook | string | `"1. Inspect application logs for specific error messages\n2. Check for recent deployments or configuration changes (both the connector and the Unique Services)\n3. Verify network connectivity between connector and Unique Services\n4. Verify service user settings and permissions within Unique\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorUniqueAPIErrors.annotations.summary | string | `"Confluence Connector Unique API errors detected"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorUniqueAPIErrors.expr | string | `"(\n  sum by (namespace) (rate(confluence_connector_unique_api_errors_total[75m]))\n  /\n  sum by (namespace) (rate(confluence_connector_unique_api_requests_total[75m]))\n) > 0.01\n"` |  |
