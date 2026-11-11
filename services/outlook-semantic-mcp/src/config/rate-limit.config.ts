@@ -1,6 +1,5 @@
 import { mcpRateLimitConfigSchema } from '@unique-ag/mcp-server-module';
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
-import { registerConfig } from './register-config';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 
 export const rateLimitConfig = registerConfig('mcpRateLimit', mcpRateLimitConfigSchema);
 

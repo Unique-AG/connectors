@@ -1,7 +1,6 @@
 import { LogsDiagnosticDataPolicy } from '@unique-ag/utils';
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
-import { registerConfig } from './register-config';
 
 export const AppConfigSchema = z
   .object({
@@ -10,11 +9,11 @@ export const AppConfigSchema = z
       .prefault('production')
       .describe('Specifies the environment in which the application is running'),
     port: z.coerce
-      .number()
+      .number<string | undefined>()
       .int()
       .min(0)
       .max(65535)
-      .prefault(51349)
+      .default(51349)
       .describe('The local HTTP port to bind the server to'),
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

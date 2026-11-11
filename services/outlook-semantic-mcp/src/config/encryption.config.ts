@@ -1,13 +1,16 @@
-import { type ConfigType, type NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import {
+  type ConfigType,
+  type NamespacedConfigType,
+  registerConfig,
+} from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { redacted } from '~/utils/zod';
-import { registerConfig } from './register-config';
 
 const ConfigSchema = z.object({
   key: redacted(
     z
-      .instanceof(Buffer)
-      .or(z.hex().transform((key) => Buffer.from(key, 'hex')))
+      .hex()
+      .transform((key) => Buffer.from(key, 'hex'))
       .or(z.base64().transform((key) => Buffer.from(key, 'base64')))
       .refine(
         (buffer) => buffer.length === 32,

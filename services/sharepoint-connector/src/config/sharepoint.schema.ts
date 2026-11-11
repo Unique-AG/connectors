@@ -183,7 +183,7 @@ export const parsedScopeIdField = z
   );
 
 const maxFilesToIngestField = z.coerce
-  .number()
+  .number<string | undefined>()
   .int()
   .positive()
   .optional()
@@ -316,7 +316,7 @@ const sharepointBaseConfig = z.object({
   tenantId: requiredStringSchema.describe('Azure AD tenant ID'),
   auth: AuthConfigSchema.describe('Authentication configuration for Microsoft APIs'),
   graphApiRateLimitPerMinuteThousands: coercedPositiveNumberSchema
-    .prefault(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS)
+    .default(DEFAULT_GRAPH_RATE_LIMIT_PER_MINUTE_THOUSANDS)
     .describe('Number of MS Graph API requests allowed per minute (in thousands)'),
   baseUrl: urlWithoutTrailingSlashSchema(
     "Your company's sharepoint URL",

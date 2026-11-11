@@ -1,8 +1,7 @@
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import { parseJsonEnvironmentVariable } from '../utils/config.util';
 import { requiredStringSchema } from '../utils/zod.util';
-import { registerConfig } from './register-config';
 
 // ==========================================
 // App Configuration
@@ -28,11 +27,11 @@ export const AppConfigSchema = z
       .prefault('production')
       .describe('Specifies the environment in which the application is running'),
     port: z.coerce
-      .number()
+      .number<string | undefined>()
       .int()
       .min(0)
       .max(65535)
-      .prefault(9542)
+      .default(9542)
       .describe('The local HTTP port to bind the server to'),
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

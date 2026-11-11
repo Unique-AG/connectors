@@ -1,7 +1,6 @@
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
-import { registerConfig } from './register-config';
 
 // Send as (‎0‎)
 // The Send as permission allows the delegate to send an email from this mailbox. Message will appear to have been sent from this mailbox owner.
@@ -43,17 +42,17 @@ const recoveryCronSchedule = z
   );
 
 const stalenessThresholdHours = z.coerce
-  .number()
+  .number<string | undefined>()
   .int()
   .positive()
-  .prefault(24)
+  .default(24)
   .describe('Hours after which a delegated access account is considered stale for health checks.');
 
 const delegatedAccessFailureThreshold = z.coerce
-  .number()
+  .number<string | undefined>()
   .min(0)
   .max(1)
-  .prefault(0.15)
+  .default(0.15)
   .describe(
     'Fraction of eligible delegated users that may be stale before the check is marked down.',
   );

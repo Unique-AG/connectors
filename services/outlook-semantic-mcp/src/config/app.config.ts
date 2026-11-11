@@ -1,9 +1,8 @@
 import { LogsDiagnosticDataPolicy } from '@unique-ag/utils';
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { enabledDisabledBoolean, stringToURL } from '~/utils/zod';
 import { mcpBackendSchema } from './mcp-backend-type.config';
-import { registerConfig } from './register-config';
 
 export const mcpDebugModeSchema = enabledDisabledBoolean(
   `Enables debug mode. In debug mode tools responses contain debugging data.`,
@@ -22,11 +21,11 @@ const ConfigSchema = z
       .prefault('production')
       .describe('The environment in which the application is running.'),
     port: z.coerce
-      .number()
+      .number<string | undefined>()
       .int()
       .min(0)
       .max(65535)
-      .prefault(9542)
+      .default(9542)
       .describe('The local HTTP port to bind the server to.'),
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

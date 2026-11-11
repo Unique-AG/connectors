@@ -1,7 +1,10 @@
-import { type ConfigType, type NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import {
+  type ConfigType,
+  type NamespacedConfigType,
+  registerConfig,
+} from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { enabledDisabledBoolean, json } from '~/utils/zod';
-import { registerConfig } from './register-config';
 
 // ==== Config for local in-cluster communication with Unique API services ====
 

@@ -1,7 +1,10 @@
-import { type ConfigType, type NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import {
+  type ConfigType,
+  type NamespacedConfigType,
+  registerConfig,
+} from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { json, stringToURL } from '~/utils/zod';
-import { registerConfig } from './register-config';
 
 const baseConfig = z.object({
   integration: z
@@ -17,7 +20,7 @@ const baseConfig = z.object({
     .min(1, 'rootScopeId cannot be empty')
     .describe('The root scope ID under which to create transcript and recording folders.'),
   userFetchConcurrency: z.coerce
-    .number()
+    .number<string | undefined>()
     .int()
     .positive()
     .default(5)

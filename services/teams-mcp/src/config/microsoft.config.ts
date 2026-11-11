@@ -1,7 +1,10 @@
-import { type ConfigType, type NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import {
+  type ConfigType,
+  type NamespacedConfigType,
+  registerConfig,
+} from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { redacted, stringToURL } from '~/utils/zod';
-import { registerConfig } from './register-config';
 
 const ConfigSchema = z.object({
   clientId: z
@@ -33,7 +36,7 @@ const ConfigSchema = z.object({
       'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes. Optional - defaults to SELF_URL environment variable if not provided.',
     ),
   subscriptionExpirationTimeHoursUTC: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(0)
     .max(23)
     .default(3)

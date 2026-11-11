@@ -1,7 +1,6 @@
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { redacted } from '~/utils/zod';
-import { registerConfig } from './register-config';
 
 const ConfigSchema = z.object({
   apiBaseUrl: z

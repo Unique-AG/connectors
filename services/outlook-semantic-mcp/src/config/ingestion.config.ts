@@ -1,15 +1,14 @@
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
 import { inboxConfigurationMailFilters } from '~/db/schema/inbox/inbox-configuration-mail-filters.dto';
 import { json } from '~/utils/zod';
 import { McpBackendType } from './mcp-backend-type.config';
-import { registerConfig } from './register-config';
 
 const connectivityTimeoutMs = z.coerce
-  .number()
+  .number<string | undefined>()
   .int()
   .positive()
-  .prefault(3000)
+  .default(3000)
   .describe('Timeout in milliseconds for connectivity health checks.');
 
 const noIngestionConfig = z.object({
@@ -21,10 +20,10 @@ export const withIngestionConfig = z.object({
   mcpBackend: z.literal(McpBackendType.MicrosoftGraphAndUniqueApi),
   connectivityTimeoutMs,
   syncFailureThreshold: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(0)
     .max(1)
-    .prefault(0.15)
+    .default(0.15)
     .describe(
       'Fraction of eligible users that may be failing before fullSync or liveCatchup is marked down.',
     ),
@@ -67,14 +66,14 @@ export const withIngestionConfig = z.object({
   // 2. 2-3 minutes you will get almost all messages it's a very low chance to lose anything
   // 3.   5 minutes you are 99% you get everything if there are big outages you will probably lose some messages but the change is quite low
   liveCatchupRecheckOverlappingWindowMinutes: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(10)
-    .prefault(10)
+    .default(10)
     .describe('How many minutes should each live catchup run overlap the previous one'),
   liveCatchupOverlappingWindowMinutes: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(2)
-    .prefault(3)
+    .default(3)
     .describe('How many minutes should each live catchup run overlap the previous one'),
 });
 

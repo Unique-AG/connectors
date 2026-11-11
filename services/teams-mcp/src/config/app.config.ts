@@ -1,7 +1,6 @@
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod';
 import { stringToURL } from '~/utils/zod';
-import { registerConfig } from './register-config';
 
 const ConfigSchema = z
   .object({
@@ -10,11 +9,11 @@ const ConfigSchema = z
       .prefault('production')
       .describe('The environment in which the application is running.'),
     port: z.coerce
-      .number()
+      .number<string | undefined>()
       .int()
       .min(0)
       .max(65535)
-      .prefault(9542)
+      .default(9542)
       .describe('The local HTTP port to bind the server to.'),
     logLevel: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

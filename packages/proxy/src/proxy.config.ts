@@ -1,12 +1,11 @@
-import { ConfigType, NamespacedConfigType } from '@proventuslabs/nestjs-zod';
+import { ConfigType, NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { envRequiredSecretSchema, json } from '@unique-ag/utils/zod';
 import { isEmptyish } from 'remeda';
 import { z } from 'zod';
-import { registerConfig } from './register-config';
 
 const requiredStringSchema = z.string().trim().nonempty();
 
-const portSchema = z.coerce.number().int().positive().max(65535);
+const portSchema = z.coerce.number<string | undefined>().int().positive().max(65535);
 
 const proxyHeadersSchema = json(z.record(z.string(), z.string()));
 
@@ -57,7 +56,7 @@ const tlsProxyConfigSchema = z.object({
 // empty object {} when no PROXY_* env vars are set, and prefault only triggers when the input is
 // undefined (not an empty object).
 export const ProxyConfigSchema = z.preprocess(
-  (input) => (isEmptyish(input) ? { authMode: 'none' } : input),
+  (input: Record<string, string | undefined>) => (isEmptyish(input) ? { authMode: 'none' } : input),
   z.discriminatedUnion('authMode', [
     noneProxyConfigSchema,
     noAuthProxyConfigSchema,
