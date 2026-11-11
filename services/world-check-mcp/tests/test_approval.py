@@ -241,7 +241,7 @@ def test_request_state_keys_seal_state_any_replica_opens() -> None:
 
 
 def test_request_state_without_keys_stays_with_the_sealing_process() -> None:
-    settings = ElicitationSettings()
+    settings = ElicitationSettings(request_state_keys=[])
     sealed = request_state_security(settings).codec.seal(b"approval")
     with pytest.raises(Exception):  # noqa: B017, PT011
         request_state_security(settings).codec.unseal(sealed)
