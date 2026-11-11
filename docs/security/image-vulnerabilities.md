@@ -167,10 +167,23 @@ The rule "no fixed version, or a fix younger than 3 days" applies to other packa
 | Base image | One exact digest |
 | Final stage | It removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build. |
 | Layer cache | The container build template turns it off for the final stage, so `apt-get upgrade` takes the newest patches. |
-| A rebuild | A normal release. The Rebuild Service workflow opens one PR for each service, with the labels `dependencies` and `rebuild`. It opens no PR for a service that has an open release-please PR or an open rebuild PR, because that release already rebuilds the image. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`. |
+| A rebuild | A normal release. The Rebuild Service workflow opens one PR for each service, with the labels `dependencies` and `rebuild`. [Rebuild rules](#rebuild-rules) say when it opens, refreshes, or closes that PR. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`. |
 | The file `deploy/rebuild-date` | It holds the time of the rebuild PR. No code reads it. It only changes a file in the service, so release-please sees a commit. Each rebuild PR writes a new time. A release does not update it. |
 | A release | It pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record. |
 | A PR that is not a release PR | It builds the image without a push. It does not scan the image. |
+
+### Rebuild rules
+
+An open release PR already rebuilds the image. The Rebuild Service workflow and the skill `vulna-squash` both run `rebuild.sh`, which follows this table.
+
+| Open release PR | Open rebuild PR | Action |
+|---|---|---|
+| No | No | Open a rebuild PR. |
+| No | Yes | Refresh it. A new commit writes a new time to `deploy/rebuild-date`. |
+| Yes | Yes | Close the rebuild PR with a comment, and delete its branch. |
+| Yes | No | Do nothing. |
+
+A service that is not in `.release-please-manifest.json` gets no action.
 
 ## Files
 
@@ -181,7 +194,7 @@ The rule "no fixed version, or a fix younger than 3 days" applies to other packa
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
 | `.github/scripts/release-rebuild/rebuild.sh` | Opens the rebuild PRs. The workflow and the skill `vulna-squash` both run it. |
-| `.github/scripts/release-rebuild/rebuild-needed.sh` | Exits 10 with the reason when a service is not released, or has an open release PR or an open rebuild PR. Any other non-zero exit is a failed lookup |
+| `.github/scripts/release-rebuild/rebuild-plan.sh` | Prints the action for one service as JSON: `open`, `refresh`, `close`, or `none`. A failed lookup exits non-zero. |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `agentic/skills/vulna-squash/scripts/` | The shell scripts that the skill runs: the scan check, the entry check, the CI watch, the PR title scope, the result label, and the report comment |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date. The nightly scan and the release gate skip them. |

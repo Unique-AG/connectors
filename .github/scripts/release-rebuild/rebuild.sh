@@ -14,11 +14,11 @@ else
 fi
 
 for service in $services; do
-  jq -e --arg path "services/${service}" 'has($path)' .release-please-manifest.json > /dev/null \
+  [ "$(jq --arg path "services/${service}" 'has($path)' .release-please-manifest.json)" = true ] \
     || { echo "::error::${service} is not a released service."; exit 1; }
 done
 
-git fetch --quiet origin main
+git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
 stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 suffix=$(date -u +%Y%m%d%H%M%S)
 gh label create rebuild --color fbca04 --description "Rebuilds an image for operating system patches" || true
@@ -26,23 +26,39 @@ tree=$(mktemp -d)
 trap 'git worktree remove --force "$tree" 2> /dev/null || true' EXIT
 
 for service in $services; do
-  status=0
-  reason=$(bash "$here/rebuild-needed.sh" "$service") || status=$?
-  if [ "$status" = 10 ]; then
-    echo "::notice::${reason}"
-    continue
-  fi
-  [ "$status" = 0 ] || exit "$status"
+  plan=$(bash "$here/rebuild-plan.sh" "$service")
+  action=$(jq -r .action <<< "$plan")
+  reason=$(jq -r .reason <<< "$plan")
+  rebuild_pr=$(jq -r '.rebuild_pr // empty' <<< "$plan")
+  rebuild_branch=$(jq -r '.rebuild_branch // empty' <<< "$plan")
+  case "$action" in
+    none)
+      echo "::notice::${reason}"
+      continue
+      ;;
+    close)
+      gh pr close "$rebuild_pr" --delete-branch --comment "$reason"
+      continue
+      ;;
+  esac
   title="build(${service}): rebuild for operating system patches"
   body=${custom_body:-"This pull request rebuilds ${service}. It changes one date file and no code. The release build takes the newest operating system patches. GitHub holds the workflow runs on this pull request. Approve the runs. Then merge this pull request. Then merge the release pull request that release-please opens."}
-  branch="rebuild/${service}-${suffix}"
   file="services/${service}/deploy/rebuild-date"
-  git worktree add --quiet -b "$branch" "$tree" origin/main
+  if [ "$action" = refresh ]; then
+    branch=$rebuild_branch
+    git fetch --quiet origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
+    git worktree add --quiet -B "$branch" "$tree" "origin/${branch}"
+  else
+    branch="rebuild/${service}-${suffix}"
+    git worktree add --quiet -b "$branch" "$tree" origin/main
+  fi
   printf '%s\n' "$stamp" > "$tree/$file"
   git -C "$tree" add "$file"
   git -C "$tree" commit --quiet --message "$title"
   git -C "$tree" push --quiet origin "$branch"
   git worktree remove --force "$tree"
   git branch --quiet -D "$branch"
-  gh pr create --base main --head "$branch" --title "$title" --label dependencies --label rebuild --body "$body"
+  if [ "$action" = open ]; then
+    gh pr create --base main --head "$branch" --title "$title" --label dependencies --label rebuild --body "$body"
+  fi
 done
