@@ -4002,8 +4002,8 @@ packages:
     resolution: {integrity: sha512-ir1UPr3dkwexU7FdV8qBBbNDRUhMmIekYMFZfi+C/sLNnRESKPl23nB9b2pltqfOQNnGzsDdId90AEtG5tCx4A==}
     engines: {node: '>=6.0.0'}
 
-  baseline-browser-mapping@2.11.34:
-    resolution: {integrity: sha512-Aqr8mA1kIvyJ3UY5YAY7ib8LSo1DmDMbMnVqGPtsKW1LxaFQFwn9Eb3yvq2fUKJsRvaXjnAV7R5osqETapzNiA==}
+  baseline-browser-mapping@2.11.35:
+    resolution: {integrity: sha512-GNk8KX52CHqeNKGk8+7tZnQab/2k1t/BgrUHPKNdijzpEhF1saPQZHVKb6m5loSAxB39gyrTYw34Qf9CQ3u1qQ==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -9120,7 +9120,7 @@ snapshots:
 
   base64url@3.0.1: {}
 
-  baseline-browser-mapping@2.11.34: {}
+  baseline-browser-mapping@2.11.35: {}
 
   bcrypt-pbkdf@1.0.2:
     dependencies:
@@ -9192,7 +9192,7 @@ snapshots:
 
   browserslist@4.29.5:
     dependencies:
-      baseline-browser-mapping: 2.11.34
+      baseline-browser-mapping: 2.11.35
       caniuse-lite: 1.0.30001823
       electron-to-chromium: 1.5.478
       node-releases: 2.0.63
