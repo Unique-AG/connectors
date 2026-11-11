@@ -132,7 +132,7 @@ jobs:
           jq --arg image "${IMAGE}:${VERSION}" '.runs[].results[]?.message.text |= ("Image: " + $image + "\n" + .)' trivy-image-scan-results.sarif > tagged.sarif
           mv tagged.sarif trivy-image-scan-results.sarif
 
-      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         if: steps.resolve.outputs.found == 'true' && hashFiles('trivy-image-scan-results.sarif') != ''
         with:
           sarif_file: trivy-image-scan-results.sarif
@@ -201,7 +201,7 @@ jobs:
           timeout: 15m
           cache: true
 
-      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         if: hashFiles('trivy-lockfiles.sarif') != ''
         with:
           sarif_file: trivy-lockfiles.sarif
@@ -233,7 +233,7 @@ jobs:
           timeout: 10m
           cache: true
 
-      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+      - uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
         if: always() && hashFiles('trivy-config.sarif') != ''
         with:
           sarif_file: trivy-config.sarif
