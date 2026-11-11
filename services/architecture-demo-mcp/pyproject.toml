@@ -18,7 +18,7 @@ dependencies = [
     "pydantic-settings==2.16.2",
     "pydantic==2.14.3",
     "pyyaml==6.0.3",
-    "sqlalchemy[asyncio]==2.1.6",
+    "sqlalchemy[asyncio]==2.1.8",
     "starlette==1.10.0",
     "tenacity==9.2.1",
     "unique-mcp==2026.46.0",
