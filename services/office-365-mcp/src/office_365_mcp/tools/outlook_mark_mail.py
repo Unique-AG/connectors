@@ -519,7 +519,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Mark Mail Messages",
+        title="Outlook: Mark Mail Messages",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
@@ -529,8 +529,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The messages to change. Each one is the `uri` of a mail result, copied word "
-                    "for word. A `folder_id` and a `web_link` are not handles."
+                    "The messages to change. Each one is the `uri` of a result of "
+                    "outlook_list_mail, outlook_search_mail, or outlook_read_thread, copied word "
+                    "for word. Never pass a `folder_id` or a `web_link`."
                 ),
             ),
         ],

@@ -36,7 +36,10 @@ sharepoint_search_files instead.
 Notes:
 - This tool does not accept the sharing invitation that a link carries. As a result, the \
 signed-in user gets no new access to the item.
-- Microsoft documents this lookup for sharing links. Another form of web address can fail.
+- Microsoft documents this lookup for sharing links. Another form of web address can fail. This \
+tool also accepts the web address of a file that someone posted in a Teams chat, which is the \
+`url` of a Teams attachment. If that fails, call sharepoint_search_files with the `name` of the \
+attachment.
 """
 
 _NOT_A_WEB_ADDRESS = (
@@ -50,7 +53,8 @@ _NOT_A_WEB_ADDRESS = (
 GRAPH_NOT_FOUND = (
     "Microsoft 365 found no file or folder at this link. The link can be expired or removed. It "
     + "can also be a link that does not open for the signed-in user. If this address is not a "
-    + "sharing link, find the item with sharepoint_search_files instead. Otherwise, ask the user "
+    + "sharing link, or it is the address of a file from Teams, find the item with "
+    + "sharepoint_search_files instead. Otherwise, ask the user "
     + "to open the link in a browser. If you call this tool again with the same arguments, the "
     + "call will fail the same way."
 )
@@ -98,7 +102,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Resolve a File Link",
+        title="SharePoint: Resolve a File Link",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

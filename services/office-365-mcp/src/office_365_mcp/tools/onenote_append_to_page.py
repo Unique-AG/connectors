@@ -171,7 +171,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Append to a Page",
+        title="OneNote: Append to a Page",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

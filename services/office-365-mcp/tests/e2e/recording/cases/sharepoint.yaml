@@ -6,6 +6,13 @@ sharepoint_list_drives-mine:
   chain:
     - tool: sharepoint_list_drives
 
+sharepoint_list_drives-site:
+  chain:
+    - tool: sharepoint_search_sites
+      args: {query: "*", limit: 1}
+    - tool: sharepoint_list_drives
+      bind: {site: "$prev.sites[0].web_url"}
+
 sharepoint_browse_folder-root:
   chain:
     - tool: sharepoint_browse_folder

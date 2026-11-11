@@ -20,7 +20,11 @@ const ListChannelsOutputSchema = z.object({
   teamId: z.string(),
   channels: z.array(
     z.object({
-      channelId: z.string(),
+      channelId: z
+        .string()
+        .describe(
+          'Internal handle for this channel. Pass it with the teamId to get_channel_messages or send_channel_message. Never display it.',
+        ),
       displayName: z.string(),
       description: z.string().optional(),
       createdDateTime: z.string().nullable(),
@@ -44,7 +48,8 @@ export class ListChannelsTool {
     description:
       'List the channels in a Microsoft Teams team. Take the teamId from list_teams. ' +
       'Each channel comes with its channelId and its membership type: standard, private or shared. ' +
-      'Pass the teamId and channelId together to get_channel_messages or send_channel_message.',
+      'Pass the teamId and channelId together to get_channel_messages or send_channel_message. ' +
+      'teamId and channelId are internal: never show them to the user.',
     parameters: ListChannelsInputSchema,
     outputSchema: ListChannelsOutputSchema,
     annotations: {

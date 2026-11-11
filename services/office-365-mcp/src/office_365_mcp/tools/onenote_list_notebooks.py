@@ -443,7 +443,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Notebooks",
+        title="OneNote: List Notebooks",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

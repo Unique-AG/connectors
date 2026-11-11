@@ -531,7 +531,7 @@ class TestAReplyKeepsTheConversation:
 
         assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
         assert times_asked(graph, "PATCH", "") == 0
-        assert draft["body"] is not None
+        assert draft["body"] == _created_body("rec-tool-outlook_draft_reply-reply")
         assert (draft["body_written"], draft["failure"]) == (True, None)
 
     async def test_the_text_of_a_forward_goes_above_the_quoted_message(
@@ -552,7 +552,7 @@ class TestAReplyKeepsTheConversation:
             "Comment": "<p>Please read this.</p>",
         }
         assert times_asked(graph, "PATCH", "") == 0
-        assert draft["body"] is not None
+        assert draft["body"] == _created_body("rec-tool-outlook_draft_reply-forward")
         assert (draft["body_written"], draft["failure"]) == (True, None)
 
     async def test_a_forward_is_made_from_the_message_and_so_carries_its_attachments(
@@ -1304,6 +1304,11 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         ]
 
 
+def _created_body(fixture: str) -> object:
+    created = cast("dict[str, object]", answer_of(fixture, "POST", "/me/messages/")["body"])
+    return created["content"]
+
+
 def _draft_shared(tool: str) -> tuple[dict[str, object], str]:
     if tool == "outlook_draft_reply":
         return {
@@ -1485,7 +1490,7 @@ class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:
         )
 
         assert draft["body_written"] is False
-        assert draft["body"] is not None
+        assert draft["body"] == _created_body("rec-tool-outlook_draft_reply-reply")
         assert draft["failure"] == "Microsoft Graph returned 400 (ErrorBodyTooLarge)"
         assert draft["uri"]
 

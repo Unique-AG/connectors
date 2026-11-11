@@ -115,7 +115,9 @@ _NOT_A_MESSAGE_HANDLE = (
     + "in `uri`. One of these is not a handle. A subject line, an email address, an Outlook web "
     + "link and a bare message id are not handles. Neither is a folder or rule handle "
     + "under the same scheme. This tool makes sure that every handle is valid before any "
-    + "message moves, so nothing moved. Fix the value and call again with the whole batch."
+    + "message moves, so nothing moved. If you have no handles, call outlook_list_mail or "
+    + "outlook_search_mail and use the `uri` values. If the value is a folder handle, pass it as "
+    + "`folder_ref`. Fix the value and call again with the whole batch."
 )
 
 _HIDDEN_DESTINATION = (
@@ -290,7 +292,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Move Mail to a Folder",
+        title="Outlook: Move Mail to a Folder",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )
@@ -300,8 +302,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The messages to move. Each one is the `uri` of a mail result, copied word "
-                    "for word. A `folder_id` and a `web_link` are not handles."
+                    "The messages to move. Each one is the `uri` of a result of outlook_list_mail, "
+                    "outlook_search_mail, or outlook_read_thread, copied word for word. Never "
+                    "pass a `folder_id` or a `web_link`."
                 ),
             ),
         ],

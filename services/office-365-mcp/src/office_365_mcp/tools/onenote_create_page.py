@@ -8,7 +8,6 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
@@ -19,6 +18,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
     request_with_query,
+    send_parsed,
 )
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
@@ -257,9 +257,7 @@ async def create_page(
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_CREATE):
-                created = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-                    request, OnenotePage, {"XXX": ODataError}
-                )
+                created = await send_parsed(client, request, OnenotePage)
 
     if asked is not None:
         return asked
@@ -316,7 +314,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Page",
+        title="OneNote: Create a Page",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

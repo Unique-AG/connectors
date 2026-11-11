@@ -81,7 +81,9 @@ _ORDER_BY_CLAUSES: Mapping[str, str] = {
 _DESCRIPTION = """\
 Finds pages across every notebook the signed-in user can reach, inside one section, or inside the \
 notebooks of one group or one SharePoint site. `title_contains` matches the title only: Microsoft \
-Graph has no full-text search over a page's words for a work or school account. The page index can \
+Graph has no full-text search over a page's words for a work or school account. If the user asks \
+for a word that is only in the body of a page, say \
+that this cannot be searched, and offer a title search. The page index can \
 hold an empty title for days after a create, so find a new page by `created_at` or by its section \
 instead.
 
@@ -322,7 +324,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Find Pages",
+        title="OneNote: List Pages",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

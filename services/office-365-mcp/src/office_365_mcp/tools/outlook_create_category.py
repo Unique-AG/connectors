@@ -63,6 +63,9 @@ If this deployment exposes outlook_mark_mail, that tool puts a category on a mes
 Notes:
 - Each category name is unique in the list. Microsoft refuses a name that the list already has. \
 If you call this tool again with the same arguments, the call will fail the same way.
+- A category name cannot change after this call. To rename a category, create a new one, move \
+the messages to it, and delete the old one. If this deployment exposes outlook_mark_mail and \
+outlook_delete_category, they do the last two steps.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 outlook_list_categories does not show a category named `name`.
 """
@@ -107,7 +110,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Category",
+        title="Outlook: Create a Category",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

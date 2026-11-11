@@ -1,15 +1,11 @@
-import re
 from collections.abc import Mapping
 from typing import Annotated, Self
-from urllib.parse import quote, unquote, urlsplit
 
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.method import Method
 from msgraph.generated.models.list_ import List_
-from msgraph.generated.models.site import Site
 from msgraph.generated.sites.item.lists.lists_request_builder import ListsRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
@@ -18,11 +14,10 @@ from office_365_mcp.graph_client import (
     collect_pages,
     graph_errors,
     graph_step,
-    request_with_query,
-    send_parsed,
 )
 from office_365_mcp.shared.handles import ListHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.sites import not_a_site, site_by_path, site_path_of
 
 TOOL_NAME = "sharepoint_list_lists"
 
@@ -35,9 +30,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"site": "https://contoso.sharepoint.
 
 _LIST_FIELDS: tuple[str, ...] = ("id", "name", "displayName", "description", "webUrl", "list")
 
-# Reserved expansion keeps the `:` and `/` of `{host}:{path}`, which Graph needs unescaped.
-_SITE_BY_PATH = "{+baseurl}/sites/{+site_path}"
-
 _LIBRARY_TEMPLATES = frozenset({"documentLibrary", "mySiteDocumentLibrary"})
 
 _ListsQuery = ListsRequestBuilder.ListsRequestBuilderGetQueryParameters
@@ -48,16 +40,10 @@ sharepoint_get_list to see its columns, or to sharepoint_list_items to read its 
 
 Notes:
 - Hidden lists and document libraries are left out. If this deployment exposes \
-sharepoint_search_files, use it to find files.
+sharepoint_list_drives, it lists the libraries of a site. If it exposes sharepoint_search_files, \
+use it to find files.
 - This tool does not sort the rows.
 """
-
-_NOT_A_SITE = (
-    f"{TOOL_NAME} takes the web address of a site, such as the `web_url` of a row from "
-    + "sharepoint_search_sites. It starts with https://. A site name is not one, nor is a list "
-    + "handle. If you call this tool again with the same arguments, the call will fail the same "
-    + "way."
-)
 
 
 class ListSummary(BaseModel):
@@ -111,11 +97,13 @@ class SiteLists(BaseModel):
 
 async def list_lists(client: GraphServiceClient, *, site: str, limit: int) -> SiteLists:
     assert limit >= 1, f"limit must be at least 1, got {limit}"
-    site_path = _site_path(site)
+    site_path = site_path_of(site)
+    if site_path is None:
+        raise ToolError(not_a_site(TOOL_NAME))
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SITE):
-            resolved = await _site(client, site_path)
+            resolved = await site_by_path(client, site_path)
         assert resolved is not None and resolved.id is not None, "Graph returned a site with no id"
         site_id = resolved.id
         with graph_step(STEP_LISTS):
@@ -133,17 +121,6 @@ async def list_lists(client: GraphServiceClient, *, site: str, limit: int) -> Si
     )
 
 
-async def _site(client: GraphServiceClient, site_path: str) -> Site | None:
-    request = request_with_query(
-        Method.GET,
-        _SITE_BY_PATH,
-        {**client.sites.path_parameters, "site_path": site_path},
-        query={},
-    )
-    request.headers.try_add("Accept", "application/json")
-    return await send_parsed(client, request, Site)
-
-
 def _is_shown(found: List_) -> bool:
     info = found.list_
     hidden = info is not None and bool(info.hidden)
@@ -151,38 +128,12 @@ def _is_shown(found: List_) -> bool:
     return found.id is not None and not hidden and not library
 
 
-_DNS_NAME = re.compile(
-    r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]", re.IGNORECASE
-)
-
-
-def _site_path(site: str) -> str:
-    """`{host}` or `{host}:{path}`, the two ways Graph addresses a site by its web address."""
-    parts = urlsplit(site)
-    decoded = parts.path
-    while (again := unquote(decoded)) != decoded:
-        decoded = again
-    segments = decoded.replace("\\", "/").strip("/").split("/")
-    host = parts.hostname or ""
-    plain_host = parts.netloc.lower() == host and _DNS_NAME.fullmatch(host) is not None
-    encoded_separator = re.search(r"%(?:2f|5c)", site, re.IGNORECASE) is not None
-    if (
-        parts.scheme not in {"http", "https"}
-        or not plain_host
-        or encoded_separator
-        or {".", ".."} & {*segments}
-    ):
-        raise ToolError(_NOT_A_SITE)
-    path = quote(parts.path.rstrip("/"), safe="/%")
-    return f"{host}:{path}" if path else host
-
-
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     graph = graph_client_for_caller(transport, *GRAPH_PERMISSIONS)
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Lists",
+        title="SharePoint: List Lists",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

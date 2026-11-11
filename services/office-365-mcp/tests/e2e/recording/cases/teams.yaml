@@ -206,6 +206,15 @@ teams_create_chat-group:
           - {user_id: persona:anna.id, name: persona:anna.name}
           - {user_id: persona:tom.id, name: persona:tom.name}
 
+teams_create_chat-by-email:
+  external: true
+  chain:
+    - tool: teams_create_chat
+      args:
+        chat_type: group
+        topic: seed-v1 case-teams-chat
+        member_emails: [persona:anna, persona:tom]
+
 teams_rename_chat-group:
   external: true
   chain:
@@ -257,6 +266,61 @@ teams_send_chat_message_with_files-group:
     - tool: teams_send_chat_message_with_files
       args: {message: seed-v1 case-teams_send_chat_message_with_files-group notes}
       bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
+
+sharepoint_read_file-teams-attachment:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_search_files
+      args: {query: seed-v1 Meeting Notes, limit: 1}
+    - *new_chat
+    - tool: teams_send_chat_message_with_files
+      args: {message: seed-v1 case-sharepoint_read_file-teams-attachment notes}
+      bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
+    - tool: teams_list_chat_messages
+      args: {limit: 5}
+      bind: {chat_id: "$2.chat_id"}
+    - tool: sharepoint_resolve_url
+      bind: {url: "$prev.messages[0].attachments[0].url"}
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.uri"}
+
+sharepoint_read_file-teams-attachment-other-user:
+  external: true
+  needs: [sharepoint-seed-files]
+  chain:
+    - tool: sharepoint_browse_folder
+      as: 2
+      args: {limit: 100}
+    - tool: sharepoint_create_text_file
+      as: 2
+      args:
+        name: seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt
+        content: "Meeting notes, weekly project sync.\nRedirect test done. Two press pages missing.\nNext: cookie banner text.\n"
+      bind: {folder: "$prev.items[name=seed-v1 Seed Files].uri"}
+    - tool: sharepoint_invite
+      as: 2
+      args: {recipients: [persona:mia], role: read, notify: false}
+      bind: {item: "$prev.uri"}
+    - tool: teams_create_chat
+      as: 2
+      args:
+        chat_type: group
+        topic: seed-v1 case-teams-chat
+        members:
+          - {user_id: persona:mia.id, name: persona:mia.name}
+          - {user_id: persona:tom.id, name: persona:tom.name}
+    - tool: teams_send_chat_message_with_files
+      as: 2
+      args: {message: seed-v1 case-sharepoint_read_file-teams-attachment-other-user notes}
+      bind: {chat_id: "$prev.chat_id", attachments: ["$2.uri"]}
+    - tool: teams_list_chat_messages
+      args: {limit: 5}
+      bind: {chat_id: "$4.chat_id"}
+    - tool: sharepoint_resolve_url
+      bind: {url: "$prev.messages[0].attachments[0].url"}
+    - tool: sharepoint_read_file
+      bind: {file: "$prev.uri"}
 
 teams_create_meeting-solo:
   chain:

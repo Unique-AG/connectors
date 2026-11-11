@@ -124,7 +124,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List the Replies to a Teams Post",
+        title="Teams: List the Replies to a Post",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

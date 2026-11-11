@@ -75,9 +75,9 @@ change to everyone who can open the folder.
 Notes:
 - This tool asks the user to agree before it creates anything, every time.
 - To copy into another drive, take `to_folder` from the `uri` of a folder, from the \
-`parent_uri` of an item, or from the `root_uri` of a drive. To find a folder on a site, give the \
-web address of the site as `path` of sharepoint_search_files. No tool lists the libraries of a \
-site.
+`parent_uri` of an item, or from the `root_uri` of a drive. To list the libraries of a site, \
+call sharepoint_list_drives with the web address of the site as `site`. To find a folder on a \
+site, give that web address as `path` of sharepoint_search_files.
 - The copy gets the permissions of the destination folder, not the permissions of the original. \
 It has only the latest version of a file, and Microsoft does not copy the metadata of the original.
 - If the destination already holds an item with the same name, the copy fails. This error can \
@@ -276,7 +276,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy an Item",
+        title="SharePoint: Copy an Item",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

@@ -153,7 +153,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Send a Teams Chat Message with Files",
+        title="Teams: Send a Chat Message with Files",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

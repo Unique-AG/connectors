@@ -174,7 +174,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Folder",
+        title="SharePoint: Create a Folder",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

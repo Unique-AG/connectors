@@ -81,7 +81,10 @@ _EVERY_TEXT_EXTENSION = ", ".join(f"`.{extension}`" for extension in TEXT_EXTENS
 
 _DESCRIPTION = """\
 This tool creates one new text file in a OneDrive or SharePoint folder where the signed-in user \
-has write access. It cannot replace a file or upload a binary file. sharepoint_browse_folder finds \
+has write access. It cannot replace a file or upload a binary file. To replace a file, or to save \
+a mail \
+attachment as a file, tell the user that this connector cannot do it. Never delete the file and \
+create it again. sharepoint_browse_folder finds \
 the folder, and sharepoint_read_file reads the new file. OneDrive and SharePoint can show the \
 change to everyone who can open the folder.
 
@@ -224,7 +227,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Text File",
+        title="SharePoint: Create a Text File",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

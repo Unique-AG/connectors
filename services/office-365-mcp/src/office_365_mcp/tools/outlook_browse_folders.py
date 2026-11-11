@@ -68,7 +68,12 @@ _NOT_A_FOLDER_HANDLE = (
 
 
 class MailFolderSummary(BaseModel):
-    uri: str = Field(description="A handle for this folder; pass it back as `parent`.")
+    uri: str = Field(
+        description=(
+            "A handle for this folder. Pass it as `parent` to this tool to open the folder, or "
+            "as `folder_ref` to a tool that takes a folder."
+        )
+    )
     display_name: str | None = Field(description="The folder's name, or null if none.")
     total_items: int | None = Field(
         description="An upper bound on items of every kind this folder holds, or null if unset."
@@ -173,7 +178,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Browse Mail Folders",
+        title="Outlook: Browse Mail Folders",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

@@ -12,12 +12,17 @@ from msgraph.generated.models.aad_user_conversation_member import AadUserConvers
 from msgraph.generated.models.chat import Chat
 from msgraph.generated.models.chat_type import ChatType
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.identity import Person, person_in_question, user_bind
+from office_365_mcp.shared.identity import (
+    Person,
+    address_in_question,
+    person_in_question,
+    user_bind,
+)
 from office_365_mcp.shared.meetings import distinct_people, named_people
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -43,6 +48,15 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 type NewChatKind = Literal["oneOnOne", "group"]
 
+type MemberEmail = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        max_length=254,
+        pattern=r"^[^@\s'()/\\<>\"]+@[^@\s'()/\\<>\"]+\.[^@\s'()/\\<>\"]+$",
+    ),
+]
+
 _MEMBER = "#microsoft.graph.aadUserConversationMember"
 _OWNER = "owner"
 
@@ -60,10 +74,14 @@ with one other person, or a group chat. This tool adds the signed-in user to the
 posts no message. teams_list_chats shows the new chat.
 
 Notes:
+- Name each person by Microsoft Entra object id in `members`, from a chat member row, a message \
+sender, or a message mention. If you have only a name, find the email address of the person with \
+a recipient lookup tool of this deployment, and pass it in `member_emails`. If you have neither, \
+tell the user that you cannot create the chat. Never guess an id or an address.
 - This tool asks the user to agree before it creates a chat, every time. This tool creates \
 nothing unless the user agrees.
-- The question shows the Microsoft Entra object id of each person in `members`. The `name` in the \
-question is only a label.
+- The question shows the Microsoft Entra object id or the email address of each person. The \
+`name` in the question is only a label.
 - Only one one-to-one chat can exist between two people. If that chat exists already, Microsoft \
 returns it and creates no new chat.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
@@ -84,6 +102,18 @@ _A_TOPIC_ON_ONE_TO_ONE = (
     "teams_create_chat received a `topic` for a one-to-one chat. Microsoft allows a topic only on "
     + "a group chat. To keep a one-to-one chat, call again without `topic`. To use a topic, set "
     + f"`chat_type` to `group`. {_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
+)
+
+_NOBODY_GIVEN = (
+    "teams_create_chat received no person. Pass the other people in `members`, or their email "
+    + f"addresses in `member_emails`. {_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
+)
+
+GRAPH_NOT_FOUND = (
+    "Microsoft 365 knows no person for one of the ids in `members` or one of the addresses in "
+    + "`member_emails`. An address must be the sign-in name or the primary email address of a "
+    + f"person in this tenant. {_NOTHING_CREATED} Ask the user for the right address, or take "
+    + f"the id from a chat member row. {_FAILS_THE_SAME_WAY}"
 )
 
 _NOBODY_ELSE = (
@@ -137,12 +167,14 @@ async def create_chat(
     client: GraphServiceClient,
     *,
     chat_type: NewChatKind,
-    members: Sequence[Person],
+    members: Sequence[Person] = (),
+    member_emails: Sequence[str] = (),
     topic: str | None = None,
     confirm: Confirm,
 ) -> CreatedChat | InputRequiredResult:
     given = distinct_people(members)
-    refused = _refusal(chat_type, given, topic)
+    spelled = distinct_addresses(member_emails)
+    refused = _refusal(chat_type, given, spelled, topic)
     if refused is not None:
         raise ToolError(refused)
 
@@ -151,20 +183,26 @@ async def create_chat(
     with graph_errors(TOOL_NAME):
         user = await identity.signed_in_user(client)
         assert user.id is not None, "identity.signed_in_user returned a user with no id"
+        own = {one.casefold() for one in (user.mail, user.user_principal_name) if one}
         others = tuple(one for one in given if one.user_id.casefold() != user.id.casefold())
-        refused = None if others else _NOBODY_ELSE
+        addresses = tuple(one for one in spelled if one.casefold() not in own)
+        refused = None if others or addresses else _NOBODY_ELSE
         if refused is None:
             with not_graph():
                 answer = await confirm(
-                    _question(chat_type, others, topic),
-                    _about(chat_type, [one.user_id for one in others], topic),
+                    _question(chat_type, others, addresses, topic),
+                    _about(chat_type, others, addresses, topic),
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_CREATE):
                 created = await client.chats.post(
-                    _new_chat(chat_type, (user.id, *(one.user_id for one in others)), topic),
+                    _new_chat(
+                        chat_type,
+                        (user.id, *(one.user_id for one in others), *addresses),
+                        topic,
+                    ),
                     request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
                 )
 
@@ -176,26 +214,45 @@ async def create_chat(
     return CreatedChat.from_chat(created)
 
 
-def _refusal(chat_type: NewChatKind, given: Sequence[Person], topic: str | None) -> str | None:
-    if chat_type == "oneOnOne" and len(given) != 1:
-        return _not_one_other(len(given))
+def distinct_addresses(addresses: Sequence[str]) -> tuple[str, ...]:
+    first_spelled: dict[str, str] = {}
+    for one in addresses:
+        _ = first_spelled.setdefault(one.casefold(), one)
+    return tuple(first_spelled.values())
+
+
+def _refusal(
+    chat_type: NewChatKind, given: Sequence[Person], addresses: Sequence[str], topic: str | None
+) -> str | None:
+    count = len(given) + len(addresses)
+    if count == 0:
+        return _NOBODY_GIVEN
+    if chat_type == "oneOnOne" and count != 1:
+        return _not_one_other(count)
     if chat_type == "oneOnOne" and topic is not None:
         return _A_TOPIC_ON_ONE_TO_ONE
     return None
 
 
-def _question(chat_type: NewChatKind, others: Sequence[Person], topic: str | None) -> str:
+def _question(
+    chat_type: NewChatKind, others: Sequence[Person], addresses: Sequence[str], topic: str | None
+) -> str:
     if chat_type == "oneOnOne":
-        return (
-            "Create a one-to-one Teams chat with "
-            + f"{person_in_question(others[0].user_id, others[0].name)}?"
+        who = (
+            person_in_question(others[0].user_id, others[0].name)
+            if others
+            else address_in_question(addresses[0])
         )
+        return f"Create a one-to-one Teams chat with {who}?"
     named = "" if topic is None else f" named {cut_for_a_question(topic)!r}"
-    return f"Create a group Teams chat{named} with {named_people(others)}?"
+    return f"Create a group Teams chat{named} with {named_people(others, addresses)}?"
 
 
-def _about(chat_type: NewChatKind, others: Sequence[str], topic: str | None) -> str:
-    return confirmation_id_for(chat_type, str(len(others)), *sorted(others), repr(topic))
+def _about(
+    chat_type: NewChatKind, others: Sequence[Person], addresses: Sequence[str], topic: str | None
+) -> str:
+    named = [one.user_id for one in others] + [f"email:{one.casefold()}" for one in addresses]
+    return confirmation_id_for(chat_type, str(len(named)), *sorted(named), repr(topic))
 
 
 def _new_chat(chat_type: NewChatKind, members: Sequence[str], topic: str | None) -> Chat:
@@ -224,7 +281,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Teams Chat",
+        title="Teams: Create a Chat",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )
@@ -239,19 +296,30 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        ctx: Context,
         members: Annotated[
-            list[Person],
+            list[Person] | None,
             Field(
-                min_length=1,
                 description=(
-                    "The other people in the chat, with one entry for each person. Do not include "
-                    + "the signed-in user, because this tool adds that user itself. This tool adds "
-                    + "every person as an owner, and Microsoft accepts no in-tenant guest as an "
-                    + "owner."
+                    "The other people in the chat that you know by Microsoft Entra object id, "
+                    + "with one entry for each person. Do not include the signed-in user, because "
+                    + "this tool adds that user itself. This tool adds every person as an owner, "
+                    + "and Microsoft accepts no in-tenant guest as an owner. Leave this out when "
+                    + "you pass only `member_emails`."
                 ),
             ),
-        ],
-        ctx: Context,
+        ] = None,
+        member_emails: Annotated[
+            list[MemberEmail] | None,
+            Field(
+                description=(
+                    "The email addresses of other people in the chat, with one address for each "
+                    + "person that has no entry in `members`. Use the sign-in name or the primary "
+                    + "email address of the person, as a recipient lookup tool of this deployment "
+                    + "reports it. Do not include the signed-in user. Never guess an address."
+                ),
+            ),
+        ] = None,
         topic: Annotated[
             str | None,
             Field(
@@ -271,7 +339,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await create_chat(
             client,
             chat_type=chat_type,
-            members=members,
+            members=members or (),
+            member_emails=member_emails or (),
             topic=topic,
             confirm=a_person_agrees(ctx),
         )
