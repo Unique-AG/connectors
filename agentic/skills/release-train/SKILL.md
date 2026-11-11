@@ -48,7 +48,7 @@ Ask the user to approve the list. Do not go to Step 3 until the user approves it
 
 ## Step 3 - Start the dev builds
 
-Start one service at a time. A run does not show its service in the run list, so the order is the only link between a service and a run. Do not start a build while another person starts one.
+Start one service at a time. A run does not show its service in the run list. The log of the job `dev / plan` shows it, so check each run there. Do not start a build while another person starts one.
 
 For each approved service:
 
@@ -64,9 +64,15 @@ For each approved service:
    gh workflow run release-dev.yaml --repo Unique-AG/connectors --ref main -f service=<service>
    ```
 
-3. Wait until the same query returns a larger ID. That ID is the run of this service. Write down the pair of service and run ID.
+3. Wait until the same query returns a larger ID. Then read the service of that run. The log of the job `dev / plan` is ready after a few seconds:
 
-Give the user each pair with the run URL. Check the result when the user asks for it.
+   ```bash
+   gh run view <run id> --repo Unique-AG/connectors --log | grep -m1 'SERVICE:'
+   ```
+
+4. If the line names the service, write down the pair of service and run ID. If it names another service, or the log is not ready, report the run as unconfirmed. Do not give its URL as the build of this service.
+
+Give the user each confirmed pair with the run URL. Check the result when the user asks for it.
 
 If a run fails, read the failed step before you do anything else:
 
