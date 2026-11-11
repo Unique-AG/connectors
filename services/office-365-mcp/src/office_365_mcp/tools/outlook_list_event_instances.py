@@ -240,7 +240,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Event Instances",
+        title="Outlook: List Event Instances",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

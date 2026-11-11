@@ -201,7 +201,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Teams Message",
+        title="Teams: Delete a Message",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

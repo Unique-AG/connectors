@@ -483,7 +483,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Draft a Reply to All",
+        title="Outlook: Draft a Reply to All",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

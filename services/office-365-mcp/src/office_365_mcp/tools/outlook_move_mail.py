@@ -292,7 +292,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Move Mail to a Folder",
+        title="Outlook: Move Mail to a Folder",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

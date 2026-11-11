@@ -216,7 +216,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Find Notebook From URL",
+        title="OneNote: Find Notebook From URL",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

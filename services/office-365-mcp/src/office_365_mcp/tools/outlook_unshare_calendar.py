@@ -192,7 +192,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Stop Sharing a Calendar",
+        title="Outlook: Unshare a Calendar",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

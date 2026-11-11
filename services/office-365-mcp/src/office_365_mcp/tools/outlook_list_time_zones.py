@@ -116,7 +116,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Time Zones",
+        title="Outlook: List Time Zones",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

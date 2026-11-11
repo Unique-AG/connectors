@@ -189,7 +189,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read Mail Thread",
+        title="Outlook: Read Mail Thread",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

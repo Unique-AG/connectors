@@ -183,7 +183,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Rename a Mail Folder",
+        title="Outlook: Rename a Mail Folder",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

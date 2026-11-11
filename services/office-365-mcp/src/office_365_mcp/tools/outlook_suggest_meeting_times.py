@@ -379,7 +379,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Suggest Meeting Times",
+        title="Outlook: Suggest Meeting Times",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
