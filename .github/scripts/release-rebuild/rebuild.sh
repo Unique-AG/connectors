@@ -7,18 +7,20 @@ custom_body=""
 if [ -n "${BODY_FILE:-}" ]; then custom_body=$(< "$BODY_FILE"); fi
 cd "$(git rev-parse --show-toplevel)"
 
+git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+manifest=$(git show origin/main:.release-please-manifest.json)
+
 if [ "$1" = all ]; then
-  services=$(jq -r 'keys[] | ltrimstr("services/")' .release-please-manifest.json)
+  services=$(jq -r 'keys[] | ltrimstr("services/")' <<< "$manifest")
 else
   services=$(printf '%s\n' "$@" | tr ', ' '\n\n' | sed '/^$/d')
 fi
 
 for service in $services; do
-  [ "$(jq --arg path "services/${service}" 'has($path)' .release-please-manifest.json)" = true ] \
+  [ "$(jq --arg path "services/${service}" 'has($path)' <<< "$manifest")" = true ] \
     || { echo "::error::${service} is not a released service."; exit 1; }
 done
 
-git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
 stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 suffix=$(date -u +%Y%m%d%H%M%S)
 gh label create rebuild --color fbca04 --description "Rebuilds an image for operating system patches" || true
@@ -47,18 +49,20 @@ for service in $services; do
   if [ "$action" = refresh ]; then
     branch=$rebuild_branch
     git fetch --quiet origin "+refs/heads/${branch}:refs/remotes/origin/${branch}"
-    git worktree add --quiet -B "$branch" "$tree" "origin/${branch}"
+    base="origin/${branch}"
   else
     branch="rebuild/${service}-${suffix}"
-    git worktree add --quiet -b "$branch" "$tree" origin/main
+    base=origin/main
   fi
+  git worktree add --quiet --detach "$tree" "$base"
   printf '%s\n' "$stamp" > "$tree/$file"
   git -C "$tree" add "$file"
   git -C "$tree" commit --quiet --message "$title"
-  git -C "$tree" push --quiet origin "$branch"
+  git -C "$tree" push --quiet origin "HEAD:refs/heads/${branch}"
   git worktree remove --force "$tree"
-  git branch --quiet -D "$branch"
   if [ "$action" = open ]; then
     gh pr create --base main --head "$branch" --title "$title" --label dependencies --label rebuild --body "$body"
+  elif [ -n "$custom_body" ]; then
+    gh pr edit "$rebuild_pr" --body "$custom_body"
   fi
 done

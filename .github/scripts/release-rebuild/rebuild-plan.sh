@@ -16,7 +16,8 @@ plan() {
   exit 0
 }
 
-released=$(jq --arg path "services/${service}" 'has($path)' .release-please-manifest.json)
+git fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+released=$(git show origin/main:.release-please-manifest.json | jq --arg path "services/${service}" 'has($path)')
 [ "$released" = true ] || plan none "${service} is not a released service."
 
 release_pr=$(gh pr list --state open --limit 200 --label "autorelease: pending" --json number,headRefName,isCrossRepository \
