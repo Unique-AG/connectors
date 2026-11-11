@@ -5,7 +5,7 @@ git fetch -q origin main
 options=$(git show origin/main:.github/workflows/release-dev.yaml | sed -n '/options:/,/^permissions:/p' | sed -n 's/^ *- //p')
 
 printf 'pr\tservice\tpending\tlast_release\tdispatch\treason\n'
-gh pr list --repo Unique-AG/connectors --state open --label "autorelease: pending" --limit 100 \
+gh pr list --repo Unique-AG/connectors --state open --label "autorelease: pending" --limit 1000 \
   --json number,headRefName,title --jq '.[] | [.number, .headRefName, .title] | @tsv' |
   while IFS=$'\t' read -r number branch title; do
     service=${branch##*--components--}
