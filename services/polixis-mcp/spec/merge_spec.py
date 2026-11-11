@@ -514,9 +514,10 @@ def _permanent_id() -> list[Edit]:
                 "when the pid is current: use it as it is. It is `merged` when Polixis merged "
                 "the entity into another, whose pid is `redir`: use that one, and tell the user "
                 "to update their records. It is `never minted` when Polixis does not know the "
-                "pid: say so, describe no entity, and find the client again by name or "
-                "identifier. A 410 error means the pid named a group Polixis dissolved, and "
-                "lists its former members."
+                "pid, which Polixis's documentation calls `unknown`: say so, describe no "
+                "entity, and find the client again by name or identifier. An HTTP error 410 "
+                "means the pid named a group Polixis dissolved, and its body lists the former "
+                "members."
             ),
         ),
         # The pattern tells the agent what a pid looks like. FastMCP does not check a tool
@@ -536,7 +537,7 @@ def _permanent_id() -> list[Edit]:
         ),
         set_(
             *schema("PidMembers", "properties", "status", "description"),
-            value="active, merged, or never minted.",
+            value=("active, merged, or never minted, which Polixis's documentation calls unknown."),
         ),
         update(
             *schema("PidMembers", "properties", "redir"),
@@ -548,7 +549,7 @@ def _permanent_id() -> list[Edit]:
         ),
         set_(
             *schema("PidMembers", "properties", "members", "description"),
-            value="The member record ids.",
+            value="The member record ids; for a merged pid, those of the pid that replaced it.",
         ),
         set_(*responses, "400", value={"description": "Not a pid shape."}),
         set_(
@@ -622,7 +623,8 @@ def _search() -> list[Edit]:
                         "description": (
                             "Dates as yyyyMMdd integers, with 00 for an unknown month or day "
                             "(19780200 is February 1978, 19780000 the year 1978). A hit matches "
-                            "when one of its dates falls within one."
+                            "when one of its dates falls within one; 19780209 also matches a hit "
+                            "dated only 19780200 or 19780000."
                         ),
                     },
                     "adaptiveLegalForms": {
@@ -946,12 +948,15 @@ _SPEC = TypeAdapter[JsonObject](dict[str, Json])
 _SECTIONS = ("openapi", "info", "servers", "security", "tags", "paths", "components")
 
 
-def main() -> None:
+def merged_yaml() -> str:
+    """`openapi.yml` as the merge builds it from Polixis's spec."""
     spec = merge(_SPEC.validate_json(VENDOR.read_bytes()))
     ordered = {key: spec[key] for key in _SECTIONS}
-    OUT.write_text(
-        yaml.dump(ordered, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100)
-    )
+    return yaml.dump(ordered, Dumper=_Dumper, sort_keys=False, allow_unicode=True, width=100)
+
+
+def main() -> None:
+    OUT.write_text(merged_yaml())
 
 
 if __name__ == "__main__":

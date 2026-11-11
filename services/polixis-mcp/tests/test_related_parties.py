@@ -76,11 +76,13 @@ async def test_get_related_parties_asks_for_every_category_on_the_first_page(
         "category": [
             "executive",
             "executiveSenior",
-            "thirdParty",
+            "board",
+            "political",
             "signature",
-            "ownershipInOtherEntities",
-            "shareholdingInformation",
+            "thirdParty",
             "membership",
+            "shareholdingInformation",
+            "ownershipInOtherEntities",
         ],
     }
 

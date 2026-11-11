@@ -17,6 +17,7 @@ from mcp_observability import RateLimitMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
+from polixis_mcp.mcp.spec_tool_errors import SpecToolErrors
 from polixis_mcp.persistence import cull_expired_entries_periodically
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import open_upstream
@@ -33,7 +34,11 @@ INSTRUCTIONS = (
     "from their own records, call `resolve_permanent_id` first and use the pid it returns. "
     "Results come ranked so the first page usually answers the "
     "question: a tool whose result has a `next_cursor` holds more, which you fetch by passing "
-    "it back alone as `cursor` only when the question needs what is left."
+    "it back alone as `cursor` only when the question needs what is left. A field whose "
+    "description starts with 'Computed by this MCP' is not sent by Polixis: this server derives "
+    "it from Polixis's data as the description says, so say so when you report it and explain "
+    "how from that description when asked. Every other field is Polixis's, renamed or "
+    "reformatted."
 )
 
 
@@ -80,7 +85,7 @@ def create_server(
         lifespan=lifespan,
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
+        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting, SpecToolErrors()],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")

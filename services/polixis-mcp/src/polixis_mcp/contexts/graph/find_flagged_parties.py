@@ -65,12 +65,16 @@ class FlaggedPartiesQuery(PageQuery):
 
 
 class FlaggedParty(BaseModel):
-    """A party near the entity that carries a sanctions, PEP or state-ownership marker."""
+    """A party of Polixis's network around the entity that carries a risk marker, picked by
+    this MCP.
+    """
 
     party: Party = Field(description="The flagged party.")
     risks: list[str] = Field(description=RISK_MARKERS_DESCRIPTION)
     path: list[PathStep] = Field(
-        description="One shortest path from the entity to the party, with the roles at each step."
+        description="Computed by this MCP, since Polixis sends the network, not paths: one "
+        "shortest path from the entity to the party over the links of Polixis's network, found "
+        "by a breadth-first walk, with the roles at each step."
     )
 
 
@@ -78,15 +82,19 @@ class FlaggedPartiesPage(BaseModel):
     """The flagged parties in the network around an entity, one page of them."""
 
     pid: str = Field(description="The entity the walk started at.")
-    parties_checked: int = Field(description="Parties in the network, the entity left out.")
+    parties_checked: int = Field(
+        description="Computed by this MCP: the parties in Polixis's network, the entity left out."
+    )
     truncated_by_polixis: bool = Field(
         description=(
-            "Whether Polixis cut the network short, so parties beyond what it returned are "
-            "missing. When true, a count of 0 does not show that none exists: say the network "
-            "was cut, rather than that none was found."
+            "Polixis's `truncated` on either graph: whether it cut the network short, so "
+            "parties beyond what it returned are missing. When true, a count of 0 does not "
+            "show that none exists: say the network was cut, rather than that none was found."
         )
     )
-    total_flagged: int = Field(description="Flagged parties across every page.")
+    total_flagged: int = Field(
+        description="Computed by this MCP: parties with a risk marker, across every page."
+    )
     total_by_risk: dict[str, int] = Field(description=RISK_COUNTS_DESCRIPTION)
     flagged: list[FlaggedParty] = Field(description="The flagged parties of this page.")
     next_cursor: str | None = Field(

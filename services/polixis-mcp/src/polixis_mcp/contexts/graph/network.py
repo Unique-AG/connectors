@@ -8,6 +8,9 @@ from polixis_mcp.contexts.cached_calls import cached_call
 from polixis_mcp.contexts.formats import node_name
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.formats import unix_date
+from polixis_mcp.contexts.risks import ALERT_CATEGORIES_DESCRIPTION
+from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
+from polixis_mcp.contexts.risks import is_hidden_alert
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import GET_SMART_GRAPH
 from polixis_mcp.upstream import GET_SUBGRAPH
@@ -141,7 +144,7 @@ def party_of(
         name=node_name(meta.get(pid)),
         entity_type=node.type,
         flags=unique(node.flags or []),
-        alerts=unique(node.alert_names or []),
+        alerts=unique(name for name in node.alert_names or [] if not is_hidden_alert(name)),
         distance=distance,
     )
 
@@ -170,32 +173,38 @@ class Party(BaseModel):
 
     pid: str = Field(description="Its pid, for the other Polixis tools.")
     name: str | None = Field(
-        description="Its name; null for a party only the full graph has, which "
-        "`get_entity_profiles` can name."
+        description="Its name, from Polixis's smart graph; null for a party only the full "
+        "graph has, which Polixis sends without names and `get_entity_profiles` can name."
     )
-    entity_type: str | None = Field(description="PERSON or ORGANIZATION.")
-    flags: list[str] = Field(description="Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.")
-    alerts: list[str] = Field(
-        description="Alert categories of the party itself, such as STATECO or RESTRICTION."
+    entity_type: str | None = Field(
+        description="PERSON or ORGANIZATION; vessels and aircraft are organizations."
     )
-    distance: int | None = Field(description="Links from the entity asked about.")
+    flags: list[str] = Field(description=FLAGS_DESCRIPTION)
+    alerts: list[str] = Field(description=ALERT_CATEGORIES_DESCRIPTION)
+    distance: int | None = Field(
+        description="The fewest links from the entity asked about at which Polixis reached it."
+    )
 
 
 class LinkRelation(BaseModel):
     """One role the link's source holds in its target."""
 
     role: str | None = Field(
-        description="Such as shareholder/ founder, director or affiliated to the legal entity."
+        description="Polixis's role, such as shareholder/ founder, director, auditor or "
+        "affiliated to the legal entity."
     )
-    share_percent: float | None = Field(description="The share held; null when not reported.")
-    former: bool = Field(description="Whether the relation has ended.")
+    share_percent: float | None = Field(
+        description="Polixis's share for the role; null when it is not reported."
+    )
+    former: bool = Field(description="Polixis's `former`: whether the relation has ended.")
     start_date: str | None = Field(description="YYYY-MM-DD, null if unknown.")
     end_date: str | None = Field(description="YYYY-MM-DD, null if unknown or current.")
 
 
 class Link(BaseModel):
-    """The source holds each relation's role in the target, such as being its shareholder. The
-    two parties are named where the link appears, so it carries their pids only.
+    """A link of Polixis's graph: the source holds each relation's role in the target, such as
+    being its shareholder. The two parties are named where the link appears, so it carries
+    their pids only.
     """
 
     source_pid: str = Field(description="The pid of the party holding the role.")
@@ -204,7 +213,9 @@ class Link(BaseModel):
 
 
 class PathStep(BaseModel):
-    """One step of a path, with every link between its two parties, whichever way they point."""
+    """One step of a path, with every link of Polixis's graph between its two parties,
+    whichever way they point.
+    """
 
     from_pid: str = Field(description="The pid the step leaves.")
     from_name: str | None = Field(description="Its name, null when Polixis gives none.")

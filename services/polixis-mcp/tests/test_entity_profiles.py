@@ -32,6 +32,22 @@ async def test_get_entity_profiles_asks_polixis_for_the_key_identifiers_by_defau
     }
 
 
+async def test_get_entity_profiles_leaves_out_the_alerts_polixis_marks_hidden(
+    mcp_client: McpClient,
+) -> None:
+    result = await call_tool(
+        mcp_client,
+        "get_entity_profiles",
+        {"pids": ["P00000000000000000000000000000200"]},
+        returns=contexts.EntityProfiles,
+    )
+
+    [profile] = result.profiles
+    assert [alert.model_dump() for alert in profile.alerts or []] == [
+        {"category": "PEP", "message": "Member of an example parliament"}
+    ]
+
+
 async def test_get_entity_profiles_gives_the_original_script_of_a_name_only_when_it_differs(
     mcp_client: McpClient,
 ) -> None:

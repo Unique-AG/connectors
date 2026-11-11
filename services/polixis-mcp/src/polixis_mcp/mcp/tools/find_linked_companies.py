@@ -58,6 +58,10 @@ async def find_linked_companies(
     director or owner the company shares with it. Each comes with the chains of people and the
     links that tie it, and its flags.
 
+    Polixis returns the network around the entity: with `scope` key its smart graph, which
+    leaves out signatory, third-party and historic relations, and with `all` its full graph
+    too. This MCP finds the companies in it and the chains of people that tie each one.
+
     The nearest come first, then the flagged, then those tied through the most people, so the
     first page usually answers the question, and `total_by_risk` counts the flagged companies
     by marker. When `truncated_by_polixis` is true, Polixis cut the network short, so more

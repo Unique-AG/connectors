@@ -51,6 +51,8 @@ large_shareholder_base:
   name: Meridian Widely Held AG
 lei_company:
   lei: "00000000000000000000"
+vessel:
+  imo: "9000000"
 isin_issuer:
   isin: CH0000000000
 stored_pid:

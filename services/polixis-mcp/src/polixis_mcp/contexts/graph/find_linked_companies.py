@@ -146,7 +146,7 @@ class PersonOnChain(BaseModel):
 
 
 class PersonChain(BaseModel):
-    """People in a row through whom the entity is tied to the company."""
+    """People in a row through whom the entity is tied to the company, found by this MCP."""
 
     people: list[PersonOnChain] = Field(
         description="The people in order, from the one tied to the entity to the one tied to "
@@ -159,20 +159,24 @@ class PersonChain(BaseModel):
 
 
 class LinkedCompany(BaseModel):
-    """A company tied to the entity, and how."""
+    """A company tied to the entity, and how, as this MCP found it in Polixis's network."""
 
     company: Party = Field(description="The company, with its flags and distance.")
     risks: list[str] = Field(description=RISK_MARKERS_DESCRIPTION)
-    hops: int = Field(description="Links between the entity and the company: 1 is direct.")
+    hops: int = Field(
+        description="Computed by this MCP: links between the entity and the company; 1 is direct."
+    )
     direct_links: list[Link] = Field(
-        description="The links between the entity and the company; empty when they are tied "
-        "only through people."
+        description="Polixis's links between the entity and the company; empty when they are "
+        "tied only through people."
     )
     through_total: int = Field(
-        description="How many people next to the company tie it to the entity."
+        description="Computed by this MCP: how many people next to the company tie it to the "
+        "entity."
     )
     through: list[PersonChain] = Field(
-        description=f"The shortest {_THROUGH_SHOWN} chains of people, with the links along each."
+        description=f"Computed by this MCP: the shortest {_THROUGH_SHOWN} chains of people, "
+        "with Polixis's links along each."
     )
 
 
@@ -180,15 +184,17 @@ class LinkedCompaniesPage(BaseModel):
     """The companies tied to an entity, one page of them."""
 
     pid: str = Field(description="The entity asked about.")
-    total_companies: int = Field(description="Companies across every page.")
-    total_direct: int = Field(description="Companies tied to the entity directly.")
-    total_flagged: int = Field(description="Companies with a risk marker.")
+    total_companies: int = Field(description="Computed by this MCP: companies across every page.")
+    total_direct: int = Field(
+        description="Computed by this MCP: companies tied to the entity directly."
+    )
+    total_flagged: int = Field(description="Computed by this MCP: companies with a risk marker.")
     total_by_risk: dict[str, int] = Field(description=RISK_COUNTS_DESCRIPTION)
     truncated_by_polixis: bool = Field(
         description=(
-            "Whether Polixis cut the network short, so companies beyond what it returned are "
-            "missing. When true, a count of 0 does not show that none exists: say the network "
-            "was cut, rather than that none was found."
+            "Polixis's `truncated`: whether it cut the network short, so companies beyond "
+            "what it returned are missing. When true, a count of 0 does not show that none "
+            "exists: say the network was cut, rather than that none was found."
         )
     )
     companies: list[LinkedCompany] = Field(

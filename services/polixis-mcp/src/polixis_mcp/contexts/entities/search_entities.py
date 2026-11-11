@@ -11,6 +11,8 @@ from polixis_mcp.contexts.formats import polixis_date_number
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
+from polixis_mcp.contexts.risks import visible_alert_texts
 from polixis_mcp.upstream import SEARCH_ENTITIES
 from polixis_mcp.upstream import SearchEntitiesRequest
 from polixis_mcp.upstream import SearchHit
@@ -76,7 +78,7 @@ def _match(*, hit: SearchHit) -> EntityMatch | None:
         sanctioned=bool(hit.sanction),
         politically_exposed=bool(hit.pep),
         sanction_statuses=hit.sanction_statuses or {},
-        alerts=unique(alert.description for alert in hit.alerts or []),
+        alerts=visible_alert_texts(hit.alerts),
         identifiers=hit.unis or {},
     )
 
@@ -99,17 +101,20 @@ class EntityMatch(BaseModel):
     entity_type: str | None = Field(
         description="PERSON or ORGANIZATION; vessels and aircraft are organizations."
     )
-    name: str | None = Field(description="Its current name, in English where Polixis has one.")
+    name: str | None = Field(
+        description="Its CURRENT_NAME record, else the first name Polixis lists, in English "
+        "where Polixis has one."
+    )
     name_count: int = Field(
-        description="How many distinct names and spellings Polixis holds for it, of which "
-        "`name_records` and `other_names` list ten at most."
+        description="Computed by this MCP: how many distinct names and spellings Polixis holds "
+        "for it, of which `name_records` and `other_names` list ten at most."
     )
     name_records: list[NameRecordView] = Field(
         description="Its first ten typed names, with the original script."
     )
     other_names: list[str] = Field(
-        description="Spellings Polixis lists that no name record holds, as many as fit in the "
-        "ten names listed."
+        description="Spellings in Polixis's `names` that no name record holds, as many as fit "
+        "in the ten names listed."
     )
     dates: dict[str, list[str]] = Field(
         description=(
@@ -119,22 +124,31 @@ class EntityMatch(BaseModel):
     )
     countries: list[str] = Field(description="ISO 3166-1 alpha-2 codes of its countries.")
     addresses: list[str] = Field(description="Its first three addresses.")
-    sanctioned: bool = Field(description="Whether Polixis flags it for sanctions exposure.")
+    sanctioned: bool = Field(
+        description="Polixis's `sanction`: whether it is designated on a sanctions list Polixis "
+        "covers, such as the UN, EU, OFAC, UK, Swiss, Canadian, French or Australian lists. A "
+        "sanction of another authority shows in `alerts` instead."
+    )
     politically_exposed: bool = Field(
-        description="Whether Polixis flags it as a PEP. It may be false for a former PEP, whom "
-        "the `flags` of `get_entity_profiles` mark FORMER_PEP."
+        description="Polixis's `pep`: whether it is flagged as a politically exposed person. "
+        "Polixis declassifies a PEP 5 years after the function ended and flags them FORMER_PEP, "
+        "which this may not show: the `flags` of `get_entity_profiles` do."
     )
     sanction_statuses: dict[str, str] = Field(
         description="Sanctions list name to its status, ACTIVE or DELISTED."
     )
-    alerts: list[str] = Field(description="Risk and status alerts, as Polixis words them.")
+    alerts: list[str] = Field(description=ALERT_TEXTS_DESCRIPTION)
     identifiers: dict[str, list[str]] = Field(
-        description="Identifiers by type, such as registration numbers, LEIs or tax ids."
+        description="Identifiers by type, such as registration numbers, LEIs, tax ids or, for a "
+        "vessel, IMO numbers."
     )
 
 
 class EntitySearchResults(BaseModel):
-    """One page of matches, best first: exact matches, then fuzzy ones."""
+    """One page of matches, best first: Polixis puts exact matches first, then those one and
+    then two edits away, and ranks each group by its own logic, which favours entities with
+    risks and prominent ones.
+    """
 
     matches: list[EntityMatch] = Field(description="The matches on this page.")
     total_matches: int | None = Field(

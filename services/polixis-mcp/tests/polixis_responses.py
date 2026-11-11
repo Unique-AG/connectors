@@ -15,6 +15,12 @@ The network around Example Holdings AG (O100), which `PATHS` and `SANCTION_EXPOS
 UNKNOWN_PID = "P0000000000000000000000000000dead"
 # Polixis answers a request about it with a 500, in the profile and in the full graph.
 FAILING_PID = "P0000000000000000000000000000fa11"
+# A group Polixis dissolved: `/api/graph/pid` answers it with a 410 that lists its former members.
+DISSOLVED_PID = "U00000000000000000000000000000d15"
+
+DISSOLVED: dict[str, object] = {
+    "references": ["O00000000000000000000000000000100", "O00000000000000000000000000000101"]
+}
 
 REJECTION: dict[str, object] = {
     "error": f"Invalid Ardis ID: {UNKNOWN_PID}",
@@ -35,7 +41,10 @@ SEARCH: dict[str, object] = {
             ],
             "sanction": True,
             "pep": False,
-            "alerts": [{"description": "Listed company", "type": ["listed"]}],
+            "alerts": [
+                {"description": "Listed company", "type": ["listed"]},
+                {"description": "An internal marker", "type": ["hidden"]},
+            ],
             "nameRecords": [
                 {"original": "Example Holdings SA", "en": "Example Holdings SA", "type": "ALIAS"},
                 {
@@ -71,7 +80,10 @@ PROFILE: dict[str, object] = {
     "dates": {"Date of Birth": [{"y": 1971, "m": 3}]},
     "gender": "f",
     "flags": ["PEP"],
-    "alertList": [{"category": "PEP", "message": "Member of an example parliament"}],
+    "alertList": [
+        {"category": "PEP", "message": "Member of an example parliament"},
+        {"category": "hidden", "message": "An internal marker"},
+    ],
     "sanctionStatuses": {},
     "sanctions": {
         "Example Sanctions List": [
@@ -101,7 +113,10 @@ RELATED_PARTIES: dict[str, object] = {
                 "names": [{"original": "Anna Beispiel", "en": "Anna Example", "language": "de"}],
                 "countries": {"country": ["ch"], "countryCitizenship": ["ch", "li"]},
                 "flags": [{"PEP": {"value": "#PEP"}}],
-                "alerts": [{"description": "Politically exposed person", "type": ["pep"]}],
+                "alerts": [
+                    {"description": "Politically exposed person", "type": ["pep"]},
+                    {"description": "An internal marker", "type": ["hidden"]},
+                ],
                 "uni": {"National ID": "756.0000.0000.01"},
             },
             "relation": [
@@ -199,7 +214,7 @@ HOLDINGS: dict[str, object] = {
             "type": "ORGANIZATION",
             "sharePercent": 100.0,
             "role": "shareholder/ founder",
-            "alerts": ["STATECO"],
+            "alerts": ["STATECO", "HIDDEN"],
             "children": [
                 {
                     "id": "O00000000000000000000000000000800",
@@ -247,7 +262,7 @@ _KEY_NODES: dict[str, object] = {
         "id": "O00000000000000000000000000000310",
         "type": "ORGANIZATION",
         "radii": [2],
-        "alertNames": ["STATECO"],
+        "alertNames": ["STATECO", "HIDDEN"],
     },
     "P00000000000000000000000000000230": {
         "id": "P00000000000000000000000000000230",
@@ -427,7 +442,11 @@ _PATH_NODES: list[object] = [
         "flags": ["PEP"],
     },
     {"id": "O00000000000000000000000000000100", "type": "ORGANIZATION"},
-    {"id": "O00000000000000000000000000000300", "type": "ORGANIZATION", "alertNames": ["STATECO"]},
+    {
+        "id": "O00000000000000000000000000000300",
+        "type": "ORGANIZATION",
+        "alertNames": ["STATECO", "HIDDEN"],
+    },
     {"id": "P00000000000000000000000000000400", "type": "PERSON", "flags": ["SANCTION"]},
 ]
 

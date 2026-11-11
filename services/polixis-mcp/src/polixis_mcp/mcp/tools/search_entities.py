@@ -25,7 +25,8 @@ async def search_entities(
         Field(
             min_length=1,
             description=(
-                "A name, registration number, LEI or ISIN of an organization or person. "
+                "A name, unique identifier or ISIN of an organization or person. Unique "
+                "identifiers include registration numbers, LEIs and, for a vessel, IMO numbers. "
                 "Required unless `cursor` is given."
             ),
         ),
@@ -47,8 +48,10 @@ async def search_entities(
         Field(
             description=(
                 "Dates such as a birth or registration date, as YYYY-MM-DD, YYYY-MM or YYYY. "
-                "A match needs one of its dates within one of them. Polixis filters on it, so "
-                "it narrows a common name better than comparing the matches yourself."
+                "A match needs a date that fits one of them: a year takes any date in it, a "
+                "month any day in it, and a full date also takes a record that knows only its "
+                "month or year. Polixis filters on it, so it narrows a common name better than "
+                "comparing the matches yourself."
             )
         ),
     ] = None,
@@ -65,7 +68,8 @@ async def search_entities(
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.EntitySearchResults:
     """Find organizations and people in Polixis by name or identifier, with their sanctions and
-    PEP flags, dates, countries and identifiers to tell matches apart.
+    PEP flags, dates, countries and identifiers to tell matches apart. Vessels and aircraft are
+    organizations here.
 
     Call it first when you have a name or identifier: every other Polixis tool takes a match's
     `pid`. When the user gives a pid instead, call `resolve_permanent_id` with it. A match may

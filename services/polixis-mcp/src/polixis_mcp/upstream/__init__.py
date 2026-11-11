@@ -38,6 +38,7 @@ from polixis_mcp.upstream.generated.vendor_requests import PathRequestInput
 from polixis_mcp.upstream.generated.vendor_requests import SearchEntitiesRequest
 from polixis_mcp.upstream.generated.vendor_requests import SearchRequestInput
 from polixis_mcp.upstream.generated.vendor_requests import SubgraphRequestInput
+from polixis_mcp.upstream.generated.vendor_responses import AlertEntry
 from polixis_mcp.upstream.generated.vendor_responses import ConnectionDetail
 from polixis_mcp.upstream.generated.vendor_responses import CorporateNodeData
 from polixis_mcp.upstream.generated.vendor_responses import DateEntry
@@ -71,6 +72,7 @@ __all__ = [
     "GetSanctionExposurePath",
     "GetSanctionExposureRequest",
     "PathRequestInput",
+    "AlertEntry",
     "ConnectionDetail",
     "GraphPath",
     "JudicialRecord",

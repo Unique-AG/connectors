@@ -130,7 +130,7 @@ class SearchRequestInput(RequestModel):
     )
     dates: list[int] | None = Field(
         default=None,
-        description="Dates as yyyyMMdd integers, with 00 for an unknown month or day (19780200 is February 1978, 19780000 the year 1978). A hit matches when one of its dates falls within one.",
+        description="Dates as yyyyMMdd integers, with 00 for an unknown month or day (19780200 is February 1978, 19780000 the year 1978). A hit matches when one of its dates falls within one; 19780209 also matches a hit dated only 19780200 or 19780000.",
     )
     adaptive_legal_forms: bool | None = Field(
         default=None,

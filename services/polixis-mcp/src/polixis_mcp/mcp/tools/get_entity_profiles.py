@@ -37,8 +37,9 @@ async def get_entity_profiles(
             description=(
                 "The parts of each profile to return. Leave it out for the key identifiers: "
                 "name records, identifiers, countries, dates, flags, alerts and sanction "
-                "statuses. Ask for `sanctions` for each listing's programme and justification, "
-                "and `positions` for the offices a PEP holds or held."
+                "statuses. Ask for `sanctions` for each listing's programme, listing and "
+                "delisting dates, reference number and designation details, and `positions` for "
+                "the offices a PEP holds or held, with their institutions and dates."
             ),
         ),
     ] = None,

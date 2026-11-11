@@ -27,10 +27,18 @@ async def get_related_parties(
         Field(
             min_length=1,
             description=(
-                "The kinds of relation to return: executive (directors and officers), "
-                "executiveSenior, signature (signatories), shareholdingInformation (its "
-                "shareholders), ownershipInOtherEntities (what it holds), thirdParty and "
-                "membership. Leave it out for all of them."
+                "The kinds of relation to return, as Polixis names them: board (the board of "
+                "directors and equivalent roles; for a person, the supervisory boards they sit "
+                "on), executiveSenior (management board members and other high-ranking roles), "
+                "executive (other executive roles, such as department heads or secretaries), "
+                "political (public administration roles, such as members of parliament), "
+                "signature (signatories), shareholdingInformation (its shareholders, indirect "
+                "shareholders and beneficial owners), ownershipInOtherEntities (its "
+                "subsidiaries, branches and holdings), thirdParty (service providers, such as "
+                "auditors and liquidators, or for a person the organizations they work for) and "
+                "membership. Polixis warns that registers use board, executiveSenior, executive "
+                "and political differently, so ask for all four when looking for directors or "
+                "managers. Leave it out for all of them."
             ),
         ),
     ] = None,

@@ -42,7 +42,8 @@ the record the bank files.
 > shareholders and its beneficial owners, and give me one table.
 
 - `search_entities` with `entity_type` `ORGANIZATION`, `countries` `["cy"]`.
-- `get_related_parties` with `categories` `["executive", "executiveSenior", "shareholdingInformation", "signature"]`.
+- `get_related_parties` with `categories` `["board", "executiveSenior", "executive", "shareholdingInformation", "signature"]`.
+  Polixis files directors under `board`, but registers differ, so it asks for the executive ones too.
   A small company fits on one page; for a large one, say how many parties there are and page on
   only if the user wants every row.
 - `get_ultimate_beneficial_owners`, whose `total_by_risk` counts the flagged owners of the tree
@@ -60,8 +61,8 @@ roles are marked as former. Any flagged party is called out above the table.
   every chain, largest first, so the agent stops once the shares fall below 25%, unless
   `total_share_unknown` counts an owner it has not read yet, whose share may be higher. The MCP
   computes that share from the per-link shares Polixis reports, and the answer says so.
-- `get_related_parties` with `executive`, `executiveSenior` and `signature`, for the people who
-  run it.
+- `get_related_parties` with `board`, `executiveSenior`, `executive` and `signature`, for the
+  people who run it.
 
 A good answer lists the natural persons at the end of a chain (`end_of_chain`) at or above 25%,
 with the `strongest_chain` behind each, and flags a `share_unknown_on_some_chain` owner whose
@@ -75,7 +76,7 @@ assess and not a finding: a shared address or network is not control.
 > The client, Marco Bellandi, says his wealth comes from selling his stake in a logistics group
 > in 2019. What does Polixis show about his companies and roles?
 
-- `search_entities`, then `get_related_parties` with `ownershipInOtherEntities`,
+- `search_entities`, then `get_related_parties` with `ownershipInOtherEntities`, `board`,
   `executiveSenior` and `executive`.
 - `get_entity_profiles` with `positions`.
 
@@ -268,6 +269,9 @@ hits there were in total, not only the first page.
 
 A good answer confirms that the identifier on the profile matches the one asked for before
 using it.
+
+An IMO number finds a vessel the same way: Polixis holds vessels and aircraft as organizations,
+with the IMO number among their identifiers.
 
 ### 19. Court decisions
 

@@ -27,11 +27,15 @@ async def get_ultimate_beneficial_owners(
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
 ) -> contexts.OwnershipPage:
-    """Who owns an organization: one row per owner, however many chains of shareholdings
-    reach it, with the share it carries in the organization summed over every chain, the
-    chain carrying the most, and its flags. Polixis reports only the share on each link: this
-    MCP computes the effective share from them. `total_by_risk` counts the flagged owners of the
-    whole tree by marker, and the first page lists up to 25 of them, the sanctioned first; the
+    """Who owns or controls an organization: one row per owner, however many chains reach it,
+    with the share it carries in the organization summed over every chain, the chain carrying
+    the most, and its flags.
+
+    Polixis traces the tree up through shareholders and control layers to the last owners,
+    and reports the role and share of each link only. This MCP turns the tree into rows and
+    computes each owner's effective share from the link shares; a controlling person whose
+    links carry no share gets none. `total_by_risk` counts the flagged owners of the whole
+    tree by marker, and the first page lists up to 25 of them, the sanctioned first; the
     others carry their flags on their own rows.
 
     Rows come largest effective share first, so a threshold question such as "who holds 25%

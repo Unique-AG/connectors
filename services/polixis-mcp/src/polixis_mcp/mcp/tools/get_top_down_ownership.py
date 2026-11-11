@@ -29,10 +29,13 @@ async def get_top_down_ownership(
 ) -> contexts.OwnershipPage:
     """What an organization or person owns: one row per holding, however many chains of
     shareholdings reach it, with the share the entity carries in it summed over every chain,
-    the chain carrying the most, and its flags. Polixis reports only the share on each link:
-    this MCP computes the effective share from them. `total_by_risk` counts the flagged holdings of
-    the whole group by marker, and the first page lists up to 25 of them, the sanctioned first;
-    the others carry their flags on their own rows.
+    the chain carrying the most, and its flags.
+
+    Polixis traces the tree down through subsidiaries and shareholding layers, and reports
+    the role and share of each link only. This MCP turns the tree into rows and computes the
+    effective share of each holding from the link shares. `total_by_risk` counts the flagged
+    holdings of the whole group by marker, and the first page lists up to 25 of them, the
+    sanctioned first; the others carry their flags on their own rows.
 
     Rows come largest effective share first, so the controlled subsidiaries lead and the
     minority stakes trail: stop once you have what the question needs. When `next_cursor`

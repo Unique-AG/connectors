@@ -114,11 +114,14 @@ class ConnectionPath(BaseModel):
     """One path from the first entity to the second."""
 
     ordered: bool = Field(
-        description="Whether the steps run in order from the first entity to the second. False "
+        description="Computed by this MCP, since Polixis lists a path's links in no order: "
+        "whether the steps run in order from the first entity to the second. False "
         "when Polixis's links do not lead from one to the other, such as for a merged pid: the "
         "steps then come as Polixis gives them, and still show the link it found."
     )
-    steps: list[PathStep] = Field(description="The steps, in order when `ordered` is true.")
+    steps: list[PathStep] = Field(
+        description="Polixis's links on the path, put in order by this MCP when `ordered` is true."
+    )
 
 
 class Connections(BaseModel):
@@ -128,11 +131,13 @@ class Connections(BaseModel):
     to_pid: str = Field(description="The entity looked for.")
     connected: bool = Field(
         description=(
-            "Whether Polixis found a path. False is not proof there is none: a relation "
-            "Polixis lacks can still connect them."
+            "Computed by this MCP: whether Polixis returned a path with links. False is not "
+            "proof there is none: a relation Polixis lacks can still connect them."
         )
     )
-    hops: int | None = Field(description="Links on the shortest path; null when not connected.")
+    hops: int | None = Field(
+        description="Computed by this MCP: the steps on the shortest path; null when not connected."
+    )
     paths: list[ConnectionPath] = Field(
         description="The paths found, usually one: the shortest Polixis knows."
     )

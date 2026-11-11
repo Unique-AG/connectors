@@ -5,7 +5,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "How two organizations or people are connected: the shortest path Polixis finds between\nthem across its whole graph, with no hop limit, and the role, share and dates of each link\nalong it, and the flags of every party on it.\n\nPolixis does not document this route yet, so its answers may change without notice.",
+    "description": "How two organizations or people are connected: the shortest path Polixis finds between\nthem across its whole graph, with no hop limit, and the role, share and dates of each link\nalong it, and the flags of every party on it. Polixis finds the path; this MCP puts its\nlinks in order from the first entity to the second.\n\nPolixis does not document this route yet, so its answers may change without notice.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -31,7 +31,7 @@
       "description": "The paths Polixis finds between two entities.",
       "properties": {
         "connected": {
-          "description": "Whether Polixis found a path. False is not proof there is none: a relation Polixis lacks can still connect them.",
+          "description": "Computed by this MCP: whether Polixis returned a path with links. False is not proof there is none: a relation Polixis lacks can still connect them.",
           "type": "boolean"
         },
         "from_pid": {
@@ -47,7 +47,7 @@
               "type": "null"
             }
           ],
-          "description": "Links on the shortest path; null when not connected."
+          "description": "Computed by this MCP: the steps on the shortest path; null when not connected."
         },
         "parties": {
           "description": "Every party on the paths, with its flags; `distance` is null here.",
@@ -55,7 +55,7 @@
             "description": "An organization or person in the network.",
             "properties": {
               "alerts": {
-                "description": "Alert categories of the party itself, such as STATECO or RESTRICTION.",
+                "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
                 "items": {
                   "type": "string"
                 },
@@ -70,7 +70,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "Links from the entity asked about."
+                "description": "The fewest links from the entity asked about at which Polixis reached it."
               },
               "entity_type": {
                 "anyOf": [
@@ -81,10 +81,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "PERSON or ORGANIZATION."
+                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
               },
               "flags": {
-                "description": "Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.",
+                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
                 "items": {
                   "type": "string"
                 },
@@ -99,7 +99,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "Its name; null for a party only the full graph has, which `get_entity_profiles` can name."
+                "description": "Its name, from Polixis's smart graph; null for a party only the full graph has, which Polixis sends without names and `get_entity_profiles` can name."
               },
               "pid": {
                 "description": "Its pid, for the other Polixis tools.",
@@ -124,13 +124,13 @@
             "description": "One path from the first entity to the second.",
             "properties": {
               "ordered": {
-                "description": "Whether the steps run in order from the first entity to the second. False when Polixis's links do not lead from one to the other, such as for a merged pid: the steps then come as Polixis gives them, and still show the link it found.",
+                "description": "Computed by this MCP, since Polixis lists a path's links in no order: whether the steps run in order from the first entity to the second. False when Polixis's links do not lead from one to the other, such as for a merged pid: the steps then come as Polixis gives them, and still show the link it found.",
                 "type": "boolean"
               },
               "steps": {
-                "description": "The steps, in order when `ordered` is true.",
+                "description": "Polixis's links on the path, put in order by this MCP when `ordered` is true.",
                 "items": {
-                  "description": "One step of a path, with every link between its two parties, whichever way they point.",
+                  "description": "One step of a path, with every link of Polixis's graph between its two parties,\nwhichever way they point.",
                   "properties": {
                     "from_name": {
                       "anyOf": [
@@ -150,7 +150,7 @@
                     "links": {
                       "description": "The links joining the two, in their own direction.",
                       "items": {
-                        "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                        "description": "A link of Polixis's graph: the source holds each relation's role in the target, such as\nbeing its shareholder. The two parties are named where the link appears, so it carries\ntheir pids only.",
                         "properties": {
                           "relations": {
                             "description": "Every role the source holds in the target.",
@@ -169,7 +169,7 @@
                                   "description": "YYYY-MM-DD, null if unknown or current."
                                 },
                                 "former": {
-                                  "description": "Whether the relation has ended.",
+                                  "description": "Polixis's `former`: whether the relation has ended.",
                                   "type": "boolean"
                                 },
                                 "role": {
@@ -181,7 +181,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                                  "description": "Polixis's role, such as shareholder/ founder, director, auditor or affiliated to the legal entity."
                                 },
                                 "share_percent": {
                                   "anyOf": [
@@ -192,7 +192,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "The share held; null when not reported."
+                                  "description": "Polixis's share for the role; null when it is not reported."
                                 },
                                 "start_date": {
                                   "anyOf": [
@@ -376,14 +376,14 @@
                 "type": "string"
               },
               "snippets": {
-                "description": "The passages where the name appears, in the decision's own language.",
+                "description": "Polixis's passages where the name appears, in the decision's own language, without its highlight tags.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "subject": {
-                "description": "`entity` when it names the entity asked about, `related_party` when it names one of its related parties.",
+                "description": "Which of Polixis's two lists it came from: `entity` when it names the entity asked about, `related_party` when it names one of its related parties, which Polixis does not say.",
                 "enum": [
                   "entity",
                   "related_party"
@@ -391,7 +391,7 @@
                 "type": "string"
               },
               "text_characters": {
-                "description": "The length of its full text, in characters.",
+                "description": "Computed by this MCP: the length of its full text, in characters.",
                 "type": "integer"
               },
               "year": {
@@ -460,7 +460,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Sanctioned, PEP, state-owned and restricted parties near an organization or person,\neach with its markers and the path to it: who holds what in whom at every step.\n\nUse it for PEP and state-ownership exposure nearby; for sanctions at any distance use\n`get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker on each\npage, so a question such as \"is any of them state-owned?\" is settled by a 0 there. The\nnearest come first, the sanctioned before the others at the same distance, so stop once\nthey are farther than the question cares about. When `truncated_by_polixis` is true,\nPolixis cut the network short: do not report that none was found. When `next_cursor` is\nset, pass it back as `cursor` for the next page.",
+    "description": "Sanctioned, PEP, state-owned and restricted parties near an organization or person,\neach with its markers and the path to it: who holds what in whom at every step.\n\nPolixis returns the network around the entity, both its smart graph and its full graph\nwith signatories, third parties and historic ties. This MCP picks the parties whose flags\nor alerts carry a risk marker and finds a shortest path to each over Polixis's links.\n\nUse it for PEP and state-ownership exposure nearby; for sanctions at any distance use\n`get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker across\nevery page, and every page repeats it, so a question such as \"is any of them\nstate-owned?\" is settled by a 0 there. The nearest come first, the sanctioned before the\nothers at the same distance, so stop once they are farther than the question cares about.\nWhen `truncated_by_polixis` is true, Polixis cut the network short: do not report that\nnone was found. When `next_cursor` is set, pass it back as `cursor` for the next page.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -520,13 +520,13 @@
         "flagged": {
           "description": "The flagged parties of this page.",
           "items": {
-            "description": "A party near the entity that carries a sanctions, PEP or state-ownership marker.",
+            "description": "A party of Polixis's network around the entity that carries a risk marker, picked by\nthis MCP.",
             "properties": {
               "party": {
                 "description": "The flagged party.",
                 "properties": {
                   "alerts": {
-                    "description": "Alert categories of the party itself, such as STATECO or RESTRICTION.",
+                    "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
                     "items": {
                       "type": "string"
                     },
@@ -541,7 +541,7 @@
                         "type": "null"
                       }
                     ],
-                    "description": "Links from the entity asked about."
+                    "description": "The fewest links from the entity asked about at which Polixis reached it."
                   },
                   "entity_type": {
                     "anyOf": [
@@ -552,10 +552,10 @@
                         "type": "null"
                       }
                     ],
-                    "description": "PERSON or ORGANIZATION."
+                    "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
                   },
                   "flags": {
-                    "description": "Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.",
+                    "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
                     "items": {
                       "type": "string"
                     },
@@ -570,7 +570,7 @@
                         "type": "null"
                       }
                     ],
-                    "description": "Its name; null for a party only the full graph has, which `get_entity_profiles` can name."
+                    "description": "Its name, from Polixis's smart graph; null for a party only the full graph has, which Polixis sends without names and `get_entity_profiles` can name."
                   },
                   "pid": {
                     "description": "Its pid, for the other Polixis tools.",
@@ -588,9 +588,9 @@
                 "type": "object"
               },
               "path": {
-                "description": "One shortest path from the entity to the party, with the roles at each step.",
+                "description": "Computed by this MCP, since Polixis sends the network, not paths: one shortest path from the entity to the party over the links of Polixis's network, found by a breadth-first walk, with the roles at each step.",
                 "items": {
-                  "description": "One step of a path, with every link between its two parties, whichever way they point.",
+                  "description": "One step of a path, with every link of Polixis's graph between its two parties,\nwhichever way they point.",
                   "properties": {
                     "from_name": {
                       "anyOf": [
@@ -610,7 +610,7 @@
                     "links": {
                       "description": "The links joining the two, in their own direction.",
                       "items": {
-                        "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                        "description": "A link of Polixis's graph: the source holds each relation's role in the target, such as\nbeing its shareholder. The two parties are named where the link appears, so it carries\ntheir pids only.",
                         "properties": {
                           "relations": {
                             "description": "Every role the source holds in the target.",
@@ -629,7 +629,7 @@
                                   "description": "YYYY-MM-DD, null if unknown or current."
                                 },
                                 "former": {
-                                  "description": "Whether the relation has ended.",
+                                  "description": "Polixis's `former`: whether the relation has ended.",
                                   "type": "boolean"
                                 },
                                 "role": {
@@ -641,7 +641,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                                  "description": "Polixis's role, such as shareholder/ founder, director, auditor or affiliated to the legal entity."
                                 },
                                 "share_percent": {
                                   "anyOf": [
@@ -652,7 +652,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "The share held; null when not reported."
+                                  "description": "Polixis's share for the role; null when it is not reported."
                                 },
                                 "start_date": {
                                   "anyOf": [
@@ -723,7 +723,7 @@
                 "type": "array"
               },
               "risks": {
-                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
                 "items": {
                   "type": "string"
                 },
@@ -751,7 +751,7 @@
           "description": "Pass it as `cursor` for the next page; null on the last page."
         },
         "parties_checked": {
-          "description": "Parties in the network, the entity left out.",
+          "description": "Computed by this MCP: the parties in Polixis's network, the entity left out.",
           "type": "integer"
         },
         "pid": {
@@ -762,15 +762,15 @@
           "additionalProperties": {
             "type": "integer"
           },
-          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "description": "Computed by this MCP: how many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
           "type": "object"
         },
         "total_flagged": {
-          "description": "Flagged parties across every page.",
+          "description": "Computed by this MCP: parties with a risk marker, across every page.",
           "type": "integer"
         },
         "truncated_by_polixis": {
-          "description": "Whether Polixis cut the network short, so parties beyond what it returned are missing. When true, a count of 0 does not show that none exists: say the network was cut, rather than that none was found.",
+          "description": "Polixis's `truncated` on either graph: whether it cut the network short, so parties beyond what it returned are missing. When true, a count of 0 does not show that none exists: say the network was cut, rather than that none was found.",
           "type": "boolean"
         }
       },
@@ -793,7 +793,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Companies an organization or person is tied to: directly, as owner, director, signatory\nor subsidiary, or through people in between, such as a PEP's relative or associate, or a\ndirector or owner the company shares with it. Each comes with the chains of people and the\nlinks that tie it, and its flags.\n\nThe nearest come first, then the flagged, then those tied through the most people, so the\nfirst page usually answers the question, and `total_by_risk` counts the flagged companies\nby marker. When `truncated_by_polixis` is true, Polixis cut the network short, so more\ncompanies may exist. Start with `radius` 2 and widen to 3 only when the\nquestion needs ties further out. For what an entity owns down the chain use\n`get_top_down_ownership`; for sanctioned, PEP or state-owned parties\n`find_flagged_parties`. When `next_cursor` is set, pass it back as `cursor`.",
+    "description": "Companies an organization or person is tied to: directly, as owner, director, signatory\nor subsidiary, or through people in between, such as a PEP's relative or associate, or a\ndirector or owner the company shares with it. Each comes with the chains of people and the\nlinks that tie it, and its flags.\n\nPolixis returns the network around the entity: with `scope` key its smart graph, which\nleaves out signatory, third-party and historic relations, and with `all` its full graph\ntoo. This MCP finds the companies in it and the chains of people that tie each one.\n\nThe nearest come first, then the flagged, then those tied through the most people, so the\nfirst page usually answers the question, and `total_by_risk` counts the flagged companies\nby marker. When `truncated_by_polixis` is true, Polixis cut the network short, so more\ncompanies may exist. Start with `radius` 2 and widen to 3 only when the\nquestion needs ties further out. For what an entity owns down the chain use\n`get_top_down_ownership`; for sanctioned, PEP or state-owned parties\n`find_flagged_parties`. When `next_cursor` is set, pass it back as `cursor`.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -862,13 +862,13 @@
         "companies": {
           "description": "The companies of this page: the nearest first, then the flagged, then those tied through the most people.",
           "items": {
-            "description": "A company tied to the entity, and how.",
+            "description": "A company tied to the entity, and how, as this MCP found it in Polixis's network.",
             "properties": {
               "company": {
                 "description": "The company, with its flags and distance.",
                 "properties": {
                   "alerts": {
-                    "description": "Alert categories of the party itself, such as STATECO or RESTRICTION.",
+                    "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
                     "items": {
                       "type": "string"
                     },
@@ -883,7 +883,7 @@
                         "type": "null"
                       }
                     ],
-                    "description": "Links from the entity asked about."
+                    "description": "The fewest links from the entity asked about at which Polixis reached it."
                   },
                   "entity_type": {
                     "anyOf": [
@@ -894,10 +894,10 @@
                         "type": "null"
                       }
                     ],
-                    "description": "PERSON or ORGANIZATION."
+                    "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
                   },
                   "flags": {
-                    "description": "Such as SANCTION, PEP, FORMER_PEP, REP or DELISTED.",
+                    "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
                     "items": {
                       "type": "string"
                     },
@@ -912,7 +912,7 @@
                         "type": "null"
                       }
                     ],
-                    "description": "Its name; null for a party only the full graph has, which `get_entity_profiles` can name."
+                    "description": "Its name, from Polixis's smart graph; null for a party only the full graph has, which Polixis sends without names and `get_entity_profiles` can name."
                   },
                   "pid": {
                     "description": "Its pid, for the other Polixis tools.",
@@ -930,9 +930,9 @@
                 "type": "object"
               },
               "direct_links": {
-                "description": "The links between the entity and the company; empty when they are tied only through people.",
+                "description": "Polixis's links between the entity and the company; empty when they are tied only through people.",
                 "items": {
-                  "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                  "description": "A link of Polixis's graph: the source holds each relation's role in the target, such as\nbeing its shareholder. The two parties are named where the link appears, so it carries\ntheir pids only.",
                   "properties": {
                     "relations": {
                       "description": "Every role the source holds in the target.",
@@ -951,7 +951,7 @@
                             "description": "YYYY-MM-DD, null if unknown or current."
                           },
                           "former": {
-                            "description": "Whether the relation has ended.",
+                            "description": "Polixis's `former`: whether the relation has ended.",
                             "type": "boolean"
                           },
                           "role": {
@@ -963,7 +963,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                            "description": "Polixis's role, such as shareholder/ founder, director, auditor or affiliated to the legal entity."
                           },
                           "share_percent": {
                             "anyOf": [
@@ -974,7 +974,7 @@
                                 "type": "null"
                               }
                             ],
-                            "description": "The share held; null when not reported."
+                            "description": "Polixis's share for the role; null when it is not reported."
                           },
                           "start_date": {
                             "anyOf": [
@@ -1018,25 +1018,25 @@
                 "type": "array"
               },
               "hops": {
-                "description": "Links between the entity and the company: 1 is direct.",
+                "description": "Computed by this MCP: links between the entity and the company; 1 is direct.",
                 "type": "integer"
               },
               "risks": {
-                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "through": {
-                "description": "The shortest 5 chains of people, with the links along each.",
+                "description": "Computed by this MCP: the shortest 5 chains of people, with Polixis's links along each.",
                 "items": {
-                  "description": "People in a row through whom the entity is tied to the company.",
+                  "description": "People in a row through whom the entity is tied to the company, found by this MCP.",
                   "properties": {
                     "links": {
                       "description": "The links along the chain in order, from the entity to the company, each in its own direction.",
                       "items": {
-                        "description": "The source holds each relation's role in the target, such as being its shareholder. The\ntwo parties are named where the link appears, so it carries their pids only.",
+                        "description": "A link of Polixis's graph: the source holds each relation's role in the target, such as\nbeing its shareholder. The two parties are named where the link appears, so it carries\ntheir pids only.",
                         "properties": {
                           "relations": {
                             "description": "Every role the source holds in the target.",
@@ -1055,7 +1055,7 @@
                                   "description": "YYYY-MM-DD, null if unknown or current."
                                 },
                                 "former": {
-                                  "description": "Whether the relation has ended.",
+                                  "description": "Polixis's `former`: whether the relation has ended.",
                                   "type": "boolean"
                                 },
                                 "role": {
@@ -1067,7 +1067,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "Such as shareholder/ founder, director or affiliated to the legal entity."
+                                  "description": "Polixis's role, such as shareholder/ founder, director, auditor or affiliated to the legal entity."
                                 },
                                 "share_percent": {
                                   "anyOf": [
@@ -1078,7 +1078,7 @@
                                       "type": "null"
                                     }
                                   ],
-                                  "description": "The share held; null when not reported."
+                                  "description": "Polixis's share for the role; null when it is not reported."
                                 },
                                 "start_date": {
                                   "anyOf": [
@@ -1160,7 +1160,7 @@
                 "type": "array"
               },
               "through_total": {
-                "description": "How many people next to the company tie it to the entity.",
+                "description": "Computed by this MCP: how many people next to the company tie it to the entity.",
                 "type": "integer"
               }
             },
@@ -1195,23 +1195,23 @@
           "additionalProperties": {
             "type": "integer"
           },
-          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "description": "Computed by this MCP: how many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
           "type": "object"
         },
         "total_companies": {
-          "description": "Companies across every page.",
+          "description": "Computed by this MCP: companies across every page.",
           "type": "integer"
         },
         "total_direct": {
-          "description": "Companies tied to the entity directly.",
+          "description": "Computed by this MCP: companies tied to the entity directly.",
           "type": "integer"
         },
         "total_flagged": {
-          "description": "Companies with a risk marker.",
+          "description": "Computed by this MCP: companies with a risk marker.",
           "type": "integer"
         },
         "truncated_by_polixis": {
-          "description": "Whether Polixis cut the network short, so companies beyond what it returned are missing. When true, a count of 0 does not show that none exists: say the network was cut, rather than that none was found.",
+          "description": "Polixis's `truncated`: whether it cut the network short, so companies beyond what it returned are missing. When true, a count of 0 does not show that none exists: say the network was cut, rather than that none was found.",
           "type": "boolean"
         }
       },
@@ -1418,7 +1418,7 @@
             }
           ],
           "default": null,
-          "description": "The parts of each profile to return. Leave it out for the key identifiers: name records, identifiers, countries, dates, flags, alerts and sanction statuses. Ask for `sanctions` for each listing's programme and justification, and `positions` for the offices a PEP holds or held."
+          "description": "The parts of each profile to return. Leave it out for the key identifiers: name records, identifiers, countries, dates, flags, alerts and sanction statuses. Ask for `sanctions` for each listing's programme, listing and delisting dates, reference number and designation details, and `positions` for the offices a PEP holds or held, with their institutions and dates."
         }
       },
       "required": [
@@ -1465,7 +1465,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Such as SANCTION, RESTRICTION, STATECO, REGULATORY or LISTED."
+                          "description": "Polixis's category: one of its own, such as regulatory (such as legal proceedings), closed (liquidated, dissolved or deceased), stateco (state-owned or a public body), restriction, sanctionterritory or listed, or one Polixis generated from a related party, ending in _RELATED, such as SANCTION_RELATED or PEP_RELATED."
                         },
                         "message": {
                           "description": "The alert, as Polixis words it.",
@@ -1485,7 +1485,7 @@
                   }
                 ],
                 "default": null,
-                "description": "Risk and status alerts."
+                "description": "Polixis's risk and status alerts, its own and those it generated from related parties."
               },
               "countries": {
                 "anyOf": [
@@ -1503,7 +1503,7 @@
                   }
                 ],
                 "default": null,
-                "description": "ISO 3166-1 alpha-2 codes by relation, such as country, countryCitizenship or countryJurisdiction."
+                "description": "ISO 3166-1 alpha-2 codes by relation, such as country, countryCitizenship or countryJurisdiction: for a person, citizenship, residence and business ties; for an organization, where it is registered or operates."
               },
               "dates": {
                 "anyOf": [
@@ -1521,7 +1521,7 @@
                   }
                 ],
                 "default": null,
-                "description": "Dates by kind, such as Date of Birth or Registration Date, as YYYY-MM-DD, YYYY-MM or YYYY."
+                "description": "Dates by kind, such as Date of Birth, Registration Date or Liquidation Date, as YYYY-MM-DD, YYYY-MM or YYYY."
               },
               "economic_activities": {
                 "anyOf": [
@@ -1551,7 +1551,7 @@
                   }
                 ],
                 "default": null,
-                "description": "Such as SANCTION, PEP, FORMER_PEP or REP."
+                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening."
               },
               "gender": {
                 "anyOf": [
@@ -1704,7 +1704,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "Where the position is held."
+                          "description": "The public body or institution where it is or was held."
                         },
                         "position": {
                           "description": "The position.",
@@ -1761,7 +1761,7 @@
                   }
                 ],
                 "default": null,
-                "description": "Why Polixis rejected the pid, such as an unknown id; null when it did not."
+                "description": "Polixis's reason for rejecting the pid, such as an unknown id, which this MCP returns in place of the profile; null when it did not."
               },
               "sanction_statuses": {
                 "anyOf": [
@@ -1802,11 +1802,11 @@
                             },
                             "type": "array"
                           },
-                          "description": "Every detail of the record, such as Program, Justification and Source.",
+                          "description": "Every detail of the record, such as Program, Sanction type, Listing Date, Delisting Date, Sanction Status, Reference Number and Designation details.",
                           "type": "object"
                         },
                         "list_name": {
-                          "description": "The sanctions list.",
+                          "description": "The sanctions list. Polixis counts each authority's list once, such as one OFAC list for every OFAC programme; the programme is in `details`.",
                           "type": "string"
                         },
                         "status": {
@@ -1818,7 +1818,7 @@
                               "type": "null"
                             }
                           ],
-                          "description": "ACTIVE or DELISTED, as the record gives it."
+                          "description": "The record's Sanction Status detail, ACTIVE or DELISTED, as it gives it."
                         }
                       },
                       "required": [
@@ -1871,11 +1871,13 @@
                 "enum": [
                   "executive",
                   "executiveSenior",
-                  "thirdParty",
+                  "board",
+                  "political",
                   "signature",
-                  "ownershipInOtherEntities",
+                  "thirdParty",
+                  "membership",
                   "shareholdingInformation",
-                  "membership"
+                  "ownershipInOtherEntities"
                 ],
                 "type": "string"
               },
@@ -1887,7 +1889,7 @@
             }
           ],
           "default": null,
-          "description": "The kinds of relation to return: executive (directors and officers), executiveSenior, signature (signatories), shareholdingInformation (its shareholders), ownershipInOtherEntities (what it holds), thirdParty and membership. Leave it out for all of them."
+          "description": "The kinds of relation to return, as Polixis names them: board (the board of directors and equivalent roles; for a person, the supervisory boards they sit on), executiveSenior (management board members and other high-ranking roles), executive (other executive roles, such as department heads or secretaries), political (public administration roles, such as members of parliament), signature (signatories), shareholdingInformation (its shareholders, indirect shareholders and beneficial owners), ownershipInOtherEntities (its subsidiaries, branches and holdings), thirdParty (service providers, such as auditors and liquidators, or for a person the organizations they work for) and membership. Polixis warns that registers use board, executiveSenior, executive and political differently, so ask for all four when looking for directors or managers. Leave it out for all of them."
         },
         "cursor": {
           "anyOf": [
@@ -1945,7 +1947,7 @@
             "description": "An organization or person related to the entity, with how.",
             "properties": {
               "alerts": {
-                "description": "Risk and status alerts, as Polixis words them.",
+                "description": "Polixis's alerts, as it words them: its own, such as a liquidation, legal proceedings or state ownership, then those it generates from related parties, such as 'Related to a sanctioned person'. A sanction outside the lists behind the SANCTION flag shows here.",
                 "items": {
                   "type": "string"
                 },
@@ -1967,10 +1969,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "PERSON or ORGANIZATION."
+                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
               },
               "flags": {
-                "description": "Such as SANCTION, PEP or REP.",
+                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
                 "items": {
                   "type": "string"
                 },
@@ -2015,7 +2017,7 @@
                       "description": "YYYY-MM-DD, YYYY-MM or YYYY, null if unknown."
                     },
                     "former": {
-                      "description": "Whether the relation has ended.",
+                      "description": "Polixis's `former`: whether the relation has ended.",
                       "type": "boolean"
                     },
                     "information_date": {
@@ -2049,7 +2051,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "The share held; null when not reported."
+                      "description": "The relation's Share property, which Polixis sends as text, as a number; null when it is missing or 0, which Polixis sends for a share it does not know."
                     },
                     "source": {
                       "anyOf": [
@@ -2145,7 +2147,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "An organization's or person's own sanctions listings, and every sanctioned party\nPolixis relates to it at any distance, each with its lists, programmes and the relations\nthat lead to it: who holds what in whom at every step.\n\nUse it for direct and indirect sanctions exposure; for PEP or state-owned parties nearby\nuse `find_flagged_parties`. The nearest come first. When `next_cursor` is set, pass it\nback as `cursor`.\nPolixis does not document this route yet, so its answers may change without notice.",
+    "description": "An organization's or person's own sanctions listings, and every sanctioned party\nPolixis relates to it at any distance, each with its lists, programmes and the relations\nthat lead to it: who holds what in whom at every step. Polixis walks its graph and\nreturns each sanctioned party with the relations that lead to it; this MCP ranks them and\ncounts the hops.\n\nUse it for direct and indirect sanctions exposure; for PEP or state-owned parties nearby\nuse `find_flagged_parties`. The nearest come first. When `next_cursor` is set, pass it\nback as `cursor`.\nPolixis does not document this route yet, so its answers may change without notice.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2207,9 +2209,9 @@
           "description": "Pass it as `cursor` for the next page; null on the last page."
         },
         "own_listings": {
-          "description": "The entity's own records on sanctions lists; empty when it is not listed.",
+          "description": "The entity's own records on sanctions lists, each named by its Source detail; empty when it is not listed.",
           "items": {
-            "description": "One record on one sanctions list.",
+            "description": "One record on one sanctions list. Polixis counts each authority's list once, such as\none OFAC list for every OFAC programme.",
             "properties": {
               "country": {
                 "anyOf": [
@@ -2235,10 +2237,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "The listing date as YYYY-MM-DD, or as the record writes it when in no form we know; null when the record gives none."
+                "description": "Computed by this MCP from the record's Listing Date, Listed Date or #UK_DESIGNATED_DATE detail, whichever it has first, as YYYY-MM-DD, or as the record writes it when in no form we know; null when the record gives none."
               },
               "programs": {
-                "description": "The sanctions programmes, such as UKRAINE-EO13662.",
+                "description": "The record's Program details, such as UKRAINE-EO13662.",
                 "items": {
                   "type": "string"
                 },
@@ -2253,7 +2255,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "ACTIVE or DELISTED, as the record gives it."
+                "description": "The record's Sanction Status detail, ACTIVE or DELISTED, as it gives it."
               }
             },
             "required": [
@@ -2284,13 +2286,13 @@
                 "type": "array"
               },
               "hops": {
-                "description": "Links between the entity and it: 1 is a direct relation.",
+                "description": "Computed by this MCP: the distinct pairs of parties on its path, so the links between the entity and it; 1 is a direct relation.",
                 "type": "integer"
               },
               "listings": {
                 "description": "Its records on sanctions lists.",
                 "items": {
-                  "description": "One record on one sanctions list.",
+                  "description": "One record on one sanctions list. Polixis counts each authority's list once, such as\none OFAC list for every OFAC programme.",
                   "properties": {
                     "country": {
                       "anyOf": [
@@ -2316,10 +2318,10 @@
                           "type": "null"
                         }
                       ],
-                      "description": "The listing date as YYYY-MM-DD, or as the record writes it when in no form we know; null when the record gives none."
+                      "description": "Computed by this MCP from the record's Listing Date, Listed Date or #UK_DESIGNATED_DATE detail, whichever it has first, as YYYY-MM-DD, or as the record writes it when in no form we know; null when the record gives none."
                     },
                     "programs": {
-                      "description": "The sanctions programmes, such as UKRAINE-EO13662.",
+                      "description": "The record's Program details, such as UKRAINE-EO13662.",
                       "items": {
                         "type": "string"
                       },
@@ -2334,7 +2336,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "ACTIVE or DELISTED, as the record gives it."
+                      "description": "The record's Sanction Status detail, ACTIVE or DELISTED, as it gives it."
                     }
                   },
                   "required": [
@@ -2360,7 +2362,7 @@
                 "description": "Its English name."
               },
               "path": {
-                "description": "The relations from the entity to it, in order. Two parties joined by several relations have one entry for each.",
+                "description": "Polixis's relations from the entity to it, in order. Two parties joined by several relations have one entry for each.",
                 "items": {
                   "description": "One relation on the way to a sanctioned party: the source holds the role in the target.\nPolixis names the two ends but gives no pid.",
                   "properties": {
@@ -2466,7 +2468,7 @@
           "type": "array"
         },
         "total_related": {
-          "description": "Sanctioned related parties across every page. Polixis has returned different counts for the same entity on two calls, so say when a count matters.",
+          "description": "Computed by this MCP: sanctioned related parties across every page. Polixis has returned different counts for the same entity on two calls, so say when a count matters.",
           "type": "integer"
         }
       },
@@ -2487,7 +2489,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "What an organization or person owns: one row per holding, however many chains of\nshareholdings reach it, with the share the entity carries in it summed over every chain,\nthe chain carrying the most, and its flags. Polixis reports only the share on each link:\nthis MCP computes the effective share from them. `total_by_risk` counts the flagged holdings of\nthe whole group by marker, and the first page lists up to 25 of them, the sanctioned first;\nthe others carry their flags on their own rows.\n\nRows come largest effective share first, so the controlled subsidiaries lead and the\nminority stakes trail: stop once you have what the question needs. When `next_cursor`\nis set, pass it back as `cursor` for the next page.",
+    "description": "What an organization or person owns: one row per holding, however many chains of\nshareholdings reach it, with the share the entity carries in it summed over every chain,\nthe chain carrying the most, and its flags.\n\nPolixis traces the tree down through subsidiaries and shareholding layers, and reports\nthe role and share of each link only. This MCP turns the tree into rows and computes the\neffective share of each holding from the link shares. `total_by_risk` counts the flagged\nholdings of the whole group by marker, and the first page lists up to 25 of them, the\nsanctioned first; the others carry their flags on their own rows.\n\nRows come largest effective share first, so the controlled subsidiaries lead and the\nminority stakes trail: stop once you have what the question needs. When `next_cursor`\nis set, pass it back as `cursor` for the next page.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2540,21 +2542,21 @@
         "entities": {
           "description": "The entities of this page.",
           "items": {
-            "description": "An entity in the ownership tree, with every chain that reaches it added up.",
+            "description": "An entity in Polixis's ownership tree, with every chain that reaches it added up by this\nMCP.",
             "properties": {
               "alerts": {
-                "description": "Alert categories, such as STATECO or RESTRICTION.",
+                "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "chains": {
-                "description": "How many distinct chains of links reach it.",
+                "description": "Computed by this MCP: how many distinct chains of links reach it in Polixis's tree.",
                 "type": "integer"
               },
               "depth": {
-                "description": "Fewest links from the entity asked about: 1 is direct.",
+                "description": "Computed by this MCP: the fewest links between it and the entity asked about in Polixis's tree; 1 is direct.",
                 "type": "integer"
               },
               "direct_share_percent": {
@@ -2566,7 +2568,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "The share across its own direct link with the entity asked about; null when it has none or Polixis reports no share."
+                "description": "Polixis's sharePercent on its own direct link with the entity asked about; null when it has none or Polixis reports no share."
               },
               "effective_share_percent": {
                 "anyOf": [
@@ -2577,10 +2579,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "Computed by this MCP, not sent by Polixis, which reports only the share on each link: the shares along each chain between it and the entity asked about multiplied together (50% of 60% is 30%), then summed over the chains. A chain with a link that reports no share is left out. For owners it is the share it holds, for holdings the share held in it. Null when no chain reports a share on every link. Call it a figure derived from Polixis's link shares, not Polixis's own."
+                "description": "Computed by this MCP, since Polixis reports only the share on each link: the shares along each chain between it and the entity asked about multiplied together (50% of 60% is 30%), then summed over the chains. Polixis may list one entity twice under the same parent, once per role; that counts once, with the larger share. A chain with a link that reports no share is left out. For owners it is the share it holds, for holdings the share held in it. Null when no chain reports a share on every link. Call it a figure derived from Polixis's link shares, not Polixis's own."
               },
               "end_of_chain": {
-                "description": "Whether nothing lies beyond it: for owners, no owner of its own is known, as for an ultimate beneficial owner; for holdings, it holds nothing further. A tree cut short by Polixis may hide more.",
+                "description": "Computed by this MCP: whether nothing lies beyond it in Polixis's tree: for owners, no owner of its own is known, as for an ultimate beneficial owner; for holdings, it holds nothing further. A tree cut short by Polixis may hide more.",
                 "type": "boolean"
               },
               "entity_type": {
@@ -2592,10 +2594,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "PERSON or ORGANIZATION."
+                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
               },
               "flags": {
-                "description": "Such as SANCTION, PEP or REP.",
+                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
                 "items": {
                   "type": "string"
                 },
@@ -2617,18 +2619,18 @@
                 "type": "string"
               },
               "roles": {
-                "description": "Its roles across its links, such as shareholder.",
+                "description": "Polixis's roles on its links, such as shareholder, or a role of control without shares.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "share_unknown_on_some_chain": {
-                "description": "Whether a chain to it has a link without a share, so the true effective share may be higher.",
+                "description": "Computed by this MCP: whether a chain to it has a link Polixis reports no share for, so the true effective share may be higher.",
                 "type": "boolean"
               },
               "strongest_chain": {
-                "description": "The chain carrying the largest share, from the link next to the entity asked about to this entity.",
+                "description": "Computed by this MCP: the chain carrying the largest effective share, from the link next to the entity asked about to this entity.",
                 "items": {
                   "description": "One link of an ownership chain.",
                   "properties": {
@@ -2656,7 +2658,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "The share across this link, with the link before it or, for the first, with the entity asked about; null when Polixis reports none."
+                      "description": "Polixis's sharePercent for this link alone, with the link before it or, for the first, with the entity asked about; null when Polixis reports none or 0."
                     }
                   },
                   "required": [
@@ -2689,12 +2691,12 @@
           "type": "array"
         },
         "flagged": {
-          "description": "At most 25 flagged entities of the whole tree, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
+          "description": "Computed by this MCP: at most 25 entities of the whole tree with a risk marker, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
           "items": {
-            "description": "A flagged entity of the tree, wherever its rows fall.",
+            "description": "A flagged entity of the tree, wherever its rows fall, picked by this MCP.",
             "properties": {
               "depth": {
-                "description": "Fewest links from the entity asked about.",
+                "description": "As on its entity row: the fewest links to it.",
                 "type": "integer"
               },
               "effective_share_percent": {
@@ -2724,7 +2726,7 @@
                 "type": "string"
               },
               "risks": {
-                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
                 "items": {
                   "type": "string"
                 },
@@ -2761,23 +2763,23 @@
           "additionalProperties": {
             "type": "integer"
           },
-          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "description": "Computed by this MCP: how many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
           "type": "object"
         },
         "total_entities": {
-          "description": "Entities across every page.",
+          "description": "Computed by this MCP: the distinct entities in the tree, across every page.",
           "type": "integer"
         },
         "total_flagged": {
-          "description": "Flagged entities in the whole tree.",
+          "description": "Computed by this MCP: entities in the whole tree with a risk marker.",
           "type": "integer"
         },
         "total_share_unknown": {
-          "description": "Entities across every page with `share_unknown_on_some_chain`, whose true share may be higher than shown. Those with no known share at all come last, so shares falling below a threshold settle it only once every one of these has been read.",
+          "description": "Computed by this MCP: entities across every page with `share_unknown_on_some_chain`, whose true share may be higher than shown. Those with no known share at all come last, so shares falling below a threshold settle it only once every one of these has been read.",
           "type": "integer"
         },
         "truncated_by_polixis": {
-          "description": "Whether Polixis cut the tree at its cap of 300 nodes per level or 5,000 in all, so even every page together is not the whole tree. Start again from a sub-holding.",
+          "description": "Polixis's `truncated`: whether it cut the tree at its cap of 300 nodes per level or 5,000 in all, so even every page together is not the whole tree. Start again from a sub-holding.",
           "type": "boolean"
         }
       },
@@ -2802,7 +2804,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Who owns an organization: one row per owner, however many chains of shareholdings\nreach it, with the share it carries in the organization summed over every chain, the\nchain carrying the most, and its flags. Polixis reports only the share on each link: this\nMCP computes the effective share from them. `total_by_risk` counts the flagged owners of the\nwhole tree by marker, and the first page lists up to 25 of them, the sanctioned first; the\nothers carry their flags on their own rows.\n\nRows come largest effective share first, so a threshold question such as \"who holds 25%\nor more\" is settled once the shares fall below it: stop there rather than reading every\npage, unless `total_share_unknown` counts owners not yet read, whose share may be higher.\nWhen `next_cursor` is set, pass it back as `cursor` for the next page.",
+    "description": "Who owns or controls an organization: one row per owner, however many chains reach it,\nwith the share it carries in the organization summed over every chain, the chain carrying\nthe most, and its flags.\n\nPolixis traces the tree up through shareholders and control layers to the last owners,\nand reports the role and share of each link only. This MCP turns the tree into rows and\ncomputes each owner's effective share from the link shares; a controlling person whose\nlinks carry no share gets none. `total_by_risk` counts the flagged owners of the whole\ntree by marker, and the first page lists up to 25 of them, the sanctioned first; the\nothers carry their flags on their own rows.\n\nRows come largest effective share first, so a threshold question such as \"who holds 25%\nor more\" is settled once the shares fall below it: stop there rather than reading every\npage, unless `total_share_unknown` counts owners not yet read, whose share may be higher.\nWhen `next_cursor` is set, pass it back as `cursor` for the next page.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2855,21 +2857,21 @@
         "entities": {
           "description": "The entities of this page.",
           "items": {
-            "description": "An entity in the ownership tree, with every chain that reaches it added up.",
+            "description": "An entity in Polixis's ownership tree, with every chain that reaches it added up by this\nMCP.",
             "properties": {
               "alerts": {
-                "description": "Alert categories, such as STATECO or RESTRICTION.",
+                "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "chains": {
-                "description": "How many distinct chains of links reach it.",
+                "description": "Computed by this MCP: how many distinct chains of links reach it in Polixis's tree.",
                 "type": "integer"
               },
               "depth": {
-                "description": "Fewest links from the entity asked about: 1 is direct.",
+                "description": "Computed by this MCP: the fewest links between it and the entity asked about in Polixis's tree; 1 is direct.",
                 "type": "integer"
               },
               "direct_share_percent": {
@@ -2881,7 +2883,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "The share across its own direct link with the entity asked about; null when it has none or Polixis reports no share."
+                "description": "Polixis's sharePercent on its own direct link with the entity asked about; null when it has none or Polixis reports no share."
               },
               "effective_share_percent": {
                 "anyOf": [
@@ -2892,10 +2894,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "Computed by this MCP, not sent by Polixis, which reports only the share on each link: the shares along each chain between it and the entity asked about multiplied together (50% of 60% is 30%), then summed over the chains. A chain with a link that reports no share is left out. For owners it is the share it holds, for holdings the share held in it. Null when no chain reports a share on every link. Call it a figure derived from Polixis's link shares, not Polixis's own."
+                "description": "Computed by this MCP, since Polixis reports only the share on each link: the shares along each chain between it and the entity asked about multiplied together (50% of 60% is 30%), then summed over the chains. Polixis may list one entity twice under the same parent, once per role; that counts once, with the larger share. A chain with a link that reports no share is left out. For owners it is the share it holds, for holdings the share held in it. Null when no chain reports a share on every link. Call it a figure derived from Polixis's link shares, not Polixis's own."
               },
               "end_of_chain": {
-                "description": "Whether nothing lies beyond it: for owners, no owner of its own is known, as for an ultimate beneficial owner; for holdings, it holds nothing further. A tree cut short by Polixis may hide more.",
+                "description": "Computed by this MCP: whether nothing lies beyond it in Polixis's tree: for owners, no owner of its own is known, as for an ultimate beneficial owner; for holdings, it holds nothing further. A tree cut short by Polixis may hide more.",
                 "type": "boolean"
               },
               "entity_type": {
@@ -2907,10 +2909,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "PERSON or ORGANIZATION."
+                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
               },
               "flags": {
-                "description": "Such as SANCTION, PEP or REP.",
+                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
                 "items": {
                   "type": "string"
                 },
@@ -2932,18 +2934,18 @@
                 "type": "string"
               },
               "roles": {
-                "description": "Its roles across its links, such as shareholder.",
+                "description": "Polixis's roles on its links, such as shareholder, or a role of control without shares.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
               "share_unknown_on_some_chain": {
-                "description": "Whether a chain to it has a link without a share, so the true effective share may be higher.",
+                "description": "Computed by this MCP: whether a chain to it has a link Polixis reports no share for, so the true effective share may be higher.",
                 "type": "boolean"
               },
               "strongest_chain": {
-                "description": "The chain carrying the largest share, from the link next to the entity asked about to this entity.",
+                "description": "Computed by this MCP: the chain carrying the largest effective share, from the link next to the entity asked about to this entity.",
                 "items": {
                   "description": "One link of an ownership chain.",
                   "properties": {
@@ -2971,7 +2973,7 @@
                           "type": "null"
                         }
                       ],
-                      "description": "The share across this link, with the link before it or, for the first, with the entity asked about; null when Polixis reports none."
+                      "description": "Polixis's sharePercent for this link alone, with the link before it or, for the first, with the entity asked about; null when Polixis reports none or 0."
                     }
                   },
                   "required": [
@@ -3004,12 +3006,12 @@
           "type": "array"
         },
         "flagged": {
-          "description": "At most 25 flagged entities of the whole tree, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
+          "description": "Computed by this MCP: at most 25 entities of the whole tree with a risk marker, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
           "items": {
-            "description": "A flagged entity of the tree, wherever its rows fall.",
+            "description": "A flagged entity of the tree, wherever its rows fall, picked by this MCP.",
             "properties": {
               "depth": {
-                "description": "Fewest links from the entity asked about.",
+                "description": "As on its entity row: the fewest links to it.",
                 "type": "integer"
               },
               "effective_share_percent": {
@@ -3039,7 +3041,7 @@
                 "type": "string"
               },
               "risks": {
-                "description": "Its risk markers: the flags SANCTION, PEP, FORMER_PEP or REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION or STATECO (state-owned or -controlled).",
+                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
                 "items": {
                   "type": "string"
                 },
@@ -3076,23 +3078,23 @@
           "additionalProperties": {
             "type": "integer"
           },
-          "description": "How many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
+          "description": "Computed by this MCP: how many of the flagged entries, across every page, carry each risk marker. Every marker is listed, so a 0 settles that none carries it without reading the other pages.",
           "type": "object"
         },
         "total_entities": {
-          "description": "Entities across every page.",
+          "description": "Computed by this MCP: the distinct entities in the tree, across every page.",
           "type": "integer"
         },
         "total_flagged": {
-          "description": "Flagged entities in the whole tree.",
+          "description": "Computed by this MCP: entities in the whole tree with a risk marker.",
           "type": "integer"
         },
         "total_share_unknown": {
-          "description": "Entities across every page with `share_unknown_on_some_chain`, whose true share may be higher than shown. Those with no known share at all come last, so shares falling below a threshold settle it only once every one of these has been read.",
+          "description": "Computed by this MCP: entities across every page with `share_unknown_on_some_chain`, whose true share may be higher than shown. Those with no known share at all come last, so shares falling below a threshold settle it only once every one of these has been read.",
           "type": "integer"
         },
         "truncated_by_polixis": {
-          "description": "Whether Polixis cut the tree at its cap of 300 nodes per level or 5,000 in all, so even every page together is not the whole tree. Start again from a sub-holding.",
+          "description": "Polixis's `truncated`: whether it cut the tree at its cap of 300 nodes per level or 5,000 in all, so even every page together is not the whole tree. Start again from a sub-holding.",
           "type": "boolean"
         }
       },
@@ -3123,7 +3125,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Checks a pid the user already holds, such as one stored in a client file. Call it first whenever the user gives a pid rather than a name. `status` is `active` when the pid is current: use it as it is. It is `merged` when Polixis merged the entity into another, whose pid is `redir`: use that one, and tell the user to update their records. It is `never minted` when Polixis does not know the pid: say so, describe no entity, and find the client again by name or identifier. A 410 error means the pid named a group Polixis dissolved, and lists its former members.",
+    "description": "Checks a pid the user already holds, such as one stored in a client file. Call it first whenever the user gives a pid rather than a name. `status` is `active` when the pid is current: use it as it is. It is `merged` when Polixis merged the entity into another, whose pid is `redir`: use that one, and tell the user to update their records. It is `never minted` when Polixis does not know the pid, which Polixis's documentation calls `unknown`: say so, describe no entity, and find the client again by name or identifier. An HTTP error 410 means the pid named a group Polixis dissolved, and its body lists the former members.",
     "inputSchema": {
       "properties": {
         "pid": {
@@ -3146,7 +3148,7 @@
           "type": "integer"
         },
         "members": {
-          "description": "The member record ids.",
+          "description": "The member record ids; for a merged pid, those of the pid that replaced it.",
           "items": {
             "type": "string"
           },
@@ -3163,7 +3165,7 @@
           ]
         },
         "status": {
-          "description": "active, merged, or never minted.",
+          "description": "active, merged, or never minted, which Polixis's documentation calls unknown.",
           "type": "string"
         }
       },
@@ -3178,7 +3180,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Find organizations and people in Polixis by name or identifier, with their sanctions and\nPEP flags, dates, countries and identifiers to tell matches apart.\n\nCall it first when you have a name or identifier: every other Polixis tool takes a match's\n`pid`. When the user gives a pid instead, call `resolve_permanent_id` with it. A match may\nnot show that a person is a former PEP: before saying a person is not a PEP, read the\n`flags` of `get_entity_profiles`, which show FORMER_PEP. When `next_cursor` is set, more\nmatches exist: pass it back as `cursor` to page through them.",
+    "description": "Find organizations and people in Polixis by name or identifier, with their sanctions and\nPEP flags, dates, countries and identifiers to tell matches apart. Vessels and aircraft are\norganizations here.\n\nCall it first when you have a name or identifier: every other Polixis tool takes a match's\n`pid`. When the user gives a pid instead, call `resolve_permanent_id` with it. A match may\nnot show that a person is a former PEP: before saying a person is not a PEP, read the\n`flags` of `get_entity_profiles`, which show FORMER_PEP. When `next_cursor` is set, more\nmatches exist: pass it back as `cursor` to page through them.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -3223,7 +3225,7 @@
             }
           ],
           "default": null,
-          "description": "Dates such as a birth or registration date, as YYYY-MM-DD, YYYY-MM or YYYY. A match needs one of its dates within one of them. Polixis filters on it, so it narrows a common name better than comparing the matches yourself."
+          "description": "Dates such as a birth or registration date, as YYYY-MM-DD, YYYY-MM or YYYY. A match needs a date that fits one of them: a year takes any date in it, a month any day in it, and a full date also takes a record that knows only its month or year. Polixis filters on it, so it narrows a common name better than comparing the matches yourself."
         },
         "entity_type": {
           "anyOf": [
@@ -3252,7 +3254,7 @@
             }
           ],
           "default": null,
-          "description": "A name, registration number, LEI or ISIN of an organization or person. Required unless `cursor` is given."
+          "description": "A name, unique identifier or ISIN of an organization or person. Unique identifiers include registration numbers, LEIs and, for a vessel, IMO numbers. Required unless `cursor` is given."
         },
         "page_size": {
           "default": 10,
@@ -3266,7 +3268,7 @@
     },
     "name": "search_entities",
     "outputSchema": {
-      "description": "One page of matches, best first: exact matches, then fuzzy ones.",
+      "description": "One page of matches, best first: Polixis puts exact matches first, then those one and\nthen two edits away, and ranks each group by its own logic, which favours entities with\nrisks and prominent ones.",
       "properties": {
         "matches": {
           "description": "The matches on this page.",
@@ -3281,7 +3283,7 @@
                 "type": "array"
               },
               "alerts": {
-                "description": "Risk and status alerts, as Polixis words them.",
+                "description": "Polixis's alerts, as it words them: its own, such as a liquidation, legal proceedings or state ownership, then those it generates from related parties, such as 'Related to a sanctioned person'. A sanction outside the lists behind the SANCTION flag shows here.",
                 "items": {
                   "type": "string"
                 },
@@ -3322,7 +3324,7 @@
                   },
                   "type": "array"
                 },
-                "description": "Identifiers by type, such as registration numbers, LEIs or tax ids.",
+                "description": "Identifiers by type, such as registration numbers, LEIs, tax ids or, for a vessel, IMO numbers.",
                 "type": "object"
               },
               "name": {
@@ -3334,10 +3336,10 @@
                     "type": "null"
                   }
                 ],
-                "description": "Its current name, in English where Polixis has one."
+                "description": "Its CURRENT_NAME record, else the first name Polixis lists, in English where Polixis has one."
               },
               "name_count": {
-                "description": "How many distinct names and spellings Polixis holds for it, of which `name_records` and `other_names` list ten at most.",
+                "description": "Computed by this MCP: how many distinct names and spellings Polixis holds for it, of which `name_records` and `other_names` list ten at most.",
                 "type": "integer"
               },
               "name_records": {
@@ -3394,7 +3396,7 @@
                 "type": "array"
               },
               "other_names": {
-                "description": "Spellings Polixis lists that no name record holds, as many as fit in the ten names listed.",
+                "description": "Spellings in Polixis's `names` that no name record holds, as many as fit in the ten names listed.",
                 "items": {
                   "type": "string"
                 },
@@ -3405,7 +3407,7 @@
                 "type": "string"
               },
               "politically_exposed": {
-                "description": "Whether Polixis flags it as a PEP. It may be false for a former PEP, whom the `flags` of `get_entity_profiles` mark FORMER_PEP.",
+                "description": "Polixis's `pep`: whether it is flagged as a politically exposed person. Polixis declassifies a PEP 5 years after the function ended and flags them FORMER_PEP, which this may not show: the `flags` of `get_entity_profiles` do.",
                 "type": "boolean"
               },
               "sanction_statuses": {
@@ -3416,7 +3418,7 @@
                 "type": "object"
               },
               "sanctioned": {
-                "description": "Whether Polixis flags it for sanctions exposure.",
+                "description": "Polixis's `sanction`: whether it is designated on a sanctions list Polixis covers, such as the UN, EU, OFAC, UK, Swiss, Canadian, French or Australian lists. A sanction of another authority shows in `alerts` instead.",
                 "type": "boolean"
               }
             },

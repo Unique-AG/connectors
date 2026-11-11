@@ -29,7 +29,9 @@ async def get_sanctions_exposure(
 ) -> contexts.SanctionsExposurePage:
     """An organization's or person's own sanctions listings, and every sanctioned party
     Polixis relates to it at any distance, each with its lists, programmes and the relations
-    that lead to it: who holds what in whom at every step.
+    that lead to it: who holds what in whom at every step. Polixis walks its graph and
+    returns each sanctioned party with the relations that lead to it; this MCP ranks them and
+    counts the hops.
 
     Use it for direct and indirect sanctions exposure; for PEP or state-owned parties nearby
     use `find_flagged_parties`. The nearest come first. When `next_cursor` is set, pass it

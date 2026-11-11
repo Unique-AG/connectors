@@ -33,7 +33,8 @@ async def find_connections(
 ) -> contexts.Connections:
     """How two organizations or people are connected: the shortest path Polixis finds between
     them across its whole graph, with no hop limit, and the role, share and dates of each link
-    along it, and the flags of every party on it.
+    along it, and the flags of every party on it. Polixis finds the path; this MCP puts its
+    links in order from the first entity to the second.
 
     Polixis does not document this route yet, so its answers may change without notice.
     """

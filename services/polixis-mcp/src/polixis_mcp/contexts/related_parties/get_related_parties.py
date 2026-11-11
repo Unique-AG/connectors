@@ -7,6 +7,9 @@ from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
+from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
+from polixis_mcp.contexts.risks import visible_alert_texts
 from polixis_mcp.upstream import CorporateNodeData
 from polixis_mcp.upstream import CorporateRequestInput
 from polixis_mcp.upstream import GET_CORPORATE_PROFILE
@@ -17,11 +20,13 @@ from polixis_mcp.upstream import Upstream
 RelationCategory = Literal[
     "executive",
     "executiveSenior",
-    "thirdParty",
+    "board",
+    "political",
     "signature",
-    "ownershipInOtherEntities",
-    "shareholdingInformation",
+    "thirdParty",
     "membership",
+    "shareholdingInformation",
+    "ownershipInOtherEntities",
 ]
 
 
@@ -62,7 +67,7 @@ def _party(item: CorporateNodeData) -> RelatedPartyView | None:
         entity_type=entity.type,
         countries=unique(code for codes in (entity.countries or {}).values() for code in codes),
         flags=unique(name for flag in entity.flags or [] for name in flag),
-        alerts=unique(alert.description for alert in entity.alerts or []),
+        alerts=visible_alert_texts(entity.alerts),
         relations=[
             RelationView(
                 relation_type=relation.type,
@@ -93,11 +98,13 @@ def _share(properties: dict[str, list[str]] | None) -> float | None:
 _ALL_CATEGORIES: tuple[RelationCategory, ...] = (
     "executive",
     "executiveSenior",
-    "thirdParty",
+    "board",
+    "political",
     "signature",
-    "ownershipInOtherEntities",
-    "shareholdingInformation",
+    "thirdParty",
     "membership",
+    "shareholdingInformation",
+    "ownershipInOtherEntities",
 )
 
 
@@ -121,8 +128,11 @@ class RelationView(BaseModel):
     title: str | None = Field(
         description="The party's role, such as director, investor or ultimately consolidated by."
     )
-    share_percent: float | None = Field(description="The share held; null when not reported.")
-    former: bool = Field(description="Whether the relation has ended.")
+    share_percent: float | None = Field(
+        description="The relation's Share property, which Polixis sends as text, as a number; "
+        "null when it is missing or 0, which Polixis sends for a share it does not know."
+    )
+    former: bool = Field(description="Polixis's `former`: whether the relation has ended.")
     start_date: str | None = Field(description="YYYY-MM-DD, YYYY-MM or YYYY, null if unknown.")
     end_date: str | None = Field(description="YYYY-MM-DD, YYYY-MM or YYYY, null if unknown.")
     information_date: str | None = Field(
@@ -139,10 +149,12 @@ class RelatedPartyView(BaseModel):
         "none, so no other tool can look the party up."
     )
     name: str | None = Field(description="Its name, in English where Polixis has one.")
-    entity_type: str | None = Field(description="PERSON or ORGANIZATION.")
+    entity_type: str | None = Field(
+        description="PERSON or ORGANIZATION; vessels and aircraft are organizations."
+    )
     countries: list[str] = Field(description="ISO 3166-1 alpha-2 codes of its countries.")
-    flags: list[str] = Field(description="Such as SANCTION, PEP or REP.")
-    alerts: list[str] = Field(description="Risk and status alerts, as Polixis words them.")
+    flags: list[str] = Field(description=FLAGS_DESCRIPTION)
+    alerts: list[str] = Field(description=ALERT_TEXTS_DESCRIPTION)
     relations: list[RelationView] = Field(
         description="Every relation to the entity, one per source that reports it."
     )

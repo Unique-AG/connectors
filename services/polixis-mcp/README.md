@@ -100,6 +100,16 @@ Every one of them also gets, from the shared client and context code:
   not ask Polixis again;
 - at most four requests to Polixis at once per process, and no request at all for a while once
   Polixis says the quota is spent, with an error that says so.
+- the alerts Polixis marks `hidden` left out, as its documentation says to ignore them.
+
+A field the MCP computes rather than takes from Polixis, such as an effective share, a path,
+a hop count or a risk marker, says so: its description starts with "Computed by this MCP" and
+says how, and the server instructions tell the agent to say so when it reports one and to
+explain how from that description. Every other field is Polixis's, renamed or reformatted.
+Keep to that for a new field. The flags and alerts are described as Polixis's documentation
+defines them (Annexes 1 and 4 of its Corporate and Graph API PDF). The `REP` flag is not
+among them, though the live graph sends it on many parties, so it is described as undefined and
+still counted as a risk marker.
 
 The tools marked undocumented call routes Polixis answers but leaves out of its spec. Whether
 it supports them is an open question to Polixis, so their descriptions tell the agent the

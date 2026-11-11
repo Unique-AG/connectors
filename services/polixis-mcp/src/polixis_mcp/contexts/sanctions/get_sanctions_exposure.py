@@ -116,15 +116,22 @@ class SanctionsExposureQuery(PageQuery):
 
 
 class Listing(BaseModel):
-    """One record on one sanctions list."""
+    """One record on one sanctions list. Polixis counts each authority's list once, such as
+    one OFAC list for every OFAC programme.
+    """
 
     list_name: str = Field(description="The sanctions list.")
     country: str | None = Field(description="ISO 3166-1 alpha-2 code of the listing authority.")
-    status: str | None = Field(description="ACTIVE or DELISTED, as the record gives it.")
-    programs: list[str] = Field(description="The sanctions programmes, such as UKRAINE-EO13662.")
+    status: str | None = Field(
+        description="The record's Sanction Status detail, ACTIVE or DELISTED, as it gives it."
+    )
+    programs: list[str] = Field(
+        description="The record's Program details, such as UKRAINE-EO13662."
+    )
     listed_on: str | None = Field(
-        description="The listing date as YYYY-MM-DD, or as the record writes it when in no "
-        "form we know; null when the record gives none."
+        description="Computed by this MCP from the record's Listing Date, Listed Date or "
+        "#UK_DESIGNATED_DATE detail, whichever it has first, as YYYY-MM-DD, or as the record "
+        "writes it when in no form we know; null when the record gives none."
     )
 
 
@@ -149,10 +156,13 @@ class SanctionedRelatedParty(BaseModel):
     name: str | None = Field(description="Its English name.")
     countries: list[str] = Field(description="ISO 3166-1 alpha-2 codes it is tied to.")
     listings: list[Listing] = Field(description="Its records on sanctions lists.")
-    hops: int = Field(description="Links between the entity and it: 1 is a direct relation.")
+    hops: int = Field(
+        description="Computed by this MCP: the distinct pairs of parties on its path, so the "
+        "links between the entity and it; 1 is a direct relation."
+    )
     path: list[SanctionPathLink] = Field(
-        description="The relations from the entity to it, in order. Two parties joined by "
-        "several relations have one entry for each."
+        description="Polixis's relations from the entity to it, in order. Two parties joined "
+        "by several relations have one entry for each."
     )
 
 
@@ -163,10 +173,12 @@ class SanctionsExposurePage(BaseModel):
 
     pid: str = Field(description="The entity asked about.")
     own_listings: list[Listing] = Field(
-        description="The entity's own records on sanctions lists; empty when it is not listed."
+        description="The entity's own records on sanctions lists, each named by its Source "
+        "detail; empty when it is not listed."
     )
     total_related: int = Field(
-        description="Sanctioned related parties across every page. Polixis has returned "
+        description="Computed by this MCP: sanctioned related parties across every page. "
+        "Polixis has returned "
         "different counts for the same entity on two calls, so say when a count matters."
     )
     related: list[SanctionedRelatedParty] = Field(

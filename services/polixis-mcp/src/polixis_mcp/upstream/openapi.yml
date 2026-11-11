@@ -167,8 +167,9 @@ paths:
         the user gives a pid rather than a name. `status` is `active` when the pid is current: use it
         as it is. It is `merged` when Polixis merged the entity into another, whose pid is `redir`: use
         that one, and tell the user to update their records. It is `never minted` when Polixis does not
-        know the pid: say so, describe no entity, and find the client again by name or identifier. A 410
-        error means the pid named a group Polixis dissolved, and lists its former members.
+        know the pid, which Polixis's documentation calls `unknown`: say so, describe no entity, and find
+        the client again by name or identifier. An HTTP error 410 means the pid named a group Polixis
+        dissolved, and its body lists the former members.
       tags:
       - PID
       parameters:
@@ -1070,7 +1071,7 @@ components:
           type: string
         status:
           type: string
-          description: active, merged, or never minted.
+          description: active, merged, or never minted, which Polixis's documentation calls unknown.
         redir:
           type: string
           nullable: true
@@ -1083,7 +1084,7 @@ components:
           type: array
           items:
             type: string
-          description: The member record ids.
+          description: The member record ids; for a merged pid, those of the pid that replaced it.
     PublisherInfo:
       type: object
       description: Provenance of the data — details about the contributing source.
@@ -1532,7 +1533,8 @@ components:
             type: integer
           description: >-
             Dates as yyyyMMdd integers, with 00 for an unknown month or day (19780200 is February 1978,
-            19780000 the year 1978). A hit matches when one of its dates falls within one.
+            19780000 the year 1978). A hit matches when one of its dates falls within one; 19780209 also
+            matches a hit dated only 19780200 or 19780000.
         adaptiveLegalForms:
           type: boolean
           description: >-

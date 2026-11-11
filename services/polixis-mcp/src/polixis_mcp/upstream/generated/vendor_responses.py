@@ -163,10 +163,16 @@ class Pagination(BaseModel):
 
 class PidMembers(BaseModel):
     pid: str | None = None
-    status: str | None = Field(None, description="active, merged, or never minted.")
+    status: str | None = Field(
+        None,
+        description="active, merged, or never minted, which Polixis's documentation calls unknown.",
+    )
     redir: str | None = Field(None, description="The pid a merged pid now points to.")
     count: int | None = Field(None, description="The number of members.")
-    members: list[str] | None = Field(None, description="The member record ids.")
+    members: list[str] | None = Field(
+        None,
+        description="The member record ids; for a merged pid, those of the pid that replaced it.",
+    )
 
 
 class Position(BaseModel):

@@ -11,6 +11,7 @@ from polixis_mcp.contexts.entities.names import name_record
 from polixis_mcp.contexts.formats import dates_by_kind
 from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
+from polixis_mcp.contexts.risks import is_hidden_alert
 from polixis_mcp.upstream import CompletionRequestInput
 from polixis_mcp.upstream import GET_PROFILE_FIELDS
 from polixis_mcp.upstream import GetProfileFieldsPath
@@ -79,7 +80,7 @@ def _entity_profile(*, pid: str, profile: Profile, sections: set[ProfileSection]
         alerts=[
             ProfileAlert(category=alert.category, message=alert.message)
             for alert in profile.alert_list or []
-            if alert.message
+            if alert.message and not is_hidden_alert(alert.category)
         ],
         sanction_statuses=profile.sanction_statuses or {},
         sanctions=[

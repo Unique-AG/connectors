@@ -65,6 +65,8 @@ def upstream_transport(upstream_requests: list[httpx2.Request]) -> httpx2.MockTr
         ):
             return httpx2.Response(500, json={"message": "Internal server error"})
         match path.rsplit("/", 1):
+            case ["/api/graph/pid", polixis_responses.DISSOLVED_PID]:
+                return httpx2.Response(410, json=polixis_responses.DISSOLVED)
             case ["/search", "api"]:
                 return httpx2.Response(200, json=polixis_responses.SEARCH)
             case ["/api/corporate", "byPublisher"]:

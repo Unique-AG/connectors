@@ -44,13 +44,17 @@ async def find_flagged_parties(
     """Sanctioned, PEP, state-owned and restricted parties near an organization or person,
     each with its markers and the path to it: who holds what in whom at every step.
 
+    Polixis returns the network around the entity, both its smart graph and its full graph
+    with signatories, third parties and historic ties. This MCP picks the parties whose flags
+    or alerts carry a risk marker and finds a shortest path to each over Polixis's links.
+
     Use it for PEP and state-ownership exposure nearby; for sanctions at any distance use
-    `get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker on each
-    page, so a question such as "is any of them state-owned?" is settled by a 0 there. The
-    nearest come first, the sanctioned before the others at the same distance, so stop once
-    they are farther than the question cares about. When `truncated_by_polixis` is true,
-    Polixis cut the network short: do not report that none was found. When `next_cursor` is
-    set, pass it back as `cursor` for the next page.
+    `get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker across
+    every page, and every page repeats it, so a question such as "is any of them
+    state-owned?" is settled by a 0 there. The nearest come first, the sanctioned before the
+    others at the same distance, so stop once they are farther than the question cares about.
+    When `truncated_by_polixis` is true, Polixis cut the network short: do not report that
+    none was found. When `next_cursor` is set, pass it back as `cursor` for the next page.
     """
     query = page_query(
         contexts.FlaggedPartiesQuery, cursor, pid=pid, radius=radius, page_size=page_size

@@ -4,7 +4,7 @@
 |---|---|
 | `polixis-graph.openapi.json` | Polixis's own spec for the graph service, polixis-graph 0.26.10.23.1, exactly as they sent it. Never edit it: it is the record of what they gave us |
 | `merge_spec.py` | Every change we make to it, one `Edit` each |
-| `../src/polixis_mcp/upstream/openapi.yml` | What `uv run poe merge-spec` builds from the two, and what the codegen reads. Never edit it by hand |
+| `../src/polixis_mcp/upstream/openapi.yml` | What `uv run poe merge-spec` builds from the two, and what the codegen reads. Never edit it by hand: `tests/test_merge_spec.py` fails when it differs from what the merge builds |
 
 Their spec is the source of truth. The merge adds what it lacks and corrects only what the live
 API contradicted when we probed it in November 2026. Each change also says why in the

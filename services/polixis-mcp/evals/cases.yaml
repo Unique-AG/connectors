@@ -19,15 +19,17 @@
 # and run as they are.
 #
 # Quota: Polixis caps requests per API key, and a few hundred calls have exhausted it. `budget`
-# is the most MCP tool calls a turn may make; the sum over every case is the most a full run
-# costs. Run a few cases at a time, and stop at the first 429.
+# is the most MCP tool calls a turn may make, not Polixis requests: most tools send one, but
+# `get_entity_profiles` sends one per pid (up to 10), and `find_flagged_parties` and
+# `find_linked_companies` with `scope: all` send two. A page read from the five-minute response
+# cache sends none. Run a few cases at a time, and stop at the first 429.
 #
 # Argument matchers in `expect.calls[].args`:
 #   a value            the argument equals it; lists compare as sets, strings ignore case
 #   {present: true}    the argument is given      {absent: true}   it is left out
 #   {contains: [...]}  the list argument holds every one of these
 #   {one_of: [...]}    the argument is one of these
-#   {min: n}, {max: n} a number at least or at most n
+#   {min: n}, {max: n} a number at least or at most n; for a list, its number of items
 # A call with `when` is required only when its condition holds in the run, and the judge
 # decides that from the tool results. A call without `when` is always required.
 
@@ -48,7 +50,7 @@ entities:
     fields: [name, birth_month, nationality, country]
   former_pep:
     type: PERSON
-    criteria: A person whose PEP positions all ended, with at least one held in a known year.
+    criteria: A person Polixis flags FORMER_PEP, whose positions all ended more than 5 years ago, with at least one held in a known year.
     fields: [name, year_in_office]
   wealth_client:
     type: PERSON
@@ -118,13 +120,17 @@ entities:
     type: ORGANIZATION
     criteria: A company whose profile lists an LEI.
     fields: [lei]
+  vessel:
+    type: ORGANIZATION
+    criteria: A sanctioned vessel, which Polixis holds as an organization with its IMO number among its identifiers.
+    fields: [imo]
   isin_issuer:
     type: ORGANIZATION
     criteria: An issuer whose profile lists an ISIN.
     fields: [isin]
   stored_pid:
-    type: ANY
-    criteria: The pid of an active entity, as a client file would hold it.
+    type: ORGANIZATION
+    criteria: The pid of an active company, as a client file would hold it.
     fields: [pid]
   merged_pid:
     type: ANY
@@ -179,7 +185,7 @@ cases:
                 countries: {present: true}
             - tool: get_related_parties
               args:
-                categories: {contains: [executive, shareholdingInformation]}
+                categories: {contains: [board, shareholdingInformation]}
             - tool: get_ultimate_beneficial_owners
           budget: 6
           answer:
@@ -281,7 +287,6 @@ cases:
             - tool: get_entity_profiles
               when: Any owner is flagged as sanctioned.
               args:
-                pids: {max: 10}
                 sections: {contains: [sanction_statuses]}
           budget: 6
           answer:
@@ -416,7 +421,6 @@ cases:
                 radius: 1
             - tool: get_entity_profiles
               args:
-                pids: {max: 10}
                 sections: {contains: [positions]}
           forbid:
             - tool: get_related_parties
@@ -444,7 +448,7 @@ cases:
           budget: 4
           answer:
             - It gives the positions held in that year, with their start and end dates.
-            - It says whether any position is current, and that the bank's own rule decides how long a former PEP stays one.
+            - It says whether any position is current, that Polixis flags a person FORMER_PEP once 5 years have passed since the function ended, and that the bank's own rule decides how long a former PEP stays one.
 
   - id: family-and-associates
     from_doc: 11
@@ -459,8 +463,12 @@ cases:
           calls:
             - tool: search_entities
             - tool: find_linked_companies
-              args:
-                radius: 2
+          forbid:
+            - tool: find_linked_companies
+              args: {radius: 3}
+              reason: >-
+                The question asks for the companies tied directly or through the people next to
+                the person, which radius 2 reaches; 3 asks Polixis for a much larger graph.
           budget: 5
           answer:
             - It lists the companies the person owns or runs, and those of the people linked to them, with the relation at each step.
@@ -664,8 +672,6 @@ cases:
                 dates: {contains: ["{common_name_person.birth_year}"]}
             - tool: get_entity_profiles
               when: More than one candidate remains after the birth date and country.
-              args:
-                pids: {max: 10}
           budget: 8
           answer:
             - It narrows the hits with evidence, birth date first, then nationality and the original-script name.
@@ -734,6 +740,21 @@ cases:
           answer:
             - It confirms that the UID on the profile matches the one asked for before using the match.
             - It gives the owners with their effective shares.
+
+  - id: identify-vessel-by-imo
+    workflow: sanctions
+    entities: [vessel]
+    turns:
+      - prompt: Is the vessel with IMO number {vessel.imo} under sanctions?
+        expect:
+          first: search_entities
+          calls:
+            - tool: search_entities
+          budget: 3
+          answer:
+            - It confirms that the IMO number among the match's identifiers is the one asked for before using the match.
+            - It states the vessel's sanctions flag and the lists that name it.
+            - If nothing matches, it says that no vessel with that IMO number was found, not that the vessel is clean, and offers to screen its owner or operator by name.
 
   - id: identify-by-isin
     workflow: onboarding
@@ -876,16 +897,6 @@ cases:
             - It does not answer yes or no.
             - It gives the evidence, such as the sanctions listings, and says the decision belongs to the compliance officer.
 
-  - id: decline-vessel
-    workflow: decline
-    turns:
-      - prompt: Is the vessel with IMO number 9123456 under sanctions?
-        expect:
-          budget: 2
-          answer:
-            - It says that Polixis covers organizations and people, so it cannot check a vessel by IMO number.
-            - It may offer to screen the vessel's owner or operator by name.
-            - It does not report the vessel as clean.
 
   - id: decline-market-data
     workflow: decline

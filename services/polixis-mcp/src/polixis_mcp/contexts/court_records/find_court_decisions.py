@@ -59,16 +59,20 @@ class CourtDecisionSummary(BaseModel):
 
     decision_id: str = Field(description="Its id, for `get_court_decision`.")
     subject: DecisionSubject = Field(
-        description="`entity` when it names the entity asked about, `related_party` when it "
-        "names one of its related parties."
+        description="Which of Polixis's two lists it came from: `entity` when it names the "
+        "entity asked about, `related_party` when it names one of its related parties, which "
+        "Polixis does not say."
     )
     court_type: str | None = Field(description="Such as General Instance Court.")
     country: str | None = Field(description="ISO 3166-1 alpha-2 code of the court's country.")
     year: str | None = Field(description="The year of the decision.")
     snippets: list[str] = Field(
-        description="The passages where the name appears, in the decision's own language."
+        description="Polixis's passages where the name appears, in the decision's own "
+        "language, without its highlight tags."
     )
-    text_characters: int = Field(description="The length of its full text, in characters.")
+    text_characters: int = Field(
+        description="Computed by this MCP: the length of its full text, in characters."
+    )
 
 
 class CourtDecisionsPage(BaseModel):

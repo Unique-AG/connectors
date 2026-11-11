@@ -11,6 +11,7 @@ from polixis_mcp.contexts.ownership.get_ownership.outputs import OwnershipFlag
 from polixis_mcp.contexts.ownership.get_ownership.outputs import OwnershipPage
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
+from polixis_mcp.contexts.risks import is_hidden_alert
 from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import risk_markers
 from polixis_mcp.persistence import Persistence
@@ -133,7 +134,9 @@ def _entity(*, pid: str, chains: list[_Chain], meta: dict[str, NodeMeta]) -> Own
         roles=unique(node.role for node in nodes),
         end_of_chain=not any(node.children for node in nodes),
         flags=unique(flag for node in nodes for flag in node.flags or []),
-        alerts=unique(alert for node in nodes for alert in node.alerts or []),
+        alerts=unique(
+            alert for node in nodes for alert in node.alerts or [] if not is_hidden_alert(alert)
+        ),
         strongest_chain=[
             ChainLink(
                 pid=node.id or "",
