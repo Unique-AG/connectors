@@ -9,7 +9,7 @@ if ! jq -e '.status == "completed" and (.conclusion | IN("success", "failure"))'
   echo "The latest nightly scan did not finish: $(jq -r '.status + " " + .conclusion' <<< "$run")." >&2; exit 1
 fi
 
-failed=$(gh run view "$(jq -r .databaseId <<< "$run")" --json jobs --jq '[.jobs[] | select(.conclusion | IN("success", "skipped") | not) | select(([.steps[] | select(.conclusion == "failure") | .name] | unique) != ["Evaluate registry findings"]) | .name] | unique | join(",")')
+failed=$(gh run view "$(jq -r .databaseId <<< "$run")" --json jobs --jq '[.jobs[] | select(.name == "Detect services" or .name == "Lockfiles of main" or (.name | startswith("Image "))) | select(.conclusion | IN("success", "skipped") | not) | select(([.steps[] | select(.conclusion == "failure") | .name] | unique) != ["Evaluate registry findings"]) | .name] | unique | join(",")')
 if [ -n "$failed" ]; then echo "The latest nightly scan has failed jobs: ${failed}." >&2; exit 1; fi
 
 gh api --paginate 'repos/{owner}/{repo}/code-scanning/alerts?state=open&tool_name=Trivy&per_page=100' \

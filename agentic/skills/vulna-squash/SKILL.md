@@ -71,7 +71,7 @@ Run `bash agentic/skills/vulna-squash/scripts/watch-checks.sh <n>`. It waits for
 | Result | Action |
 |--------|--------|
 | `green` | Go to Part E. |
-| `red` | Decide the cause (below). |
+| `red` | Decide the cause (below). Only `gatekeeper` failed: a maintainer must rerun it. Go to Part E. |
 | `timed_out` | Go to Part E. State the timeout. |
 | `held` | Go to Part E. State that a maintainer must approve the run. |
 

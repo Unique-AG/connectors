@@ -17,7 +17,10 @@ while true; do
     checks=${checks:-[]}
     own='def own: .name == "gatekeeper" or (.name | startswith("Cursor Automation"));'
     if jq -e "$own"' any(.[] | select(own | not); .bucket | IN("fail", "cancel"))' <<< "$checks" > /dev/null; then echo red; exit 0; fi
-    if jq -e "$own"' [.[] | select(own | not)] | length > 0 and all(.[]; .bucket != "pending")' <<< "$checks" > /dev/null; then echo green; exit 0; fi
+    if jq -e "$own"' [.[] | select(own | not)] | length > 0 and all(.[]; .bucket != "pending")' <<< "$checks" > /dev/null; then
+      if jq -e 'any(.[]; .name == "gatekeeper" and (.bucket | IN("fail", "cancel")))' <<< "$checks" > /dev/null; then echo red; else echo green; fi
+      exit 0
+    fi
   fi
   left=$((deadline - SECONDS))
   if [ "$left" -le 0 ]; then echo timed_out; exit 0; fi
