@@ -76,7 +76,9 @@ _NO_REASON_FROM_GRAPH = "Microsoft reported an error for this person and gave no
 _DESCRIPTION = """\
 Shares one file or folder in OneDrive or SharePoint with the people that the user names. Each \
 person gets read access or write access to the item. By default, this tool sends each of them the \
-invitation immediately, and nothing here can recall it. No tool here can remove the access. \
+invitation immediately, and nothing here can recall it. No tool here can remove the access. To \
+take it back, tell \
+the user to remove it in OneDrive or SharePoint. Never delete or move the item. \
 sharepoint_create_share_link is the tool for a link that names no person.
 
 Notes:

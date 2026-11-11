@@ -15,6 +15,7 @@ from msgraph.generated.users.item.translate_exchange_ids.translate_exchange_ids_
 )
 from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
 from msgraph.graph_service_client import GraphServiceClient
+from opentelemetry import trace
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
@@ -25,6 +26,7 @@ from office_365_mcp.shared.mail import (
     MailSummary,
     carries_category,
     has_flag_state,
+    participants_term,
 )
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -129,6 +131,24 @@ async def search_mail(
         ]
     )
     reached = graph_mailbox(client, mailbox)
+    trace.get_current_span().set_attribute(
+        "search_mail.arguments",
+        [
+            *(field.name for field in fields(criteria) if getattr(criteria, field.name)),
+            *(
+                name
+                for name, value in (
+                    ("received_after", received_after),
+                    ("received_before", received_before),
+                    ("importance", importance),
+                    ("flagged", flagged),
+                    ("has_attachments", has_attachments),
+                    ("category", category),
+                )
+                if value is not None
+            ),
+        ],
+    )
 
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_SEARCH):
@@ -186,7 +206,7 @@ def _query_string(criteria: SearchCriteria) -> str:
     if criteria.sender:
         terms.append(f"from:{kql.quoted(criteria.sender)}")
     if criteria.recipient:
-        terms.append(f"participants:{kql.quoted(criteria.recipient)}")
+        terms.append(participants_term(criteria.recipient))
     if criteria.to:
         terms.append(f"to:{kql.quoted(criteria.to)}")
     if criteria.subject:

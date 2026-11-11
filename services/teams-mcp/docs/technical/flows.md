@@ -207,19 +207,26 @@ sequenceDiagram
 
     Note over TeamsMCP: Map hits to rows. Container is derived from the ids the hit<br/>carries: teamId AND channelId → channel, chatId → chat,<br/>neither → unknown (logged as a shape, never inferred)
 
-    Note over TeamsMCP: Hydrate every hit — one extra Graph call per hit (N+1),<br/>concurrency capped at 3 (pLimit)
-    loop For each hit (up to 3 in parallel)
-        alt teamId and channelId present
-            TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
-            MSGraph->>TeamsMCP: Full message (body, attachments, ...)
-            Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
-        else chatId present
-            TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
-            MSGraph->>TeamsMCP: Full message (body, attachments, ...)
-            Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
-        else no addressable id
-            Note over TeamsMCP: Skip the call; return the row without content
+    Note over TeamsMCP: Hydration and container names run in parallel,<br/>each capped at 3 calls at a time and bounded at 15 seconds
+    par Hydrate every hit (one extra Graph call per hit)
+        loop For each hit (up to 3 in parallel)
+            alt teamId and channelId present
+                TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId}/messages/{id}
+                MSGraph->>TeamsMCP: Full message (body, attachments, ...)
+                Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
+            else chatId present
+                TeamsMCP->>MSGraph: GET /chats/{chatId}/messages/{id}
+                MSGraph->>TeamsMCP: Full message (body, attachments, ...)
+                Note over TeamsMCP: On any failure (403 / 404 / 429 / parse):<br/>return the row without content (no error)
+            else no addressable id
+                Note over TeamsMCP: Skip the call; return the row without content
+            end
         end
+    and Name each distinct container, at most once
+        TeamsMCP->>MSGraph: GET /chats/{chatId}?$expand=members (per distinct chat)
+        TeamsMCP->>MSGraph: GET /teams/{teamId}/channels/{channelId} (per distinct channel)
+        TeamsMCP->>MSGraph: GET /me/joinedTeams (once, only if any channel hit)
+        Note over TeamsMCP: On any failure, or once the budget is spent (call skipped):<br/>leave that name null (no error)
     end
 
     TeamsMCP->>MCPClient: messages[], returnedCount, moreResultsAvailable
@@ -232,6 +239,7 @@ sequenceDiagram
 - Container classification uses only the two identifiers Microsoft documents on a `chatMessage`. A chat hit arrives with `channelIdentity: {}`, so the object's presence proves nothing: `channel` requires both `teamId` and `channelId`. A hit with neither shape is reported as `unknown` and logged as a key-presence shape (never ids) rather than guessed at.
 - Hydration is unconditional and issues one additional Graph call per addressable hit. Concurrency is capped at 3 to avoid Graph throttling, and the pass as a whole is bounded at 15 seconds. Any failed fetch falls back to a row without `content` rather than failing the page (logged at `warn`), so a tenant lacking admin consent for `ChannelMessage.Read.All` gets bodyless channel rows. A hit that is a reply inside a channel thread is also always bodyless: Graph addresses a reply under its parent post and the search index does not name the parent, so no id here can fetch it.
 - A search hit is an Exchange projection of the message: the sender arrives as a mailbox `emailAddress` and the link as an Outlook Web `webLink`, so both those spellings and the Teams-native ones (`from.user`, `webUrl`) are read. Hydration only ever fills a gap — it never overwrites a field the hit provided.
+- Each row names its container (`chatName`, or `teamName` + `channelName`) so the agent can say where a message was posted without showing ids. Lookups are per distinct container, not per hit, and each is made at most once. A lookup that fails, or that is skipped because the 15-second budget is spent, leaves the name `null`.
 - See [Tools Reference](./tools.md) for the full `search_messages` parameter list.
 
 ### Chat Send Flow

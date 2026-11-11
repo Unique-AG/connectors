@@ -48,11 +48,27 @@ export interface WebLinkInput {
  *
  * Results are batched per mailbox to minimise Graph API round-trips.
  *
- * Returns a Map keyed by `webLinkMapKey(mailbox, id)`.
+ * Returns a `WebLinks` lookup, queried with the mailbox and the message id.
  */
 
-export function webLinkMapKey(mailbox: string, id: string): string {
-  return `${mailbox}_${id}`;
+export class WebLinks {
+  private readonly links = new Map<string, string>();
+
+  public set(mailbox: string, id: string, webLink: string): void {
+    this.links.set(this.key(mailbox, id), webLink);
+  }
+
+  /** Empty string when the mailbox or id is missing, or no link could be built. */
+  public get(mailbox: string | null | undefined, id: string | null | undefined): string {
+    if (!mailbox || !id) {
+      return '';
+    }
+    return this.links.get(this.key(mailbox, id)) ?? '';
+  }
+
+  private key(mailbox: string, id: string): string {
+    return `${mailbox}_${id}`;
+  }
 }
 
 @Injectable()
@@ -71,14 +87,14 @@ export class BuildWebLinksCommand {
     userProfileId: string;
     userProfileEmail: string;
     ids: WebLinkInput[];
-  }): Promise<Map<string, string>> {
-    const result = new Map<string, string>();
+  }): Promise<WebLinks> {
+    const result = new WebLinks();
 
     const delegatedByMailbox = new Map<string, WebLinkInput[]>();
 
     for (const item of ids) {
       if (item.mailbox === userProfileEmail) {
-        result.set(webLinkMapKey(item.mailbox, item.id), item.webLink);
+        result.set(item.mailbox, item.id, item.webLink);
       } else {
         const bucket = delegatedByMailbox.get(item.mailbox) ?? [];
         bucket.push(item);
@@ -103,14 +119,14 @@ export class BuildWebLinksCommand {
         const restId = immutableToRest.get(item.id);
         if (!restId) {
           this.logger.warn({ msg: 'ID translation missing — omitting web link', id: item.id });
-          result.set(webLinkMapKey(item.mailbox, item.id), '');
+          result.set(item.mailbox, item.id, '');
         } else {
-          result.set(webLinkMapKey(item.mailbox, item.id), this.buildOwaUrl(restId));
+          result.set(item.mailbox, item.id, this.buildOwaUrl(restId));
         }
       }
 
       for (const item of restItems) {
-        result.set(webLinkMapKey(item.mailbox, item.id), this.buildOwaUrl(item.id));
+        result.set(item.mailbox, item.id, this.buildOwaUrl(item.id));
       }
     }
 

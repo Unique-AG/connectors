@@ -150,6 +150,13 @@ outlook_create_category-basic:
     - tool: outlook_create_category
       args: {name: "seed-v1 case-outlook_create_category-basic", color: preset3}
 
+outlook_delete_category-created:
+  chain:
+    - tool: outlook_create_category
+      args: {name: "seed-v1 case-outlook_delete_category-created", color: preset5}
+    - tool: outlook_delete_category
+      args: {name: "seed-v1 case-outlook_delete_category-created"}
+
 outlook_list_categories-created:
   chain:
     - tool: outlook_create_category

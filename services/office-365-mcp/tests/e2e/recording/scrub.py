@@ -588,6 +588,8 @@ class Mapper:
             return self.home(raw)
         if api and raw.startswith("u!") and (link := _shared_link(raw[2:])) is not None:
             return "u!" + base64.urlsafe_b64encode(self.url(link).encode()).decode().rstrip("=")
+        if api and raw.casefold().endswith(".sharepoint.com"):
+            return self.host(raw)
         if raw in self.ids or _LONG_ID.fullmatch(raw):
             return self.id(raw)
         if (call := _CALL.fullmatch(raw)) is not None:

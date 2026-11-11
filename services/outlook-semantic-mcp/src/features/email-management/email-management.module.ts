@@ -8,15 +8,20 @@ import { AddAttachmentsToDraftEmailCommand } from './add-attachments-to-draft-em
 import { CreateDraftEmailCommand } from './create-draft-email.command';
 import { StreamUniqueAttachmentCommand } from './email-attachments/stream-unique-attachment.command';
 import { UploadInMemoryAttachmentCommand } from './email-attachments/upload-in-memory-attachment.command';
+import { GetDraftStateQuery } from './get-draft-state.query';
 import { LookupContactsQuery } from './lookup-contacts.query';
+import { RemoveAttachmentsFromDraftEmailCommand } from './remove-attachments-from-draft-email.command';
+import { UpdateDraftEmailCommand } from './update-draft-email.command';
 
 const COMMANDS = [
   CreateDraftEmailCommand,
   AddAttachmentsToDraftEmailCommand,
   UploadInMemoryAttachmentCommand,
   StreamUniqueAttachmentCommand,
+  UpdateDraftEmailCommand,
+  RemoveAttachmentsFromDraftEmailCommand,
 ];
-const QUERIES = [LookupContactsQuery];
+const QUERIES = [LookupContactsQuery, GetDraftStateQuery];
 
 @Module({
   imports: [
