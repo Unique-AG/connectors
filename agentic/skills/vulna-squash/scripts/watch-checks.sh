@@ -15,8 +15,9 @@ while true; do
     if [ -n "$held" ]; then echo held; exit 0; fi
     checks=$(bounded gh pr checks "$number" --json name,bucket 2> /dev/null || true)
     checks=${checks:-[]}
-    if jq -e 'any(.[]; .bucket | IN("fail", "cancel"))' <<< "$checks" > /dev/null; then echo red; exit 0; fi
-    if jq -e 'any(.[]; .name == "gatekeeper" and .bucket == "pass") and all(.[]; .bucket != "pending" or (.name | startswith("Cursor Automation")))' <<< "$checks" > /dev/null; then echo green; exit 0; fi
+    own='def own: .name == "gatekeeper" or (.name | startswith("Cursor Automation"));'
+    if jq -e "$own"' any(.[] | select(own | not); .bucket | IN("fail", "cancel"))' <<< "$checks" > /dev/null; then echo red; exit 0; fi
+    if jq -e "$own"' [.[] | select(own | not)] | length > 0 and all(.[]; .bucket != "pending")' <<< "$checks" > /dev/null; then echo green; exit 0; fi
   fi
   left=$((deadline - SECONDS))
   if [ "$left" -le 0 ]; then echo timed_out; exit 0; fi
