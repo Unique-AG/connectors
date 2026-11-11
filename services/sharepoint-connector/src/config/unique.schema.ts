@@ -55,7 +55,7 @@ const uniqueBaseConfig = z.object({
     'scopeManagementServiceBaseUrl must not end with a trailing slash',
   ),
   apiRateLimitPerMinute: coercedPositiveIntSchema
-    .prefault(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
+    .default(DEFAULT_UNIQUE_API_RATE_LIMIT_PER_MINUTE)
     .describe('Number of Unique API requests allowed per minute'),
   ingestionConfig: z
     .record(z.string(), z.unknown())

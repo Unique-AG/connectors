@@ -56,8 +56,8 @@ catalogs:
       specifier: 0.78.0
       version: 0.78.0
     '@proventuslabs/nestjs-zod':
-      specifier: 2.0.0
-      version: 2.0.0
+      specifier: 2.2.0
+      version: 2.2.0
     '@suites/di.nestjs':
       specifier: 4.0.3
       version: 4.0.3
@@ -518,7 +518,7 @@ importers:
     dependencies:
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../utils
@@ -564,7 +564,7 @@ importers:
     dependencies:
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/utils':
         specifier: workspace:*
         version: link:../utils
@@ -674,7 +674,7 @@ importers:
         version: 1.10.0
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: file:packages/instrumentation(@opentelemetry/instrumentation-pg@0.77.0(@opentelemetry/api@1.10.0))
@@ -816,7 +816,7 @@ importers:
         version: 1.10.0
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: file:packages/instrumentation(@opentelemetry/instrumentation-pg@0.77.0(@opentelemetry/api@1.10.0))
@@ -961,7 +961,7 @@ importers:
         version: 0.78.0(@opentelemetry/api@1.10.0)
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/aes-gcm-encryption':
         specifier: workspace:*
         version: link:../../packages/aes-gcm-encryption
@@ -1178,7 +1178,7 @@ importers:
         version: 1.10.0
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: file:packages/instrumentation(@opentelemetry/instrumentation-pg@0.77.0(@opentelemetry/api@1.10.0))
@@ -1338,7 +1338,7 @@ importers:
         version: 0.78.0(@opentelemetry/api@1.10.0)
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@qfetch/qfetch':
         specifier: 0.1.0
         version: 0.1.0(@proventuslabs/retry-strategies@0.1.2)
@@ -1513,7 +1513,7 @@ importers:
         version: 1.10.0
       '@proventuslabs/nestjs-zod':
         specifier: 'catalog:'
-        version: 2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
+        version: 2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)
       '@unique-ag/instrumentation':
         specifier: workspace:*
         version: file:packages/instrumentation(@opentelemetry/instrumentation-pg@0.77.0(@opentelemetry/api@1.10.0))
@@ -3044,11 +3044,12 @@ packages:
   '@protobufjs/utf8@1.1.2':
     resolution: {integrity: sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug==}
 
-  '@proventuslabs/nestjs-zod@2.0.0':
-    resolution: {integrity: sha512-XIhWD7sLNNPFPzG3JYl+474Fn3FwhxUt55u9ykluwGCkRoeiZaOm5zU7+yyDTrewGVvsOsrGfdMeI4a+ylJfgw==}
+  '@proventuslabs/nestjs-zod@2.2.0':
+    resolution: {integrity: sha512-4lAZaou8/HVMRujlFEbfZic0QmanUkHnfcNuzSUBZt39O58UKKdBtx4yhp/PrGlhpfkL0x1LmMvIOGyDaVw3Pw==}
+    engines: {node: '>=20.19.0'}
     peerDependencies:
-      '@nestjs/common': ^10.0.0 || ^11.0.0
-      '@nestjs/config': ^3.0.0 || ^4.0.0
+      '@nestjs/common': ^10.0.0 || ^11.0.0 || ^12.0.0
+      '@nestjs/config': ^3.0.0 || ^4.0.0 || ^12.0.0
       zod: ^3.25.0 || ^4.0.0
 
   '@proventuslabs/retry-strategies@0.1.2':
@@ -8167,11 +8168,13 @@ snapshots:
 
   '@protobufjs/utf8@1.1.2': {}
 
-  '@proventuslabs/nestjs-zod@2.0.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)':
+  '@proventuslabs/nestjs-zod@2.2.0(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/config@4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2))(zod@4.6.7)':
     dependencies:
       '@nestjs/common': 11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/config': 4.0.4(@nestjs/common@11.2.8(reflect-metadata@0.2.2)(rxjs@7.8.2))(rxjs@7.8.2)
       lodash: 4.18.1
+      type-fest: 4.41.0
+      uid: 2.0.2
       zod: 4.6.7
 
   '@proventuslabs/retry-strategies@0.1.2': {}
