@@ -41,6 +41,7 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
    - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. The tracker lists Debian source packages, so use the row of the source package of the alerted package (for example, `libapt-pkg7.0` has the source package `apt`). A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
    - `main` already holds the fixed version.
    - An open PR with the label `dependencies` already changes the package. The nightly job covers it.
+   - The package is an operating system package, and the service has an open release-please PR (`gh pr list --state open --head release-please--branches--main--components--<service>`) or an open PR with the label `rebuild`. The release of that PR rebuilds the image.
    - A closed PR that was not merged names the same package and version. A person rejected it.
 4. If nothing is left, go to the Slack message with that reason.
 5. Group the rest into batches. Put patch and minor bumps of one ecosystem in one batch. Put each major bump in its own batch. Put the operating system packages of one service in one rebuild batch.
@@ -49,8 +50,8 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
    - Node: change the `catalog:` entry or the `package.json` files, then run `pnpm update -r --lockfile-only <name>`.
    - Operating system: run `gh workflow run release-rebuild.yaml -f services=<service>`. Skip Parts B to E for this PR. A person approves the held runs.
 7. Give the PR a title that passes `cz --no-breaking-footer lint`. In the body, link the scan run and list the alert URLs, the CVE or GHSA IDs and the exact changes. For an operating system package, give the GHSA for the description and the Debian advisory (DSA or DLA) from the tracker row that step 3 used, each when it exists. If one is missing, give the CVE and the tracker URL. If a DSA or DLA exists, say that it is the source of the fix. Otherwise, if step 3 saw a fixed row, say that the fixed row and version of the Debian tracker are the source. If the tracker did not answer, say that the fix is not confirmed. A GHSA for an operating system package can list no patched version.
-8. Open the PR with BOTH labels in the `gh pr create` call: `--label dependencies --label ai-assisted`. The label `dependencies` starts the PR automation. The label `ai-assisted` is set at open time, so that the automation stops at its entry check and this run keeps the PR.
-9. Skip Part B for a PR that this run opened. Go to Part C.
+8. Set the labels in the `gh pr create` call. A rebuild PR gets `--label dependencies --label rebuild`. Every other PR gets `--label dependencies --label ai-assisted`. The label `dependencies` starts the PR automation. The label `rebuild` or `ai-assisted` is set at open time, so that the automation stops at its entry check and this run keeps the PR.
+9. Skip Part B for a PR that this run opened. Go to Part C. A rebuild PR has no Parts B to E.
 
 ## Slack message (mode `findings`)
 
@@ -63,7 +64,7 @@ Run `gh pr view <n> --repo Unique-AG/connectors --json state,labels,headRefName,
 Stop with no change when any of these is true:
 - The PR is not open, or it comes from a fork.
 - The PR lacks the label `dependencies`.
-- The PR has the label `ai-assisted` or `human-required`.
+- The PR has the label `ai-assisted`, `human-required` or `rebuild`.
 
 ## Part C: Assess
 

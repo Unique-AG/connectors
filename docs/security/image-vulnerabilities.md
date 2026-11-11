@@ -167,7 +167,8 @@ The rule "no fixed version, or a fix younger than 3 days" applies to other packa
 | Base image | One exact digest |
 | Final stage | It removes the package manager, runs as a non-root user, and runs `apt-get upgrade` on every build. |
 | Layer cache | The container build template turns it off for the final stage, so `apt-get upgrade` takes the newest patches. |
-| A rebuild | A normal release. The Rebuild Service workflow opens one PR for each service. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`. |
+| A rebuild | A normal release. The Rebuild Service workflow opens one PR for each service, with the labels `dependencies` and `rebuild`. It opens no PR for a service that has an open release-please PR or an open rebuild PR, because that release already rebuilds the image. Its `build(...)` commit makes release-please open a patch release. Release-please sets the chart `version`, the chart `appVersion`, and the image tag in `values.yaml`. |
+| The file `deploy/rebuild-date` | It holds the time of the rebuild PR. No code reads it. It only changes a file in the service, so release-please sees a commit. Each rebuild PR writes a new time. A release does not update it. |
 | A release | It pushes the image to GHCR and to Azure, signs it with Cosign, and attaches an SBOM and a provenance record. |
 | A PR that is not a release PR | It builds the image without a push. It does not scan the image. |
 

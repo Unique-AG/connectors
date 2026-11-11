@@ -44,8 +44,19 @@ jobs:
           stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           suffix=$(date -u +%Y%m%d%H%M%S)
 
+          gh label create rebuild --color fbca04 --description "Rebuilds an image for operating system patches" || true
+          open_rebuilds=$(gh pr list --state open --label rebuild --json title --jq '.[].title')
+
           for service in $services; do
             title="build(${service}): rebuild for operating system patches"
+            if [ "$(gh pr list --state open --head "release-please--branches--main--components--${service}" --json number --jq length)" != 0 ]; then
+              echo "::notice::${service} has an open release pull request. Its release rebuilds the image."
+              continue
+            fi
+            if grep -qxF "$title" <<< "$open_rebuilds"; then
+              echo "::notice::${service} has an open rebuild pull request."
+              continue
+            fi
             branch="rebuild/${service}-${suffix}"
             file="services/${service}/deploy/rebuild-date"
             git switch --detach --quiet "$base"
@@ -58,5 +69,7 @@ jobs:
               --base main \
               --head "$branch" \
               --title "$title" \
+              --label dependencies \
+              --label rebuild \
               --body "This pull request rebuilds ${service}. It changes one date file and no code. The release build takes the newest operating system patches. GitHub holds the workflow runs on this pull request. Approve the runs. Then merge this pull request. Then merge the release pull request that release-please opens."
           done
