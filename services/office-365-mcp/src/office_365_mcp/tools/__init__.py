@@ -39,6 +39,7 @@ from office_365_mcp.tools import (
     outlook_create_folder,
     outlook_create_mail_rule,
     outlook_delete_calendar,
+    outlook_delete_category,
     outlook_delete_event,
     outlook_delete_folder,
     outlook_delete_mail_rule,
@@ -250,6 +251,7 @@ _TOOL_MODULES: tuple[ToolModule, ...] = (
     outlook_delete_mail_rule,
     outlook_list_categories,
     outlook_create_category,
+    outlook_delete_category,
     outlook_list_time_zones,
     outlook_list_calendars,
     outlook_list_calendar_groups,
@@ -537,6 +539,7 @@ PRESETS: Mapping[str, tuple[str, ...]] = {
         "outlook_create_mail_rule",
         "outlook_update_mail_rule",
         "outlook_delete_mail_rule",
+        "outlook_delete_category",
     ),
     "outlook-calendar": (
         "outlook_list_calendars",

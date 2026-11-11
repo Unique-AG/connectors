@@ -42,6 +42,10 @@
           "type": "required"
         }
       ],
+      "body": {
+        "content": "",
+        "contentType": "html"
+      },
       "end": {
         "dateTime": "~tomorrow",
         "timeZone": "Europe/Zurich"

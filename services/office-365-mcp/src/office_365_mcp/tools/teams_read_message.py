@@ -30,7 +30,10 @@ GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = (
     "Reads one Teams message in full — text, sender, mentions, attachments, reactions, and "
-    "edit or delete status — from a handle another tool produced."
+    "edit or delete status — from a handle another tool produced. A file that someone posted "
+    "shows in `attachments`. Its `url` is the web address of the file. To read the file, give "
+    "that `url` to a tool of this deployment that opens a SharePoint web address. If none exists, "
+    "tell the user. Never guess what the file says."
 )
 
 GRAPH_NOT_FOUND = (

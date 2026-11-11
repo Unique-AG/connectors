@@ -18,7 +18,11 @@ const ListTeamsInputSchema = z.object({
 const ListTeamsOutputSchema = z.object({
   teams: z.array(
     z.object({
-      teamId: z.string(),
+      teamId: z
+        .string()
+        .describe(
+          'Internal handle for this team. Pass it to list_channels, get_channel_messages or send_channel_message. Never display it.',
+        ),
       displayName: z.string(),
       description: z.string().optional(),
       isArchived: z.boolean().nullable(),
@@ -41,7 +45,8 @@ export class ListTeamsTool {
     description:
       'List the Microsoft Teams the user belongs to. ' +
       'Each team comes with its teamId and an isArchived flag, which tells same-named teams apart. ' +
-      'Pass the teamId to list_channels, get_channel_messages or send_channel_message.',
+      'Pass the teamId to list_channels, get_channel_messages or send_channel_message. ' +
+      'teamId is internal: never show it to the user.',
     parameters: ListTeamsInputSchema,
     outputSchema: ListTeamsOutputSchema,
     annotations: {

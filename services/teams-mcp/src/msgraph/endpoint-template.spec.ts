@@ -21,6 +21,13 @@ describe('templateEndpoint', () => {
     expect(label).not.toContain('8a1b2c3d');
   });
 
+  it('templates a single chat so no participant id survives', () => {
+    const label = templateEndpoint(`${GRAPH}/v1.0/chats/${ONE_ON_ONE}?$expand=members`);
+
+    expect(label).toBe('/chats/:chatId');
+    expect(label).not.toContain('8a1b2c3d');
+  });
+
   it('templates a group chat message list', () => {
     expect(templateEndpoint(`${GRAPH}/v1.0/chats/${GROUP_CHAT}/messages`)).toBe(
       '/chats/:chatId/messages',
@@ -44,6 +51,12 @@ describe('templateEndpoint', () => {
   it('templates a channel list', () => {
     expect(templateEndpoint(`${GRAPH}/v1.0/teams/${TEAM}/channels`)).toBe(
       '/teams/:teamId/channels',
+    );
+  });
+
+  it('templates a single channel', () => {
+    expect(templateEndpoint(`${GRAPH}/v1.0/teams/${TEAM}/channels/${CHANNEL}`)).toBe(
+      '/teams/:teamId/channels/:channelId',
     );
   });
 
@@ -98,8 +111,10 @@ describe('templateEndpoint', () => {
 
   it('never returns a label containing a chat thread id for any route it knows', () => {
     const urls = [
+      `${GRAPH}/v1.0/chats/${ONE_ON_ONE}`,
       `${GRAPH}/v1.0/chats/${ONE_ON_ONE}/messages`,
       `${GRAPH}/v1.0/chats/${ONE_ON_ONE}/messages/${MESSAGE}`,
+      `${GRAPH}/v1.0/teams/${TEAM}/channels/${CHANNEL}`,
       `${GRAPH}/v1.0/teams/${TEAM}/channels/${CHANNEL}/messages`,
     ];
 

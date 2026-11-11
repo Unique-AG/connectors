@@ -136,6 +136,7 @@ Feature: Organizing the mailbox
       When Mia asks her assistant to rename the category to "Follow-up Q1"
       Then Mia's categories hold "Follow-up Q1"
       And the 4 messages carry "Follow-up Q1"
+      And Mia's categories no longer hold "Follow-up Q4"
 
   Rule: An inbox rule acts on new mail without Mia
 
@@ -369,6 +370,14 @@ Feature: Organizing the mailbox
       Then Mia is told that the category "Follow-up Q4" is already there
       And the assistant offers another name or the category that exists
       But Mia's categories hold no second "Follow-up Q4"
+
+    @unhappy @uc-05-81
+    Scenario: A category that Mia does not have is not deleted
+      Given Mia has no category named "Follow-up Q9"
+      When Mia asks her assistant to delete the category "Follow-up Q9"
+      Then Mia is told that no category has that name
+      And the assistant offers the categories that Mia has
+      But nothing is deleted
 
     @unhappy @uc-05-38
     Scenario: A rule that Microsoft rejects as invalid is not repeated

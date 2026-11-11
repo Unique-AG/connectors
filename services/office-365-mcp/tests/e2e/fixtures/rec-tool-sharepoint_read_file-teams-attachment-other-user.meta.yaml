@@ -1,0 +1,41 @@
+scenario: sharepoint_read_file-teams-attachment-other-user
+fixture: rec-tool-sharepoint_read_file-teams-attachment-other-user
+source: recorded
+target: graph
+recorded_at: '2026-11-09T14:25:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  binaries kept by hash: 1
+  hosts replaced: 1
+  ids mapped: 168
+  keys dropped: 34
+  persona addresses: 25
+  persona names: 22
+  query parameters dropped: 11
+  response headers dropped: 163
+  text kept: 36
+  text replaced: 60
+literals:
+- 'Meeting notes, weekly project sync.
+
+  Redirect test done. Two press pages missing.
+
+  Next: cookie banner text.
+
+  '
+- group
+- persona:mia
+- persona:mia.id
+- persona:mia.name
+- persona:tom.id
+- persona:tom.name
+- read
+- seed-v1 case-sharepoint_read_file-teams-attachment-other-user notes
+- seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt
+- seed-v1 case-teams-chat
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.5

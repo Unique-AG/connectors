@@ -281,6 +281,28 @@ class TestMiaControlsWhoIsInAGroupChat:
         )
         assert result["topic"] == SEED_TOPIC
 
+    async def test_it_creates_a_group_chat_from_the_addresses_of_people_mia_never_chatted_with(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_create_chat-by-email")
+        mia = Person()
+
+        result = await call(
+            "teams_create_chat",
+            person=mia,
+            chat_type="group",
+            topic=SEED_TOPIC,
+            member_emails=["anna@example.test", "tom@example.test"],
+        )
+
+        assert _uncalled(routes) == []
+        assert len(mia.asked) == 1
+        assert "anna@example.test" in mia.asked[0] and "tom@example.test" in mia.asked[0]
+        body = _body(routes[("POST", "/chats")])
+        assert (body["chatType"], body["topic"]) == ("group", SEED_TOPIC)
+        assert len(_members_of(body)) == 3
+        assert result["topic"] == SEED_TOPIC
+
     @pytest.mark.parametrize(
         ("share_history", "told"),
         [(True, "will see all earlier messages"), (False, "will not see the earlier messages")],

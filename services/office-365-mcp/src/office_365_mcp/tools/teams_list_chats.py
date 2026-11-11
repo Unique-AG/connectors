@@ -54,8 +54,8 @@ This tool lists the signed-in user's Teams chats: one-to-one chats, group chats,
 chats, newest last message first. The result shows who is in a conversation and when it was \
 last active. It also shows the last message, its sender, and whether the user read it. A \
 meeting chat reports a `meeting_uri` for its transcripts and recordings. This tool does not \
-cover channel activity. teams_browse_channel walks one channel, and teams_search_messages \
-searches message text across chats and channels.
+cover channel activity. If this deployment exposes teams_browse_channel, it walks one channel. If \
+it exposes teams_search_messages, that tool searches message text across chats and channels.
 
 Notes:
 - To find a meeting's `meeting_uri`, set `chat_type="meeting"` and, if you know it, \

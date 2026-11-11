@@ -70,7 +70,7 @@ Each entry has these keys:
 
 | Key | Meaning |
 | --- | --- |
-| `status` | `untested`, `working`, `partly`, or `gap`. See below. |
+| `status` | `working`, `partly`, or `gap`. See below. |
 | `ask` | What Mia types to the assistant, in her words. It names no tool. |
 | `blocker` | The limit. It is there when the status is `partly` or `gap`, and only then. See below. |
 | `provenance` | `observed` when the chain is a pattern in the prod logs. `drafted` when it comes from the tool descriptions. |
@@ -86,8 +86,7 @@ The status:
 
 | Status | Meaning |
 | --- | --- |
-| `untested` | Nobody ran the scenario. |
-| `working` | A person ran it by hand in a real mailbox, and it did what the scenario says. No recorded run exists. |
+| `working` | The connector meets the scenario. Automated tests prove it, or `no_test` says why they cannot. |
 | `partly` | A limit blocks a part of it, or the prod logs show this kind of task failing. |
 | `gap` | Nothing meets the scenario today. The chain is empty. |
 
