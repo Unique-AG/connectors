@@ -33,13 +33,13 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 
 ## Part A: Findings (mode `findings`)
 
-1. Run `bash agentic/skills/vulna-squash/scripts/trivy-alerts.sh`. It checks the latest run of the workflow `security-trivy-nightly.yaml` on `main`, and it prints the open CRITICAL and HIGH alerts of the tool `Trivy` as JSON, without the category `trivy-config`. If it exits 1, go to the Slack message with the reason that it prints. If the API answers 403, read the Trivy results artifact of that run instead.
+1. Run `bash agentic/skills/vulna-squash/scripts/trivy-alerts.sh`. It checks the latest run of the workflow `security-trivy-nightly.yaml` on `main`, and it prints the open CRITICAL and HIGH alerts of the tool `Trivy` as JSON, without the category `trivy-config`. If it exits 1, go to the Slack message with the reason that it prints. If the API answers 403, read the Trivy image results artifacts of that run instead, and say in the Slack message that the lockfile findings were not read.
 3. Drop an alert when any of these is true:
    - The package is not an operating system package, and no fixed version exists or the fix is younger than 3 days.
    - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. The tracker lists Debian source packages, so use the row of the source package of the alerted package (for example, `libapt-pkg7.0` has the source package `apt`). A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
    - `main` already holds the fixed version.
    - An open PR with the label `dependencies` already changes the package. The nightly job covers it.
-   - The package is an operating system package, and `bash .github/scripts/release-rebuild/rebuild-needed.sh <service>` exits 1. It prints the reason. The service has an open release PR or an open rebuild PR, and that release rebuilds the image.
+   - The package is an operating system package, and `bash .github/scripts/release-rebuild/rebuild-needed.sh <service>` exits 10. It prints the reason. The service has an open release PR or an open rebuild PR, and that release rebuilds the image. If it exits with any other non-zero code, the lookup failed: go to the Slack message with that reason.
    - A closed PR that was not merged names the same package and version. A person rejected it.
 4. If nothing is left, go to the Slack message with that reason.
 5. Group the rest into batches. Put patch and minor bumps of one ecosystem in one batch. Put each major bump in its own batch. Put the operating system packages of one service in one rebuild batch.

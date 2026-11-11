@@ -22,10 +22,13 @@ suffix=$(date -u +%Y%m%d%H%M%S)
 gh label create rebuild --color fbca04 --description "Rebuilds an image for operating system patches" || true
 
 for service in $services; do
-  if ! reason=$(bash "$here/rebuild-needed.sh" "$service"); then
+  status=0
+  reason=$(bash "$here/rebuild-needed.sh" "$service") || status=$?
+  if [ "$status" = 10 ]; then
     echo "::notice::${reason}"
     continue
   fi
+  [ "$status" = 0 ] || exit "$status"
   title="build(${service}): rebuild for operating system patches"
   body="This pull request rebuilds ${service}. It changes one date file and no code. The release build takes the newest operating system patches. GitHub holds the workflow runs on this pull request. Approve the runs. Then merge this pull request. Then merge the release pull request that release-please opens."
   if [ -n "${BODY_FILE:-}" ]; then body=$(< "$BODY_FILE"); fi
