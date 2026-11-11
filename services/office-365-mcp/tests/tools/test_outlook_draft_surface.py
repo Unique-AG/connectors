@@ -341,6 +341,7 @@ class TestTheWholeConfirmationOverARealClient:
         arguments: Mapping[str, object],
         methods: list[str],
     ) -> None:
+        _ = methods
         result = await an_agreeing_client.call_tool(
             tool, {**arguments, **_COPIED_AND_MARKED, "mailbox": _SHARED_MAILBOX}
         )
