@@ -8,7 +8,7 @@ dependencies = [
     "fastmcp==4.1.5",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
-    "pydantic==2.14.2",
+    "pydantic==2.14.3",
     # fastmcp already depends on py-key-value-aio[filetree,memory];
     # this adds the postgresql extra (asyncpg) for durable OAuth storage.
     "py-key-value-aio[postgresql]==0.4.6",
