@@ -14,7 +14,7 @@ from typing import cast
 import httpx
 import respx
 
-E2E = Path(__file__).parent / "e2e"
+INTEGRATION = Path(__file__).parent / "integration"
 DOCGEN = Path(__file__).parents[1] / "scripts" / "dogfood" / "seed" / "docgen.py"
 V1 = "/v1.0"
 
@@ -49,11 +49,13 @@ def generated(stub: Path) -> bytes:
 def recorded_json(stem: str) -> Json:
     """The JSON body of interaction N of a recorded fixture, named `<fixture>.<N>`."""
     fixture, _, number = stem.rpartition(".")
-    spec = cast("list[Json]", json.loads((E2E / "fixtures" / f"{fixture}.json").read_text()))
+    spec = cast(
+        "list[Json]", json.loads((INTEGRATION / "fixtures" / f"{fixture}.json").read_text())
+    )
     return cast("Json", spec[int(number) - 1]["response_json"])
 
 
-def response(spec: Mapping[str, object], bodies: Path = E2E / "bodies") -> httpx.Response:
+def response(spec: Mapping[str, object], bodies: Path = INTEGRATION / "bodies") -> httpx.Response:
     named = bodies / str(spec.get("body", ""))
     content = named.read_bytes() if named.is_file() else b""
     if "response_json" in spec:
@@ -83,7 +85,9 @@ def serve(router: respx.MockRouter, name: str) -> dict[tuple[str, str], respx.Ro
     with a `host` key (a download on the SharePoint host) routes by that host and its own path."""
     answers: dict[tuple[str, str], list[httpx.Response]] = defaultdict(list)
     routes: dict[tuple[str, str], Json] = {}
-    for spec in cast("list[Json]", json.loads((E2E / "fixtures" / f"{name}.json").read_text())):
+    for spec in cast(
+        "list[Json]", json.loads((INTEGRATION / "fixtures" / f"{name}.json").read_text())
+    ):
         method, path, host = str(spec["method"]), str(spec["path"]), spec.get("host")
         if host is None:
             if not path.startswith(V1):

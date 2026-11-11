@@ -15,7 +15,7 @@ the parameters, and the docs to match. For the tool reference, read `../docs/REA
 | `STATUS.md` | The status of every scenario, by surface. It lists the work for UN-27222. A script writes it. |
 | `PENDING.txt` | The ids of the scenarios that have no `tests` and no `no_test` yet. The list only gets shorter. |
 | `../tests/test_scenario_traceability.py` | The check that every scenario has a test or a reason, and that each named test exists. |
-| `../tests/tools/scenarios/` | The scenario tests, and the helper that they use. |
+| `../tests/integration/` | The scenario tests, and the helper that they use. |
 | `../tests/test_use_cases.py` | The check that the files agree, that the chains use real tools, arguments, and values, and that the two generated pages are current. |
 | `../docs/use-cases.md` | The guide for readers. The text between its two markers comes from the features and the sidecars. A person writes the rest. |
 | `../scripts/render-use-cases.py` | Writes the guide and `STATUS.md`. Run `uv run python scripts/render-use-cases.py`, or add `--check` to find drift. |
@@ -126,23 +126,23 @@ uv run pytest tests/test_use_cases.py
 
 ## Running the scenarios
 
-`../tests/e2e/test_scenarios.py` runs each scenario that has a fixture. The run uses the real app,
-the real middleware, and the real tools. Microsoft Graph does not answer. A fixture answers. The
-run uses no network. It uses the legacy MCP handshake, so a tool asks for approval with an
-elicitation request.
+`../tests/integration/test_scenarios.py` runs each scenario that has a fixture. The run uses the
+real app, the real middleware, and the real tools. Microsoft Graph does not answer. A fixture
+answers. The run uses no network. It uses the legacy MCP handshake, so a tool asks for approval
+with an elicitation request.
 
 ```bash
 cd services/office-365-mcp
-uv run pytest tests/e2e
+uv run pytest tests/integration
 ```
 
-A fixture is a file `../tests/e2e/fixtures/<name>.json`. It is a list of interactions. An
+A fixture is a file `../tests/integration/fixtures/<name>.json`. It is a list of interactions. An
 interaction has a request part and an answer part:
 
 - The request part: `method`, `path`, and optionally `host`, `query`, `json` (the body), and
   `headers`. The headers are only `prefer` and `consistencylevel`, and they must be equal.
 - The answer part: `status`, and optionally `response_json` (a JSON answer, held in the fixture) or
-  `body` (the name of a file in `../tests/e2e/bodies/`, for a page, a binary or a stub), and
+  `body` (the name of a file in `../tests/integration/bodies/`, for a page, a binary or a stub), and
   `response_headers`, the headers of the answer (for example `location` of a redirect).
 
 The run is strict. A request that matches no unused interaction fails the step, and the message
@@ -192,7 +192,7 @@ To add a run:
    or use a body that is there.
 3. Add `fixture` or a variant to the entry, and add `bind`, `fault`, `approval`, and `expect` to the
    steps.
-4. Run `uv run pytest tests/e2e`. A request that does not match shows the request. Copy its values
+4. Run `uv run pytest tests/integration`. A request that does not match shows the request. Copy its values
    into the fixture.
 5. List the runner node id of each new run in `tests` (see "Testing a scenario").
 6. Increase `_MINIMUM_EXECUTABLE` in `test_scenarios.py` to the new number of runs.
@@ -208,14 +208,14 @@ fixture exists, that a sidecar names each fixture, and that a fixture or a sidec
 body.
 
 A recorder writes a fixture from a run against a test tenant. It scrubs the answers, so that
-only seed text stays, and it lints them. `../tests/e2e/recording/README.md` has the commands, and
+only seed text stays, and it lints them. `../tests/recording/README.md` has the commands, and
 `../scripts/dogfood/seed/README.md` has the seed. A recorded fixture is a variant named
 `recorded` in the sidecar, and its fixture name starts with `rec-`. The option `--link` of the
 recorder writes that variant into the sidecar.
 
 ## Running a tool case
 
-`../tests/e2e/test_tool_cases.py` runs the chain of each case in `../tests/e2e/recording/cases/`
+`../tests/integration/test_tool_cases.py` runs the chain of each case in `../tests/recording/cases/`
 against the fixture `rec-tool-<case>`. The run uses the day of the recording as today, because a
 day symbol in a fixture matches only a day within one day of today. A case that has no fixture does
 not run.
@@ -234,7 +234,7 @@ An entry has one of these keys, and never both:
 
 | Key | Meaning |
 | --- | --- |
-| `tests` | A list of pytest node ids, with at least one. A node id is relative to the service folder, for example `tests/tools/scenarios/test_02_find_and_read_mail.py::TestUnreadMail::test_it_lists_unread_mail`. It names a function, or a class and a function, or a whole class. A parametrized test has no bracket part. |
+| `tests` | A list of pytest node ids, with at least one. A node id is relative to the service folder, for example `tests/integration/test_02_find_and_read_mail.py::TestUnreadMail::test_it_lists_unread_mail`. It names a function, or a class and a function, or a whole class. A parametrized test has no bracket part. |
 | `no_test` | A text `<kind>: <reason>`. The reason is one sentence. |
 
 The test uses `ast` to check that each file exists and defines each name. It does not collect or
@@ -253,8 +253,8 @@ runner for each run. The id has the name of the run in brackets:
 
 ```yaml
 tests:
-  - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01]"
-  - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/busy]"
+  - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01]"
+  - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/busy]"
 ```
 
 The runner is the only test that can have a bracket. The bracket must name a run of the same
@@ -273,26 +273,26 @@ Add no line to the list. The list only gets shorter. When it is empty, delete th
 
 ### Where a test lives
 
-Put the tests of a feature in `../tests/tools/scenarios/test_<NN>_<feature>.py`. `NN` and `<feature>`
+Put the tests of a feature in `../tests/integration/test_<NN>_<feature>.py`. `NN` and `<feature>`
 come from the name of the feature file. A feature has one module. Put the tests of one scenario in
-one class, and name the class for the scenario. The folder is in `tests/tools`, so the fixtures of
-`tests/tools/conftest.py` apply: `graph` is the respx router for Microsoft Graph, and
+one class, and name the class for the scenario. The fixtures of `tests/integration/conftest.py`
+apply: `graph` is the respx router for Microsoft Graph, and
 `retry_sleeps` (from `tests/conftest.py`) records the waits of the retry handler so that a test
 does not wait.
 
 ### The helper
 
-`../tests/tools/scenarios/support.py` gives four names:
+`../tests/integration/support.py` gives four names:
 
 | Name | Use |
 | --- | --- |
 | `call(tool, *, person=None, **arguments)` | Calls the tool through the real app and the real middleware, with the arguments that the assistant sends. It returns the result as a mapping. It raises `ToolError` with the text that the assistant sees. |
 | `Person` | The user who answers the approval question. `Person(approval="no")` declines. The values are the `approval` values of the runner. `person.asked` holds the questions that the user got. |
 | `serve(graph, name)` | Makes Graph answer from the fixture `name`. It returns a dictionary of routes, one for each method and path. |
-| `response(spec)` | Makes one answer, for example `response({"status": 500, "body": "error.generalException.json"})`. The body is a file in `../tests/e2e/bodies/`. |
+| `response(spec)` | Makes one answer, for example `response({"status": 500, "body": "error.generalException.json"})`. The body is a file in `../tests/integration/bodies/`. |
 | `recorded_json("fixture.NN")` | The JSON answer of interaction `NN` of a recorded fixture, as a mapping. |
 
-The helper uses `build_server`, `Person`, and `patch_obo` of `../tests/e2e/test_scenarios.py`.
+The helper uses `build_server`, `Person`, and `patch_obo` of `../tests/integration/test_scenarios.py`.
 
 ### A test with a recorded fixture
 
@@ -451,7 +451,7 @@ sidecar entry has `deferred`, a list of recorder case ids. Examples: a shared ca
 that the tenant index does not list yet, a meeting recording or transcript, and a Teams search hit.
 Keep the `tests` or `no_test` key of the scenario. A test fails when the tag and the key do not
 agree, and when a listed case does not exist or has no `deferred` reason in
-`../tests/e2e/recording/cases/`. `STATUS.md` has the count and the list of cases with their reasons.
+`../tests/recording/cases/`. `STATUS.md` has the count and the list of cases with their reasons.
 When a case is finished, delete its `deferred` reason, and delete the tag and the key from the
 scenarios that no longer wait.
 

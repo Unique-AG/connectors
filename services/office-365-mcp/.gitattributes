@@ -1,2 +1,2 @@
-tests/e2e/fixtures/** linguist-generated=true
-tests/e2e/bodies/** linguist-generated=true
+tests/integration/fixtures/** linguist-generated=true
+tests/integration/bodies/** linguist-generated=true

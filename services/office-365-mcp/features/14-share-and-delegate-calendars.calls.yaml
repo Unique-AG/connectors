@@ -1,7 +1,7 @@
 uc-14-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_colleague_is_given_read_access_after_mia_approves_and_then_shows_in_the_list"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_colleague_is_given_read_access_after_mia_approves_and_then_shows_in_the_list"
   provenance: drafted
   ask: "Give Anna read access to my calendar."
   asks_user: true
@@ -19,7 +19,7 @@ uc-14-01:
 uc-14-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_share_is_stopped_after_mia_approves"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_share_is_stopped_after_mia_approves"
   provenance: drafted
   ask: "Stop sharing my calendar with Anna."
   asks_user: true
@@ -36,7 +36,7 @@ uc-14-03:
     - outlook_create_event_on_behalf-manager
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_meeting_is_booked_on_the_calendar_of_the_manager_after_mia_approves"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_meeting_is_booked_on_the_calendar_of_the_manager_after_mia_approves"
   provenance: observed
   evidence: outlook_create_event_on_behalf in 1 call
   ask: "Book the Budget review with Anna on Lena's calendar."
@@ -50,7 +50,7 @@ uc-14-03:
 uc-14-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_calendar_that_nobody_shared_is_not_listed_and_gets_no_event"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_calendar_that_nobody_shared_is_not_listed_and_gets_no_event"
   provenance: drafted
   ask: "Book the Budget review on Lena's calendar."
   asks_user: false
@@ -61,7 +61,7 @@ uc-14-04:
 uc-14-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_it_lists_the_four_events_of_the_calendar_of_a_team"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_it_lists_the_four_events_of_the_calendar_of_a_team"
   provenance: observed
   evidence: outlook_list_group_events in 1 call, which failed
   ask: "What is on the calendar of the Platform team this week?"
@@ -76,7 +76,7 @@ uc-14-05:
 uc-14-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_a_team_calendar_that_microsoft_refuses_is_explained_and_lists_no_event"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_a_team_calendar_that_microsoft_refuses_is_explained_and_lists_no_event"
   provenance: drafted
   ask: "What is on the calendar of the Platform team this week?"
   asks_user: false
@@ -90,7 +90,7 @@ uc-14-06:
 uc-14-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_a_team_calendar_that_cannot_be_read_to_the_end_is_not_reported_as_empty"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_a_team_calendar_that_cannot_be_read_to_the_end_is_not_reported_as_empty"
   provenance: drafted
   ask: "What is on the calendar of the Platform team this week?"
   asks_user: false
@@ -107,7 +107,7 @@ uc-14-07:
 uc-14-08:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_booking_that_microsoft_refuses_is_explained_and_creates_nothing"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_booking_that_microsoft_refuses_is_explained_and_creates_nothing"
   provenance: drafted
   ask: "Book the Budget review with Anna on Lena's calendar."
   asks_user: true
@@ -121,7 +121,7 @@ uc-14-08:
 uc-14-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_booking_that_microsoft_fails_is_not_repeated_and_the_calendar_is_read_first"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_booking_that_microsoft_fails_is_not_repeated_and_the_calendar_is_read_first"
   provenance: drafted
   ask: "Book the Budget review with Anna on Lena's calendar."
   asks_user: true
@@ -137,7 +137,7 @@ uc-14-09:
 uc-14-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_calendar_that_was_shared_for_reading_only_is_not_written_to"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestActingOnTheCalendarOfAManager::test_a_calendar_that_was_shared_for_reading_only_is_not_written_to"
   provenance: drafted
   ask: "Book the Budget review with Anna on Lena's calendar."
   asks_user: false
@@ -152,7 +152,7 @@ uc-14-10:
 uc-14-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_calendar_that_mia_did_not_create_is_not_shared"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_calendar_that_mia_did_not_create_is_not_shared"
   provenance: drafted
   ask: "Give Anna read access to Lena's calendar."
   asks_user: false
@@ -166,7 +166,7 @@ uc-14-11:
 uc-14-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_the_share_with_the_whole_company_cannot_be_stopped"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_the_share_with_the_whole_company_cannot_be_stopped"
   provenance: drafted
   ask: "Stop sharing my calendar with everyone in the company."
   asks_user: false
@@ -181,7 +181,7 @@ uc-14-12:
 uc-14-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_role_that_microsoft_refuses_is_reported_after_the_approval_and_shares_nothing"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestSharingOneOfMiasCalendars::test_a_role_that_microsoft_refuses_is_reported_after_the_approval_and_shares_nothing"
   provenance: drafted
   ask: "Give Anna write access to my calendar."
   asks_user: true
@@ -198,7 +198,7 @@ uc-14-13:
 uc-14-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_that_mia_refuses_changes_nothing_and_says_it_was_not_confirmed"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_that_mia_refuses_changes_nothing_and_says_it_was_not_confirmed"
   provenance: drafted
   ask: "Give Anna read access to my calendar."
   asks_user: true
@@ -211,7 +211,7 @@ uc-14-14:
 uc-14-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_question_that_gets_no_answer_changes_nothing"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_question_that_gets_no_answer_changes_nothing"
   provenance: drafted
   ask: "Give Anna read access to my calendar."
   asks_user: true
@@ -224,7 +224,7 @@ uc-14-15:
 uc-14-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_for_one_request_does_not_cover_another"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_for_one_request_does_not_cover_another"
   provenance: drafted
   ask: "Give Anna read access to my calendar."
   asks_user: true
@@ -251,7 +251,7 @@ uc-14-17:
 uc-14-18:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_a_team_without_a_calendar_is_reported_with_the_way_to_look_the_teams_up_again"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_a_team_without_a_calendar_is_reported_with_the_way_to_look_the_teams_up_again"
   provenance: drafted
   ask: "What is on the calendar of the Platform team this week?"
   asks_user: false
@@ -266,7 +266,7 @@ uc-14-18:
 uc-14-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_one_busy_answer_is_waited_out_inside_the_same_call"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestATeamCalendar::test_one_busy_answer_is_waited_out_inside_the_same_call"
   provenance: drafted
   ask: "What is on the calendar of the Platform team this week?"
   asks_user: false
@@ -280,7 +280,7 @@ uc-14-19:
 uc-14-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_an_empty_calendar_of_mia_is_deleted_after_she_approves"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_an_empty_calendar_of_mia_is_deleted_after_she_approves"
   provenance: drafted
   ask: "Delete my calendar Offsite."
   asks_user: true
@@ -293,8 +293,8 @@ uc-14-20:
 uc-14-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_cannot_be_deleted_is_explained_and_stays"
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_holds_a_meeting_is_not_deleted"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_cannot_be_deleted_is_explained_and_stays"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_holds_a_meeting_is_not_deleted"
   provenance: drafted
   ask: "Delete the calendar Offsite."
   asks_user: false
@@ -308,7 +308,7 @@ uc-14-21:
 uc-14-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestALinkThatIsNotACalendarLink::test_it_reads_and_changes_nothing_and_asks_nothing"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestALinkThatIsNotACalendarLink::test_it_reads_and_changes_nothing_and_asks_nothing"
   provenance: drafted
   ask: "Delete the calendar Spare calendar."
   asks_user: false
@@ -321,7 +321,7 @@ uc-14-22:
 uc-14-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestALinkThatIsNotACalendarLink::test_a_name_in_place_of_an_address_shares_nothing"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestALinkThatIsNotACalendarLink::test_a_name_in_place_of_an_address_shares_nothing"
   provenance: drafted
   ask: "Give Anna Meier read access to my calendar."
   asks_user: false
@@ -335,7 +335,7 @@ uc-14-23:
 uc-14-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_gets_a_meeting_while_mia_decides_is_not_deleted"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestDeletingACalendar::test_a_calendar_that_gets_a_meeting_while_mia_decides_is_not_deleted"
   provenance: drafted
   ask: "Delete the calendar Spare."
   asks_user: true
@@ -348,7 +348,7 @@ uc-14-24:
 uc-14-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_14_share_and_delegate_calendars.py::TestATeamsMeetingOnTheCalendarOfAManager"
+    - "tests/integration/test_14_share_and_delegate_calendars.py::TestATeamsMeetingOnTheCalendarOfAManager"
   provenance: drafted
   ask: "Book the Budget review with Anna on Lena's calendar as a Teams meeting."
   asks_user: true

@@ -8,4 +8,4 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/../.."
-exec .venv/bin/python -W ignore -m tests.e2e.recording.runbook "$@"
+exec .venv/bin/python -W ignore -m tests.recording.runbook "$@"

@@ -295,11 +295,18 @@ Once the service runs, it exposes these endpoints:
 
 ## Tests
 
-Integration tests start a Postgres container. Docker must run for this. The app under test creates
-the one table it needs, the same way production does.
+| Folder | What it holds |
+| --- | --- |
+| `tests/integration/` | The real app, middleware and tools, called through an MCP client in one process. Recorded fixtures or `respx` routes answer for Microsoft Graph. The tests use no network. |
+| `tests/recording/` | The recorder that captures the fixtures from real Graph, and the tests of the recorder. The recorder runs by hand only. |
+| `tests/graph_client/`, `tests/shared/`, `tests/test_*.py` | Tests of one module, one rule, or the configuration. |
+
+Tests that carry the `docker` marker start a Postgres container, so Docker must run for them. The
+app under test creates the one table it needs, the same way production does.
 
 ```bash
-uv run pytest
+uv run pytest                  # every test
+uv run pytest -m "not docker"  # without the tests that need Docker
 ```
 
 ## Lint & type-check

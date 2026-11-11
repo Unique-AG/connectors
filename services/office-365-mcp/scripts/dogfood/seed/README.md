@@ -4,7 +4,7 @@
 string and every file comes from `corpus/`. The seed tags each item. Because of the tag, a second
 `apply` creates nothing, and `cleanup` deletes only the items the seed made.
 
-The recorder in `tests/e2e/recording/` records scenarios against Mia's mailbox. It keeps only text
+The recorder in `tests/recording/` records scenarios against Mia's mailbox. It keeps only text
 that is in this corpus.
 
 ## Personas

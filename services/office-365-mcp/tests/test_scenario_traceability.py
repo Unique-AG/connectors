@@ -14,8 +14,8 @@ import yaml
 _SERVICE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 _FEATURES = _SERVICE_ROOT / "features"
 _PENDING = _FEATURES / "PENDING.txt"
-_RUNNER = "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says"
-_CASES = _SERVICE_ROOT / "tests" / "e2e" / "recording" / "cases"
+_RUNNER = "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says"
+_CASES = _SERVICE_ROOT / "tests" / "recording" / "cases"
 _NO_TEST_KINDS = ("assistant", "human", "limit")
 
 

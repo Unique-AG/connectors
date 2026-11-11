@@ -1,7 +1,7 @@
 uc-10-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_contract_moves_into_a_new_folder_after_each_approval"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_contract_moves_into_a_new_folder_after_each_approval"
   ask: "Move the 4 signed contracts from Contracts into a new folder called 2026 Signed."
   provenance: drafted
   asks_user: true
@@ -18,7 +18,7 @@ uc-10-01:
 uc-10-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_folder_is_copied_into_a_folder_of_another_drive_and_the_original_stays"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_folder_is_copied_into_a_folder_of_another_drive_and_the_original_stays"
   ask: "Copy my Template folder into the Sales site."
   provenance: drafted
   asks_user: true
@@ -39,7 +39,7 @@ uc-10-02:
 uc-10-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_delete_moves_a_file_to_the_recycle_bin_after_the_person_approves"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_delete_moves_a_file_to_the_recycle_bin_after_the_person_approves"
   ask: "Delete the file Old draft.docx."
   provenance: drafted
   asks_user: true
@@ -51,7 +51,7 @@ uc-10-03:
 uc-10-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_meeting_notes_are_saved_as_a_new_text_file_after_the_person_approves"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_meeting_notes_are_saved_as_a_new_text_file_after_the_person_approves"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -64,7 +64,7 @@ uc-10-04:
 uc-10-05:
   status: gap
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_an_existing_file_is_not_replaced_and_the_tool_offers_no_replace"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_an_existing_file_is_not_replaced_and_the_tool_offers_no_replace"
   ask: "Replace the content of Plan.docx with this new text."
   blocker:
     kind: tool
@@ -78,7 +78,7 @@ uc-10-05:
 uc-10-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_a_colleague_gets_edit_access_with_an_invitation_after_the_person_approves"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_a_colleague_gets_edit_access_with_an_invitation_after_the_person_approves"
   ask: "Give Anna edit access to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
@@ -94,7 +94,7 @@ uc-10-06:
 uc-10-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_a_view_link_is_created_after_the_person_approves_and_sent_to_nobody"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_a_view_link_is_created_after_the_person_approves_and_sent_to_nobody"
   ask: "Give me a view-only sharing link to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
@@ -108,7 +108,7 @@ uc-10-07:
 uc-10-08:
   status: gap
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_access_cannot_be_taken_back_because_no_tool_removes_it"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_access_cannot_be_taken_back_because_no_tool_removes_it"
   ask: "Stop sharing Q3 Plan.pptx with Anna."
   blocker:
     kind: tool
@@ -122,7 +122,7 @@ uc-10-08:
 uc-10-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_file_is_renamed_and_only_its_name_is_sent"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_file_is_renamed_and_only_its_name_is_sent"
   ask: "Rename Plan v1.docx to Plan v2.docx."
   provenance: drafted
   asks_user: true
@@ -136,7 +136,7 @@ uc-10-09:
 uc-10-10:
   status: gap
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_mail_attachment_cannot_be_saved_because_only_text_files_are_created"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_mail_attachment_cannot_be_saved_because_only_text_files_are_created"
   ask: "Save the file attached to Anna's mail in my Tenders folder."
   blocker:
     kind: tool
@@ -150,7 +150,7 @@ uc-10-10:
 uc-10-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_folder_that_microsoft_will_not_open_creates_no_file"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_folder_that_microsoft_will_not_open_creates_no_file"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: false
@@ -164,7 +164,7 @@ uc-10-11:
 uc-10-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_name_that_is_already_used_creates_nothing_more"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_name_that_is_already_used_creates_nothing_more"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -176,7 +176,7 @@ uc-10-12:
 uc-10-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_busy_microsoft_is_given_the_time_it_asks_for_and_the_save_is_sent_once"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_busy_microsoft_is_given_the_time_it_asks_for_and_the_save_is_sent_once"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -190,7 +190,7 @@ uc-10-13:
 uc-10-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_write_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_write_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -206,7 +206,7 @@ uc-10-14:
 uc-10-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_file_that_was_saved_but_cannot_be_shown_is_not_saved_twice"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_file_that_was_saved_but_cannot_be_shown_is_not_saved_twice"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -222,7 +222,7 @@ uc-10-15:
 uc-10-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_rejected_save_gives_the_reason_and_is_not_repeated"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_rejected_save_gives_the_reason_and_is_not_repeated"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -236,7 +236,7 @@ uc-10-16:
 uc-10-17:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_name_with_a_sign_that_microsoft_does_not_allow_is_refused"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_name_with_a_sign_that_microsoft_does_not_allow_is_refused"
   ask: "Save these meeting notes as Sync: 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: false
@@ -250,7 +250,7 @@ uc-10-17:
 uc-10-18:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_name_that_is_not_a_text_file_is_refused"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_name_that_is_not_a_text_file_is_refused"
   ask: "Save these meeting notes as Sync 14 June.docx in my Notes folder."
   provenance: drafted
   asks_user: false
@@ -264,7 +264,7 @@ uc-10-18:
 uc-10-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_text_of_exactly_one_million_characters_is_saved_whole"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_text_of_exactly_one_million_characters_is_saved_whole"
   ask: "Save this text as Log.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -278,7 +278,7 @@ uc-10-19:
 uc-10-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_text_of_one_million_and_one_characters_is_refused"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_text_of_one_million_and_one_characters_is_refused"
   ask: "Save this text as Log.txt in my Notes folder."
   provenance: drafted
   asks_user: false
@@ -292,7 +292,7 @@ uc-10-20:
 uc-10-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_the_top_folder_of_a_library_is_not_changed"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_the_top_folder_of_a_library_is_not_changed"
   ask: "Rename the top folder of the Sales site library to Archive."
   provenance: drafted
   asks_user: false
@@ -303,7 +303,7 @@ uc-10-21:
 uc-10-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_move_to_another_drive_is_refused_with_the_copy_then_delete_advice"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_move_to_another_drive_is_refused_with_the_copy_then_delete_advice"
   ask: "Move Q3 Plan.pptx from my OneDrive into the Sales site."
   provenance: drafted
   asks_user: true
@@ -323,7 +323,7 @@ uc-10-22:
 uc-10-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_file_that_is_already_in_the_folder_is_not_moved"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_file_that_is_already_in_the_folder_is_not_moved"
   ask: "Move Plan v1.docx into the Projects folder."
   provenance: drafted
   asks_user: false
@@ -336,7 +336,7 @@ uc-10-23:
 uc-10-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_copy_into_the_same_folder_carries_the_new_name"
+    - "tests/integration/test_10_organize_and_share_files.py::TestFilingDocuments::test_a_copy_into_the_same_folder_carries_the_new_name"
   ask: "Make a copy of Template.docx in the same folder."
   provenance: drafted
   asks_user: true
@@ -353,7 +353,7 @@ uc-10-24:
 uc-10-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_file_that_is_already_gone_is_not_deleted_again"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_file_that_is_already_gone_is_not_deleted_again"
   ask: "Delete the file Old draft.docx."
   provenance: drafted
   asks_user: false
@@ -367,7 +367,7 @@ uc-10-25:
 uc-10-26:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_a_person_named_without_a_mail_address_is_not_invited"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_a_person_named_without_a_mail_address_is_not_invited"
   ask: "Give Anna at Brightway edit access to Q3 Plan.pptx."
   provenance: drafted
   asks_user: false
@@ -384,7 +384,7 @@ uc-10-26:
 uc-10-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_an_invitation_that_may_be_out_is_sent_once_and_the_app_is_to_be_checked"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_an_invitation_that_may_be_out_is_sent_once_and_the_app_is_to_be_checked"
   ask: "Give Anna edit access to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
@@ -400,7 +400,7 @@ uc-10-27:
 uc-10-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_a_link_without_sign_in_that_the_organization_blocks_is_explained"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_a_link_without_sign_in_that_the_organization_blocks_is_explained"
   ask: "Give me a sharing link to Q3 Plan.pptx that anyone can open."
   provenance: drafted
   asks_user: true
@@ -414,7 +414,7 @@ uc-10-28:
 uc-10-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsNotApproved::test_a_declined_change_leaves_everything_as_it_was"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsNotApproved::test_a_declined_change_leaves_everything_as_it_was"
   ask: "Rename Plan v1.docx to Plan v2.docx."
   provenance: drafted
   asks_user: true
@@ -426,7 +426,7 @@ uc-10-30:
 uc-10-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsNotApproved::test_a_change_without_an_answer_does_not_happen_and_can_be_asked_again"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsNotApproved::test_a_change_without_an_answer_does_not_happen_and_can_be_asked_again"
   ask: "Delete the file Old draft.docx."
   provenance: drafted
   asks_user: true
@@ -438,7 +438,7 @@ uc-10-31:
 uc-10-32:
   status: working
   tests:
-    - "tests/e2e/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
+    - "tests/integration/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
   ask: "Rename Plan v1.docx to Plan v2.docx."
   provenance: drafted
   asks_user: true
@@ -452,7 +452,7 @@ uc-10-32:
 uc-10-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_move_that_microsoft_fails_is_tried_once_more_and_asked_again"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_move_that_microsoft_fails_is_tried_once_more_and_asked_again"
   ask: "Move Q3 Plan.pptx into the Archive folder."
   provenance: drafted
   asks_user: true
@@ -467,7 +467,7 @@ uc-10-29:
 uc-10-33:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_a_note_of_exactly_2000_characters_goes_out_with_the_invitation"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_a_note_of_exactly_2000_characters_goes_out_with_the_invitation"
   ask: "Give Anna edit access to Q3 Plan.pptx and add this note to the invitation."
   provenance: drafted
   asks_user: true
@@ -483,7 +483,7 @@ uc-10-33:
 uc-10-34:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestGivingAccess::test_a_note_of_2001_characters_stops_the_invitation"
+    - "tests/integration/test_10_organize_and_share_files.py::TestGivingAccess::test_a_note_of_2001_characters_stops_the_invitation"
   ask: "Give Anna edit access to Q3 Plan.pptx and add this note to the invitation."
   provenance: drafted
   asks_user: false
@@ -499,7 +499,7 @@ uc-10-34:
 uc-10-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_file_that_microsoft_refuses_to_save_is_explained_after_the_approval"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_file_that_microsoft_refuses_to_save_is_explained_after_the_approval"
   ask: "Save these meeting notes as Sync 14 June.txt in my Notes folder."
   provenance: drafted
   asks_user: true
@@ -513,7 +513,7 @@ uc-10-35:
 uc-10-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_missing_consent_is_explained_and_nothing_is_moved"
+    - "tests/integration/test_10_organize_and_share_files.py::TestAChangeThatIsRefusedBeforeAnythingHappens::test_a_missing_consent_is_explained_and_nothing_is_moved"
   ask: "Move Plan.docx into the Archive folder."
   provenance: drafted
   asks_user: false
@@ -527,7 +527,7 @@ uc-10-36:
 uc-10-37:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_write_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_write_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
   ask: "Copy my Template folder into my Archive folder."
   provenance: drafted
   asks_user: true
@@ -544,7 +544,7 @@ uc-10-37:
 uc-10-38:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_write_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
+    - "tests/integration/test_10_organize_and_share_files.py::TestASaveThatFails::test_a_write_that_microsoft_fails_is_sent_once_and_looked_for_before_a_repeat"
   ask: "Create the folder 2026 Signed in my Contracts folder."
   provenance: drafted
   asks_user: true
@@ -560,7 +560,7 @@ uc-10-38:
 uc-10-39:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked"
   ask: "Move Q3 Plan.pptx into the folder Archive."
   provenance: drafted
   asks_user: false
@@ -571,7 +571,7 @@ uc-10-39:
 uc-10-40:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_name_of_blank_spaces_is_refused"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_name_of_blank_spaces_is_refused"
   ask: "Rename Q3 Plan.pptx to a name of spaces."
   provenance: drafted
   asks_user: false
@@ -582,7 +582,7 @@ uc-10-40:
 uc-10-41:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_file_in_the_place_of_a_folder_is_refused_and_nobody_is_asked"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_file_in_the_place_of_a_folder_is_refused_and_nobody_is_asked"
   ask: "Create the folder 2026 in Plan v1.docx."
   provenance: drafted
   asks_user: false
@@ -593,7 +593,7 @@ uc-10-41:
 uc-10-42:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_folder_is_not_moved_into_itself"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_folder_is_not_moved_into_itself"
   ask: "Move the folder Archive into the folder Archive."
   provenance: drafted
   asks_user: false
@@ -605,7 +605,7 @@ uc-10-42:
 uc-10-43:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_person_named_twice_is_not_invited"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_person_named_twice_is_not_invited"
   ask: "Give Anna edit access to Q3 Plan.pptx."
   provenance: drafted
   asks_user: false
@@ -618,7 +618,7 @@ uc-10-43:
 uc-10-44:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_person_with_an_error_from_microsoft_is_named_with_the_reason"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_person_with_an_error_from_microsoft_is_named_with_the_reason"
   ask: "Give Anna and Ben edit access to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
@@ -631,7 +631,7 @@ uc-10-44:
 uc-10-45:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_the_question_about_a_folder_delete_says_how_full_the_folder_is"
+    - "tests/integration/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_the_question_about_a_folder_delete_says_how_full_the_folder_is"
   ask: "Delete the folder Old drafts."
   provenance: drafted
   asks_user: true
@@ -644,7 +644,7 @@ uc-10-45:
 uc-10-46:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_the_approval_question_is_passed_back_before_anything_changes"
+    - "tests/integration/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_the_approval_question_is_passed_back_before_anything_changes"
   ask: "Rename Plan v1.docx to Plan v2.docx."
   provenance: drafted
   asks_user: true
@@ -655,7 +655,7 @@ uc-10-46:
 uc-10-47:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_link_without_an_address_is_not_reported_as_made"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_link_without_an_address_is_not_reported_as_made"
   ask: "Give me a view-only link to Q3 Plan.pptx."
   provenance: drafted
   asks_user: true
@@ -668,7 +668,7 @@ uc-10-47:
 uc-10-48:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_place_with_no_name_is_named_in_a_general_way"
+    - "tests/integration/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_place_with_no_name_is_named_in_a_general_way"
   ask: "Create the folder 2026 in the top folder of the Sales library."
   provenance: drafted
   asks_user: true
@@ -679,7 +679,7 @@ uc-10-48:
 uc-10-49:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_change_that_microsoft_answers_without_the_item_is_checked_by_a_second_read"
+    - "tests/integration/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_change_that_microsoft_answers_without_the_item_is_checked_by_a_second_read"
   ask: "Rename Plan v1.docx to Plan v2.docx."
   provenance: drafted
   asks_user: true
@@ -692,7 +692,7 @@ uc-10-49:
 uc-10-50:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_notebook_is_not_attached_to_a_post"
+    - "tests/integration/test_10_organize_and_share_files.py::TestTheQuestionToMia::test_a_notebook_is_not_attached_to_a_post"
   ask: "Post the OneNote notebook Customers in the channel Launch."
   provenance: drafted
   asks_user: false
@@ -704,7 +704,7 @@ uc-10-50:
 uc-10-51:
   status: working
   tests:
-    - "tests/tools/scenarios/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_move_of_an_item_with_no_known_old_folder_gives_no_way_back"
+    - "tests/integration/test_10_organize_and_share_files.py::TestARequestThatCannotSucceed::test_a_move_of_an_item_with_no_known_old_folder_gives_no_way_back"
   ask: "Move Plan v1.docx into Archive."
   provenance: drafted
   asks_user: true

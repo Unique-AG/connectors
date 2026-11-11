@@ -1,8 +1,8 @@
 uc-11-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_reply_from_monday_to_saturday_in_the_zone_of_mia"
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_message_for_senders_inside_and_outside_the_organization"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_reply_from_monday_to_saturday_in_the_zone_of_mia"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_message_for_senders_inside_and_outside_the_organization"
   ask: "Turn on my out-of-office reply from Monday to Friday and tell everyone I am away."
   provenance: drafted
   asks_user: true
@@ -17,7 +17,7 @@ uc-11-01:
 uc-11-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_refuses_a_reply_with_no_end_and_leaves_the_reply_off"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_refuses_a_reply_with_no_end_and_leaves_the_reply_off"
   ask: "Turn on my out-of-office reply until I say otherwise."
   provenance: drafted
   asks_user: false
@@ -28,7 +28,7 @@ uc-11-02:
 uc-11-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_turns_the_reply_off_without_asking_mia"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_turns_the_reply_off_without_asking_mia"
   ask: "Turn off my out-of-office reply."
   provenance: drafted
   asks_user: false
@@ -39,7 +39,7 @@ uc-11-03:
 uc-11-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_lists_a_sender_in_the_tab_it_was_fixed_to"
+    - "tests/integration/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_lists_a_sender_in_the_tab_it_was_fixed_to"
   ask: "Always put mail from ada@acme.example in my Focused tab."
   provenance: drafted
   asks_user: false
@@ -52,7 +52,7 @@ uc-11-04:
 uc-11-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheStateOfTheReplyIsRead"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheStateOfTheReplyIsRead"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -64,7 +64,7 @@ uc-11-07:
 uc-11-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_asks_mia_before_it_writes_the_reply"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_asks_mia_before_it_writes_the_reply"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -76,7 +76,7 @@ uc-11-05:
 uc-11-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_mia_declines"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_mia_declines"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -88,7 +88,7 @@ uc-11-06:
 uc-11-08:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_tells_why_the_state_cannot_be_read"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_tells_why_the_state_cannot_be_read"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -108,7 +108,7 @@ uc-11-08:
 uc-11-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_reads_the_state_at_the_second_try_after_one_failure"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_reads_the_state_at_the_second_try_after_one_failure"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -126,7 +126,7 @@ uc-11-09:
 uc-11-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_reports_a_reading_that_fails_twice_and_never_says_off"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_reports_a_reading_that_fails_twice_and_never_says_off"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -142,8 +142,8 @@ uc-11-10:
 uc-11-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_gives_the_reason_when_microsoft_refuses_the_dates"
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_says_when_the_reply_can_be_stored_after_a_busy_answer"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_gives_the_reason_when_microsoft_refuses_the_dates"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_says_when_the_reply_can_be_stored_after_a_busy_answer"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -161,7 +161,7 @@ uc-11-11:
 uc-11-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_asks_again_and_stores_the_reply_at_the_second_try"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_asks_again_and_stores_the_reply_at_the_second_try"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -179,7 +179,7 @@ uc-11-12:
 uc-11-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_reports_a_reply_that_fails_to_store_twice_and_never_says_on"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_reports_a_reply_that_fails_to_store_twice_and_never_says_on"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -195,7 +195,7 @@ uc-11-13:
 uc-11-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_the_question_gets_no_usable_answer"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_the_question_gets_no_usable_answer"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -212,7 +212,7 @@ uc-11-14:
 uc-11-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_the_client_cannot_ask"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_the_client_cannot_ask"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -228,8 +228,8 @@ uc-11-15:
 uc-11-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_rejects_an_approval_that_was_given_for_another_reply"
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_turns_nothing_on_when_the_stored_reply_changed_after_mia_was_asked"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_rejects_an_approval_that_was_given_for_another_reply"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_turns_nothing_on_when_the_stored_reply_changed_after_mia_was_asked"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: true
@@ -250,8 +250,8 @@ uc-11-16:
 uc-11-17:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_refuses_a_name_where_an_address_is_needed_and_stores_nothing"
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_finds_nobody_for_a_name_that_no_mail_and_no_directory_holds"
+    - "tests/integration/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_refuses_a_name_where_an_address_is_needed_and_stores_nothing"
+    - "tests/integration/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_finds_nobody_for_a_name_that_no_mail_and_no_directory_holds"
   ask: "Always put mail from Ada Keller in my Focused tab."
   provenance: drafted
   asks_user: false
@@ -269,7 +269,7 @@ uc-11-17:
 uc-11-18:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_moves_a_sender_that_has_a_fixed_tab_to_the_new_tab"
+    - "tests/integration/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_moves_a_sender_that_has_a_fixed_tab_to_the_new_tab"
   ask: "Always put mail from ada@acme.example in my Focused tab."
   provenance: drafted
   asks_user: false
@@ -304,7 +304,7 @@ uc-11-19:
 uc-11-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_asks_nobody_when_the_stored_reply_cannot_be_read_first"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_asks_nobody_when_the_stored_reply_cannot_be_read_first"
   ask: "Turn on my out-of-office reply from Monday to Friday."
   provenance: drafted
   asks_user: false
@@ -322,7 +322,7 @@ uc-11-20:
 uc-11-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_explains_an_account_with_no_mailbox"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_explains_an_account_with_no_mailbox"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -337,7 +337,7 @@ uc-11-21:
 uc-11-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_waits_out_one_busy_answer_inside_the_same_call"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_waits_out_one_busy_answer_inside_the_same_call"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -353,7 +353,7 @@ uc-11-22:
 uc-11-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_names_the_permission_that_no_administrator_gave"
+    - "tests/integration/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_names_the_permission_that_no_administrator_gave"
   ask: "Is my out-of-office reply on?"
   provenance: drafted
   asks_user: false
@@ -372,7 +372,7 @@ uc-11-23:
 uc-11-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_lists_every_fixed_sender_with_its_tab"
+    - "tests/integration/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_lists_every_fixed_sender_with_its_tab"
   ask: "Which senders do I always put in a tab?"
   provenance: drafted
   asks_user: false
@@ -383,7 +383,7 @@ uc-11-24:
 uc-11-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_tells_why_the_senders_cannot_be_read"
+    - "tests/integration/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_tells_why_the_senders_cannot_be_read"
   ask: "Which senders do I always put in a tab?"
   provenance: drafted
   asks_user: false
@@ -403,7 +403,7 @@ uc-11-25:
 uc-11-26:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_tells_why_the_tab_cannot_be_stored"
+    - "tests/integration/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_tells_why_the_tab_cannot_be_stored"
   ask: "Always put mail from ada@acme.example in my Focused tab."
   provenance: drafted
   asks_user: false
@@ -424,7 +424,7 @@ uc-11-26:
 uc-11-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_stores_the_tab_once_at_the_second_try"
+    - "tests/integration/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_stores_the_tab_once_at_the_second_try"
   ask: "Always put mail from ada@acme.example in my Focused tab."
   provenance: drafted
   asks_user: false
@@ -446,7 +446,7 @@ uc-11-27:
 uc-11-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_reports_a_tab_that_fails_to_store_twice_and_never_says_set"
+    - "tests/integration/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_reports_a_tab_that_fails_to_store_twice_and_never_says_set"
   ask: "Always put mail from ada@acme.example in my Focused tab."
   provenance: drafted
   asks_user: false
@@ -464,7 +464,7 @@ uc-11-28:
 uc-11-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_with_no_end_that_goes_to_contacts_only"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_with_no_end_that_goes_to_contacts_only"
   ask: "Is my automatic reply on?"
   provenance: drafted
   asks_user: false
@@ -476,8 +476,8 @@ uc-11-29:
 uc-11-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_reply_as_a_reply_with_no_state"
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_setting_with_no_state_and_no_audience"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_reply_as_a_reply_with_no_state"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_setting_with_no_state_and_no_audience"
   ask: "Is my automatic reply on?"
   provenance: drafted
   asks_user: false
@@ -489,7 +489,7 @@ uc-11-30:
 uc-11-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reports_the_state_that_microsoft_stored_after_a_change"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reports_the_state_that_microsoft_stored_after_a_change"
   ask: "Turn my automatic reply off."
   provenance: drafted
   asks_user: false
@@ -501,7 +501,7 @@ uc-11-31:
 uc-11-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_names_the_contacts_who_get_the_reply_in_the_question"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_names_the_contacts_who_get_the_reply_in_the_question"
   ask: "Turn on an automatic reply from Monday to Saturday for my contacts outside the company."
   provenance: drafted
   asks_user: true
@@ -513,7 +513,7 @@ uc-11-32:
 uc-11-33:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_the_time_zone_the_hours_the_language_and_the_archive_folder"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_the_time_zone_the_hours_the_language_and_the_archive_folder"
   ask: "What are my working hours, language and archive folder?"
   provenance: drafted
   asks_user: false
@@ -525,7 +525,7 @@ uc-11-33:
 uc-11-34:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_language_as_no_language"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_language_as_no_language"
   ask: "What are my working hours, language and archive folder?"
   provenance: drafted
   asks_user: false
@@ -537,7 +537,7 @@ uc-11-34:
 uc-11-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_lists_the_category_names_of_the_mailbox"
+    - "tests/integration/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_lists_the_category_names_of_the_mailbox"
   ask: "Which categories do I have?"
   provenance: drafted
   asks_user: false
@@ -549,7 +549,7 @@ uc-11-35:
 uc-11-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderWithNoStoredTabIsListedWithNoTab"
+    - "tests/integration/test_11_mailbox_preferences.py::TestASenderWithNoStoredTabIsListedWithNoTab"
   ask: "Which senders do I always put in a tab?"
   provenance: drafted
   asks_user: false

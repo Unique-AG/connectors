@@ -1,8 +1,8 @@
 uc-13-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_creates_a_group_chat_from_the_addresses_of_people_mia_never_chatted_with"
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_refuses_a_display_name_because_only_entra_ids_name_a_person"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_creates_a_group_chat_from_the_addresses_of_people_mia_never_chatted_with"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_refuses_a_display_name_because_only_entra_ids_name_a_person"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -19,7 +19,7 @@ uc-13-01:
 uc-13-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_creates_a_group_chat_from_people_mia_already_chats_with"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_creates_a_group_chat_from_people_mia_already_chats_with"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -33,8 +33,8 @@ uc-13-07:
 uc-13-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_tells_mia_in_the_question_whether_the_new_member_sees_the_earlier_messages"
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_reports_the_reason_when_microsoft_refuses_a_member_for_a_one_to_one_chat"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_tells_mia_in_the_question_whether_the_new_member_sees_the_earlier_messages"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_reports_the_reason_when_microsoft_refuses_a_member_for_a_one_to_one_chat"
   ask: "Add Priya to the Launch chat and let her see the earlier messages."
   provenance: drafted
   asks_user: true
@@ -51,7 +51,7 @@ uc-13-02:
 uc-13-08:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_tells_mia_in_the_question_whether_the_new_member_sees_the_earlier_messages"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_tells_mia_in_the_question_whether_the_new_member_sees_the_earlier_messages"
   ask: "Add Priya to the Launch chat."
   provenance: drafted
   asks_user: true
@@ -68,7 +68,7 @@ uc-13-08:
 uc-13-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_removes_a_member_after_mia_approves_the_change"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_removes_a_member_after_mia_approves_the_change"
   ask: "Remove Tom from the Launch chat."
   provenance: drafted
   asks_user: true
@@ -81,7 +81,7 @@ uc-13-03:
 uc-13-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_reads_the_chat_type_of_a_one_to_one_chat_and_adds_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_reads_the_chat_type_of_a_one_to_one_chat_and_adds_nobody"
   ask: "Add Tom to my chat with Anna."
   provenance: drafted
   asks_user: false
@@ -94,8 +94,8 @@ uc-13-04:
 uc-13-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_creates_a_meeting_and_gives_mia_the_join_address"
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_sends_the_attendees_with_the_meeting_and_gives_them_back"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_creates_a_meeting_and_gives_mia_the_join_address"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_sends_the_attendees_with_the_meeting_and_gives_them_back"
   ask: "Create an online meeting for tomorrow at 14:00 for 30 minutes with Anna and Tom, and give me the join link."
   provenance: drafted
   asks_user: true
@@ -110,7 +110,7 @@ uc-13-05:
 uc-13-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_shows_attendance_only_to_the_organizer"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_shows_attendance_only_to_the_organizer"
   ask: "Who attended Anna's Design review?"
   provenance: drafted
   asks_user: false
@@ -123,7 +123,7 @@ uc-13-06:
 uc-13-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_renames_a_group_chat_and_changes_nothing_else_about_it"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestMiaControlsWhoIsInAGroupChat::test_it_renames_a_group_chat_and_changes_nothing_else_about_it"
   ask: "Rename the Launch chat to Launch 2.0."
   provenance: drafted
   asks_user: true
@@ -138,7 +138,7 @@ uc-13-09:
 uc-13-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_moves_a_meeting_and_leaves_its_attendees_and_every_calendar_alone"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_moves_a_meeting_and_leaves_its_attendees_and_every_calendar_alone"
   ask: "Move the online meeting Design review to 15:00 for 30 minutes."
   provenance: drafted
   asks_user: true
@@ -156,7 +156,7 @@ uc-13-10:
 uc-13-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_adds_an_attendee_and_keeps_the_earlier_attendees"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_adds_an_attendee_and_keeps_the_earlier_attendees"
   ask: "Add Priya to the online meeting Design review."
   provenance: drafted
   asks_user: true
@@ -175,7 +175,7 @@ uc-13-11:
 uc-13-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_deletes_a_meeting_after_mia_approves_the_deletion"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_deletes_a_meeting_after_mia_approves_the_deletion"
   ask: "Delete the online meeting Design review."
   provenance: drafted
   asks_user: true
@@ -193,7 +193,7 @@ uc-13-12:
 uc-13-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_to_sign_in_again_and_creates_no_chat"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_to_sign_in_again_and_creates_no_chat"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -208,7 +208,7 @@ uc-13-13:
 uc-13-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_that_an_administrator_must_grant_the_access_for_the_new_chat"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_that_an_administrator_must_grant_the_access_for_the_new_chat"
   ask: "Create a group chat called Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -223,7 +223,7 @@ uc-13-14:
 uc-13-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_how_long_to_wait_and_does_not_create_the_chat_again_sooner"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_how_long_to_wait_and_does_not_create_the_chat_again_sooner"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -238,7 +238,7 @@ uc-13-15:
 uc-13-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_create_a_failed_chat_again_before_the_chats_are_checked"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_create_a_failed_chat_again_before_the_chats_are_checked"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -255,7 +255,7 @@ uc-13-16:
 uc-13-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_makes_no_fifth_addition_within_a_minute_and_tells_mia_to_wait"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_makes_no_fifth_addition_within_a_minute_and_tells_mia_to_wait"
   ask: "Add Priya to the Launch chat."
   provenance: drafted
   asks_user: true
@@ -272,7 +272,7 @@ uc-13-35:
 uc-13-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_change_the_members_again_before_they_are_checked"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_change_the_members_again_before_they_are_checked"
   ask: "Add Priya to the Launch chat."
   provenance: drafted
   asks_user: true
@@ -290,8 +290,8 @@ uc-13-36:
 uc-13-37:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_change_a_meeting_that_microsoft_does_not_show_and_asks_nobody"
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_change_a_meeting_that_microsoft_cannot_find_at_the_change"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_change_a_meeting_that_microsoft_does_not_show_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_does_not_change_a_meeting_that_microsoft_cannot_find_at_the_change"
   ask: "Move the online meeting Design review to 15:00 for 30 minutes."
   provenance: drafted
   asks_user: false
@@ -305,7 +305,7 @@ uc-13-37:
 uc-13-38:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_creates_no_chat_when_the_chat_program_cannot_show_a_question"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_creates_no_chat_when_the_chat_program_cannot_show_a_question"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: false
@@ -320,7 +320,7 @@ uc-13-38:
 uc-13-18:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_meeting_that_was_deleted_a_moment_before_its_deletion"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_meeting_that_was_deleted_a_moment_before_its_deletion"
   ask: "Delete the online meeting Design review."
   provenance: drafted
   asks_user: true
@@ -339,7 +339,7 @@ uc-13-18:
 uc-13-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_asks_mia_again_and_advises_one_retry_when_a_rename_fails"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_asks_mia_again_and_advises_one_retry_when_a_rename_fails"
   ask: "Rename the Launch chat to Launch 2.0."
   provenance: drafted
   asks_user: true
@@ -357,7 +357,7 @@ uc-13-19:
 uc-13-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_an_attendance_that_microsoft_fails_to_read_as_unreadable"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_an_attendance_that_microsoft_fails_to_read_as_unreadable"
   ask: "Who attended my Design review?"
   provenance: drafted
   asks_user: false
@@ -373,7 +373,7 @@ uc-13-20:
 uc-13-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_refuses_a_chat_with_mia_alone_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_refuses_a_chat_with_mia_alone_and_asks_nobody"
   ask: "Start a group chat called Notes with just me in it."
   provenance: drafted
   asks_user: false
@@ -387,7 +387,7 @@ uc-13-21:
 uc-13-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_gives_a_one_to_one_chat_no_title_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_gives_a_one_to_one_chat_no_title_and_asks_nobody"
   ask: "Start a one-to-one chat with Anna and call it Launch."
   provenance: drafted
   asks_user: false
@@ -401,7 +401,7 @@ uc-13-22:
 uc-13-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_refuses_a_title_that_teams_does_not_accept"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_refuses_a_title_that_teams_does_not_accept"
   ask: "Start a group chat with Anna and Tom named Launch: Phase 1."
   provenance: drafted
   asks_user: false
@@ -416,7 +416,7 @@ uc-13-23:
 uc-13-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_accepts_a_title_of_exactly_250_characters"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_accepts_a_title_of_exactly_250_characters"
   ask: "Start a group chat with Anna and Tom with this title: a title of 250 characters."
   provenance: drafted
   asks_user: true
@@ -431,7 +431,7 @@ uc-13-24:
 uc-13-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_removes_nobody_who_is_not_a_member"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_removes_nobody_who_is_not_a_member"
   ask: "Remove Tom from the Launch chat."
   provenance: drafted
   asks_user: false
@@ -446,7 +446,7 @@ uc-13-25:
 uc-13-26:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_changes_only_a_meeting_that_mia_organizes"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_changes_only_a_meeting_that_mia_organizes"
   ask: "Move the online meeting Design review to 15:00 for 30 minutes."
   provenance: drafted
   asks_user: false
@@ -461,7 +461,7 @@ uc-13-26:
 uc-13-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_refuses_a_meeting_that_ends_before_it_starts_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_refuses_a_meeting_that_ends_before_it_starts_and_asks_nobody"
   ask: "Create an online meeting for tomorrow from 14:00 to 13:00 with Anna."
   provenance: drafted
   asks_user: false
@@ -476,7 +476,7 @@ uc-13-27:
 uc-13-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_says_the_attendance_is_not_ready_for_a_meeting_that_just_ended"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_says_the_attendance_is_not_ready_for_a_meeting_that_just_ended"
   ask: "Who attended my Design review?"
   provenance: drafted
   asks_user: false
@@ -490,7 +490,7 @@ uc-13-28:
 uc-13-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_says_that_a_meeting_has_no_attendance_report_hours_after_it_ended"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatAndAMeetingThatTeamsAccepts::test_it_says_that_a_meeting_has_no_attendance_report_hours_after_it_ended"
   ask: "Who attended my Design review?"
   provenance: drafted
   asks_user: false
@@ -504,7 +504,7 @@ uc-13-29:
 uc-13-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_names_the_guest_that_a_new_attendee_list_would_remove"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_names_the_guest_that_a_new_attendee_list_would_remove"
   ask: "Add Priya to the online meeting Design review."
   provenance: drafted
   asks_user: true
@@ -523,7 +523,7 @@ uc-13-30:
 uc-13-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_changes_nothing_when_mia_declines"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_changes_nothing_when_mia_declines"
   ask: "Start a group chat named Launch with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -534,7 +534,7 @@ uc-13-31:
 uc-13-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_changes_nothing_when_the_chat_program_answers_the_question_with_an_error"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestNothingChangesUnlessMiaClearlyAgrees::test_it_changes_nothing_when_the_chat_program_answers_the_question_with_an_error"
   ask: "Add Priya to the Launch chat."
   provenance: drafted
   asks_user: true
@@ -545,17 +545,17 @@ uc-13-32:
 uc-13-33:
   status: working
   tests:
-    - "tests/tools/test_teams_create_chat.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_other_members_creates_nothing"
-    - "tests/tools/test_teams_create_chat.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_topic_creates_nothing"
-    - "tests/tools/test_teams_add_chat_member.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_user_another_chat_and_another_history"
-    - "tests/tools/test_teams_add_chat_member.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_addition_adds_nobody"
-    - "tests/tools/test_teams_remove_chat_member.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_membership_removes_nobody"
-    - "tests/e2e/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
-    - "tests/tools/test_teams_create_meeting.py::TestThePersonBeforeTheCreate::test_the_question_is_bound_to_the_external_id_that_graph_receives"
-    - "tests/tools/test_teams_create_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_meeting_creates_nothing"
-    - "tests/tools/test_teams_update_meeting.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_every_change"
-    - "tests/tools/test_teams_update_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_change_changes_nothing"
-    - "tests/tools/test_teams_delete_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_meeting_deletes_nothing"
+    - "tests/integration/test_teams_create_chat.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_other_members_creates_nothing"
+    - "tests/integration/test_teams_create_chat.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_topic_creates_nothing"
+    - "tests/integration/test_teams_add_chat_member.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_another_user_another_chat_and_another_history"
+    - "tests/integration/test_teams_add_chat_member.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_addition_adds_nobody"
+    - "tests/integration/test_teams_remove_chat_member.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_membership_removes_nobody"
+    - "tests/integration/test_era_contract.py::test_a_tool_that_asks_writes_only_under_the_answer_it_asked_for"
+    - "tests/integration/test_teams_create_meeting.py::TestThePersonBeforeTheCreate::test_the_question_is_bound_to_the_external_id_that_graph_receives"
+    - "tests/integration/test_teams_create_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_meeting_creates_nothing"
+    - "tests/integration/test_teams_update_meeting.py::TestThePersonBeforeTheChange::test_the_binding_differs_for_every_change"
+    - "tests/integration/test_teams_update_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_change_changes_nothing"
+    - "tests/integration/test_teams_delete_meeting.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_meeting_deletes_nothing"
   ask: "Remove Tom from the Launch chat."
   provenance: drafted
   asks_user: true
@@ -584,7 +584,7 @@ uc-13-39:
     - teams_read_meeting-attendance
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_names_each_attendee_with_the_time_that_person_attended"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAnOnlineMeetingBelongsToItsOrganizer::test_it_names_each_attendee_with_the_time_that_person_attended"
   ask: "Who attended my Design review, and for how long?"
   provenance: drafted
   asks_user: false
@@ -598,7 +598,7 @@ uc-13-39:
 uc-13-40:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatProgramOfTheNewerKind::test_it_makes_an_approved_change_once_when_the_question_comes_in_the_answer"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatProgramOfTheNewerKind::test_it_makes_an_approved_change_once_when_the_question_comes_in_the_answer"
   ask: "Create an online meeting for tomorrow at 14:00 with Anna."
   provenance: drafted
   asks_user: true
@@ -609,7 +609,7 @@ uc-13-40:
 uc-13-41:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAChatProgramOfTheNewerKind::test_it_changes_nothing_unless_the_answer_is_the_word_for_yes"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAChatProgramOfTheNewerKind::test_it_changes_nothing_unless_the_answer_is_the_word_for_yes"
   ask: "Add Priya to the Launch chat."
   provenance: drafted
   asks_user: true
@@ -620,7 +620,7 @@ uc-13-41:
 uc-13-42:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_meeting_reference_that_is_not_one_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_meeting_reference_that_is_not_one_and_asks_nobody"
   ask: "Move the online meeting Design review to 15:00 for 30 minutes."
   provenance: drafted
   asks_user: false
@@ -631,7 +631,7 @@ uc-13-42:
 uc-13-43:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_change_that_teams_cannot_take_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_change_that_teams_cannot_take_and_asks_nobody"
   ask: "Change the online meeting Design review."
   provenance: drafted
   asks_user: false
@@ -643,7 +643,7 @@ uc-13-43:
 uc-13-44:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_new_meeting_whose_time_teams_cannot_read_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_new_meeting_whose_time_teams_cannot_read_and_asks_nobody"
   ask: "Create an online meeting for tomorrow at 14:00 with Anna."
   provenance: drafted
   asks_user: false
@@ -658,7 +658,7 @@ uc-13-44:
 uc-13-45:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_does_not_delete_or_read_a_meeting_that_microsoft_does_not_show"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_does_not_delete_or_read_a_meeting_that_microsoft_does_not_show"
   ask: "Delete the online meeting Design review."
   provenance: drafted
   asks_user: false
@@ -671,7 +671,7 @@ uc-13-45:
 uc-13-48:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_one_to_one_chat_with_two_people_and_asks_nobody"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_refuses_a_one_to_one_chat_with_two_people_and_asks_nobody"
   ask: "Start a one-to-one chat with Anna and Tom."
   provenance: drafted
   asks_user: false
@@ -684,7 +684,7 @@ uc-13-48:
 uc-13-46:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_names_a_member_without_a_name_as_such_in_the_question"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_names_a_member_without_a_name_as_such_in_the_question"
   ask: "Remove the member with no name from the Launch chat."
   provenance: drafted
   asks_user: true
@@ -698,7 +698,7 @@ uc-13-46:
 uc-13-49:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_gives_no_attendee_list_when_microsoft_answers_the_change_without_one"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_gives_no_attendee_list_when_microsoft_answers_the_change_without_one"
   ask: "Rename the online meeting Design review to Design review 2."
   provenance: drafted
   asks_user: true
@@ -711,7 +711,7 @@ uc-13-49:
 uc-13-50:
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_names_a_chat_without_a_title_by_its_members_in_the_question"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_names_a_chat_without_a_title_by_its_members_in_the_question"
   ask: "Add Priya to the chat with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -727,7 +727,7 @@ uc-13-47:
     - teams_create_chat-one-to-one
   status: working
   tests:
-    - "tests/tools/scenarios/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_creates_a_one_to_one_chat_after_mia_approves_it"
+    - "tests/integration/test_13_run_teams_chats_and_online_meetings.py::TestWhatTeamsDoesNotTakeAsAChange::test_it_creates_a_one_to_one_chat_after_mia_approves_it"
   ask: "Start a one-to-one chat with Tom."
   provenance: drafted
   asks_user: true

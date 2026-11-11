@@ -1,7 +1,7 @@
 uc-03-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_lists_the_meetings_of_a_day_with_their_times_in_zurich"
+    - "tests/integration/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_lists_the_meetings_of_a_day_with_their_times_in_zurich"
   provenance: observed
   evidence: outlook_list_events alone in 5 sessions
   ask: "What is on my calendar tomorrow?"
@@ -13,7 +13,7 @@ uc-03-01:
 uc-03-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_lists_a_moved_date_of_a_weekly_meeting_on_its_own_day_only"
+    - "tests/integration/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_lists_a_moved_date_of_a_weekly_meeting_on_its_own_day_only"
   provenance: drafted
   ask: "What do I have on my calendar next week?"
   asks_user: false
@@ -24,7 +24,7 @@ uc-03-02:
 uc-03-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_gives_overlapping_meetings_times_that_show_the_clash"
+    - "tests/integration/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_gives_overlapping_meetings_times_that_show_the_clash"
   provenance: drafted
   ask: "Do I have a clash in my calendar tomorrow?"
   asks_user: false
@@ -35,7 +35,7 @@ uc-03-03:
 uc-03-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_shows_what_each_attendee_answered"
+    - "tests/integration/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_shows_what_each_attendee_answered"
   provenance: observed
   evidence: outlook_list_events then outlook_read_event 20 times, 15 of them in 2 automated sessions; 233 of 244 read_event calls sit in those 2 sessions
   ask: "Who is coming to the Launch review, and who has answered?"
@@ -49,8 +49,8 @@ uc-03-04:
 uc-03-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_has_no_attendee_filter_so_a_person_is_found_by_reading_the_events"
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_shows_what_each_attendee_answered"
+    - "tests/integration/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_has_no_attendee_filter_so_a_person_is_found_by_reading_the_events"
+    - "tests/integration/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_shows_what_each_attendee_answered"
   provenance: drafted
   ask: "When is my next meeting with Tom?"
   asks_user: false
@@ -67,7 +67,7 @@ uc-03-05:
 uc-03-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_opens_the_meeting_of_an_invitation_by_its_subject_with_time_and_attendees"
+    - "tests/integration/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_it_opens_the_meeting_of_an_invitation_by_its_subject_with_time_and_attendees"
   provenance: drafted
   evidence: outlook_search_mail then outlook_read_event 22 times, 21 of them in 2 automated sessions
   ask: "What are the details of the meeting in Anna's invitation mail?"
@@ -83,7 +83,7 @@ uc-03-06:
 uc-03-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_a_meeting_deleted_after_the_listing_is_reported_as_unread_and_not_as_deleted"
+    - "tests/integration/test_03_read_the_calendar.py::TestWhoIsComingAndWhereTheMeetingIs::test_a_meeting_deleted_after_the_listing_is_reported_as_unread_and_not_as_deleted"
   provenance: observed
   evidence: 11 failures in 2 automated sessions, Microsoft 404 item not found
   ask: "Give me the details of the Budget review."
@@ -99,7 +99,7 @@ uc-03-08:
     - outlook_list_events-colleague-calendar
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestASharedCalendar::test_it_lists_the_events_of_a_calendar_that_a_colleague_shared"
+    - "tests/integration/test_03_read_the_calendar.py::TestASharedCalendar::test_it_lists_the_events_of_a_calendar_that_a_colleague_shared"
   provenance: drafted
   ask: "What is on Anna's calendar tomorrow?"
   asks_user: false
@@ -113,7 +113,7 @@ uc-03-08:
 uc-03-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_it_reads_the_agenda_attached_to_a_meeting"
+    - "tests/integration/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_it_reads_the_agenda_attached_to_a_meeting"
   provenance: drafted
   ask: "What is in the agenda that is attached to the Launch review?"
   asks_user: false
@@ -129,9 +129,9 @@ uc-03-09:
 uc-03-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_refusal_of_microsoft_is_explained_and_lists_no_meeting"
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_busy_microsoft_at_every_try_asks_to_wait_30_seconds_and_not_sooner"
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_rejected_question_gives_the_reason_and_says_it_fails_again"
+    - "tests/integration/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_refusal_of_microsoft_is_explained_and_lists_no_meeting"
+    - "tests/integration/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_busy_microsoft_at_every_try_asks_to_wait_30_seconds_and_not_sooner"
+    - "tests/integration/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_rejected_question_gives_the_reason_and_says_it_fails_again"
   provenance: drafted
   ask: "What is on my calendar tomorrow?"
   asks_user: false
@@ -143,7 +143,7 @@ uc-03-10:
 uc-03-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_calendar_that_cannot_be_read_to_the_end_is_not_reported_as_empty"
+    - "tests/integration/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_a_calendar_that_cannot_be_read_to_the_end_is_not_reported_as_empty"
   provenance: drafted
   ask: "What is on my calendar tomorrow?"
   asks_user: false
@@ -157,7 +157,7 @@ uc-03-11:
 uc-03-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestASharedCalendar::test_a_calendar_that_is_no_longer_shared_is_reported_as_unreadable_not_as_empty"
+    - "tests/integration/test_03_read_the_calendar.py::TestASharedCalendar::test_a_calendar_that_is_no_longer_shared_is_reported_as_unreadable_not_as_empty"
   provenance: drafted
   ask: "What is on Anna's calendar tomorrow?"
   asks_user: false
@@ -172,7 +172,7 @@ uc-03-12:
 uc-03-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAWindowNamedBackwards"
+    - "tests/integration/test_03_read_the_calendar.py::TestAWindowNamedBackwards"
   provenance: drafted
   ask: "What is on my calendar from Friday back to Wednesday next week?"
   asks_user: false
@@ -187,7 +187,7 @@ uc-03-13:
 uc-03-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestADayOrAWeek::test_a_week_of_40_meetings_is_cut_at_the_default_limit_and_whole_at_a_limit_of_40"
+    - "tests/integration/test_03_read_the_calendar.py::TestADayOrAWeek::test_a_week_of_40_meetings_is_cut_at_the_default_limit_and_whole_at_a_limit_of_40"
   provenance: drafted
   ask: "What is on my calendar next week?"
   asks_user: false
@@ -202,7 +202,7 @@ uc-03-14:
 uc-03-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_it_names_an_attachment_it_cannot_give_and_shows_no_content_of_it"
+    - "tests/integration/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_it_names_an_attachment_it_cannot_give_and_shows_no_content_of_it"
   provenance: drafted
   ask: "What is in the file that is attached to the Launch review?"
   asks_user: false
@@ -218,7 +218,7 @@ uc-03-15:
 uc-03-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_it_reads_a_file_that_microsoft_reports_at_exactly_the_size_limit"
+    - "tests/integration/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_it_reads_a_file_that_microsoft_reports_at_exactly_the_size_limit"
   provenance: drafted
   ask: "What is in the agenda that is attached to the Launch review?"
   asks_user: false
@@ -234,7 +234,7 @@ uc-03-16:
 uc-03-17:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_an_attachment_that_arrives_empty_is_reported_as_a_fault_of_microsoft"
+    - "tests/integration/test_03_read_the_calendar.py::TestAnAttachmentOfAMeeting::test_an_attachment_that_arrives_empty_is_reported_as_a_fault_of_microsoft"
   provenance: drafted
   ask: "What is in the agenda that is attached to the Launch review?"
   asks_user: false
@@ -265,7 +265,7 @@ uc-03-18:
 uc-03-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_lists_a_day_with_nothing_on_as_empty_and_complete"
+    - "tests/integration/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_lists_a_day_with_nothing_on_as_empty_and_complete"
   provenance: drafted
   ask: "What is on my calendar tomorrow?"
   asks_user: false
@@ -290,7 +290,7 @@ uc-03-20:
 uc-03-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_one_busy_answer_is_waited_out_inside_the_same_call"
+    - "tests/integration/test_03_read_the_calendar.py::TestMicrosoftCannotReadTheCalendar::test_one_busy_answer_is_waited_out_inside_the_same_call"
   provenance: drafted
   ask: "What is on my calendar tomorrow?"
   asks_user: false
@@ -302,7 +302,7 @@ uc-03-21:
 uc-03-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAMeetingThatRepeats::test_it_lists_the_dates_of_a_series_inside_the_window"
+    - "tests/integration/test_03_read_the_calendar.py::TestAMeetingThatRepeats::test_it_lists_the_dates_of_a_series_inside_the_window"
   provenance: drafted
   ask: "On which dates does the Team sync take place in the next six weeks?"
   asks_user: false
@@ -317,7 +317,7 @@ uc-03-22:
 uc-03-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAMeetingThatRepeats::test_a_meeting_that_does_not_repeat_is_refused_with_the_way_to_read_it"
+    - "tests/integration/test_03_read_the_calendar.py::TestAMeetingThatRepeats::test_a_meeting_that_does_not_repeat_is_refused_with_the_way_to_read_it"
   provenance: drafted
   ask: "On which dates does the Budget review take place?"
   asks_user: false
@@ -335,7 +335,7 @@ uc-03-23:
 uc-03-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestAMeetingThatRepeats::test_a_series_that_cannot_be_read_is_reported_as_unread_and_not_as_ended"
+    - "tests/integration/test_03_read_the_calendar.py::TestAMeetingThatRepeats::test_a_series_that_cannot_be_read_is_reported_as_unread_and_not_as_ended"
   provenance: drafted
   ask: "On which dates does the Team sync take place in the next six weeks?"
   asks_user: false
@@ -351,7 +351,7 @@ uc-03-24:
 uc-03-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestRemindersAndGroups::test_it_lists_a_reminder_with_the_time_when_it_fires"
+    - "tests/integration/test_03_read_the_calendar.py::TestRemindersAndGroups::test_it_lists_a_reminder_with_the_time_when_it_fires"
   provenance: drafted
   ask: "Which reminders do I have this week?"
   asks_user: false
@@ -375,7 +375,7 @@ uc-03-27:
     - outlook_list_calendar_groups-with-shared
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestRemindersAndGroups::test_it_shows_the_calendars_by_group_and_marks_the_own_ones"
+    - "tests/integration/test_03_read_the_calendar.py::TestRemindersAndGroups::test_it_shows_the_calendars_by_group_and_marks_the_own_ones"
   provenance: drafted
   ask: "How are my calendars grouped?"
   asks_user: false
@@ -386,7 +386,7 @@ uc-03-27:
 uc-03-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_tells_a_meeting_that_mia_organizes_from_an_invitation"
+    - "tests/integration/test_03_read_the_calendar.py::TestADayOrAWeek::test_it_tells_a_meeting_that_mia_organizes_from_an_invitation"
   provenance: drafted
   evidence: outlook_list_events right after get_me in 4 sessions; the logs hold no arguments, so the reason for get_me is not known
   ask: "Which of my meetings tomorrow do I organize myself?"
@@ -401,7 +401,7 @@ uc-03-28:
 uc-03-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestALinkThatTheAssistantMadeUp::test_it_reads_nothing_and_says_which_link_to_use"
+    - "tests/integration/test_03_read_the_calendar.py::TestALinkThatTheAssistantMadeUp::test_it_reads_nothing_and_says_which_link_to_use"
   provenance: drafted
   ask: "Open the Launch review."
   asks_user: false
@@ -414,7 +414,7 @@ uc-03-29:
 uc-03-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestALinkThatTheAssistantMadeUp::test_a_time_zone_that_does_not_exist_is_not_guessed"
+    - "tests/integration/test_03_read_the_calendar.py::TestALinkThatTheAssistantMadeUp::test_a_time_zone_that_does_not_exist_is_not_guessed"
   provenance: drafted
   ask: "What is on my calendar tomorrow, in Atlantis time?"
   asks_user: false
@@ -426,8 +426,8 @@ uc-03-30:
 uc-03-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_it_shows_the_weekly_rule_and_how_it_ends"
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_a_meeting_that_does_not_repeat_shows_no_rule"
+    - "tests/integration/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_it_shows_the_weekly_rule_and_how_it_ends"
+    - "tests/integration/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_a_meeting_that_does_not_repeat_shows_no_rule"
   provenance: drafted
   ask: "How often does the Weekly design sync take place?"
   asks_user: false
@@ -440,7 +440,7 @@ uc-03-31:
 uc-03-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_one_date_of_a_series_is_sent_to_the_series_and_not_listed"
+    - "tests/integration/test_03_read_the_calendar.py::TestTheRepeatRuleOfAMeeting::test_one_date_of_a_series_is_sent_to_the_series_and_not_listed"
   provenance: drafted
   ask: "On which dates does the Team sync take place?"
   asks_user: false
@@ -454,7 +454,7 @@ uc-03-32:
 uc-03-33:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestMeetingsThatWereCancelled"
+    - "tests/integration/test_03_read_the_calendar.py::TestMeetingsThatWereCancelled"
   provenance: drafted
   ask: "Which meetings do I have this week that are not cancelled?"
   asks_user: false
@@ -466,7 +466,7 @@ uc-03-33:
 uc-03-34:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestATimeThatMicrosoftGivesInAStrangeForm"
+    - "tests/integration/test_03_read_the_calendar.py::TestATimeThatMicrosoftGivesInAStrangeForm"
   provenance: drafted
   ask: "Open the Team sync."
   asks_user: false
@@ -479,7 +479,7 @@ uc-03-34:
 uc-03-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_03_read_the_calendar.py::TestACalendarWithNoOwner"
+    - "tests/integration/test_03_read_the_calendar.py::TestACalendarWithNoOwner"
   provenance: drafted
   ask: "Which calendars do I have?"
   asks_user: false
