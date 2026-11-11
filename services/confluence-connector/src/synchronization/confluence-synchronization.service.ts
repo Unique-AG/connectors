@@ -145,7 +145,7 @@ export class ConfluenceSynchronizationService {
     } finally {
       tenant.isScanning = false;
       this.metrics.setSyncPhase(SyncPhase.Idle);
-      this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
+      this.metrics.recordSyncResult(elapsedSeconds(startTime), syncResult);
     }
   }
 

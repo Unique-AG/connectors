@@ -1,7 +1,7 @@
 import { createMock, type DeepMocked } from '@golevelup/ts-vitest';
 import type { Counter, Histogram, ObservableGauge } from '@opentelemetry/api';
 import type { MetricService } from 'nestjs-otel';
-import { describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { createMockTenant } from '../../synchronization/__mocks__/sync.fixtures';
 import { tenantStorage } from '../../tenant/tenant-context.storage';
 import { Metrics, SyncPhase } from '../metrics.service';
@@ -48,33 +48,81 @@ function makeMetricService(): {
 const tenant = createMockTenant('test-tenant');
 
 describe('Metrics', () => {
-  describe('recordSyncDuration', () => {
-    it('records duration with tenant and result labels', () => {
-      const { metricService, histograms } = makeMetricService();
+  describe('recordSyncResult', () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('records duration and counts the sync with tenant and result labels', () => {
+      const { metricService, histograms, counters } = makeMetricService();
       const metrics = new Metrics(metricService);
 
       tenantStorage.run(tenant, () => {
-        metrics.recordSyncDuration(1.5, 'success');
+        metrics.recordSyncResult(0.3, 'failure');
       });
 
-      expect(histograms.get('cfc_sync_duration_seconds')?.record).toHaveBeenCalledWith(1.5, {
+      const labels = { tenant: 'test-tenant', result: 'failure' };
+      expect(histograms.get('cfc_sync_duration_seconds')?.record).toHaveBeenCalledWith(0.3, labels);
+      expect(counters.get('cfc_syncs_total')?.add).toHaveBeenCalledWith(1, labels);
+    });
+
+    it('reports the time of the last successful sync', () => {
+      vi.useFakeTimers({ now: new Date('2026-11-11T10:00:00Z') });
+      const { metricService, gauges } = makeMetricService();
+      const metrics = new Metrics(metricService);
+
+      tenantStorage.run(tenant, () => {
+        metrics.recordSyncResult(1.5, 'success');
+      });
+      vi.setSystemTime(new Date('2026-11-11T11:00:00Z'));
+      tenantStorage.run(tenant, () => {
+        metrics.recordSyncResult(1.5, 'failure');
+      });
+
+      const gauge = getOrThrow(gauges, 'cfc_last_successful_sync_timestamp_seconds');
+      // biome-ignore lint/style/noNonNullAssertion: The gauge registers its callback in the constructor
+      const callback = gauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
+      const observe = vi.fn();
+      callback({ observe });
+
+      expect(observe).toHaveBeenCalledExactlyOnceWith(Date.parse('2026-11-11T10:00:00Z') / 1000, {
         tenant: 'test-tenant',
-        result: 'success',
       });
     });
 
-    it('records failure result label', () => {
-      const { metricService, histograms } = makeMetricService();
+    it('reports no last successful sync before the first success', () => {
+      const { metricService, gauges } = makeMetricService();
       const metrics = new Metrics(metricService);
 
       tenantStorage.run(tenant, () => {
-        metrics.recordSyncDuration(0.3, 'failure');
+        metrics.recordSyncResult(0.3, 'failure');
       });
 
-      expect(histograms.get('cfc_sync_duration_seconds')?.record).toHaveBeenCalledWith(0.3, {
-        tenant: 'test-tenant',
-        result: 'failure',
+      const gauge = getOrThrow(gauges, 'cfc_last_successful_sync_timestamp_seconds');
+      // biome-ignore lint/style/noNonNullAssertion: The gauge registers its callback in the constructor
+      const callback = gauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
+      const observe = vi.fn();
+      callback({ observe });
+
+      expect(observe).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('recordCleanupResult', () => {
+    it('records duration and counts the cleanup run with tenant and result labels', () => {
+      const { metricService, histograms, counters } = makeMetricService();
+      const metrics = new Metrics(metricService);
+
+      tenantStorage.run(tenant, () => {
+        metrics.recordCleanupResult(4, 'success');
       });
+
+      const labels = { tenant: 'test-tenant', result: 'success' };
+      expect(histograms.get('cfc_cleanup_duration_seconds')?.record).toHaveBeenCalledWith(
+        4,
+        labels,
+      );
+      expect(counters.get('cfc_tenant_cleanups_total')?.add).toHaveBeenCalledWith(1, labels);
     });
   });
 
@@ -290,6 +338,10 @@ describe('Metrics', () => {
         metrics.initializeCounters();
       });
 
+      const syncs = getOrThrow(counters, 'cfc_syncs_total');
+      expect(syncs.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'success' });
+      expect(syncs.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'failure' });
+
       const pages = getOrThrow(counters, 'cfc_pages_processed_total');
       expect(pages.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'success' });
       expect(pages.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'failure' });
@@ -334,6 +386,10 @@ describe('Metrics', () => {
       tenantStorage.run(tenant, () => {
         metrics.initializeCleanupCounters();
       });
+
+      const runs = getOrThrow(counters, 'cfc_tenant_cleanups_total');
+      expect(runs.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'success' });
+      expect(runs.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'failure' });
 
       const content = getOrThrow(counters, 'cfc_cleanup_content_deleted_total');
       expect(content.add).toHaveBeenCalledWith(0, { tenant: 'test-tenant', result: 'success' });

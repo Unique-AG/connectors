@@ -431,6 +431,8 @@ Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique pl
 | Metric                                    | Type      | Labels            | Description                                              |
 |-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
 | `cfc_sync_duration_seconds`               | Histogram | `tenant`, `result` | Duration of a full synchronization cycle per tenant     |
+| `cfc_syncs_total`                         | Counter   | `tenant`, `result` | Finished sync cycles. Starts at 0 for both results, so the first sync after a pod start is counted |
+| `cfc_last_successful_sync_timestamp_seconds` | Gauge  | `tenant`          | Unix time of the last sync cycle without an error. Absent until the pod's first successful sync |
 | `cfc_scan_duration_seconds`               | Histogram | `tenant`          | Duration of the page discovery (scan) phase              |
 | `cfc_attachment_upload_duration_seconds`   | Histogram | `tenant`          | Duration of a single attachment upload to Unique         |
 
@@ -452,6 +454,7 @@ Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 2
 | Metric                                    | Type      | Labels            | Description                                              |
 |-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
 | `cfc_cleanup_duration_seconds`            | Histogram | `tenant`, `result` | Duration of a deleted tenant content cleanup             |
+| `cfc_tenant_cleanups_total`               | Counter   | `tenant`, `result` | Finished deleted tenant cleanup runs. Starts at 0 for both results |
 | `cfc_cleanup_content_deleted_total`       | Counter   | `tenant`, `result` | Content items deleted during tenant cleanup              |
 | `cfc_cleanup_scopes_deleted_total`        | Counter   | `tenant`, `result` | Scopes deleted during tenant cleanup                     |
 
