@@ -140,7 +140,9 @@ class OperationClient:
         body = route.request_body
         if not content and body and body.required and "application/json" in body.content_schema:
             content = b"{}"
-            headers = httpx2.Headers({**headers, "Content-Type": "application/json"})
+            headers = httpx2.Headers(headers)
+            headers.pop("Content-Length", None)
+            headers["Content-Type"] = "application/json"
         # Built again through the client so its default headers are merged in.
         request = self._http.build_request(
             built.method,
