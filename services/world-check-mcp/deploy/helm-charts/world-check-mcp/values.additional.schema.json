@@ -4,5 +4,9 @@
   "title": "World Check MCP Values",
   "description": "Values for the World Check MCP Helm chart. A Python FastMCP server on the base chart. Exposure uses base chart Gateway API routes (no custom Ingress).",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "envVars": {
+      "description": "Additional environment variables in native Kubernetes syntax (e.g. valueFrom secretKeyRef). Required: ELICITATION_REQUEST_STATE_KEYS, a JSON list of keys of at least 32 characters from a secret, shared by every replica so an approval answered on another pod opens. The first key seals, every key opens, so a key rotates by prepending the new one. Also set the secrets listed in .env.example."
+    }
+  }
 }

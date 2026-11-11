@@ -22,7 +22,9 @@ env:
 # Set per deployment in the overlay. The app refuses to start without them.
 # - MCP_BASE_URL: the public https origin, matching routes.hostname
 # - every secret in .env.example, from a secret through envVars: UPSTREAM_API_KEY,
-#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET, ZITADEL_JWT_SIGNING_KEY
+#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET, ZITADEL_JWT_SIGNING_KEY,
+#   ELICITATION_REQUEST_STATE_KEYS (a JSON list shared by every replica, or an approval answered
+#   on another pod fails)
 envVars: []
 
 image:
