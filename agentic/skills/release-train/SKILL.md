@@ -70,7 +70,8 @@ Give the user each pair with the run URL. Check the result when the user asks fo
 
 If a run fails, read the failed step before you do anything else:
 
-- The failure is before the step that pushes the image: start a new run. Do not re-run the old one.
+- The step `Look for an existing image` reports that the image comes from another commit: do not start a new run. Every run fails the same way until someone deletes the tag by hand. Tell the user.
+- Another failure before the step that pushes the image: start a new run. Do not re-run the old one.
 - The image push worked, but a later step failed (for example the push of the branch `dev/<service>/main`): do not start a new run. A new run can choose the same version. It stops when `main` moved, because the revision of the existing image differs. Tell the user which step failed. The user decides how to fix the tag or the branch.
 
 ## Step 4 - Find what each deployment needs
@@ -86,7 +87,7 @@ The script compares `main` with the tag of the last release. It prints six group
 | Group | What to do |
 |---|---|
 | `config` | List each new, renamed, or removed environment variable. A change that keeps the keys and the defaults needs no action. |
-| `added lines that read the environment` | Find the settings class behind each line. Read its default values and its prefix. If the class is new, add its variables to the list of the `config` group. |
+| `added lines that read the environment` | Find the settings class behind each line. Read its default values and its prefix. If the class is new, add its variables to the list of the `config` group. A direct read, such as `os.getenv("NAME")`, has no class. Add `NAME` to the list. |
 | `chart` | Read the diff of `values.yaml` and `values.schema.json`. A chart ignores an overlay key that it no longer reads, and ArgoCD still shows green. Copy each new, renamed, or removed key to the overlay of each cluster. Network policy defaults matter only where the overlay turns `networkPolicy` on. |
 | `terraform` | Do Step 5 of `bump-service`. A change that adds a Graph scope must reach the infrastructure repository before the overlay uses the scope. |
 | `migrations` | The migration runs at start. No overlay change is needed. Tell the user about it. |
