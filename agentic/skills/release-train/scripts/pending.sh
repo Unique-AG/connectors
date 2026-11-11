@@ -10,7 +10,7 @@ gh pr list --repo Unique-AG/connectors --state open --label "autorelease: pendin
   while IFS=$'\t' read -r number branch title; do
     service=${branch##*--components--}
     pending=${title##* }
-    if [[ ! $service =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
+    if [[ $branch != *--components--* || ! $service =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
       printf '%s\t%s\t%s\t-\tno\tbranch names no component\n' "$number" "$branch" "$pending"
       continue
     fi
@@ -20,9 +20,13 @@ gh pr list --repo Unique-AG/connectors --state open --label "autorelease: pendin
     if ! grep -qx "$service" <<< "$options"; then
       dispatch=no
       reason="not in the service list of the Dev Build workflow"
-    elif ! git cat-file -e "origin/main:services/$service/deploy/helm-charts/$service/Chart.yaml" 2> /dev/null; then
+    elif [ "$last" = "-" ]; then
       dispatch=no
-      reason="no Helm chart on main"
+      reason="no version in the manifest"
+    elif ! git cat-file -e "origin/main:services/$service/deploy/helm-charts/$service/Chart.yaml" 2> /dev/null ||
+      ! git cat-file -e "origin/main:services/$service/deploy/Dockerfile" 2> /dev/null; then
+      dispatch=no
+      reason="no Helm chart or no Dockerfile on main"
     fi
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$number" "$service" "$pending" "$last" "$dispatch" "$reason"
   done

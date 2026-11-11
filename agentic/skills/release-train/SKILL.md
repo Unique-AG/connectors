@@ -48,19 +48,30 @@ Ask the user to approve the list. Do not go to Step 3 until the user approves it
 
 ## Step 3 - Start the dev builds
 
-For each approved service, run:
+Start one service at a time. A run does not show its service in the run list, so the order is the only link between a service and a run. Do not start a build while another person starts one.
 
-```bash
-gh workflow run release-dev.yaml --repo Unique-AG/connectors --ref main -f service=<service>
-```
+For each approved service:
 
-Wait 20 seconds. Then make sure that one new run exists for each service:
+1. Read the newest run ID:
 
-```bash
-gh run list --repo Unique-AG/connectors --workflow release-dev.yaml --limit <count> --json databaseId,status,conclusion,createdAt
-```
+   ```bash
+   gh run list --repo Unique-AG/connectors --workflow release-dev.yaml --event workflow_dispatch --limit 1 --json databaseId --jq '.[0].databaseId // 0'
+   ```
 
-Give the user the run URLs. If a run fails, start a new run. Do not re-run the old one. Check the result when the user asks for it.
+2. Start the build:
+
+   ```bash
+   gh workflow run release-dev.yaml --repo Unique-AG/connectors --ref main -f service=<service>
+   ```
+
+3. Wait until the same query returns a larger ID. That ID is the run of this service. Write down the pair of service and run ID.
+
+Give the user each pair with the run URL. Check the result when the user asks for it.
+
+If a run fails, read the failed step before you do anything else:
+
+- The failure is before the step that pushes the image: start a new run. Do not re-run the old one.
+- The image push worked, but a later step failed (for example the push of the branch `dev/<service>/main`): do not start a new run. A new run can choose the same version. It stops when `main` moved, because the revision of the existing image differs. Tell the user which step failed. The user decides how to fix the tag or the branch.
 
 ## Step 4 - Find what each deployment needs
 
