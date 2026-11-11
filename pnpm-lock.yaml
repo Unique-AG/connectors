@@ -182,8 +182,8 @@ catalogs:
       specifier: 5.9.3
       version: 5.9.3
     undici:
-      specifier: 8.12.3
-      version: 8.12.3
+      specifier: 8.12.4
+      version: 8.12.4
     unplugin-swc:
       specifier: 2.0.0
       version: 2.0.0
@@ -530,7 +530,7 @@ importers:
         version: 2.58.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
     devDependencies:
       '@nestjs/common':
         specifier: 'catalog:'
@@ -582,7 +582,7 @@ importers:
         version: 2.58.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -731,7 +731,7 @@ importers:
         version: 1.2.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -861,7 +861,7 @@ importers:
         version: 1.2.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1066,7 +1066,7 @@ importers:
         version: 1.2.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
       windows-iana:
         specifier: 5.1.0
         version: 5.1.0
@@ -1235,7 +1235,7 @@ importers:
         version: 0.3.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -1558,7 +1558,7 @@ importers:
         version: 1.2.0
       undici:
         specifier: 'catalog:'
-        version: 8.12.3
+        version: 8.12.4
       zod:
         specifier: 'catalog:'
         version: 4.6.7
@@ -6488,8 +6488,8 @@ packages:
   undici-types@8.9.0:
     resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
 
-  undici@8.12.3:
-    resolution: {integrity: sha512-+fdndUTwBP86cVjihTp21hZHo7d6oj1c/47XPA3lL8mM0XHs+C4EkcjmgRsFnFk2f/UONGDy9ItBItmXsLOQHw==}
+  undici@8.12.4:
+    resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
     engines: {node: '>=22.19.0'}
 
   universalify@2.0.1:
@@ -11599,7 +11599,7 @@ snapshots:
       ssh-remote-port-forward: 1.0.4
       tar-fs: 3.1.3
       tmp: 0.2.7
-      undici: 8.12.3
+      undici: 8.12.4
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
@@ -11723,7 +11723,7 @@ snapshots:
 
   undici-types@8.9.0: {}
 
-  undici@8.12.3: {}
+  undici@8.12.4: {}
 
   universalify@2.0.1: {}
 
