@@ -145,19 +145,21 @@ prometheus:
       alert: ConfluenceConnectorUniqueAPIErrors
       annotations:
         summary: "Confluence Connector Unique API errors detected"
-        description: "More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 30 minutes. Current error rate: {{ $value | humanizePercentage }}."
+        description: "More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ $value | humanizePercentage }}."
         runbook: |
           1. Inspect application logs for specific error messages
           2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
-      # Requests only happen during a sync, so a 30m window keeps a failed sync visible long enough
-      # for `for` to pass, at any sync interval.
+      # Requests only happen during a sync. The 75m window is longer than the hourly sync interval,
+      # so an error that repeats on every sync keeps the alert firing instead of resolving between
+      # syncs. The error counter is created by the first failed request, and rate() does not count
+      # that first sample, so a single failed sync right after a pod start does not fire this alert.
       expr: |
         (
-          sum by (namespace) (rate(confluence_connector_unique_api_errors_total[30m]))
+          sum by (namespace) (rate(confluence_connector_unique_api_errors_total[75m]))
           /
-          sum by (namespace) (rate(confluence_connector_unique_api_requests_total[30m]))
+          sum by (namespace) (rate(confluence_connector_unique_api_requests_total[75m]))
         ) > 0.01
       for: 5m
       labels:
