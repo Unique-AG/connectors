@@ -498,6 +498,13 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | Alert | Fires when | `for` | Severity |
 |---|---|---|---|
 | `ConfluenceConnectorUniqueAPIErrors` | More than 1% of the requests to the Unique API (GraphQL and REST) failed in the last 75 minutes | `5m` | `warning` |
+| `ConfluenceConnectorSyncFailing` | Every sync of a tenant in the last 3 hours failed | `15m` | `critical` |
+| `ConfluenceConnectorSyncDegraded` | More than half of a tenant's syncs in the last 6 hours failed, and at least one in the last 3 hours succeeded | `15m` | `warning` |
+| `ConfluenceConnectorSyncStuck` | A sync has run for more than 6 hours. Later syncs of the tenant are skipped meanwhile | `6h` | `warning` |
+| `ConfluenceConnectorContentFailures` | Pages, attachments or deletions fail on every sync for 2 hours, while the syncs themselves finish | `2h` | `warning` |
+| `ConfluenceConnectorTenantCleanupFailing` | Every cleanup run of a tenant with status `deleted` in the last 3 hours failed | `15m` | `warning` |
+
+The sync alerts expect syncs that start at least hourly and finish within the interval. For slower schedules, widen the windows so each holds at least two sync outcomes.
 
 Requests to Unique only happen during a sync, so the 75-minute window must be longer than the sync interval (`scanIntervalCron`). For schedules slower than hourly, override the rule's `expr` with a wider window, or the alert resolves between failing syncs.
 

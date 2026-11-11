@@ -163,8 +163,10 @@ prometheus:
       labels:
         severity: warning
         alertGroup: confluence-connector
-    # The sync rules below assume a sync interval (scanIntervalCron) of one hour or less. With a
-    # longer interval, widen the windows so each one covers at least two syncs.
+    # Each sync rule window must hold at least two sync outcomes, or one failed sync is enough to
+    # fire. The windows fit syncs that start at least hourly (scanIntervalCron) and finish within
+    # the interval. A sync that runs longer than the interval makes the scheduler skip the next
+    # start, so widen the windows for slow or infrequent syncs.
     ConfluenceConnectorSyncFailing:
       alert: ConfluenceConnectorSyncFailing
       annotations:
@@ -178,11 +180,11 @@ prometheus:
           5. Network errors: check NetworkPolicy, proxy and DNS
       expr: |
         (
-          sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count{result="failure"}[3h])) > 0
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[3h])) > 0
         )
         unless on (namespace, tenant)
         (
-          sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count{result="success"}[3h])) > 0
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="success"}[3h])) > 0
         )
       for: 15m
       labels:
@@ -196,13 +198,17 @@ prometheus:
         runbook: |
           1. Search the connector logs for "Sync failed" with this tenantName
           2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side
-      # The upper bound leaves a fully failing tenant to ConfluenceConnectorSyncFailing.
+      # The unless clause is the ConfluenceConnectorSyncFailing condition, so the two never fire together.
       expr: |
         (
-          sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count{result="failure"}[6h]))
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[6h]))
           /
-          sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count[6h]))
-        ) > 0.5 < 1
+          sum by (namespace, tenant) (increase(cfc_syncs_total[6h]))
+        ) > 0.5
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="success"}[3h])) == 0
+        )
       for: 15m
       labels:
         severity: warning
@@ -211,13 +217,13 @@ prometheus:
       alert: ConfluenceConnectorSyncStuck
       annotations:
         summary: "Confluence Connector sync of tenant {{ $labels.tenant }} has not finished for 6 hours"
-        description: "Tenant {{ $labels.tenant }} has been in sync phase {{ $labels.phase }} for 6 hours. While a sync runs, every scheduled sync of the tenant is skipped."
+        description: "A sync of tenant {{ $labels.tenant }} started more than 6 hours ago and has not finished. While a sync runs, every scheduled sync of the tenant is skipped."
         runbook: |
           1. Check the connector logs for the last progress line of this tenant
           2. A very large first sync can take this long. Check whether pages are still being ingested
           3. If nothing moves, restart the pod
       expr: |
-        max by (namespace, tenant, phase) (cfc_sync_phase{phase!="idle"}) == 1
+        max by (namespace, tenant) (cfc_sync_phase{phase!="idle"}) == 1
       for: 6h
       labels:
         severity: warning
@@ -253,11 +259,11 @@ prometheus:
           2. Check that the service user can still manage the tenant's root folder
       expr: |
         (
-          sum by (namespace, tenant) (increase(cfc_cleanup_duration_seconds_count{result="failure"}[3h])) > 0
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="failure"}[3h])) > 0
         )
         unless on (namespace, tenant)
         (
-          sum by (namespace, tenant) (increase(cfc_cleanup_duration_seconds_count{result="success"}[3h])) > 0
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="success"}[3h])) > 0
         )
       for: 15m
       labels:

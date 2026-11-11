@@ -148,7 +148,7 @@ spec:
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.description | string | `"More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ $value | humanizePercentage }}."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.runbook | string | `"1. Search the connector logs for \"Sync failed\" with this tenantName\n2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.summary | string | `"Confluence Connector sync degraded for tenant {{ $labels.tenant }}"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count{result=\"failure\"}[6h]))\n  /\n  sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count[6h]))\n) > 0.5 < 1\n"` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_syncs_total{result=\"failure\"}[6h]))\n  /\n  sum by (namespace, tenant) (increase(cfc_syncs_total[6h]))\n) > 0.5\nunless on (namespace, tenant)\n(\n  sum by (namespace, tenant) (increase(cfc_syncs_total{result=\"success\"}[3h])) == 0\n)\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.for | string | `"15m"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.labels.alertGroup | string | `"confluence-connector"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.labels.severity | string | `"warning"` |  |
@@ -156,15 +156,15 @@ spec:
 | prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.annotations.description | string | `"Every sync of tenant {{ $labels.tenant }} in the last 3 hours failed. Nothing new from Confluence reaches Unique."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.annotations.runbook | string | `"1. Search the connector logs for \"Sync failed\" with this tenantName\n2. \"Scope with id ... not found\": the root folder in Unique was deleted. Create a new one and update ingestion.scopeId\n3. \"Root scope ownership mismatch\" or \"Failed to claim root scope ownership\": another Confluence instance owns the folder\n4. 401/403 from Confluence or Zitadel: rotate the client secret\n5. Network errors: check NetworkPolicy, proxy and DNS\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.annotations.summary | string | `"Confluence Connector sync failing for tenant {{ $labels.tenant }}"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count{result=\"failure\"}[3h])) > 0\n)\nunless on (namespace, tenant)\n(\n  sum by (namespace, tenant) (increase(cfc_sync_duration_seconds_count{result=\"success\"}[3h])) > 0\n)\n"` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_syncs_total{result=\"failure\"}[3h])) > 0\n)\nunless on (namespace, tenant)\n(\n  sum by (namespace, tenant) (increase(cfc_syncs_total{result=\"success\"}[3h])) > 0\n)\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.for | string | `"15m"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.labels.alertGroup | string | `"confluence-connector"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncFailing.labels.severity | string | `"critical"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.alert | string | `"ConfluenceConnectorSyncStuck"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.description | string | `"Tenant {{ $labels.tenant }} has been in sync phase {{ $labels.phase }} for 6 hours. While a sync runs, every scheduled sync of the tenant is skipped."` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.description | string | `"A sync of tenant {{ $labels.tenant }} started more than 6 hours ago and has not finished. While a sync runs, every scheduled sync of the tenant is skipped."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.runbook | string | `"1. Check the connector logs for the last progress line of this tenant\n2. A very large first sync can take this long. Check whether pages are still being ingested\n3. If nothing moves, restart the pod\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.summary | string | `"Confluence Connector sync of tenant {{ $labels.tenant }} has not finished for 6 hours"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.expr | string | `"max by (namespace, tenant, phase) (cfc_sync_phase{phase!=\"idle\"}) == 1\n"` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.expr | string | `"max by (namespace, tenant) (cfc_sync_phase{phase!=\"idle\"}) == 1\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.for | string | `"6h"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.labels.alertGroup | string | `"confluence-connector"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.labels.severity | string | `"warning"` |  |
@@ -172,7 +172,7 @@ spec:
 | prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.annotations.description | string | `"Tenant {{ $labels.tenant }} has status deleted, and every cleanup in the last 3 hours failed. Its content stays in Unique."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.annotations.runbook | string | `"1. Search the connector logs for \"cleanup\" with this tenantName\n2. Check that the service user can still manage the tenant's root folder\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.annotations.summary | string | `"Confluence Connector cannot clean up deleted tenant {{ $labels.tenant }}"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_cleanup_duration_seconds_count{result=\"failure\"}[3h])) > 0\n)\nunless on (namespace, tenant)\n(\n  sum by (namespace, tenant) (increase(cfc_cleanup_duration_seconds_count{result=\"success\"}[3h])) > 0\n)\n"` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result=\"failure\"}[3h])) > 0\n)\nunless on (namespace, tenant)\n(\n  sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result=\"success\"}[3h])) > 0\n)\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.for | string | `"15m"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.labels.alertGroup | string | `"confluence-connector"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorTenantCleanupFailing.labels.severity | string | `"warning"` |  |
