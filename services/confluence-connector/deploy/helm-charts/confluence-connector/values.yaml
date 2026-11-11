@@ -194,7 +194,7 @@ prometheus:
       alert: ConfluenceConnectorSyncDegraded
       annotations:
         summary: "Confluence Connector sync degraded for tenant {{ $labels.tenant }}"
-        description: "More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ $value | humanizePercentage }}."
+        description: "More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ humanizePercentage $value }}."
         runbook: |
           1. Search the connector logs for "Sync failed" with this tenantName
           2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side

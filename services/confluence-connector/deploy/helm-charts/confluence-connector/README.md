@@ -145,7 +145,7 @@ spec:
 | prometheus.additionalAlerts.ConfluenceConnectorContentFailures.labels.alertGroup | string | `"confluence-connector"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorContentFailures.labels.severity | string | `"warning"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.alert | string | `"ConfluenceConnectorSyncDegraded"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.description | string | `"More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ $value | humanizePercentage }}."` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.description | string | `"More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ humanizePercentage $value }}."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.runbook | string | `"1. Search the connector logs for \"Sync failed\" with this tenantName\n2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.annotations.summary | string | `"Confluence Connector sync degraded for tenant {{ $labels.tenant }}"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncDegraded.expr | string | `"(\n  sum by (namespace, tenant) (increase(cfc_syncs_total{result=\"failure\"}[6h]))\n  /\n  sum by (namespace, tenant) (increase(cfc_syncs_total[6h]))\n) > 0.5\nunless on (namespace, tenant)\n(\n  sum by (namespace, tenant) (increase(cfc_syncs_total{result=\"success\"}[3h])) == 0\n)\n"` |  |
