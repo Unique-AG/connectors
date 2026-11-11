@@ -6,9 +6,11 @@ from pydantic import ConfigDict
 from pydantic import Field
 from pydantic import TypeAdapter
 
+from world_check_mcp.upstream.generated.vendor_requests import GetOngoingScreeningUpdatesRequest
 from world_check_mcp.upstream.generated.vendor_requests import GetResultsRequest
 from world_check_mcp.upstream.generated.vendor_requests import SearchCasesRequest
 from world_check_mcp.upstream.generated.vendor_responses import PaginationReferenceResponse
+from world_check_mcp.upstream.generated.vendor_responses import WatchlistResults
 
 
 class CaseHitWire(BaseModel):
@@ -31,6 +33,27 @@ class CaseSearchWire(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
 
     results: list[CaseHitWire] = []
+    pagination: PaginationReferenceResponse | None = None
+
+
+class OgsUpdateWire(BaseModel):
+    """An ongoing screening update row. Hand-written because the generated model requires
+    caseSystemId, and a row without it must be skipped rather than fail the whole page.
+    """
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore", populate_by_name=True)
+
+    case_id: str | None = Field(default=None, alias="caseId")
+    case_system_id: str | None = Field(default=None, alias="caseSystemId")
+    group_id: str | None = Field(default=None, alias="groupId")
+    update_date: str | None = Field(default=None, alias="updateDate")
+    watchlist_results: WatchlistResults | None = Field(default=None, alias="watchlistResults")
+
+
+class OgsUpdatesWire(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="ignore")
+
+    results: list[OgsUpdateWire] | None = None
     pagination: PaginationReferenceResponse | None = None
 
 
@@ -82,6 +105,9 @@ class ScreeningStatusWire(BaseModel):
     )
 
 
+GET_ONGOING_SCREENING_UPDATES = Operation[OgsUpdatesWire, GetOngoingScreeningUpdatesRequest](
+    "getOngoingScreeningUpdates", TypeAdapter(OgsUpdatesWire)
+)
 # getResults keeps its generated request model but a hand-written response, since the results carry
 # the passport mrzLine fields the generated model drops.
 GET_RESULTS = Operation[ResultsWire, GetResultsRequest]("getResults", TypeAdapter(ResultsWire))
