@@ -44,7 +44,7 @@ section "migrations" '/migrations/'
 section "image" '/deploy/Dockerfile$'
 printf '== added lines that read the environment\n'
 if [ -n "$files" ]; then
-  git diff -U0 "$baseline" origin/main -- $files | grep -E '^\+[^+].*(Settings\(|BaseSettings|process\.env|os\.environ|validation_alias|env_prefix)' || echo "(none)"
+  git diff -U0 "$baseline" origin/main -- $files | grep -E '^\+[^+].*(Settings\(|BaseSettings|process\.env|os\.environ|os\.getenv|validation_alias|env_prefix)' || echo "(none)"
 else
   echo "(none)"
 fi
