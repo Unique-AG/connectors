@@ -64,14 +64,29 @@ For each approved service:
    gh workflow run release-dev.yaml --repo Unique-AG/connectors --ref main -f service=<service>
    ```
 
-3. Wait until the same query returns a larger ID. Then read the job ID of `dev / plan` and its log. The log is ready when this job ends, which is a few seconds after the start. Do not use `gh run view --log`. It refuses a run that is in progress.
+3. Wait 10 seconds. List the runs with an ID above the one from step 1:
+
+   ```bash
+   gh run list --repo Unique-AG/connectors --workflow release-dev.yaml --event workflow_dispatch --limit 20 --json databaseId --jq '[.[] | select(.databaseId > <baseline>) | .databaseId]'
+   ```
+
+   Exactly one ID must appear. If two or more appear, another dispatch ran at the same time. Report all of them as unconfirmed.
+
+4. Check who started the run. The two logins must be equal:
+
+   ```bash
+   gh api repos/Unique-AG/connectors/actions/runs/<run id> --jq .triggering_actor.login
+   gh api user --jq .login
+   ```
+
+5. Check the service of the run. Read the job ID of `dev / plan` and its log. The log is ready when this job ends, which is a few seconds after the start. Do not use `gh run view --log`. It refuses a run that is in progress.
 
    ```bash
    job=$(gh run view <run id> --repo Unique-AG/connectors --json jobs --jq '.jobs[] | select(.name == "dev / plan") | .databaseId')
    gh api --allow-escape-sequences repos/Unique-AG/connectors/actions/jobs/"$job"/logs | grep -m1 'SERVICE:'
    ```
 
-4. If the line names the service, write down the pair of service and run ID. If it names another service, or the log is not ready, report the run as unconfirmed. Do not give its URL as the build of this service.
+6. If the three checks pass, write down the pair of service and run ID. If one check fails, or the log is not ready, report the run as unconfirmed. Do not give its URL as the build of this service.
 
 Give the user each confirmed pair with the run URL. Check the result when the user asks for it.
 
