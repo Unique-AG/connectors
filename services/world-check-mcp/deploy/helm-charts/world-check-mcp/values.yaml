@@ -18,11 +18,17 @@ env:
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
   DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
+  # zitadel is the default and needs the ZITADEL_* variables below, or the app fails at startup.
+  # none serves without sign-in, on loopback only.
+  MCP_AUTH_MODE: zitadel
 
 # Set per deployment in the overlay. The app refuses to start without them.
 # - MCP_BASE_URL: the public https origin, matching routes.hostname
+# - ZITADEL_BASE_URL: the Zitadel issuer, https outside localhost (env in the overlay)
+# - ZITADEL_ORG_ID: optional, restricts sign-in to one organisation (env in the overlay)
 # - every secret in .env.example, from a secret through envVars: UPSTREAM_API_KEY,
-#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET, ZITADEL_JWT_SIGNING_KEY
+#   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_JWT_SIGNING_KEY (at least 32 characters),
+#   and ZITADEL_CLIENT_SECRET, which stays unset for a public client with PKCE
 envVars: []
 
 image:
