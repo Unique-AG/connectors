@@ -33,10 +33,8 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 
 ## Part A: Findings (mode `findings`)
 
-1. Read the latest run of the workflow `security-trivy-nightly.yaml` on `main`. If it is older than 24 hours, failed or cancelled, go to the Slack message with that reason.
-2. Read the open alerts of the tool `Trivy`: `gh api --paginate 'repos/Unique-AG/connectors/code-scanning/alerts?state=open&tool_name=Trivy&per_page=100'`. Ignore the category `trivy-config`.
+1. Run `bash agentic/skills/vulna-squash/scripts/trivy-alerts.sh`. It checks the latest run of the workflow `security-trivy-nightly.yaml` on `main`, and it prints the open CRITICAL and HIGH alerts of the tool `Trivy` as JSON, without the category `trivy-config`. If it exits 1, go to the Slack message with the reason that it prints. If the API answers 403, read the Trivy results artifact of that run instead.
 3. Drop an alert when any of these is true:
-   - The severity is not `critical` or `high`.
    - The package is not an operating system package, and no fixed version exists or the fix is younger than 3 days.
    - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. The tracker lists Debian source packages, so use the row of the source package of the alerted package (for example, `libapt-pkg7.0` has the source package `apt`). A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
    - `main` already holds the fixed version.
@@ -59,12 +57,7 @@ At the end of the run, post ONE Slack message through the Slack action of the au
 
 ## Part B: Entry check (both modes)
 
-Run `gh pr view <n> --repo Unique-AG/connectors --json state,labels,headRefName,headRepositoryOwner,files,title`.
-
-Stop with no change when any of these is true:
-- The PR is not open, or it comes from a fork.
-- The PR lacks the label `dependencies`.
-- The PR has the label `ai-assisted`, `human-required` or `rebuild`.
+Run `bash agentic/skills/vulna-squash/scripts/entry-check.sh <n>`. If it exits 1, stop with no change. It prints the reason: the PR is not open, it comes from a fork, it lacks the label `dependencies`, or it has the label `ai-assisted`, `human-required` or `rebuild`.
 
 ## Part C: Assess
 
@@ -72,14 +65,14 @@ Use the skill `dependency-pr-review` for this PR. Skip its scratch run (lens C),
 
 ## Part D: Watch CI and fix
 
-Watch `gh pr checks <n>` for 45 minutes at most. Wait 3 to 5 minutes between reads.
+Run `bash agentic/skills/vulna-squash/scripts/watch-checks.sh <n>`. It waits for 45 minutes at most, and it prints one word.
 
 | Result | Action |
 |--------|--------|
-| Every required check is green | Go to Part E. |
-| A check is red | Decide the cause (below). |
-| A check still runs after 45 minutes | Go to Part E. State the timeout. |
-| A run is in `action_required` | Go to Part E. State that a maintainer must approve the run. |
+| `green` | Go to Part E. |
+| `red` | Decide the cause (below). |
+| `timed_out` | Go to Part E. State the timeout. |
+| `held` | Go to Part E. State that a maintainer must approve the run. |
 
 To decide the cause, read the failed log (`gh run view <run-id> --log-failed`). Compare it with the latest run of the same check on `main`.
 
@@ -96,17 +89,16 @@ To make a fix:
 3. Run the command that the failed job ran.
 4. Commit with `fix(<scope>): adapt to <pkg> <version>`. Push to the same branch.
 5. Set the scope of the PR title from the files of the PR. Keep the type and the subject of the title. Do this after every push.
-   - Get the scope: `files=$(gh api --paginate repos/Unique-AG/connectors/pulls/<n>/files --jq '.[].filename') && scope=$(printf '%s\n' "$files" | node .github/scripts/deps-nightly/scope.cli.mjs)`
-   - Set the title: `title=$(gh pr view <n> --repo Unique-AG/connectors --json title -q .title) && gh pr edit <n> --repo Unique-AG/connectors --title "$(printf '%s' "$title" | sed -E "s/^([a-z]+)(\([^)]*\))?(!?):/\1($scope)\3:/")"`
-   - If a command fails, the result is `human-required`. Put the error in the hand-off section.
+   - Run `bash agentic/skills/vulna-squash/scripts/set-pr-scope.sh <n>`.
+   - If the script fails, the result is `human-required`. Put the error in the hand-off section.
 
 After attempt 2, go to Part E.
 
 ## Part E: Verdict, report and hand-off
 
-1. If the bump caused a breaking change that we use, or CI is red after the attempts, or CI timed out, or the cause is unclear, or a fix is outside the PR scope, or a command in step 5 of Part D failed, or a run is held in `action_required` (reason: "a maintainer must approve the run"): the agent could not finish. The result is `human-required`.
+1. If the bump caused a breaking change that we use, or CI is red after the attempts, or CI timed out, or the cause is unclear, or a fix is outside the PR scope, or the script in step 5 of Part D failed, or a run is held in `action_required` (reason: "a maintainer must approve the run"): the agent could not finish. The result is `human-required`.
 2. In all other cases, the result is `ai-assisted`.
-3. The labels are exclusive. If the result is `human-required`, run `gh pr edit <n> --repo Unique-AG/connectors --add-label human-required --remove-label ai-assisted`. If the result is `ai-assisted`, make sure that the PR has that label and not the other one.
+3. Run `bash agentic/skills/vulna-squash/scripts/set-result-label.sh <n> <result>`. It sets the result label and removes the other one.
 4. Write the report with the shape of `dependency-pr-review`. Start it with `<!-- vulna-squash-report -->`. Add the sections `What CI shows` and `What the agent changed`. Use the verdict that `dependency-pr-review` gives. A red CI that the bump caused means `do not merge`.
 5. If the result is `human-required`, add this section under the verdict. A person files the ticket. Use the package that caused the problem for `<package>`. If none caused it, use the first package of the PR title. The draft holds only public facts: the package, the versions, the PR link, and the verdict.
 
@@ -124,14 +116,7 @@ Next steps:
 1. <exact action for a person>
 ```
 
-6. Post ONE comment. If a comment that starts with `<!-- vulna-squash-report -->` exists, update it in place:
-
-```bash
-gh api repos/Unique-AG/connectors/issues/<n>/comments --paginate \
-  --jq '.[] | select(.body | startswith("<!-- vulna-squash-report -->")) | .id'
-gh pr comment <n> --repo Unique-AG/connectors --body-file report.md
-gh api --method PATCH repos/Unique-AG/connectors/issues/comments/<id> -F body=@report.md
-```
+6. Save the report to a file. Run `bash agentic/skills/vulna-squash/scripts/post-report.sh <n> <file>`. It posts ONE comment, or it updates the comment that starts with `<!-- vulna-squash-report -->` in place.
 
 Do not merge. Do not close the PR. Do not create a GitHub issue. Stop.
 

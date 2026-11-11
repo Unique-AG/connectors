@@ -2,7 +2,8 @@
 set -euo pipefail
 
 : "${1:?usage: rebuild.sh <service|all>...}"
-here=$(dirname "$0")
+here=$(cd "$(dirname "$0")" && pwd)
+cd "$(git rev-parse --show-toplevel)"
 
 if [ "$1" = all ]; then
   services=$(jq -r 'keys[] | ltrimstr("services/")' .release-please-manifest.json)
