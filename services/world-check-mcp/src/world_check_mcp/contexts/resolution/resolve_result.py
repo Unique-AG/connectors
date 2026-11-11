@@ -2,6 +2,7 @@ from mcp_observability import traced
 
 from world_check_mcp.contexts.attribution import AttributionError
 from world_check_mcp.contexts.attribution import reviewer_note
+from world_check_mcp.contexts.case_locks import CaseLocks
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.pages import all_case_results
 from world_check_mcp.contexts.pages import ResultPageError
@@ -97,10 +98,26 @@ async def apply_resolution(
     request: ResolutionRequest,
     plan: ResolutionPlan,
     actor: str,
+    locks: CaseLocks,
 ) -> ResolutionOutcome:
     """Save an already approved match decision, after reading the case once more. A case id that
-    now maps to another case changes the plan, so it is refused too.
+    now maps to another case changes the plan, so it is refused too. The case stays locked from
+    that read to the write, and a second approval on it is refused.
     """
+    refusal = ResolutionError(
+        "Another decision on this case is being saved. Review the case and request fresh approval."
+    )
+    with locks.hold(plan.case_system_id, refuse=refusal):
+        return await _apply_resolution(upstream=upstream, request=request, plan=plan, actor=actor)
+
+
+async def _apply_resolution(
+    *,
+    upstream: Upstream,
+    request: ResolutionRequest,
+    plan: ResolutionPlan,
+    actor: str,
+) -> ResolutionOutcome:
     current = await prepare_resolution(upstream=upstream, request=request, actor=actor)
     if current != plan:
         raise ResolutionError(

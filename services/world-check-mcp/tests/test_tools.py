@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import cast
 
@@ -943,6 +944,37 @@ async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_afte
 
     _ext_1_maps_to[:] = ["sys-1"]
     assert _writes == []
+
+
+async def _world_check_with_a_slow_write(request: httpx2.Request) -> httpx2.Response:
+    if request.method == "PUT":
+        await asyncio.sleep(0.05)
+    return _world_check(request)
+
+
+async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case() -> None:
+    _writes.clear()
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore()),
+        httpx2.MockTransport(_world_check_with_a_slow_write),
+    )
+    arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}
+
+    async def resolve() -> ToolError | None:
+        async with Client(server, elicitation_handler=_approve) as client:
+            try:
+                await client.call_tool("resolve_result", arguments)
+            except ToolError as error:
+                return error
+        return None
+
+    outcomes = await asyncio.gather(resolve(), resolve())
+
+    refused = [error for error in outcomes if error is not None]
+    assert len(refused) == 1
+    assert "Another decision on this case is being saved" in str(refused[0])
+    assert len(_writes) == 1
 
 
 async def test_resolve_result_decline_does_not_write() -> None:
