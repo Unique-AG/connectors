@@ -2,6 +2,7 @@ import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context } from '@unique-ag/mcp-server-module';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { describe, expect, it, type Mock, vi } from 'vitest';
+import { ConfirmSchema } from '~/utils/confirm-write';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { CreateEventCommand } from '../create-event.command';
 import {
@@ -10,7 +11,6 @@ import {
   CreateEventTool,
 } from '../create-event.tool';
 import { GetCalendarQuery } from '../get-calendar.query';
-import { ConfirmSchema } from '../utils/confirm-write';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
 const INPUT = {

@@ -364,7 +364,7 @@ async def update_event(
             client,
             calendar_id=handle.calendar_id,
             event_id=handle.event_id,
-            html_body=body_html is not None,
+            html_body=body_html is not None or online_meeting,
         )
         patch = EventPatch(
             subject=subject,
@@ -524,7 +524,15 @@ def _no_teams_meeting_here(calendar: Calendar) -> str | None:
     return None if allowed is None else _no_teams_meeting(allowed)
 
 
+def _is_blank(stored_body: str) -> bool:
+    element = _BODY_ELEMENT.search(stored_body)
+    inner = stored_body if element is None else element.group(1)
+    return not _squeezed(re.sub(r"<[^>]*>", " ", inner)) and "<img" not in inner.lower()
+
+
 def _patched(patch: EventPatch, *, before: Event) -> Event:
+    if patch.online_meeting and patch.body_html is None and _is_blank(_stored_body(before)):
+        patch = replace(patch, body_html="")
     if patch.attendees is None:
         return event_patch_body(patch)
     rooms = resource_addresses(before)

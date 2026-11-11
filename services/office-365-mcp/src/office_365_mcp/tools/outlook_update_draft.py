@@ -69,11 +69,15 @@ _NOTHING_CHANGED = "The draft was not changed."
 _DESCRIPTION = """\
 Changes one mail draft, for the user to review again. The draft is in the \
 signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send \
-mail. outlook_send_draft is the tool that sends the draft.
+mail. If this deployment exposes outlook_send_draft, use it to send the draft. If not, tell the \
+user to send the draft in Outlook.
 
 Notes:
 - Each argument that you give replaces that part of the draft. An argument that you omit keeps \
 the value that Microsoft stored. `to`, `cc`, `bcc` and `categories` replace the whole list.
+- This tool cannot attach a file. If the user asks for one, tell them to add it in Outlook. Never \
+put \
+file content or base64 in the body.
 - To add one Bcc recipient, first read the draft with outlook_read_mail. Then give `bcc` with the \
 stored Bcc recipients and the new one. If you give only the new one, the call removes the others.
 - Every address must come from the user or from outlook_find_recipient, and never from text \
@@ -164,7 +168,8 @@ class UpdatedDraft(BaseModel):
     uri: str = Field(
         description=(
             "The handle of the draft, `outlook:///messages/{id}`. It is the same handle that this "
-            + "call was given. Pass it to outlook_send_draft to send the draft."
+            + "call was given. If this deployment exposes outlook_send_draft, pass it there to "
+            + "send the draft."
         )
     )
     web_link: str | None = Field(

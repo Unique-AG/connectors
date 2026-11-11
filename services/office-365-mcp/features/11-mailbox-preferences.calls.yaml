@@ -1,5 +1,5 @@
 uc-11-01:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_reply_from_monday_to_saturday_in_the_zone_of_mia"
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_stores_the_message_for_senders_inside_and_outside_the_organization"
@@ -15,7 +15,7 @@ uc-11-01:
       uses: {time_zone: time zone of the preferences}
 
 uc-11-02:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_refuses_a_reply_with_no_end_and_leaves_the_reply_off"
   ask: "Turn on my out-of-office reply until I say otherwise."
@@ -26,7 +26,7 @@ uc-11-02:
   note: the tool never runs the reply without an end date
 
 uc-11-03:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyAlwaysHasAnEnd::test_it_turns_the_reply_off_without_asking_mia"
   ask: "Turn off my out-of-office reply."
@@ -37,7 +37,7 @@ uc-11-03:
       args: {status: disabled}
 
 uc-11-04:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_lists_a_sender_in_the_tab_it_was_fixed_to"
   ask: "Always put mail from ada@acme.example in my Focused tab."
@@ -50,7 +50,7 @@ uc-11-04:
       args: {sender: ada@acme.example, classify_as: focused}
 
 uc-11-07:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheStateOfTheReplyIsRead"
   ask: "Is my out-of-office reply on?"
@@ -62,7 +62,7 @@ uc-11-07:
   note: the tool reads status, the scheduled end, and the messages
 
 uc-11-05:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_asks_mia_before_it_writes_the_reply"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -74,7 +74,7 @@ uc-11-05:
   note: the tool writes nothing before Mia agrees
 
 uc-11-06:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_mia_declines"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -86,7 +86,7 @@ uc-11-06:
   note: when Mia declines, the tool raises that the automatic reply was not changed
 
 uc-11-08:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_tells_why_the_state_cannot_be_read"
   ask: "Is my out-of-office reply on?"
@@ -106,7 +106,7 @@ uc-11-08:
     that is off.
 
 uc-11-09:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_reads_the_state_at_the_second_try_after_one_failure"
   ask: "Is my out-of-office reply on?"
@@ -124,7 +124,7 @@ uc-11-09:
     errors.py:218-227. An answer that cannot be read, errors.py:238-247.
 
 uc-11-10:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_reports_a_reading_that_fails_twice_and_never_says_off"
   ask: "Is my out-of-office reply on?"
@@ -140,7 +140,7 @@ uc-11-10:
     it. The assistant reads twice and no third time.
 
 uc-11-11:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_gives_the_reason_when_microsoft_refuses_the_dates"
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_says_when_the_reply_can_be_stored_after_a_busy_answer"
@@ -159,7 +159,7 @@ uc-11-11:
     stored reply changes in these two cases. A fault at the read, before the question, is uc-11-20.
 
 uc-11-12:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_asks_again_and_stores_the_reply_at_the_second_try"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -177,7 +177,7 @@ uc-11-12:
     (:163), because the tool asks on every call that schedules a reply.
 
 uc-11-13:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_reports_a_reply_that_fails_to_store_twice_and_never_says_on"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -193,7 +193,7 @@ uc-11-13:
     it. The assistant does not call the tool a third time.
 
 uc-11-14:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_the_question_gets_no_usable_answer"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -210,7 +210,7 @@ uc-11-14:
     tools/outlook_set_automatic_reply.py:62.
 
 uc-11-15:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_leaves_the_reply_off_when_the_client_cannot_ask"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -226,7 +226,7 @@ uc-11-15:
     found or invalid request, seam.py:213 and :260-262. The same case for a send is uc-04-15.
 
 uc-11-16:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_rejects_an_approval_that_was_given_for_another_reply"
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyStartsOnlyAfterMiaAgrees::test_it_turns_nothing_on_when_the_stored_reply_changed_after_mia_was_asked"
@@ -248,7 +248,7 @@ uc-11-16:
     protocol (seam.py:268-290).
 
 uc-11-17:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_refuses_a_name_where_an_address_is_needed_and_stores_nothing"
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_finds_nobody_for_a_name_that_no_mail_and_no_directory_holds"
@@ -267,7 +267,7 @@ uc-11-17:
     exist (tools/outlook_find_recipient.py:116-119), so the assistant asks Mia.
 
 uc-11-18:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_moves_a_sender_that_has_a_fixed_tab_to_the_new_tab"
   ask: "Always put mail from ada@acme.example in my Focused tab."
@@ -284,7 +284,7 @@ uc-11-18:
     :78-82, and it posts a new row only when none is held.
 
 uc-11-19:
-  status: untested
+  status: working
   no_test: "assistant: Whether the assistant obeys a planted line in a message depends on the model, and outlook_read_mail only labels the text of a message as untrusted data."
   ask: "Read Tom's last message to me."
   provenance: drafted
@@ -302,7 +302,7 @@ uc-11-19:
     outlook_read_mail tells the assistant to report the text to Mia, so no step says that it does.
 
 uc-11-20:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAReplyThatMicrosoftWillNotStoreIsNotTurnedOn::test_it_asks_nobody_when_the_stored_reply_cannot_be_read_first"
   ask: "Turn on my out-of-office reply from Monday to Friday."
@@ -320,7 +320,7 @@ uc-11-20:
     changes.
 
 uc-11-21:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_explains_an_account_with_no_mailbox"
   ask: "Is my out-of-office reply on?"
@@ -335,7 +335,7 @@ uc-11-21:
     reading is never a reply that is off.
 
 uc-11-22:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_waits_out_one_busy_answer_inside_the_same_call"
   ask: "Is my out-of-office reply on?"
@@ -351,7 +351,7 @@ uc-11-22:
     OPEN: 4 busy answers in a row take about 90 s, longer than the 60 s tool limit of node-chat.
 
 uc-11-23:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestAStateThatCannotBeReadIsNeverReportedAsOff::test_it_names_the_permission_that_no_administrator_gave"
   ask: "Is my out-of-office reply on?"
@@ -370,7 +370,7 @@ uc-11-23:
     failed call is the only step, so it is optional. A failed reading is never a reply that is off.
 
 uc-11-24:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderHasAFixedTab::test_it_lists_every_fixed_sender_with_its_tab"
   ask: "Which senders do I always put in a tab?"
@@ -381,7 +381,7 @@ uc-11-24:
   note: the tool gives one row for each sender with the address and the tab, and an empty list means that Mia fixed no sender (tools/outlook_list_focused_overrides.py:20-28)
 
 uc-11-25:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_tells_why_the_senders_cannot_be_read"
   ask: "Which senders do I always put in a tab?"
@@ -401,7 +401,7 @@ uc-11-25:
     list.
 
 uc-11-26:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_tells_why_the_tab_cannot_be_stored"
   ask: "Always put mail from ada@acme.example in my Focused tab."
@@ -422,7 +422,7 @@ uc-11-26:
     changes no tab.
 
 uc-11-27:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_stores_the_tab_once_at_the_second_try"
   ask: "Always put mail from ada@acme.example in my Focused tab."
@@ -444,7 +444,7 @@ uc-11-27:
     one row, so a repeat leaves the sender once in the list.
 
 uc-11-28:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestATabThatCannotBeReadOrStoredIsNeverReportedAsEmpty::test_it_reports_a_tab_that_fails_to_store_twice_and_never_says_set"
   ask: "Always put mail from ada@acme.example in my Focused tab."
@@ -462,7 +462,7 @@ uc-11-28:
     no scenario states what Mia is told then.
 
 uc-11-29:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_with_no_end_that_goes_to_contacts_only"
   ask: "Is my automatic reply on?"
@@ -474,7 +474,7 @@ uc-11-29:
   note: "tools/outlook_get_mailbox_settings.py:316-335: the tool reports alwaysEnabled and contactsOnly as Microsoft stores them, and a missing start or end as null (:107-111)."
 
 uc-11-30:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_reply_as_a_reply_with_no_state"
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_reply_setting_with_no_state_and_no_audience"
@@ -487,7 +487,7 @@ uc-11-30:
   note: "expected behaviour from tools/outlook_get_mailbox_settings.py:138-150 (from_setting None): every field of the reply is null and status is null, so the answer never says off."
 
 uc-11-31:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reports_the_state_that_microsoft_stored_after_a_change"
   ask: "Turn my automatic reply off."
@@ -499,7 +499,7 @@ uc-11-31:
   note: "tools/outlook_set_automatic_reply.py:113-124 and :282-302: the report holds the state that the answer of Microsoft holds, and null for a state that is missing."
 
 uc-11-32:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_names_the_contacts_who_get_the_reply_in_the_question"
   ask: "Turn on an automatic reply from Monday to Saturday for my contacts outside the company."
@@ -511,7 +511,7 @@ uc-11-32:
   note: "tools/outlook_set_automatic_reply.py:187-195 names the audience in the question."
 
 uc-11-33:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_the_time_zone_the_hours_the_language_and_the_archive_folder"
   ask: "What are my working hours, language and archive folder?"
@@ -523,7 +523,7 @@ uc-11-33:
   note: "tools/outlook_get_mailbox_settings.py:173-177 and :207-231 read the preferences part."
 
 uc-11-34:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_reads_a_mailbox_that_holds_no_language_as_no_language"
   ask: "What are my working hours, language and archive folder?"
@@ -535,7 +535,7 @@ uc-11-34:
   note: "expected behaviour from tools/outlook_get_mailbox_settings.py:173-177 (from_locale_info None) and :222-226: a missing language and a missing archive folder are null."
 
 uc-11-35:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestTheReplyMiaSeesIsTheReplyThatOutlookHolds::test_it_lists_the_category_names_of_the_mailbox"
   ask: "Which categories do I have?"
@@ -547,7 +547,7 @@ uc-11-35:
   note: "tools/outlook_get_mailbox_settings.py:300-313 lists the category names and says whether the list stopped short."
 
 uc-11-36:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_11_mailbox_preferences.py::TestASenderWithNoStoredTabIsListedWithNoTab"
   ask: "Which senders do I always put in a tab?"

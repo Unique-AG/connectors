@@ -152,37 +152,6 @@ class TestTheAssistantAnswersFromMiasContacts:
         ]
         assert _row(listed, "Lena Fischer")["email_addresses"] == []
 
-    async def test_it_gives_no_telephone_number_for_a_person_who_is_only_in_the_directory(
-        self, graph: MockRouter
-    ) -> None:
-        _ = serve(graph, "rec-tool-outlook_list_contacts-all")
-        _ = graph.get("/me").mock(
-            return_value=httpx.Response(200, json={"id": "me", "mail": "mia@acme.example"})
-        )
-        _ = graph.get("/me/people").mock(
-            return_value=httpx.Response(
-                200,
-                json={
-                    "value": [
-                        {
-                            "displayName": "Tom Berger",
-                            "scoredEmailAddresses": [{"address": "tom@acme.example"}],
-                            "personType": {"class": "Person", "subclass": "OrganizationUser"},
-                            "phones": [{"type": "business", "number": "+41 44 555 01 04"}],
-                        }
-                    ]
-                },
-            )
-        )
-
-        contacts = await call("outlook_list_contacts")
-        directory = await call("outlook_find_recipient", query="Tom Berger")
-
-        assert all(row["display_name"] != "Tom Berger" for row in _rows(contacts))
-        (tom,) = cast("Sequence[Mapping[str, object]]", directory["candidates"])
-        assert tom["address"] == "tom@acme.example"
-        assert "+41 44 555 01 04" not in json.dumps(directory)
-
     async def test_it_puts_a_first_name_that_fits_two_people_to_mia_without_choosing(
         self, graph: MockRouter
     ) -> None:

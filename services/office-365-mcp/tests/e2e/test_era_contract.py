@@ -26,6 +26,7 @@ from tests.e2e.test_scenarios import HERE, Replay, build_server, items, mapping,
 from tests.e2e.test_tool_cases import RUNNABLE, freeze_the_clock
 
 _IDS = {
+    "mia": "00000000-aa0f-4286-8305-d989485e14b5",
     "anna": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
     "tom": "00000000-e469-40d3-8f5b-9a7c5dac541e",
 }

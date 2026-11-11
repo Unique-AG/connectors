@@ -16,6 +16,7 @@ from mcp.types import (
     ElicitResult,
     EmbeddedResource,
     InputRequiredResult,
+    TextResourceContents,
 )
 from respx import MockRouter, Route
 from respx.models import Call
@@ -585,6 +586,40 @@ class TestAFileMovesBetweenMailTeamsAndSharePoint:
         assert resolved["name"] == "seed-v1 Project Plan.docx"
         assert isinstance(offer.resource, BlobResourceContents)
         assert offer.resource.mime_type == DOCX
+
+    async def test_it_resolves_a_file_that_a_chat_shows_as_a_reference_attachment(
+        self, graph: MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-sharepoint_read_file-teams-attachment")
+        listed = await call(
+            "teams_list_chat_messages", chat_id="19:5s8q5t4ig507874f4l06948227913531@thread.v2"
+        )
+        (attached,) = _list(_list(listed, "messages")[0], "attachments")
+        resolved = await call("sharepoint_resolve_url", url=attached["url"])
+
+        assert attached["content_type"] == "reference"
+        assert resolved["name"] == "seed-v1 Meeting Notes.txt"
+        assert str(resolved["uri"]).startswith("sharepoint:///files/")
+
+    async def test_it_reads_a_file_that_anna_shared_with_mia_and_posted_in_a_chat(
+        self, graph: MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-sharepoint_read_file-teams-attachment-other-user")
+        listed = await call(
+            "teams_list_chat_messages", chat_id="19:g71c902v10u17ab7d1qh522v93rhppa3@thread.v2"
+        )
+        message = _list(listed, "messages")[0]
+        (attached,) = _list(message, "attachments")
+        resolved = await call("sharepoint_resolve_url", url=attached["url"])
+        read = await _read_file(cast("str", resolved["uri"]))
+
+        assert "Anna" in str(message["sender"])
+        assert attached["content_type"] == "reference"
+        assert (
+            resolved["name"] == "seed-v1 case-sharepoint_read_file-teams-attachment-other-user.txt"
+        )
+        assert isinstance(read.resource, TextResourceContents)
+        assert read.resource.text.startswith("Meeting notes, weekly project sync.")
 
 
 class TestABriefSaysWhichPartItCouldNotRead:

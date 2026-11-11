@@ -28,9 +28,7 @@ from tests.e2e.recording.record import (
     GRAPH,
     Plan,
     catalogs,
-    describe,
-    guard_for,
-    planned_values,
+    dry_run_lines,
     resolve,
     tool_of,
 )
@@ -49,6 +47,7 @@ MAX_WAIT = 300
 BIND_RETRIES = 3
 SLOW_INDEX = {"teams_search_messages": 5}
 TIMEOUT = 600
+REQUEST_TIMEOUT = 60
 MEETING_SUBJECT = "seed-v1 meeting"
 TEAM_PHASES = ("teams", "teams-posts", "teams-chats")
 MEETING_CASES = (
@@ -226,6 +225,10 @@ def _once(
     before = written.stat().st_mtime_ns if written.is_file() else None
     env = {
         "GRAPH_TOKEN": token(sh, upns[plan.persona - 1], tools, plan.scopes),
+        **{
+            f"GRAPH_TOKEN_{who}": token(sh, upns[who - 1], tools, plan.scopes)
+            for who in sorted(plan.personas - {plan.persona})
+        },
         "SEED_UPNS": ",".join(upns),
     }
     try:
@@ -366,9 +369,7 @@ def check(dry: bool) -> int:
 def dry_results(found: Sequence[Run], upns: Sequence[str]) -> Results:
     results: Results = {}
     for run in found:
-        lines = describe(
-            run.plan, guard_for(upns, run.plan, True, DEFAULT_CAP), planned_values(upns)
-        )
+        lines = dry_run_lines(upns, run.plan, True, DEFAULT_CAP)
         refused = [line.strip() for line in lines if "REFUSED" in line]
         if run.status == "run":
             results[run.plan.scenario] = {
@@ -386,7 +387,7 @@ def probed(token_: str, path: str) -> int:
     guard = Guard("probe", frozenset(), False)
     if guard.refuses_request(request, "discover") is not None:
         return 0
-    with httpx.Client() as client:
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
         answer = client.send(request)
     body = (
         cast("Mapping[str, list[Mapping[str, object]]]", answer.json())
@@ -412,7 +413,7 @@ def graph(
     guard = Guard(upns[0], frozenset(one.casefold() for one in upns), method != "GET")
     if (refusal := guard.refuses_request(request, tool)) is not None:
         raise MeetingFailed(f"the guard refused {method} {path}: {refusal}")
-    with httpx.Client() as client:
+    with httpx.Client(timeout=REQUEST_TIMEOUT) as client:
         answer = client.send(request)
     if not answer.is_success:
         raise MeetingFailed(f"{method} {path} answered {answer.status_code}")

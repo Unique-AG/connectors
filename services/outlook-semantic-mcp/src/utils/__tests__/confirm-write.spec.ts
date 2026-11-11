@@ -40,7 +40,7 @@ describe(confirmWrite.name, () => {
     const outcome = await result;
     expect(outcome.status).toBe('unavailable');
     expect(outcome).toMatchObject({ message: expect.stringMatching(/timed out/i) });
-    expect(outcome).toMatchObject({ message: expect.stringMatching(/nothing was sent/i) });
+    expect(outcome).toMatchObject({ message: expect.stringMatching(/nothing was changed/i) });
     expect(warn).toHaveBeenCalled();
   });
 

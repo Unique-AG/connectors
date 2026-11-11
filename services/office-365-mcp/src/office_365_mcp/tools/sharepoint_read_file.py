@@ -60,8 +60,10 @@ sharepoint_search_files or sharepoint_browse_folder already located. The tool \
 because a folder has no content to read.
 
 Notes:
-- This tool converts nothing itself and does not turn a document into text. A Word file comes \
-back as a Word file. Set `convert_to` to `pdf` for text you can read.
+- This tool does not turn a document into text. It returns the file as an embedded resource, and a \
+Word or Excel file comes back as a Word or Excel file. You may not be able to read a file in that \
+form. A PDF may be readable, but that is not sure. If you cannot read the content, tell the user \
+so, and give the web address of the file. Never guess what the file says.
 - This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
 message.
 """
@@ -97,7 +99,9 @@ _NOT_CONVERTIBLE = (
     "Microsoft 365 cannot convert this file to PDF. It reports that it does not support this "
     + "format. The handle is correct, so a different handle will not help. Call this tool again "
     + "with the same handle and without `convert_to`. This tool then returns the file in its own "
-    + "format. A second request for the conversion fails the same way."
+    + "format. You may not be able to read that format. If you cannot, tell the user so, give "
+    + "the web address of the file, and never guess the content. A second request for the "
+    + "conversion fails the same way."
 )
 
 _NO_SIZE = (
@@ -303,10 +307,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Literal["pdf"] | None,
             Field(
                 description=(
-                    "The value `pdf` converts the file to PDF before this tool returns it. "
-                    + "Leave this parameter unset to get the file's own format, which is the "
-                    + "default. Microsoft converts these formats: doc, docx, dot, dotx, eml, "
-                    + "epub, htm, html, md, msg, odp, ods, and odt. It also converts these "
+                    "The value `pdf` converts the file to PDF before this tool returns it. You get "
+                    + "a PDF file, not text. Leave this parameter unset to get the file's own "
+                    + "format, which is the default. Microsoft converts these formats: doc, "
+                    + "docx, dot, dotx, eml, epub, htm, html, md, msg, odp, ods, and odt. It "
+                    + "also converts these "
                     + "formats: pps, ppsx, ppt, pptx, rtf, tif, tiff, xls, xlsm, and xlsx. A "
                     + "file that is already a PDF is not on that list, and needs no "
                     + "conversion. Conversion can still fail for a file that is on the list."

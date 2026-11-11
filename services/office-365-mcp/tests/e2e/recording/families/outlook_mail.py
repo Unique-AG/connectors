@@ -28,6 +28,7 @@ WRITE_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_create_category": ("POST /v1.0/me/outlook/masterCategories",),
     "outlook_create_folder": (f"POST {_FOLDERS}", f"POST {_FOLDERS}/*/childFolders"),
     "outlook_create_mail_rule": (f"POST {_RULES}",),
+    "outlook_delete_category": ("DELETE /v1.0/me/outlook/masterCategories/*",),
     "outlook_delete_folder": (f"POST {_FOLDERS}/*/move",),
     "outlook_delete_mail_rule": (f"DELETE {_RULES}/*",),
     "outlook_disable_mail_rule": (f"PATCH {_RULES}/*",),
