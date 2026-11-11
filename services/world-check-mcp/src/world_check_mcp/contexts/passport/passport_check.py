@@ -4,6 +4,8 @@ from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Passport
 from world_check_mcp.contexts.passport.models import PassportCheck
 from world_check_mcp.contexts.passport.payload import passport_arguments
+from world_check_mcp.contexts.screening import check_case_id
+from world_check_mcp.contexts.screening import check_date_of_birth
 from world_check_mcp.contexts.screening import FieldValue
 from world_check_mcp.contexts.screening import match_from_result
 from world_check_mcp.contexts.screening import refuse_existing_case
@@ -38,6 +40,8 @@ async def passport_check(
     limit: int = 20,
 ) -> PassportCheck:
     """Create a Passport Check case and screen it. This does not record a verification decision."""
+    check_date_of_birth(dob=passport.date_of_birth)
+    check_case_id(case_id=case_id)
     await refuse_existing_case(upstream=upstream, case_id=case_id)
     template = await upstream.call(
         GET_CASE_TEMPLATE_FOR_GROUP,

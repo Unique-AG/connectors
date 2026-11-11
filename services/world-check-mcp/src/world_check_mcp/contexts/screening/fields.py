@@ -32,19 +32,27 @@ def check_entity(
     gender: Gender | None,
     case_id: str | None,
 ) -> None:
+    check_date_of_birth(dob=dob)
+    check_case_id(case_id=case_id)
+    individual = (dob, nationality, country_of_residence, place_of_birth, gender)
+    if entity_type == "ORGANISATION" and any(value is not None for value in individual):
+        raise ScreeningError("Use registered_country for organizations, not individual fields.")
+    if entity_type == "INDIVIDUAL" and registered_country is not None:
+        raise ScreeningError("registered_country is only valid for organizations.")
+
+
+def check_date_of_birth(*, dob: date | None) -> None:
     if dob is not None and dob > date.today():
         raise ScreeningError("Date of birth cannot be in the future.")
+
+
+def check_case_id(*, case_id: str | None) -> None:
     if case_id is not None and (
         case_id.startswith("/") or case_id.endswith("/") or "//" in case_id
     ):
         raise ScreeningError(
             "case_id cannot start or end with a slash or contain consecutive slashes."
         )
-    individual = (dob, nationality, country_of_residence, place_of_birth, gender)
-    if entity_type == "ORGANISATION" and any(value is not None for value in individual):
-        raise ScreeningError("Use registered_country for organizations, not individual fields.")
-    if entity_type == "INDIVIDUAL" and registered_country is not None:
-        raise ScreeningError("registered_country is only valid for organizations.")
 
 
 def screening_arguments(

@@ -1,4 +1,6 @@
 from world_check_mcp.contexts.screening.errors import ScreeningError
+from world_check_mcp.contexts.screening.fields import check_case_id
+from world_check_mcp.contexts.screening.fields import check_date_of_birth
 from world_check_mcp.contexts.screening.fields import validate_fields
 from world_check_mcp.contexts.screening.models import EntityType
 from world_check_mcp.contexts.screening.models import FieldValue
@@ -17,6 +19,8 @@ __all__ = [
     "ScreeningError",
     "ScreeningMatch",
     "ScreeningOutcome",
+    "check_case_id",
+    "check_date_of_birth",
     "match_from_result",
     "refuse_existing_case",
     "rescreen_case",
