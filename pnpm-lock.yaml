@@ -170,8 +170,8 @@ catalogs:
       specifier: 0.3.0
       version: 0.3.0
     supertest:
-      specifier: 7.3.1
-      version: 7.3.1
+      specifier: 7.3.2
+      version: 7.3.2
     type-fest:
       specifier: 5.10.0
       version: 5.10.0
@@ -439,7 +439,7 @@ importers:
         version: 7.8.2
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -783,7 +783,7 @@ importers:
         version: 1.9.0
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -907,7 +907,7 @@ importers:
         version: 1.9.0
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1130,7 +1130,7 @@ importers:
         version: 1.9.0
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       type-fest:
         specifier: 'catalog:'
         version: 5.10.0
@@ -1287,7 +1287,7 @@ importers:
         version: 1.9.0
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -1477,7 +1477,7 @@ importers:
         version: 1.9.0
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       type-fest:
         specifier: 'catalog:'
         version: 5.10.0
@@ -1604,7 +1604,7 @@ importers:
         version: 1.9.0
       supertest:
         specifier: 'catalog:'
-        version: 7.3.1
+        version: 7.3.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -6186,8 +6186,8 @@ packages:
     resolution: {integrity: sha512-u+PFV+VKiAKKzJqnCvveNya3N+pR/8jUZs/ek6jRfE41fpSCNdFY61L7NYmSgB6I9TTFM50ywoPXRKgw2k3wKw==}
     engines: {node: '>=14.18.0'}
 
-  supertest@7.3.1:
-    resolution: {integrity: sha512-vNaNCFoCR/edDbErQZp5KLNT8R4dSPHX7rlDLoE8hWLAm/878j6ShMbe8HK/E6RwwuhlSXVelXAIg9AxR5WWPw==}
+  supertest@7.3.2:
+    resolution: {integrity: sha512-hR0dKRUE+PwZhHLdq/GRhf97HbUQte+AhbpWBQ9nh02tpjujVJj0GY4aygd1dAKdNZ7UZexWHpeItyJi/jLsgw==}
     engines: {node: '>=14.18.0'}
 
   supports-color@7.2.0:
@@ -11374,7 +11374,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  supertest@7.3.1:
+  supertest@7.3.2:
     dependencies:
       cookie-signature: 1.2.2
       methods: 1.1.2
