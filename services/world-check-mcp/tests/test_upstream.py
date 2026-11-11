@@ -6,11 +6,13 @@ from datetime import UTC
 from typing import cast
 
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
 from mcp_configs import RetrySettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
+import pytest
 
 from tests.offline_server import build_server
 from world_check_mcp.persistence import Persistence
@@ -210,3 +212,27 @@ async def test_get_api_info_does_not_ask_for_credentials() -> None:
     assert "Date" not in properties
     api = next(request for request in seen if request.url.path != "/auth/oauth2/v1/token")
     assert api.headers["Authorization"] == "Bearer access-token"
+
+
+@pytest.mark.parametrize(
+    "token_response",
+    [
+        httpx2.Response(200, content=b"not json"),
+        httpx2.Response(200, json=["access-token"]),
+        httpx2.Response(200, json={"expires_in": 3600}),
+        httpx2.Response(200, json={"access_token": "access-token"}),
+    ],
+)
+async def test_a_malformed_token_response_raises_a_tool_error_naming_the_token_url(
+    token_response: httpx2.Response,
+) -> None:
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        assert request.url.path == "/auth/oauth2/v1/token"
+        return token_response
+
+    server = build_server(
+        _settings(), Persistence(store=MemoryStore()), httpx2.MockTransport(respond)
+    )
+    async with Client(server) as client:
+        with pytest.raises(ToolError, match=r"https://api\.risk\.lseg\.com/auth/oauth2/v1/token"):
+            await client.call_tool("get_api_info", {})

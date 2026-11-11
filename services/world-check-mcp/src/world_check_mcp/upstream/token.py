@@ -12,6 +12,7 @@ from datetime import timedelta
 from typing import cast, override
 
 import httpx2
+from mcp_openapi.upstream import UpstreamError
 from pydantic import SecretStr
 
 _REFRESH_MARGIN = timedelta(seconds=30)
@@ -94,7 +95,13 @@ class ServiceAccountAuth(httpx2.Auth):
                 data={"grant_type": "client_credentials"},
             )
         response.raise_for_status()
-        return _token_body(cast(object, response.json()))
+        try:
+            payload = cast(object, response.json())
+        except ValueError as error:
+            raise UpstreamError(
+                f"LSEG token response from {self._token_url} was not JSON"
+            ) from error
+        return _token_body(payload, self._token_url)
 
 
 def _basic(client_id: str, client_secret: str) -> str:
@@ -102,14 +109,14 @@ def _basic(client_id: str, client_secret: str) -> str:
     return f"Basic {b64encode(raw).decode('ascii')}"
 
 
-def _token_body(payload: object) -> tuple[str, timedelta]:
+def _token_body(payload: object, token_url: str) -> tuple[str, timedelta]:
     if not isinstance(payload, dict):
-        raise ValueError("LSEG token response was not a JSON object")
+        raise UpstreamError(f"LSEG token response from {token_url} was not a JSON object")
     body = cast(dict[object, object], payload)
     access_token = body.get("access_token")
     expires_in = body.get("expires_in")
     if not isinstance(access_token, str) or not access_token:
-        raise ValueError("LSEG token response has no access_token")
+        raise UpstreamError(f"LSEG token response from {token_url} has no access_token")
     if not isinstance(expires_in, int) or isinstance(expires_in, bool) or expires_in <= 0:
-        raise ValueError("LSEG token response has no expires_in")
+        raise UpstreamError(f"LSEG token response from {token_url} has no expires_in")
     return access_token, timedelta(seconds=expires_in)
