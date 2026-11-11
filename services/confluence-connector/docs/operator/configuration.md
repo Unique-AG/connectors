@@ -496,6 +496,8 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 |---|---|---|---|
 | `ConfluenceConnectorUniqueAPIErrors` | More than 1% of the requests to the Unique API (GraphQL and REST) failed in the last 75 minutes | `5m` | `warning` |
 
+Requests to Unique only happen during a sync, so the 75-minute window must be longer than the sync interval (`scanIntervalCron`). For schedules slower than hourly, override the rule's `expr` with a wider window, or the alert resolves between failing syncs.
+
 #### Alert Configuration
 
 Each alert is a complete rule under `prometheus.additionalAlerts`. Override any field in your values, or replace the whole rule:

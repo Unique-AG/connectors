@@ -151,15 +151,25 @@ prometheus:
           2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
-      # Requests only happen during a sync. The 75m window is longer than the hourly sync interval,
-      # so an error that repeats on every sync keeps the alert firing instead of resolving between
-      # syncs. The error counter is created by the first failed request, and rate() does not count
-      # that first sample, so a single failed sync right after a pod start does not fire this alert.
+      # Requests only happen during a sync, so the 75m window must be longer than the sync interval
+      # (scanIntervalCron). Otherwise an error that repeats on every sync resolves the alert between
+      # syncs. Widen it for schedules slower than hourly.
+      # A counter series for a new operation or status is created by its first request, and
+      # increase() does not count that first value. Adding the first value of every series that
+      # did not exist 75m ago counts it, for example the first error after a pod start.
       expr: |
         (
-          sum by (namespace) (rate(confluence_connector_unique_api_errors_total[75m]))
+          sum by (namespace) (
+            (increase(confluence_connector_unique_api_errors_total[75m]) + (min_over_time(confluence_connector_unique_api_errors_total[75m]) unless confluence_connector_unique_api_errors_total offset 75m))
+            or increase(confluence_connector_unique_api_errors_total[75m])
+            or (min_over_time(confluence_connector_unique_api_errors_total[75m]) unless confluence_connector_unique_api_errors_total offset 75m)
+          )
           /
-          sum by (namespace) (rate(confluence_connector_unique_api_requests_total[75m]))
+          sum by (namespace) (
+            (increase(confluence_connector_unique_api_requests_total[75m]) + (min_over_time(confluence_connector_unique_api_requests_total[75m]) unless confluence_connector_unique_api_requests_total offset 75m))
+            or increase(confluence_connector_unique_api_requests_total[75m])
+            or (min_over_time(confluence_connector_unique_api_requests_total[75m]) unless confluence_connector_unique_api_requests_total offset 75m)
+          )
         ) > 0.01
       for: 5m
       labels:
