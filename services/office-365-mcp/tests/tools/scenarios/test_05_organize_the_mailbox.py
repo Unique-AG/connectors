@@ -7,7 +7,7 @@ import httpx
 import pytest
 import respx
 
-from office_365_mcp.tools import PRESETS, TOOL_NAMES
+from office_365_mcp.tools import TOOL_NAMES, resolve
 from tests.conftest import RecordedSleeps
 from tests.e2e.test_scenarios import Person
 from tests.graph_fixtures import response, serve
@@ -44,10 +44,12 @@ _OUTCOME_UNKNOWN = "does not know if Microsoft 365 made the change"
 _DELETING_TOOLS = {
     "onenote_delete_page",
     "outlook_delete_calendar",
+    "outlook_delete_category",
     "outlook_delete_event",
     "outlook_delete_folder",
     "outlook_delete_mail_rule",
     "sharepoint_delete_item",
+    "sharepoint_delete_list_item",
     "teams_delete_meeting",
     "teams_delete_message",
     "teams_remove_chat_member",
@@ -406,24 +408,57 @@ class TestEmptyingDeletedItemsIsLeftToMia:
         assert times_asked(graph, "POST", "/move") == 0
 
 
-class TestWhatNoPresetCanDoToday:
+class TestSeveralPresetsHoldTheToolsOfATask:
     @pytest.mark.parametrize(
-        "pair",
+        ("presets", "tools"),
         [
-            ("outlook_create_category", "outlook_mark_mail"),
-            ("outlook_browse_folders", "outlook_create_mail_rule"),
+            (
+                ("outlook-write", "outlook-automate"),
+                ("outlook_create_category", "outlook_mark_mail"),
+            ),
+            (
+                ("outlook-read", "outlook-rules"),
+                ("outlook_browse_folders", "outlook_create_mail_rule"),
+            ),
+            (
+                ("outlook-write", "outlook-rules"),
+                ("outlook_create_category", "outlook_mark_mail", "outlook_delete_category"),
+            ),
         ],
-        ids=["category-and-mail", "folders-and-rules"],
+        ids=["category-and-mail", "folders-and-rules", "rename-a-category"],
     )
-    def test_no_preset_holds_both_tools_of_the_task(self, pair: tuple[str, str]) -> None:
-        assert set(pair) <= set(TOOL_NAMES)
-        assert [name for name, tools in PRESETS.items() if set(pair) <= set(tools)] == []
+    def test_the_union_of_two_presets_holds_both_tools_of_the_task(
+        self, presets: tuple[str, str], tools: tuple[str, ...]
+    ) -> None:
+        assert set(tools) <= set(resolve(presets=presets, enabled=None).tools)
 
-    def test_no_tool_renames_a_category(self) -> None:
+    def test_the_tools_that_touch_the_list_of_categories_are_these_three(self) -> None:
         assert {name for name in TOOL_NAMES if "categor" in name} == {
             "outlook_create_category",
+            "outlook_delete_category",
             "outlook_list_categories",
         }
+
+
+class TestACategoryIsRenamedByCreateMoveAndDelete:
+    async def test_a_category_is_deleted_after_a_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_delete_category-created")
+        created = await call(
+            "outlook_create_category",
+            name="seed-v1 case-outlook_delete_category-created",
+            color="preset5",
+        )
+        person = Person()
+
+        name = str(created["name"])
+        erased = await invoke_as("outlook_delete_category", {"name": name}, person=person)
+
+        assert len(person.asked) == 1
+        assert name in person.asked[0]
+        assert "DELETE" in methods_asked(graph)
+        assert erased.structured_content == {"name": name, "deleted": True}
 
 
 class TestAnInboxRuleActsOnNewMailWithoutMia:

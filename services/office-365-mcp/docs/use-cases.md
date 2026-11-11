@@ -15,8 +15,9 @@ shows a starting point. "What happens" shows what the assistant does. "Limit" sh
 not work as Mia expects. A part named "Not supported yet" lists what people ask for and what the
 server cannot do today.
 
-The examples come from how people use the server and from what its tools can do. Not every example
-was run by hand. For the tools behind the examples, read the [tool reference](README.md).
+The examples come from how people use the server and from what its tools can do. Each example has
+a test, or the status page says why no test can prove it. For the tools behind the examples, read
+the [tool reference](README.md).
 
 ## Rules for every example
 
@@ -33,7 +34,7 @@ was run by hand. For the tools behind the examples, read the [tool reference](RE
 
 - Outlook: [Finding and reading mail](#finding-and-reading-mail), [Drafting and sending mail](#drafting-and-sending-mail), [Organizing the mailbox](#organizing-the-mailbox), [Mailbox preferences](#mailbox-preferences), [Reading the calendar](#reading-the-calendar), [Scheduling and answering meetings](#scheduling-and-answering-meetings), [Sharing and delegating calendars](#sharing-and-delegating-calendars), [Managing contacts](#managing-contacts)
 - Teams: [Catching up on Teams](#catching-up-on-teams), [Posting in Teams](#posting-in-teams), [Running Teams chats and online meetings](#running-teams-chats-and-online-meetings)
-- SharePoint: [Finding and reading files in OneDrive and SharePoint](#finding-and-reading-files-in-onedrive-and-sharepoint), [Organizing and sharing files in OneDrive and SharePoint](#organizing-and-sharing-files-in-onedrive-and-sharepoint)
+- SharePoint: [Finding and reading files in OneDrive and SharePoint](#finding-and-reading-files-in-onedrive-and-sharepoint), [Organizing and sharing files in OneDrive and SharePoint](#organizing-and-sharing-files-in-onedrive-and-sharepoint), [Finding and reading SharePoint lists](#finding-and-reading-sharepoint-lists)
 - OneNote: [Working with notes in OneNote](#working-with-notes-in-onenote)
 - Across sources: [Working across mail, calendar, files, and Teams](#working-across-mail-calendar-files-and-teams)
 
@@ -349,6 +350,32 @@ What happens:
 - The assistant tells Mia that it found no message.
 - It does not tell Mia that more messages may match.
 
+**Mail with one company is found by the domain of the company**
+
+Ask your assistant: "Find the mail with acme.com about the invoice."
+
+Tests: 1
+
+Situation: Mia got mail from "acme.com" and sent mail to "acme.com", and she has mail with other companies.
+
+What happens:
+
+- The assistant shows the messages that came from, went to, or were copied to an address at "acme.com".
+- It does not show the mail with other companies.
+
+**A person is found by the domain of their company**
+
+Ask your assistant: "Who do I know at acme.com?"
+
+Tests: 1
+
+Situation: Mia wrote to Tom at "acme.com", and her address book does not list "acme.com".
+
+What happens:
+
+- The assistant shows Tom and his address.
+- It says that Tom is found in Mia's past mail and not in the address book.
+
 #### The assistant reads a message and its attachments
 
 **A message is read in full and its attachments are named**
@@ -364,20 +391,18 @@ What happens:
 - The assistant gives the full text of the message.
 - It names "Draft v2.docx" with its size.
 
-**The content of an Excel attachment answers a question**
+**An Excel attachment is handed over as a file**
 
-Ask your assistant: "What is the total in the last row of the Excel file that Anna attached?"
+Ask your assistant: "Open the Excel file that Anna attached."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not be able to read the numbers inside an Excel attachment.
-
-Situation: Anna attached a 2 MB Excel workbook with a total of 4,200 in its last row.
+Situation: Anna attached a 2 MB Excel workbook.
 
 What happens:
 
-- The assistant answers 4,200.
+- The assistant gets the workbook in its own format.
+- The connector does not turn the workbook into text.
 
 **An attachment above 10 MB is refused**
 
@@ -546,6 +571,18 @@ What happens:
 - The assistant lists the 3 unread messages of "support@example.com".
 - It does not list messages of Mia's own mailbox.
 
+**A mailbox that Mia cannot open is explained as missing access**
+
+Ask your assistant: "Show me the unread messages in the finance mailbox."
+
+Tests: 1
+
+Situation: Mia has no access to the shared mailbox "finance".
+
+What happens:
+
+- The assistant tells Mia that she has no access to "finance".
+
 #### Mia is told what happened when Microsoft cannot do what she asked
 
 The assistant never reports a search that failed as a search that found nothing.
@@ -697,10 +734,6 @@ What happens:
 - The message is listed.
 - The message shows no flag.
 
-#### Not supported yet in finding and reading mail
-
-- The assistant says that an administrator must grant the connector a permission, and not that Mia has no access to the mailbox.
-
 ### Drafting and sending mail
 
 Mia lets her assistant write mail for her. The assistant leaves each message as a draft for Mia to read, and sends it only after Mia approves.
@@ -786,6 +819,19 @@ What happens:
 
 - The assistant tells Mia that Tom is already on the draft.
 - The draft stays as it is until Mia chooses.
+
+**A blind copy is put on a draft**
+
+Ask your assistant: "Put Priya on blind copy on my draft to Anna."
+
+Tests: 1
+
+Situation: Mia has a draft addressed to Anna.
+
+What happens:
+
+- Priya is on the draft as a blind copy.
+- Anna cannot see Priya on the message.
 
 **The subject, the importance, and a recipient of a draft change**
 
@@ -1463,7 +1509,6 @@ What happens:
 
 #### Not supported yet in drafting and sending mail
 
-- The assistant cannot add a blind copy to a draft yet.
 - The assistant cannot attach a file to a draft yet.
 
 ### Organizing the mailbox
@@ -1515,9 +1560,6 @@ What happens:
 Ask your assistant: "File these 5 messages in my Archive folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant sometimes cannot move mail at first, because it names a message in the wrong way. It then searches again and moves the messages.
 
 Situation: Mia named 5 messages by their subjects only.
 
@@ -1679,9 +1721,6 @@ Ask your assistant: "Create a red category Follow-up Q4 and put it on my unread 
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant creates the category and puts it on mail only when the administrator has turned on both groups of tools.
-
 Situation: Mia has 4 unread messages from Tom Berger.
 
 What happens:
@@ -1695,15 +1734,14 @@ Ask your assistant: "Rename my category Follow-up Q4 to Follow-up Q1."
 
 Tests: 2
 
-!!! warning "Limit"
-    The assistant cannot rename a category. It makes a new category with the new name and moves the 4 messages to it. The old category stays in the list.
-
 Situation: Mia has the category "Follow-up Q4" on 4 messages.
 
 What happens:
 
 - Mia's categories hold "Follow-up Q1".
 - The 4 messages carry "Follow-up Q1".
+- Mia's categories no longer hold "Follow-up Q4".
+- The assistant asks Mia to approve first.
 
 #### An inbox rule acts on new mail without Mia
 
@@ -1712,9 +1750,6 @@ What happens:
 Ask your assistant: "Make a rule that moves mail from billing@example.com to my Finance folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
 
 What happens:
 
@@ -1774,9 +1809,6 @@ What happens:
 Ask your assistant: "Make a rule that moves the mail I do not need to my Archive folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may create a rule for every new message without asking which mail Mia means.
 
 What happens:
 
@@ -2017,14 +2049,25 @@ What happens:
 - The assistant offers another name or the category that exists.
 - Mia's categories hold no second "Follow-up Q4".
 
+**A category that Mia does not have is not deleted**
+
+Ask your assistant: "Delete my category Follow-up Q9."
+
+Tests: 1
+
+Situation: Mia has no category named "Follow-up Q9".
+
+What happens:
+
+- Mia is told that no category has that name.
+- The assistant offers the categories that Mia has.
+- Nothing is deleted.
+
 **A rule that Microsoft rejects as invalid is not repeated**
 
 Ask your assistant: "Make a rule that moves mail from billing@example.com to my Finance folder."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant cannot find the folder for a rule unless the administrator turns on the folder tools next to the rule tools.
 
 Situation: Mia asks her assistant for a rule that moves mail from "billing@example.com" to "Finance".
 
@@ -2564,9 +2607,6 @@ Mia sets how her mailbox behaves while she is away and which senders reach her a
 Ask your assistant: "Turn on my out-of-office reply from Monday to Friday and tell everyone I am away."
 
 Tests: 2
-
-!!! warning "Limit"
-    The assistant can leave outside senders without a reply. It can also stop the reply a day early or use the wrong time zone.
 
 What happens:
 
@@ -3649,9 +3689,6 @@ Ask your assistant: "Save an invitation for the Board prep on Monday from 10:00 
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot keep a real invitation draft. It can save the meeting without attendees and add them after Mia approves.
-
 What happens:
 
 - "Board prep" is on Mia's calendar on Monday from 10:00 to 11:00 with no attendee.
@@ -3662,9 +3699,6 @@ What happens:
 Ask your assistant: "Put the Offsite on my Team calendar."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may not put a meeting on a second calendar of Mia. Nobody tested it.
 
 Situation: Mia has a second calendar named "Team".
 
@@ -4487,9 +4521,6 @@ Ask your assistant: "What is on the calendar of the Platform team this week?"
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant may not be able to read a team calendar. One attempt failed, and the cause is not known.
-
 Situation: The team "Platform" has 4 events on its calendar this week.
 
 What happens:
@@ -5089,10 +5120,6 @@ What happens:
 
 - The assistant lists "Tom Berger".
 
-#### Not supported yet in managing contacts
-
-- The assistant cannot look up the telephone number of a colleague who is not in Mia's contacts.
-
 ## Teams
 
 ### Catching up on Teams
@@ -5158,10 +5185,7 @@ What happens:
 
 Ask your assistant: "What happened in the Releases channel this week?"
 
-Tests: 3
-
-!!! warning "Limit"
-    The assistant may miss posts of a busy channel when it reads a whole week.
+Tests: 4
 
 Situation: The channel "Releases" has 3 posts this week and 2 older posts, and one post of this week has 4 replies.
 
@@ -5326,9 +5350,6 @@ What happens:
 Ask your assistant: "Summarize the Budget review that is on my calendar."
 
 No test: assistant
-
-!!! warning "Limit"
-    The assistant may not be able to read the transcript of a meeting that has no meeting chat. Nobody tested it.
 
 Situation: "Budget review" is on Mia's calendar and it has a transcript. Mia has no meeting chat for "Budget review".
 
@@ -6445,6 +6466,19 @@ Mia leads projects and starts group chats and online meetings for them. Mia asks
 
 #### Mia controls who is in a group chat
 
+**A group chat is created and named**
+
+Ask your assistant: "Start a group chat named Launch with Anna and Tom."
+
+Tests: 2
+
+Situation: Mia has never chatted with Anna or Tom.
+
+What happens:
+
+- Mia is asked to approve the chat first.
+- After she approves, the chat "Launch" has Mia, Anna, and Tom as members.
+
 **A group chat is created from people Mia already chats with**
 
 Ask your assistant: "Start a group chat named Launch with Anna and Tom."
@@ -7109,10 +7143,6 @@ What happens:
 - Mia is asked to approve the chat first.
 - After she approves, Mia has a one-to-one chat with Tom that has no title.
 
-#### Not supported yet in running teams chats and online meetings
-
-- The assistant cannot start a chat with a person it has never chatted with.
-
 ## SharePoint
 
 ### Finding and reading files in OneDrive and SharePoint
@@ -7303,21 +7333,18 @@ What happens:
 - It gives Mia the web address that opens the file in a browser.
 - It does not summarize only a part of the file.
 
-**A file that Microsoft cannot convert is read as it is or reported**
+**A file that Microsoft cannot convert is handed over in its own format**
 
-Ask your assistant: "Summarize the Brightway Master Agreement."
+Ask your assistant: "Read the Brightway Master Agreement."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may not be able to read some files that Microsoft cannot convert.
 
 Situation: Microsoft cannot convert "Brightway Master Agreement.docx" to a PDF.
 
 What happens:
 
-- The assistant reads the file in its own format or tells Mia that it cannot read the file.
-- It does not invent the content of the file.
+- The assistant gets the file in its own format.
+- The connector does not turn the file into text.
 
 #### Mia is told what happened when Microsoft cannot do what she asked
 
@@ -7539,20 +7566,17 @@ What happens:
 - The assistant names her OneDrive.
 - It gives the web address that opens the drive in a browser.
 
-**The libraries of a site are not listed as drives**
+**The libraries of a site are listed**
 
 Ask your assistant: "Which document libraries does the Sales site have?"
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot list the document libraries of a site.
-
 Situation: The Sales site holds the library "Shared Documents".
 
 What happens:
 
-- The assistant does not list the libraries of the Sales site.
+- The assistant lists "Shared Documents" with the web address that opens it.
 - It does not present her own drives as libraries of the Sales site.
 
 #### The assistant finds a site from what Mia remembers about it
@@ -7777,9 +7801,6 @@ What happens:
 Ask your assistant: "Copy my Template folder into the Sales site."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant can copy into the Sales site only when it can find a folder there.
 
 Situation: Mia has the folder "Template" of 20 files in her OneDrive.
 
@@ -8428,6 +8449,185 @@ Cases:
 - The assistant cannot save an attached file in a folder.
 - The assistant cannot take back access to a file.
 
+### Finding and reading SharePoint lists
+
+Mia's team tracks tasks and issues in lists on SharePoint sites. Mia asks her assistant which lists a site has, which columns a list has, and which items a list holds. The assistant sees only the lists that Mia herself can open.
+
+**Starting point.** Mia can open the Finance site.
+
+#### The assistant finds the lists of a site that Mia names
+
+**The lists of a site are shown**
+
+Ask your assistant: "Which lists does the Finance site have?"
+
+Tests: 1
+
+Situation: The Finance site holds the lists "Tasks" and "Issues", a hidden list, and the library "Documents".
+
+What happens:
+
+- The assistant names the lists "Tasks" and "Issues".
+- It does not name the hidden list or the library "Documents".
+
+**A site name is not taken for the address of a site**
+
+Ask your assistant: "Which lists does Finance have?"
+
+Tests: 1
+
+Situation: Mia has not given the web address of the Finance site.
+
+What happens:
+
+- The assistant finds the web address of the Finance site before it names a list.
+- It does not name a list of another site.
+
+#### The assistant describes the columns of a list
+
+**The columns of a list are shown**
+
+Ask your assistant: "Which columns does the Tasks list on the Finance site have?"
+
+Tests: 1
+
+Situation: The list "Tasks" has the required column "Title" and the column "Status" with the choices "Open" and "Closed".
+
+What happens:
+
+- The assistant names the columns "Title" and "Status".
+- It says that "Status" takes "Open" or "Closed".
+
+**A folder is not taken for a list**
+
+Ask your assistant: "Which columns does the Tasks list on the Finance site have?"
+
+Tests: 1
+
+Situation: Mia's OneDrive holds a folder "Tasks", and the Finance site holds the list "Tasks".
+
+What happens:
+
+- The assistant names the columns of the list "Tasks" on the Finance site.
+- It does not describe the folder "Tasks" as a list.
+
+#### The assistant reads the items of a list
+
+**The open items of a list are shown**
+
+Ask your assistant: "Which items in the Tasks list are open?"
+
+Tests: 2
+
+Situation: The list "Tasks" holds the open item "Close books" with the amount 12.5.
+
+What happens:
+
+- The assistant names the item "Close books" with the amount 12.5.
+- It gives the web address that opens the item in a browser.
+
+**A filter on a column that the list does not index is refused**
+
+Ask your assistant: "Which items in the Tasks list have q1 in their notes?"
+
+Tests: 1
+
+Situation: The column "Notes" of the list "Tasks" is not indexed.
+
+What happens:
+
+- The assistant tells Mia that it can filter only on an indexed column.
+- It does not present other items as the items that match.
+
+#### The assistant adds an item to a list only after Mia agrees
+
+**An item is added after Mia agrees**
+
+Ask your assistant: "Add the task Close books with the status Open to the Tasks list."
+
+Tests: 2
+
+Situation: The list "Tasks" has the column "Title" and the column "Status" with the choices "Open" and "Closed".
+
+What happens:
+
+- The assistant asks Mia to agree to the new item and names its values.
+- After Mia agrees, the list "Tasks" holds the item "Close books" with the status "Open".
+- The assistant asks Mia to approve first.
+
+**A person column is not written**
+
+Ask your assistant: "Add the task Close books to the Tasks list with me as the owner."
+
+Tests: 1
+
+Situation: The column "Owner" of the list "Tasks" holds a person.
+
+What happens:
+
+- The assistant tells Mia that it cannot write a person column.
+- It does not ask Mia to agree, and it adds no item.
+
+#### The assistant changes an item only after Mia agrees to the old and the new values
+
+**The status of an item is changed after Mia agrees**
+
+Ask your assistant: "Set the status of Close books in the Tasks list to Closed."
+
+Tests: 2
+
+Situation: The item "Close books" of the list "Tasks" has the status "Open".
+
+What happens:
+
+- The assistant asks Mia to agree to change the status from "Open" to "Closed".
+- After Mia agrees, the item "Close books" has the status "Closed".
+- The assistant asks Mia to approve first.
+
+**An item that somebody changed in the meantime is not overwritten**
+
+Ask your assistant: "Set the status of Close books in the Tasks list to Closed."
+
+Tests: 1
+
+Situation: Somebody changes the item "Close books" after the assistant reads it.
+
+What happens:
+
+- The assistant tells Mia that the item changed.
+- It does not overwrite the other change.
+- The assistant asks Mia to approve first.
+
+#### The assistant moves an item to the recycle bin only after Mia agrees
+
+**An item is moved to the recycle bin after Mia agrees**
+
+Ask your assistant: "Delete the task Close books from the Tasks list."
+
+Tests: 1
+
+Situation: The list "Tasks" holds the item "Close books".
+
+What happens:
+
+- The assistant asks Mia to agree to move "Close books" to the recycle bin of the site.
+- After Mia agrees, the list "Tasks" no longer holds the item "Close books".
+- The assistant asks Mia to approve first.
+
+**An item stays when Mia declines**
+
+Ask your assistant: "Delete the task Close books from the Tasks list."
+
+Tests: 1
+
+Situation: The list "Tasks" holds the item "Close books".
+
+What happens:
+
+- The assistant tells Mia that the item was not moved to the recycle bin.
+- The list "Tasks" still holds the item "Close books".
+- The assistant asks Mia to approve first.
+
 ## OneNote
 
 ### Working with notes in OneNote
@@ -8865,9 +9065,6 @@ Cases:
 Ask your assistant: "Create a section 2025 in my Archive section group of Project Falcon."
 
 Tests: 1
-
-!!! warning "Limit"
-    The assistant may tell Mia that an administrator must act, although it could create the section in the notebook instead.
 
 Situation: Mia has the section group "Archive" in her notebook "Project Falcon". Microsoft refuses a new section in "Archive".
 
@@ -9585,9 +9782,6 @@ Ask your assistant: "Send the latest price list to Anna by mail."
 
 Tests: 1
 
-!!! warning "Limit"
-    The assistant cannot attach the file to the mail. It puts a link to the file in the draft.
-
 Situation: The latest price list is in the Sales site.
 
 What happens:
@@ -9613,10 +9807,7 @@ What happens:
 
 Ask your assistant: "What is in the file that Anna posted in our chat yesterday?"
 
-Tests: 1
-
-!!! warning "Limit"
-    The assistant may not be able to open a file that someone posted in Teams.
+Tests: 3
 
 Situation: Anna posted the file "Offer.docx" in a chat with Mia yesterday.
 

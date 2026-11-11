@@ -27,8 +27,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "finance"}
 
 _DESCRIPTION = """\
 Finds SharePoint sites by free text, for the signed-in user. Each row has the `web_url` of one \
-site, with its `display_name` and its `description`. Pass `web_url` as `path` to \
-sharepoint_search_files to search only this site. This tool finds sites. It does not find files \
+site, with its `display_name` and its `description`. If this deployment exposes \
+sharepoint_search_files, pass `web_url` as `path` to it to search only this site. This tool finds \
+sites. It does not find files \
 or folders.
 
 Notes:
@@ -40,9 +41,9 @@ class SiteSummary(BaseModel):
     web_url: str = Field(
         description=(
             "The web address of the site, for example "
-            + "`https://contoso.sharepoint.com/sites/Finance`. Pass it as `path` to "
-            + "sharepoint_search_files to search only this site. Always give it to the user when "
-            + "you answer about this site."
+            + "`https://contoso.sharepoint.com/sites/Finance`. If this "
+            + "deployment exposes sharepoint_search_files, pass it as `path` to that tool to "
+            + "search only this site. Always give it to the user when you answer about this site."
         )
     )
     display_name: str | None = Field(

@@ -19,6 +19,7 @@ from tests.e2e.recording.record import persona_values, with_personas
 from tests.e2e.test_scenarios import HERE, build_server, items, mapping, patch_obo, run_chain
 
 _IDS = {
+    "mia": "00000000-aa0f-4286-8305-d989485e14b5",
     "anna": "00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1",
     "tom": "00000000-e469-40d3-8f5b-9a7c5dac541e",
 }
@@ -27,7 +28,6 @@ _PERSONAS = persona_values(stand_in.UPNS, {}, synthetic=True) | {
 }
 _NEEDS_RE_RECORDING = frozenset(
     {
-        "onenote_get_operation-notebook",
         "onenote_list_pages-team",
         "outlook_list_group_events-team",
         "outlook_respond_to_invite-accept",
@@ -38,7 +38,6 @@ _NEEDS_RE_RECORDING = frozenset(
         "teams_list_channels-private",
         "teams_search_messages-alpine",
         "teams_search_messages-lena",
-        "teams_search_messages-person-window",
     }
 )
 RUNNABLE = {

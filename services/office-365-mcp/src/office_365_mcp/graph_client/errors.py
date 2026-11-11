@@ -8,6 +8,7 @@ to "branch on the `innerError.code` value, not the message text"
 (https://learn.microsoft.com/en-us/graph/api/calltranscript-get).
 """
 
+import logging
 import unicodedata
 from asyncio import CancelledError
 from collections.abc import Generator
@@ -22,6 +23,7 @@ from kiota_http._exceptions import KiotaHTTPXError
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from kiota_http.middleware.retry_handler import RetryHandler
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
+from opentelemetry import trace
 
 from office_365_mcp.graph_client.observability import (
     current_graph_operation,
@@ -30,6 +32,8 @@ from office_365_mcp.graph_client.observability import (
     record_graph_step,
     record_graph_throttled,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class GraphFailure(Exception):
@@ -69,9 +73,15 @@ class GraphThrottled(GraphFailure):
         request_id: str | None,
         retry_after_seconds: float | None,
         inner_code: str | None = None,
+        reason: str | None = None,
     ) -> None:
         super().__init__(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=reason,
         )
         self.retry_after_seconds: float | None = retry_after_seconds
 
@@ -212,6 +222,7 @@ def _measured(
     except APIError as error:
         failure = _classify(error)
         status = _status_of(failure)
+        _report(operation, step, failure)
         if isinstance(failure, GraphThrottled):
             record_graph_throttled(operation, retried=_sdk_spent_its_retries(failure))
         raise failure from error
@@ -219,12 +230,11 @@ def _measured(
         # DNS, connect, or read timeout: no HTTP response exists yet, and the request adapter raises
         # `APIError` only once one does, so this never reaches the clause above.
         status = _STATUS[GraphUnavailable]
-        raise GraphUnavailable(
-            f"Microsoft Graph was unreachable: {error}",
-            status=None,
-            code=None,
-            request_id=None,
-        ) from error
+        unreachable = GraphUnavailable(
+            f"Microsoft Graph was unreachable: {error}", status=None, code=None, request_id=None
+        )
+        _report(operation, step, unreachable)
+        raise unreachable from error
     except GraphFailure as failure:
         # Raised inside the block, not translated here: `collect_pages` refusing an unending
         # collection is the one that happens.
@@ -239,12 +249,14 @@ def _measured(
         if not isinstance(error, KiotaHTTPXError) and type(error) is not Exception:
             raise
         status = _STATUS[GraphUnavailable]
-        raise GraphUnavailable(
+        unreadable = GraphUnavailable(
             f"Microsoft Graph gave an answer this connector could not read: {error}",
             status=None,
             code=None,
             request_id=None,
-        ) from error
+        )
+        _report(operation, step, unreadable)
+        raise unreadable from error
     finally:
         _UNMEASURED.reset(outer)
         enclosing = _UNMEASURED.get()
@@ -258,6 +270,25 @@ def _measured(
         if operation_level:
             record_graph_call(operation, status=status, seconds=elapsed)
         record_graph_step(operation, step=step, status=status, seconds=elapsed)
+
+
+def _report(operation: str | None, step: str | None, failure: GraphFailure) -> None:
+    fields = {
+        "graph_operation": operation,
+        "graph_step": step,
+        "graph_remedy": _status_of(failure),
+        "graph_status": failure.status,
+        "graph_code": failure.code,
+        "graph_inner_code": failure.inner_code,
+        "graph_request_id": failure.request_id,
+        "graph_reason": failure.reason,
+    }
+    present = {name: value for name, value in fields.items() if value is not None}
+    level = logging.INFO if isinstance(failure, GraphForbidden | GraphNotFound) else logging.WARNING
+    logger.log(level, "graph call failed", extra=present)
+    trace.get_current_span().set_attributes(
+        {name: value for name, value in present.items() if name != "graph_reason"}
+    )
 
 
 def _status_of(failure: GraphFailure) -> str:
@@ -320,10 +351,16 @@ def _classify(error: APIError) -> GraphFailure:
             request_id=request_id,
             inner_code=inner_code,
             retry_after_seconds=retry_after_seconds,
+            reason=_reason(error),
         )
     if status in (401, 403):
         return GraphForbidden(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=_reason(error),
         )
     if status == 404:
         return GraphNotFound(
@@ -331,7 +368,12 @@ def _classify(error: APIError) -> GraphFailure:
         )
     if status is not None and status >= 500:
         return GraphUnavailable(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=_reason(error),
         )
     return GraphFailure(
         message,

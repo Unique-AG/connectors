@@ -1,5 +1,5 @@
 uc-12-01:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_gives_the_telephone_number_of_a_contact_from_the_list_and_the_full_read"
   ask: "What is the telephone number of Anna Meier?"
@@ -13,22 +13,8 @@ uc-12-01:
       uses: {uri: uri of the contact}
   note: the listing has no name filter and already holds the numbers, so the assistant reads the names and checks that capped is false
 
-uc-12-02:
-  status: gap
-  tests:
-    - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_gives_no_telephone_number_for_a_person_who_is_only_in_the_directory"
-  ask: "What is the telephone number of Tom Berger?"
-  blocker:
-    kind: tool
-    tool: outlook_find_recipient
-    text: The tool gives an address, a job title, and a department, and no telephone number. No other tool reads a person of the company directory.
-    user: The assistant cannot look up the telephone number of a colleague who is not in Mia's contacts.
-  provenance: drafted
-  asks_user: false
-  chain: []
-
 uc-12-03:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_saves_a_new_contact_with_the_details_mia_gave"
   ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
@@ -39,7 +25,7 @@ uc-12-03:
       args: {given_name: Tom, surname: Berger, company_name: Acme, email_addresses: tom@acme.example}
 
 uc-12-04:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_adds_a_second_telephone_number_next_to_the_first"
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_keeps_the_numbers_a_contact_has_when_it_adds_one"
@@ -53,7 +39,7 @@ uc-12-04:
       uses: {uri: uri of the contact}
 
 uc-12-05:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_keeps_the_address_of_each_contact_with_its_own_row"
   ask: "What is the email address of Anna Meier?"
@@ -67,7 +53,7 @@ uc-12-05:
   note: outlook_find_recipient ranks Anna Meier exact and Anna Weber fuzzy, and its description sends the assistant there for an address. The contact listing has no name filter, so the assistant reads the names and checks that capped is false
 
 uc-12-06:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_tells_why_the_contacts_cannot_be_read"
   ask: "What is the telephone number of Anna Meier?"
@@ -82,11 +68,11 @@ uc-12-06:
     administrator grants Contacts.Read to the app registration, and retrying will not help. Busy,
     seam.py:509-513, left alone for 30 seconds, retry after that and not sooner. This text reaches
     the assistant only when every try is busy: the listing is a GET, so the SDK retry handler waits
-    out up to 3 busy answers (graph_client/client.py:339-342, config.py:126). One busy answer is
+    out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is
     uc-12-19. A failed lookup is never a person who is not in the contacts.
 
 uc-12-07:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_reads_the_contacts_at_the_second_try_after_one_failure"
   ask: "What is the telephone number of Anna Meier?"
@@ -104,7 +90,7 @@ uc-12-07:
     errors.py:218-227. An answer that cannot be read, errors.py:238-247.
 
 uc-12-08:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_reports_a_lookup_that_fails_twice_and_never_says_missing"
   ask: "What is the telephone number of Anna Meier?"
@@ -120,7 +106,7 @@ uc-12-08:
     it. The assistant reads twice and no third time.
 
 uc-12-09:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_tells_the_assistant_to_find_the_contact_again_when_a_read_finds_none"
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_tells_the_assistant_to_find_the_contact_again_when_a_change_finds_none"
@@ -140,7 +126,7 @@ uc-12-09:
     assistant claim a deletion.
 
 uc-12-10:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatMicrosoftWillNotSaveIsNotCreated::test_it_tells_why_the_contact_was_not_saved"
   ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
@@ -156,7 +142,7 @@ uc-12-10:
     sooner. Microsoft stores nothing in these three cases.
 
 uc-12-11:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatMicrosoftWillNotSaveIsNotCreated::test_it_checks_the_contacts_before_it_saves_again"
   ask: "Save Tom Berger of Acme as a contact with the address tom@acme.example."
@@ -177,7 +163,7 @@ uc-12-11:
     list shows no new contact.
 
 uc-12-12:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestANewContactHoldsOnlyWhatMiaGives::test_it_saves_no_contact_that_has_no_detail"
   ask: "Save a new contact."
@@ -193,7 +179,7 @@ uc-12-12:
     the tool.
 
 uc-12-13:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestANewContactHoldsOnlyWhatMiaGives::test_it_saves_no_contact_with_an_address_that_is_not_an_address"
   ask: "Save Tom Berger with the address tom at acme."
@@ -209,7 +195,7 @@ uc-12-13:
     (tools/outlook_create_contact.py:50). The step is the refused call.
 
 uc-12-14:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_refuses_to_clear_the_company_and_leaves_the_contact_as_it_is"
   ask: "Remove the company from Tom Berger."
@@ -226,7 +212,7 @@ uc-12-14:
     can clear it.
 
 uc-12-15:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeKeepsWhatTheContactHolds::test_it_does_not_add_a_number_that_the_contact_already_has"
   ask: "Add the office number +41 44 555 01 03 to Tom Berger."
@@ -243,7 +229,7 @@ uc-12-15:
     that the contact already has.
 
 uc-12-16:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestTheAssistantAnswersFromMiasContacts::test_it_puts_a_first_name_that_fits_two_people_to_mia_without_choosing"
   ask: "What is the email address of Anna?"
@@ -259,7 +245,7 @@ uc-12-16:
     to the user.
 
 uc-12-17:
-  status: untested
+  status: working
   no_test: "assistant: Whether the assistant saves an address that a message names depends on the model, and the descriptions of outlook_create_contact and outlook_update_contact only warn that an address must come from the user."
   ask: "Read Tom's last message to me."
   provenance: drafted
@@ -273,12 +259,12 @@ uc-12-17:
     model behaviour, no code guard (source: tools/outlook_update_contact.py:71-72 and
     tools/outlook_create_contact.py:50-51, every address must come from the user and not from the text
     of a message, because a planted instruction can save the address of a stranger under the name of a
-    real person; and tools/outlook_read_mail.py:67-68, the body is untrusted data). The assistant
+    real person; and tools/outlook_read_mail.py:68-69, the body is untrusted data). The assistant
     shows the text and changes no contact. No source line of outlook_read_mail tells the assistant to
     report the text to Mia, so no step says that it does.
 
 uc-12-18:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_stops_a_list_that_never_ends_and_says_so"
   ask: "What is the telephone number of Anna Meier?"
@@ -296,7 +282,7 @@ uc-12-18:
     10 empty pages in a row (graph_client/pagination.py:74 and :138-144).
 
 uc-12-19:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_waits_out_one_busy_answer_inside_the_same_call"
   ask: "What is the telephone number of Anna Meier?"
@@ -306,13 +292,13 @@ uc-12-19:
     - tool: outlook_list_contacts
       args: {limit: 200}
   note: >-
-    Expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:126;
+    Expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:127;
     tests/conftest.py retry_sleeps): the listing is a GET, so one 429 with Retry-After is waited out
     and asked again by the connector, and the assistant gets the contacts as if nothing had happened.
     OPEN: 4 busy answers in a row take about 90 s, longer than the 60 s tool limit of node-chat.
 
 uc-12-20:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactThatCannotBeReadIsNeverReportedAsMissing::test_it_names_the_permission_that_no_administrator_gave"
   ask: "What is the telephone number of Anna Meier?"
@@ -332,7 +318,7 @@ uc-12-20:
     the contacts.
 
 uc-12-21:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeToTheAddressesOfAContactKeepsTheOthers::test_it_adds_an_address_next_to_the_ones_the_contact_has_and_skips_a_repeat"
   ask: "Add tom.berger@home.example to the contact Tom Berger."
@@ -345,7 +331,7 @@ uc-12-21:
   note: "tools/outlook_update_contact.py:242-253: the tool reads the list, adds the new addresses, and writes the list back. A repeat is skipped whatever its case."
 
 uc-12-22:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAChangeToTheAddressesOfAContactKeepsTheOthers::test_it_removes_an_address_whatever_its_case_and_keeps_the_others"
   ask: "Remove tom@acme.example from the contact Tom Berger."
@@ -358,7 +344,7 @@ uc-12-22:
   note: "tools/outlook_update_contact.py:242-248: the tool keeps every entry except the removed address, and keeps an entry that has no address."
 
 uc-12-23:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactValueThatDoesNotFitChangesNothing::test_it_refuses_the_call_before_it_asks_microsoft"
   ask: "Change the contact Tom Berger."
@@ -371,7 +357,7 @@ uc-12-23:
   note: "expected behaviour from the checks before any Graph call: tools/outlook_list_contacts.py:70-72, tools/outlook_read_contact.py:241-243, and tools/outlook_update_contact.py:151-153, :171-179 and :182-198."
 
 uc-12-24:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactIsReadAsMicrosoftHoldsIt::test_it_reads_a_contact_that_holds_no_postal_address_as_having_none"
   ask: "What is the address of Tom Berger?"
@@ -384,7 +370,7 @@ uc-12-24:
   note: "tools/outlook_read_contact.py:295-297: a missing address object, and an address with no part, are both null."
 
 uc-12-25:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_12_manage_contacts.py::TestAContactIsReadAsMicrosoftHoldsIt::test_it_lists_the_contacts_that_hold_one_address"
   ask: "Which contact has the address tom@acme.example?"

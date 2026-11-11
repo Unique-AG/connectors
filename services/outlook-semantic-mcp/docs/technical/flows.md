@@ -233,7 +233,7 @@ sequenceDiagram
 
 ## Email Draft Creation Flow
 
-When the user calls the `create_draft_email` tool:
+When the user calls the `draft_email` tool:
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
@@ -243,7 +243,7 @@ sequenceDiagram
     participant OutlookMCP as Outlook Semantic MCP Server
     participant MSGraph as Microsoft Graph API
 
-    MCPClient->>OutlookMCP: create_draft_email (subject, body, recipients, attachments)
+    MCPClient->>OutlookMCP: draft_email (subject, body, recipients, attachments)
     OutlookMCP->>MSGraph: POST /me/messages (subject, body as HTML, toRecipients, ccRecipients)
     MSGraph->>OutlookMCP: Draft created (draftId, webLink)
 
@@ -262,6 +262,49 @@ sequenceDiagram
 - The draft is created in the user's Outlook Drafts folder via Microsoft Graph — it is **not** sent automatically.
 - The `webLink` in the response lets the user open the draft directly in Outlook to review and send.
 - If one or more attachments fail to upload, the draft is still returned with a list of failed attachments.
+
+## Email Draft Editing Flow
+
+When the agent edits an existing draft, it first finds and reads it, then calls one of `update_draft_email`, `add_attachments_to_draft_email`, or `remove_attachments_from_draft_email`:
+
+```mermaid
+%%{init: {'theme': 'neutral', 'themeVariables': { 'fontSize': '14px' }}}%%
+sequenceDiagram
+    autonumber
+    participant MCPClient as MCP Client
+    participant OutlookMCP as Outlook Semantic MCP Server
+    participant MSGraph as Microsoft Graph API
+
+    MCPClient->>OutlookMCP: search_emails (Drafts folder)
+    OutlookMCP->>MCPClient: Results with isDraft and openEmailParams
+    MCPClient->>OutlookMCP: open_email (openEmailParams, HTML body)
+    OutlookMCP->>MSGraph: GET /me/messages/{id} (isDraft, HTML body, attachments)
+    MSGraph->>OutlookMCP: Draft body, recipients, attachment names
+    OutlookMCP->>MCPClient: Email data with metadata.isDraft and metadata.attachments
+
+    MCPClient->>OutlookMCP: update_draft_email / add_attachments_to_draft_email / remove_attachments_from_draft_email
+    OutlookMCP->>MSGraph: GET /me/messages/{id} (isDraft, subject, attachments)
+    alt Message is no longer a draft
+        OutlookMCP->>MCPClient: Failure, nothing changed
+    else Still a draft
+        opt remove_attachments_from_draft_email
+            OutlookMCP->>MCPClient: Elicitation: remove these attachments?
+            MCPClient->>OutlookMCP: Accept or decline
+        end
+        OutlookMCP->>MSGraph: PATCH /me/messages/{id} or POST / DELETE /me/messages/{id}/attachments
+        MSGraph->>OutlookMCP: Draft updated
+        OutlookMCP->>MCPClient: Result (webLink, attachmentsFailed or removed / failed)
+    end
+```
+
+**Key points:**
+
+- Microsoft Graph only accepts edits to subject, body, and recipients while the message is a draft, so every editing tool re-checks `isDraft` itself instead of trusting the earlier read.
+- The agent opens a draft with `openEmailParams`. That reads the live HTML from Graph. When the object includes `uniqueContentId` and `chunkIds`, the response also carries those matched ingested passages in `chunks`.
+- `update_draft_email` sends only the fields that were passed. `content` is HTML stored unchanged. Body and recipient lists replace the existing ones.
+- Inline attachments are not removed unless `includeInline` is set.
+- Attachment removal waits for the user's confirmation. If the user declines or the client cannot show the prompt, nothing is deleted.
+- In a shared or delegated mailbox the same calls go to `/users/{mailbox}/messages/...`.
 
 ## Related Documentation
 

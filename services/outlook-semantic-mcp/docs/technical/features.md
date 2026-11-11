@@ -42,7 +42,7 @@ Available in both modes. Behaviour is identical.
 
 **What's supported**
 
-- Create draft emails in the signed-in user's Drafts folder via `create_draft_email`, with subject, body, recipients (To, CC, BCC), and attachments.
+- Create draft emails in the signed-in user's Drafts folder via `draft_email`, with subject, body, recipients (To, CC, BCC), and attachments.
 - The draft is not sent automatically — the tool response includes a `webLink` for the user to open and send from Outlook.
 - Attachments can be provided as base64-encoded data URIs or Unique content URIs (cluster-local mode only).
 
@@ -51,7 +51,28 @@ Available in both modes. Behaviour is identical.
 - Sending email directly from the MCP — drafts must be sent manually by the user.
 - Creating drafts in another user's mailbox (delegated or otherwise).
 
-**See also:** [Tools — create_draft_email](./tools.md#create_draft_email)
+**See also:** [Tools — draft_email](./tools.md#draft_email)
+
+---
+
+## Draft Editing
+
+Available in both modes. Behaviour is identical.
+
+**What's supported**
+
+- Edit an existing unsent draft — subject, body, To and CC recipients — via `update_draft_email`. This works for drafts created by the MCP and for drafts the user wrote in Outlook.
+- Add attachments to an existing draft via `add_attachments_to_draft_email`.
+- Remove attachments from an existing draft via `remove_attachments_from_draft_email`. The user must confirm the removal in a prompt first.
+- Find drafts with `search_emails` (results carry `isDraft`) and read the live HTML with `open_email` (`openEmailParams`) before editing. Edits in a shared or delegated mailbox use `openEmailParams.mailbox`.
+
+**What's not supported**
+
+- Editing a message that was already sent. Every editing tool re-reads the message from Microsoft Graph and refuses when it is no longer a draft.
+- Editing only part of the body without sending the rest. `update_draft_email` replaces the whole HTML body. The agent edits the HTML `open_email` returned and sends that HTML back; the server does not convert Markdown. Rebuilding the body drops fonts, tables, the signature, the quoted thread, and `cid:` images.
+- Removing an inline image unless the caller sets `includeInline`. Those attachments are pictures the body references.
+
+**See also:** [Tools — Draft Editing](./tools.md#Draft-Editing)
 
 ---
 

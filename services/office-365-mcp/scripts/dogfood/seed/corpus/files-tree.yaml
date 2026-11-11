@@ -39,3 +39,18 @@ team:
     - {name: Team Budget.xlsx, folder: Team Drafts, kind: xlsx, rows: [[Item, Planned], [Print, "4000"]], properties: {title: Team Budget, creator: anna, last_modified_by: anna, company: Lakeside Demo AG}}
   channel_files:
     - {name: Channel Notes.txt, kind: txt, text: "Channel notes. The files of this channel live here.\n"}
+
+# The opt-in phase `lists`: two generic lists on the team site and a OneDrive folder of the same
+# name as a list. `columns` are Graph columnDefinition bodies. `rows` are list item fields.
+lists:
+  folder: Tasks
+  lists:
+    - name: Tasks
+      columns:
+        - {name: Status, indexed: true, choice: {choices: [Open, Closed], allowTextEntry: false, displayAs: dropDownMenu}}
+        - {name: Amount, number: {}}
+        - {name: Notes, indexed: false, text: {}}
+        - {name: Owner, personOrGroup: {allowMultipleSelection: false, chooseFromType: peopleOnly}}
+      rows:
+        - {Title: Close books, Status: Open, Amount: 12.5}
+    - {name: Issues}

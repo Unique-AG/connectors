@@ -285,8 +285,8 @@ async def _copy_to_notebook(
     builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_to_notebook_body.CopyToNotebookPostRequestBody(
             id=destination.notebook_id, group_id=group_id_of(destination.owner), rename_as=new_name
@@ -306,8 +306,8 @@ async def _copy_to_section_group(
     builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_section_group
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_to_section_group_body.CopyToSectionGroupPostRequestBody(
             id=destination.section_group_id,

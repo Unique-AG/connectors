@@ -35,7 +35,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import CollectedItems, GraphCollection, collect_pages, graph_step
 from office_365_mcp.shared.calendar import counted_people
 from office_365_mcp.shared.handles import MeetingHandle
-from office_365_mcp.shared.identity import Person, person_in_question
+from office_365_mcp.shared.identity import Person, address_in_question, person_in_question
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.window import as_utc
 
@@ -97,9 +97,15 @@ async def resolve_meeting(
 def organized_by(meeting: OnlineMeeting, user: User) -> bool:
     participants = meeting.participants
     organizer = None if participants is None else participants.organizer
-    identities = None if organizer is None else organizer.identity
-    named = None if identities is None or identities.user is None else identities.user.id
+    named = user_id_of(None if organizer is None else organizer.identity)
     return named is not None and user.id is not None and named.casefold() == user.id.casefold()
+
+
+def user_id_of(identities: IdentitySet | None) -> str | None:
+    """The user's Entra object id. An unknown `@odata.type` on the identity still deserializes to
+    the base `identity`, which carries the id."""
+    user = None if identities is None else identities.user
+    return None if user is None else user.id
 
 
 def meeting_times(
@@ -151,8 +157,11 @@ def distinct_people(people: Sequence[Person]) -> tuple[Person, ...]:
     )
 
 
-def named_people(people: Sequence[Person]) -> str:
-    named = [person_in_question(person.user_id, person.name) for person in people]
+def named_people(people: Sequence[Person], addresses: Sequence[str] = ()) -> str:
+    named = [
+        *(person_in_question(person.user_id, person.name) for person in people),
+        *(address_in_question(address) for address in addresses),
+    ]
     return f"{counted_people(named)}: {', '.join(named)}"
 
 

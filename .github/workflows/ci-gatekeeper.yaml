@@ -76,3 +76,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           timeout: "1200"
           interval: "60"
+          ignored: "Cursor Automation: Connectors Dependency PR Assess"

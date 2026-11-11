@@ -48,7 +48,7 @@ TOOL_NAME = "onenote_list_sections"
 STEP_SECTIONS = "sections"
 STEP_SECTION_GROUPS = "section_groups"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "parent": "onenote:///notebooks/1-SYNTHETICNOTEBOOK0000"

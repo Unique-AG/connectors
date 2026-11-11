@@ -1,5 +1,5 @@
 uc-01-01:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_a_search_by_word_and_type_asks_for_that_type_and_shows_the_hit"
   ask: "Find the Brightway agreement as a Word document."
@@ -11,7 +11,7 @@ uc-01-01:
       args: {query: Brightway agreement, file_type: docx}
 
 uc-01-02:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_the_file_edited_last_comes_first_with_its_editor"
   ask: "Show me the quarterly plan that was edited last, and who edited it."
@@ -22,7 +22,7 @@ uc-01-02:
       args: {query: quarterly plan, sort_by: last_modified}
 
 uc-01-03:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_a_search_stays_on_the_site_that_a_site_search_named"
   ask: "Find the NDA template on the Legal site only."
@@ -36,7 +36,7 @@ uc-01-03:
       uses: {path: web address of the Legal site from sharepoint_search_sites}
 
 uc-01-04:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_a_search_without_a_match_answers_with_an_empty_list"
   ask: "Find the Zephyr budget."
@@ -48,7 +48,7 @@ uc-01-04:
       args: {query: Zephyr}
 
 uc-01-05:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestBrowsingAFolder::test_a_folder_lists_one_level_newest_first"
   ask: "What is in the folder 2026 Contracts, newest first?"
@@ -63,7 +63,7 @@ uc-01-05:
       uses: {folder: handle of the folder 2026 Contracts from the search}
 
 uc-01-06:
-  status: untested
+  status: working
   ask: "What is the launch date in the Brightway launch plan?"
   provenance: observed
   evidence: sharepoint_search_files then sharepoint_read_file in 9 sessions; sharepoint_read_file alone in 27 sessions
@@ -94,7 +94,7 @@ uc-01-06:
           graph_calls: {GET /v1.0/drives/*/content: 1, GET /v1.0/drives/*: 1, GET /*/download.aspx: 1}
 
 uc-01-07:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_sharing_link_leads_to_the_file_it_opens"
   ask: "Summarize the Q3 plan that Anna sent me a sharing link to."
@@ -107,7 +107,7 @@ uc-01-07:
       uses: {file: handle from sharepoint_resolve_url}
 
 uc-01-08:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_every_file_of_a_folder_is_read_on_its_own"
   ask: "Which of the 6 offers in the Tenders folder has the lowest price?"
@@ -121,7 +121,7 @@ uc-01-08:
       uses: {file: handle of each file}
 
 uc-01-10:
-  status: untested
+  status: working
   ask: "Summarize the Brightway annual report PDF."
   provenance: drafted
   asks_user: false
@@ -138,13 +138,8 @@ uc-01-10:
   fixture: uc-01-10
 
 uc-01-11:
-  status: partly
-  ask: "Summarize the Brightway Master Agreement."
-  blocker:
-    kind: unknown
-    tool: sharepoint_read_file
-    text: When Microsoft answers 406 to `convert_to` pdf, the tool raises an error that asks for a second call without `convert_to`, and that call returns the file in its own format. Its description says that it does not turn a document into text. No run shows that the assistant can read a Word file in that form, so the cause is not known.
-    user: The assistant may not be able to read some files that Microsoft cannot convert.
+  status: working
+  ask: "Read the Brightway Master Agreement."
   provenance: observed
   evidence: 16 failures in 9 sessions; the 4 newest were Microsoft 406 on the content
   asks_user: false
@@ -158,18 +153,17 @@ uc-01-11:
         tool_error: tools.sharepoint_read_file._NOT_CONVERTIBLE
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE: 1, GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content: 1}
     - tool: sharepoint_read_file
-      optional: true
       bind: {file: "sharepoint:///files/b%21RUNDRIVE/01RUNFILE"}
       expect:
         result:
           "content[0].resource.uri": file:///Brightway%20Master%20Agreement.docx
           "content[0].resource.mimeType": application/vnd.openxmlformats-officedocument.wordprocessingml.document
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE: 1, GET /v1.0/drives/b!RUNDRIVE/items/01RUNFILE/content: 1}
-  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call returns the file in its own format; no run shows that the assistant reads it
+  note: when Microsoft refuses the conversion, the tool says to call again without convert_to, and the second call returns the file in its own format. No tool gives a document as text, so the client of the assistant reads it
   fixture: uc-01-11
 
 uc-01-16:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingAFile::test_files_that_changed_in_a_window_are_asked_for_with_that_window"
   ask: "Which Brightway files on the Sales site changed this week?"
@@ -184,7 +178,7 @@ uc-01-16:
   note: the tool needs a word in query, so the topic Brightway stays in the ask
 
 uc-01-12:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_file_that_needs_no_conversion_comes_back_as_it_is"
   ask: "What is the launch date in the Brightway launch notes?"
@@ -198,7 +192,7 @@ uc-01-12:
   note: a PDF and a text file are not on the convert list of the tool, so the call leaves convert_to out
 
 uc-01-13:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestBrowsingAFolder::test_the_top_of_onedrive_lists_its_files_and_folders"
   ask: "What is in my OneDrive?"
@@ -208,7 +202,7 @@ uc-01-13:
     - tool: sharepoint_browse_folder
 
 uc-01-14:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_sharing_link_leads_to_the_file_it_opens"
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_pasted_address_that_opens_nothing_sends_the_assistant_to_the_search"
@@ -225,7 +219,7 @@ uc-01-14:
   note: Microsoft documents the lookup for sharing links, so an address from a browser can fail and then the assistant searches by the file name
 
 uc-01-15:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestBrowsingAFolder::test_the_files_of_a_channel_are_listed_from_its_files_folder"
   ask: "What files are in the Launch channel of the Platform team?"
@@ -241,7 +235,7 @@ uc-01-15:
       uses: {folder: handle of the channel folder from teams_get_channel_files_folder}
 
 uc-01-17:
-  status: untested
+  status: working
   ask: "What is the launch date in the Brightway launch plan?"
   provenance: drafted
   asks_user: false
@@ -296,7 +290,7 @@ uc-01-17:
           graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNPLAN: 1}
 
 uc-01-18:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_microsoft_that_stays_busy_is_reported_with_the_wait_it_asked_for"
   ask: "Tell me the launch date in the Brightway launch plan."
@@ -308,10 +302,10 @@ uc-01-18:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:126). One busy answer is uc-01-30."
+  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is uc-01-30."
 
 uc-01-19:
-  status: untested
+  status: working
   ask: "What is the launch date in the Brightway launch plan?"
   provenance: drafted
   asks_user: false
@@ -403,7 +397,7 @@ uc-01-19:
 
 
 uc-01-20:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_read_that_fails_twice_is_reported_as_failed_and_not_to_be_repeated"
   ask: "What is the launch date in the Brightway launch plan?"
@@ -421,7 +415,7 @@ uc-01-20:
   note: "expected behaviour from shared/seam.py:549-553: Retry once; if it fails again the same way, stop and report it, because some Graph 500s are permanent for particular content"
 
 uc-01-21:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_rejected_read_gives_the_reason_and_is_not_to_be_repeated"
   ask: "Look up the launch date in the Brightway launch plan."
@@ -436,7 +430,7 @@ uc-01-21:
   note: "expected behaviour from shared/seam.py:579-584 and 587-590: Microsoft 365 rejected this request because it is a bad request, the same call fails the same way, and Microsoft 365 gave this reason (the reason text)"
 
 uc-01-22:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_a_folder_is_refused_with_the_handle_that_lists_it"
   ask: "Read the Tenders folder."
@@ -453,7 +447,7 @@ uc-01-22:
   note: "expected behaviour from tools/sharepoint_read_file.py:69-79 (_NOT_A_FILE_HANDLE, raised at :134-136 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:185-186), so the assistant may browse without the failed read, which is why that step is optional."
 
 uc-01-23:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_an_item_that_only_looks_like_a_file_is_not_read"
   ask: "Summarize the Customers file in my OneDrive."
@@ -467,7 +461,7 @@ uc-01-23:
   note: "expected behaviour for both rows from tools/sharepoint_read_file.py:88-95 (_NOT_A_PLAIN_FILE): Microsoft does not hold the item as a plain file, a OneNote notebook and a shortcut to another drive both look like files, open the item in a browser instead, reading it again fails the same way"
 
 uc-01-24:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_a_file_of_unknown_size_is_not_read"
   ask: "Summarize the Brightway Master Agreement."
@@ -482,7 +476,7 @@ uc-01-24:
   note: "expected behaviour from tools/sharepoint_read_file.py:103-109 (_NO_SIZE): the tool will not fetch a file whose size it does not know, this is a gap in what Microsoft reported, open the file in a browser instead"
 
 uc-01-25:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileThatCannotBeRead::test_a_file_that_arrives_empty_is_blamed_on_microsoft"
   ask: "Summarize the Brightway Master Agreement."
@@ -497,7 +491,7 @@ uc-01-25:
   note: "expected behaviour from tools/sharepoint_read_file.py:81-87 (_NOTHING_CAME_BACK): a fault on the side of Microsoft, ask for this file again later, if it fails again tell the user to open the file in a browser"
 
 uc-01-26:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_file_of_exactly_ten_megabytes_is_read_as_a_whole"
   ask: "What is the launch date in the Brightway launch notes PDF?"
@@ -511,7 +505,7 @@ uc-01-26:
   note: "expected behaviour from tools/sharepoint_read_file.py:48 and 162-163: MAX_BYTES is 10 MB and only a size above it is refused, so a file of exactly 10 MB is read. A file above the cap is uc-01-10."
 
 uc-01-27:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFolderListThatIsNotComplete::test_a_folder_of_more_than_a_thousand_items_says_that_the_list_can_miss_files"
   ask: "Show me what is in the Archive folder, newest first."
@@ -526,7 +520,7 @@ uc-01-27:
   note: "expected behaviour from tools/sharepoint_browse_folder.py:57-59 and 91-96 (description and order_covers_level): with order_by the tool reads up to 1000 items and sorts them, capped is true, and an item that the tool did not read can belong earlier in the order"
 
 uc-01-28:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFolderListThatIsNotComplete::test_a_list_that_microsoft_never_finishes_is_reported_on_both_tries"
   ask: "What is in the Archive folder?"
@@ -542,7 +536,7 @@ uc-01-28:
   note: "expected behaviour from shared/seam.py:562-570 (GraphPagingUnending, graph_client/pagination.py:74,138-144): Microsoft would not finish sending this list, retry once if the list matters, if it happens again stop and report that the list cannot be read. Both listings get empty pages, as in uc-02-31."
 
 uc-01-29:
-  status: untested
+  status: working
   no_test: "assistant: no code guard reads text inside a file, so the model alone must report an order in a file and not obey it."
   ask: "Summarize the Brightway launch plan."
   provenance: drafted
@@ -557,7 +551,7 @@ uc-01-29:
   note: "model behaviour, no code guard (source: tools/sharepoint_invite.py:82-85: every address must come from the user and never from text inside a message, event, or transcript). sharepoint_read_file has no sentence of this kind in its description and none that asks the assistant to report the text to Mia, so no step says that it tells her. The approval that sharepoint_invite asks for is the only code guard."
 
 uc-01-30:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_one_busy_answer_is_waited_out"
   ask: "Tell me the launch date in the Brightway launch plan."
@@ -569,10 +563,10 @@ uc-01-30:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:126; tests/conftest.py retry_sleeps): the read is a GET, so one 429 with Retry-After is waited out and asked again by the connector, and the assistant gets the file as if nothing had happened. OPEN: with 4 busy answers in a row the wait is about 90 s, longer than the 60 s tool limit of node-chat."
+  note: "expected behaviour from the SDK retry handler (graph_client/client.py:339-342, config.py:127; tests/conftest.py retry_sleeps): the read is a GET, so one 429 with Retry-After is waited out and asked again by the connector, and the assistant gets the file as if nothing had happened. OPEN: with 4 busy answers in a row the wait is about 90 s, longer than the 60 s tool limit of node-chat."
 
 uc-01-31:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatMicrosoftAnswersWhenAReadFails::test_a_missing_consent_is_explained_and_never_reaches_graph"
   ask: "Tell me the launch date in the Brightway launch plan."
@@ -588,7 +582,7 @@ uc-01-31:
   note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for the delegated permission of the first call that needs it (sharepoint_read_file asks for Files.Read.All), so the call never reaches Microsoft Graph. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The failing call is the first call that needs the permission, so both steps are optional."
 
 uc-01-32:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_drive_of_the_user_is_named_with_its_web_address"
   ask: "Which drive holds my files?"
@@ -597,29 +591,23 @@ uc-01-32:
   asks_user: false
   chain:
     - tool: sharepoint_list_drives
-  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:62-67)
+  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:64-69)
 
 uc-01-33:
-  status: partly
+  status: working
   tests:
-    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_tool_has_no_site_to_list_and_says_it_lists_no_site_library"
+    - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhereTheFilesAreStored::test_the_libraries_of_a_site_are_listed_from_its_web_address"
   ask: "Which document libraries does the Sales site have?"
-  blocker:
-    kind: tool
-    tool: sharepoint_list_drives
-    text: No tool lists the document libraries of a SharePoint site. The description of sharepoint_list_drives (tools/sharepoint_list_drives.py:36-37) sends the assistant to sharepoint_search_files, which needs a word to search for and shows files, not libraries.
-    user: The assistant cannot list the document libraries of a site.
   provenance: drafted
   asks_user: false
   chain:
-    - tool: sharepoint_list_drives
-      optional: true
     - tool: sharepoint_search_sites
       args: {query: Sales}
-  note: "expected behaviour from tools/sharepoint_list_drives.py:36-37: this tool does not list the document libraries of SharePoint sites. The description steers the assistant away from sharepoint_list_drives for this ask, so the first step is optional. The ask names no topic, so no file search follows."
+    - tool: sharepoint_list_drives
+      uses: {site: web address of the Sales site from sharepoint_search_sites}
 
 uc-01-34:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingASite::test_a_search_without_a_match_answers_with_an_empty_list"
   ask: "Find the Zephyr site."
@@ -631,7 +619,7 @@ uc-01-34:
   note: "expected behaviour from tools/sharepoint_search_sites.py:75-77 (SiteList.sites): an empty list means that no site matched. The tool states no sentence for Mia, so the assistant reports the empty list as found no site."
 
 uc-01-35:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingASite::test_a_search_with_more_matches_than_the_limit_says_that_it_stopped_early"
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestFindingASite::test_a_search_with_more_than_a_thousand_matches_stays_capped_at_the_highest_limit"
@@ -647,7 +635,7 @@ uc-01-35:
   note: "expected behaviour from tools/sharepoint_search_sites.py:81-85 (SiteList.capped): capped is true when `limit` or the cap of 1000 sites stopped the search while more sites matched, and the field text says to raise `limit` up to 1000 or to make `query` more specific. Below 1000 matches a raised `limit` shows all of them (default 25, tools/sharepoint_search_sites.py:135-142), so the scenario states more than 1000 matches, where capped stays true after the second search with `limit` 1000. The source has no text that tells the assistant to report the cap to Mia, so the Then states only that the assistant does not call the list complete (model behaviour from the capped field, no code guard)."
 
 uc-01-36:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestReadingAFile::test_a_file_that_names_another_file_leads_to_the_named_file"
   ask: "What is the budget that the Brightway launch plan names?"
@@ -667,7 +655,7 @@ uc-01-36:
       uses: {file: handle of the workbook from the second search}
 
 uc-01-37:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_a_handle_of_the_wrong_kind_is_refused_and_microsoft_is_not_asked"
   ask: "Read the folder Tenders."
@@ -678,7 +666,7 @@ uc-01-37:
   note: "expected behaviour per row from tools/sharepoint_read_file.py:69-80 (_NOT_A_FILE_HANDLE: a folder handle is not a file handle) and tools/sharepoint_browse_folder.py:62-70 (_NOT_A_FOLDER_HANDLE: a file handle is not a folder handle). Both checks come before any Graph call."
 
 uc-01-38:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileInTheFormThatMiaNeeds::test_a_converted_file_comes_back_as_a_pdf_with_a_pdf_name"
   ask: "What is the launch date in the Brightway launch plan?"
@@ -691,7 +679,7 @@ uc-01-38:
   note: "expected behaviour from tools/sharepoint_read_file.py:220-224 (_converted_name): the name of the PDF is the name of the file with its last extension replaced by .pdf, and a name with no extension gets .pdf added. A real conversion cannot be recorded: the recorder refuses the converted PDF, which is a binary body that the seed generator did not make."
 
 uc-01-39:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFolderInTheOrderThatMiaAsksFor::test_a_folder_is_listed_in_the_order_of_the_names"
   ask: "List the folder Ordered by name."
@@ -704,7 +692,7 @@ uc-01-39:
       uses: {folder: handle of the folder Ordered}
 
 uc-01-40:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileInTheFormThatMiaNeeds::test_a_file_with_no_usable_type_is_read_as_plain_bytes"
   ask: "Read the file Notes.txt."
@@ -716,7 +704,7 @@ uc-01-40:
   note: "expected behaviour from tools/sharepoint_read_file.py:227-241 (_media_type, _is_utf8): a file with no type from Microsoft, and a text type with a body that is not valid UTF-8, come back as application/octet-stream."
 
 uc-01-41:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestAFileInTheFormThatMiaNeeds::test_a_file_larger_than_microsoft_said_is_refused_while_it_comes_in"
   ask: "Summarize the Brightway annual report PDF."
@@ -728,7 +716,7 @@ uc-01-41:
   note: "expected behaviour from tools/sharepoint_read_file.py:179-180 and 254-270 (_too_large with no size): the download stops at 10 MB, and the text says that the file is more than 10 MB and gives the web address of the file."
 
 uc-01-42:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_a_window_that_runs_backwards_is_refused"
   ask: "Find the Brightway files that changed between 30 October and 26 October."
@@ -740,7 +728,7 @@ uc-01-42:
   note: "expected behaviour from tools/sharepoint_search_files.py:66-72 (_WINDOW_RUNS_BACKWARDS): put the earlier point in modified_after and the later one in modified_before, then call again. The check comes before any Graph call."
 
 uc-01-43:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_a_search_with_no_word_in_it_is_refused"
   ask: "Search for files."
@@ -751,7 +739,7 @@ uc-01-43:
   note: "expected behaviour from tools/sharepoint_search_files.py:74-78 (_NOTHING_TO_SEARCH_FOR): query holds no word to look for and no other argument was given, so the tool searches nothing."
 
 uc-01-44:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_a_search_on_a_site_names_the_site"
   ask: "Find Team Charter."
@@ -763,7 +751,7 @@ uc-01-44:
   note: "expected behaviour from tools/sharepoint_search_files.py:203-217 (_sites): the sites come from the group of results for the field SPSiteURL, ranked by the count that Microsoft gives, and a bucket with no key or no count is left out. The test tenant answers with no group of results, so the answer in the test is made by hand."
 
 uc-01-45:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_a_search_answer_with_no_site_list_shows_no_site"
   ask: "Find the Brightway files."
@@ -775,7 +763,7 @@ uc-01-45:
   note: "expected behaviour from tools/sharepoint_search_files.py:203-221 (_sites, _hits_container): an answer with no group of results, or with a group of another field only, gives an empty files list and an empty sites list. An empty list is never a sign that the matches have no site."
 
 uc-01-46:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_a_time_window_with_exact_times_is_searched_to_the_moment"
   ask: "Find the Brightway files that changed from 08:00 on 26 October to 17:45:30 on 30 October."
@@ -787,7 +775,7 @@ uc-01-46:
   note: "expected behaviour from tools/sharepoint_search_files.py:251-260 (_closing_term, _wire): a time as the upper bound closes the window at that moment, and a time with a fraction of a second keeps the fraction."
 
 uc-01-47:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestARequestThatCannotSucceed::test_an_address_that_is_not_a_web_address_is_refused"
   ask: "Open Plan.docx."
@@ -798,7 +786,7 @@ uc-01-47:
   note: "expected behaviour from tools/sharepoint_resolve_url.py:42-48 (_NOT_A_WEB_ADDRESS) and 84-89 (_is_web_address): the tool takes a full address that starts with https:// and names a host. A name, an http address and an address that urlsplit cannot read are refused before any Graph call."
 
 uc-01-48:
-  status: untested
+  status: working
   tests:
     - "tests/tools/scenarios/test_01_find_and_read_files.py::TestWhatTheSearchAndTheListingsShow::test_an_entry_without_an_id_or_an_address_is_left_out"
   ask: "Which drives and sites do I have?"

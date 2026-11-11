@@ -80,7 +80,8 @@ The recorder prints the counts of each replacement. It refuses to write when the
   so `id` names the top-level `id` only, and the `id` of an attachment is no destination. A value under a `FORBIDDEN` key is
   refused. A write glob with no `*` outside `/v1.0/me/` needs a `seed-v1 case-` name in the body.
   An event of the default calendar passes when the run read the event as seed data or created it.
-  After any 429 or 5xx answer, or a send that raises, no write is sent.
+  After a request of a step gets a 429 or 5xx answer, or its send raises, no later write is sent.
+  A preflight request that fails refuses the case, as the cap item below says.
 - A write of a tool in `CREATED_ONLY` must name an item that the same run created. The number is
   the position of the `*` that holds that item. A chat is created by `POST /v1.0/chats`, and its
   topic must hold `seed-v1 case-`.
@@ -90,9 +91,21 @@ The recorder prints the counts of each replacement. It refuses to write when the
 - Addresses: any `@`, also full-width or percent-encoded, must be an address that `getaddresses`
   parses. The address, with its IDNA domain, must be one of `SEED_UPNS`. A send of a draft is
   refused when an answer of the run showed a recipient that is not one of `SEED_UPNS`.
+- A step can carry `as: 1..3`, the position in `SEED_UPNS` of the user whose token the step uses.
+  Without `as`, the step uses the user of the case `persona`. Each user of the run has a guard and
+  a `/me` check of its own, and the runbook gives the token of a user other than the case user in
+  `GRAPH_TOKEN_<n>`. A missing token refuses the case before any request. A token of another user
+  than the position refuses the case before any step. The own drives of all users of the run are
+  one set: a path under `/v1.0/drives/<id>/` of that set passes the path check for every step of
+  the run. The other rules, the tool globs and the seed-data rule for writes, still decide.
 - The preflight reads `/me/drive` for the drive id. A token with no Files scope gets no drive id,
   and the run goes on without the drive.
-- A cap of 40 requests per run (`--max-requests`, at most 100).
+- A cap of 40 requests per run (`--max-requests`, at most 100). The cap counts the requests of
+  all steps together, also when the steps run as different users. A request of a step that gets an
+  answer 429 or 5xx, or an error of the transport, also stops the writes of every later step,
+  whoever runs it. Another 4xx answer does not, because Microsoft did not apply that write. A
+  preflight request that gets any answer but 200 refuses the case before a step runs. Only the
+  read of `/me/drive` may fail, and the run goes on without the drive.
 - An extra address is open only for the tools that a family names in `ADDRESSES`, and only when its
   variable is set: `SEED_DIRECTORY_UPN`, `SEED_GUEST_UPN`, `SEED_ROOM_UPN` and `SEED_SHARED_UPN`. A
   case writes `env:SEED_ROOM_UPN`. The fixture holds `room@example.test`. Put these addresses into
@@ -114,7 +127,8 @@ The recorder prints the counts of each replacement. It refuses to write when the
 - A drive other than the own drive, such as the library of a team, is open for reading only to the
   named tools of `READ_GETS`: `sharepoint_browse_folder` for the children of an item, and
   `sharepoint_create_folder` and `sharepoint_copy_item` for an item. `sharepoint_read_file` cannot
-  read it. A write there follows the rules of its tool. The item that it names must be seed data
+  read it, unless the drive is the own drive of a test user that a step of the run uses (see `as`
+  below). A write there follows the rules of its tool. The item that it names must be seed data
   or an item that the run created.
 - A write of `onenote_create_page` into the notebook of a team needs the id of the team and the id
   of the section. The run must have read both as seed data. `onenote_copy_notebook` into a team
@@ -176,10 +190,6 @@ scenarios that wait on it have `@deferred` and a `deferred` list in their sideca
 - Meeting (6 cases): a person holds one Teams meeting at a time. Run `record_all.sh meeting all`.
 - Private channel (3 cases): the tenant policy refuses to create a private channel. An
   administrator must switch on private channels.
-- Search (3 cases, recorded, expect unmet): Graph sends `chatMessage` without a hash, so
-  `teams_search_messages` drops every hit. The server needs a change.
-- `onenote_get_operation-notebook` (recorded, expect unmet): Graph sends the status not started
-  and the SDK parses it to None. The server needs a change.
 
 The fixture is `rec-tool-<id>`. A case that creates what it changes needs no reseed: name the item
 `seed-v1 case-<id>`, and `seed.py cleanup --cases --as N` deletes it. `--link` does not apply to a

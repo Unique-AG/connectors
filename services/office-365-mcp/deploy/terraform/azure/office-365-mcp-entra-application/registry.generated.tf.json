@@ -140,6 +140,20 @@
           ]
         },
         {
+          "name": "teams_list_call_transcripts",
+          "permissions": [
+            "User.Read",
+            "Chat.Read",
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
+          "name": "teams_read_call_transcript",
+          "permissions": [
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
           "name": "teams_list_meeting_recordings",
           "permissions": [
             "OnlineMeetings.Read",
@@ -408,6 +422,12 @@
           ]
         },
         {
+          "name": "outlook_delete_category",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
           "name": "outlook_list_time_zones",
           "permissions": [
             "User.Read"
@@ -478,7 +498,7 @@
         {
           "name": "outlook_list_group_events",
           "permissions": [
-            "Calendars.Read"
+            "Group.Read.All"
           ]
         },
         {
@@ -671,6 +691,42 @@
           ]
         },
         {
+          "name": "sharepoint_list_lists",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_get_list",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_list_items",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_update_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_delete_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
           "name": "onenote_list_notebooks",
           "permissions": [
             "Notes.Read"
@@ -727,7 +783,7 @@
         {
           "name": "onenote_list_sections",
           "permissions": [
-            "Notes.Read"
+            "Notes.Read.All"
           ]
         },
         {
@@ -813,6 +869,8 @@
         "teams_delete_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
+        "teams_list_call_transcripts",
+        "teams_read_call_transcript",
         "teams_list_meeting_recordings",
         "teams_read_meeting",
         "teams_create_meeting",
@@ -852,6 +910,7 @@
         "outlook_delete_mail_rule",
         "outlook_list_categories",
         "outlook_create_category",
+        "outlook_delete_category",
         "outlook_list_time_zones",
         "outlook_list_calendars",
         "outlook_list_calendar_groups",
@@ -894,6 +953,12 @@
         "sharepoint_create_share_link",
         "sharepoint_invite",
         "sharepoint_search_sites",
+        "sharepoint_list_lists",
+        "sharepoint_get_list",
+        "sharepoint_list_items",
+        "sharepoint_create_list_item",
+        "sharepoint_update_list_item",
+        "sharepoint_delete_list_item",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -952,6 +1017,11 @@
           "teams_list_chats",
           "teams_list_meeting_transcripts",
           "teams_read_transcript"
+        ],
+        "teams-call-transcripts": [
+          "teams_list_chats",
+          "teams_list_call_transcripts",
+          "teams_read_call_transcript"
         ],
         "teams-recordings": [
           "teams_list_chats",
@@ -1129,7 +1199,8 @@
           "outlook_create_category",
           "outlook_create_mail_rule",
           "outlook_update_mail_rule",
-          "outlook_delete_mail_rule"
+          "outlook_delete_mail_rule",
+          "outlook_delete_category"
         ],
         "outlook-calendar": [
           "outlook_list_calendars",
@@ -1284,6 +1355,29 @@
           "sharepoint_read_file",
           "sharepoint_search_sites"
         ],
+        "sharepoint-lists": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items"
+        ],
+        "sharepoint-lists-write": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item"
+        ],
+        "sharepoint-lists-delete": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item",
+          "sharepoint_delete_list_item"
+        ],
         "onenote-read": [
           "onenote_list_notebooks",
           "onenote_list_pages",
@@ -1351,6 +1445,7 @@
         "ChannelMessage.ReadWrite",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
+        "CallTranscripts.Read.All",
         "OnlineMeetingRecording.Read.All",
         "OnlineMeetingArtifact.Read.All",
         "OnlineMeetings.ReadWrite",
@@ -1369,6 +1464,7 @@
         "Calendars.Read",
         "Calendars.Read.Shared",
         "Calendars.ReadBasic",
+        "Group.Read.All",
         "Place.Read.All",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
@@ -1376,9 +1472,11 @@
         "Contacts.ReadWrite",
         "Files.ReadWrite.All",
         "Sites.Read.All",
+        "Sites.ReadWrite.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "Notes.Read.All"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -1390,6 +1488,7 @@
         "ChannelMessage.Send": false,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
+        "CallTranscripts.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "ChannelMessage.ReadWrite": true,
         "Chat.ReadWrite": false,
@@ -1415,10 +1514,13 @@
         "Files.Read.All": true,
         "Files.ReadWrite.All": true,
         "Sites.Read.All": true,
+        "Sites.ReadWrite.All": true,
         "Notes.Read": false,
+        "Notes.Read.All": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false,
         "Place.Read.All": true,
+        "Group.Read.All": true,
         "Contacts.Read": false,
         "Contacts.ReadWrite": false
       },

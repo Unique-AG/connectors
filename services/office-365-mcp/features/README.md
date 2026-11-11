@@ -70,7 +70,7 @@ Each entry has these keys:
 
 | Key | Meaning |
 | --- | --- |
-| `status` | `untested`, `working`, `partly`, or `gap`. See below. |
+| `status` | `working`, `partly`, or `gap`. See below. |
 | `ask` | What Mia types to the assistant, in her words. It names no tool. |
 | `blocker` | The limit. It is there when the status is `partly` or `gap`, and only then. See below. |
 | `provenance` | `observed` when the chain is a pattern in the prod logs. `drafted` when it comes from the tool descriptions. |
@@ -86,8 +86,7 @@ The status:
 
 | Status | Meaning |
 | --- | --- |
-| `untested` | Nobody ran the scenario. |
-| `working` | A person ran it by hand in a real mailbox, and it did what the scenario says. No recorded run exists. |
+| `working` | The connector meets the scenario. Automated tests prove it, or `no_test` says why they cannot. |
 | `partly` | A limit blocks a part of it, or the prod logs show this kind of task failing. |
 | `gap` | Nothing meets the scenario today. The chain is empty. |
 
@@ -470,8 +469,7 @@ list for UN-27222.
   so the cause is not known. Does the assistant send one message in each call? 20 consecutive calls
   in one session suggest it.
 - Does `outlook_create_event_on_behalf` work on a second calendar of Mia in a real mailbox? The
-  source allows it. Nobody ran it. If it works, change the description and set `uc-07-09` to
-  `untested`.
+  description names it, and the source allows it. Nobody ran it.
 
 ### For the code owners
 

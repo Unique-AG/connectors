@@ -529,8 +529,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The messages to change: `uri` values from a search, list, read, or thread "
-                    "result."
+                    "The messages to change. Each one is the `uri` of a result of "
+                    "outlook_list_mail, outlook_search_mail, or outlook_read_thread, copied word "
+                    "for word. Never pass a `folder_id` or a `web_link`."
                 ),
             ),
         ],

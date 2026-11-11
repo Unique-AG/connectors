@@ -20,7 +20,7 @@ const baseConfig = z.object({
     .min(1, 'rootScopeId cannot be empty')
     .describe('The root scope ID under which to create transcript and recording folders.'),
   userFetchConcurrency: z.coerce
-    .number()
+    .number<string | undefined>()
     .int()
     .positive()
     .default(5)

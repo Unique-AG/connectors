@@ -21,6 +21,7 @@ mock_provider "azuread" {
         "ChannelMessage.Send"              = "e2222222-2222-2222-2222-222222222222"
         "OnlineMeetings.Read"              = "66666666-6666-6666-6666-666666666666"
         "OnlineMeetingTranscript.Read.All" = "77777777-7777-7777-7777-777777777777"
+        "CallTranscripts.Read.All"         = "9a9a9a9a-9a9a-9a9a-9a9a-9a9a9a9a9a9a"
         "OnlineMeetingRecording.Read.All"  = "88888888-8888-8888-8888-888888888888"
         "ChannelMessage.ReadWrite"         = "e3333333-3333-3333-3333-333333333333"
         "Chat.ReadWrite"                   = "e4444444-4444-4444-4444-444444444444"
@@ -46,12 +47,15 @@ mock_provider "azuread" {
         "Files.Read.All"                   = "c1111111-1111-1111-1111-111111111111"
         "Files.ReadWrite.All"              = "c2222222-2222-2222-2222-222222222222"
         "Sites.Read.All"                   = "c3333333-3333-3333-3333-333333333333"
+        "Sites.ReadWrite.All"              = "c4444444-4444-4444-4444-444444444444"
         "Notes.Read"                       = "d1111111-1111-1111-1111-111111111111"
         "Notes.Create"                     = "d2222222-2222-2222-2222-222222222222"
         "Notes.ReadWrite"                  = "d3333333-3333-3333-3333-333333333333"
         "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
         "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
         "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
+        "Group.Read.All"                   = "f4444444-4444-4444-4444-444444444444"
+        "Notes.Read.All"                   = "d4444444-4444-4444-4444-444444444444"
       }
     }
   }
@@ -158,6 +162,103 @@ run "several_presets_are_the_union_of_their_tools" {
   }
 }
 
+run "a_list_of_presets_resolves_like_the_comma_separated_string" {
+  variables {
+    tools_preset = ["teams-chat", "outlook-read"]
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,Mail.Read,Mail.Read.Shared,People.Read"
+    error_message = "the list teams-chat, outlook-read composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 13
+    error_message = "the list teams-chat, outlook-read resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = output.tool_surface.preset == "teams-chat,outlook-read"
+    error_message = "tool_surface.preset is ${coalesce(output.tool_surface.preset, "null")}, not the comma-separated string the pod reads"
+  }
+}
+
+run "a_list_of_one_preset_resolves" {
+  variables {
+    tools_preset = ["teams-chat"]
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read"
+    error_message = "the list teams-chat composed ${join(",", local.permissions)}"
+  }
+}
+
+run "a_string_with_spaces_resolves_like_a_list" {
+  variables {
+    tools_preset = "teams-chat, outlook-read "
+  }
+
+  assert {
+    condition     = length(local.tools) == 13 && output.tool_surface.preset == "teams-chat,outlook-read"
+    error_message = "teams-chat, outlook-read resolved ${length(local.tools)} tools and preset ${coalesce(output.tool_surface.preset, "null")}"
+  }
+}
+
+run "every_preset_as_a_list_resolves_every_tool" {
+  command = plan
+
+  variables {
+    tools_preset = [
+      "teams",
+      "teams-chat",
+      "teams-messages",
+      "teams-channels",
+      "teams-transcripts",
+      "teams-call-transcripts",
+      "teams-recordings",
+      "teams-meetings",
+      "teams-write",
+      "teams-write-files",
+      "teams-edit",
+      "teams-meetings-write",
+      "teams-chat-admin",
+      "teams-files",
+      "outlook-read",
+      "outlook-mailbox",
+      "outlook-write",
+      "outlook-delete",
+      "outlook-send",
+      "outlook-automate",
+      "outlook-rules",
+      "outlook-calendar",
+      "outlook-calendar-write",
+      "outlook-calendar-manage",
+      "outlook-calendar-delegate",
+      "outlook-calendar-rooms",
+      "outlook-group-calendar",
+      "outlook-contacts",
+      "outlook-contacts-write",
+      "sharepoint-search",
+      "sharepoint-read",
+      "sharepoint-write",
+      "sharepoint-share",
+      "sharepoint-sites",
+      "sharepoint-lists",
+      "sharepoint-lists-write",
+      "sharepoint-lists-delete",
+      "onenote-read",
+      "onenote-write",
+      "onenote-delete",
+    ]
+  }
+
+  assert {
+    condition     = length(local.tools) == length(local.tool_names)
+    error_message = "every preset in a list resolved ${length(local.tools)} tools, not every tool of the registry"
+  }
+}
+
 run "preset_teams_messages" {
   variables {
     tools_preset = "teams-messages"
@@ -188,6 +289,17 @@ run "preset_teams_transcripts" {
   assert {
     condition     = join(",", local.permissions) == "User.Read,Chat.Read,OnlineMeetings.Read,OnlineMeetingTranscript.Read.All"
     error_message = "teams-transcripts composed ${join(",", local.permissions)}"
+  }
+}
+
+run "preset_teams_call_transcripts" {
+  variables {
+    tools_preset = "teams-call-transcripts"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Chat.Read,CallTranscripts.Read.All"
+    error_message = "teams-call-transcripts composed ${join(",", local.permissions)}"
   }
 }
 
@@ -440,7 +552,7 @@ run "preset_outlook_rules" {
   }
 
   assert {
-    condition     = length(local.tools) == 10
+    condition     = length(local.tools) == 11
     error_message = "outlook-rules resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 }
@@ -546,7 +658,7 @@ run "preset_outlook_group_calendar" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Calendars.Read"
+    condition     = join(",", local.permissions) == "User.Read,Team.ReadBasic.All,Group.Read.All"
     error_message = "outlook-group-calendar composed ${join(",", local.permissions)}"
   }
 
@@ -556,8 +668,8 @@ run "preset_outlook_group_calendar" {
   }
 
   assert {
-    condition     = length(local.admin_consent) == 0
-    error_message = "the group calendar view takes Calendars.Read in place of Group.Read.All, so it needs no administrator, and this needs ${join(",", local.admin_consent)}"
+    condition     = local.admin_consent == ["Group.Read.All"]
+    error_message = "Microsoft marks the delegated Group.Read.All as AdminConsentRequired: Yes, and the group calendar view needs no other administrator permission; this composed ${join(",", local.admin_consent)}"
   }
 }
 
@@ -683,13 +795,61 @@ run "preset_sharepoint_sites" {
   }
 }
 
+run "preset_sharepoint_lists" {
+  variables {
+    tools_preset = "sharepoint-lists"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All"
+    error_message = "sharepoint-lists composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All"]
+    error_message = "Sites.Read.All needs an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_lists_write" {
+  variables {
+    tools_preset = "sharepoint-lists-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All,Sites.ReadWrite.All"
+    error_message = "sharepoint-lists-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All", "Sites.ReadWrite.All"]
+    error_message = "Sites.Read.All and Sites.ReadWrite.All need an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_sharepoint_lists_delete" {
+  variables {
+    tools_preset = "sharepoint-lists-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Sites.Read.All,Sites.ReadWrite.All"
+    error_message = "sharepoint-lists-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = local.admin_consent == ["Sites.Read.All", "Sites.ReadWrite.All"]
+    error_message = "Sites.Read.All and Sites.ReadWrite.All need an administrator. This preset composed ${join(",", local.admin_consent)}"
+  }
+}
+
 run "preset_onenote_read" {
   variables {
     tools_preset = "onenote-read"
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Read.All"
     error_message = "onenote-read composed ${join(",", local.permissions)}"
   }
 
@@ -705,7 +865,7 @@ run "preset_onenote_write" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite,Notes.Read.All"
     error_message = "onenote-write composed ${join(",", local.permissions)}"
   }
 
@@ -721,7 +881,7 @@ run "preset_onenote_delete" {
   }
 
   assert {
-    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite"
+    condition     = join(",", local.permissions) == "User.Read,Notes.Read,Notes.Create,Notes.ReadWrite,Notes.Read.All"
     error_message = "onenote-delete composed ${join(",", local.permissions)}"
   }
 
@@ -1124,4 +1284,45 @@ run "a_multi_tenant_registration_emits_the_organizations_authority" {
     condition     = output.deployment_env["unique-qa"].mcpConfig.entra.tenantId == "organizations"
     error_message = "the customer-tenant overlay carries ${coalesce(output.deployment_env["unique-qa"].mcpConfig.entra.tenantId, "null")} as its tenant id, not the organizations authority the pod validates every tenant's tokens under"
   }
+}
+
+run "a_list_with_an_unknown_preset_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = ["teams-chat", "outlook"]
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "an_empty_list_of_presets_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = []
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "a_comma_separated_string_inside_a_list_is_refused" {
+  command = plan
+
+  variables {
+    tools_preset = ["teams-chat,outlook-read"]
+  }
+
+  expect_failures = [var.tools_preset]
+}
+
+run "a_list_of_presets_and_tools_enabled_are_refused_together" {
+  command = plan
+
+  variables {
+    tools_preset  = ["teams-chat"]
+    tools_enabled = ["teams_list_chats"]
+  }
+
+  expect_failures = [var.tools_enabled]
 }

@@ -1,3 +1,4 @@
+import json
 import re
 from typing import cast
 from urllib.parse import unquote
@@ -97,6 +98,28 @@ class TestADraftGoesToTheRealAddressOfTheRightPerson:
         assert (created["importance"], created["categories"]) == ("high", ["Contracts"])
         assert _addresses(draft) == [_ANNA]
 
+    async def test_it_sends_the_blind_copy_and_reads_it_back_from_the_stored_draft(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post("/me/messages").mock(
+            return_value=httpx.Response(
+                201,
+                json={
+                    "id": _Q3_MESSAGE_ID,
+                    "toRecipients": [_recipient(_ANNA)],
+                    "bccRecipients": [_recipient(_PRIYA)],
+                },
+            )
+        )
+
+        draft = await call(
+            "outlook_draft_mail", to=[_ANNA], bcc=[_PRIYA], subject="Contract", body="Text."
+        )
+
+        created = sent_json(graph, "POST", "/me/messages")
+        assert created["bccRecipients"] == [_recipient(_PRIYA)]
+        assert _addresses(draft, "bcc") == [_PRIYA]
+
     async def test_two_people_with_one_name_lead_to_a_question_and_no_draft(
         self, graph: respx.MockRouter
     ) -> None:
@@ -140,6 +163,32 @@ class TestADraftGoesToTheRealAddressOfTheRightPerson:
         assert (row["address"], row["automatic_reply_message"]) == (_ANNA, _AWAY_MESSAGE)
 
 
+_PRIYA = "priya@example.test"
+
+
+def _recipient(address: str) -> dict[str, object]:
+    return {"emailAddress": {"address": address}}
+
+
+def _a_draft_addressed_to_anna(graph: respx.MockRouter, **fields: object) -> respx.Route:
+    stored: dict[str, object] = {
+        "id": _Q3_MESSAGE_ID,
+        "isDraft": True,
+        "subject": "Contract",
+        "toRecipients": [_recipient(_ANNA)],
+        "ccRecipients": [],
+        "bccRecipients": [],
+    } | fields
+    _ = graph.route(method="GET", path__regex=_ORIGINAL).mock(
+        return_value=httpx.Response(200, json=stored)
+    )
+
+    def patched(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=stored | json.loads(request.content))
+
+    return graph.route(method="PATCH", path__regex=_ORIGINAL).mock(side_effect=patched)
+
+
 class TestADraftChangesUntilMiaApproves:
     async def test_it_shortens_the_draft_in_place_and_makes_no_second_draft(
         self, graph: respx.MockRouter
@@ -172,8 +221,65 @@ class TestADraftChangesUntilMiaApproves:
         assert "PATCH" not in methods_asked(graph)
 
     @pytest.mark.parametrize("tool", _DRAFT_TOOLS)
-    async def test_the_draft_tools_offer_no_blind_copy(self, tool: str) -> None:
-        assert {name for name in await tool_parameters(tool) if "bcc" in name.lower()} == set()
+    async def test_every_draft_tool_takes_a_blind_copy(self, tool: str) -> None:
+        assert "bcc" in await tool_parameters(tool)
+
+    async def test_it_puts_a_person_on_the_draft_as_a_blind_copy(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _a_draft_addressed_to_anna(graph)
+
+        draft = await call("outlook_update_draft", message_ref=_Q3_MESSAGE, bcc=[_PRIYA])
+
+        patched = sent_json(graph, "PATCH", _Q3_MESSAGE_ID)
+        assert patched["bccRecipients"] == [{"emailAddress": {"address": _PRIYA}}]
+        assert "toRecipients" not in patched
+        assert (_addresses(draft), _addresses(draft, "bcc")) == ([_ANNA], [_PRIYA])
+        assert _addresses(draft, "cc") == []
+
+    async def test_a_change_without_a_blind_copy_keeps_the_stored_one(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _a_draft_addressed_to_anna(graph, bccRecipients=[_recipient(_PRIYA)])
+
+        _ = await call("outlook_update_draft", message_ref=_Q3_MESSAGE, subject="Changed")
+
+        assert "bccRecipients" not in sent_json(graph, "PATCH", _Q3_MESSAGE_ID)
+
+    async def test_an_empty_blind_copy_list_removes_every_blind_copy(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _a_draft_addressed_to_anna(graph, bccRecipients=[_recipient(_PRIYA)])
+
+        _ = await call("outlook_update_draft", message_ref=_Q3_MESSAGE, bcc=[])
+
+        assert sent_json(graph, "PATCH", _Q3_MESSAGE_ID)["bccRecipients"] == []
+
+    @pytest.mark.parametrize(
+        ("change", "stored", "told"),
+        [
+            ({"bcc": [_ANNA]}, {}, "already has that address in To"),
+            (
+                {"to": [_PRIYA]},
+                {"bccRecipients": [_recipient(_PRIYA)]},
+                "already has that address in Bcc",
+            ),
+        ],
+        ids=["blind-copy-to-an-addressee", "addressee-already-on-blind-copy"],
+    )
+    async def test_a_person_on_another_list_of_the_draft_is_not_added_again(
+        self,
+        graph: respx.MockRouter,
+        change: dict[str, object],
+        stored: dict[str, object],
+        told: str,
+    ) -> None:
+        _ = _a_draft_addressed_to_anna(graph, **stored)
+
+        advice = await advice_for("outlook_update_draft", message_ref=_Q3_MESSAGE, **change)
+
+        assert told in advice
+        assert "PATCH" not in methods_asked(graph)
 
     async def test_it_changes_the_subject_the_importance_and_the_recipients_of_the_draft(
         self, graph: respx.MockRouter
@@ -329,6 +435,28 @@ class TestADraftInASharedMailbox:
         assert "customer@acme.example" in question
         assert made.structured_content is not None
         assert times_asked(graph, "POST", "/users/support@example.com/messages") == 1
+
+    async def test_the_question_names_the_blind_copy(self, graph: respx.MockRouter) -> None:
+        _ = serve_as(graph, "rec-tool-outlook_draft_mail-basic", "support@example.com")
+        person = Person()
+
+        _ = await invoke_as(
+            "outlook_draft_mail",
+            {
+                "mailbox": "support@example.com",
+                "to": ["customer@acme.example"],
+                "bcc": [_PRIYA],
+                "subject": "Your order",
+                "body": "The order is confirmed.",
+            },
+            person=person,
+        )
+
+        (question,) = person.asked
+        assert f"It is blind copied to {_PRIYA}." in question
+        assert sent_json(graph, "POST", "/users/support@example.com/messages")["bccRecipients"] == [
+            _recipient(_PRIYA)
+        ]
 
     @pytest.mark.parametrize(
         ("approval", "told"),
@@ -855,7 +983,7 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
             (
                 "outlook_draft_mail",
                 {"to": [_ANNA], "cc": [_ANNA], "subject": "Hello", "body": "Hi"},
-                "in both `to` and `cc`",
+                "in more than one of `to`, `cc` and `bcc`",
             ),
             (
                 "outlook_draft_reply",
@@ -906,7 +1034,54 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "cc": [_ANNA],
                     "body": "Hi",
                 },
-                "in both `to` and `cc`",
+                "in more than one of `to`, `cc` and `bcc`",
+            ),
+            (
+                "outlook_draft_mail",
+                {"to": [_ANNA], "bcc": [_ANNA.upper()], "subject": "Hello", "body": "Hi"},
+                "in more than one of `to`, `cc` and `bcc`",
+            ),
+            (
+                "outlook_draft_mail",
+                {"to": [_ANNA], "bcc": [_ANNA_MEIER], "subject": "Hello", "body": "Hi"},
+                "in `bcc`, which is not one email address",
+            ),
+            (
+                "outlook_draft_reply",
+                {
+                    "message_ref": _Q3_MESSAGE,
+                    "mode": "forward",
+                    "to": [_ANNA],
+                    "cc": [_OTHER],
+                    "bcc": [_OTHER],
+                    "body": "Hi",
+                },
+                "in more than one of `to`, `cc` and `bcc`",
+            ),
+            (
+                "outlook_draft_reply",
+                {
+                    "message_ref": _Q3_MESSAGE,
+                    "mode": "reply",
+                    "bcc": [_OTHER, _OTHER.upper()],
+                    "body": "Hi",
+                },
+                "twice in `bcc`",
+            ),
+            (
+                "outlook_draft_reply_all",
+                {"message_ref": _Q3_MESSAGE, "cc": [_OTHER], "bcc": [_OTHER], "body": "Hi"},
+                "in both `cc` and `bcc`",
+            ),
+            (
+                "outlook_draft_reply_all",
+                {"message_ref": _Q3_MESSAGE, "bcc": [_ANNA_MEIER], "body": "Hi"},
+                "in `bcc`, which is not one email address",
+            ),
+            (
+                "outlook_update_draft",
+                {"message_ref": _Q3_MESSAGE, "cc": [_ANNA], "bcc": [_ANNA]},
+                "in more than one of `to`, `cc` and `bcc`",
             ),
             (
                 "outlook_draft_reply_all",
@@ -931,7 +1106,7 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
             (
                 "outlook_update_draft",
                 {"message_ref": _Q3_MESSAGE, "to": [_ANNA], "cc": [_ANNA]},
-                "in both `to` and `cc`",
+                "in more than one of `to`, `cc` and `bcc`",
             ),
             (
                 "outlook_update_draft",
@@ -948,6 +1123,13 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
             "reply-cc-name",
             "reply-cc-twice",
             "reply-forward-both-lists",
+            "mail-blind-in-to",
+            "mail-blind-name",
+            "reply-forward-three-lists",
+            "reply-blind-twice",
+            "reply-all-cc-and-blind",
+            "reply-all-blind-name",
+            "update-cc-and-blind",
             "reply-all-cc-name",
             "reply-all-cc-twice",
             "update-name",
@@ -1008,6 +1190,64 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
 
         assert "the reply already goes to that address" in advice
         assert methods_asked(graph) == {"GET"}
+
+    async def test_a_blind_copy_to_the_sender_makes_no_draft(self, graph: respx.MockRouter) -> None:
+        _ = _the_original(graph)
+
+        advice = await advice_for(
+            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", bcc=[_ANNA], body="Hi"
+        )
+
+        assert "in `bcc`, and the reply already goes to that address" in advice
+        assert methods_asked(graph) == {"GET"}
+
+    async def test_a_blind_copy_to_someone_else_is_written_on_the_reply(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
+        _ = _the_original(graph)
+
+        _ = await call(
+            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", bcc=[_PRIYA], body="Hi"
+        )
+
+        assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
+
+    async def test_a_blind_copy_is_written_on_a_forward(self, graph: respx.MockRouter) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-forward")
+
+        _ = await call(
+            "outlook_draft_reply",
+            message_ref=_Q3_MESSAGE,
+            mode="forward",
+            to=[_ANNA],
+            bcc=[_PRIYA],
+            body="Hi",
+        )
+
+        assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
+
+    async def test_a_blind_copy_is_written_on_a_reply_to_everyone(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
+
+        _ = await call(
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, bcc=[_PRIYA], body="Thanks."
+        )
+
+        assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
+
+    async def test_a_blind_copy_to_a_person_on_the_reply_to_everyone_is_not_added_again(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
+
+        _ = await call(
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, bcc=[_ANNA], body="Thanks."
+        )
+
+        assert "bccRecipients" not in sent_json(graph, "PATCH", "")
 
     async def test_a_copy_to_someone_else_is_read_back_from_the_stored_draft(
         self, graph: respx.MockRouter

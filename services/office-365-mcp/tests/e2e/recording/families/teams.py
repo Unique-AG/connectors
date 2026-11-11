@@ -73,6 +73,16 @@ EXTERNAL = frozenset(
 )
 INVITERS = frozenset({"teams_create_meeting", "teams_update_meeting"})
 ADDRESSES: Mapping[str, frozenset[str]] = {"SEED_GUEST_UPN": INVITERS}
+UNRECORDED: Mapping[str, str] = {
+    "teams_list_call_transcripts": (
+        "The seed run creates Teams meetings, not one-to-one or group calls, so it has no call "
+        "transcript corpus to record or scrub."
+    ),
+    "teams_read_call_transcript": (
+        "The seed run creates Teams meetings, not one-to-one or group calls, so it has no call "
+        "transcript corpus to record or scrub."
+    ),
+}
 PREFIXES = ("/v1.0/teams/", "/v1.0/chats/")
 THREAD_ID = (
     re.compile(r"[\w\-=.]+@thread\.(?:v2|tacv2|skype)"),

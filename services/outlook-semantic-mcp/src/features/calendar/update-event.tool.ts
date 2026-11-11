@@ -4,16 +4,17 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
 import * as z from 'zod';
+import { ConfirmSchema, confirmWrite } from '~/utils/confirm-write';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { oneLine } from '~/utils/one-line';
 import { offsetDateTime } from '~/utils/relative-range';
 import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import type { CalendarEventSnapshot } from './get-calendar-event.query';
 import { GetCalendarEventQuery } from './get-calendar-event.query';
 import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
-import { describeCalendar, formatDisplayWhen, oneLine } from './utils/calendar-display';
+import { describeCalendar, formatDisplayWhen } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
-import { ConfirmSchema, confirmWrite } from './utils/confirm-write';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
   isSeriesOccurrence,

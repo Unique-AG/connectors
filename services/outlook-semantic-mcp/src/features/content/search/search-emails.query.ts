@@ -229,29 +229,19 @@ export class SearchEmailsQuery {
     semanticResults: SearchEmailResult[],
     graphResults: SearchEmailResult[],
   ): SearchEmailResult[] {
-    const graphById = new Map(
-      graphResults
-        .filter(
-          (item): item is SearchEmailResult & { msGraphMessageId: string } =>
-            !!item.msGraphMessageId,
-        )
-        .map((item) => [item.msGraphMessageId, item]),
-    );
+    const graphById = new Map(graphResults.map((item) => [item.msGraphMessageId, item]));
 
     const enriched: Array<{
       result: SearchEmailResult;
       hadGraphMatch: boolean;
     }> = semanticResults.map((semanticResult) => {
-      const { msGraphMessageId } = semanticResult;
-      const graphResult = msGraphMessageId ? graphById.get(msGraphMessageId) : null;
+      const graphResult = graphById.get(semanticResult.msGraphMessageId);
 
       if (!graphResult) {
         return { result: semanticResult, hadGraphMatch: false };
       }
 
-      if (msGraphMessageId) {
-        graphById.delete(msGraphMessageId);
-      }
+      graphById.delete(semanticResult.msGraphMessageId);
       return {
         result: {
           ...semanticResult,
@@ -260,6 +250,16 @@ export class SearchEmailsQuery {
             graphText: graphResult.text,
           }),
           replyToParams: graphResult.replyToParams ?? semanticResult.replyToParams,
+          isDraft: graphResult.isDraft,
+          openEmailParams: {
+            ...graphResult.openEmailParams,
+            ...(semanticResult.openEmailParams.uniqueContentId
+              ? { uniqueContentId: semanticResult.openEmailParams.uniqueContentId }
+              : {}),
+            ...(semanticResult.openEmailParams.chunkIds
+              ? { chunkIds: semanticResult.openEmailParams.chunkIds }
+              : {}),
+          },
         },
         hadGraphMatch: true,
       };

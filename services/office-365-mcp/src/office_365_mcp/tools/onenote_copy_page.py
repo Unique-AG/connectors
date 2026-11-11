@@ -224,8 +224,8 @@ async def _copy(
     builder = root.pages.by_onenote_page_id(handle.page_id).copy_to_section
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_to_section_body.CopyToSectionPostRequestBody(
             id=destination.section_id, group_id=group_id_of(destination.owner)

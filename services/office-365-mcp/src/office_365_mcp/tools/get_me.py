@@ -25,8 +25,8 @@ given name, surname, email, sign-in name, job title, office location, telephone 
 preferred language. This tool applies when a request depends on who "I", "me", or "my" refers to.
 
 Notes:
-- This tool describes only the caller. Resolve the address of somebody else with a directory or \
-contacts lookup instead.
+- This tool describes only the caller. To look up somebody else, use a directory or contacts \
+lookup tool of this deployment. If it has none, tell the user.
 """
 
 

@@ -398,7 +398,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ],
         time_zone: Annotated[
             str,
-            Field(min_length=1, description="The zone starts_at and ends_at are written in."),
+            Field(
+                min_length=1, description="The IANA zone that starts_at and ends_at are written in."
+            ),
         ],
         optional_attendees: Annotated[
             list[str],
