@@ -183,7 +183,7 @@ An open release PR already rebuilds the image. The Rebuild Service workflow and 
 | Yes | Yes | Close the rebuild PR with a comment, and delete its branch. |
 | Yes | No | Do nothing. |
 
-A service that is not in `.release-please-manifest.json` gets no action.
+`rebuild-plan.sh` prints `none` for a service that is not in `.release-please-manifest.json`. `rebuild.sh` stops with an error for it.
 
 ## Files
 
@@ -193,7 +193,7 @@ A service that is not in `.release-please-manifest.json` gets no action.
 | `.github/workflows/security-release-gate-exception.yaml` | The comment that records who set the label |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
-| `.github/scripts/release-rebuild/rebuild.sh` | Opens the rebuild PRs. The workflow and the skill `vulna-squash` both run it. |
+| `.github/scripts/release-rebuild/rebuild.sh` | Opens, refreshes, or closes the rebuild PR of each service. The workflow and the skill `vulna-squash` both run it. |
 | `.github/scripts/release-rebuild/rebuild-plan.sh` | Prints the action for one service as JSON: `open`, `refresh`, `close`, or `none`. A failed lookup exits non-zero. |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `agentic/skills/vulna-squash/scripts/` | The shell scripts that the skill runs: the scan check, the entry check, the CI watch, the PR title scope, the result label, and the report comment |

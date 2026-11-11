@@ -8,8 +8,8 @@ on:
         required: true
 
 permissions:
-  contents: write # to push one branch for each service
-  pull-requests: write # to open one pull request for each service
+  contents: write # to push and delete the rebuild branch of each service
+  pull-requests: write # to open, edit, and close the rebuild pull request of each service
 
 concurrency:
   group: release-rebuild
@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Open one pull request for each service
+      - name: Open, refresh, or close the rebuild pull request of each service
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
