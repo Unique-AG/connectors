@@ -1064,27 +1064,27 @@ async def test_get_ogs_updates_rejects_a_future_end() -> None:
 
 @asynccontextmanager
 async def _serve_over_http(server: FastMCP) -> AsyncGenerator[str]:
-    with socket.socket() as probe:
-        probe.bind(("127.0.0.1", 0))
-        port = cast(int, probe.getsockname()[1])
-    settings = ServerSettings(
-        host="127.0.0.1",
-        port=port,
-        mcp_base_url=AnyHttpUrl(f"http://127.0.0.1:{port}"),
-        mcp_allowed_origins=[],
-    )
-    config = uvicorn.Config(
-        http_app(server, settings), host=settings.host, port=port, log_config=None
-    )
-    http_server = uvicorn.Server(config)
-    serving = asyncio.create_task(http_server.serve())
-    while not http_server.started:
-        await asyncio.sleep(0.01)
-    try:
-        yield f"http://127.0.0.1:{port}/mcp"
-    finally:
-        http_server.should_exit = True
-        await serving
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        port = cast(int, reserved.getsockname()[1])
+        settings = ServerSettings(
+            host="127.0.0.1",
+            port=port,
+            mcp_base_url=AnyHttpUrl(f"http://127.0.0.1:{port}"),
+            mcp_allowed_origins=[],
+        )
+        config = uvicorn.Config(http_app(server, settings), log_config=None)
+        http_server = uvicorn.Server(config)
+        serving = asyncio.create_task(http_server.serve(sockets=[reserved]))
+        try:
+            async with asyncio.timeout(10):
+                while not http_server.started and not serving.done():
+                    await asyncio.sleep(0.01)
+            assert http_server.started, "the server stopped before it started"
+            yield f"http://127.0.0.1:{port}/mcp"
+        finally:
+            http_server.should_exit = True
+            await asyncio.gather(serving, return_exceptions=True)
 
 
 @pytest.mark.parametrize("protocol_version", ["2025-06-18", "2025-11-25"])
