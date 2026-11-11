@@ -37,7 +37,7 @@ _FEATURES = _ROOT / "features"
 
 TARGET = _ROOT / "docs" / "use-cases.md"
 STATUS = _FEATURES / "STATUS.md"
-_CASES = _ROOT / "tests" / "e2e" / "recording" / "cases"
+_CASES = _ROOT / "tests" / "recording" / "cases"
 
 _BEGIN = "<!-- use-cases:begin -->"
 _END = "<!-- use-cases:end -->"

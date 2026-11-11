@@ -3,7 +3,7 @@
 import pytest
 
 from office_365_mcp.shared import handles
-from tests.tools.conftest import JOIN_WEB_URL, MEETING_ID
+from tests.integration.conftest import JOIN_WEB_URL, MEETING_ID
 
 _TRANSCRIPT_ID = "MSMjMCMjSYNTHETIC0001"
 

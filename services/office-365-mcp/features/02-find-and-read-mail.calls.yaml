@@ -5,9 +5,9 @@ uc-02-01:
   evidence: outlook_list_mail alone in 18 sessions
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/busy]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/recorded]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/busy]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-01/recorded]"
   chain:
     - tool: outlook_list_mail
       args: {unread_only: true, received_after: yesterday}
@@ -35,7 +35,7 @@ uc-02-01:
 uc-02-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_finds_a_message_by_sender_subject_and_attachment_together"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_finds_a_message_by_sender_subject_and_attachment_together"
   ask: "Find the March invoice from Brightway that has a PDF."
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
@@ -47,7 +47,7 @@ uc-02-02:
 uc-02-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_narrows_a_search_to_a_time_window"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_narrows_a_search_to_a_time_window"
   ask: "Show me the messages that Anna sent me in March."
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
@@ -59,7 +59,7 @@ uc-02-03:
 uc-02-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_lists_only_the_flagged_messages"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_lists_only_the_flagged_messages"
   ask: "Which of my messages are flagged?"
   provenance: drafted
   asks_user: false
@@ -70,7 +70,7 @@ uc-02-04:
 uc-02-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_result_that_fills_the_limit_says_that_more_messages_may_match"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_result_that_fills_the_limit_says_that_more_messages_may_match"
   ask: "Show me every message that mentions invoice."
   provenance: observed
   evidence: outlook_search_mail alone in 20 sessions
@@ -82,7 +82,7 @@ uc-02-05:
 uc-02-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_reads_a_message_in_full_and_names_its_attachments_with_their_size"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_reads_a_message_in_full_and_names_its_attachments_with_their_size"
   ask: "Read the Contract draft message to me and tell me what is attached."
   provenance: observed
   evidence: outlook_search_mail then outlook_read_mail in 4 sessions; outlook_list_mail then outlook_read_mail in 4 sessions
@@ -95,7 +95,7 @@ uc-02-06:
 uc-02-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_gives_an_excel_workbook_as_a_file_and_never_as_text"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_gives_an_excel_workbook_as_a_file_and_never_as_text"
   ask: "Open the Excel file that Anna attached."
   provenance: drafted
   asks_user: false
@@ -108,7 +108,7 @@ uc-02-07:
 uc-02-08:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_above_the_cap_is_refused_and_never_downloaded"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_above_the_cap_is_refused_and_never_downloaded"
   ask: "Read the PDF that Anna attached to her message."
   provenance: drafted
   asks_user: false
@@ -122,8 +122,8 @@ uc-02-08:
 uc-02-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAConversationFromFirstMessageToLast::test_it_gives_the_whole_conversation_with_a_short_preview_of_each_message"
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAConversationFromFirstMessageToLast::test_it_gives_the_last_message_in_full_when_its_preview_cuts_the_decision_off"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAConversationFromFirstMessageToLast::test_it_gives_the_whole_conversation_with_a_short_preview_of_each_message"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAConversationFromFirstMessageToLast::test_it_gives_the_last_message_in_full_when_its_preview_cuts_the_decision_off"
   ask: "What did we decide in the conversation about the launch?"
   provenance: drafted
   asks_user: false
@@ -139,7 +139,7 @@ uc-02-09:
 uc-02-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASharedMailbox::test_it_lists_the_unread_mail_of_the_shared_mailbox_and_not_the_own_mailbox"
+    - "tests/integration/test_02_find_and_read_mail.py::TestASharedMailbox::test_it_lists_the_unread_mail_of_the_shared_mailbox_and_not_the_own_mailbox"
   ask: "Show me the unread messages in support@example.com."
   provenance: drafted
   asks_user: false
@@ -150,7 +150,7 @@ uc-02-10:
 uc-02-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASharedMailbox::test_a_refused_mailbox_is_explained_as_a_missing_access_of_the_user"
+    - "tests/integration/test_02_find_and_read_mail.py::TestASharedMailbox::test_a_refused_mailbox_is_explained_as_a_missing_access_of_the_user"
   ask: "Show me the unread messages in the finance mailbox."
   provenance: drafted
   asks_user: false
@@ -161,7 +161,7 @@ uc-02-11:
 uc-02-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_finds_mail_that_mia_sent_to_one_person_about_a_topic"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_finds_mail_that_mia_sent_to_one_person_about_a_topic"
   ask: "What did I send to Tom about the offer?"
   provenance: drafted
   asks_user: false
@@ -172,7 +172,7 @@ uc-02-12:
 uc-02-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_gives_the_unread_count_of_the_folder_and_the_newest_unread_messages"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_gives_the_unread_count_of_the_folder_and_the_newest_unread_messages"
   ask: "How many of my messages are unread, and which 5 are the newest?"
   provenance: drafted
   asks_user: false
@@ -184,7 +184,7 @@ uc-02-13:
 uc-02-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_shows_the_latest_message_of_the_person_that_the_name_finds"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_shows_the_latest_message_of_the_person_that_the_name_finds"
   ask: "Show me the last message from Anna."
   provenance: drafted
   asks_user: false
@@ -199,7 +199,7 @@ uc-02-14:
 uc-02-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_lists_the_junk_folder_and_reads_nothing_of_the_inbox"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_lists_the_junk_folder_and_reads_nothing_of_the_inbox"
   ask: "Did the invoice from Brightway go to junk?"
   provenance: drafted
   asks_user: false
@@ -211,7 +211,7 @@ uc-02-16:
 uc-02-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_gives_a_pdf_as_the_file_that_microsoft_sent"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_gives_a_pdf_as_the_file_that_microsoft_sent"
   ask: "What is the amount due on the invoice that Brightway sent as a PDF?"
   provenance: drafted
   asks_user: false
@@ -229,8 +229,8 @@ uc-02-17:
   provenance: drafted
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-17/busy]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-17/busy-without-a-wait-time]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-17/busy]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-17/busy-without-a-wait-time]"
   chain:
     - tool: outlook_search_mail
       args: {sender: Anna}
@@ -286,9 +286,9 @@ uc-02-18:
   provenance: drafted
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-18/fails-on-its-side]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-18/no-answer-in-time]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-18/unreadable]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-18/fails-on-its-side]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-18/no-answer-in-time]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-18/unreadable]"
   chain:
     - tool: outlook_search_mail
       args: {sender: Anna}
@@ -361,7 +361,7 @@ uc-02-19:
   provenance: drafted
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-19/fails-twice]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-02-19/fails-twice]"
   chain:
     - tool: outlook_search_mail
       args: {sender: Anna}
@@ -401,7 +401,7 @@ uc-02-19:
 uc-02-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_an_item_that_microsoft_cannot_find_is_never_reported_as_deleted"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_an_item_that_microsoft_cannot_find_is_never_reported_as_deleted"
   ask: "Read the Contract draft message to me."
   provenance: drafted
   asks_user: false
@@ -421,7 +421,7 @@ uc-02-20:
 uc-02-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_list_that_never_ends_is_reported_and_not_as_an_empty_mailbox"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_list_that_never_ends_is_reported_and_not_as_an_empty_mailbox"
   ask: "Which of my messages since yesterday are unread?"
   provenance: drafted
   asks_user: false
@@ -440,8 +440,8 @@ uc-02-31:
 uc-02-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_lists_mail_with_attachments_newest_first_and_skips_the_rest"
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_search_with_a_filter_alone_is_refused_before_microsoft_is_asked"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_it_lists_mail_with_attachments_newest_first_and_skips_the_rest"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_search_with_a_filter_alone_is_refused_before_microsoft_is_asked"
   ask: "Show me my messages that have attachments."
   provenance: drafted
   asks_user: false
@@ -460,8 +460,8 @@ uc-02-21:
 uc-02-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_window_given_back_to_front_is_refused_and_the_fix_is_named"
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_the_window_in_the_right_order_is_searched_whole"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_window_given_back_to_front_is_refused_and_the_fix_is_named"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_the_window_in_the_right_order_is_searched_whole"
   ask: "Show me the messages from Anna between 20 March and 10 March."
   provenance: drafted
   asks_user: false
@@ -478,7 +478,7 @@ uc-02-22:
 uc-02-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_name_that_fits_two_people_is_put_to_the_user_and_no_mail_is_read"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_name_that_fits_two_people_is_put_to_the_user_and_no_mail_is_read"
   ask: "Show me the last message from Anna."
   provenance: drafted
   asks_user: false
@@ -494,7 +494,7 @@ uc-02-23:
 uc-02-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_folder_that_the_mailbox_lacks_is_explained_with_the_way_to_list_folders"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_folder_that_the_mailbox_lacks_is_explained_with_the_way_to_list_folders"
   ask: "Show me the unread messages in my Archive folder."
   provenance: drafted
   asks_user: false
@@ -510,7 +510,7 @@ uc-02-24:
 uc-02-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_reads_an_attachment_of_exactly_ten_mebibytes"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_it_reads_an_attachment_of_exactly_ten_mebibytes"
   ask: "What is the amount due on the invoice that Brightway sent as a PDF?"
   provenance: drafted
   asks_user: false
@@ -528,7 +528,7 @@ uc-02-25:
 uc-02-26:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_above_the_cap_is_refused_and_never_downloaded"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_above_the_cap_is_refused_and_never_downloaded"
   ask: "Read the PDF that Anna attached to her message."
   provenance: drafted
   asks_user: false
@@ -546,7 +546,7 @@ uc-02-26:
 uc-02-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_that_cannot_be_read_here_is_left_to_outlook"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_that_cannot_be_read_here_is_left_to_outlook"
   ask: "Read the attachment of that message."
   provenance: drafted
   asks_user: false
@@ -565,7 +565,7 @@ uc-02-27:
 uc-02-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_that_arrives_with_no_content_is_asked_for_again_later"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_attachment_that_arrives_with_no_content_is_asked_for_again_later"
   ask: "Read the PDF that Anna attached to her message."
   provenance: drafted
   asks_user: false
@@ -581,7 +581,7 @@ uc-02-28:
 uc-02-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAConversationFromFirstMessageToLast::test_a_thread_answer_that_holds_other_conversations_is_refused"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAConversationFromFirstMessageToLast::test_a_thread_answer_that_holds_other_conversations_is_refused"
   ask: "What did we decide in the conversation about the launch?"
   provenance: drafted
   asks_user: false
@@ -600,7 +600,7 @@ uc-02-29:
 uc-02-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_instruction_inside_a_message_is_given_as_text_and_causes_no_write"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageAndItsAttachments::test_an_instruction_inside_a_message_is_given_as_text_and_causes_no_write"
   ask: "Read the Payment details message from Tom to me."
   provenance: drafted
   asks_user: false
@@ -619,7 +619,7 @@ uc-02-30:
 uc-02-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_one_busy_answer_is_waited_out_and_the_search_shows_its_result"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_one_busy_answer_is_waited_out_and_the_search_shows_its_result"
   ask: "Find the messages that Anna sent me."
   provenance: drafted
   asks_user: false
@@ -635,7 +635,7 @@ uc-02-32:
 uc-02-33:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_missing_permission_is_explained_to_the_administrator_and_the_user"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_missing_permission_is_explained_to_the_administrator_and_the_user"
   ask: "Find the messages that Anna sent me."
   provenance: drafted
   asks_user: false
@@ -654,7 +654,7 @@ uc-02-33:
 uc-02-34:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_message_beyond_a_capped_listing_is_found_by_a_search"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_a_message_beyond_a_capped_listing_is_found_by_a_search"
   ask: "What does the Brightway offer for the new office say?"
   provenance: observed
   evidence: >-
@@ -679,7 +679,7 @@ uc-02-34:
 uc-02-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_the_matches_keep_the_order_of_the_index_and_each_holds_its_receipt_time"
+    - "tests/integration/test_02_find_and_read_mail.py::TestTheAssistantFindsAMessageFromWhatMiaRemembers::test_the_matches_keep_the_order_of_the_index_and_each_holds_its_receipt_time"
   ask: "What is the newest message from Anna about the budget?"
   provenance: observed
   evidence: >-
@@ -707,8 +707,8 @@ uc-02-35:
 uc-02-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAFolderThatMiaNames::test_it_lists_the_folder_by_the_handle_that_the_folder_list_reported"
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAFolderThatMiaNames::test_a_folder_name_is_refused_in_place_of_a_folder_handle"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAFolderThatMiaNames::test_it_lists_the_folder_by_the_handle_that_the_folder_list_reported"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAFolderThatMiaNames::test_a_folder_name_is_refused_in_place_of_a_folder_handle"
   ask: "Show me the unread messages in my Projects folder."
   provenance: observed
   evidence: >-
@@ -730,7 +730,7 @@ uc-02-36:
 uc-02-37:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAFolderThatMiaNames::test_a_handle_that_microsoft_no_longer_knows_leads_to_a_new_folder_list"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAFolderThatMiaNames::test_a_handle_that_microsoft_no_longer_knows_leads_to_a_new_folder_list"
   ask: "Show me the unread messages in my Projects folder."
   provenance: drafted
   asks_user: false
@@ -752,7 +752,7 @@ uc-02-37:
 uc-02-38:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailThatMiaSentToHerself::test_it_lists_the_messages_whose_sender_is_the_address_that_get_me_gave"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMailThatMiaSentToHerself::test_it_lists_the_messages_whose_sender_is_the_address_that_get_me_gave"
   ask: "Show me the messages that I sent to myself."
   provenance: observed
   evidence: >-
@@ -774,7 +774,7 @@ uc-02-38:
 uc-02-40:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_it_gives_the_type_that_fits_the_bytes"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_it_gives_the_type_that_fits_the_bytes"
   ask: "Read the attachment of the message from Anna."
   provenance: drafted
   asks_user: false
@@ -788,7 +788,7 @@ uc-02-40:
 uc-02-41:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_an_attachment_that_is_larger_than_it_was_announced_is_refused"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_an_attachment_that_is_larger_than_it_was_announced_is_refused"
   ask: "Read the attachment of the message from Anna."
   provenance: drafted
   asks_user: false
@@ -802,7 +802,7 @@ uc-02-41:
 uc-02-42:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_an_attachment_of_a_kind_that_nobody_knows_is_listed_as_unknown"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_an_attachment_of_a_kind_that_nobody_knows_is_listed_as_unknown"
   ask: "Which attachments does the message from Anna have?"
   provenance: drafted
   asks_user: false
@@ -814,7 +814,7 @@ uc-02-42:
 uc-02-43:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_a_message_with_no_follow_up_flag_is_listed_with_no_flag"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAnAttachmentIsGivenAsMicrosoftDescribesIt::test_a_message_with_no_follow_up_flag_is_listed_with_no_flag"
   ask: "List my newest mail."
   provenance: drafted
   asks_user: false
@@ -825,7 +825,7 @@ uc-02-43:
 uc-02-44:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailOfOneImportanceIsListedOrFound"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMailOfOneImportanceIsListedOrFound"
   ask: "Show me my messages of high importance."
   provenance: drafted
   asks_user: false
@@ -836,7 +836,7 @@ uc-02-44:
 uc-02-45:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAValueThatDoesNotFitListsNoMail"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAValueThatDoesNotFitListsNoMail"
   ask: "List the mail that Anna Meier sent me."
   provenance: drafted
   asks_user: false
@@ -851,7 +851,7 @@ uc-02-45:
 uc-02-46:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageIsNamedByItsHandleAndByNothingElse"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageIsNamedByItsHandleAndByNothingElse"
   ask: "Read the message Q3 budget review."
   provenance: drafted
   asks_user: false
@@ -864,7 +864,7 @@ uc-02-46:
 uc-02-47:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAWindowClosesAtTheEndOfTheDayOrAtTheMomentThatMiaNames"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAWindowClosesAtTheEndOfTheDayOrAtTheMomentThatMiaNames"
   ask: "Show me the messages that Anna sent me up to 12:00 on 10 March."
   provenance: drafted
   asks_user: false
@@ -875,7 +875,7 @@ uc-02-47:
 uc-02-48:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment"
   ask: "Find the mail with Anna that has an attachment named Draft v2.pdf."
   provenance: drafted
   asks_user: false
@@ -887,7 +887,7 @@ uc-02-48:
 uc-02-49:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord"
+    - "tests/integration/test_02_find_and_read_mail.py::TestWordsInQuotesStayTogetherAndAnOperatorWordIsOnlyAWord"
   ask: "Find the mail that holds the words budget OR plan, and the mail that holds the phrase Q3 budget."
   provenance: drafted
   asks_user: false
@@ -901,7 +901,7 @@ uc-02-49:
 uc-02-50:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestASearchThatFindsNothingGivesAnEmptyList"
+    - "tests/integration/test_02_find_and_read_mail.py::TestASearchThatFindsNothingGivesAnEmptyList"
   ask: "Find the mail about the budget."
   provenance: drafted
   asks_user: false
@@ -913,7 +913,7 @@ uc-02-50:
 uc-02-51:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageWithNoTextIsReadWithNoText"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageWithNoTextIsReadWithNoText"
   ask: "Read the last message from Anna."
   provenance: drafted
   asks_user: false
@@ -926,7 +926,7 @@ uc-02-51:
 uc-02-52:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAMessageThatListsNoConversationGivesAnEmptyThread"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAMessageThatListsNoConversationGivesAnEmptyThread"
   ask: "What did we decide in the conversation about the launch?"
   provenance: drafted
   asks_user: false
@@ -939,7 +939,7 @@ uc-02-52:
 uc-02-53:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment::test_a_recipient_is_searched_in_every_address_field_not_in_participants"
+    - "tests/integration/test_02_find_and_read_mail.py::TestMailIsFoundByWhoGotItAndByTheNameOfAnAttachment::test_a_recipient_is_searched_in_every_address_field_not_in_participants"
   ask: "Find the mail with acme.com about the invoice."
   provenance: drafted
   asks_user: false
@@ -951,7 +951,7 @@ uc-02-53:
 uc-02-54:
   status: working
   tests:
-    - "tests/tools/scenarios/test_02_find_and_read_mail.py::TestAPersonIsFoundByTheDomainOfTheirCompany"
+    - "tests/integration/test_02_find_and_read_mail.py::TestAPersonIsFoundByTheDomainOfTheirCompany"
   ask: "Who do I know at acme.com?"
   provenance: drafted
   asks_user: false

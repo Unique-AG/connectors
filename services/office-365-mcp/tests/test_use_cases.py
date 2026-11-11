@@ -59,7 +59,7 @@ _APPROVALS = {"yes", "no", "silent", "unanswered"}
 _FAULTS = {"graph", "transport", "input"}
 _EXPECT_KEYS = {"tool_error", "result", "graph_calls", "retry_sleeps"}
 _GRAPH_CALL = re.compile(r"(GET|POST|PUT|PATCH|DELETE) /\S+")
-_E2E = _SERVICE_ROOT / "tests" / "e2e"
+_INTEGRATION = _SERVICE_ROOT / "tests" / "integration"
 _APPROVAL_PHRASE = "asked to approve"
 _MAX_STEPS = 5
 _NOT_OBSERVABLE = re.compile(r"\b(?:(?:asks?|asked) Microsoft|unless)\b", re.IGNORECASE)
@@ -336,7 +336,7 @@ class TestSidecars:
                 "`args` and `uses` belong to a step with one tool"
             )
         for name in _fixtures(entry):
-            assert (_E2E / "fixtures" / f"{name}.json").is_file(), f"no fixture {name}"
+            assert (_INTEGRATION / "fixtures" / f"{name}.json").is_file(), f"no fixture {name}"
         assert [problem for step in _run_steps(entry) for problem in _runner_problems(step)] == []
 
     @pytest.mark.parametrize(("stem", "scenario_id"), _entries())
@@ -395,11 +395,11 @@ class TestTheScenarioRuns:
     def test_every_fixture_and_body_is_used(self) -> None:
         sidecars = [_sidecar(feature_file) for feature_file in _FEATURE_FILES]
         named = {name for s in sidecars for e in s.values() for name in _fixtures(_object(e))}
-        tests = (_SERVICE_ROOT / "tests" / "tools").rglob("test_*.py")
+        tests = (_SERVICE_ROOT / "tests" / "integration").rglob("test_*.py")
         for path in tests:
             named |= set(cast("list[str]", _SERVED.findall(path.read_text())))
-        fixtures = sorted((_E2E / "fixtures").glob("*.json"))
-        bodies = sorted((_E2E / "bodies").iterdir())
+        fixtures = sorted((_INTEGRATION / "fixtures").glob("*.json"))
+        bodies = sorted((_INTEGRATION / "bodies").iterdir())
         text = "".join(
             path.read_text()
             for path in [

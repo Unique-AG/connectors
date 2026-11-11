@@ -1,7 +1,7 @@
 uc-16-01:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_list_lists.py::test_it_returns_visible_lists_and_leaves_out_hidden_lists_and_libraries"
+    - "tests/integration/test_sharepoint_list_lists.py::test_it_returns_visible_lists_and_leaves_out_hidden_lists_and_libraries"
   ask: "Which lists does the Finance site have?"
   provenance: drafted
   asks_user: false
@@ -14,7 +14,7 @@ uc-16-01:
 uc-16-02:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_list_lists.py::test_a_value_that_is_not_a_site_url_makes_no_graph_call"
+    - "tests/integration/test_sharepoint_list_lists.py::test_a_value_that_is_not_a_site_url_makes_no_graph_call"
   ask: "Which lists does Finance have?"
   provenance: drafted
   asks_user: false
@@ -31,7 +31,7 @@ uc-16-02:
 uc-16-03:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_get_list.py::test_it_maps_each_column_facet_to_a_type"
+    - "tests/integration/test_sharepoint_get_list.py::test_it_maps_each_column_facet_to_a_type"
   ask: "Which columns does the Tasks list on the Finance site have?"
   provenance: drafted
   asks_user: false
@@ -43,7 +43,7 @@ uc-16-03:
 uc-16-04:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_get_list.py::test_a_value_that_is_not_a_list_handle_makes_no_graph_call"
+    - "tests/integration/test_sharepoint_get_list.py::test_a_value_that_is_not_a_list_handle_makes_no_graph_call"
   ask: "Which columns does the Tasks list on the Finance site have?"
   provenance: drafted
   asks_user: false
@@ -56,8 +56,8 @@ uc-16-04:
 uc-16-05:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_list_items.py::test_it_returns_items_with_their_fields_and_a_handle"
-    - "tests/tools/test_sharepoint_list_items.py::test_an_indexed_eq_filter_is_the_only_items_query"
+    - "tests/integration/test_sharepoint_list_items.py::test_it_returns_items_with_their_fields_and_a_handle"
+    - "tests/integration/test_sharepoint_list_items.py::test_an_indexed_eq_filter_is_the_only_items_query"
   ask: "Which items in the Tasks list are open?"
   provenance: drafted
   asks_user: false
@@ -73,7 +73,7 @@ uc-16-05:
 uc-16-06:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_list_items.py::test_a_filter_it_cannot_send_never_reaches_the_items_route"
+    - "tests/integration/test_sharepoint_list_items.py::test_a_filter_it_cannot_send_never_reaches_the_items_route"
   ask: "Which items in the Tasks list have q1 in their notes?"
   provenance: drafted
   asks_user: false
@@ -90,8 +90,8 @@ uc-16-06:
 uc-16-07:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_create_list_item.py::test_it_posts_the_typed_fields_once_the_person_agrees"
-    - "tests/tools/test_sharepoint_create_list_item.py::test_a_declined_question_sends_nothing"
+    - "tests/integration/test_sharepoint_create_list_item.py::test_it_posts_the_typed_fields_once_the_person_agrees"
+    - "tests/integration/test_sharepoint_create_list_item.py::test_a_declined_question_sends_nothing"
   ask: "Add the task Close books with the status Open to the Tasks list."
   provenance: drafted
   asks_user: true
@@ -107,7 +107,7 @@ uc-16-07:
 uc-16-08:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_create_list_item.py::test_a_column_it_cannot_write_sends_nothing_and_asks_nobody"
+    - "tests/integration/test_sharepoint_create_list_item.py::test_a_column_it_cannot_write_sends_nothing_and_asks_nobody"
   ask: "Add the task Close books to the Tasks list with me as the owner."
   provenance: drafted
   asks_user: false
@@ -124,8 +124,8 @@ uc-16-08:
 uc-16-09:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_update_list_item.py::test_it_patches_with_the_item_etag_and_shows_old_and_new_values"
-    - "tests/tools/test_sharepoint_update_list_item.py::test_a_declined_question_sends_nothing"
+    - "tests/integration/test_sharepoint_update_list_item.py::test_it_patches_with_the_item_etag_and_shows_old_and_new_values"
+    - "tests/integration/test_sharepoint_update_list_item.py::test_a_declined_question_sends_nothing"
   ask: "Set the status of Close books in the Tasks list to Closed."
   provenance: drafted
   asks_user: true
@@ -140,7 +140,7 @@ uc-16-09:
 uc-16-10:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_update_list_item.py::test_a_changed_row_is_a_tool_error_that_sends_the_model_to_read_again"
+    - "tests/integration/test_sharepoint_update_list_item.py::test_a_changed_row_is_a_tool_error_that_sends_the_model_to_read_again"
   ask: "Set the status of Close books in the Tasks list to Closed."
   provenance: drafted
   asks_user: true
@@ -158,7 +158,7 @@ uc-16-10:
 uc-16-11:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_delete_list_item.py::test_it_deletes_the_row_only_after_the_person_agrees_to_the_named_row"
+    - "tests/integration/test_sharepoint_delete_list_item.py::test_it_deletes_the_row_only_after_the_person_agrees_to_the_named_row"
   ask: "Delete the task Close books from the Tasks list."
   provenance: drafted
   asks_user: true
@@ -172,7 +172,7 @@ uc-16-11:
 uc-16-12:
   status: working
   tests:
-    - "tests/tools/test_sharepoint_delete_list_item.py::test_a_declined_question_sends_nothing"
+    - "tests/integration/test_sharepoint_delete_list_item.py::test_a_declined_question_sends_nothing"
   ask: "Delete the task Close books from the Tasks list."
   provenance: drafted
   asks_user: true

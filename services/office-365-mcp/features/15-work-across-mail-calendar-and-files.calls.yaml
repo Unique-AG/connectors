@@ -1,8 +1,8 @@
 uc-15-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestMiaStartsHerDayWithOneOverview::test_it_gives_the_meetings_and_the_newest_mail_with_the_count_of_unread_mail"
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestMiaStartsHerDayWithOneOverview::test_it_gives_the_attendees_of_a_meeting_it_reads"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestMiaStartsHerDayWithOneOverview::test_it_gives_the_meetings_and_the_newest_mail_with_the_count_of_unread_mail"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestMiaStartsHerDayWithOneOverview::test_it_gives_the_attendees_of_a_meeting_it_reads"
   ask: "Give me a brief of my day, and put Anna's mail first."
   provenance: observed
   evidence: outlook_list_events then outlook_list_mail 17 times; the 2 longest sessions repeat the loop list_mail, search_mail, read_event, list_events
@@ -20,7 +20,7 @@ uc-15-01:
 uc-15-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAnInvitationIsNeverAnsweredWithoutMia::test_it_shows_the_invitation_of_anna_in_the_inbox_and_sends_no_answer"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAnInvitationIsNeverAnsweredWithoutMia::test_it_shows_the_invitation_of_anna_in_the_inbox_and_sends_no_answer"
   ask: "Go through my inbox."
   provenance: observed
   evidence: a session of 20 calls on 2026-09-30 ran outlook_list_mail, outlook_move_mail, outlook_read_event, outlook_respond_to_invite, outlook_mark_mail
@@ -34,7 +34,7 @@ uc-15-02:
 uc-15-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAReplyUsesADocumentFromSharePoint"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAReplyUsesADocumentFromSharePoint"
   ask: "Answer Anna's mail with the latest price list."
   provenance: observed
   evidence: a session of 22 calls on 2026-10-09 ran outlook_search_mail, sharepoint_read_file, outlook_read_thread, outlook_draft_reply, outlook_move_mail
@@ -55,7 +55,7 @@ uc-15-03:
 uc-15-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAThreadLeadsToATimeForAWorkshop"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAThreadLeadsToATimeForAWorkshop"
   ask: "Find a time next week for the 90-minute workshop that Anna and Tom discussed."
   provenance: drafted
   evidence: a session of 19 calls on 2026-10-13 ran outlook_search_mail 10 times, outlook_read_mail 8 times, and outlook_check_availability
@@ -84,7 +84,7 @@ uc-15-04:
 uc-15-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAMeetingIsPreparedFromItsInvitationMailAndFiles"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAMeetingIsPreparedFromItsInvitationMailAndFiles"
   ask: "Get me ready for tomorrow's Launch review."
   provenance: drafted
   asks_user: false
@@ -111,7 +111,7 @@ uc-15-06:
     - outlook_draft_mail-to-found-person
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestADecisionFromAChatBecomesAMailDraft"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestADecisionFromAChatBecomesAMailDraft"
   ask: "Draft a mail to Anna and Tom that states what we decided in the Launch chat."
   provenance: drafted
   asks_user: false
@@ -130,7 +130,7 @@ uc-15-06:
 uc-15-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestEverythingAboutOneCustomerIsGathered"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestEverythingAboutOneCustomerIsGathered"
   ask: "Tell me everything we have about Acme in mail, Teams, and files."
   provenance: drafted
   asks_user: false
@@ -154,7 +154,7 @@ uc-15-09:
     - teams_read_transcript-past
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestActionItemsFromATranscriptBecomeAMailDraft"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestActionItemsFromATranscriptBecomeAMailDraft"
   ask: "Draft a mail to the attendees of yesterday's Design review with the action items."
   provenance: drafted
   asks_user: false
@@ -178,7 +178,7 @@ uc-15-09:
 uc-15-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_puts_a_link_to_the_file_in_the_draft_after_mia_approves_the_link"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_puts_a_link_to_the_file_in_the_draft_after_mia_approves_the_link"
   ask: "Send the latest price list to Anna by mail."
   provenance: drafted
   asks_user: true
@@ -196,7 +196,7 @@ uc-15-10:
 uc-15-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_saves_the_text_of_a_mail_in_a_folder_after_mia_approves_the_file"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_saves_the_text_of_a_mail_in_a_folder_after_mia_approves_the_file"
   ask: "Save the text of Anna's mail Offer terms in my Offers folder."
   provenance: drafted
   asks_user: true
@@ -214,9 +214,9 @@ uc-15-11:
 uc-15-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_a_teams_message_links"
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_resolves_a_file_that_a_chat_shows_as_a_reference_attachment"
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_anna_shared_with_mia_and_posted_in_a_chat"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_a_teams_message_links"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_resolves_a_file_that_a_chat_shows_as_a_reference_attachment"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAFileMovesBetweenMailTeamsAndSharePoint::test_it_reads_a_file_that_anna_shared_with_mia_and_posted_in_a_chat"
   ask: "What is in the file that Anna posted in our chat yesterday?"
   provenance: drafted
   asks_user: false
@@ -235,7 +235,7 @@ uc-15-12:
 uc-15-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestABriefSaysWhichPartItCouldNotRead"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestABriefSaysWhichPartItCouldNotRead"
   ask: "Give me a brief of my day, and put Anna's mail first."
   provenance: drafted
   asks_user: false
@@ -256,7 +256,7 @@ uc-15-13:
 uc-15-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAReplyThatNeedsAPriceListSaysWhenItCouldNotReadTheList"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAReplyThatNeedsAPriceListSaysWhenItCouldNotReadTheList"
   ask: "Answer Anna's mail with the latest price list."
   provenance: drafted
   asks_user: false
@@ -274,7 +274,7 @@ uc-15-14:
 uc-15-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAMeetingIsPreparedEvenWhenItsDeckCannotBeRead"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAMeetingIsPreparedEvenWhenItsDeckCannotBeRead"
   ask: "Get me ready for tomorrow's Launch review."
   provenance: drafted
   asks_user: false
@@ -295,7 +295,7 @@ uc-15-15:
 uc-15-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestASearchAcrossThreePlacesSaysWhichPlaceItCouldNotSearch"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestASearchAcrossThreePlacesSaysWhichPlaceItCouldNotSearch"
   ask: "Tell me everything we have about Acme in mail, Teams, and files."
   provenance: drafted
   asks_user: false
@@ -314,7 +314,7 @@ uc-15-16:
 uc-15-17:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestATimeIsNeverOfferedAsFreeForAPersonWhoseCalendarCannotBeRead"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestATimeIsNeverOfferedAsFreeForAPersonWhoseCalendarCannotBeRead"
   ask: "Find a time next week for the 90-minute workshop that Anna and Tom discussed."
   provenance: drafted
   asks_user: false
@@ -333,7 +333,7 @@ uc-15-17:
 uc-15-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestADecisionIsNotDraftedWhenTheChatCannotBeRead"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestADecisionIsNotDraftedWhenTheChatCannotBeRead"
     - "tests/test_error_mapping.py::TestEveryToolTranslatesItsOwnRefusal::test_a_refused_call_reaches_the_client_as_advice"
   ask: "Draft a mail to Anna and Tom that states what we decided in the Launch chat."
   provenance: drafted
@@ -347,7 +347,7 @@ uc-15-19:
 uc-15-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestActionItemsAreNotDraftedWhenTheCompanySwitchedTranscriptsOff"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestActionItemsAreNotDraftedWhenTheCompanySwitchedTranscriptsOff"
   ask: "Draft a mail to the attendees of yesterday's Design review with the action items."
   provenance: drafted
   asks_user: false
@@ -362,7 +362,7 @@ uc-15-20:
 uc-15-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAMailThatMicrosoftDoesNotReturnIsNotReportedAsUnsent"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAMailThatMicrosoftDoesNotReturnIsNotReportedAsUnsent"
   ask: "Save the text of Anna's mail Offer terms in my Offers folder."
   provenance: drafted
   asks_user: false
@@ -377,7 +377,7 @@ uc-15-21:
 uc-15-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAFileThatAnnaPostedIsNotDescribedWhenMiaCannotOpenIt"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAFileThatAnnaPostedIsNotDescribedWhenMiaCannotOpenIt"
   ask: "What is in the file that Anna posted in our chat yesterday?"
   provenance: drafted
   asks_user: false
@@ -392,7 +392,7 @@ uc-15-22:
 uc-15-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestASharingLinkNeedsMiasClearAgreement::test_it_creates_no_link_when_mia_declines"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestASharingLinkNeedsMiasClearAgreement::test_it_creates_no_link_when_mia_declines"
   ask: "Send the latest price list to Anna by mail."
   provenance: drafted
   asks_user: true
@@ -406,7 +406,7 @@ uc-15-27:
 uc-15-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestASharingLinkNeedsMiasClearAgreement::test_it_creates_no_link_when_the_question_gets_an_error_for_an_answer"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestASharingLinkNeedsMiasClearAgreement::test_it_creates_no_link_when_the_question_gets_an_error_for_an_answer"
   ask: "Send the latest price list to Anna by mail."
   provenance: drafted
   asks_user: true
@@ -420,7 +420,7 @@ uc-15-28:
 uc-15-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestASharingLinkNeedsMiasClearAgreement::test_it_rejects_an_approval_that_was_given_for_something_else"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestASharingLinkNeedsMiasClearAgreement::test_it_rejects_an_approval_that_was_given_for_something_else"
   ask: "Send the latest price list to Anna by mail."
   provenance: drafted
   asks_user: true
@@ -431,7 +431,7 @@ uc-15-29:
 uc-15-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestALinkThatMicrosoftFailsIsAskedForOnceMoreAndThenReported::test_it_asks_mia_again_and_then_reports_that_it_could_not_create_the_link"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestALinkThatMicrosoftFailsIsAskedForOnceMoreAndThenReported::test_it_asks_mia_again_and_then_reports_that_it_could_not_create_the_link"
   ask: "Send the latest price list to Anna by mail."
   provenance: drafted
   asks_user: true
@@ -473,7 +473,7 @@ uc-15-38:
 uc-15-39:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestMiaStartsHerDayWithOneOverview::test_it_reads_the_mail_first_and_then_the_calendar"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestMiaStartsHerDayWithOneOverview::test_it_reads_the_mail_first_and_then_the_calendar"
   ask: "What does my unread mail say, and do I have room today for what Anna asks?"
   provenance: observed
   evidence: outlook_list_mail then outlook_list_events in 7 sessions, outlook_read_mail then outlook_list_events in 5, and outlook_list_mail, outlook_list_events, outlook_read_event in 4, in prod between 2026-10-14 and 2026-10-23; the logs hold the tool names and no arguments, and the intent is read from the chain, not logged

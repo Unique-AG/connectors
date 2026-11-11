@@ -5,7 +5,7 @@ uc-06-01:
   evidence: teams_list_chats alone in 7 sessions; in 30 sessions in total
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-01]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-01]"
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
@@ -17,7 +17,7 @@ uc-06-01:
 uc-06-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_shows_a_chat_without_a_title_by_its_members"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_shows_a_chat_without_a_title_by_its_members"
   ask: "Show me my Teams chats."
   provenance: observed
   evidence: teams_list_chats in 30 sessions
@@ -29,8 +29,8 @@ uc-06-02:
 uc-06-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_finds_a_topic_in_a_chat_and_in_a_channel"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_reads_a_hit_in_full"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_finds_a_topic_in_a_chat_and_in_a_channel"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_reads_a_hit_in_full"
   ask: "Where did we talk about the pricing change in Teams?"
   provenance: observed
   evidence: teams_search_messages in 19 sessions, alone in 9
@@ -45,10 +45,10 @@ uc-06-03:
 uc-06-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_posts_with_their_replies_and_reports_the_posts_it_did_not_read"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_has_no_date_bound_so_it_returns_the_older_posts_as_well"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reports_a_page_that_held_more_posts_than_the_limit"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_the_next_page_of_posts_with_the_link_of_the_first_page"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_posts_with_their_replies_and_reports_the_posts_it_did_not_read"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_has_no_date_bound_so_it_returns_the_older_posts_as_well"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reports_a_page_that_held_more_posts_than_the_limit"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_the_next_page_of_posts_with_the_link_of_the_first_page"
   ask: "What happened in the Releases channel this week?"
   provenance: drafted
   asks_user: false
@@ -73,7 +73,7 @@ uc-06-05:
     - teams_read_transcript-lines
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_who_said_what_in_a_transcript"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_who_said_what_in_a_transcript"
   ask: "Summarize yesterday's Design review with the action items."
   provenance: observed
   evidence: teams_list_chats then teams_list_meeting_transcripts then teams_read_transcript in 7 sessions
@@ -88,7 +88,7 @@ uc-06-05:
 uc-06-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_reads_a_transcript_of_three_hours_to_its_last_decision"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_reads_a_transcript_of_three_hours_to_its_last_decision"
   ask: "What did we decide in the three-hour meeting?"
   provenance: drafted
   evidence: teams_read_transcript in 18 calls
@@ -105,7 +105,7 @@ uc-06-06:
 uc-06-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_reports_a_meeting_that_nobody_transcribed"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_reports_a_meeting_that_nobody_transcribed"
   ask: "Summarize the Weekly sync."
   provenance: observed
   evidence: teams_list_meeting_transcripts in 17 calls
@@ -121,7 +121,7 @@ uc-06-08:
     - teams_list_meeting_recordings-past
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_describes_a_recording_and_gives_none_of_its_content"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_describes_a_recording_and_gives_none_of_its_content"
   ask: "Send me the recording of the Design review."
   provenance: observed
   evidence: teams_list_meeting_recordings in 1 call
@@ -134,7 +134,7 @@ uc-06-08:
 uc-06-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_for_messages_that_mention_mia"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_for_messages_that_mention_mia"
   ask: "Show me where people mentioned me in Teams."
   provenance: drafted
   asks_user: false
@@ -148,7 +148,7 @@ uc-06-09:
 uc-06-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_the_messages_of_one_person_in_a_time_window"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_searches_the_messages_of_one_person_in_a_time_window"
   ask: "What did Tom write in Teams yesterday?"
   provenance: drafted
   asks_user: false
@@ -159,8 +159,8 @@ uc-06-10:
 uc-06-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_reads_the_newest_messages_of_a_group_chat_with_their_senders"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_says_that_older_messages_exist_when_microsoft_offers_more"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_reads_the_newest_messages_of_a_group_chat_with_their_senders"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_says_that_older_messages_exist_when_microsoft_offers_more"
   ask: "What is new in the Launch chat?"
   provenance: drafted
   asks_user: false
@@ -174,7 +174,7 @@ uc-06-11:
 uc-06-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_reads_each_unread_chat_and_names_the_sender_of_each_message"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestReadingAChat::test_it_reads_each_unread_chat_and_names_the_sender_of_each_message"
   ask: "Read me what is new in my unread chats."
   provenance: drafted
   asks_user: false
@@ -188,8 +188,8 @@ uc-06-12:
 uc-06-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_tells_two_dates_of_a_recurring_meeting_apart"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_refuses_a_transcript_of_another_call_when_microsoft_drops_the_filter"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_tells_two_dates_of_a_recurring_meeting_apart"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_refuses_a_transcript_of_another_call_when_microsoft_drops_the_filter"
   ask: "Summarize the Weekly sync of 5 October."
   provenance: drafted
   asks_user: false
@@ -208,7 +208,7 @@ uc-06-13:
 uc-06-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_the_company_switched_off_as_refused"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_the_company_switched_off_as_refused"
   ask: "Summarize yesterday's Design review."
   provenance: drafted
   asks_user: false
@@ -247,7 +247,7 @@ uc-06-15:
 uc-06-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_to_sign_in_again_and_lists_no_chat"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_to_sign_in_again_and_lists_no_chat"
   ask: "Which of my Teams chats have unread messages?"
   provenance: drafted
   asks_user: false
@@ -274,8 +274,8 @@ uc-06-18:
   provenance: drafted
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-18/limited]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-18/too-busy]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-18/limited]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-06-18/too-busy]"
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
@@ -315,8 +315,8 @@ uc-06-18:
 uc-06-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_read_that_microsoft_keeps_failing"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_list_that_keeps_saying_more_follows_and_sends_none"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_read_that_microsoft_keeps_failing"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_list_that_keeps_saying_more_follows_and_sends_none"
   ask: "What is unread in my Teams chats?"
   provenance: drafted
   asks_user: false
@@ -330,7 +330,7 @@ uc-06-19:
 uc-06-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_reports_the_reason_when_microsoft_rejects_the_search"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_reports_the_reason_when_microsoft_rejects_the_search"
   ask: "Where did we talk about the pricing change in Teams?"
   provenance: drafted
   asks_user: false
@@ -358,7 +358,7 @@ uc-06-31:
 uc-06-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_chat_that_microsoft_cannot_find_without_saying_it_was_deleted"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_chat_that_microsoft_cannot_find_without_saying_it_was_deleted"
   ask: "What is new in the Launch chat?"
   provenance: drafted
   asks_user: false
@@ -372,7 +372,7 @@ uc-06-32:
 uc-06-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_microsoft_no_longer_returns_as_gone"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_microsoft_no_longer_returns_as_gone"
   ask: "Summarize the Design review from two months ago."
   provenance: drafted
   asks_user: false
@@ -391,7 +391,7 @@ uc-06-21:
 uc-06-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_refuses_a_transcript_of_one_byte_over_100_megabytes_as_too_long"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_refuses_a_transcript_of_one_byte_over_100_megabytes_as_too_long"
   ask: "Summarize yesterday's Design review."
   provenance: drafted
   asks_user: false
@@ -407,7 +407,7 @@ uc-06-22:
 uc-06-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reads_a_transcript_whose_size_equals_the_ceiling"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reads_a_transcript_whose_size_equals_the_ceiling"
   ask: "What did we decide in yesterday's Design review?"
   provenance: drafted
   asks_user: false
@@ -425,7 +425,7 @@ uc-06-23:
 uc-06-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_does_not_summarize_a_transcript_that_stops_before_its_declared_end"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_does_not_summarize_a_transcript_that_stops_before_its_declared_end"
   ask: "Give me the summary of the Design review."
   provenance: drafted
   asks_user: false
@@ -443,7 +443,7 @@ uc-06-24:
 uc-06-25:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_is_not_ready_after_a_meeting_that_just_ended"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_transcript_that_is_not_ready_after_a_meeting_that_just_ended"
   ask: "Summarize the Design review that just ended."
   provenance: drafted
   asks_user: false
@@ -458,7 +458,7 @@ uc-06-25:
 uc-06-26:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_meeting_that_microsoft_does_not_show_as_not_found"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatCannotBeUsed::test_it_reports_a_meeting_that_microsoft_does_not_show_as_not_found"
   ask: "Summarize the Design review."
   provenance: drafted
   asks_user: false
@@ -488,7 +488,7 @@ uc-06-33:
 uc-06-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_refuses_a_search_with_nothing_to_look_for_before_it_asks_microsoft"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestFindingAMessage::test_it_refuses_a_search_with_nothing_to_look_for_before_it_asks_microsoft"
   ask: "Search my Teams messages."
   provenance: drafted
   asks_user: false
@@ -500,8 +500,8 @@ uc-06-27:
 uc-06-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_marks_a_crowded_chat_whose_members_may_be_cut"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_names_every_member_that_microsoft_listed_and_warns"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_marks_a_crowded_chat_whose_members_may_be_cut"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_names_every_member_that_microsoft_listed_and_warns"
   ask: "Show me my group chats and who is in them."
   provenance: drafted
   asks_user: false
@@ -527,8 +527,8 @@ uc-06-29:
 uc-06-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_reports_that_chats_beyond_the_newest_fifty_may_exist"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_says_the_list_is_complete_when_no_older_chat_exists"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_reports_that_chats_beyond_the_newest_fifty_may_exist"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_says_the_list_is_complete_when_no_older_chat_exists"
   ask: "Which of my Teams chats have unread messages?"
   provenance: drafted
   asks_user: false
@@ -540,7 +540,7 @@ uc-06-30:
 uc-06-34:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_finds_unread_posts_of_channels_through_the_read_state_search"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhichChatsNeedMia::test_it_finds_unread_posts_of_channels_through_the_read_state_search"
   ask: "What did I miss in my Teams channels?"
   provenance: drafted
   asks_user: false
@@ -558,7 +558,7 @@ uc-06-35:
     - teams_read_transcript-past
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_the_summary_from_the_transcript_and_the_message_written_after_it"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatAMeetingSaid::test_it_gives_the_summary_from_the_transcript_and_the_message_written_after_it"
   ask: "Summarize the Design review, and tell me what people wrote about it afterwards."
   provenance: observed
   evidence: teams_read_transcript then teams_search_messages in 3 sessions of prod between 2026-10-14 and 2026-10-23; the logs hold the tool names and no arguments, so the listing steps come from uc-06-05
@@ -579,7 +579,7 @@ uc-06-35:
 uc-06-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_a_thread_of_fifty_replies_and_says_that_more_exist"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAChannelWithItsReplies::test_it_reads_a_thread_of_fifty_replies_and_says_that_more_exist"
   ask: "Show me all replies to the post 'v2 is out?' in Releases."
   provenance: drafted
   asks_user: false
@@ -597,7 +597,7 @@ uc-06-36:
 uc-06-37:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_channel_folder_that_microsoft_cannot_find_without_calling_it_empty"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_reports_a_channel_folder_that_microsoft_cannot_find_without_calling_it_empty"
   ask: "What files are in the Launch channel of the Platform team?"
   provenance: drafted
   asks_user: false
@@ -613,7 +613,7 @@ uc-06-37:
 uc-06-40:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_how_long_to_wait_when_a_channel_keeps_limiting_the_reads"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhenMicrosoftCannotDoWhatMiaAsked::test_it_tells_mia_how_long_to_wait_when_a_channel_keeps_limiting_the_reads"
   ask: "What happened in the Releases channel this week?"
   provenance: drafted
   asks_user: false
@@ -629,7 +629,7 @@ uc-06-40:
 uc-06-42:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_the_full_text_and_the_reactions_of_each_hit_when_mia_asks_for_it"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_the_full_text_and_the_reactions_of_each_hit_when_mia_asks_for_it"
   ask: "Find the messages about the offer and show me what they say."
   provenance: drafted
   asks_user: false
@@ -641,7 +641,7 @@ uc-06-42:
 uc-06-43:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_narrows_a_search_by_one_more_condition"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_narrows_a_search_by_one_more_condition"
   ask: "Find what Tom wrote about the offer before 9:00."
   provenance: drafted
   asks_user: false
@@ -653,9 +653,9 @@ uc-06-43:
 uc-06-44:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_leaves_out_a_hit_that_names_no_sender_or_no_message"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_gives_no_handle_and_reads_no_text_for_a_hit_that_has_no_address"
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_a_hit_without_its_text_when_microsoft_cannot_read_the_message"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_leaves_out_a_hit_that_names_no_sender_or_no_message"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_gives_no_handle_and_reads_no_text_for_a_hit_that_has_no_address"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_shows_a_hit_without_its_text_when_microsoft_cannot_read_the_message"
   ask: "Find the messages about the offer and show me what they say."
   provenance: drafted
   asks_user: false
@@ -667,7 +667,7 @@ uc-06-44:
 uc-06-45:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_finds_nothing_when_microsoft_answers_with_no_hits_container"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestSearchingFurther::test_it_finds_nothing_when_microsoft_answers_with_no_hits_container"
   ask: "Find the messages about the offer."
   provenance: drafted
   asks_user: false
@@ -679,7 +679,7 @@ uc-06-45:
 uc-06-47:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_reference_that_is_not_one_and_asks_microsoft_nothing"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_reference_that_is_not_one_and_asks_microsoft_nothing"
   ask: "Read the message Launch."
   provenance: drafted
   asks_user: false
@@ -690,7 +690,7 @@ uc-06-47:
 uc-06-48:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_transcript_window_that_cannot_match_a_turn"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAReferenceThatTheAssistantMadeUp::test_it_refuses_a_transcript_window_that_cannot_match_a_turn"
   ask: "Read the transcript of Design review from minute 2 to minute 1."
   provenance: drafted
   asks_user: false
@@ -707,7 +707,7 @@ uc-06-48:
 uc-06-49:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_reports_a_meeting_that_microsoft_does_not_show_as_not_found"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_reports_a_meeting_that_microsoft_does_not_show_as_not_found"
   ask: "Which recordings does Design review have?"
   provenance: drafted
   asks_user: false
@@ -721,7 +721,7 @@ uc-06-49:
 uc-06-50:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_tells_a_meeting_that_may_still_get_a_recording_from_one_that_has_none"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_tells_a_meeting_that_may_still_get_a_recording_from_one_that_has_none"
   ask: "Which recordings does Design review have?"
   provenance: drafted
   asks_user: false
@@ -735,7 +735,7 @@ uc-06-50:
 uc-06-51:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_says_unknown_when_microsoft_names_no_organizer_and_no_end_for_a_recording"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestTheRecordingsOfAMeeting::test_it_says_unknown_when_microsoft_names_no_organizer_and_no_end_for_a_recording"
   ask: "Which recordings does Design review have?"
   provenance: drafted
   asks_user: false
@@ -749,7 +749,7 @@ uc-06-51:
 uc-06-52:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_reads_the_text_without_speakers_when_the_company_forbids_speaker_names"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_reads_the_text_without_speakers_when_the_company_forbids_speaker_names"
   ask: "What did Design review say?"
   provenance: drafted
   asks_user: false
@@ -765,7 +765,7 @@ uc-06-52:
 uc-06-53:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_skips_a_turn_that_holds_no_words"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_skips_a_turn_that_holds_no_words"
   ask: "What did Design review say?"
   provenance: drafted
   asks_user: false
@@ -781,7 +781,7 @@ uc-06-53:
 uc-06-54:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_lists_a_transcript_once_when_microsoft_sends_it_on_two_pages"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_lists_a_transcript_once_when_microsoft_sends_it_on_two_pages"
   ask: "Which transcripts does Design review have?"
   provenance: drafted
   asks_user: false
@@ -795,7 +795,7 @@ uc-06-54:
 uc-06-55:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatTheListsOfTeamsKeepApart::test_it_reports_no_channels_when_microsoft_ignores_the_kind_asked_for"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatTheListsOfTeamsKeepApart::test_it_reports_no_channels_when_microsoft_ignores_the_kind_asked_for"
   ask: "Which standard channels does Sales have?"
   provenance: drafted
   asks_user: false
@@ -809,7 +809,7 @@ uc-06-55:
 uc-06-56:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestWhatTheListsOfTeamsKeepApart::test_it_describes_a_system_event_and_a_post_of_a_bot_in_a_chat"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestWhatTheListsOfTeamsKeepApart::test_it_describes_a_system_event_and_a_post_of_a_bot_in_a_chat"
   ask: "What is new in Design review?"
   provenance: drafted
   asks_user: false
@@ -823,7 +823,7 @@ uc-06-56:
 uc-06-57:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAMeetingChatThatHoldsNoJoinAddress::test_it_lists_the_chat_without_a_meeting_reference"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAMeetingChatThatHoldsNoJoinAddress::test_it_lists_the_chat_without_a_meeting_reference"
   ask: "Which meeting chats do I have?"
   provenance: drafted
   asks_user: false
@@ -835,7 +835,7 @@ uc-06-57:
 uc-06-58:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestOlderMessagesOfAChat::test_it_reads_the_messages_sent_before_a_day_or_a_moment"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestOlderMessagesOfAChat::test_it_reads_the_messages_sent_before_a_day_or_a_moment"
   ask: "Show me the messages of Launch up to the end of 4 November."
   provenance: drafted
   asks_user: false
@@ -850,7 +850,7 @@ uc-06-58:
 uc-06-59:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestAReplyReadByItsOwnReference::test_it_reads_one_reply_of_a_thread_in_full"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestAReplyReadByItsOwnReference::test_it_reads_one_reply_of_a_thread_in_full"
   ask: "Read the reply of Tom to the post Hosting plan."
   provenance: drafted
   asks_user: false
@@ -870,7 +870,7 @@ uc-06-59:
 uc-06-60:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestTheReactionsOfAMessage::test_it_shows_who_reacted_to_a_message_of_a_chat"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestTheReactionsOfAMessage::test_it_shows_who_reacted_to_a_message_of_a_chat"
   ask: "Show me the message that I wrote in the chat Launch and who reacted."
   provenance: drafted
   asks_user: false
@@ -884,7 +884,7 @@ uc-06-60:
 uc-06-46:
   status: working
   tests:
-    - "tests/tools/scenarios/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_reports_any_other_refusal_of_the_transcript_without_a_second_try"
+    - "tests/integration/test_06_catch_up_on_teams.py::TestATranscriptThatNeedsAnotherFormat::test_it_reports_any_other_refusal_of_the_transcript_without_a_second_try"
   ask: "What did Design review say?"
   provenance: drafted
   asks_user: false

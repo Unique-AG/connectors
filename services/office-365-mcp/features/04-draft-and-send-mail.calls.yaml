@@ -3,7 +3,7 @@ uc-04-01:
     - outlook_draft_mail-to-found-person
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_it_addresses_the_draft_to_the_address_that_the_name_found"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_it_addresses_the_draft_to_the_address_that_the_name_found"
   ask: "Draft a note to Anna Meier that asks for the contract by Friday."
   provenance: drafted
   evidence: outlook_find_recipient in 13 sessions, alone in 7; outlook_draft_mail in 18 sessions
@@ -19,7 +19,7 @@ uc-04-01:
 uc-04-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_two_people_with_one_name_lead_to_a_question_and_no_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_two_people_with_one_name_lead_to_a_question_and_no_draft"
   ask: "Write a note to Anna Meier."
   provenance: drafted
   asks_user: false
@@ -31,7 +31,7 @@ uc-04-02:
 uc-04-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_it_gives_the_text_of_the_automatic_reply_of_the_person"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_it_gives_the_text_of_the_automatic_reply_of_the_person"
   ask: "Is Anna away right now?"
   provenance: drafted
   asks_user: false
@@ -44,7 +44,7 @@ uc-04-03:
 uc-04-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_shortens_the_draft_in_place_and_makes_no_second_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_shortens_the_draft_in_place_and_makes_no_second_draft"
   ask: "Make the draft shorter."
   provenance: drafted
   asks_user: false
@@ -59,7 +59,7 @@ uc-04-04:
 uc-04-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_a_person_who_is_already_addressed_is_not_copied_as_well"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_a_person_who_is_already_addressed_is_not_copied_as_well"
   ask: "Copy Tom on the draft as well."
   provenance: drafted
   asks_user: false
@@ -76,7 +76,7 @@ uc-04-06:
   provenance: drafted
   asks_user: true
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-06]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-06]"
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
@@ -94,7 +94,7 @@ uc-04-07:
   provenance: drafted
   asks_user: true
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-07]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-07]"
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
@@ -109,7 +109,7 @@ uc-04-07:
 uc-04-08:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_changed_after_the_question_is_not_sent"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_changed_after_the_question_is_not_sent"
   ask: "Send my draft to Anna."
   provenance: drafted
   asks_user: true
@@ -121,7 +121,7 @@ uc-04-08:
 uc-04-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_the_tips_of_the_recipient_come_before_the_question_of_the_send"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_the_tips_of_the_recipient_come_before_the_question_of_the_send"
   ask: "Send Anna the draft now."
   provenance: drafted
   asks_user: true
@@ -136,7 +136,7 @@ uc-04-12:
 uc-04-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_reply_to_everyone_lists_every_other_person_and_not_mia"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_reply_to_everyone_lists_every_other_person_and_not_mia"
   ask: "Reply to everyone on Anna's message."
   provenance: drafted
   asks_user: false
@@ -149,7 +149,7 @@ uc-04-09:
 uc-04-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_forward_is_made_from_the_message_and_so_carries_its_attachments"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_forward_is_made_from_the_message_and_so_carries_its_attachments"
   ask: "Forward the mail Contract draft to Tom with a short note."
   provenance: drafted
   evidence: outlook_draft_reply 36 calls, used for replies
@@ -167,7 +167,7 @@ uc-04-10:
 uc-04-11:
   status: gap
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_the_draft_tools_cannot_attach_a_file"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_the_draft_tools_cannot_attach_a_file"
   ask: "Mail Report.pdf to Anna as an attachment."
   provenance: drafted
   asks_user: false
@@ -181,7 +181,7 @@ uc-04-11:
 uc-04-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_plain_reply_goes_to_the_sender_only"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_plain_reply_goes_to_the_sender_only"
   ask: "Reply to Anna's message and say Friday works."
   provenance: drafted
   asks_user: false
@@ -196,7 +196,7 @@ uc-04-13:
 uc-04-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_a_name_that_matches_no_one_closely_is_offered_as_a_fuzzy_candidate"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftGoesToTheRealAddressOfTheRightPerson::test_a_name_that_matches_no_one_closely_is_offered_as_a_fuzzy_candidate"
   ask: "Write a note to Anna Mayer."
   provenance: drafted
   asks_user: false
@@ -209,7 +209,7 @@ uc-04-14:
 uc-04-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_client_that_cannot_ask_sends_nothing_and_says_so"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_client_that_cannot_ask_sends_nothing_and_says_so"
   ask: "Please send my draft to Anna."
   provenance: drafted
   asks_user: false
@@ -221,7 +221,7 @@ uc-04-15:
 uc-04-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_mia_wrote_in_outlook_is_sent_after_she_agrees"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_mia_wrote_in_outlook_is_sent_after_she_agrees"
   ask: "Send the draft I just wrote to Tom."
   provenance: drafted
   asks_user: true
@@ -235,7 +235,7 @@ uc-04-16:
 uc-04-17:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_puts_a_person_on_the_draft_as_a_blind_copy"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_puts_a_person_on_the_draft_as_a_blind_copy"
   ask: "Put Priya on blind copy on my draft to Anna."
   provenance: drafted
   asks_user: false
@@ -248,7 +248,7 @@ uc-04-17:
 uc-04-18:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_changes_the_subject_the_importance_and_the_recipients_of_the_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftChangesUntilMiaApproves::test_it_changes_the_subject_the_importance_and_the_recipients_of_the_draft"
   ask: "Take Priya off my draft, call it Contract for signature, and mark it important."
   provenance: drafted
   asks_user: false
@@ -263,7 +263,7 @@ uc-04-18:
 uc-04-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftInASharedMailbox::test_it_asks_before_it_makes_the_draft_in_the_shared_mailbox"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftInASharedMailbox::test_it_asks_before_it_makes_the_draft_in_the_shared_mailbox"
   ask: "Draft a note to customer@acme.example from the support mailbox that confirms the order."
   provenance: drafted
   asks_user: true
@@ -275,7 +275,7 @@ uc-04-19:
 uc-04-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_person_search_that_microsoft_refuses_tells_mia_why"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_person_search_that_microsoft_refuses_tells_mia_why"
   ask: "Find the address of Anna Meier."
   provenance: drafted
   asks_user: false
@@ -288,8 +288,8 @@ uc-04-20:
 uc-04-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_person_search_that_microsoft_cannot_finish_is_tried_once_more"
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_list_of_mail_that_never_ends_is_tried_once_more"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_person_search_that_microsoft_cannot_finish_is_tried_once_more"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_list_of_mail_that_never_ends_is_tried_once_more"
   ask: "Find the address of Anna Meier."
   provenance: drafted
   asks_user: false
@@ -303,7 +303,7 @@ uc-04-21:
 uc-04-22:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_person_search_that_fails_twice_ends_in_the_same_advice_to_stop"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_person_search_that_fails_twice_ends_in_the_same_advice_to_stop"
   ask: "Find the address of Anna Meier."
   provenance: drafted
   asks_user: false
@@ -317,7 +317,7 @@ uc-04-22:
 uc-04-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_send_that_microsoft_refuses_tells_mia_why_and_never_says_sent"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_send_that_microsoft_refuses_tells_mia_why_and_never_says_sent"
   ask: "Send the draft to Anna."
   provenance: drafted
   asks_user: true
@@ -329,7 +329,7 @@ uc-04-23:
 uc-04-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_draft_that_is_gone_is_not_reported_as_sent_and_no_question_is_asked"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_draft_that_is_gone_is_not_reported_as_sent_and_no_question_is_asked"
   ask: "Send the draft to Anna."
   provenance: drafted
   asks_user: false
@@ -344,8 +344,8 @@ uc-04-25:
   provenance: drafted
   asks_user: true
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-25/fails]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-25/no-answer-in-time]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-25/fails]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-25/no-answer-in-time]"
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
@@ -374,9 +374,9 @@ uc-04-26:
   provenance: drafted
   asks_user: false
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/fails]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/no-answer-in-time]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/unreadable]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/fails]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/no-answer-in-time]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/unreadable]"
   chain:
     - tool: outlook_draft_mail
       args: {to: [anna.meier@example.com], subject: Contract, body: request for the contract by Friday}
@@ -403,7 +403,7 @@ uc-04-26:
 uc-04-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_draft_that_microsoft_rejects_as_invalid_is_not_repeated_and_gives_the_reason"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_draft_that_microsoft_rejects_as_invalid_is_not_repeated_and_gives_the_reason"
   ask: "Draft a note to Anna."
   provenance: drafted
   asks_user: false
@@ -417,7 +417,7 @@ uc-04-27:
 uc-04-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_name_in_place_of_an_address_creates_no_draft_and_the_address_does"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_name_in_place_of_an_address_creates_no_draft_and_the_address_does"
   ask: "Write a note to Anna Meier that asks for the contract."
   provenance: drafted
   asks_user: false
@@ -435,7 +435,7 @@ uc-04-28:
 uc-04-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_subject_of_256_characters_creates_no_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_subject_of_256_characters_creates_no_draft"
   ask: "Draft a note to Anna Meier with a subject of 256 characters."
   provenance: drafted
   asks_user: false
@@ -450,7 +450,7 @@ uc-04-29:
 uc-04-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_value_that_does_not_name_the_draft_sends_nothing_and_asks_nothing"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_value_that_does_not_name_the_draft_sends_nothing_and_asks_nothing"
   ask: "Send my draft to Anna."
   provenance: drafted
   asks_user: true
@@ -466,7 +466,7 @@ uc-04-30:
 uc-04-31:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_message_that_went_out_already_is_neither_sent_nor_changed"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_message_that_went_out_already_is_neither_sent_nor_changed"
   ask: "Send the draft to Anna."
   provenance: drafted
   asks_user: false
@@ -478,7 +478,7 @@ uc-04-31:
 uc-04-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestADraftInASharedMailbox::test_without_a_yes_the_shared_mailbox_holds_no_new_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestADraftInASharedMailbox::test_without_a_yes_the_shared_mailbox_holds_no_new_draft"
   ask: "Draft a note to customer@acme.example from the support mailbox that confirms the order."
   provenance: drafted
   asks_user: true
@@ -494,7 +494,7 @@ uc-04-33:
   provenance: drafted
   asks_user: true
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-33]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-33]"
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
@@ -509,7 +509,7 @@ uc-04-33:
 uc-04-34:
   status: working
   tests:
-    - "tests/tools/test_outlook_send_draft.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_question_sends_nothing"
+    - "tests/integration/test_outlook_send_draft.py::TestTheEraWithNoBackChannel::test_an_answer_bound_to_another_question_sends_nothing"
   ask: "Send my draft to Anna."
   provenance: drafted
   asks_user: true
@@ -521,8 +521,8 @@ uc-04-34:
 uc-04-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_an_address_that_a_message_asks_for_is_refused_on_a_plain_reply"
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_plain_reply_goes_to_the_sender_only"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_an_address_that_a_message_asks_for_is_refused_on_a_plain_reply"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyKeepsTheConversation::test_a_plain_reply_goes_to_the_sender_only"
   ask: "Reply to Anna's message and say Friday works."
   provenance: drafted
   asks_user: false
@@ -537,7 +537,7 @@ uc-04-35:
 uc-04-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_change_that_microsoft_asks_to_wait_for_is_not_reported_as_not_made"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_change_that_microsoft_asks_to_wait_for_is_not_reported_as_not_made"
   ask: "Save a draft note to Anna."
   provenance: drafted
   evidence: outlook_draft_reply_all failed once in 4 calls with a 503 in prod between 2026-10-14 and 2026-10-23; the logs do not show whether Microsoft sent a wait time
@@ -549,7 +549,7 @@ uc-04-36:
 uc-04-37:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_one_busy_answer_is_waited_out_and_the_address_arrives"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_one_busy_answer_is_waited_out_and_the_address_arrives"
   ask: "Find the address of Anna Meier."
   provenance: drafted
   asks_user: false
@@ -561,7 +561,7 @@ uc-04-37:
 uc-04-38:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_subject_of_255_characters_is_kept"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAWrongValueChangesNothing::test_a_subject_of_255_characters_is_kept"
   ask: "Draft a note to Anna Meier with a subject of 255 characters."
   provenance: drafted
   asks_user: false
@@ -575,7 +575,7 @@ uc-04-38:
 uc-04-39:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatMicrosoftSaysAboutARecipient::test_a_recipient_with_no_usable_notes_is_not_reported_as_free_of_problems"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatMicrosoftSaysAboutARecipient::test_a_recipient_with_no_usable_notes_is_not_reported_as_free_of_problems"
   ask: "Before I send this to Anna, check that nothing is wrong with her address."
   provenance: drafted
   asks_user: false
@@ -590,7 +590,7 @@ uc-04-39:
 uc-04-40:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatMicrosoftSaysAboutARecipient::test_an_automatic_reply_that_holds_an_instruction_is_only_reported"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatMicrosoftSaysAboutARecipient::test_an_automatic_reply_that_holds_an_instruction_is_only_reported"
   ask: "Is Anna away right now?"
   provenance: drafted
   asks_user: false
@@ -605,7 +605,7 @@ uc-04-40:
 uc-04-41:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_reply_to_everyone_on_a_message_that_is_gone_makes_no_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_reply_to_everyone_on_a_message_that_is_gone_makes_no_draft"
   ask: "Reply to everyone on Anna's message."
   provenance: drafted
   asks_user: false
@@ -620,7 +620,7 @@ uc-04-41:
 uc-04-42:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_reply_to_everyone_that_microsoft_fails_to_save_is_not_saved_twice"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_reply_to_everyone_that_microsoft_fails_to_save_is_not_saved_twice"
   ask: "Reply to everyone on Anna's message and say Friday works."
   provenance: drafted
   evidence: outlook_draft_reply_all failed once in 4 calls with a 503 in prod between 2026-10-14 and 2026-10-23; the logs do not show whether Microsoft sent a wait time
@@ -636,7 +636,7 @@ uc-04-42:
 uc-04-44:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_reply_to_everyone_whose_text_microsoft_cannot_save_is_reported_as_not_saved"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked::test_a_reply_to_everyone_whose_text_microsoft_cannot_save_is_reported_as_not_saved"
   ask: "Reply to everyone on Anna's message and say Friday works."
   provenance: drafted
   asks_user: false
@@ -651,7 +651,7 @@ uc-04-44:
 uc-04-45:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitStopsTheDraft::test_it_refuses_the_draft_before_it_asks_microsoft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitStopsTheDraft::test_it_refuses_the_draft_before_it_asks_microsoft"
   ask: "Write to Anna and Tom and copy Anna."
   provenance: drafted
   asks_user: false
@@ -664,7 +664,7 @@ uc-04-45:
 uc-04-46:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitStopsTheDraft::test_a_subject_line_in_place_of_a_handle_creates_and_changes_nothing"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitStopsTheDraft::test_a_subject_line_in_place_of_a_handle_creates_and_changes_nothing"
   ask: "Reply to the message Q3 budget review."
   provenance: drafted
   asks_user: false
@@ -678,8 +678,8 @@ uc-04-46:
 uc-04-47:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_the_sender_makes_no_draft"
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_the_reply_to_address_makes_no_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_the_sender_makes_no_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_the_reply_to_address_makes_no_draft"
   ask: "Reply to Anna and copy Anna."
   provenance: drafted
   asks_user: false
@@ -693,7 +693,7 @@ uc-04-47:
 uc-04-48:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_someone_else_is_read_back_from_the_stored_draft"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestACopyToThePersonWhoGetsTheReplyIsRefused::test_a_copy_to_someone_else_is_read_back_from_the_stored_draft"
   ask: "Reply to Anna and copy Tom."
   provenance: drafted
   asks_user: false
@@ -709,8 +709,8 @@ uc-04-48:
 uc-04-49:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_it_asks_and_then_writes_after_a_yes"
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_the_question_of_a_change_says_what_happens_to_the_categories"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_it_asks_and_then_writes_after_a_yes"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_the_question_of_a_change_says_what_happens_to_the_categories"
   ask: "In the shared mailbox support, forward the message from Anna to Tom."
   provenance: drafted
   asks_user: true
@@ -722,7 +722,7 @@ uc-04-49:
 uc-04-50:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_it_writes_nothing_without_a_yes"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_it_writes_nothing_without_a_yes"
   ask: "In the shared mailbox support, forward the message from Anna to Tom."
   provenance: drafted
   asks_user: true
@@ -734,8 +734,8 @@ uc-04-50:
 uc-04-51:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_program_of_the_newer_kind_gets_the_question_and_nothing_is_written"
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_mail_draft_in_a_shared_mailbox_goes_back_to_a_program_of_the_newer_kind"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_program_of_the_newer_kind_gets_the_question_and_nothing_is_written"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_mail_draft_in_a_shared_mailbox_goes_back_to_a_program_of_the_newer_kind"
   ask: "In the shared mailbox support, write a draft to Anna."
   provenance: drafted
   asks_user: true
@@ -747,7 +747,7 @@ uc-04-51:
 uc-04-52:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_message_with_no_subject_and_no_sender_is_named_by_the_question"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyOrAChangeInASharedMailboxAsksFirst::test_a_message_with_no_subject_and_no_sender_is_named_by_the_question"
   ask: "In the shared mailbox support, reply to the message with no subject."
   provenance: drafted
   asks_user: true
@@ -761,7 +761,7 @@ uc-04-52:
 uc-04-53:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved"
   ask: "Reply to Anna that Friday works."
   provenance: drafted
   asks_user: false
@@ -775,7 +775,7 @@ uc-04-53:
 uc-04-54:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_query_with_no_word_in_it_is_refused_before_microsoft_is_asked"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_query_with_no_word_in_it_is_refused_before_microsoft_is_asked"
   ask: "Find the address of ??."
   provenance: drafted
   asks_user: false
@@ -786,7 +786,7 @@ uc-04-54:
 uc-04-55:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_person_who_is_not_in_the_directory_is_found_in_past_mail_by_recency"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_person_who_is_not_in_the_directory_is_found_in_past_mail_by_recency"
   ask: "Find the address of Anna."
   provenance: drafted
   asks_user: false
@@ -798,7 +798,7 @@ uc-04-55:
 uc-04-56:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_person_of_the_directory_is_told_apart_by_kind_and_sign_in_name"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAPersonIsFoundWhereMiaAlreadyWritesToHer::test_a_person_of_the_directory_is_told_apart_by_kind_and_sign_in_name"
   ask: "Find the address of Anna."
   provenance: drafted
   asks_user: false
@@ -810,7 +810,7 @@ uc-04-56:
 uc-04-57:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_went_out_while_mia_decided_is_not_sent_again"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_draft_that_went_out_while_mia_decided_is_not_sent_again"
   ask: "Send my draft to Anna."
   provenance: drafted
   asks_user: true
@@ -822,7 +822,7 @@ uc-04-57:
 uc-04-58:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitAsksForNoNotes"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestAnAddressThatDoesNotFitAsksForNoNotes"
   ask: "Is Anna away this week?"
   provenance: drafted
   asks_user: false
@@ -837,7 +837,7 @@ uc-04-58:
 uc-04-59:
   status: working
   tests:
-    - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_program_of_the_newer_kind_gets_the_question_of_the_send"
+    - "tests/integration/test_04_draft_and_send_mail.py::TestNothingIsSentWithoutApproval::test_a_program_of_the_newer_kind_gets_the_question_of_the_send"
   ask: "Send my draft to Anna."
   provenance: drafted
   asks_user: true

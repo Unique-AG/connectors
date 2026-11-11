@@ -1,8 +1,8 @@
 uc-07-01:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAcceptingAnInvitation::test_an_accept_is_asked_first_and_recorded_once_it_is_approved"
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestAnInvitationIsNeverAnsweredWithoutMia::test_it_sends_no_answer_to_the_organizer_when_mia_declines"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAcceptingAnInvitation::test_an_accept_is_asked_first_and_recorded_once_it_is_approved"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestAnInvitationIsNeverAnsweredWithoutMia::test_it_sends_no_answer_to_the_organizer_when_mia_declines"
   provenance: observed
   evidence: outlook_respond_to_invite in 2 calls; outlook_list_events in 5 sessions alone
   ask: "Accept the Launch review invitation."
@@ -17,7 +17,7 @@ uc-07-01:
 uc-07-02:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_decline_carries_the_note_to_the_organizer"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_decline_carries_the_note_to_the_organizer"
   provenance: drafted
   ask: "Decline the Launch review on Friday and tell Anna that I am on leave."
   asks_user: true
@@ -30,7 +30,7 @@ uc-07-02:
 uc-07-03:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_new_time_is_not_proposed_when_the_organizer_allows_none"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_new_time_is_not_proposed_when_the_organizer_allows_none"
   provenance: drafted
   ask: "Decline the Launch review and propose Monday at 10:00 instead."
   asks_user: false
@@ -43,7 +43,7 @@ uc-07-03:
 uc-07-18:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_new_time_is_proposed_when_the_organizer_allows_it"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_new_time_is_proposed_when_the_organizer_allows_it"
   provenance: drafted
   ask: "Tell Anna that I cannot make the Launch review, but that Monday at 10:00 works for me."
   asks_user: true
@@ -61,7 +61,7 @@ uc-07-18:
 uc-07-04:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_it_suggests_afternoon_times_when_both_colleagues_are_busy_in_the_morning"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_it_suggests_afternoon_times_when_both_colleagues_are_busy_in_the_morning"
   provenance: observed
   evidence: outlook_check_availability in 3 sessions; one session ran outlook_search_mail, outlook_read_mail, and outlook_check_availability in a row
   ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
@@ -76,7 +76,7 @@ uc-07-04:
 uc-07-05:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_teams_meeting_is_asked_first_and_goes_out_to_each_attendee"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_teams_meeting_is_asked_first_and_goes_out_to_each_attendee"
   provenance: observed
   evidence: outlook_create_event in 4 sessions
   ask: "Book the Launch review on Monday at 14:00 with Anna and Tom, with a Teams meeting."
@@ -90,7 +90,7 @@ uc-07-05:
 uc-07-06:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_weekly_meeting_is_booked_in_one_call_as_one_series_of_eight"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_weekly_meeting_is_booked_in_one_call_as_one_series_of_eight"
   provenance: drafted
   ask: "Book a Stand-up every Monday at 09:00 for 15 minutes for 8 weeks."
   asks_user: false
@@ -101,7 +101,7 @@ uc-07-06:
 uc-07-07:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_room_that_fits_the_group_is_invited_as_a_room"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_room_that_fits_the_group_is_invited_as_a_room"
   provenance: drafted
   ask: "Book the Workshop on Monday at 14:00 for 6 people and find a room for it."
   asks_user: true
@@ -121,7 +121,7 @@ uc-07-07:
 uc-07-08:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_an_invitation_to_finish_later_is_saved_with_no_attendee_and_no_question"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_an_invitation_to_finish_later_is_saved_with_no_attendee_and_no_question"
   provenance: drafted
   ask: "Save an invitation for the Board prep on Monday from 10:00 to 11:00 as a draft, so that I can finish it later."
   asks_user: false
@@ -133,7 +133,7 @@ uc-07-08:
 uc-07-09:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_on_a_second_calendar_of_mia_is_not_put_on_the_main_one"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_on_a_second_calendar_of_mia_is_not_put_on_the_main_one"
   provenance: drafted
   ask: "Put the Offsite on my Team calendar."
   asks_user: true
@@ -147,7 +147,7 @@ uc-07-09:
 uc-07-10:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_one_date_of_a_series_moves_and_the_series_is_left_alone"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_one_date_of_a_series_moves_and_the_series_is_left_alone"
   provenance: drafted
   ask: "Move next Thursday's Team sync to Friday."
   asks_user: true
@@ -161,7 +161,7 @@ uc-07-10:
 uc-07-11:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_whole_series_is_cancelled_after_the_question_and_the_attendees_are_told"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_whole_series_is_cancelled_after_the_question_and_the_attendees_are_told"
   provenance: observed
   evidence: outlook_cancel_event in 1 call, which failed
   ask: "Cancel the whole Team sync series."
@@ -176,7 +176,7 @@ uc-07-11:
 uc-07-12:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_of_another_organizer_is_neither_changed_nor_asked_about"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_of_another_organizer_is_neither_changed_nor_asked_about"
   provenance: drafted
   ask: "Move the Launch review to Friday."
   asks_user: false
@@ -191,8 +191,8 @@ uc-07-12:
 uc-07-13:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestListingTheInvitationsThatWait::test_it_lists_the_invitations_without_an_answer_and_not_the_accepted_ones"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnEventWithNoAnswerOfMia"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestListingTheInvitationsThatWait::test_it_lists_the_invitations_without_an_answer_and_not_the_accepted_ones"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnEventWithNoAnswerOfMia"
   provenance: drafted
   ask: "Which invitations still wait for my answer?"
   asks_user: false
@@ -203,8 +203,8 @@ uc-07-13:
 uc-07-14:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestCancellingAMeetingWithANote::test_a_meeting_is_cancelled_with_a_note_for_the_attendee"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestACancelWhoseAttendeeHasNoAddress"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestCancellingAMeetingWithANote::test_a_meeting_is_cancelled_with_a_note_for_the_attendee"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestACancelWhoseAttendeeHasNoAddress"
   provenance: drafted
   ask: "Cancel my Design review with Anna tomorrow and tell her that I am sick."
   asks_user: true
@@ -218,7 +218,7 @@ uc-07-14:
 uc-07-15:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_person_is_added_to_a_meeting_and_the_others_stay"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_person_is_added_to_a_meeting_and_the_others_stay"
   provenance: drafted
   ask: "Add Priya to the Launch review."
   asks_user: true
@@ -237,7 +237,7 @@ uc-07-15:
 uc-07-16:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_day_is_blocked_as_out_of_office_with_no_question_and_no_invitation"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_day_is_blocked_as_out_of_office_with_no_question_and_no_invitation"
   provenance: drafted
   ask: "Block next Friday as an out of office day."
   asks_user: false
@@ -248,8 +248,8 @@ uc-07-16:
 uc-07-17:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestForwardingAnInvitation::test_an_invitation_is_forwarded_with_the_note_and_the_organizer_is_told"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAForwardThatCannotBeRead::test_a_meeting_with_no_recorded_start_is_named_in_the_question_without_a_time"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestForwardingAnInvitation::test_an_invitation_is_forwarded_with_the_note_and_the_organizer_is_told"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAForwardThatCannotBeRead::test_a_meeting_with_no_recorded_start_is_named_in_the_question_without_a_time"
   provenance: drafted
   ask: "Forward the Launch review to Priya and add the note: please join."
   asks_user: true
@@ -266,7 +266,7 @@ uc-07-17:
 uc-07-19:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_refused_search_for_free_times_is_explained_and_suggests_no_time"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_refused_search_for_free_times_is_explained_and_suggests_no_time"
   provenance: drafted
   ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
   asks_user: false
@@ -278,7 +278,7 @@ uc-07-19:
 uc-07-20:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_search_that_microsoft_cannot_finish_is_not_reported_as_no_free_time"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_search_that_microsoft_cannot_finish_is_not_reported_as_no_free_time"
   provenance: drafted
   ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
   asks_user: false
@@ -292,7 +292,7 @@ uc-07-20:
 uc-07-21:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_booking_that_microsoft_refuses_is_explained_and_creates_nothing"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_booking_that_microsoft_refuses_is_explained_and_creates_nothing"
   provenance: drafted
   ask: "Book the Launch review on Monday at 14:00 with Anna and Tom."
   asks_user: true
@@ -309,8 +309,8 @@ uc-07-22:
   ask: "Book the Launch review on Monday at 14:00 with Anna and Tom."
   asks_user: true
   tests:
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-07-22/fails]"
-    - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-07-22/no-answer-in-time]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-07-22/fails]"
+    - "tests/integration/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-07-22/no-answer-in-time]"
   chain:
     - tool: outlook_create_event
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna and Tom}
@@ -336,7 +336,7 @@ uc-07-22:
 uc-07-23:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_that_ends_before_it_starts_is_not_booked"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_that_ends_before_it_starts_is_not_booked"
   provenance: drafted
   ask: "Book the Launch review with Anna on Monday from 15:00 to 14:00."
   asks_user: false
@@ -349,8 +349,8 @@ uc-07-23:
 uc-07-24:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_teams_meeting_on_a_calendar_that_takes_none_is_refused_and_then_booked_without"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestABookingForSomebodyElseWithNobodyInvited::test_a_calendar_that_takes_no_teams_meeting_gets_none_and_the_way_on_is_named"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_teams_meeting_on_a_calendar_that_takes_none_is_refused_and_then_booked_without"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestABookingForSomebodyElseWithNobodyInvited::test_a_calendar_that_takes_no_teams_meeting_gets_none_and_the_way_on_is_named"
   provenance: drafted
   ask: "Book the Launch review on Monday at 14:00 with Anna, with a Teams meeting."
   asks_user: true
@@ -376,7 +376,7 @@ uc-07-25:
 uc-07-26:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_new_time_is_not_proposed_with_an_acceptance"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_new_time_is_not_proposed_with_an_acceptance"
   provenance: drafted
   ask: "Accept the Launch review and propose Monday at 10:00."
   asks_user: false
@@ -391,7 +391,7 @@ uc-07-26:
 uc-07-27:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_of_another_organizer_is_neither_changed_nor_asked_about"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_of_another_organizer_is_neither_changed_nor_asked_about"
   provenance: drafted
   ask: "Cancel the Launch review."
   asks_user: false
@@ -405,7 +405,7 @@ uc-07-27:
 uc-07-28:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_that_mia_refuses_changes_nothing_and_says_it_was_not_confirmed"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_that_mia_refuses_changes_nothing_and_says_it_was_not_confirmed"
   provenance: drafted
   ask: "Cancel my Design review with Anna tomorrow."
   asks_user: true
@@ -418,7 +418,7 @@ uc-07-28:
 uc-07-29:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_question_that_gets_no_answer_changes_nothing"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_question_that_gets_no_answer_changes_nothing"
   provenance: drafted
   ask: "Cancel my Design review with Anna tomorrow."
   asks_user: true
@@ -431,7 +431,7 @@ uc-07-29:
 uc-07-30:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_for_one_request_does_not_cover_another"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestNothingIsDoneWithoutAnApproval::test_an_approval_for_one_request_does_not_cover_another"
   provenance: drafted
   ask: "Cancel my Design review with Anna tomorrow."
   asks_user: true
@@ -461,7 +461,7 @@ uc-07-31:
 uc-07-32:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_booking_that_microsoft_cannot_serve_now_may_exist_and_is_not_repeated"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_booking_that_microsoft_cannot_serve_now_may_exist_and_is_not_repeated"
   ask: "Book the Launch review on Monday at 14:00 with Anna and Tom."
   provenance: drafted
   asks_user: true
@@ -473,7 +473,7 @@ uc-07-32:
 uc-07-33:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_withdrawn_invitation_records_no_answer_and_says_to_look_again"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_a_withdrawn_invitation_records_no_answer_and_says_to_look_again"
   ask: "Accept the Launch review invitation."
   provenance: drafted
   asks_user: false
@@ -490,7 +490,7 @@ uc-07-33:
 uc-07-34:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestForwardingAnInvitation::test_a_forward_that_microsoft_fails_is_not_repeated_and_the_user_is_asked_to_check"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestForwardingAnInvitation::test_a_forward_that_microsoft_fails_is_not_repeated_and_the_user_is_asked_to_check"
   ask: "Forward the Launch review to Priya."
   provenance: drafted
   asks_user: true
@@ -505,7 +505,7 @@ uc-07-34:
 uc-07-35:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_one_busy_answer_is_waited_out_inside_the_same_call"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_one_busy_answer_is_waited_out_inside_the_same_call"
   ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
   provenance: drafted
   asks_user: false
@@ -517,7 +517,7 @@ uc-07-35:
 uc-07-36:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_colleague_who_is_free_is_shown_with_the_working_hours_to_compare_with"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_colleague_who_is_free_is_shown_with_the_working_hours_to_compare_with"
   provenance: drafted
   ask: "Is Anna free on Tuesday at 14:00?"
   asks_user: false
@@ -531,7 +531,7 @@ uc-07-36:
 uc-07-37:
   status: working
   tests:
-    - "tests/tools/scenarios/test_15_work_across_mail_calendar_and_files.py::TestATimeIsNeverOfferedAsFreeForAPersonWhoseCalendarCannotBeRead::test_it_marks_the_row_of_the_unreadable_calendar_and_shows_the_other_as_free"
+    - "tests/integration/test_15_work_across_mail_calendar_and_files.py::TestATimeIsNeverOfferedAsFreeForAPersonWhoseCalendarCannotBeRead::test_it_marks_the_row_of_the_unreadable_calendar_and_shows_the_other_as_free"
   provenance: drafted
   ask: "Is Anna free on Tuesday at 14:00?"
   asks_user: false
@@ -543,7 +543,7 @@ uc-07-37:
 uc-07-38:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_day_with_no_time_for_everyone_gives_no_suggestion_and_the_reason"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestFindingATime::test_a_day_with_no_time_for_everyone_gives_no_suggestion_and_the_reason"
   provenance: drafted
   ask: "Find 30 minutes on Monday when Anna, Tom, and I are all free."
   asks_user: false
@@ -558,7 +558,7 @@ uc-07-38:
 uc-07-39:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_every_invitation_of_a_leave_day_is_answered_one_at_a_time_each_with_a_question"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_every_invitation_of_a_leave_day_is_answered_one_at_a_time_each_with_a_question"
   provenance: drafted
   ask: "I am on leave next Friday. Decline all my meetings that day and tell the organizers that I am on leave."
   asks_user: true
@@ -574,7 +574,7 @@ uc-07-39:
 uc-07-40:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_an_answer_that_microsoft_rejects_gives_the_reason_after_the_approval"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnsweringAnInvitation::test_an_answer_that_microsoft_rejects_gives_the_reason_after_the_approval"
   provenance: drafted
   evidence: outlook_respond_to_invite failed with a 400 in 3 of its 14 calls in 2 sessions; the logs give no cause
   ask: "Accept the Launch review invitation."
@@ -590,7 +590,7 @@ uc-07-40:
 uc-07-41:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_that_is_gone_is_not_changed_or_deleted_and_the_advice_is_to_look_again"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_that_is_gone_is_not_changed_or_deleted_and_the_advice_is_to_look_again"
   provenance: drafted
   evidence: outlook_update_event failed in its only call in prod; the logs give no cause
   ask: "Move the Launch review to Friday."
@@ -608,7 +608,7 @@ uc-07-41:
 uc-07-42:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_deleted_meeting_is_asked_about_by_name_and_attendee_and_then_removed"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_deleted_meeting_is_asked_about_by_name_and_attendee_and_then_removed"
   provenance: drafted
   ask: "Delete my Design review with Anna tomorrow."
   asks_user: true
@@ -622,7 +622,7 @@ uc-07-42:
 uc-07-43:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_of_another_organizer_is_neither_changed_nor_asked_about"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_of_another_organizer_is_neither_changed_nor_asked_about"
   provenance: drafted
   ask: "Delete the Launch review."
   asks_user: false
@@ -636,7 +636,7 @@ uc-07-43:
 uc-07-44:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_that_is_gone_is_not_changed_or_deleted_and_the_advice_is_to_look_again"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestChangingOrCancellingAMeeting::test_a_meeting_that_is_gone_is_not_changed_or_deleted_and_the_advice_is_to_look_again"
   provenance: drafted
   ask: "Delete my Design review."
   asks_user: false
@@ -652,7 +652,7 @@ uc-07-44:
 uc-07-45:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_at_the_time_of_another_city_is_booked_in_that_zone"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestBookingAMeeting::test_a_meeting_at_the_time_of_another_city_is_booked_in_that_zone"
   provenance: drafted
   ask: "Book the Launch review with Priya on Monday at 15:00 Mumbai time."
   asks_user: true
@@ -688,7 +688,7 @@ uc-07-47:
 uc-07-48:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestARoomList::test_a_room_list_that_microsoft_does_not_know_is_reported_with_the_way_on"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestARoomList::test_a_room_list_that_microsoft_does_not_know_is_reported_with_the_way_on"
   provenance: drafted
   ask: "Find the rooms of the room list building9@example.com."
   asks_user: false
@@ -700,7 +700,7 @@ uc-07-48:
 uc-07-49:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestALinkThatIsNotAMeetingLink"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestALinkThatIsNotAMeetingLink"
   provenance: drafted
   ask: "Cancel the Launch review."
   asks_user: false
@@ -713,7 +713,7 @@ uc-07-49:
 uc-07-50:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestABookingThatCannotBeRead"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestABookingThatCannotBeRead"
   provenance: drafted
   ask: "Book the Launch review with Anna on Monday at 14:00."
   asks_user: false
@@ -725,7 +725,7 @@ uc-07-50:
 uc-07-51:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeABooking::test_the_question_names_every_detail_of_the_booking"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeABooking::test_the_question_names_every_detail_of_the_booking"
   provenance: drafted
   ask: "Book the Launch review every second day until the 10th, at Room Pilatus."
   asks_user: true
@@ -737,8 +737,8 @@ uc-07-51:
 uc-07-52:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeABooking::test_a_booking_with_a_room_or_a_place_and_nobody_else_says_nobody_is_invited"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestABookingForSomebodyElseWithNobodyInvited::test_the_question_says_who_is_told_and_names_no_owner_when_microsoft_gives_none"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeABooking::test_a_booking_with_a_room_or_a_place_and_nobody_else_says_nobody_is_invited"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestABookingForSomebodyElseWithNobodyInvited::test_the_question_says_who_is_told_and_names_no_owner_when_microsoft_gives_none"
   provenance: drafted
   ask: "Book room Pilatus for the Launch review on Monday at 14:00."
   asks_user: true
@@ -749,9 +749,9 @@ uc-07-52:
 uc-07-53:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_it_reads_no_calendar_and_says_what_to_correct"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_person_named_as_needed_and_as_optional_is_refused"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_room_that_is_not_an_address_is_refused"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_it_reads_no_calendar_and_says_what_to_correct"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_person_named_as_needed_and_as_optional_is_refused"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_room_that_is_not_an_address_is_refused"
   provenance: drafted
   ask: "When are Anna and I free on Monday?"
   asks_user: false
@@ -762,7 +762,7 @@ uc-07-53:
 uc-07-54:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_room_asked_for_is_sent_and_the_rooms_that_microsoft_names_are_shown"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestASearchForFreeTimeThatCannotBeRead::test_a_room_asked_for_is_sent_and_the_rooms_that_microsoft_names_are_shown"
   provenance: drafted
   ask: "When are Anna and I free on Monday, with room Pilatus?"
   asks_user: false
@@ -774,7 +774,7 @@ uc-07-54:
 uc-07-55:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatCannotBeRead"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAChangeThatCannotBeRead"
   provenance: drafted
   ask: "Change the Launch review."
   asks_user: false
@@ -787,8 +787,8 @@ uc-07-55:
 uc-07-56:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_it_changes_nothing_and_asks_nothing_and_says_why"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_a_calendar_that_takes_no_teams_meeting_gets_none"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_it_changes_nothing_and_asks_nothing_and_says_why"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_a_calendar_that_takes_no_teams_meeting_gets_none"
   provenance: drafted
   ask: "Add a Teams meeting to the Launch review."
   asks_user: false
@@ -802,8 +802,8 @@ uc-07-56:
 uc-07-57:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeAChange::test_the_question_names_the_change"
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeAChange::test_a_place_is_asked_about_also_when_nobody_is_invited"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeAChange::test_the_question_names_the_change"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestWhatMiaIsToldBeforeAChange::test_a_place_is_asked_about_also_when_nobody_is_invited"
   provenance: drafted
   ask: "Remove all categories and change the place of the Launch review to Room Pilatus."
   asks_user: true
@@ -815,7 +815,7 @@ uc-07-57:
 uc-07-58:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAForwardThatCannotBeRead::test_it_forwards_nothing_and_asks_nothing"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAForwardThatCannotBeRead::test_it_forwards_nothing_and_asks_nothing"
   provenance: drafted
   ask: "Forward the Launch review to Priya Rao."
   asks_user: false
@@ -827,7 +827,7 @@ uc-07-58:
 uc-07-59:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAnAnswerWithANewTimeThatCannotBeSent"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAnAnswerWithANewTimeThatCannotBeSent"
   provenance: drafted
   ask: "Decline the Launch review and propose Friday at 10:00."
   asks_user: false
@@ -839,7 +839,7 @@ uc-07-59:
 uc-07-60:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_a_body_that_keeps_the_stored_body_is_sent_after_the_question"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestAChangeThatTheStoredMeetingRefuses::test_a_body_that_keeps_the_stored_body_is_sent_after_the_question"
   provenance: drafted
   ask: "Add a line to the body of the Launch review."
   asks_user: true
@@ -851,7 +851,7 @@ uc-07-60:
 uc-07-61:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestTheTimeZonesInTheNamesOfAListing"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestTheTimeZonesInTheNamesOfAListing"
   ask: "What is on my calendar on Monday in Zurich time?"
   provenance: drafted
   asks_user: false
@@ -865,7 +865,7 @@ uc-07-61:
 uc-07-62:
   status: working
   tests:
-    - "tests/tools/scenarios/test_07_schedule_and_answer_meetings.py::TestARoomList::test_a_name_in_place_of_the_address_of_a_room_list_reads_nothing"
+    - "tests/integration/test_07_schedule_and_answer_meetings.py::TestARoomList::test_a_name_in_place_of_the_address_of_a_room_list_reads_nothing"
   ask: "Find the rooms of the room list Building 9."
   provenance: drafted
   asks_user: false
