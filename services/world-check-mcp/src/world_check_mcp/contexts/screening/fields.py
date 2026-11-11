@@ -107,7 +107,7 @@ def _require_watchlist_group(*, template: CaseTemplateResponse, group_id: str) -
     if template.group_id != group_id or template.group_screening_type != "CASE_MANAGEMENT_AUDIT":
         raise ScreeningError("Choose a case-management group. screen_entity persists a case.")
     mandatory = template.mandatory_provider_types or []
-    if any(_normalized(value=provider) != "WATCHLIST" for provider in mandatory):
+    if any(normalized(value=provider) != "WATCHLIST" for provider in mandatory):
         raise ScreeningError(
             "This group requires other providers. Choose a WATCHLIST-only group, "
             "or use passport_check for Passport Check."
@@ -117,14 +117,14 @@ def _require_watchlist_group(*, template: CaseTemplateResponse, group_id: str) -
 def _definitions(*, template: CaseTemplateResponse, entity_type: str) -> list[FieldDefinition]:
     by_provider = template.secondary_fields_by_provider or {}
     watchlist = [
-        fields for name, fields in by_provider.items() if _normalized(value=name) == "WATCHLIST"
+        fields for name, fields in by_provider.items() if normalized(value=name) == "WATCHLIST"
     ]
     if len(watchlist) != 1:
         raise ScreeningError("This group does not uniquely define WATCHLIST secondary fields.")
     matches = [
         fields
         for name, fields in watchlist[0].secondary_fields_by_entity.items()
-        if _normalized(value=name) == entity_type
+        if normalized(value=name) == entity_type
     ]
     if len(matches) != 1:
         raise ScreeningError(f"This group does not uniquely define {entity_type} secondary fields.")
@@ -155,7 +155,7 @@ def _with_named_fields(
         value = named[label]
         if value is None:
             continue
-        matches = [field for field in definitions if _normalized(value=field.label) == label]
+        matches = [field for field in definitions if normalized(value=field.label) == label]
         if len(matches) != 1:
             raise ScreeningError(f"Cannot uniquely map {label}. See get_group_settings.")
         if label == "DATE_OF_BIRTH":
@@ -224,7 +224,7 @@ def _wire(*, field: FieldValue) -> dict[str, str]:
     return {"typeId": field.type_id, "value": field.value}
 
 
-def _normalized(*, value: str) -> str:
+def normalized(*, value: str) -> str:
     return to_snake(value).upper().replace(" ", "_")
 
 

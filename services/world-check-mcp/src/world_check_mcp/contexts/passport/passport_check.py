@@ -7,6 +7,7 @@ from world_check_mcp.contexts.passport.payload import passport_arguments
 from world_check_mcp.contexts.screening import FieldValue
 from world_check_mcp.contexts.screening import match_from_result
 from world_check_mcp.contexts.screening import refuse_existing_case
+from world_check_mcp.contexts.screening import ScreeningError
 from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
 from world_check_mcp.upstream import GET_COUNTRIES
 from world_check_mcp.upstream import GET_NATIONALITIES
@@ -38,16 +39,18 @@ async def passport_check(
     limit: int = 20,
 ) -> PassportCheck:
     """Create a Passport Check case and screen it. This does not record a verification decision."""
-    await refuse_existing_case(upstream=upstream, case_id=case_id)
+    try:
+        await refuse_existing_case(upstream=upstream, case_id=case_id)
+    except ScreeningError as error:
+        raise PassportError(str(error)) from error
     template = await upstream.call(
         GET_CASE_TEMPLATE_FOR_GROUP,
         GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
     )
     countries = await upstream.call(GET_COUNTRIES, GetCountriesRequest())
     nationalities = await upstream.call(GET_NATIONALITIES, GetNationalitiesRequest())
-    saved = await upstream.call_untyped(
-        SAVE_AND_SCREEN,
-        **passport_arguments(
+    try:
+        arguments = passport_arguments(
             passport=passport,
             name=name or f"{passport.given_name} {passport.last_name}",
             group_id=group_id,
@@ -58,8 +61,10 @@ async def passport_check(
             include_watchlist=include_watchlist,
             secondary_fields=list(secondary_fields or []),
             custom_fields=list(custom_fields or []),
-        ),
-    )
+        )
+    except ScreeningError as error:
+        raise PassportError(str(error)) from error
+    saved = await upstream.call_untyped(SAVE_AND_SCREEN, **arguments)
     if not saved.case_system_id:
         raise PassportError(
             "LSEG completed the passport check but returned no caseSystemId. "

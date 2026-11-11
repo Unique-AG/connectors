@@ -1,4 +1,5 @@
 from world_check_mcp.contexts.screening.errors import ScreeningError
+from world_check_mcp.contexts.screening.fields import normalized
 from world_check_mcp.contexts.screening.fields import validate_fields
 from world_check_mcp.contexts.screening.models import EntityType
 from world_check_mcp.contexts.screening.models import FieldValue
@@ -18,6 +19,7 @@ __all__ = [
     "ScreeningMatch",
     "ScreeningOutcome",
     "match_from_result",
+    "normalized",
     "refuse_existing_case",
     "rescreen_case",
     "screen_entity",
