@@ -17,9 +17,7 @@
         {
           "@odata.etag": "W/\"OLSAVUWLDSFxhFpkEoycCBUrOvSd/QtnFGAntQg7\"",
           "bodyPreview": "Here is the budget workbook for the relaunch. Please check the actual costs.",
-          "categories": [
-            "seed-v1"
-          ],
+          "categories": ["seed-v1"],
           "flag": {
             "flagStatus": "notFlagged"
           },
@@ -121,9 +119,7 @@
         {
           "@odata.etag": "W/\"OLSAVUWLDSFxhFpkEoycCBUrOvSd/QtnFGAntQg7\"",
           "bodyPreview": "Here is the budget workbook for the relaunch. Please check the actual costs.",
-          "categories": [
-            "seed-v1"
-          ],
+          "categories": ["seed-v1"],
           "conversationId": "AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo=",
           "flag": {
             "flagStatus": "notFlagged"
@@ -243,9 +239,7 @@
     },
     "json": {
       "@odata.type": "#microsoft.graph.message",
-      "categories": [
-        "seed-v1 case-outlook_draft_reply-forward-workbook"
-      ]
+      "categories": ["seed-v1 case-outlook_draft_reply-forward-workbook"]
     },
     "status": 200,
     "response_headers": {
@@ -260,9 +254,7 @@
         "contentType": "html"
       },
       "bodyPreview": "synthetic text 02",
-      "categories": [
-        "seed-v1 case-outlook_draft_reply-forward-workbook"
-      ],
+      "categories": ["seed-v1 case-outlook_draft_reply-forward-workbook"],
       "ccRecipients": [],
       "changeKey": "JRPKFFVDSUCelZucLgthPRCtNsCm/RqiPIGnnubj",
       "conversationId": "AAQkSAdmSIH6KAD5GXFcPYphGXV5LI13Xti0WJW5VMSfYUEzZ6GvRHRRJNDq1qfJF6PUtKqOl8spuEo=",

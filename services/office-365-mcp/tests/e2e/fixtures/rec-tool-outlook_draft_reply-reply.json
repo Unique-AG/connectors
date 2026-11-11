@@ -17,10 +17,7 @@
         {
           "@odata.etag": "W/\"OMFVFEEQIZTkgNtaOqrhKVHkBiMn/HohLSNhbZ3I\"",
           "bodyPreview": "Accepted. I attach the final numbers. Please check line 7 before Thursday.",
-          "categories": [
-            "seed-v1",
-            "Finance"
-          ],
+          "categories": ["seed-v1", "Finance"],
           "flag": {
             "flagStatus": "flagged"
           },
@@ -122,10 +119,7 @@
         {
           "@odata.etag": "W/\"NXRRILPXVVPseEmmClpoLUHcFtNd/LnnHQQmuI6t\"",
           "bodyPreview": "Mia, the Q3 review is due. Your project spent 18 percent more on external services than planned.",
-          "categories": [
-            "seed-v1",
-            "Finance"
-          ],
+          "categories": ["seed-v1", "Finance"],
           "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
           "flag": {
             "flagStatus": "notFlagged"
@@ -165,10 +159,7 @@
         {
           "@odata.etag": "W/\"XGYUUZFDUMDsaLibAahdTCPqAlHn/DnzZPWglF1v\"",
           "bodyPreview": "The agency work for the press pages was not planned. I will write a short explanation.",
-          "categories": [
-            "seed-v1",
-            "Finance"
-          ],
+          "categories": ["seed-v1", "Finance"],
           "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
           "flag": {
             "flagStatus": "notFlagged"
@@ -208,10 +199,7 @@
         {
           "@odata.etag": "W/\"WCEJJZRTKWRkgPrzUdmtOYBxCuEw/AmqRPIihN2t\"",
           "bodyPreview": "Thanks. Please also add the forecast for Q4.",
-          "categories": [
-            "seed-v1",
-            "Finance"
-          ],
+          "categories": ["seed-v1", "Finance"],
           "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
           "flag": {
             "flagStatus": "notFlagged"
@@ -251,10 +239,7 @@
         {
           "@odata.etag": "W/\"RGJOZAQKPEFdiUfiSgduEVGiUyRl/EkpHGFfmY2y\"",
           "bodyPreview": "Forecast for Q4: no more agency costs, hosting stays the same.",
-          "categories": [
-            "seed-v1",
-            "Finance"
-          ],
+          "categories": ["seed-v1", "Finance"],
           "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
           "flag": {
             "flagStatus": "notFlagged"
@@ -294,10 +279,7 @@
         {
           "@odata.etag": "W/\"OMFVFEEQIZTkgNtaOqrhKVHkBiMn/HohLSNhbZ3I\"",
           "bodyPreview": "Accepted. I attach the final numbers. Please check line 7 before Thursday.",
-          "categories": [
-            "seed-v1",
-            "Finance"
-          ],
+          "categories": ["seed-v1", "Finance"],
           "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
           "flag": {
             "flagStatus": "flagged"
@@ -410,9 +392,7 @@
     },
     "json": {
       "@odata.type": "#microsoft.graph.message",
-      "categories": [
-        "seed-v1 case-outlook_draft_reply-reply"
-      ]
+      "categories": ["seed-v1 case-outlook_draft_reply-reply"]
     },
     "status": 200,
     "response_headers": {
@@ -427,9 +407,7 @@
         "contentType": "html"
       },
       "bodyPreview": "synthetic text 02",
-      "categories": [
-        "seed-v1 case-outlook_draft_reply-reply"
-      ],
+      "categories": ["seed-v1 case-outlook_draft_reply-reply"],
       "ccRecipients": [],
       "changeKey": "ILWWXGLEXYQfsDbuQtuiNGKcXvDn/TlqHMJbrdVS",
       "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
