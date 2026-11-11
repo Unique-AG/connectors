@@ -261,7 +261,7 @@ outlook_draft_reply-reply:
   needs: [mail-search-index]
   chain:
     - tool: outlook_search_mail
-      args: {subject: Q3 budget review, has_attachments: true, limit: 1}
+      args: {subject: Q3 budget review, attachment_name: q3-numbers.csv, has_attachments: true, limit: 1}
     - tool: outlook_read_thread
       bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_draft_reply
@@ -275,7 +275,7 @@ outlook_draft_reply-forward:
   needs: [mail-search-index]
   chain:
     - tool: outlook_search_mail
-      args: {subject: Q3 budget review, has_attachments: true, limit: 1}
+      args: {subject: Q3 budget review, attachment_name: q3-numbers.csv, has_attachments: true, limit: 1}
     - tool: outlook_read_thread
       bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_draft_reply

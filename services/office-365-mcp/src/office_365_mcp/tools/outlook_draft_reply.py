@@ -216,8 +216,8 @@ class MailReplyDraft(BaseModel):
     )
     body: str | None = Field(
         description=(
-            "The body as Microsoft stored it, as HTML: the text of this tool, then the quoted "
-            + "original message. The value is null if Microsoft returned no body."
+            "The body as Microsoft stored it, as HTML: the text of the `body` argument, then the "
+            + "quoted original message. The value is null if Microsoft returned no body."
         )
     )
     importance: str | None = Field(
@@ -234,15 +234,15 @@ class MailReplyDraft(BaseModel):
     )
     body_written: bool = Field(
         description=(
-            "Whether the second write landed. That write puts the Cc and Bcc recipients, the "
-            + "importance and the categories on the draft. The text is on the draft before this "
-            + "write. The value is true when there is nothing to write. If the write did not "
-            + "land, `failure` says why."
+            "True when Microsoft saved the second write, or when there is nothing to write. That "
+            + "write puts the Cc and Bcc recipients, the importance and the categories on the "
+            + "draft. The text is on the draft before this write. If Microsoft did not save the "
+            + "write, `failure` says why."
         )
     )
     failure: str | None = Field(
         description=(
-            "What Microsoft said when the second write did not land. The value is null when "
+            "What Microsoft said when it did not save the second write. The value is null when "
             + "`body_written` is true."
         )
     )

@@ -525,19 +525,21 @@ class TestAReplyKeepsTheConversation:
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
 
-        _ = await call(
+        draft = await call(
             "outlook_draft_reply", message_ref=_REPLIED, mode="reply", body="Friday works."
         )
 
         assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
         assert times_asked(graph, "PATCH", "") == 0
+        assert draft["body"] is not None
+        assert (draft["body_written"], draft["failure"]) == (True, None)
 
     async def test_the_text_of_a_forward_goes_above_the_quoted_message(
         self, graph: respx.MockRouter
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_draft_reply-forward")
 
-        _ = await call(
+        draft = await call(
             "outlook_draft_reply",
             message_ref=_REPLIED,
             mode="forward",
@@ -550,6 +552,8 @@ class TestAReplyKeepsTheConversation:
             "Comment": "<p>Please read this.</p>",
         }
         assert times_asked(graph, "PATCH", "") == 0
+        assert draft["body"] is not None
+        assert (draft["body_written"], draft["failure"]) == (True, None)
 
     async def test_a_forward_is_made_from_the_message_and_so_carries_its_attachments(
         self, graph: respx.MockRouter
@@ -1235,8 +1239,8 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
     async def test_a_blind_copy_to_someone_else_is_written_on_the_reply(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
         _ = _the_original(graph, message_id=_REPLIED_ID)
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
 
         _ = await call(
             "outlook_draft_reply", message_ref=_REPLIED, mode="reply", bcc=[_PRIYA], body="Hi"
@@ -1283,8 +1287,8 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
     async def test_a_copy_to_someone_else_is_read_back_from_the_stored_draft(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
         _ = _the_original(graph, message_id=_REPLIED_ID)
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
 
         draft = await call(
             "outlook_draft_reply",
@@ -1324,10 +1328,10 @@ def _a_shared_mailbox_that_holds(graph: respx.MockRouter, tool: str) -> None:
         "outlook_draft_reply_all": "rec-tool-outlook_draft_reply_all-everyone",
     }.get(tool)
     if fixture is not None:
-        _ = serve_as(graph, fixture, _SHARED)
         _ = _the_original(
             graph, message_id=_REPLIED_ID if tool == "outlook_draft_reply" else _Q3_MESSAGE_ID
         )
+        _ = serve_as(graph, fixture, _SHARED)
         return
     _ = graph.route(method="GET", path__regex=_ORIGINAL).mock(
         return_value=httpx.Response(
@@ -1444,8 +1448,8 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
     async def test_a_message_with_no_subject_and_no_sender_is_named_by_the_question(
         self, graph: respx.MockRouter
     ) -> None:
-        _ = serve_as(graph, "rec-tool-outlook_draft_reply-reply", _SHARED)
         _ = _the_original(graph, message_id=_REPLIED_ID, subject=None, **{"from": None})
+        _ = serve_as(graph, "rec-tool-outlook_draft_reply-reply", _SHARED)
         person = Person()
 
         _ = await invoke_as(
@@ -1462,8 +1466,8 @@ class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:
     async def test_a_reply_keeps_the_draft_and_says_the_blind_copy_is_missing(
         self, graph: respx.MockRouter
     ) -> None:
-        routes = serve(graph, "rec-tool-outlook_draft_reply-reply")
         _ = _the_original(graph, message_id=_REPLIED_ID)
+        routes = serve(graph, "rec-tool-outlook_draft_reply-reply")
         patch = next(route for key, route in routes.items() if key[0] == "PATCH")
         _ = patch.mock(
             return_value=httpx.Response(

@@ -2,7 +2,7 @@ scenario: outlook_draft_reply-reply
 fixture: rec-tool-outlook_draft_reply-reply
 source: recorded
 target: graph
-recorded_at: '2026-11-11T14:36:05+00:00'
+recorded_at: '2026-11-11T15:05:46+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 62
@@ -15,6 +15,7 @@ replacements:
 literals:
 - Q3 budget review
 - Thanks for the note.
+- q3-numbers.csv
 - reply
 - seed-v1 case-outlook_draft_reply-reply
 sdk_versions:

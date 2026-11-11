@@ -3,7 +3,7 @@
     "method": "GET",
     "path": "/v1.0/me/messages",
     "query": {
-      "$search": "\"subject:\\\"Q3 budget review\\\"\"",
+      "$search": "\"subject:\\\"Q3 budget review\\\" attachment:q3-numbers.csv\"",
       "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
       "$top": "1"
     },
@@ -12,7 +12,7 @@
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
     },
     "response_json": {
-      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$search=%22subject:%5C%22Q3%20budget%20review%5C%22%22&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skiptoken=PQXLLuF1ODr3TVEVJibpjPR4TADCvDODWQQJMQEFUgAPhZDSzTOgDfeGMqEGZcPAKoZJB0EEAQk4NikVgMZKW1r0TCEFCtUXUaESSRu1",
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/messages?$search=%22subject:%5C%22Q3%20budget%20review%5C%22%20attachment:q3-numbers.csv%22&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skiptoken=HQPAElX6PgP0KQMToU7soOZ6FI2jr0DhCMUACNWWTkORA4vkZaQmNib4R26gAuM9BFLEaUOnStY8RSYglM4CY1laO06gTcMFDiFOHGs0",
       "value": [
         {
           "@odata.etag": "W/\"OMFVFEEQIZTkgNtaOqrhKVHkBiMn/HohLSNhbZ3I\"",
@@ -349,11 +349,11 @@
     "status": 201,
     "response_headers": {
       "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
-      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('MEwMTiLQMHOIBTULEksuUo3bnBGiNS-DSk1Yy1Vvqd63MlMWTx1R3vzxkrYY78jRqJHB')",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('DFyQLwWPNEDPMWXYOudcEd2pjPJrCL-EOa0Ac6Glvx18FdOODi0A2aqfuuQZ41nCStDK')",
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"ICCBEWUWVGZxxAilRvvvAULaQaIf/LhaYWMfsi14\"",
+      "@odata.etag": "W/\"MITTRDPZPDViePknYlsmBEOzWuJf/ZquLXAdadLL\"",
       "bccRecipients": [],
       "body": {
         "content": "synthetic text 01",
@@ -362,9 +362,9 @@
       "bodyPreview": "synthetic text 02",
       "categories": [],
       "ccRecipients": [],
-      "changeKey": "GNCDCZJDHAVmjCmbKpmaPPNxBgNs/ZinBYEiuk16",
+      "changeKey": "OXIFRPJUDSZdhGreKxftNJWbHgXt/TrfTHLbohRH",
       "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
-      "createdDateTime": "2026-11-11T14:36:06Z",
+      "createdDateTime": "2026-11-11T15:05:46Z",
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -375,13 +375,13 @@
         }
       },
       "hasAttachments": false,
-      "id": "MEwMTiLQMHOIBTULEksuUo3bnBGiNS-DSk1Yy1Vvqd63MlMWTx1R3vzxkrYY78jRqJHB",
+      "id": "DFyQLwWPNEDPMWXYOudcEd2pjPJrCL-EOa0Ac6Glvx18FdOODi0A2aqfuuQZ41nCStDK",
       "importance": "normal",
       "isDraft": true,
       "isRead": true,
-      "lastModifiedDateTime": "2026-11-11T14:36:06Z",
+      "lastModifiedDateTime": "2026-11-11T15:05:47Z",
       "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
-      "receivedDateTime": "2026-11-11T14:36:06Z",
+      "receivedDateTime": "2026-11-11T15:05:47Z",
       "replyTo": [],
       "sender": {
         "emailAddress": {
@@ -389,7 +389,7 @@
           "name": "Mia Keller"
         }
       },
-      "sentDateTime": "2026-11-11T14:36:06Z",
+      "sentDateTime": "2026-11-11T15:05:47Z",
       "subject": "RE: Q3 budget review",
       "toRecipients": [
         {
@@ -399,12 +399,12 @@
           }
         }
       ],
-      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FGEt7Dr9Lacl25WuDRPv1A9oklfxJC22oAiUUE&exvsurl=1&viewmodel=ReadMessageItem"
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCTe9Re5Xfxa08NaVDDi8S2mqesvUL19hYQaBE&exvsurl=1&viewmodel=ReadMessageItem"
     }
   },
   {
     "method": "PATCH",
-    "path": "/v1.0/me/messages/MEwMTiLQMHOIBTULEksuUo3bnBGiNS-DSk1Yy1Vvqd63MlMWTx1R3vzxkrYY78jRqJHB",
+    "path": "/v1.0/me/messages/DFyQLwWPNEDPMWXYOudcEd2pjPJrCL-EOa0Ac6Glvx18FdOODi0A2aqfuuQZ41nCStDK",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
@@ -420,7 +420,7 @@
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"LMPENDPSHPChcSecKnrcTZVpXeOd/AapZGZome10\"",
+      "@odata.etag": "W/\"UQIDGUZRSXMhsKwpUqtvCDAmNiWk/JroOOUbfcBW\"",
       "bccRecipients": [],
       "body": {
         "content": "synthetic text 01",
@@ -431,9 +431,9 @@
         "seed-v1 case-outlook_draft_reply-reply"
       ],
       "ccRecipients": [],
-      "changeKey": "TUXFUCLNCDWtuPvvOzpsUULaOoKj/BvaRXPxst22",
+      "changeKey": "ILWWXGLEXYQfsDbuQtuiNGKcXvDn/TlqHMJbrdVS",
       "conversationId": "AAQkBYuaOLX5XOC5TRWpQAgcLBF3SF91Dgi4DTJ9AWWxWHVgJ0PuBZUPOEnzBaF3mbcYgh3MgGlISi3=",
-      "createdDateTime": "2026-11-11T14:36:06Z",
+      "createdDateTime": "2026-11-11T15:05:46Z",
       "flag": {
         "flagStatus": "notFlagged"
       },
@@ -444,13 +444,13 @@
         }
       },
       "hasAttachments": false,
-      "id": "MEwMTiLQMHOIBTULEksuUo3bnBGiNS-DSk1Yy1Vvqd63MlMWTx1R3vzxkrYY78jRqJHB",
+      "id": "DFyQLwWPNEDPMWXYOudcEd2pjPJrCL-EOa0Ac6Glvx18FdOODi0A2aqfuuQZ41nCStDK",
       "importance": "normal",
       "isDraft": true,
       "isRead": true,
-      "lastModifiedDateTime": "2026-11-11T14:36:07Z",
+      "lastModifiedDateTime": "2026-11-11T15:05:47Z",
       "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
-      "receivedDateTime": "2026-11-11T14:36:06Z",
+      "receivedDateTime": "2026-11-11T15:05:47Z",
       "replyTo": [],
       "sender": {
         "emailAddress": {
@@ -458,7 +458,7 @@
           "name": "Mia Keller"
         }
       },
-      "sentDateTime": "2026-11-11T14:36:06Z",
+      "sentDateTime": "2026-11-11T15:05:47Z",
       "subject": "RE: Q3 budget review",
       "toRecipients": [
         {
@@ -468,7 +468,7 @@
           }
         }
       ],
-      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FGEt7Dr9Lacl25WuDRPv1A9oklfxJC22oAiUUE&exvsurl=1&viewmodel=ReadMessageItem"
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCTe9Re5Xfxa08NaVDDi8S2mqesvUL19hYQaBE&exvsurl=1&viewmodel=ReadMessageItem"
     }
   }
 ]

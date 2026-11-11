@@ -1478,20 +1478,20 @@ What happens:
 - The question says that Microsoft chooses the address.
 - The assistant asks Mia to approve first.
 
-#### A reply whose text cannot be saved is reported
+#### A reply whose copies cannot be saved is reported
 
-**A reply whose text Microsoft cannot save is reported as not saved**
+**A reply whose blind copy Microsoft cannot save is reported as not saved**
 
-Ask your assistant: "Reply to Anna that Friday works."
+Ask your assistant: "Reply to Anna that Friday works, and put Priya in Bcc."
 
 Tests: 1
 
-Situation: Mia asks her assistant to reply to Anna with a text that Microsoft refuses.
+Situation: Mia asks her assistant to reply to Anna with a blind copy to Priya.
 
 What happens:
 
-- The draft exists without the text.
-- The assistant tells Mia that the text is not saved.
+- The draft holds the text of the reply without the blind copy.
+- The assistant tells Mia that the blind copy is not saved.
 
 #### A person is found in the mail of Mia when the directory does not list her
 

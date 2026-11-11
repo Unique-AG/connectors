@@ -659,7 +659,7 @@ uc-04-45:
     - tool: outlook_find_recipient
     - tool: outlook_draft_mail
       uses: {to: address of Anna from outlook_find_recipient}
-  note: "expected behaviour from the address checks before any Graph call: tools/outlook_draft_mail.py:92-102 and :164-167, tools/outlook_draft_reply.py:146-182 and :352-391, tools/outlook_draft_reply_all.py:117-135 and :321-329, tools/outlook_update_draft.py:123-152, :256-272 and :325-336. Each tool refuses before it makes a draft."
+  note: "expected behaviour from the address checks before any Graph call: tools/outlook_draft_mail.py:92-102 and :164-167, tools/outlook_draft_reply.py:143-180 and :344-392, tools/outlook_draft_reply_all.py:117-135 and :321-329, tools/outlook_update_draft.py:123-152, :256-272 and :325-336. Each tool refuses before it makes a draft."
 
 uc-04-46:
   status: untested
@@ -673,7 +673,7 @@ uc-04-46:
     - tool: outlook_draft_reply
       args: {mode: reply}
       uses: {message_ref: uri of the message from the previous listing}
-  note: "expected behaviour from the handle check at the start of each tool: tools/outlook_draft_reply.py:274-276, tools/outlook_draft_reply_all.py:253-255, tools/outlook_update_draft.py:318-321. The tool refuses before it makes or changes a draft."
+  note: "expected behaviour from the handle check at the start of each tool: tools/outlook_draft_reply.py:276-278, tools/outlook_draft_reply_all.py:253-255, tools/outlook_update_draft.py:318-321. The tool refuses before it makes or changes a draft."
 
 uc-04-47:
   status: untested
@@ -717,7 +717,7 @@ uc-04-49:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - any_of: [outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft]
-  note: "tools/outlook_draft_reply.py:285-325, tools/outlook_draft_reply_all.py:266-292 and tools/outlook_update_draft.py:282-309 read the message, ask Mia with the draft and the mailbox named, and write after a yes."
+  note: "tools/outlook_draft_reply.py:287-334, tools/outlook_draft_reply_all.py:266-292 and tools/outlook_update_draft.py:282-309 read the message, ask Mia with the draft and the mailbox named, and write after a yes."
 
 uc-04-50:
   status: untested
@@ -762,14 +762,14 @@ uc-04-53:
   status: untested
   tests:
     - "tests/tools/scenarios/test_04_draft_and_send_mail.py::TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved"
-  ask: "Reply to Anna that Friday works."
+  ask: "Reply to Anna that Friday works, and put Priya in Bcc."
   provenance: drafted
   asks_user: false
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_draft_reply
-      args: {mode: reply}
-      uses: {message_ref: uri of the message of Anna}
+      args: {mode: reply, body: Friday works}
+      uses: {message_ref: uri of the message of Anna, bcc: address of Priya}
   note: "expected behaviour from tools/outlook_draft_reply.py:501-511 and :518-535 (the same shape as uc-04-44 for a reply to everyone): the draft exists, body_written is false, and failure holds what Microsoft said. The second request is not repeated."
 
 uc-04-54:
@@ -859,7 +859,7 @@ uc-04-60:
       args: {mode: reply, body: Friday works}
       uses: {message_ref: uri of the message}
   must_not: [outlook_draft_reply_all, outlook_send_draft]
-  note: "tools/outlook_draft_reply.py:461-481: the text is the comment of the create request, so Microsoft puts it above the quoted message. No second request runs when the call has no Cc, Bcc, importance or category."
+  note: "tools/outlook_draft_reply.py:461-481: the text is the comment of the create request, so Microsoft puts it above the quoted message. No second request runs when the call has no Cc, Bcc, importance or category (:491-492 and :502-503)."
 
 uc-04-61:
   status: untested

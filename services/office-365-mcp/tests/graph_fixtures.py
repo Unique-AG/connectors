@@ -82,8 +82,7 @@ def serve(
     router: respx.MockRouter, name: str, renamed: Mapping[str, str] | None = None
 ) -> dict[tuple[str, str], respx.Route]:
     """One route per method and path of the fixture, answering in the recorded order. An entry
-    with a `host` key (a download on the SharePoint host) routes by that host and its own path.
-    `renamed` maps an id of the recording to the id that the test uses for the same message."""
+    with a `host` key (a download on the SharePoint host) routes by that host and its own path."""
     answers: dict[tuple[str, str], list[httpx.Response]] = defaultdict(list)
     routes: dict[tuple[str, str], Json] = {}
     for spec in cast("list[Json]", json.loads((E2E / "fixtures" / f"{name}.json").read_text())):
