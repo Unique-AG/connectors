@@ -119,7 +119,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Calendar Groups",
+        title="Outlook: List Calendar Groups",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

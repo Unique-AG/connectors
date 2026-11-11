@@ -360,7 +360,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Meeting and Its Attendance",
+        title="Teams: Read a Meeting and Its Attendance",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

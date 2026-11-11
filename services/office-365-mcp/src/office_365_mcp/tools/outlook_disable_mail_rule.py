@@ -182,7 +182,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Disable Mail Rule",
+        title="Outlook: Disable Mail Rule",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

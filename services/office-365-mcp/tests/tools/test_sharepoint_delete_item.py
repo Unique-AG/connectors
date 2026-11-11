@@ -804,7 +804,7 @@ class TestHowItDeclaresItself:
         assert annotations is not None, (
             "a tool with no annotations joins the write surface by omission"
         )
-        assert tool.title == "Delete an Item"
+        assert tool.title == "SharePoint: Delete an Item"
         assert annotations.read_only_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["readOnlyHint"]
         assert annotations.destructive_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_DESTRUCTIVE_IDEMPOTENT["idempotentHint"]

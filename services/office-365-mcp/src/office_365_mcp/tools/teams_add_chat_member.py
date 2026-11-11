@@ -141,7 +141,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Add a Teams Chat Member",
+        title="Teams: Add a Chat Member",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

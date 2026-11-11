@@ -236,7 +236,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Section",
+        title="OneNote: Create a Section",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

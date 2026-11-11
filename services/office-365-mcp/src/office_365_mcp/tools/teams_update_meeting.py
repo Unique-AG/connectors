@@ -312,7 +312,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Update a Teams Meeting",
+        title="Teams: Update a Meeting",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

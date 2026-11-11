@@ -308,7 +308,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy Mail to a Folder",
+        title="Outlook: Copy Mail to a Folder",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

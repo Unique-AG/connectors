@@ -224,7 +224,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Text File",
+        title="SharePoint: Create a Text File",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

@@ -165,7 +165,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read an Event Attachment",
+        title="Outlook: Read an Event Attachment",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

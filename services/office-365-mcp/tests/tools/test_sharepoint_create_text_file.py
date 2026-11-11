@@ -832,7 +832,7 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
         assert annotations.open_world_hint is WRITE_ADDITIVE["openWorldHint"]
-        assert tool.title == "Create a Text File"
+        assert tool.title == "SharePoint: Create a Text File"
 
     async def test_it_takes_folder_name_and_content_and_no_others(
         self, transport: httpx.AsyncClient
