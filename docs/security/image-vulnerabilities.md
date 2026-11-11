@@ -180,5 +180,7 @@ The rule "no fixed version, or a fix younger than 3 days" applies to other packa
 | `.github/workflows/security-release-gate-exception.yaml` | The comment that records who set the label |
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
+| `.github/scripts/release-rebuild/rebuild.sh` | Opens the rebuild PRs. The workflow and the skill `vulna-squash` both run it. |
+| `.github/scripts/release-rebuild/rebuild-needed.sh` | Exits 1 with the reason when a service has an open release PR or an open rebuild PR |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date. The nightly scan and the release gate skip them. |
