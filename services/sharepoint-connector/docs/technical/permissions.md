@@ -1,7 +1,6 @@
 <!-- confluence-page-id: 1953399156 -->
 <!-- confluence-space-key: PUBDOC -->
 
-
 ## Overview
 
 The SharePoint Connector requires specific permissions to access Microsoft Graph API and SharePoint REST API. This document lists all required permissions with their use cases.
@@ -10,9 +9,9 @@ The SharePoint Connector requires specific permissions to access Microsoft Graph
 
 ### Content Sync (Required)
 
-| API | Permission | Type | Description |
-|-----|------------|------|-------------|
-| Microsoft Graph | `Sites.Selected` | Application | Access to specifically granted sites |
+| API             | Permission                          | Type        | Description                                       |
+| --------------- | ----------------------------------- | ----------- | ------------------------------------------------- |
+| Microsoft Graph | `Sites.Selected`                    | Application | Access to specifically granted sites              |
 | Microsoft Graph | `Lists.SelectedOperations.Selected` | Application | Access to specifically granted document libraries |
 
 **Note:** Use `Sites.Selected` for site-level access or `Lists.SelectedOperations.Selected` for more granular library-level access. Both can be enabled simultaneously for mixed access scenarios.
@@ -23,19 +22,19 @@ The SharePoint Connector requires specific permissions to access Microsoft Graph
 
 Microsoft Graph cannot list or download list attachments. That uses SharePoint REST, even when permission sync is off.
 
-| API | Permission | Type | Description |
-|-----|------------|------|-------------|
+| API             | Permission       | Type        | Description                                                 |
+| --------------- | ---------------- | ----------- | ----------------------------------------------------------- |
 | SharePoint REST | `Sites.Selected` | Application | List and download list attachments, and read `ReadSecurity` |
 
 The SharePoint API permission is separate from the Graph `Sites.Selected` permission. The app also needs a site grant, certificate authentication (SharePoint REST rejects app-only tokens obtained with a client secret), and network access to `https://{tenant}.sharepoint.com/_api`.
 
 ### Permission Sync (Optional)
 
-| API | Permission | Type | Description |
-|-----|------------|------|-------------|
-| Microsoft Graph | `GroupMember.Read.All` | Application | Read group memberships |
-| Microsoft Graph | `User.ReadBasic.All` | Application | Read basic user profiles |
-| SharePoint REST | `Sites.Selected` | Application | Access site groups |
+| API             | Permission             | Type        | Description              |
+| --------------- | ---------------------- | ----------- | ------------------------ |
+| Microsoft Graph | `GroupMember.Read.All` | Application | Read group memberships   |
+| Microsoft Graph | `User.ReadBasic.All`   | Application | Read basic user profiles |
+| SharePoint REST | `Sites.Selected`       | Application | Access site groups       |
 
 ## Microsoft Graph Permissions
 
@@ -43,29 +42,33 @@ The SharePoint API permission is separate from the Graph `Sites.Selected` permis
 
 These APIs are used for fetching SharePoint content:
 
-| API Endpoint | Method | Use Case | Permission |
-|--------------|--------|----------|------------|
-| `/sites/{siteId}` | GET | Fetch site metadata | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/sites/{siteId}/drives` | GET | Fetch document libraries | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/drives/{driveId}/items/{itemId}/children` | GET | Fetch folder children | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/drives/{driveId}/items/{itemId}/content` | GET | Download file content | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/sites/{siteId}/lists` | GET | Find SitePages list | `Sites.Selected` |
-| `/sites/{siteId}/lists/{listId}/items` | GET | List ASPX pages | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET | Get ASPX page content | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/sites/{siteId}/sites` | GET | Discover child subsites | `Sites.Selected` |
+| API Endpoint                                    | Method | Use Case                                                          | Permission                                              |
+| ----------------------------------------------- | ------ | ----------------------------------------------------------------- | ------------------------------------------------------- |
+| `/sites/{siteId}`                               | GET    | Fetch site metadata                                               | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/drives`                        | GET    | Fetch document libraries                                          | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/list/columns`                | GET    | Find the sync column of a document library                        | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/items/{itemId}/children`     | GET    | Fetch folder children                                             | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/drives/{driveId}/items/{itemId}/content`      | GET    | Download file content                                             | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists`                         | GET    | Find the SitePages list and the lists to scan for attachments     | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/columns`        | GET    | Read the columns of the sites configuration list                  | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items`          | GET    | List ASPX pages, list items, and sites configuration list entries | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items/{itemId}` | GET    | Get ASPX page content                                             | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/sites`                         | GET    | Discover child subsites                                           | `Sites.Selected`                                        |
 
-Either permission covers the endpoints above. A library-level grant via `Lists.SelectedOperations.Selected` also provides access to basic site information (metadata, drives listing) for the site that hosts the granted library.
+A library-level grant via `Lists.SelectedOperations.Selected` also provides access to basic site information (metadata, drives listing) for the site that hosts the granted library.
+
+With `sitesSource: sharepoint_list`, the app also needs a grant on the site or list that holds the [sites configuration list](<../operator/configuration.md#Dynamic-Sites-Configuration-(sharepoint_list)>).
 
 ### Permission Mode
 
 These APIs are used when permission sync is enabled:
 
-| API Endpoint | Method | Use Case | Permission |
-|--------------|--------|----------|------------|
-| `/drives/{driveId}/items/{itemId}/permissions` | GET | Fetch file/folder permissions | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/sites/{siteId}/lists/{listId}/items/{itemId}/permissions` | GET | Fetch ASPX page permissions (beta) | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
-| `/groups/{groupId}/members` | GET | Read Entra ID group members | `GroupMember.Read.All`, `User.ReadBasic.All` |
-| `/groups/{groupId}/owners` | GET | Read Entra ID group owners | `GroupMember.Read.All`, `User.ReadBasic.All` |
+| API Endpoint                                                | Method | Use Case                           | Permission                                              |
+| ----------------------------------------------------------- | ------ | ---------------------------------- | ------------------------------------------------------- |
+| `/drives/{driveId}/items/{itemId}/permissions`              | GET    | Fetch file/folder permissions      | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/sites/{siteId}/lists/{listId}/items/{itemId}/permissions` | GET    | Fetch ASPX page permissions (beta) | `Sites.Selected` or `Lists.SelectedOperations.Selected` |
+| `/groups/{groupId}/members`                                 | GET    | Read Entra ID group members        | `GroupMember.Read.All`, `User.ReadBasic.All`            |
+| `/groups/{groupId}/owners`                                  | GET    | Read Entra ID group owners         | `GroupMember.Read.All`, `User.ReadBasic.All`            |
 
 ## SharePoint REST Permissions
 
@@ -73,15 +76,14 @@ List attachment sync uses these endpoints in every sync mode, including `content
 
 SharePoint REST rejects app-only tokens obtained with a client secret. Use certificate authentication, grant the SharePoint `Sites.Selected` application permission on the site, and allow network access to `https://{tenant}.sharepoint.com/_api`.
 
-| API Endpoint | Method | Use Case | Permission |
-|--------------|--------|----------|------------|
-| `/_api/web/lists(guid'{listId}')/RootFolder/Folders('Attachments')/Folders?$expand=Files` | GET | List item attachment names and sizes | `Sites.Selected` |
-| `/_api/web/lists(guid'{listId}')/items({itemId})/AttachmentFiles('{fileName}')/$value` | GET | Download an attachment | `Sites.Selected` |
-| `/_api/web/lists(guid'{listId}')?$select=ReadSecurity` | GET | Reject lists users can read only their own items of | `Sites.Selected` |
-| `/_api/web/sitegroups/getById({groupId})` | GET | Read site group details | `Sites.Selected` |
-| `/_api/web/sitegroups/getById({groupId})/users` | GET | Read site group members | `Sites.Selected`* |
+| API Endpoint                                                                              | Method | Use Case                                            | Permission        |
+| ----------------------------------------------------------------------------------------- | ------ | --------------------------------------------------- | ----------------- |
+| `/_api/web/lists(guid'{listId}')/RootFolder/Folders('Attachments')/Folders?$expand=Files` | GET    | List item attachment names and sizes                | `Sites.Selected`  |
+| `/_api/web/lists(guid'{listId}')/items({itemId})/AttachmentFiles('{fileName}')/$value`    | GET    | Download an attachment                              | `Sites.Selected`  |
+| `/_api/web/lists(guid'{listId}')?$select=ReadSecurity`                                    | GET    | Reject lists users can read only their own items of | `Sites.Selected`  |
+| `/_api/web/sitegroups/getById({groupId})/users`                                           | GET    | Read site group members                             | `Sites.Selected`* |
 
-**Note:** If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members. The app principal must be a member/owner of the group or hold Full Control.
+**Note:** If "Who can view the membership of the group?" is **not** set to **Everyone**, the connector cannot read group members. Set it to **Everyone**, or make the app principal a member or owner of the group.
 
 ### Public Sites and Tenant-Wide Visibility Groups
 
@@ -93,11 +95,11 @@ Public SharePoint sites may include tenant-wide principals such as `Everyone` an
 
 `Sites.Selected` follows the principle of least privilege:
 
-| Permission | Scope | Admin Control |
-|------------|-------|---------------|
-| `Sites.Read.All` | All sites in tenant | None (all sites exposed) |
+| Permission            | Scope               | Admin Control            |
+| --------------------- | ------------------- | ------------------------ |
+| `Sites.Read.All`      | All sites in tenant | None (all sites exposed) |
 | `Sites.ReadWrite.All` | All sites in tenant | None (all sites exposed) |
-| `Sites.Selected` | Only granted sites | Per-site grants required |
+| `Sites.Selected`      | Only granted sites  | Per-site grants required |
 
 ### Benefits
 
@@ -119,8 +121,12 @@ Grant-PnPAzureADAppSitePermission `
   -AppId "{client-id}" `
   -DisplayName "Unique SharePoint Connector" `
   -Site "https://{tenant}.sharepoint.com/sites/{site-name}" `
-  -Permissions Write
+  -Permissions Read
 ```
+
+The connector only issues read (GET) calls against Microsoft Graph and SharePoint REST, so a `Read` grant is sufficient.
+
+An existing `Write` grant should be downgraded to `Read`. Look up its ID with `Get-PnPAzureADAppSitePermission -Site "<site-url>"`, then run `Set-PnPAzureADAppSitePermission -Site "<site-url>" -PermissionId "<id>" -Permissions Read`.
 
 See [Authentication Guide](../operator/authentication.md#4.-Grant-Site-Specific-Access) for detailed instructions.
 
@@ -190,12 +196,12 @@ https://login.microsoftonline.com/{tenant-id}/v2.0/adminconsent
 
 The SharePoint Connector uses **application permissions** (not delegated):
 
-| Aspect | Application | Delegated |
-|--------|-------------|-----------|
-| User context | None (service account) | Signed-in user |
-| Consent | Admin only | User or admin |
-| Access scope | As configured | Limited by user access |
-| Use case | Background services | User-interactive apps |
+| Aspect       | Application            | Delegated              |
+| ------------ | ---------------------- | ---------------------- |
+| User context | None (service account) | Signed-in user         |
+| Consent      | Admin only             | User or admin          |
+| Access scope | As configured          | Limited by user access |
+| Use case     | Background services    | User-interactive apps  |
 
 **Why application permissions?**
 
@@ -207,10 +213,10 @@ The SharePoint Connector uses **application permissions** (not delegated):
 
 Microsoft Graph enforces rate limits:
 
-| Limit Type | Value | Scope |
-|------------|-------|-------|
-| Requests per app | ~10,000 / 10 min | Per app registration |
-| Concurrent requests | 4 per app per resource | Per resource type |
+| Limit Type          | Value                  | Scope                |
+| ------------------- | ---------------------- | -------------------- |
+| Requests per app    | ~10,000 / 10 min       | Per app registration |
+| Concurrent requests | 4 per app per resource | Per resource type    |
 
 The connector respects these limits via:
 

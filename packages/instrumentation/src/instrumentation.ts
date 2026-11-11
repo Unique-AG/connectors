@@ -15,6 +15,7 @@ import { addCleanupListener } from 'async-cleanup';
 import { type OtelConfig, parseOtelConfig } from './config.js';
 import { createMetricReader } from './exporters/metrics.js';
 import { createSpanProcessor } from './exporters/traces.js';
+import { createRedaction } from './redaction.js';
 
 export interface InstrumentationOptions {
   defaultServiceName?: string;
@@ -23,6 +24,11 @@ export interface InstrumentationOptions {
   additionalInstrumentations?: Instrumentation[];
   configOverrides?: Partial<OtelConfig>;
   views?: ViewOptions[];
+  /**
+   * Raw secret values, such as an API key in the URL path, that must not be exported. Every
+   * occurrence in a span name, a span attribute or an HTTP metric attribute becomes `[REDACTED]`.
+   */
+  sensitiveValues?: string[];
 }
 
 /**
@@ -36,6 +42,7 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
     additionalInstrumentations = [],
     configOverrides = {},
     views = [],
+    sensitiveValues = [],
   } = options;
 
   const config = { ...parseOtelConfig(), ...configOverrides };
@@ -50,6 +57,8 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   // Create exporters based on configuration
   const metricReader = createMetricReader(config);
   const spanProcessor = createSpanProcessor(config);
+
+  const redaction = sensitiveValues.length > 0 ? createRedaction(sensitiveValues) : undefined;
 
   // Build instrumentations array
   const instrumentations = [
@@ -100,11 +109,17 @@ export function initOpenTelemetry(options: InstrumentationOptions = {}) {
   if (metricReader) {
     sdkConfig.metricReaders = [metricReader];
   }
-  if (spanProcessor) {
+  // An unset `spanProcessors` makes NodeSDK build an unredacted exporter from the environment.
+  if (!spanProcessor) {
+    sdkConfig.spanProcessors = [];
+  } else if (redaction) {
+    sdkConfig.spanProcessors = [redaction.spanProcessor, spanProcessor];
+  } else {
     sdkConfig.spanProcessors = [spanProcessor];
   }
-  if (views.length) {
-    sdkConfig.views = views;
+  const allViews = redaction ? [...views, redaction.httpMetricsView] : views;
+  if (allViews.length) {
+    sdkConfig.views = allViews;
   }
 
   const otelSDK = new NodeSDK(sdkConfig);

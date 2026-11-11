@@ -115,7 +115,7 @@ _HANDLE_OWNER = _SHARED / "handles.py"
 # scheme nothing lists is a grammar no rule guards, and a family nothing lists is a surface that
 # became addressable without anybody deciding it should be.
 _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
-    "teams:///": frozenset({"chats", "teams", "meetings", "transcripts"}),
+    "teams:///": frozenset({"chats", "teams", "meetings", "transcripts", "calltranscripts"}),
     "outlook:///": frozenset(
         {
             "messages",
@@ -127,7 +127,7 @@ _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
             "contacts",
         }
     ),
-    "sharepoint:///": frozenset({"files", "folders"}),
+    "sharepoint:///": frozenset({"files", "folders", "lists", "listitems"}),
     "onenote:///": frozenset({"sections", "pages", "notebooks", "sectiongroups", "operations"}),
 }
 _HANDLE_SCHEMES: tuple[str, ...] = tuple(_HANDLE_FAMILIES)

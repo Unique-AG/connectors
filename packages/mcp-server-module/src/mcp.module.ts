@@ -3,7 +3,8 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: Fork of @rekog-labs/MCP-Nest */
 /** biome-ignore-all lint/suspicious/noExplicitAny: Fork of @rekog-labs/MCP-Nest */
 import { DynamicModule, Module, Provider, Type } from '@nestjs/common';
-import { DiscoveryModule } from '@nestjs/core';
+import { DiscoveryModule, ModuleRef } from '@nestjs/core';
+import { type McpRateLimitConfig } from './config/rate-limit.config';
 import type {
   McpAsyncOptions,
   McpModuleAsyncOptions,
@@ -15,6 +16,7 @@ import { McpExecutorService } from './services/mcp-executor.service';
 import { McpRegistryService } from './services/mcp-registry.service';
 import { McpSseService } from './services/mcp-sse.service';
 import { McpStreamableHttpService } from './services/mcp-streamable-http.service';
+import { MCP_RATE_LIMITER, RateLimiterService } from './services/rate-limiter.service';
 import { SsePingService } from './services/sse-ping.service';
 import { createSseController } from './transport/sse.controller.factory';
 import { StdioService } from './transport/stdio.service';
@@ -89,6 +91,17 @@ export class McpModule {
       },
       McpRegistryService,
       McpExecutorService,
+      {
+        provide: MCP_RATE_LIMITER,
+        useFactory: ({ rateLimit }: McpOptions, moduleRef: ModuleRef) =>
+          rateLimit
+            ? new RateLimiterService(
+                moduleRef.get(rateLimit.config, { strict: false }),
+                rateLimit.getRequestKey,
+              )
+            : null,
+        inject: ['MCP_OPTIONS', ModuleRef],
+      },
       SsePingService,
       McpSseService,
       McpStreamableHttpService,
@@ -214,6 +227,18 @@ export class McpModule {
     return controllers;
   }
 
+  private static createRateLimiterProvider({ rateLimit }: McpOptions): Provider {
+    if (!rateLimit) {
+      return { provide: MCP_RATE_LIMITER, useValue: null };
+    }
+    return {
+      provide: MCP_RATE_LIMITER,
+      useFactory: (config: McpRateLimitConfig) =>
+        new RateLimiterService(config, rateLimit.getRequestKey),
+      inject: [rateLimit.config],
+    };
+  }
+
   private static createProvidersFromOptions(options: McpOptions, moduleId: string): Provider[] {
     const providers: Provider[] = [
       {
@@ -226,6 +251,7 @@ export class McpModule {
       },
       McpRegistryService,
       McpExecutorService,
+      this.createRateLimiterProvider(options),
       SsePingService,
       McpSseService,
       McpStreamableHttpService,

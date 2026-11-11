@@ -7,12 +7,11 @@ from kiota_abstractions.request_adapter import RequestAdapter
 from kiota_abstractions.request_information import RequestInformation
 from kiota_abstractions.serialization.parsable import Parsable
 from kiota_abstractions.serialization.parsable_factory import ParsableFactory
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.graph_client.client import request_with_query
+from office_365_mcp.graph_client.client import GRAPH_ERROR_MAP, GraphErrorMap, request_with_query
 
-type _ErrorMap = dict[str, type[ParsableFactory[ODataError]]]
+type _ErrorMap = GraphErrorMap | None
 
 
 class _Sends(Protocol):
@@ -54,11 +53,11 @@ def request_with_json_body(
 async def send_parsed[M: Parsable](
     client: GraphServiceClient, request: RequestInformation, factory: ParsableFactory[M]
 ) -> M | None:
-    return await _sends(client).send_async(request, factory, {"XXX": ODataError})
+    return await _sends(client).send_async(request, factory, GRAPH_ERROR_MAP)
 
 
 async def send_no_response_content(client: GraphServiceClient, request: RequestInformation) -> None:
-    await _sends(client).send_no_response_content_async(request, {"XXX": ODataError})
+    await _sends(client).send_no_response_content_async(request, GRAPH_ERROR_MAP)
 
 
 def _adapter(client: GraphServiceClient) -> RequestAdapter[httpx.Request]:

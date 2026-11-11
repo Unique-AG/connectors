@@ -1,5 +1,6 @@
+import assert from 'node:assert';
 import { AesGcmEncryptionModule, AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
-import { defaultLoggerOptions } from '@unique-ag/logger';
+import { createLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
@@ -16,24 +17,31 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
+import { AdminConsentController } from './auth/admin-consent.controller';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import { registerChatModule } from './chat/chat.module';
 import {
+  type AMQPConfig,
   type AppConfig,
   type AppConfigNamespaced,
+  type AuthConfig,
   type AuthConfigNamespaced,
   amqpConfig,
   appConfig,
   authConfig,
   type ChatConfigNamespaced,
   chatConfig,
+  type DatabaseConfig,
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
   healthConfig,
+  type MicrosoftConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  rateLimitConfig,
+  type UniqueConfig,
   type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
@@ -43,7 +51,9 @@ import { registerKbIntegrationModule } from './kb-integration/kb-integration.mod
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { serverInstructions } from './server.instructions';
+import { serverIcons } from './server-icons';
 import { GraphErrorFilter } from './utils/graph-error.filter';
+import { deploymentSecrets } from './utils/log-secrets';
 
 @Module({
   imports: [
@@ -59,16 +69,36 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         encryptionConfig,
         healthConfig,
         microsoftConfig,
+        rateLimitConfig,
         uniqueConfig,
       ],
     }),
     LoggerModule.forRootAsync({
-      inject: [appConfig.KEY],
-      useFactory: (config: AppConfig) => {
+      inject: [
+        appConfig.KEY,
+        amqpConfig.KEY,
+        authConfig.KEY,
+        databaseConfig.KEY,
+        encryptionConfig.KEY,
+        microsoftConfig.KEY,
+        uniqueConfig.KEY,
+      ],
+      useFactory: (
+        config: AppConfig,
+        amqp: AMQPConfig,
+        auth: AuthConfig,
+        database: DatabaseConfig,
+        encryption: EncryptionConfig,
+        microsoft: MicrosoftConfig,
+        unique: UniqueConfig,
+      ) => {
+        const loggerOptions = createLoggerOptions({
+          secrets: deploymentSecrets({ amqp, auth, database, encryption, microsoft, unique }),
+        });
         return {
-          ...defaultLoggerOptions,
+          ...loggerOptions,
           pinoHttp: {
-            ...defaultLoggerOptions.pinoHttp,
+            ...loggerOptions.pinoHttp,
             level: config.logLevel,
             genReqId: () => {
               const ctx = trace.getSpanContext(context.active());
@@ -128,6 +158,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           chat: configService.get('chat.integration', { infer: true }),
           ingestion: configService.get('unique.integration', { infer: true }),
           signInTenantId: configService.get('microsoft.signInTenantId', { infer: true }),
+          allowedTenantIds: configService.get('microsoft.allowedTenantIds', { infer: true }),
         }),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
@@ -144,7 +175,13 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           infer: true,
         }),
 
-        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager, amqpConnection),
+        oauthStore: new McpOAuthStore(
+          drizzle,
+          aesService,
+          cacheManager,
+          amqpConnection,
+          configService.get('auth.hmacSecret', { infer: true }).value,
+        ),
         encryptionService: aesService,
         metricService,
       }),
@@ -153,12 +190,22 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       name: 'teams-mcp',
       version: packageJson.version,
       instructions: serverInstructions,
+      icons: serverIcons,
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),
         statelessMode: false,
       },
       mcpEndpoint: 'mcp',
+      rateLimit: {
+        config: rateLimitConfig.KEY,
+        getRequestKey: (request) => {
+          const userProfileId = (request.raw as { user?: { userProfileId?: string } }).user
+            ?.userProfileId;
+          assert.ok(userProfileId, 'McpAuthJwtGuard sets the user profile on every MCP request');
+          return userProfileId;
+        },
+      },
     }),
     MsGraphModule,
     AMQPModule,
@@ -166,7 +213,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     ...registerChatModule(),
     HealthModule,
   ],
-  controllers: [ManifestController],
+  controllers: [ManifestController, AdminConsentController],
   providers: [
     { provide: APP_FILTER, useClass: GraphErrorFilter },
     { provide: APP_GUARD, useClass: McpAuthJwtGuard },

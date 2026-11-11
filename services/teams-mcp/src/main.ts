@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrumentation';
+import { redactRequestSecrets } from '@unique-ag/logger';
 import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Logger, LoggerErrorInterceptor } from 'nestjs-pino';
@@ -10,8 +11,11 @@ import { type AppConfig, appConfig } from './config';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  // Registered before `listen` adds the module middleware, pino-http's included, so it wraps them.
+  app.use(redactRequestSecrets());
 
   app.enableShutdownHooks();
+  app.set('trust proxy', 1);
 
   const logger = app.get(Logger);
   app.useLogger(logger);

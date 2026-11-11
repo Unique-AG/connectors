@@ -10,13 +10,13 @@ on:
         options:
           - backstop-mcp
           - confluence-connector
-          - hello-mcp
           - kb-mcp
           - office-365-mcp
           - outlook-semantic-mcp
           - sharepoint-connector
           - teams-mcp
           - with-intelligence-mcp
+          - world-check-mcp
 
 permissions:
   contents: read # to read the repository

@@ -84,7 +84,8 @@ def postgres_container() -> Generator[PostgresContainer]:
     then be asserting against local values — silently, and depending on test order, since this
     fixture is session-scoped and the suite is randomly ordered.
     """
-    with PostgresContainer("postgres:17-alpine") as postgres:
+    # Long enough for log redaction, which skips secrets under `MIN_SECRET_LENGTH`.
+    with PostgresContainer("postgres:17-alpine", password="backstop-test-password") as postgres:
         url = postgres.get_connection_url().replace("+psycopg2", "+asyncpg")
         environment_before_migrations = os.environ.copy()
         os.environ["DB_URL"] = url

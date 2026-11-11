@@ -1,0 +1,26 @@
+scenario: outlook_list_events-series-exception
+fixture: rec-tool-outlook_list_events-series-exception
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:25:11+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 18
+  keys dropped: 10
+  persona addresses: 9
+  persona names: 9
+  query parameters dropped: 4
+  response headers dropped: 14
+  text kept: 17
+literals:
+- '2026-11-09'
+- '2026-12-07'
+- Weekly design sync
+- ~nextMonday
+- ~nextMonday+28
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

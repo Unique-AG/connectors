@@ -1,0 +1,22 @@
+scenario: sharepoint_browse_folder-channel-files
+fixture: rec-tool-sharepoint_browse_folder-channel-files
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:05:46+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 24
+  keys dropped: 34
+  persona addresses: 2
+  persona names: 2
+  response headers dropped: 32
+  text kept: 12
+  text replaced: 7
+literals:
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

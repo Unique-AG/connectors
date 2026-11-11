@@ -69,7 +69,7 @@ sequenceDiagram
     KB-->>Server: Results
     Server-->>Client: Search results
 
-    Client->>Server: Opaque MCP token + create_draft_email
+    Client->>Server: Opaque MCP token + draft_email
     Server->>Graph: Create draft (using stored MS token)
     Graph-->>Server: Draft created
     Server-->>Client: Draft link
@@ -279,6 +279,21 @@ Each token pair shares a `familyId` (format: `tkfam_...`) and a `generation` cou
 3. If **valid** → token marked used, new token issued with incremented `generation`
 
 This detects scenarios where an attacker obtains a refresh token and uses it while the legitimate client still holds the original. Whichever uses it second triggers the revocation.
+
+## Log Redaction
+
+Every log line has the secrets this deployment is configured with replaced by `[Redacted]`: the HMAC
+secret, the Microsoft client and webhook secrets, the encryption key in its hex and base64 forms, the
+database and RabbitMQ passwords, the proxy password and the Basic credentials it is sent as, and the
+Zitadel client secret in external mode.
+
+The tokens a request, RabbitMQ handler or scheduled job reads are redacted too, but only from the
+lines logged while it runs: an HTTP request is covered by the request redaction middleware, and each
+`@RabbitSubscribe` handler and scheduled job by `@LogSecretsScope()` (`src/utils/log-secrets.ts`).
+The error handler that logs a failed RabbitMQ message (`src/amqp/amqp.utils.ts`) runs after the
+handler has returned, so it redacts the deployment's secrets but not a token the handler read. A new
+handler or job method needs `@LogSecretsScope()` above `@NewTrace` and, for a handler, below
+`@RabbitSubscribe`.
 
 ## Webhook Validation
 

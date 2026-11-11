@@ -1,0 +1,24 @@
+scenario: teams_list_chat_members-send-chat
+fixture: rec-tool-teams_list_chat_members-send-chat
+source: recorded
+target: graph
+recorded_at: '2026-11-03T10:21:35+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 325
+  keys dropped: 76
+  other addresses replaced: 4
+  persona addresses: 54
+  persona names: 54
+  query parameters dropped: 20
+  response headers dropped: 24
+  text kept: 13
+  text replaced: 99
+literals:
+- seed-v1 case-teams-send
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

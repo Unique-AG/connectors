@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { OAUTH_ENDPOINTS } from '../src';
 import { createMockModuleConfig, MockOAuthStore } from '../src/__mocks__';
 import { McpOAuthModule } from '../src/mcp-oauth.module';
+import { followProviderRedirect, openConsentPage, submitConsent } from './consent.helpers';
 
 describe('OAuth Authorization Code Flow (E2E)', () => {
   let app: INestApplication;
@@ -59,33 +60,27 @@ describe('OAuth Authorization Code Flow (E2E)', () => {
       const codeChallenge = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM'; // SHA256 of verifier
       const clientState = 'client-state-123';
 
-      // Step 1: Initiate authorization
-      const authResponse = await request(app.getHttpServer()).get(OAUTH_ENDPOINTS.authorize).query({
-        response_type: 'code',
+      // Step 1: Initiate authorization and approve the client on the consent page
+      const consentPage = await openConsentPage(app, {
         client_id: registeredClient.client_id,
         redirect_uri: 'http://localhost:4000/callback',
         code_challenge: codeChallenge,
-        code_challenge_method: 'S256',
         state: clientState,
         scope: 'offline_access mcp:read',
       });
+      const authResponse = await submitConsent(app, consentPage, 'approve');
 
       expect(authResponse.status).toBe(302);
       expect(authResponse.headers.location).toContain('state=');
       expect(authResponse.headers.location).toContain('code=mock-provider-code');
 
-      // biome-ignore lint/style/noNonNullAssertion: tested for existence with expect
-      const callbackUrl = new URL(authResponse.headers.location!);
-      const providerState = callbackUrl.searchParams.get('state');
-      const providerCode = callbackUrl.searchParams.get('code');
-
       // Step 2: Handle callback (simulating provider redirect back)
-      const callbackResponse = await request(app.getHttpServer())
-        .get(OAUTH_ENDPOINTS.callback)
-        .query({
-          state: providerState,
-          code: providerCode,
-        });
+      const callbackResponse = await followProviderRedirect(
+        app,
+        // biome-ignore lint/style/noNonNullAssertion: tested for existence with expect
+        authResponse.headers.location!,
+        consentPage.cookie,
+      );
 
       expect(callbackResponse.status).toBe(302);
       expect(callbackResponse.headers.location).toContain('http://localhost:4000/callback');

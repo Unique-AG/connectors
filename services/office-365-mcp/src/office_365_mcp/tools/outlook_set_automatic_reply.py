@@ -63,7 +63,16 @@ _NOTHING_CHANGED = "The automatic reply was not changed."
 
 _DESCRIPTION = (
     "Turns the signed-in user's automatic reply (out of office) on for a fixed window, or off. "
-    "Turning it on asks the user to agree first."
+    "Turning it on asks the user to agree first.\n\n"
+    "Notes:\n"
+    "- Give `start` and `end` with a time of day. To end the reply after Friday, set `end` to "
+    "00:00 on Saturday.\n"
+    "- Set `time_zone` to the zone of the `start` and `end` that the user gave. If the user "
+    "gave no zone and this deployment exposes outlook_get_mailbox_settings, that tool gives the "
+    "time zone of the user. The default is UTC.\n"
+    "- An `external_audience` that you do not set keeps the stored value. With no stored value, "
+    "it is `none`, and no sender outside the organization gets a reply. To answer every outside "
+    "sender, set `all`."
 )
 
 _NO_WINDOW = (
@@ -311,11 +320,20 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ctx: Context,
         start: Annotated[
             str | None,
-            Field(description="When the reply starts, ISO-8601. Required with scheduled."),
+            Field(
+                description=(
+                    "When the reply starts, ISO-8601 with a time of day, for example "
+                    "`2026-11-02T00:00:00`. Required with scheduled."
+                )
+            ),
         ] = None,
         end: Annotated[
             str | None,
-            Field(description="When the reply stops, same form as start. Required with scheduled."),
+            Field(
+                description=(
+                    "When the reply stops, in the same form as `start`. Required with scheduled."
+                )
+            ),
         ] = None,
         time_zone: Annotated[
             str,
@@ -331,7 +349,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = None,
         external_audience: Annotated[
             ExternalAudience | None,
-            Field(description="Who outside the organization is answered at all."),
+            Field(
+                description=(
+                    "Who outside the organization gets `external_message`: `none`, "
+                    "`contactsOnly`, or `all`. If you do not set it, the stored value stays. "
+                    "With no stored value, it is `none`."
+                )
+            ),
         ] = None,
         client: GraphServiceClient = graph,
     ) -> AutomaticReplyReport | InputRequiredResult:

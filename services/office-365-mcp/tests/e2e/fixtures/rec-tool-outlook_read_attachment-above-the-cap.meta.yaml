@@ -1,0 +1,21 @@
+scenario: outlook_read_attachment-above-the-cap
+fixture: rec-tool-outlook_read_attachment-above-the-cap
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:49:00+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 15
+  keys dropped: 6
+  persona addresses: 3
+  persona names: 3
+  response headers dropped: 28
+  text kept: 5
+literals:
+- Scan above the size cap
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

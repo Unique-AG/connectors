@@ -1,0 +1,558 @@
+outlook_list_calendars-all:
+  chain:
+    - tool: outlook_list_calendars
+
+outlook_list_calendars-shared:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
+  needs: [shared_calendars]
+  chain:
+    - tool: outlook_list_calendars
+      expect:
+        result:
+          "calendars[name=seed-v1 Anna Planning].can_edit": true
+          "calendars[name=seed-v1 Tom Rota].can_edit": false
+
+outlook_list_calendar_groups-all:
+  chain:
+    - tool: outlook_list_calendar_groups
+
+outlook_list_calendar_groups-with-shared:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
+  needs: [shared_calendars]
+  chain:
+    - tool: outlook_list_calendar_groups
+
+outlook_list_events-today:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+
+outlook_list_events-overlap:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextTuesday", ends_on: "~nextTuesday", subject_contains: Overlap}
+      expect: {result: {"events[*].subject": [Overlap A, Overlap B]}}
+
+outlook_list_events-series-exception:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday+28", subject_contains: Weekly design sync}
+      expect: {result: {"events[kind=exception].subject": Weekly design sync, capped: false}}
+
+outlook_list_events-week-40:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday+14", ends_on: "~nextMonday+18", subject_contains: Slot}
+      expect: {result: {capped: true, "events[24].subject": Slot 25}}
+
+outlook_list_events-week-40-whole:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday+14", ends_on: "~nextMonday+18", subject_contains: Slot, limit: 40}
+      expect: {result: {capped: false, "events[0].subject": Slot 01, "events[39].subject": Slot 40}}
+
+outlook_list_events-not-cancelled:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", cancelled: false}
+
+outlook_list_events-invitations-waiting:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~today", ends_on: "~tomorrow", owner_response: notResponded, limit: 100}
+
+outlook_list_events-colleague-calendar:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
+  needs: [shared_calendars]
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday+1"}
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Anna Planning].uri"}
+      expect: {result: {"events[*].subject": [Design review, Budget walkthrough, Team lunch]}}
+
+outlook_read_event-agenda:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Offsite agenda review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_read_event-answers-mixed:
+  needs: [answers]
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Design workshop}
+      expect: {result: {"events[*].subject": [Design workshop]}}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+      expect: {result: {"attendees[*].response": [accepted, declined]}}
+
+outlook_read_event-answers-open:
+  needs: [answers]
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Content review}
+      expect: {result: {"events[*].subject": [Content review]}}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+      expect: {result: {"attendees[*].response": [tentativelyAccepted, none]}}
+
+outlook_read_event-series-master:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday", subject_contains: Weekly design sync}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].series_master_uri"}
+      expect: {result: {"recurrence.pattern.kind": weekly}}
+
+outlook_read_event-no-new-time:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Fixed slot}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+      expect: {result: {allow_new_time_proposals: false}}
+
+outlook_list_event_instances-standup:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Daily standup}
+    - tool: outlook_list_event_instances
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+      bind: {uri: "$prev.events[0].series_master_uri"}
+
+outlook_list_event_instances-series:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday", subject_contains: Weekly design sync}
+    - tool: outlook_list_event_instances
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday+28"}
+      bind: {uri: "$prev.events[0].series_master_uri"}
+      expect: {result: {"events[kind=exception].subject": Weekly design sync}}
+
+outlook_list_event_attachments-agenda:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Offsite agenda review}
+    - tool: outlook_list_event_attachments
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_read_event_attachment-agenda:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Offsite agenda review}
+    - tool: outlook_list_event_attachments
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_read_event_attachment
+      bind: {uri: "$prev.attachments[0].uri"}
+
+outlook_list_reminders-today:
+  chain:
+    - tool: outlook_list_reminders
+      args: {starts_on: "~yesterday", ends_on: "~today"}
+      expect: {result: {"reminders[subject=Submit the expense report].subject": Submit the expense report}}
+
+outlook_list_time_zones-windows:
+  chain:
+    - tool: outlook_list_time_zones
+
+outlook_list_contacts-all:
+  chain:
+    - tool: outlook_list_contacts
+
+outlook_read_contact-first:
+  chain:
+    - tool: outlook_list_contacts
+    - tool: outlook_read_contact
+      bind: {uri: "$prev.contacts[0].uri"}
+
+outlook_find_recipient-anna:
+  chain:
+    - tool: outlook_find_recipient
+      args: {query: Anna Meier}
+
+outlook_find_rooms-all:
+  needs: [rooms]
+  chain:
+    - tool: outlook_find_rooms
+
+outlook_check_availability-tomorrow:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_check_availability
+      args: {starts_at: "~tomorrowT08:00:00", ends_at: "~tomorrowT18:00:00", time_zone: Europe/Zurich}
+      bind: {addresses: ["$prev.attendees[0].address"]}
+
+outlook_check_availability-working-hours:
+  chain:
+    - tool: outlook_check_availability
+      args:
+        addresses: [persona:anna, persona:tom]
+        starts_at: "~nextMondayT08:00:00"
+        ends_at: "~nextMondayT18:00:00"
+        time_zone: Europe/Zurich
+      expect:
+        result:
+          "schedules[0].working_hours.days": [monday, tuesday, wednesday, thursday]
+          "schedules[1].working_hours.days": [monday, tuesday, wednesday, thursday, friday]
+          "schedules[0].working_hours.time_zone": W. Europe Standard Time
+
+outlook_check_availability-colleague-free:
+  chain:
+    - tool: outlook_check_availability
+      args:
+        addresses: [persona:tom]
+        starts_at: "~nextThursdayT08:00:00"
+        ends_at: "~nextThursdayT18:00:00"
+        time_zone: Europe/Zurich
+      expect: {result: {"schedules[0].error": null}}
+
+outlook_suggest_meeting_times-tomorrow:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_suggest_meeting_times
+      args:
+        starts_at: "~tomorrowT08:00:00"
+        ends_at: "~tomorrowT18:00:00"
+        time_zone: Europe/Zurich
+        duration_minutes: 30
+      bind: {attendees: ["$prev.attendees[0].address"]}
+
+outlook_suggest_meeting_times-afternoon:
+  chain:
+    - tool: outlook_suggest_meeting_times
+      args:
+        attendees: [persona:anna]
+        starts_at: "~nextMondayT08:00:00"
+        ends_at: "~nextMondayT18:00:00"
+        time_zone: Europe/Zurich
+        duration_minutes: 30
+      expect: {result: {duration_minutes: 30}}
+
+outlook_suggest_meeting_times-nobody-free:
+  chain:
+    - tool: outlook_suggest_meeting_times
+      args:
+        attendees: [persona:tom]
+        starts_at: "~nextWednesdayT08:00:00"
+        ends_at: "~nextWednesdayT18:00:00"
+        time_zone: Europe/Zurich
+        duration_minutes: 30
+      expect: {result: {"suggestions[*]": [], empty_reason: AttendeesUnavailable}}
+
+outlook_list_calendar_shares-default:
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~today", ends_on: "~today", limit: 1}
+    - tool: outlook_list_calendar_shares
+      bind: {calendar_ref: "$prev.calendar.uri"}
+
+outlook_list_calendar_shares-shared-calendar:
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_list_calendar_shares
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Shared calendar].uri"}
+
+outlook_list_group_events-team:
+  needs: [group_calendar]
+  scopes: [Group.Read.All]
+  chain:
+    - tool: teams_list_my_teams
+    - tool: outlook_list_group_events
+      args: {starts_on: "~nextMonday", ends_on: "~nextMonday+3"}
+      bind: {group_id: "$prev.teams[display_name=seed-v1 team].team_id"}
+      expect: {result: {"events[*].subject": [Team standup, Release review, Retro, Planning]}}
+
+outlook_create_contact-person:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_create_contact-person
+        given_name: Nora
+        surname: Weber
+        company_name: Lakeside Demo AG
+        job_title: Buyer
+        business_phones: ["+41 44 555 01 03"]
+
+outlook_update_contact-title:
+  chain:
+    - tool: outlook_create_contact
+      args:
+        display_name: seed-v1 case-outlook_update_contact-title
+        given_name: Omar
+        surname: Haddad
+    - tool: outlook_update_contact
+      args: {job_title: Head of Sales}
+      bind: {uri: "$prev.uri"}
+
+outlook_create_event-simple:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_create_event-simple
+        starts_at: "~tomorrowT10:00:00"
+        ends_at: "~tomorrowT10:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+
+outlook_create_event-teams-meeting:
+  external: true
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_create_event-teams-meeting
+        starts_at: "~tomorrowT15:00:00"
+        ends_at: "~tomorrowT15:30:00"
+        time_zone: Europe/Zurich
+        attendees: [persona:anna]
+        online_meeting: true
+      expect: {result: {is_online_meeting: true}}
+
+outlook_create_event-zone-mumbai:
+  chain:
+    - tool: outlook_list_time_zones
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_create_event-zone-mumbai
+        starts_at: "~tomorrowT15:30:00"
+        ends_at: "~tomorrowT16:15:00"
+        attendees: []
+      bind: {time_zone: "$prev.time_zones[alias=India Standard Time].alias"}
+      expect: {result: {"start.time_zone": India Standard Time}}
+
+outlook_create_event-series-eight:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_create_event-series-eight
+        starts_at: "~nextWednesdayT09:00:00"
+        ends_at: "~nextWednesdayT09:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+        recurrence: {pattern_type: weekly, days_of_week: [wednesday], range_type: numbered, number_of_occurrences: 8}
+
+outlook_create_event_on_behalf-shared-calendar:
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_create_event_on_behalf
+      args:
+        subject: seed-v1 case-outlook_create_event_on_behalf-shared-calendar
+        starts_at: "~tomorrowT11:00:00"
+        ends_at: "~tomorrowT11:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Shared calendar].uri"}
+
+outlook_create_event_on_behalf-manager:
+  deferred: "Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them."
+  needs: [shared_calendars]
+  external: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_create_event_on_behalf
+      args:
+        subject: seed-v1 case-outlook_create_event_on_behalf-manager
+        starts_at: "~nextThursdayT11:00:00"
+        ends_at: "~nextThursdayT11:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Anna Planning].uri"}
+
+outlook_update_event-subject:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_update_event-subject
+        starts_at: "~tomorrowT12:00:00"
+        ends_at: "~tomorrowT12:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+    - tool: outlook_update_event
+      args: {subject: seed-v1 case-outlook_update_event-subject moved}
+      bind: {uri: "$prev.uri"}
+
+outlook_update_event-occurrence:
+  external: true
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_update_event-occurrence
+        starts_at: "~nextTuesdayT09:00:00"
+        ends_at: "~nextTuesdayT09:30:00"
+        time_zone: Europe/Zurich
+        attendees: [persona:anna]
+        online_meeting: false
+        categories: [seed-v1]
+        recurrence: {pattern_type: weekly, days_of_week: [tuesday], range_type: numbered, number_of_occurrences: 8}
+    - tool: outlook_list_event_instances
+      args: {starts_on: "~nextTuesday", ends_on: "~nextTuesday+49"}
+      bind: {uri: "$prev.uri"}
+    - tool: outlook_update_event
+      args:
+        starts_at: "~nextTuesday+14T10:00:00"
+        ends_at: "~nextTuesday+14T10:30:00"
+        time_zone: Europe/Zurich
+      bind: {uri: "$prev.events[2].uri"}
+
+outlook_delete_event-created:
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_delete_event-created
+        starts_at: "~tomorrowT13:00:00"
+        ends_at: "~tomorrowT13:30:00"
+        time_zone: Europe/Zurich
+        attendees: []
+    - tool: outlook_delete_event
+      bind: {uri: "$prev.uri"}
+
+outlook_delete_event-with-attendee:
+  external: true
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_delete_event-with-attendee
+        starts_at: "~tomorrowT14:00:00"
+        ends_at: "~tomorrowT14:30:00"
+        time_zone: Europe/Zurich
+        attendees: [persona:anna]
+        online_meeting: false
+    - tool: outlook_delete_event
+      bind: {uri: "$prev.uri"}
+
+outlook_share_calendar-anna:
+  external: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_share_calendar
+      args: {address: persona:anna, role: read}
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Shared calendar].uri"}
+      expect: {result: {role: read}}
+
+outlook_unshare_calendar-anna:
+  external: true
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_share_calendar
+      args: {address: persona:anna, role: read}
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Shared calendar].uri"}
+    - tool: outlook_list_calendar_shares
+      bind: {calendar_ref: "$1.calendars[name=seed-v1 Shared calendar].uri"}
+    - tool: outlook_unshare_calendar
+      bind: {share_ref: "$2.uri"}
+
+outlook_forward_event-hosting:
+  external: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Hosting review}
+    - tool: outlook_read_event
+      bind: {uri: "$prev.events[0].uri"}
+    - tool: outlook_forward_event
+      args: {comment: Please join for the hosting part.}
+      bind: {uri: "$1.events[0].uri", to: ["$prev.attendees[0].address"]}
+
+outlook_forward_event-received:
+  external: true
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Offsite forward target}
+    - tool: outlook_forward_event
+      args: {comment: Please look after the transport., to: [persona:tom]}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_cancel_event-budget:
+  destructive: true
+  external: true
+  reseed: [cal-events]
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~yesterday", ends_on: "~today", subject_contains: Budget alignment}
+    - tool: outlook_cancel_event
+      args: {comment: The numbers are not final.}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_cancel_event-occurrence:
+  external: true
+  chain:
+    - tool: outlook_create_event
+      args:
+        subject: seed-v1 case-outlook_cancel_event-occurrence
+        starts_at: "~nextTuesdayT11:00:00"
+        ends_at: "~nextTuesdayT11:30:00"
+        time_zone: Europe/Zurich
+        attendees: [persona:anna]
+        online_meeting: false
+        categories: [seed-v1]
+        recurrence: {pattern_type: weekly, days_of_week: [tuesday], range_type: numbered, number_of_occurrences: 8}
+    - tool: outlook_list_event_instances
+      args: {starts_on: "~nextTuesday", ends_on: "~nextTuesday+49"}
+      bind: {uri: "$prev.uri"}
+    - tool: outlook_cancel_event
+      args: {comment: The room is closed that day.}
+      bind: {uri: "$prev.events[2].uri"}
+
+outlook_respond_to_invite-accept:
+  destructive: true
+  external: true
+  reseed: {phases: [cal-invites], personas: [2, 3, 1]}
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Vendor call}
+    - tool: outlook_respond_to_invite
+      args: {response: accept, comment: I will join.}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_respond_to_invite-decline:
+  destructive: true
+  external: true
+  reseed: {phases: [cal-invites], personas: [2, 3, 1]}
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Design critique}
+    - tool: outlook_respond_to_invite
+      args: {response: decline, comment: I cannot join.}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_respond_to_invite-tentative:
+  destructive: true
+  external: true
+  reseed: {phases: [cal-invites], personas: [2, 3, 1]}
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Planning session}
+    - tool: outlook_respond_to_invite
+      args: {response: tentative, comment: I may join late.}
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_respond_to_invite-new-time:
+  destructive: true
+  external: true
+  reseed: {phases: [cal-invites], personas: [2, 3, 1]}
+  chain:
+    - tool: outlook_list_events
+      args: {starts_on: "~tomorrow", ends_on: "~tomorrow", subject_contains: Workshop prep}
+    - tool: outlook_respond_to_invite
+      args:
+        response: decline
+        comment: This time does not fit. Here is one that does.
+        proposed_new_time:
+          starts_at: "~nextMondayT15:00:00"
+          ends_at: "~nextMondayT15:30:00"
+          time_zone: Europe/Zurich
+      bind: {uri: "$prev.events[0].uri"}
+
+outlook_delete_calendar-spare:
+  destructive: true
+  reseed: [cal-calendars]
+  chain:
+    - tool: outlook_list_calendars
+    - tool: outlook_delete_calendar
+      bind: {calendar_ref: "$prev.calendars[name=seed-v1 Spare calendar].uri"}

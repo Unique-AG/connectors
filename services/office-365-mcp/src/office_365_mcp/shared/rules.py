@@ -410,7 +410,7 @@ def conditions_of(predicates: MessageRulePredicates | None) -> RuleConditions | 
         body_contains=predicates.body_contains or None,
         body_or_subject_contains=predicates.body_or_subject_contains or None,
         categories=predicates.categories or None,
-        from_addresses=_addresses(predicates.from_addresses) or None,
+        from_addresses=addresses_of(predicates.from_addresses) or None,
         has_attachments=predicates.has_attachments,
         header_contains=predicates.header_contains or None,
         importance=spelled(predicates.importance),
@@ -432,7 +432,7 @@ def conditions_of(predicates: MessageRulePredicates | None) -> RuleConditions | 
         sensitivity=spelled(predicates.sensitivity),
         sent_cc_me=predicates.sent_cc_me,
         sent_only_to_me=predicates.sent_only_to_me,
-        sent_to_addresses=_addresses(predicates.sent_to_addresses) or None,
+        sent_to_addresses=addresses_of(predicates.sent_to_addresses) or None,
         sent_to_me=predicates.sent_to_me,
         sent_to_or_cc_me=predicates.sent_to_or_cc_me,
         subject_contains=predicates.subject_contains or None,
@@ -575,13 +575,13 @@ def actions_of(actions: MessageRuleActions | None) -> RuleActions | None:
         assign_categories=actions.assign_categories or None,
         copy_to_folder=actions.copy_to_folder or None,
         delete=actions.delete,
-        forward_as_attachment_to=_addresses(actions.forward_as_attachment_to) or None,
-        forward_to=_addresses(actions.forward_to) or None,
+        forward_as_attachment_to=addresses_of(actions.forward_as_attachment_to) or None,
+        forward_to=addresses_of(actions.forward_to) or None,
         mark_as_read=actions.mark_as_read,
         mark_importance=spelled(actions.mark_importance),
         move_to_folder=actions.move_to_folder or None,
         permanent_delete=actions.permanent_delete,
-        redirect_to=_addresses(actions.redirect_to) or None,
+        redirect_to=addresses_of(actions.redirect_to) or None,
         stop_processing_rules=actions.stop_processing_rules,
     )
     return reported if reported.model_dump() else None
@@ -1069,9 +1069,7 @@ def unusable_addresses(
     return [entry for entry in entries if ONE_ADDRESS.match(entry.strip()) is None]
 
 
-def unusable_folders(actions: RuleActionsInput | None) -> list[str]:
-    if actions is None:
-        return []
+def unusable_folders(actions: RuleActionsInput) -> list[str]:
     asked = (actions.move_to_folder, actions.copy_to_folder)
     return [ref for ref in asked if ref is not None and _folder_segment(ref) is None]
 
@@ -1187,7 +1185,7 @@ def _reach(actions: MessageRuleActions | None) -> list[str]:
     return [
         f"{how} {_listed(addresses)}."
         for how, recipients in sent
-        if (addresses := _addresses(recipients))
+        if (addresses := addresses_of(recipients))
     ]
 
 
@@ -1197,13 +1195,7 @@ def _listed(parts: Sequence[str]) -> str:
     return f"{', '.join(parts[:-1])}, and {parts[-1]}"
 
 
-def _addresses(recipients: list[Recipient] | None) -> list[str]:
-    named: list[str] = []
-    for recipient in recipients or []:
-        email = recipient.email_address
-        if email is None:
-            continue
-        address = email.address if email.address else email.name
-        if address is not None:
-            named.append(address)
-    return named
+def addresses_of(recipients: list[Recipient] | None) -> list[str]:
+    emails = [one.email_address for one in recipients or [] if one.email_address is not None]
+    named = [email.address if email.address else email.name for email in emails]
+    return [address for address in named if address is not None]

@@ -86,6 +86,7 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "ChannelMessage.Send",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
+        "CallTranscripts.Read.All",
         "OnlineMeetingRecording.Read.All",
         "ChannelMessage.ReadWrite",
         "Chat.ReadWrite",
@@ -111,10 +112,13 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Files.Read.All",
         "Files.ReadWrite.All",
         "Sites.Read.All",
+        "Sites.ReadWrite.All",
         "Notes.Read",
+        "Notes.Read.All",
         "Notes.Create",
         "Notes.ReadWrite",
         "Place.Read.All",
+        "Group.Read.All",
         "Contacts.Read",
         "Contacts.ReadWrite",
     }
@@ -255,8 +259,6 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
     async def elicited(question: str) -> str | None:
         try:
             answer = await ctx.elicit(question, response_type=[agree, decline])
-        except ToolError as already_a_refusal:
-            return str(already_a_refusal)
         except Exception as unanswered:
             if isinstance(unanswered, MCPError) and unanswered.code in _CANNOT_BE_ASKED:
                 return _nobody_to_ask(nothing_happened)
@@ -372,9 +374,7 @@ class GraphAdviceMiddleware(Middleware):
             if isinstance(cause, TokenExchangeFailed):
                 return ToolError(_token_advice(cause.cause, cause.permissions))
             if isinstance(cause, GraphFailure):
-                known = self._advice.get(tool)
-                if known is None:
-                    return None
+                known = self._advice[tool]
                 permissions = known.permissions if narrowed is None else narrowed
                 return ToolError(
                     _advice(
@@ -435,7 +435,7 @@ _TRANSCRIPT_ACCESS_DISABLED = "GraphAccessToTranscriptsDisabled"
 
 _TRANSCRIPTS_SWITCHED_OFF = (
     "Microsoft 365 refused this request because this organization has Microsoft Graph access to "
-    + "Teams meeting transcripts switched OFF. This is a tenant-wide Teams setting, off by "
+    + "Teams transcripts switched OFF. This is a tenant-wide Teams setting, off by "
     + "default, and it blocks every transcript read regardless of which permissions this connector "
     + "holds — so it is NOT a consent problem and asking the user to sign in again will not change "
     + "it. A Microsoft Teams administrator has to turn it on: Teams admin center → Meetings → "
@@ -445,6 +445,15 @@ _TRANSCRIPTS_SWITCHED_OFF = (
     + "transcript call from this connector fails identically, so do not retry this one and do not "
     + "try another meeting or another transcript. Everything else this connector does — chats, "
     + "channels, message search — is unaffected."
+)
+
+
+_LICENSE_INFORMATION_MISSING = "Failed to get license information for the user"
+
+_NEEDS_A_TEAMS_LICENSE = (
+    "Microsoft 365 refused this request because this user's Office 365 license does not cover "
+    + "it. An administrator has to assign a license that includes the service this tool uses. A "
+    + "new license can take time to apply, so trying again later may work."
 )
 
 
@@ -525,6 +534,8 @@ def _remedy(
             )
         if failure.inner_code == _TRANSCRIPT_ACCESS_DISABLED:
             return _TRANSCRIPTS_SWITCHED_OFF
+        if failure.reason is not None and _LICENSE_INFORMATION_MISSING in failure.reason:
+            return _NEEDS_A_TEAMS_LICENSE
         if forbidden is not None:
             return forbidden
         named = _named(permissions)

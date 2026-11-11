@@ -1,0 +1,103 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/contacts",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,displayName,givenName,surname,emailAddresses,businessPhones,homePhones,mobilePhone,companyName,jobTitle",
+      "$top": "50"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"MFRZZMOLPQPzkKrgEvznRDPzLaYo/XdhUGPsDayt\"",
+          "businessPhones": ["+41 44 555 01 02"],
+          "companyName": "Rhein Logistics",
+          "displayName": "Marc Dubois",
+          "emailAddresses": [
+            {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          ],
+          "givenName": "Marc",
+          "homePhones": [],
+          "id": "EFgJBuLNOVXOAIEPKztyTj4boIPzWP-SVu0Ev3Iuzt45HvAQZg8W7ffifqZC42raTpDY",
+          "jobTitle": "Dispatcher",
+          "mobilePhone": null,
+          "surname": "Dubois"
+        },
+        {
+          "@odata.etag": "W/\"XMPDXHKQIKNxmAylTnssZMWcUhWk/YsqCICwOolx\"",
+          "businessPhones": ["+41 44 555 01 01"],
+          "companyName": "Alpine Print",
+          "displayName": "Lena Fischer",
+          "emailAddresses": [],
+          "givenName": "Lena",
+          "homePhones": [],
+          "id": "BThJCsOJEBYNJRYOHcqjHh5qiPNpDJ-KDy2Pl6Qffj52QzCSOe8T1cfgvsFD82kwJiFB",
+          "jobTitle": "Account Manager",
+          "mobilePhone": null,
+          "surname": "Fischer"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/contacts/EFgJBuLNOVXOAIEPKztyTj4boIPzWP-SVu0Ev3Iuzt45HvAQZg8W7ffifqZC42raTpDY",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,displayName,givenName,middleName,surname,nickName,emailAddresses,businessPhones,homePhones,mobilePhone,imAddresses,companyName,jobTitle,department,officeLocation,profession,manager,assistantName,businessHomePage,businessAddress,homeAddress,otherAddress,birthday,spouseName,children,categories,personalNotes,lastModifiedDateTime"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"MFRZZMOLPQPzkKrgEvznRDPzLaYo/XdhUGPsDayt\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 02"],
+      "categories": ["seed-v1"],
+      "children": [],
+      "companyName": "Rhein Logistics",
+      "department": null,
+      "displayName": "Marc Dubois",
+      "emailAddresses": [
+        {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      ],
+      "givenName": "Marc",
+      "homeAddress": {},
+      "homePhones": [],
+      "id": "EFgJBuLNOVXOAIEPKztyTj4boIPzWP-SVu0Ev3Iuzt45HvAQZg8W7ffifqZC42raTpDY",
+      "imAddresses": [],
+      "jobTitle": "Dispatcher",
+      "lastModifiedDateTime": "2026-10-29T14:52:30Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": null,
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Dubois"
+    }
+  }
+]

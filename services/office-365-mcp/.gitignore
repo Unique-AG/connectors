@@ -6,3 +6,4 @@ __pycache__/
 .basedpyright_cache/
 .env
 .coverage
+.record-all/

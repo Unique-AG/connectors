@@ -1,0 +1,28 @@
+scenario: outlook_create_event_on_behalf-shared-calendar
+fixture: rec-tool-outlook_create_event_on_behalf-shared-calendar
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:09:49+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 16
+  keys dropped: 7
+  persona addresses: 7
+  persona names: 5
+  query parameters dropped: 1
+  response headers dropped: 31
+  text kept: 10
+  text replaced: 3
+literals:
+- '2026-10-31T11:00:00'
+- '2026-10-31T11:30:00'
+- Europe/Zurich
+- seed-v1 case-outlook_create_event_on_behalf-shared-calendar
+- ~tomorrowT11:00:00
+- ~tomorrowT11:30:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

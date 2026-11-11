@@ -1,0 +1,24 @@
+scenario: onenote_rename_page-seed
+fixture: rec-tool-onenote_rename_page-seed
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:08:34+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 176
+  keys dropped: 45
+  query parameters dropped: 14
+  response headers dropped: 105
+  text kept: 72
+  text replaced: 121
+literals:
+- <p>Start.</p>
+- seed-v1 Scratch
+- seed-v1 case-onenote_rename_page-seed
+- seed-v1 case-onenote_rename_page-seed new
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

@@ -56,7 +56,7 @@ def main() -> None:
         "--no-release",
         dest="release",
         action="store_false",
-        help="skip release-please and the release re-run list",
+        help="skip release-please and the dev build and release re-run lists",
     )
     arguments = parser.parse_args()
 

@@ -1,0 +1,24 @@
+scenario: outlook_list_mail-flagged
+fixture: rec-tool-outlook_list_mail-flagged
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:57:22+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 141
+  keys dropped: 9
+  other addresses replaced: 18
+  persona addresses: 95
+  persona names: 95
+  response headers dropped: 63
+  text kept: 95
+  text replaced: 35
+literals:
+- inbox
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

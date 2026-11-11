@@ -1,0 +1,81 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/mailFolders/inbox/messageRules",
+    "json": {
+      "actions": {
+        "markAsRead": true
+      },
+      "conditions": {
+        "subjectContains": ["seed-v1 case-outlook_disable_mail_rule-off"]
+      },
+      "displayName": "seed-v1 case-outlook_disable_mail_rule-off",
+      "isEnabled": true,
+      "sequence": 10
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('inbox')/messageRules('DMCBBKmiqzz=')"
+    },
+    "response_json": {
+      "actions": {
+        "markAsRead": true
+      },
+      "conditions": {
+        "subjectContains": ["seed-v1 case-outlook_disable_mail_rule-off"]
+      },
+      "displayName": "seed-v1 case-outlook_disable_mail_rule-off",
+      "hasError": false,
+      "id": "DMCBBKmiqzz=",
+      "isEnabled": true,
+      "isReadOnly": false,
+      "sequence": 1
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messageRules/DMCBBKmiqzz=",
+    "query": {
+      "$select": "id,displayName,isEnabled,isReadOnly,actions"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "actions": {
+        "markAsRead": true
+      },
+      "displayName": "seed-v1 case-outlook_disable_mail_rule-off",
+      "id": "DMCBBKmiqzz=",
+      "isEnabled": true,
+      "isReadOnly": false
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/mailFolders/inbox/messageRules/DMCBBKmiqzz=",
+    "json": {
+      "isEnabled": false
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "actions": {
+        "markAsRead": true
+      },
+      "conditions": {
+        "subjectContains": ["seed-v1 case-outlook_disable_mail_rule-off"]
+      },
+      "displayName": "seed-v1 case-outlook_disable_mail_rule-off",
+      "hasError": false,
+      "id": "DMCBBKmiqzz=",
+      "isEnabled": false,
+      "isReadOnly": false,
+      "sequence": 1
+    }
+  }
+]

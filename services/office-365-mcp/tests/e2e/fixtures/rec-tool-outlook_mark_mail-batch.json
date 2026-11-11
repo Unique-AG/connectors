@@ -1,0 +1,368 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>One.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_mark_mail-batch one",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('JNlFTiELMEQYBWRUYybpEv7jiUAbBL-OQw2Rt8Gafd38GkIJLa9Q1wdjzlOJ2pSpEqPZ')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"EKLQSCCGITPwvVtpChpvZLSxApUa/YyzRFEcz/Lt\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>One.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "One.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "CIBLDUBUJPWcaUnjRnamGHTeChBj/QdyZTZju/Zc",
+      "conversationId": "AAQkTUoaTIO0FGH8TRSnIBwyGOR2FE05Iqv7DNB6BFVpOPUhP3BgDTJJTAfMVC789_7Mfi7keSUcGYR=",
+      "createdDateTime": "2026-11-02T21:15:37Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "hasAttachments": false,
+      "id": "JNlFTiELMEQYBWRUYybpEv7jiUAbBL-OQw2Rt8Gafd38GkIJLa9Q1wdjzlOJ2pSpEqPZ",
+      "importance": "normal",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-11-02T21:15:38Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:15:38Z",
+      "replyTo": [],
+      "sentDateTime": "2026-11-02T21:15:38Z",
+      "subject": "seed-v1 case-outlook_mark_mail-batch one",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FLQj2Tn0Tijn87ShHPCl6D1xjffxWI9vZsBpBJ&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>Two.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_mark_mail-batch two",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('WVqGOxMMTSGEUKHJXpeySm7qaOOaYB-CMj0Ny8Lxfq92TmKBYl2P4xvwjaIR8iLpHDQC')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"ZXZXQUPFFPEhyDfzRbdiTLEiHePr/EfzOJEuj/Sc\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Two.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "Two.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "XIPZQILLIEEfcOjmGxnoYMDaGyDx/EppMAHkz/Zo",
+      "conversationId": "AAQkFOnxMWS6TWE7PAQyTTqcZTY0JP34Pvw0POD9NPYnJURiE2TbIEHCUPGaRRI2J87Lmo7huIROug8=",
+      "createdDateTime": "2026-11-02T21:15:38Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "hasAttachments": false,
+      "id": "WVqGOxMMTSGEUKHJXpeySm7qaOOaYB-CMj0Ny8Lxfq92TmKBYl2P4xvwjaIR8iLpHDQC",
+      "importance": "normal",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-11-02T21:15:38Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:15:38Z",
+      "replyTo": [],
+      "sentDateTime": "2026-11-02T21:15:38Z",
+      "subject": "seed-v1 case-outlook_mark_mail-batch two",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FDFc8Ii1Rpix39ZeVLTr5T0ckqgsWC0pUpICWN&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>Three.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_mark_mail-batch three",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('OEfMDhCZBFXGIUFKOvzeMa0scOJcRM-JFf5Oc9Qmnn89IvEXAz6V8fdoqsMX3cToJyGF')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"IZDQDVLCTFEjdIraGygeDRKiLrEm/UujPRZnd/In\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Three.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "Three.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "DTGPUWBYNUMakJuwFhsoWSXbUxMv/BgxRONgi/Tu",
+      "conversationId": "AAQkUUrfVWO4YXX8WOHpDCbfOIN2DR35Iue9CZD2GVKkDETiZ0UjXJMJHB5vjynJKg1Vsfb_tfeGJoU=",
+      "createdDateTime": "2026-11-02T21:15:38Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "hasAttachments": false,
+      "id": "OEfMDhCZBFXGIUFKOvzeMa0scOJcRM-JFf5Oc9Qmnn89IvEXAz6V8fdoqsMX3cToJyGF",
+      "importance": "normal",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-11-02T21:15:38Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:15:38Z",
+      "replyTo": [],
+      "sentDateTime": "2026-11-02T21:15:38Z",
+      "subject": "seed-v1 case-outlook_mark_mail-batch three",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FJHp3Rn5Ezhz35XxSIVo2I0dfawcYU2iMfIyOB&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/JNlFTiELMEQYBWRUYybpEv7jiUAbBL-OQw2Rt8Gafd38GkIJLa9Q1wdjzlOJ2pSpEqPZ",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "importance": "high"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"NEWXVCOVXFVutYycHceiIKZfVuXz/DmoNTKws/Rp\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>One.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "One.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "MFZJHOVHJCLqmPtgSmdaDFZvFfAf/XygLVKiy/Eo",
+      "conversationId": "AAQkTUoaTIO0FGH8TRSnIBwyGOR2FE05Iqv7DNB6BFVpOPUhP3BgDTJJTAfMVC789_7Mfi7keSUcGYR=",
+      "createdDateTime": "2026-11-02T21:15:37Z",
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "hasAttachments": false,
+      "id": "JNlFTiELMEQYBWRUYybpEv7jiUAbBL-OQw2Rt8Gafd38GkIJLa9Q1wdjzlOJ2pSpEqPZ",
+      "importance": "high",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-11-02T21:15:38Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:15:38Z",
+      "replyTo": [],
+      "sentDateTime": "2026-11-02T21:15:38Z",
+      "subject": "seed-v1 case-outlook_mark_mail-batch one",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FLQj2Tn0Tijn87ShHPCl6D1xjffxWI9vZsBpBJ&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/WVqGOxMMTSGEUKHJXpeySm7qaOOaYB-CMj0Ny8Lxfq92TmKBYl2P4xvwjaIR8iLpHDQC",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "importance": "high"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"UOKOPFAHTMGvjRpdAwxuLEPxIdNg/DznQOGtx/Og\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Two.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "Two.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "JLLWOSMIANSynWjkSpagYJQdSbIo/OqfLIGya/Ap",
+      "conversationId": "AAQkFOnxMWS6TWE7PAQyTTqcZTY0JP34Pvw0POD9NPYnJURiE2TbIEHCUPGaRRI2J87Lmo7huIROug8=",
+      "createdDateTime": "2026-11-02T21:15:38Z",
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "hasAttachments": false,
+      "id": "WVqGOxMMTSGEUKHJXpeySm7qaOOaYB-CMj0Ny8Lxfq92TmKBYl2P4xvwjaIR8iLpHDQC",
+      "importance": "high",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-11-02T21:15:39Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:15:38Z",
+      "replyTo": [],
+      "sentDateTime": "2026-11-02T21:15:38Z",
+      "subject": "seed-v1 case-outlook_mark_mail-batch two",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FDFc8Ii1Rpix39ZeVLTr5T0ckqgsWC0pUpICWN&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/OEfMDhCZBFXGIUFKOvzeMa0scOJcRM-JFf5Oc9Qmnn89IvEXAz6V8fdoqsMX3cToJyGF",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "importance": "high"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"ETFRYZBMAOErjHvdQlcnSJAvDcGu/QtpQBJhv/Kt\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Three.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "Three.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "CDSSGXVVNFXgwXjtGidaJKUsZzGx/UjkJTLid/La",
+      "conversationId": "AAQkUUrfVWO4YXX8WOHpDCbfOIN2DR35Iue9CZD2GVKkDETiZ0UjXJMJHB5vjynJKg1Vsfb_tfeGJoU=",
+      "createdDateTime": "2026-11-02T21:15:38Z",
+      "flag": {
+        "flagStatus": "flagged"
+      },
+      "hasAttachments": false,
+      "id": "OEfMDhCZBFXGIUFKOvzeMa0scOJcRM-JFf5Oc9Qmnn89IvEXAz6V8fdoqsMX3cToJyGF",
+      "importance": "high",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-11-02T21:15:39Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-11-02T21:15:38Z",
+      "replyTo": [],
+      "sentDateTime": "2026-11-02T21:15:38Z",
+      "subject": "seed-v1 case-outlook_mark_mail-batch three",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FJHp3Rn5Ezhz35XxSIVo2I0dfawcYU2iMfIyOB&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  }
+]

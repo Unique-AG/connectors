@@ -51,6 +51,21 @@ export class ChatService {
   }
 
   @Span()
+  public async getChat(userProfileId: string, chatId: string): Promise<MsChat> {
+    const span = this.traceService.getSpan();
+    span?.setAttribute('user_profile_id', userProfileId);
+    span?.setAttribute('chat_id', chatId);
+
+    this.logger.debug({ userProfileId }, 'Fetching chat from Microsoft Graph');
+
+    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    // Members name a chat that has no topic, so they are expanded like list_chats does.
+    const response = await client.api(`/chats/${chatId}`).expand('members').get();
+
+    return MsChatSchema.parse(response);
+  }
+
+  @Span()
   public async getChatMessages(
     userProfileId: string,
     chatId: string,

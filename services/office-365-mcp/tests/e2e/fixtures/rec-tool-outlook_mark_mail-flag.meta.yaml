@@ -1,0 +1,25 @@
+scenario: outlook_mark_mail-flag
+fixture: rec-tool-outlook_mark_mail-flag
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:11:58+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 26
+  keys dropped: 16
+  persona addresses: 9
+  persona names: 8
+  response headers dropped: 42
+  text kept: 16
+literals:
+- <p>A draft to mark.</p>
+- Website
+- inbox
+- seed-v1
+- seed-v1 case-outlook_mark_mail-flag
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

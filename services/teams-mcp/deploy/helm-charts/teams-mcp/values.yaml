@@ -29,7 +29,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/teams-mcp
-  tag: 0.4.12 # x-release-please-version
+  tag: 0.5.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -288,6 +288,15 @@ mcpConfig:
     # Leave as "common" when users choose their directory at login.
     # Independent of clientId/clientSecret; not the tenant that owns the app registration.
     signInTenantId: common
+    # -- Where Microsoft Entra sends a tenant admin after they grant admin consent through `{selfUrl}/admin/consent`.
+    # Must be registered as a redirect URI on the app registration.
+    # Optional - defaults to https://www.unique.ai/setup/consent-completed/entra-id, the Terraform module's default.
+    # adminConsentRedirectUri: ""
+    # -- Entra tenant IDs (GUIDs) allowed to use the MCP server. Empty allows any tenant.
+    # A sign-in from an unlisted tenant is rejected, and a user whose tenant is removed loses
+    # access at their next Microsoft token refresh.
+    # example: ["d050ee55-f842-4802-8263-d802dc017162"]
+    allowedTenantIds: []
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://teams.mcp.unique.app
@@ -365,9 +374,17 @@ networkPolicy:
   enableDefaultDeny:
     ingress: true
     egress: true
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
   baseline:
     prometheus:
       namespace: system
+    ephemeralPorts:
+      enabled: false
     egress:
       microsoft:
         toFQDNs:

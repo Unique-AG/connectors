@@ -1,0 +1,26 @@
+scenario: outlook_draft_reply-forward-workbook
+fixture: rec-tool-outlook_draft_reply-forward-workbook
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:30:14+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 38
+  keys dropped: 16
+  persona addresses: 13
+  persona names: 12
+  response headers dropped: 42
+  text kept: 11
+  text replaced: 4
+literals:
+- Budget workbook
+- Please read this workbook.
+- forward
+- persona:tom
+- seed-v1 case-outlook_draft_reply-forward-workbook
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -3,6 +3,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from mcp_configs import RateLimitSettings
+from mcp_observability import (
+    RateLimitMiddleware,
+    ToolCallObservabilityMiddleware,
+    access_token_subject,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
@@ -23,6 +29,7 @@ from office_365_mcp.logging import (
 )
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.server import admin_consent_url, ready_response, surface_manifest
+from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, register_tools, resolve
 from office_365_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRestoreMiddleware
@@ -65,6 +72,7 @@ def create_app(
     database_config: DatabaseConfig | None = None,
     entra_config: EntraConfig | None = None,
     surface_config: SurfaceConfig | None = None,
+    rate_limit: RateLimitSettings | None = None,
 ) -> Starlette:
     """Compose the app. Every long-lived object is built once and injected."""
     config = config or AppConfig()
@@ -118,7 +126,9 @@ def create_app(
     mcp = FastMCP(
         "Office 365 MCP",
         version=config.version,
+        icons=SERVER_ICONS,
         auth=auth,
+        mask_error_details=True,
         # Earlier in this list is further out: `add_middleware` appends and the chain is built over
         # `reversed(middleware)`. The first two are ordered for that, not for tidiness.
         #
@@ -127,11 +137,18 @@ def create_app(
         # Then the advice one, outside the operations layer, so a client reads the polished refusal
         # while that layer still logs the untranslated failure.
         middleware=[
+            # Outermost FastMCP middleware: logs one line per tool call (start, complete/fail).
+            ToolCallObservabilityMiddleware(),
             BoundedNameMiddleware(),
             GraphAdviceMiddleware(graph_advice(selection)),
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, or its line carries the session task's stale trace.
             MessageLogMiddleware(),
+            *(
+                [RateLimitMiddleware(rate_limit, get_request_key=access_token_subject)]
+                if rate_limit is not None
+                else []
+            ),
         ],
         lifespan=lifespan,
     )

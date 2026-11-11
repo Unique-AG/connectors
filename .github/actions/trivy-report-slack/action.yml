@@ -1,0 +1,80 @@
+name: Trivy report to Slack
+description: Build a Slack report from the Trivy results of published images and post it to an incoming webhook
+
+inputs:
+  webhook:
+    description: Slack incoming webhook URL
+    required: true
+  channel:
+    description: ID of the Slack channel. A legacy incoming webhook posts to the channel in the payload.
+    required: true
+  title:
+    description: Title shown in the Slack header
+    required: true
+  version_label:
+    description: Label shown after the title in the Slack header
+    required: true
+  reports_path:
+    description: Directory that holds one trivy-registry-<service> folder per service
+    required: true
+  services:
+    description: JSON array of the services to report, each with service and version
+    required: true
+  trigger_label:
+    description: Trigger shown in the context line, for example scheduled or manual
+    required: true
+  repository:
+    description: GitHub repository (owner/repo)
+    required: true
+  actor:
+    description: GitHub actor that started the workflow
+    required: true
+  workflow_name:
+    description: Workflow display name
+    required: true
+  run_url:
+    description: URL of the workflow run
+    required: true
+  repository_alerts:
+    description: Optional JSON with the open alerts of the lock files and the configuration, for example {"lockfiles":{"critical":0,"high":0,"medium":0},"config":{"critical":0,"high":0,"medium":0}}
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Build Slack payload
+      id: build-payload
+      shell: bash
+      env:
+        TITLE: ${{ inputs.title }}
+        CHANNEL: ${{ inputs.channel }}
+        VERSION_LABEL: ${{ inputs.version_label }}
+        REPORTS_PATH: ${{ inputs.reports_path }}
+        SERVICES: ${{ inputs.services }}
+        TRIGGER_LABEL: ${{ inputs.trigger_label }}
+        REPOSITORY: ${{ inputs.repository }}
+        ACTOR: ${{ inputs.actor }}
+        WORKFLOW_NAME: ${{ inputs.workflow_name }}
+        RUN_URL: ${{ inputs.run_url }}
+        REPOSITORY_ALERTS: ${{ inputs.repository_alerts }}
+      run: |
+        set -euo pipefail
+        PAYLOAD=$(node "${{ github.action_path }}/build-payload.mjs")
+        if [ -z "$PAYLOAD" ]; then
+          echo "::warning title=Slack report not posted::Every image scan failed, so there is nothing to report. Read the scan jobs of this run."
+          echo "Every image scan failed. No Slack report was posted." >> "$GITHUB_STEP_SUMMARY"
+        fi
+        {
+          echo 'payload<<EOF'
+          echo "$PAYLOAD"
+          echo 'EOF'
+        } >> "$GITHUB_OUTPUT"
+
+    - name: Send Slack notification
+      if: steps.build-payload.outputs.payload != ''
+      uses: slackapi/slack-github-action@dcb1066f776dd043e64d0e8ba94ca15cc7e1875d # v4.0.0
+      with:
+        webhook: ${{ inputs.webhook }}
+        webhook-type: incoming-webhook
+        payload: ${{ steps.build-payload.outputs.payload }}

@@ -20,13 +20,21 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphForbidden, GraphThrottled, GraphUnavailable
+from office_365_mcp.graph_client import (
+    GraphForbidden,
+    GraphNotFound,
+    GraphThrottled,
+    GraphUnavailable,
+)
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
 from office_365_mcp.tools import teams_create_chat as creator
 from office_365_mcp.tools.teams_create_chat import NewChatKind, a_person_agrees, create_chat
+from tests.tools.scenarios.support import Person as Approver
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import GROUP_MEMBERS, GROUP_TOPIC, uncalled, was_sent
 
 from .conftest import ME, OTHER_USER_ID, SIGNED_IN_USER_ID
 
@@ -338,7 +346,8 @@ class TestTheSchemaRefusals:
                 "at least",
             ),
             ({"chat_type": "group", "members": [OTHER_USER_ID]}, "valid dictionary"),
-            ({"chat_type": "group", "members": []}, "at least"),
+            ({"chat_type": "group", "member_emails": ["anna"]}, "pattern"),
+            ({"chat_type": "group", "member_emails": ["o'brien@example.invalid"]}, "pattern"),
             ({"chat_type": "meeting", "members": [_GRACE_ARGUMENT]}, "oneOnOne"),
         ],
     )
@@ -953,8 +962,8 @@ class TestHowItDeclaresItself:
         tool = await _registered(transport)
 
         assert (
-            "The question shows the Microsoft Entra object id of each person in `members`. The "
-            + "`name` in the question is only a label."
+            "The question shows the Microsoft Entra object id or the email address of each "
+            + "person. The `name` in the question is only a label."
         ) in " ".join((tool.description or "").split())
 
     async def test_the_description_says_an_existing_one_to_one_chat_comes_back(
@@ -990,14 +999,14 @@ class TestHowItDeclaresItself:
             + "sure that teams_list_chats does not already show the chat."
         ) in " ".join((tool.description or "").split())
 
-    async def test_the_arguments_are_chat_type_members_and_topic_and_nothing_else(
+    async def test_the_arguments_are_chat_type_members_member_emails_and_topic_and_nothing_else(
         self, transport: httpx.AsyncClient
     ) -> None:
         tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", tool.parameters["properties"])
-        assert set(properties) == {"chat_type", "members", "topic"}
-        assert set(cast("Sequence[str]", tool.parameters["required"])) == {"chat_type", "members"}
+        assert set(properties) == {"chat_type", "members", "member_emails", "topic"}
+        assert set(cast("Sequence[str]", tool.parameters["required"])) == {"chat_type"}
 
     async def test_the_chat_type_is_one_on_one_or_group_and_nothing_else(
         self, transport: httpx.AsyncClient
@@ -1007,10 +1016,11 @@ class TestHowItDeclaresItself:
         assert chat_type["enum"] == ["oneOnOne", "group"]
 
     async def test_every_member_is_a_guid_with_a_name(self, transport: httpx.AsyncClient) -> None:
-        members = (await _listed(transport))["members"]
+        options = cast(
+            "Sequence[Mapping[str, object]]", (await _listed(transport))["members"]["anyOf"]
+        )
 
-        assert members["minItems"] == 1
-        items = cast("Mapping[str, object]", members["items"])
+        items = cast("Mapping[str, object]", options[0]["items"])
         properties = cast("Mapping[str, Mapping[str, object]]", items["properties"])
         assert properties["user_id"]["pattern"] == identity.ENTRA_OBJECT_ID_PATTERN
         assert properties["name"]["minLength"] == 1
@@ -1019,9 +1029,11 @@ class TestHowItDeclaresItself:
     async def test_the_name_of_a_member_is_only_a_label_and_teams_binds_the_object_id(
         self, transport: httpx.AsyncClient
     ) -> None:
-        members = (await _listed(transport))["members"]
+        options = cast(
+            "Sequence[Mapping[str, object]]", (await _listed(transport))["members"]["anyOf"]
+        )
 
-        items = cast("Mapping[str, object]", members["items"])
+        items = cast("Mapping[str, object]", options[0]["items"])
         properties = cast("Mapping[str, Mapping[str, str]]", items["properties"])
         described = " ".join(properties["name"]["description"].split())
         assert "as a label only. Teams identifies the person only by `user_id`." in described
@@ -1038,3 +1050,243 @@ class TestHowItDeclaresItself:
             + "an owner."
         ) in described
         assert 15 <= len(described.split()) <= 60
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_creates_a_group_chat_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_create_chat-group")
+        mia = Approver()
+
+        created = await call(
+            "teams_create_chat",
+            person=mia,
+            chat_type="group",
+            topic=GROUP_TOPIC,
+            members=GROUP_MEMBERS,
+        )
+
+        assert created["chat_id"] == "19:922f7pt174v290p606p2q0ll41b70812@thread.v2"
+        assert created["chat_type"] == "group"
+        assert created["topic"] == GROUP_TOPIC
+        assert "Anna Meier" in mia.asked[0] and "Tom Berger" in mia.asked[0]
+        assert was_sent(routes, "POST", "/chats")
+        assert uncalled(routes) == []
+
+
+_GRACE_ADDRESS = "grace@example.invalid"
+_BOB_ADDRESS = "Bob.Kelso@example.invalid"
+
+
+async def _binding_of(
+    client: GraphServiceClient,
+    chat_type: NewChatKind,
+    *,
+    members: Sequence[Person] = (),
+    member_emails: Sequence[str] = (),
+) -> str:
+    seen: list[str] = []
+
+    async def capturing(question: str, about: str) -> Confirmed:
+        assert question
+        seen.append(about)
+        return None
+
+    _ = await create_chat(
+        client,
+        chat_type=chat_type,
+        members=members,
+        member_emails=member_emails,
+        confirm=capturing,
+    )
+    return seen[0]
+
+
+class TestPeopleGivenByEmailAddress:
+    async def test_an_address_is_bound_as_the_user_of_that_address(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph)
+
+        _ = await create_chat(
+            client, chat_type="oneOnOne", member_emails=[_GRACE_ADDRESS], confirm=_agrees
+        )
+
+        assert [member["user@odata.bind"] for member in _members_sent(post)] == [
+            _bind(SIGNED_IN_USER_ID),
+            _bind(_GRACE_ADDRESS),
+        ]
+
+    async def test_people_by_id_and_by_address_are_bound_together(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group", topic="Launch"))
+
+        _ = await create_chat(
+            client,
+            chat_type="group",
+            members=[_GRACE],
+            member_emails=[_BOB_ADDRESS],
+            topic="Launch",
+            confirm=_agrees,
+        )
+
+        assert [member["user@odata.bind"] for member in _members_sent(post)] == [
+            _bind(SIGNED_IN_USER_ID),
+            _bind(OTHER_USER_ID),
+            _bind(_BOB_ADDRESS),
+        ]
+
+    @pytest.mark.parametrize("own", ["ada@example.invalid", "ADA@corp.example.invalid"])
+    async def test_the_address_of_the_signed_in_user_is_never_a_second_member(
+        self, client: GraphServiceClient, graph: respx.MockRouter, own: str
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group"))
+
+        _ = await create_chat(
+            client,
+            chat_type="group",
+            member_emails=[own, _GRACE_ADDRESS],
+            confirm=_agrees,
+        )
+
+        assert [member["user@odata.bind"] for member in _members_sent(post)] == [
+            _bind(SIGNED_IN_USER_ID),
+            _bind(_GRACE_ADDRESS),
+        ]
+
+    async def test_only_the_address_of_the_signed_in_user_leaves_nobody_else(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph)
+
+        with pytest.raises(ToolError, match="only the signed-in user"):
+            _ = await create_chat(
+                client, chat_type="group", member_emails=["ada@example.invalid"], confirm=_agrees
+            )
+
+        assert post.call_count == 0
+
+    async def test_no_person_at_all_is_refused_before_any_request(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="received no person") as refused:
+            _ = await create_chat(client, chat_type="group", confirm=_agrees)
+
+        assert "`member_emails`" in str(refused.value)
+        assert _NOTHING_CREATED in str(refused.value)
+        assert len(graph.calls) == 0
+
+    async def test_a_one_to_one_chat_with_a_person_by_id_and_one_by_address_is_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="received 2 people for a one-to-one chat"):
+            _ = await create_chat(
+                client,
+                chat_type="oneOnOne",
+                members=[_GRACE],
+                member_emails=[_BOB_ADDRESS],
+                confirm=_agrees,
+            )
+
+        assert len(graph.calls) == 0
+
+    async def test_the_members_keep_the_order_in_which_the_addresses_were_given(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph, _chat_payload(chat_type="group"))
+
+        _ = await create_chat(
+            client,
+            chat_type="group",
+            member_emails=[_BOB_ADDRESS, _GRACE_ADDRESS],
+            confirm=_agrees,
+        )
+
+        assert [member["user@odata.bind"] for member in _members_sent(post)][1:] == [
+            _bind(_BOB_ADDRESS),
+            _bind(_GRACE_ADDRESS),
+        ]
+
+    async def test_the_same_address_in_two_spellings_is_one_person(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph)
+
+        _ = await create_chat(
+            client,
+            chat_type="oneOnOne",
+            member_emails=[_GRACE_ADDRESS, _GRACE_ADDRESS.upper()],
+            confirm=_agrees,
+        )
+
+        assert len(_members_sent(post)) == 2
+
+    async def test_the_question_names_the_address(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+        asked: list[str] = []
+
+        async def recording(question: str, about: str) -> Confirmed:
+            assert about
+            asked.append(question)
+            return None
+
+        _ = await create_chat(
+            client, chat_type="oneOnOne", member_emails=[_GRACE_ADDRESS], confirm=recording
+        )
+
+        assert asked == [
+            "Create a one-to-one Teams chat with the person with the email address "
+            + f"'{_GRACE_ADDRESS}'?"
+        ]
+
+    async def test_a_declined_question_creates_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        post = _creates(graph)
+
+        with pytest.raises(ToolError, match=_NOTHING_CREATED):
+            _ = await create_chat(
+                client, chat_type="oneOnOne", member_emails=[_GRACE_ADDRESS], confirm=_refuses
+            )
+
+        assert post.call_count == 0
+
+    async def test_the_approval_covers_the_address_and_not_its_letter_case(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _creates(graph)
+
+        grace = await _binding_of(client, "oneOnOne", member_emails=[_GRACE_ADDRESS])
+        shouted = await _binding_of(client, "oneOnOne", member_emails=[_GRACE_ADDRESS.upper()])
+        other = await _binding_of(client, "oneOnOne", member_emails=[_BOB_ADDRESS])
+        by_id = await _binding_of(client, "oneOnOne", members=[_GRACE])
+
+        assert grace == shouted
+        assert len({grace, other, by_id}) == 3
+
+    async def test_an_address_that_microsoft_does_not_know_creates_nothing(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _signed_in(graph)
+        _ = graph.post("/chats").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "Resource not found"}}
+            )
+        )
+
+        with pytest.raises(GraphNotFound):
+            _ = await create_chat(
+                client, chat_type="oneOnOne", member_emails=[_GRACE_ADDRESS], confirm=_agrees
+            )
+
+    def test_the_advice_for_an_unknown_person_says_what_to_ask_for_and_not_to_repeat(self) -> None:
+        advice = " ".join(creator.GRAPH_NOT_FOUND.split())
+
+        assert "sign-in name or the primary email address" in advice
+        assert "No chat was created." in advice
+        assert "Ask the user for the right address" in advice
+        assert "the call will fail the same way" in advice

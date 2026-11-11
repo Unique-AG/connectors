@@ -8,22 +8,22 @@ requires-python = ">=3.14"
 dependencies = [
     "alembic==1.20.1",
     "asyncpg==0.32.0",
-    "fastmcp==4.1.4",
+    "fastmcp==4.1.6",
     "httpx2==2.16.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
     "mcp-types==2.3.0",
     "py-key-value-aio[redis,wrappers-encryption]==0.4.6",
-    "pydantic-settings==2.16.1",
-    "pydantic==2.14.1",
+    "pydantic-settings==2.16.2",
+    "pydantic==2.14.3",
     "pyyaml==6.0.3",
-    "sqlalchemy[asyncio]==2.1.6",
+    "sqlalchemy[asyncio]==2.1.8",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.44.2",
-    "unique-sdk==2026.44.2",
-    "unique-toolkit[monitoring,otel]==2026.44.2",
+    "unique-mcp==2026.46.0",
+    "unique-sdk==2026.46.0",
+    "unique-toolkit[monitoring,otel]==2026.46.0",
     "uvicorn[standard]==0.54.0",
 ]
 
@@ -41,9 +41,9 @@ dev = [
     "mcp-architecture==0.1.0",
     "mcp-openapi[codegen]==0.1.0",
     "poethepoet==0.49.0",
-    "pytest-asyncio==1.4.1",
+    "pytest-asyncio==1.4.1.post1",
     "pytest==9.2.0",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
 ]
 
 [tool.pytest.ini_options]
@@ -94,6 +94,8 @@ operation-ids = ["getDailyMeta", "getDailyPrices"]
 operation-module = "mcp_openapi.upstream"
 models-module = "architecture_demo_mcp.upstream.generated.vendor_responses"
 models-output = "src/architecture_demo_mcp/upstream/generated/vendor_responses.py"
+requests-module = "architecture_demo_mcp.upstream.generated.vendor_requests"
+requests-output = "src/architecture_demo_mcp/upstream/generated/vendor_requests.py"
 operations-output = "src/architecture_demo_mcp/upstream/generated/operations.py"
 
 # The import contracts every MCP keeps, which packages/mcp-architecture/ARCHITECTURE.md explains.

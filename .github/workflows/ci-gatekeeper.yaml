@@ -11,11 +11,10 @@ concurrency:
 jobs:
   conventional-pr-title:
     name: Validate PR title and scope
-    # These labels skip the job: the two release-please labels, the Dependabot label, and the title exception.
+    # These labels skip the job: the two release-please labels and the title exception.
     if: >-
       !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&
-      !contains(github.event.pull_request.labels.*.name, 'dependencies') &&
       !contains(github.event.pull_request.labels.*.name, 'title-exception')
     permissions:
       pull-requests: read # to list the files of the pull request
@@ -30,7 +29,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: cachix/install-nix-action@448cde739abec1eaf0646249e3d25bb8d9bc7702 # v31.11.2
+      - uses: cachix/install-nix-action@75c75c31ebece974e48ebc36b4ad125bd97bd97b # v31.11.3
 
       - name: Pre-build cz
         run: nix build --no-link github:proventuslabs/scriptorium/db7be54d3f1b10f77e96f20694f4bcf9799de19e#cz
@@ -63,7 +62,6 @@ jobs:
           fi
 
   gatekeeper:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'dependencies') }}
     permissions:
       checks: read # to read the check runs of the pull request
       statuses: read # to read the commit statuses of the pull request
@@ -78,3 +76,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           timeout: "1200"
           interval: "60"
+          ignored: "Cursor Automation: Connectors Dependency PR Assess"

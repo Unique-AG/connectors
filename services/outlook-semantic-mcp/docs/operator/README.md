@@ -64,7 +64,7 @@ flowchart LR
 
 ### Unique SaaS
 
-After [granting admin consent](https://login.microsoftonline.com/organizations/adminconsent?client_id=ba326974-edcf-49ef-bf7a-74b3e0ea450a) (see [Authentication](./authentication.md#unique-saas) for why this is needed), provide the following to Unique Support or Solution Engineering:
+After granting admin consent through the `/admin/consent` link of your deployment (see [Authentication](./authentication.md#unique-saas) for why this is needed), provide the following to Unique Support or Solution Engineering:
 
 - [ ] **Backend mode** — controls how email search works; see [Deployment Modes](./configuration.md#Deployment-Modes) for the full trade-offs:
   - `microsoft_graph` — live KQL search directly against Microsoft Graph; no email ingestion into Unique KB; lighter deployment
@@ -106,7 +106,7 @@ Follow these steps to go from zero to a running deployment:
    - [ ] All secrets stored in Kubernetes Secrets (not ConfigMaps)
    - [ ] TLS termination configured at ingress
    - [ ] Network policies restrict pod-to-pod communication
-   - [ ] Log aggregation in place (tokens are not logged)
+   - [ ] Log aggregation in place (the deployment's secrets are redacted from every log line, and request and handler tokens from the lines logged while they run; see [Log redaction](../technical/security.md#Log-Redaction))
    - [ ] Monitoring alerts configured for authentication failures
 
    For the full security architecture, see [Security Documentation](../technical/security.md). For a breakdown of what data is stored where, see [Data Classification and Flow](../technical/security.md#Data-Classification-and-Flow).

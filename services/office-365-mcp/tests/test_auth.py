@@ -318,6 +318,57 @@ class TestTenantBoundTokens:
         assert await verifier.verify_token(_entra_token(other_pem)) is None
 
 
+@pytest.fixture
+def allowlisted_verifier(signing_key: tuple[str, str]) -> TenantBoundJWTVerifier:
+    _, public_pem = signing_key
+    stock = JWTVerifier(
+        public_key=public_pem,
+        audience=[_CLIENT_ID, f"api://{_CLIENT_ID}"],
+        algorithm="RS256",
+        required_scopes=["access_as_user"],
+    )
+    return TenantBoundJWTVerifier(stock, allowed_tenant_ids=frozenset({_TENANT_ID}))
+
+
+class TestTenantAllowlist:
+    async def test_a_token_from_a_listed_tenant_is_accepted(
+        self, allowlisted_verifier: TenantBoundJWTVerifier, signing_key: tuple[str, str]
+    ) -> None:
+        private_pem, _ = signing_key
+        token = _entra_token(private_pem, tid=_TENANT_ID, iss=_issuer(_TENANT_ID))
+
+        accepted = await allowlisted_verifier.verify_token(token)
+
+        assert accepted is not None
+        assert accepted.claims["tid"] == _TENANT_ID
+
+    async def test_a_token_from_an_unlisted_tenant_is_rejected(
+        self, allowlisted_verifier: TenantBoundJWTVerifier, signing_key: tuple[str, str]
+    ) -> None:
+        private_pem, _ = signing_key
+        token = _entra_token(private_pem, tid=_ANOTHER_TENANT_ID, iss=_issuer(_ANOTHER_TENANT_ID))
+
+        assert await allowlisted_verifier.verify_token(token) is None
+
+    async def test_an_empty_allowlist_accepts_any_tenant(
+        self, signing_key: tuple[str, str]
+    ) -> None:
+        _, public_pem = signing_key
+        stock = JWTVerifier(
+            public_key=public_pem,
+            audience=[_CLIENT_ID, f"api://{_CLIENT_ID}"],
+            algorithm="RS256",
+            required_scopes=["access_as_user"],
+        )
+        open_verifier = TenantBoundJWTVerifier(stock, allowed_tenant_ids=frozenset())
+        private_pem, _ = signing_key
+        token = _entra_token(private_pem, tid=_ANOTHER_TENANT_ID, iss=_issuer(_ANOTHER_TENANT_ID))
+
+        accepted = await open_verifier.verify_token(token)
+
+        assert accepted is not None
+
+
 def _unsigned_jwt(claims: Mapping[str, object]) -> str:
     """Unsigned: the provider only exchanges tokens its verifier has already accepted."""
 

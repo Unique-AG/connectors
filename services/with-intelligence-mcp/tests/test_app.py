@@ -5,11 +5,12 @@ from typing import Protocol, cast
 
 import pytest
 from cryptography.fernet import Fernet
-from fastmcp import FastMCP
+from fastmcp import Client, FastMCP
 from starlette.testclient import TestClient
 
 from with_intelligence_mcp.app import create_app
 from with_intelligence_mcp.server.tools import TOOLS
+from with_intelligence_mcp.server_icons import SERVER_ICONS
 
 
 class _HttpResponse(Protocol):
@@ -99,6 +100,13 @@ class TestMcpEndpoint:
             "get_manager",
             "get_consultant",
         ]
+
+    @pytest.mark.usefixtures("client")
+    async def test_initialize_advertises_the_server_icons(self) -> None:
+        server = cast("FastMCP[None]", create_app().state.fastmcp_server)
+        async with Client(server) as mcp_client:
+            assert mcp_client.server_info is not None
+            assert mcp_client.server_info.icons == SERVER_ICONS
 
     async def test_tools_publish_typed_output_schemas_and_closed_world_annotations(self) -> None:
         mcp = FastMCP("test")

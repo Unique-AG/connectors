@@ -1,0 +1,16 @@
+# The three test users. `index` is the position in SEED_UPNS and the value of `--as`.
+# The UPNs are never written here: they come from SEED_UPNS at run time.
+company: Lakeside Demo AG
+personas:
+  mia:
+    index: 1
+    display_name: Mia Keller
+    job_title: Project Lead
+  anna:
+    index: 2
+    display_name: Anna Meier
+    job_title: Finance Controller
+  tom:
+    index: 3
+    display_name: Tom Berger
+    job_title: IT Operations

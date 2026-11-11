@@ -3,7 +3,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
 from hashlib import sha256
-from typing import Literal, Protocol, Self, assert_never, cast
+from typing import Literal, Protocol, Self, cast
 from urllib.parse import unquote, urlsplit
 
 from kiota_abstractions.base_request_builder import BaseRequestBuilder
@@ -17,12 +17,10 @@ from msgraph.generated.groups.item.onenote import onenote_request_builder as gro
 from msgraph.generated.models.external_link import ExternalLink
 from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.notebook import Notebook
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_operation import OnenoteOperation
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.generated.models.onenote_patch_content_command import OnenotePatchContentCommand
 from msgraph.generated.models.onenote_section import OnenoteSection
-from msgraph.generated.models.operation_status import OperationStatus
 from msgraph.generated.models.section_group import SectionGroup
 from msgraph.generated.sites.item.onenote import onenote_request_builder as site_onenote
 from msgraph.generated.users.item.onenote import onenote_request_builder as user_onenote
@@ -55,6 +53,8 @@ from office_365_mcp.graph_client import (
     graph_step,
     no_retry,
     request_with_query,
+    send_no_response_content,
+    send_parsed,
 )
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
@@ -107,8 +107,6 @@ def onenote_root(client: GraphServiceClient, owner: OnenoteOwner | None) -> Onen
             return client.groups.by_group_id(owner.owner_id).onenote
         case "sites":
             return client.sites.by_site_id(owner.owner_id).onenote
-        case _:
-            assert_never(owner.kind)
 
 
 def group_and_site_refused(tool: str) -> str:
@@ -178,9 +176,7 @@ async def get_with_query[M: Parsable](
         typed=typed,
     )
     request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, model, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, model)
 
 
 async def patch_page(
@@ -197,16 +193,14 @@ async def patch_page(
     )
     request = RequestInformation(Method.POST, patch.url_template, patch.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _post_request_body.OnenotePatchContentPostRequestBody(commands=list(commands)),
     )
     if not safe_to_repeat:
         request.add_request_options(no_retry())
-    await client.request_adapter.send_no_response_content_async(  # pyright: ignore[reportUnknownMemberType]
-        request, {"XXX": ODataError}
-    )
+    await send_no_response_content(client, request)
 
 
 class _Links(Protocol):
@@ -418,8 +412,6 @@ class NotebookAudience:
                     return "which belongs to a Microsoft 365 group"
                 case "sites":
                     return "which belongs to a SharePoint site"
-                case _:
-                    assert_never(self.owner.kind)
         if self.is_shared:
             return "which is shared with other people"
         if self.user_role is not None and self.user_role != OWNER_ROLE:
@@ -645,12 +637,16 @@ def operation_id_in(location: str | None) -> str | None:
 
 OperationState = Literal["NotStarted", "Running", "Completed", "Failed"]
 
-_STATUS_TEXT: Mapping[OperationStatus, OperationState] = {
-    OperationStatus.NotStarted: "NotStarted",
-    OperationStatus.Running: "Running",
-    OperationStatus.Completed: "Completed",
-    OperationStatus.Failed: "Failed",
+_STATE_OF_WORD: Mapping[str, OperationState] = {
+    "notstarted": "NotStarted",
+    "running": "Running",
+    "completed": "Completed",
+    "failed": "Failed",
 }
+
+
+def operation_state(word: str | None) -> OperationState | None:
+    return None if word is None else _STATE_OF_WORD.get("".join(word.split()).lower())
 
 
 class OperationSummary(BaseModel):
@@ -667,7 +663,8 @@ class OperationSummary(BaseModel):
     status: OperationState | None = Field(
         description=(
             "Microsoft's own status word for this operation: NotStarted, Running, Completed or "
-            + "Failed. Null right after Microsoft accepts a copy, before it reports any status. "
+            + "Failed. Microsoft writes NotStarted as the two words not started. Null when "
+            + "Microsoft names no status, for example right after it accepts a copy. "
             + "Poll onenote_get_operation with `uri` to fill it in. Poll again until it reads "
             + "Completed or Failed."
         )
@@ -713,14 +710,20 @@ class OperationSummary(BaseModel):
     )
 
     @classmethod
-    def from_operation(cls, op: OnenoteOperation, *, owner: OnenoteOwner | None = None) -> Self:
+    def from_operation(
+        cls,
+        op: OnenoteOperation,
+        state: OperationState | None,
+        *,
+        owner: OnenoteOwner | None = None,
+    ) -> Self:
         assert op.id is not None, "Graph answered with an operation that has no id"
         result = resource_handle_of(op.resource_location, op.resource_id)
         result_uri, result_kind = result if result is not None else (None, None)
         error = op.error
         return cls(
             uri=OnenoteOperationHandle(op.id, owner=owner).uri,
-            status=(None if op.status is None else _STATUS_TEXT[op.status]),
+            status=state,
             percent_complete=op.percent_complete,
             created_at=op.created_date_time,
             last_action_at=op.last_action_date_time,
@@ -755,7 +758,9 @@ def accepted_operation(
         node = JsonParseNodeFactory().get_root_parse_node(_JSON_MEDIA_TYPE, fetched.content)
         operation = node.get_object_value(OnenoteOperation)
         if operation.id is not None:
-            return OperationSummary.from_operation(operation, owner=owner)
+            word = node.get_child_node("status")
+            state = operation_state(None if word is None else word.get_str_value())
+            return OperationSummary.from_operation(operation, state, owner=owner)
     operation_id = operation_id_in(fetched.headers.get("operation-location"))
     if operation_id is None:
         return None

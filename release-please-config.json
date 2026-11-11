@@ -118,31 +118,6 @@
         }
       ]
     },
-    "services/hello-mcp": {
-      "release-type": "python",
-      "component": "hello-mcp",
-      "extra-files": [
-        {
-          "type": "yaml",
-          "path": "deploy/helm-charts/hello-mcp/Chart.yaml",
-          "jsonpath": "$.version"
-        },
-        {
-          "type": "yaml",
-          "path": "deploy/helm-charts/hello-mcp/Chart.yaml",
-          "jsonpath": "$.appVersion"
-        },
-        {
-          "type": "generic",
-          "path": "deploy/helm-charts/hello-mcp/values.yaml"
-        },
-        {
-          "type": "toml",
-          "path": "uv.lock",
-          "jsonpath": "$.package[?(@.source.editable)].version"
-        }
-      ]
-    },
     "services/kb-mcp": {
       "release-type": "python",
       "component": "kb-mcp",
@@ -235,6 +210,31 @@
         {
           "type": "generic",
           "path": "deploy/helm-charts/with-intelligence-mcp/values.yaml"
+        },
+        {
+          "type": "toml",
+          "path": "uv.lock",
+          "jsonpath": "$.package[?(@.source.editable)].version"
+        }
+      ]
+    },
+    "services/world-check-mcp": {
+      "release-type": "python",
+      "component": "world-check-mcp",
+      "extra-files": [
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/world-check-mcp/Chart.yaml",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "yaml",
+          "path": "deploy/helm-charts/world-check-mcp/Chart.yaml",
+          "jsonpath": "$.appVersion"
+        },
+        {
+          "type": "generic",
+          "path": "deploy/helm-charts/world-check-mcp/values.yaml"
         },
         {
           "type": "toml",

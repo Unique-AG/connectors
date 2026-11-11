@@ -1,0 +1,26 @@
+scenario: outlook_list_event_attachments-agenda
+fixture: rec-tool-outlook_list_event_attachments-agenda
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:56:07+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 9
+  keys dropped: 6
+  persona addresses: 2
+  persona names: 2
+  query parameters dropped: 1
+  response headers dropped: 21
+  text kept: 6
+literals:
+- '2026-10-29'
+- '2026-10-30'
+- Offsite agenda review
+- ~today
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

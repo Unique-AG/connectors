@@ -4,17 +4,17 @@ version = "0.2.0"
 description = "With Intelligence FastMCP server with OAuth credential bridging"
 requires-python = ">=3.14"
 dependencies = [
-    "fastmcp==4.1.4",
+    "fastmcp==4.1.6",
     "uvicorn[standard]==0.54.0",
-    "pydantic[email]==2.14.1",
-    "pydantic-settings==2.16.1",
+    "pydantic[email]==2.14.3",
+    "pydantic-settings==2.16.2",
     "python-dotenv==1.2.4",
     "httpx==0.28.1",
-    "opentelemetry-api==1.45.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
     "opentelemetry-exporter-prometheus==0.66b1",
-    "opentelemetry-instrumentation-asgi==0.66b1",
-    "sqlalchemy[asyncio]==2.1.6",
+    "opentelemetry-instrumentation-asgi==0.66b2",
+    "sqlalchemy[asyncio]==2.1.8",
     "asyncpg==0.32.0",
     "alembic==1.20.1",
     "cryptography==50.0.2",
@@ -22,7 +22,9 @@ dependencies = [
     "markdownify==1.2.3",
     "tenacity==9.2.1",
     "typing-extensions==4.16.0",
-    "unique-mcp==2026.44.2",
+    "mcp-configs==0.1.0",
+    "mcp-observability==0.1.0",
+    "unique-mcp==2026.46.0",
     "starlette==1.10.0",
     "mcp==2.3.0",
     "mcp-credential-auth==0.1.0",
@@ -44,9 +46,9 @@ packages = ["src/with_intelligence_mcp"]
 [dependency-groups]
 dev = [
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1",
+    "pytest-asyncio==1.4.1.post1",
     "hatchling==1.33.0",
-    "ruff==0.17.3",
+    "ruff==0.17.4",
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers[postgres]==4.15.0",
@@ -96,4 +98,6 @@ reportUnusedFunction = false
 reportCallInDefaultInitializer = false
 
 [tool.uv.sources]
+mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-credential-auth = { path = "../../packages/mcp-credential-auth" }
+mcp-observability = { path = "../../packages/mcp-observability" }

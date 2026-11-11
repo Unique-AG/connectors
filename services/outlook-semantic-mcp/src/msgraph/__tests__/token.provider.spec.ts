@@ -1,4 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
+import assert from 'node:assert';
+import { createLoggerOptions, runWithLogSecrets } from '@unique-ag/logger';
+import pino from 'pino';
 import type { Dispatcher } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../../__mocks__';
@@ -26,6 +29,7 @@ describe('TokenProvider', () => {
     clientId: 'test-client-id',
     clientSecret: 'test-client-secret',
     signInTenantId: 'common',
+    allowedTenantIds: [],
     scopes: ['https://graph.microsoft.com/.default'],
   };
 
@@ -303,6 +307,115 @@ describe('TokenProvider', () => {
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
         'Token refresh failed: Network error',
       );
+    });
+  });
+
+  describe('refreshAccessToken with a tenant allowlist', () => {
+    const LISTED_TENANT = 'd050ee55-f842-4802-8263-d802dc017162';
+    const OTHER_TENANT = '79a9ddfe-a4f3-4307-8086-471132901889';
+
+    const entraAccessToken = (tid: string) =>
+      `eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.${Buffer.from(JSON.stringify({ tid })).toString('base64url')}.signature`;
+
+    const savedTokens = () =>
+      mockDependencies.drizzle.update.mock.results.map(
+        (result) => result.value.set.mock.calls[0]?.[0],
+      );
+
+    beforeEach(() => {
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+    });
+
+    it('stores the refreshed token of a listed tenant', async () => {
+      const accessToken = entraAccessToken(LISTED_TENANT);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ access_token: accessToken }),
+      } as never);
+
+      const unit = new TokenProvider(
+        { ...mockConfig, allowedTenantIds: [LISTED_TENANT] },
+        mockDependencies as any,
+      );
+
+      await expect(unit.refreshAccessToken('user-profile-123')).resolves.toBe(accessToken);
+      expect(savedTokens()).toEqual([expect.objectContaining({ accessToken: expect.any(String) })]);
+    });
+
+    it('clears the Graph tokens and revokes the MCP session of a tenant no longer listed', async () => {
+      const onPermanentAuthFailure = vi.fn().mockResolvedValue(undefined);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ access_token: entraAccessToken(OTHER_TENANT) }),
+      } as never);
+
+      const unit = new TokenProvider({ ...mockConfig, allowedTenantIds: [LISTED_TENANT] }, {
+        ...mockDependencies,
+        onPermanentAuthFailure,
+      } as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        `Entra tenant ${OTHER_TENANT} is not on the allowlist`,
+      );
+      expect(savedTokens()).toEqual([{ accessToken: null, refreshToken: null }]);
+      expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');
+    });
+  });
+
+  describe('log redaction', () => {
+    function createCapturingLogger() {
+      const pinoHttpOptions = createLoggerOptions().pinoHttp;
+      assert.ok(
+        typeof pinoHttpOptions === 'object' &&
+          pinoHttpOptions !== null &&
+          'hooks' in pinoHttpOptions,
+        'Expected pinoHttp options with hooks',
+      );
+      const lines: string[] = [];
+      const logger = pino({ hooks: pinoHttpOptions.hooks }, { write: (line) => lines.push(line) });
+      return { logger, lines };
+    }
+
+    it('redacts the access token from what the request logs after reading it', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        accessToken: 'ZW5jcnlwdGVkLWFjY2Vzcy10b2tlbg==',
+      };
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+      const { logger, lines } = createCapturingLogger();
+
+      await runWithLogSecrets([], async () => {
+        const accessToken = await unit.getAccessToken();
+        logger.error(`Graph rejected ${accessToken}`);
+      });
+
+      expect(JSON.parse(lines[0] ?? '{}').msg).toBe('Graph rejected [Redacted]');
+    });
+
+    it('redacts the old and new tokens from what the request logs after a refresh', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+        }),
+      } as any);
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+      const { logger, lines } = createCapturingLogger();
+
+      await runWithLogSecrets([], async () => {
+        await unit.refreshAccessToken('user-profile-123');
+        logger.error('tokens encrypted-refresh-token new-access-token new-refresh-token');
+      });
+
+      expect(JSON.parse(lines[0] ?? '{}').msg).toBe('tokens [Redacted] [Redacted] [Redacted]');
     });
   });
 });

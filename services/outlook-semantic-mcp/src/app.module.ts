@@ -1,9 +1,10 @@
+import assert from 'node:assert';
 import { AesGcmEncryptionModule, AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
-import { defaultLoggerOptions } from '@unique-ag/logger';
+import { createLoggerOptions } from '@unique-ag/logger';
 import { McpAuthJwtGuard, McpOAuthModule } from '@unique-ag/mcp-oauth';
 import { McpModule } from '@unique-ag/mcp-server-module';
 import { ProbeModule } from '@unique-ag/probe';
-import { ProxyModule, ProxyService, proxyConfig } from '@unique-ag/proxy';
+import { type ProxyConfig, ProxyModule, ProxyService, proxyConfig } from '@unique-ag/proxy';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { CACHE_MANAGER, CacheModule } from '@nestjs/cache-manager';
@@ -19,20 +20,27 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { typeid } from 'typeid-js';
 import * as packageJson from '../package.json';
 import { AMQPModule } from './amqp/amqp.module';
+import { AdminConsentController } from './auth/admin-consent.controller';
 import { McpOAuthStore } from './auth/mcp-oauth.store';
 import { createMicrosoftOAuthProvider } from './auth/microsoft.provider';
 import {
+  type AMQPConfig,
   type AppConfig,
   type AppConfigNamespaced,
+  type AuthConfig,
   type AuthConfigNamespaced,
   amqpConfig,
   appConfig,
   authConfig,
+  type DatabaseConfig,
   databaseConfig,
   type EncryptionConfig,
   encryptionConfig,
+  type MicrosoftConfig,
   type MicrosoftConfigNamespaced,
   microsoftConfig,
+  rateLimitConfig,
+  type UniqueConfig,
   type UniqueConfigNamespaced,
   uniqueConfig,
 } from './config';
@@ -44,7 +52,9 @@ import { HealthModule } from './health/health.module';
 import { ManifestController } from './manifest.controller';
 import { MsGraphModule } from './msgraph/msgraph.module';
 import { buildServerInstructions } from './server.instructions';
+import { serverIcons } from './server-icons';
 import { GraphErrorFilter } from './utils/graph-error.filter';
+import { deploymentSecrets } from './utils/log-secrets';
 
 @Module({
   imports: [
@@ -58,6 +68,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         databaseConfig,
         encryptionConfig,
         microsoftConfig,
+        rateLimitConfig,
         uniqueConfig,
         delegatedAccessConfig,
         ingestionConfig,
@@ -72,12 +83,41 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     }),
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({
-      inject: [appConfig.KEY],
-      useFactory: (config: AppConfig) => {
+      inject: [
+        appConfig.KEY,
+        amqpConfig.KEY,
+        authConfig.KEY,
+        databaseConfig.KEY,
+        encryptionConfig.KEY,
+        microsoftConfig.KEY,
+        proxyConfig.KEY,
+        uniqueConfig.KEY,
+      ],
+      useFactory: (
+        config: AppConfig,
+        amqp: AMQPConfig,
+        auth: AuthConfig,
+        database: DatabaseConfig,
+        encryption: EncryptionConfig,
+        microsoft: MicrosoftConfig,
+        proxy: ProxyConfig,
+        unique: UniqueConfig,
+      ) => {
+        const loggerOptions = createLoggerOptions({
+          secrets: deploymentSecrets({
+            amqp,
+            auth,
+            database,
+            encryption,
+            microsoft,
+            proxy,
+            unique,
+          }),
+        });
         return {
-          ...defaultLoggerOptions,
+          ...loggerOptions,
           pinoHttp: {
-            ...defaultLoggerOptions.pinoHttp,
+            ...loggerOptions.pinoHttp,
             level: config.logLevel,
             mixin: () => {
               // For some reason open telemetry pino integration which we are using is not adding
@@ -145,6 +185,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
         provider: createMicrosoftOAuthProvider(
           proxyService.getHttpAgent({ mode: 'always' }),
           configService.get('microsoft.signInTenantId', { infer: true }),
+          configService.get('microsoft.allowedTenantIds', { infer: true }),
         ),
 
         clientId: configService.get('microsoft.clientId', { infer: true }),
@@ -163,7 +204,13 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
           infer: true,
         }),
 
-        oauthStore: new McpOAuthStore(drizzle, aesService, cacheManager, amqpConnection),
+        oauthStore: new McpOAuthStore(
+          drizzle,
+          aesService,
+          cacheManager,
+          amqpConnection,
+          configService.get('auth.hmacSecret', { infer: true }).value,
+        ),
         encryptionService: aesService,
         metricService,
       }),
@@ -172,12 +219,22 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
       name: 'outlook-semantic-mcp',
       version: packageJson.version,
       instructions: buildServerInstructions(),
+      icons: serverIcons,
       streamableHttp: {
         enableJsonResponse: false,
         sessionIdGenerator: () => typeid('session').toString(),
         statelessMode: false,
       },
       mcpEndpoint: 'mcp',
+      rateLimit: {
+        config: rateLimitConfig.KEY,
+        getRequestKey: (request) => {
+          const userProfileId = (request.raw as { user?: { userProfileId?: string } }).user
+            ?.userProfileId;
+          assert.ok(userProfileId, 'McpAuthJwtGuard sets the user profile on every MCP request');
+          return userProfileId;
+        },
+      },
     }),
     MsGraphModule,
     AMQPModule,
@@ -190,7 +247,7 @@ import { GraphErrorFilter } from './utils/graph-error.filter';
     HealthModule,
     registerBackendModule(),
   ],
-  controllers: [ManifestController],
+  controllers: [ManifestController, AdminConsentController],
   providers: [
     { provide: APP_FILTER, useClass: GraphErrorFilter },
     { provide: APP_GUARD, useClass: McpAuthJwtGuard },

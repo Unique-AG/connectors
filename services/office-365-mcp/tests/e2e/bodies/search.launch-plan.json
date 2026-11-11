@@ -1,0 +1,40 @@
+{
+  "value": [
+    {
+      "searchTerms": ["Brightway", "Launch", "Plan"],
+      "hitsContainers": [
+        {
+          "moreResultsAvailable": false,
+          "total": 1,
+          "hits": [
+            {
+              "hitId": "01RUNPLAN",
+              "rank": 1,
+              "summary": "launch plan",
+              "resource": {
+                "@odata.type": "#microsoft.graph.driveItem",
+                "id": "01RUNPLAN",
+                "name": "Brightway Launch Plan.docx",
+                "size": 24576,
+                "webUrl": "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Launch%20Plan.docx",
+                "createdDateTime": "2026-09-01T08:00:00Z",
+                "lastModifiedDateTime": "2026-10-01T16:00:00Z",
+                "createdBy": { "user": { "displayName": "Anna Berg" } },
+                "lastModifiedBy": { "user": { "displayName": "Anna Berg" } },
+                "file": {
+                  "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                },
+                "parentReference": {
+                  "driveId": "b!RUNDRIVE",
+                  "driveType": "documentLibrary",
+                  "id": "01RUNPARENT",
+                  "path": "/drive/root:/Plans"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

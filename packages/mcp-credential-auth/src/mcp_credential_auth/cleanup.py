@@ -61,6 +61,7 @@ async def _delete_unreferenced_clients(session: AsyncSession, cutoff: datetime) 
     result = await session.execute(
         delete(OAuthClient).where(
             OAuthClient.created_at < cutoff,
+            OAuthClient.activated_at.is_(None),
             OAuthClient.client_id.not_in(select(PendingAuthorization.client_id)),
             OAuthClient.client_id.not_in(select(AuthorizationCode.client_id)),
             OAuthClient.client_id.not_in(select(OAuthToken.client_id)),

@@ -3,6 +3,7 @@ from enum import StrEnum
 from importlib.metadata import version as pkg_version
 from typing import Annotated, ClassVar, Self, cast
 from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from uuid import UUID
 
 from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
 from pydantic import (
@@ -72,6 +73,7 @@ class ToolsPreset(StrEnum):
     TEAMS_MESSAGES = "teams-messages"
     TEAMS_CHANNELS = "teams-channels"
     TEAMS_TRANSCRIPTS = "teams-transcripts"
+    TEAMS_CALL_TRANSCRIPTS = "teams-call-transcripts"
     TEAMS_RECORDINGS = "teams-recordings"
     TEAMS_MEETINGS = "teams-meetings"
     TEAMS_WRITE = "teams-write"
@@ -100,6 +102,9 @@ class ToolsPreset(StrEnum):
     SHAREPOINT_WRITE = "sharepoint-write"
     SHAREPOINT_SHARE = "sharepoint-share"
     SHAREPOINT_SITES = "sharepoint-sites"
+    SHAREPOINT_LISTS = "sharepoint-lists"
+    SHAREPOINT_LISTS_WRITE = "sharepoint-lists-write"
+    SHAREPOINT_LISTS_DELETE = "sharepoint-lists-delete"
     ONENOTE_READ = "onenote-read"
     ONENOTE_WRITE = "onenote-write"
     ONENOTE_DELETE = "onenote-delete"
@@ -232,6 +237,16 @@ _PERSONAL_ACCOUNT_AUTHORITIES = frozenset({"common", "consumers"})
 _NAMED_AUTHORITIES = _PERSONAL_ACCOUNT_AUTHORITIES | {ORGANIZATIONS}
 
 
+def _tenant_guid(entry: str) -> str:
+    """Entra writes `tid` as a lowercase, dashed GUID, and the allowlist is compared exactly."""
+    try:
+        return str(UUID(entry))
+    except ValueError:
+        raise ValueError(
+            f"ENTRA_ALLOWED_TENANT_IDS lists {entry!r}, which is not a tenant GUID"
+        ) from None
+
+
 class EntraConfig(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(
         env_prefix="ENTRA_", hide_input_in_errors=True
@@ -240,6 +255,7 @@ class EntraConfig(BaseSettings):
     tenant_id: str = Field(min_length=1)
     client_id: str = Field(min_length=1)
     client_secret: SecretStr = Field(min_length=1)
+    allowed_tenant_ids: Annotated[frozenset[str], NoDecode] = Field(default_factory=frozenset)
 
     @field_validator("tenant_id", mode="before")
     @classmethod
@@ -247,6 +263,13 @@ class EntraConfig(BaseSettings):
         if isinstance(value, str) and value.lower() in _NAMED_AUTHORITIES:
             return value.lower()
         return value
+
+    @field_validator("allowed_tenant_ids", mode="before")
+    @classmethod
+    def _split_the_tenants_an_operator_writes(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        return frozenset(_tenant_guid(entry) for entry in _split_comma_list(value))
 
     @model_validator(mode="after")
     def _reject_personal_account_authorities(self) -> Self:

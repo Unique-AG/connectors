@@ -45,6 +45,7 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, GraphAdviceMiddl
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import sharepoint_invite as inviter
 from office_365_mcp.tools.sharepoint_invite import Invitation, a_person_agrees, invite
+from tests.tools.scenarios.support import call, serve
 
 _DRIVE_ID = "b!SYNTHETICDRIVE0000"
 _FILE_ID = "01SYNTHETICFILE0000"
@@ -87,12 +88,16 @@ def _row(
     roles: Sequence[str] = ("read",),
     error: Mapping[str, object] | None = None,
     identity_key: str = "grantedToV2",
+    identity_email: str | None = None,
 ) -> dict[str, object]:
+    identity = {"id": "00000000-0000-4000-8000-000000000002", "displayName": name}
     row: dict[str, object] = {
         "id": f"SYNTHETIC-PERMISSION-{email}",
         "roles": list(roles),
         "invitation": {"email": email, "signInRequired": True},
-        identity_key: {"user": {"id": "00000000-0000-4000-8000-000000000002", "displayName": name}},
+        identity_key: {
+            "user": identity | ({} if identity_email is None else {"email": identity_email})
+        },
     }
     if error is not None:
         row["error"] = dict(error)
@@ -915,6 +920,48 @@ class TestWhatItAnswers:
 
         assert answer.recipients[0].email is None
 
+    @pytest.mark.parametrize("identity_key", ["grantedToV2", "grantedTo"])
+    async def test_a_colleague_with_no_invitation_gets_the_address_of_the_identity(
+        self, client: GraphServiceClient, graph: respx.MockRouter, identity_key: str
+    ) -> None:
+        _ = _reads(graph)
+        row = _row(identity_key=identity_key, identity_email=_ADA)
+        del row["invitation"]
+        _ = _invites(graph, [row])
+
+        answer = await _invite(client)
+
+        assert answer.recipients[0].email == _ADA
+
+    @pytest.mark.parametrize(("later", "address"), [(_ADA, _ADA), (None, None)])
+    async def test_an_empty_identity_address_is_skipped(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        later: str | None,
+        address: str | None,
+    ) -> None:
+        _ = _reads(graph)
+        row = _row(identity_email="")
+        del row["invitation"]
+        if later is not None:
+            row["grantedTo"] = {"user": {"email": later}}
+        _ = _invites(graph, [row])
+
+        answer = await _invite(client)
+
+        assert answer.recipients[0].email == address
+
+    async def test_the_invitation_address_wins_over_the_identity_address(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph)
+        _ = _invites(graph, [_row(identity_email="other@example.invalid")])
+
+        answer = await _invite(client)
+
+        assert answer.recipients[0].email == _ADA
+
     async def test_an_empty_collection_is_an_empty_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
@@ -1153,3 +1200,41 @@ class TestHowItDeclaresItself:
 
     def test_forbidden_advice_says_nothing_was_shared(self) -> None:
         assert _NOTHING_SHARED in inviter.GRAPH_FORBIDDEN
+
+
+_INVITED_FOLDER = "seed-v1 case-sharepoint_invite-anna"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_shares_a_new_folder_with_one_person_without_a_notice(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-sharepoint_invite-anna")
+        found = await call("sharepoint_search_files", query="seed-v1 Project Plan", limit=1)
+        plan = cast("list[dict[str, str]]", found["files"])[0]
+        folder = await call(
+            "sharepoint_create_folder", parent=plan["parent_uri"], name=_INVITED_FOLDER
+        )
+
+        invitation = await call(
+            "sharepoint_invite",
+            item=folder["uri"],
+            recipients=["anna@example.test"],
+            role="read",
+            notify=False,
+        )
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        grant = next(route for (_verb, path), route in routes.items() if path.endswith("/invite"))
+        assert _sent(grant) == {
+            "recipients": [{"email": "anna@example.test"}],
+            "requireSignIn": True,
+            "retainInheritedPermissions": True,
+            "roles": ["read"],
+            "sendInvitation": False,
+        }
+        assert invitation["item_uri"] == folder["uri"]
+        recipients = cast("list[dict[str, object]]", invitation["recipients"])
+        assert [
+            (row["email"], row["display_name"], row["roles"], row["error"]) for row in recipients
+        ] == [("anna@example.test", "Anna Meier", ["read"], None)]

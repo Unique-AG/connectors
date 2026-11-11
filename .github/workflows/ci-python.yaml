@@ -27,18 +27,16 @@ on:
       - ".github/workflows/_template-containerize.yaml"
       - ".github/workflows/_template-helm.yaml"
       - ".github/workflows/_template-terraform.yaml"
-      - ".github/actions/**"
   workflow_dispatch:
     inputs:
       packages:
-        description: 'Python packages to run CI for (comma-separated, e.g., "hello-mcp" or "all")'
+        description: 'Python packages to run CI for (comma-separated, e.g., "kb-mcp" or "all")'
         required: true
         default: "all"
 
 permissions:
   contents: read # to read the repository
   packages: read # to let the called workflows pull the base chart and the cache image from GHCR
-  pull-requests: read # to let containerize read the live security-exception label
 
 concurrency:
   group: ci-python-${{ github.event.pull_request.number || github.ref }}
@@ -101,7 +99,6 @@ jobs:
               - '.github/workflows/_template-containerize.yaml'
               - '.github/workflows/_template-helm.yaml'
               - '.github/workflows/_template-terraform.yaml'
-              - '.github/actions/**'
 
       # This step builds the list of Python services for the matrix jobs.
       # A change to a workflow file lists every service. A manual run lists the services that the input names.
@@ -182,7 +179,7 @@ jobs:
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
           echo "Python packages to validate: $packages"
 
-  # Each project keeps its own uv.lock, and a Dependabot security update bumps one at a time, so
+  # Each project keeps its own uv.lock, and a bump of one package can reach one project only, so
   # versions drift between alignments. This lists the drift as a warning and never fails.
   version-drift:
     name: Report Python version drift
@@ -194,7 +191,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
 
@@ -210,7 +207,7 @@ jobs:
       matrix:
         package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: services/${{ matrix.package }}
@@ -220,7 +217,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -228,7 +225,7 @@ jobs:
       - name: Set up Python
         run: uv python install
 
-      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
         with:
           run_install: false
 
@@ -261,7 +258,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -302,7 +299,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -343,7 +340,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -384,7 +381,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -425,7 +422,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -466,7 +463,7 @@ jobs:
           persist-credentials: false
 
       - name: Install uv
-        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.11.33"
           enable-cache: true
@@ -523,10 +520,6 @@ jobs:
     name: Containerize ${{ matrix.package }}
     needs: detect-changes
     if: needs.detect-changes.outputs.packages != '[]'
-    permissions:
-      contents: read # to let the called workflow read the repository
-      packages: read # to let the called workflow read the cache image from GHCR
-      pull-requests: read # to let the called workflow read the live security-exception label
     strategy:
       fail-fast: false
       matrix:

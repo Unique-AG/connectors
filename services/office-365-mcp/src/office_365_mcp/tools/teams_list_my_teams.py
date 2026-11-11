@@ -29,7 +29,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 _DESCRIPTION = """\
 Lists the teams the signed-in user belongs to, in no particular order, as the starting point for \
 any question about a team or a channel. It does not cover chats, group chats, or meeting chats, \
-which are an entirely separate surface. Use teams_list_chats for those instead.\
+which are an entirely separate surface. If this deployment exposes teams_list_chats, use it for \
+those instead.\
 """
 
 

@@ -35,6 +35,8 @@ from office_365_mcp.shared.seam import (
 )
 from office_365_mcp.tools import outlook_create_folder as creator
 from office_365_mcp.tools.outlook_create_folder import CreatedFolder, a_person_agrees, create_folder
+from tests.tools.scenarios.support import call as call_tool
+from tests.tools.scenarios.support import serve
 
 _PARENT_ID = "AQMkADAwSYNTHETIC-folder-0001"
 _NEW_ID = "AQMkADAwSYNTHETIC-folder-0002"
@@ -630,3 +632,23 @@ class TestHowItDeclaresItself:
 
         assert isinstance(answer, InputRequiredResult)
         assert top.call_count == 0
+
+
+_TOP_FOLDER = "seed-v1 case-outlook_create_folder-top"
+_TOP_FOLDER_ID = (
+    "AAMkVCdwJJT4SNS1IXKwENexOIU4NJ03Rtw2ZKD1TAHmHWNwD0EuNEQyRQPTAMGxilfBGAjjQWnhB2o3WTL0RRObkXuuAopvLIZcDlVr"
+    "-HggMFOoXsouWTI="
+)
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_creates_a_top_level_folder_and_hands_back_the_handle_microsoft_gave(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-outlook_create_folder-top")
+
+        created = await call_tool("outlook_create_folder", name=_TOP_FOLDER)
+
+        assert [key for key, route in routes.items() if not route.called] == []
+        assert _sent(routes[("POST", _TOP)]) == {"displayName": _TOP_FOLDER}
+        assert created == {"uri": MailFolderHandle(_TOP_FOLDER_ID).uri, "display_name": _TOP_FOLDER}

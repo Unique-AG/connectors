@@ -1,0 +1,22 @@
+scenario: teams_search_messages-alpine
+fixture: rec-tool-teams_search_messages-alpine
+source: recorded
+target: graph
+recorded_at: '2026-11-03T11:51:07+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 16
+  keys dropped: 1
+  persona addresses: 2
+  persona names: 2
+  response headers dropped: 6
+  text kept: 6
+  text replaced: 4
+literals:
+- Alpine Print
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

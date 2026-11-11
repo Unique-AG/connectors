@@ -9,8 +9,8 @@ import { redacted } from '~/utils/zod';
 const ConfigSchema = z.object({
   key: redacted(
     z
-      .instanceof(Buffer)
-      .or(z.hex().transform((key) => Buffer.from(key, 'hex')))
+      .hex()
+      .transform((key) => Buffer.from(key, 'hex'))
       .or(z.base64().transform((key) => Buffer.from(key, 'base64')))
       .refine(
         (buffer) => buffer.length === 32,

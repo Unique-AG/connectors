@@ -1,0 +1,149 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "end": {
+        "dateTime": "~nextWednesday",
+        "timeZone": "Europe/Zurich"
+      },
+      "isAllDay": false,
+      "recurrence": {
+        "pattern": {
+          "daysOfWeek": ["wednesday"],
+          "firstDayOfWeek": "sunday",
+          "interval": 1,
+          "type": "weekly"
+        },
+        "range": {
+          "numberOfOccurrences": 8,
+          "startDate": "~nextWednesday",
+          "type": "numbered"
+        }
+      },
+      "start": {
+        "dateTime": "~nextWednesday",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_create_event-series-eight",
+      "transactionId": "00000000-97e8-485a-8c9d-6bacbe105535"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('WUhFAmYEUEKSWOKKRcpvFv8qsDIpHK-WNc1Ld1Osbn22FyDRRv2C4nsbabIM2kTjNaGU')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"z2Hlxl66RrELHe1F3tgoniRL5xHAmw==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [],
+      "body": {
+        "content": "synthetic text 01",
+        "contentType": "html"
+      },
+      "bodyPreview": "",
+      "categories": [],
+      "changeKey": "i0Xafw31InJISz0A9swwfbRI2iHNak==",
+      "createdDateTime": "2026-11-02T22:29:27.3047344Z",
+      "end": {
+        "dateTime": "2026-11-04T09:30:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "iCalUId": "955288055895M09922T1J0036V79X456574393943772K14K943EQS902424129881038964124550231PHI3816577096964PD65D70802QATAI",
+      "id": "WUhFAmYEUEKSWOKKRcpvFv8qsDIpHK-WNc1Ld1Osbn22FyDRRv2C4nsbabIM2kTjNaGU",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isDraft": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "isReminderOn": true,
+      "lastModifiedDateTime": "2026-11-02T22:29:27.3848144Z",
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "locations": [],
+      "occurrenceId": null,
+      "onlineMeeting": null,
+      "onlineMeetingProvider": "unknown",
+      "onlineMeetingUrl": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "Europe/Zurich",
+      "originalStartTimeZone": "Europe/Zurich",
+      "recurrence": {
+        "pattern": {
+          "dayOfMonth": 0,
+          "daysOfWeek": ["wednesday"],
+          "firstDayOfWeek": "sunday",
+          "index": "first",
+          "interval": 1,
+          "month": 0,
+          "type": "weekly"
+        },
+        "range": {
+          "endDate": "0001-01-01",
+          "numberOfOccurrences": 8,
+          "recurrenceTimeZone": "Europe/Zurich",
+          "startDate": "2026-11-04",
+          "type": "numbered"
+        }
+      },
+      "reminderMinutesBeforeStart": 15,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-04T09:00:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_create_event-series-eight",
+      "transactionId": "00000000-97e8-485a-8c9d-6bacbe105535",
+      "type": "seriesMaster",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FBCb4Jx6Ujrb12KnIBOw1X0oedkmRQ9rQdYsNZ&exvsurl=1"
+    }
+  }
+]
