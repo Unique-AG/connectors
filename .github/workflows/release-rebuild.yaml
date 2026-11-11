@@ -11,6 +11,10 @@ permissions:
   contents: write # to push one branch for each service
   pull-requests: write # to open one pull request for each service
 
+concurrency:
+  group: release-rebuild
+  cancel-in-progress: false
+
 jobs:
   rebuild:
     runs-on: ubuntu-slim

@@ -181,7 +181,7 @@ The rule "no fixed version, or a fix younger than 3 days" applies to other packa
 | `.github/workflows/security-trivy-nightly.yaml` | The nightly scan and the Slack report |
 | `.github/workflows/release-rebuild.yaml` | The Rebuild Service workflow |
 | `.github/scripts/release-rebuild/rebuild.sh` | Opens the rebuild PRs. The workflow and the skill `vulna-squash` both run it. |
-| `.github/scripts/release-rebuild/rebuild-needed.sh` | Exits 1 with the reason when a service has an open release PR or an open rebuild PR |
+| `.github/scripts/release-rebuild/rebuild-needed.sh` | Exits 10 with the reason when a service is not released, or has an open release PR or an open rebuild PR. Any other non-zero exit is a failed lookup |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
 | `agentic/skills/vulna-squash/scripts/` | The shell scripts that the skill runs: the scan check, the entry check, the CI watch, the PR title scope, the result label, and the report comment |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date. The nightly scan and the release gate skip them. |
