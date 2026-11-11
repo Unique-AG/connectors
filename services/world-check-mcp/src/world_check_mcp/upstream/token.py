@@ -24,6 +24,7 @@ class ServiceAccountAuth(httpx2.Auth):
     _client_id: str
     _client_secret: str
     _token_url: str
+    _public_token_url: str
     _timeout: float
     _transport: httpx2.AsyncBaseTransport | None
     _now: Callable[[], datetime]
@@ -44,6 +45,9 @@ class ServiceAccountAuth(httpx2.Auth):
         self._client_id = client_id.get_secret_value()
         self._client_secret = client_secret.get_secret_value()
         self._token_url = token_url
+        self._public_token_url = str(
+            httpx2.URL(token_url).copy_with(userinfo=b"", query=None, fragment=None)
+        )
         self._timeout = timeout
         self._transport = transport
         self._now = now
@@ -99,9 +103,9 @@ class ServiceAccountAuth(httpx2.Auth):
             payload = cast(object, response.json())
         except ValueError as error:
             raise UpstreamError(
-                f"LSEG token response from {self._token_url} was not JSON"
+                f"LSEG token response from {self._public_token_url} was not JSON"
             ) from error
-        return _token_body(payload, self._token_url)
+        return _token_body(payload, self._public_token_url)
 
 
 def _basic(client_id: str, client_secret: str) -> str:

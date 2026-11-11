@@ -236,3 +236,23 @@ async def test_a_malformed_token_response_raises_a_tool_error_naming_the_token_u
     async with Client(server) as client:
         with pytest.raises(ToolError, match=r"https://api\.risk\.lseg\.com/auth/oauth2/v1/token"):
             await client.call_tool("get_api_info", {})
+
+
+async def test_a_malformed_token_response_error_omits_the_token_url_secrets() -> None:
+    settings = _settings().model_copy(
+        update={
+            "token_url": AnyHttpUrl("https://id:pw@api.risk.lseg.com/auth/oauth2/v1/token?key=s#f")
+        }
+    )
+
+    def respond(_request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, content=b"not json")
+
+    server = build_server(settings, Persistence(store=MemoryStore()), httpx2.MockTransport(respond))
+    async with Client(server) as client:
+        with pytest.raises(ToolError) as raised:
+            await client.call_tool("get_api_info", {})
+
+    message = str(raised.value)
+    assert "https://api.risk.lseg.com/auth/oauth2/v1/token" in message
+    assert not any(secret in message for secret in ("id:pw", "key=s", "#f"))
