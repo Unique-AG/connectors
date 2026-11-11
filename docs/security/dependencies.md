@@ -55,7 +55,7 @@ The skill `vulna-squash` does the whole job for a dependency PR in one run, in m
 
 ```mermaid
 flowchart TD
-  opened[Event: label dependencies added] --> labels{"Label dependencies, and no agent label?"}
+  opened[Event: label dependencies added] --> labels{"Label dependencies, and no agent label or rebuild label?"}
   labels -->|no| stop[Stop with no change]
   labels -->|yes| assess[Assess the bump with the skill dependency-pr-review]
   assess --> ci{State of the checks}

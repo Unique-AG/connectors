@@ -33,21 +33,21 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 
 ## Part A: Findings (mode `findings`)
 
-1. Run `bash agentic/skills/vulna-squash/scripts/trivy-alerts.sh`. It checks the latest scheduled run of the workflow `security-trivy-nightly.yaml` on `main`. If it exits 1 and the message names the scan, go to the Slack message with that reason.
+1. Run `bash agentic/skills/vulna-squash/scripts/trivy-alerts.sh`. It checks the latest scheduled run of the workflow `security-trivy-nightly.yaml` on `main`. If it exits 1 and the message names the scan, go to the Slack message with that reason. If it exits with any other non-zero code and the error is not 403, the lookup failed: go to the Slack message with that reason.
 2. The script prints the open CRITICAL and HIGH alerts of the tool `Trivy` as JSON, without the category `trivy-config`. If the API answers 403, read the Trivy image results artifacts of that run instead, and say in the Slack message that the lockfile findings were not read.
 3. Drop an alert when any of these is true:
    - The package is not an operating system package, and no fixed version exists or the fix is younger than 3 days.
    - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. The tracker lists Debian source packages, so use the row of the source package of the alerted package (for example, `libapt-pkg7.0` has the source package `apt`). A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
    - `main` already holds the fixed version.
    - An open PR with the label `dependencies` already changes the package. The nightly job covers it.
-   - The package is an operating system package, and `bash .github/scripts/release-rebuild/rebuild-needed.sh <service>` exits 10. It prints the reason. The service is not released, or it has an open release PR or an open rebuild PR, and that release rebuilds the image. Name each open release PR in the Slack message, because a person must merge it to ship the patch. If it exits with any other non-zero code, the lookup failed: go to the Slack message with that reason.
+   - The package is an operating system package, and `bash .github/scripts/release-rebuild/rebuild-needed.sh <service>` exits 10. It prints the reason. The service is not released, or it has an open release PR or an open rebuild PR. An open release PR or rebuild PR rebuilds the image. Name each open release PR in the Slack message, because a person must merge it to ship the patch. If it exits with any other non-zero code, the lookup failed: go to the Slack message with that reason.
    - A closed PR that was not merged names the same package and version. A person rejected it.
 4. If nothing is left, go to the Slack message with that reason.
 5. Group the rest into batches. Put patch and minor bumps of one ecosystem in one batch. Put each major bump in its own batch. Put the operating system packages of one service in one rebuild batch.
 6. For each batch, open one PR from the branch `vulna-squash/<batch>`:
    - Python: change the manifests, then run `PROJECTS="<projects>" bash scripts/each-python-project.sh uv lock --upgrade-package <pkg>==<version>`.
    - Node: change the `catalog:` entry or the `package.json` files, then run `pnpm update -r --lockfile-only <name>`.
-   - Operating system: write the PR body of step 7 to a file. Run `BODY_FILE=<file> bash .github/scripts/release-rebuild/rebuild.sh <service>`. The script opens the PR from the branch `rebuild/<service>-<time>` with the labels `dependencies` and `rebuild`, and it skips a service that `rebuild-needed.sh` rejects. It leaves your checkout as it is. Skip steps 8 and 9 and Parts B to E for this PR. A person approves the held runs.
+   - Operating system: write the PR body of step 7 to a file. Run `BODY_FILE=<file> bash .github/scripts/release-rebuild/rebuild.sh <service>`. The script opens the PR from the branch `rebuild/<service>-<time>` with the labels `dependencies` and `rebuild`, and it skips a service that `rebuild-needed.sh` rejects. It leaves your checkout as it is. Skip steps 8 and 9 and Parts B to E for this PR. A person approves the held runs. In the Slack message, give this PR the status `held`.
 7. Give the PR a title that passes `cz --no-breaking-footer lint`. In the body, link the scan run and list the alert URLs, the CVE or GHSA IDs and the exact changes. For an operating system package, give the GHSA for the description and the Debian advisory (DSA or DLA) from the tracker row that step 3 used, each when it exists. If one is missing, give the CVE and the tracker URL. If a DSA or DLA exists, say that it is the source of the fix. Otherwise, if step 3 saw a fixed row, say that the fixed row and version of the Debian tracker are the source. If the tracker did not answer, say that the fix is not confirmed. A GHSA for an operating system package can list no patched version.
 8. Open the PR with BOTH labels in the `gh pr create` call: `--label dependencies --label ai-assisted`. The label `dependencies` starts the PR automation. The label `ai-assisted` is set at open time, so that the automation stops at its entry check and this run keeps the PR.
 9. Skip Part B for a PR that this run opened. Go to Part C.
@@ -58,7 +58,7 @@ At the end of the run, post ONE Slack message through the Slack action of the au
 
 ## Part B: Entry check (both modes)
 
-Run `bash agentic/skills/vulna-squash/scripts/entry-check.sh <n>`. If it exits 1, stop with no change. It prints the reason: the PR is not open, it comes from a fork, it lacks the label `dependencies`, or it has the label `ai-assisted`, `human-required` or `rebuild`.
+Run `bash agentic/skills/vulna-squash/scripts/entry-check.sh <n>`. If it exits with a non-zero code, stop with no change. It prints the reason: the PR is not open, it comes from a fork, it lacks the label `dependencies`, or it has the label `ai-assisted`, `human-required` or `rebuild`.
 
 ## Part C: Assess
 
@@ -71,7 +71,7 @@ Run `bash agentic/skills/vulna-squash/scripts/watch-checks.sh <n>`. It waits for
 | Result | Action |
 |--------|--------|
 | `green` | Go to Part E. |
-| `red` | Decide the cause (below). Only `gatekeeper` failed: a maintainer must rerun it. Go to Part E. |
+| `red` | If only `gatekeeper` failed, a maintainer must rerun it: go to Part E. Otherwise decide the cause (below). |
 | `timed_out` | Go to Part E. State the timeout. |
 | `held` | Go to Part E. State that a maintainer must approve the run. |
 
