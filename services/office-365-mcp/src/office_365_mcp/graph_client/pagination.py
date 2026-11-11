@@ -116,11 +116,9 @@ async def collect_pages[T](
         capped = len(items) >= limit or scanned >= max_scanned
         return not capped
 
-    # The SDK leaves `RequestAdapter`'s own type parameter unbound, so `client.request_adapter`
-    # reads as unknown-typed. Taking `client` confines that here instead of to every call site.
     iterator = PageIterator(
         _readable_first_page(first_page),
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+        client.request_adapter,
         error_mapping={"XXX": ODataError},
     )
     empty_pages_in_a_row = 0

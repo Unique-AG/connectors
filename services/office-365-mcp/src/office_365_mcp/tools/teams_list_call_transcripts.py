@@ -253,7 +253,7 @@ async def _listing(
     """Every transcript Graph lists for the window, newest first, and whether the scan cap hit."""
     adhoc_calls = client.me.adhoc_calls
     builder = adhoc_calls.get_all_transcriptsuser_id_user_id_with_start_date_time_with_end_date_time
-    base_url = builder.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+    base_url = builder.request_adapter.base_url
     function = (
         f"getAllTranscripts(userId='{odata_literal(user_id)}',"
         + f"startDateTime={opens.astimezone(UTC):{_WIRE_FORMAT}},"

@@ -5,7 +5,6 @@ import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.time_zone_information import TimeZoneInformation
 from msgraph.generated.users.item.outlook.supported_time_zones.supported_time_zones_get_response import (  # noqa: E501
     SupportedTimeZonesGetResponse,
@@ -13,7 +12,7 @@ from msgraph.generated.users.item.outlook.supported_time_zones.supported_time_zo
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, send_parsed
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -109,9 +108,7 @@ async def _first_page(
     )
     request = RequestInformation(Method.GET, template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, SupportedTimeZonesGetResponse, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, SupportedTimeZonesGetResponse)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
