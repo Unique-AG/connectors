@@ -10,12 +10,11 @@ from typing import cast
 
 import httpx
 from kiota_abstractions.request_information import RequestInformation
-from kiota_abstractions.serialization.parsable_factory import ParsableFactory
 from kiota_http.httpx_request_adapter import HttpxRequestAdapter
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.graph_service_client import GraphServiceClient
 from opentelemetry import trace
 
+from office_365_mcp.graph_client.client import GRAPH_ERROR_MAP
 from office_365_mcp.graph_client.errors import (
     GraphResponseTooLarge,
     GraphUnavailable,
@@ -25,8 +24,6 @@ from office_365_mcp.graph_client.errors import (
 _CHUNK_BYTES = 64 * 1024
 
 _MAX_ERROR_BODY_BYTES = 64 * 1024
-
-_ERROR_MAP: dict[str, type[ParsableFactory[ODataError]]] = {"XXX": ODataError}
 
 _RECOMPUTED_PER_BODY = frozenset({"content-length"})
 
@@ -98,8 +95,8 @@ async def _raise_for_status(adapter: HttpxRequestAdapter, response: httpx.Respon
             truncated = True
             break
     span = trace.get_current_span()
-    await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
-        _rebuilt(response, bytes(body), parsable=not truncated), _ERROR_MAP, span, span
+    await adapter.throw_failed_responses(
+        _rebuilt(response, bytes(body), parsable=not truncated), GRAPH_ERROR_MAP, span, span
     )
 
 
