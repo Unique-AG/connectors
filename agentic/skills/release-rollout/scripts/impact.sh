@@ -36,16 +36,19 @@ printf '== infrastructure pins (* marks this cluster)\n'
 infra=$("$here/clone.sh" infrastructure)
 git -C "$infra" grep -n "x-$service-version" -- providers |
   sed -E 's/^([^:]+):[0-9]+:.*(x-[a-z0-9-]+-version.*)$/\1 \2/' |
-  awk -v c="/$cluster/" '{ print (index($1, c) ? "* " : "  ") $0 }' | none .
+  awk -v c="/$cluster/" '{ print (index($1, c) ? "* " : "  ") $0 }' | none . || true
 
+keys() { schema "$1" | jq -r "$2" | sort; }
+{ a_paths=$(keys "$a" "$paths") && b_paths=$(keys "$b" "$paths") && a_required=$(keys "$a" "$required") && b_required=$(keys "$b" "$required"); } ||
+  { echo "error: cannot read the chart schema of $a or $b" >&2; exit 1; }
 printf '== chart: keys added\n'
-added=$(comm -13 <(schema "$a" | jq -r "$paths" | sort) <(schema "$b" | jq -r "$paths" | sort))
+added=$(comm -13 <(printf '%s\n' "$a_paths") <(printf '%s\n' "$b_paths"))
 printf '%s\n' "$added" | none .
 printf '== chart: keys removed\n'
-removed=$(comm -23 <(schema "$a" | jq -r "$paths" | sort) <(schema "$b" | jq -r "$paths" | sort))
+removed=$(comm -23 <(printf '%s\n' "$a_paths") <(printf '%s\n' "$b_paths"))
 printf '%s\n' "$removed" | none .
 printf '== chart: keys now required\n'
-needed=$(comm -13 <(schema "$a" | jq -r "$required" | sort) <(schema "$b" | jq -r "$required" | sort))
+needed=$(comm -13 <(printf '%s\n' "$a_required") <(printf '%s\n' "$b_required"))
 printf '%s\n' "$needed" | none .
 printf '== chart: default changes in values.yaml\n'
 changed "$chart/values.yaml" | none '^[+-][^+-]'
@@ -59,10 +62,14 @@ repo=$("$here/clone.sh" monorepo)
 app=$(git -C "$repo" grep -l "x-$service-version" -- "gitops-resources/argocd/clusters/$cluster/$env")
 [ "$(wc -l <<< "$app")" -eq 1 ] && [ -n "$app" ] || { echo "error: expected one $service app spec in $cluster/$env" >&2; exit 1; }
 overlay="$repo/$(dirname "$app")/values.yaml"
-overlay_keys=$(awk '
+inline=0
+if [ ! -f "$overlay" ]; then overlay="$repo/$app"; inline=1; fi
+overlay_keys=$(awk -v inline="$inline" '
   /^[[:space:]]*(#|$)/ || /^[[:space:]]*- / { next }
   { match($0, /^ */); i = RLENGTH; s = substr($0, i + 1) }
   s !~ /^[A-Za-z0-9_."-]+:( |$)/ { next }
+  inline && !on { if (s ~ /^valuesObject:/) { on = 1; vi = i } next }
+  inline && i <= vi { exit }
   { sub(/:.*/, "", s); while (n > 0 && st[n] >= i) n--; n++; st[n] = i; k[n] = s; p = k[1]; for (j = 2; j <= n; j++) p = p "." k[j]; print p }
 ' "$overlay" | sort -u)
 printf '== overlay %s\n' "${overlay#"$repo"/}"

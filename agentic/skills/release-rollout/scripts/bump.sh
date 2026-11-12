@@ -65,6 +65,7 @@ if [ "${OPEN:-0}" = 1 ]; then
   exit 0
 fi
 
+[ -z "$(git status --porcelain)" ] || { echo "error: the clone $PWD has uncommitted changes; clean it first" >&2; exit 1; }
 git checkout -q -B "$branch" "origin/$base"
 for file in $files; do
   if [ "$target" = infrastructure ]; then
@@ -75,7 +76,7 @@ for file in $files; do
     "$pin" argocd "$file" "$service" sha "$sha" "$version"
   fi
 done
-git add -A
+git add -- $files
 git commit --no-verify -q -m "$title"
 git show --stat --format='%s' HEAD
 echo "prepared branch $branch in $PWD. Edit it if needed, then run again with OPEN=1."
