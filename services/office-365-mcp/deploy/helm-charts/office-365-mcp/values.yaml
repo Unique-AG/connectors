@@ -148,6 +148,168 @@ grafana:
     enabled: true
     folder: mcp-servers
 
+prometheus:
+  additionalAlerts:
+    Office365McpDown:
+      alert: Office365McpDown
+      annotations:
+        summary: "Office 365 MCP has no ready pod in {{ $labels.namespace }}"
+        description: "The office-365-mcp deployment has no available replica. Every tool call and every sign-in fails."
+        runbook: |
+          1. Run kubectl get pods and kubectl describe pod for office-365-mcp
+          2. Pods Running but not Ready: search the logs for "ready.database_timeout" or "ready.database_unreachable". Make sure that Postgres is reachable, that DB_URL is correct and that the database user has CREATE on its schema
+          3. Pods not Running: look at the pod events for image pull, scheduling or OOMKilled errors
+      expr: |
+        sum by (namespace) (kube_deployment_status_replicas_available{deployment="office-365-mcp"}) == 0
+        and on (namespace)
+        sum by (namespace) (kube_deployment_spec_replicas{deployment="office-365-mcp"}) > 0
+      for: 10m
+      labels:
+        severity: critical
+        alertGroup: office-365-mcp
+    Office365McpToolErrors:
+      alert: Office365McpToolErrors
+      annotations:
+        summary: "Office 365 MCP tool calls fail in {{ $labels.namespace }}"
+        description: "More than 20% of the tool calls in the last hour failed, with at least 10 failures. Current failure ratio: {{ humanizePercentage $value }}."
+        runbook: |
+          1. Open the Office 365 MCP dashboard and find the tool in "Tool errors by tool and cause"
+          2. ToolError also counts Graph errors. While Office365McpGraphFailing or Office365McpGraphForbidden is pending or firing, this alert stays silent. Follow those runbooks for Graph faults
+          3. Search the logs for "Microsoft 365 issued no token". This is an Entra On-Behalf-Of failure. Check the AADSTS code, the client secret and the admin consent
+          4. Search the logs for "graph call failed" with the graph_operation of the tool
+      expr: |
+        (
+          sum by (namespace) ((increase(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) and mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"} offset 1h) or (last_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) unless mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"} offset 1h))
+          /
+          sum by (namespace) ((increase(mcp_calls_total{job="office-365-mcp", kind="tool"}[1h]) and mcp_calls_total{job="office-365-mcp", kind="tool"} offset 1h) or (last_over_time(mcp_calls_total{job="office-365-mcp", kind="tool"}[1h]) unless mcp_calls_total{job="office-365-mcp", kind="tool"} offset 1h))
+        ) > 0.2
+        and on (namespace)
+        sum by (namespace) ((increase(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) and mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"} offset 1h) or (last_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) unless mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"} offset 1h)) >= 10
+        unless on (namespace)
+        ALERTS{alertname=~"Office365McpGraphFailing|Office365McpGraphForbidden"}
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpGraphFailing:
+      alert: Office365McpGraphFailing
+      annotations:
+        summary: "Microsoft Graph calls from Office 365 MCP fail in {{ $labels.namespace }}"
+        description: "More than 20% of the Graph operations in the last hour failed, with at least 10 failures. Current failure ratio: {{ humanizePercentage $value }}."
+        runbook: |
+          1. Open the Office 365 MCP dashboard and find the operation in "Graph failures by operation and status"
+          2. Search the logs for "graph call failed". The fields graph_operation, graph_status, graph_code and graph_request_id identify the call
+          3. graph_remedy unavailable with graph_status 5xx: Microsoft Graph has a fault. Check the Microsoft 365 service health. Give the graph_request_id to Microsoft support
+          4. graph_remedy unavailable with no graph_status: the pod cannot reach Graph. Check the NetworkPolicy egress, DNS and the proxy
+          5. graph_remedy failed or error: the request or the code has a defect. Open a ticket with the log lines
+      expr: |
+        (
+          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) and graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"} offset 1h) or (last_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) unless graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"} offset 1h))
+          /
+          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp"}[1h]) and graph_operations_total{job="office-365-mcp"} offset 1h) or (last_over_time(graph_operations_total{job="office-365-mcp"}[1h]) unless graph_operations_total{job="office-365-mcp"} offset 1h))
+        ) > 0.2
+        and on (namespace)
+        sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) and graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"} offset 1h) or (last_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) unless graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"} offset 1h)) >= 10
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpGraphForbidden:
+      alert: Office365McpGraphForbidden
+      annotations:
+        summary: "Microsoft Graph refuses Office 365 MCP calls in {{ $labels.namespace }}"
+        description: "More than 20% of the Graph operations in the last hour got 401 or 403, with at least 10 refusals. Current ratio: {{ humanizePercentage $value }}."
+        runbook: |
+          1. Search the logs for "graph call failed" with graph_remedy forbidden. Find the graph_operation and graph_code
+          2. 401 on all operations: the delegated token is not accepted. Check the Entra app registration and the client secret
+          3. 403 on one tool: the app registration does not have that delegated permission, or the admin consent is missing. Grant it in Entra
+      expr: |
+        (
+          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) and graph_operations_total{job="office-365-mcp", status="forbidden"} offset 1h) or (last_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) unless graph_operations_total{job="office-365-mcp", status="forbidden"} offset 1h))
+          /
+          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp"}[1h]) and graph_operations_total{job="office-365-mcp"} offset 1h) or (last_over_time(graph_operations_total{job="office-365-mcp"}[1h]) unless graph_operations_total{job="office-365-mcp"} offset 1h))
+        ) > 0.2
+        and on (namespace)
+        sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) and graph_operations_total{job="office-365-mcp", status="forbidden"} offset 1h) or (last_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) unless graph_operations_total{job="office-365-mcp", status="forbidden"} offset 1h)) >= 10
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpGraphThrottled:
+      alert: Office365McpGraphThrottled
+      annotations:
+        summary: "Microsoft Graph throttles Office 365 MCP in {{ $labels.namespace }}"
+        description: '{{ $value | printf "%.0f" }} Graph operations in the last hour got 429 after the SDK used all its retries. The callers got an error.'
+        runbook: |
+          1. Open the Office 365 MCP dashboard and find the operation in "Throttling rate by operation"
+          2. retried=true: the SDK retried and Graph still refused. Too many calls go to one mailbox or one tenant. Find the agent or the user that sends them
+          3. retried=false: Graph asked for a wait of 180 seconds or more. The tenant is over its Graph quota
+      expr: |
+        sum by (namespace) ((increase(graph_throttled_total{job="office-365-mcp"}[1h]) and graph_throttled_total{job="office-365-mcp"} offset 1h) or (last_over_time(graph_throttled_total{job="office-365-mcp"}[1h]) unless graph_throttled_total{job="office-365-mcp"} offset 1h)) > 5
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpGraphSlow:
+      alert: Office365McpGraphSlow
+      annotations:
+        summary: "Office 365 MCP Graph operations take more than 60 seconds in {{ $labels.namespace }}"
+        description: '{{ $value | printf "%.0f" }} Graph operations in the last hour took more than 60 seconds. Kong and the chat close the request at 60 seconds, so the user gets no answer.'
+        runbook: |
+          1. Open the Office 365 MCP dashboard and find the operation in "Graph operations over 30 and 60 seconds" and "Graph p95 duration by operation"
+          2. Find the step in "Graph p95 duration by step"
+          3. A high "Pages scanned per walk" value means that the tool reads too many pages. Make the query of the tool narrower
+          4. Retry-After waits also add time. Look at Office365McpGraphThrottled
+      expr: |
+        sum by (namespace) ((increase(graph_operation_duration_seconds_count{job="office-365-mcp"}[1h]) and graph_operation_duration_seconds_count{job="office-365-mcp"} offset 1h) or (last_over_time(graph_operation_duration_seconds_count{job="office-365-mcp"}[1h]) unless graph_operation_duration_seconds_count{job="office-365-mcp"} offset 1h))
+        -
+        sum by (namespace) ((increase(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[1h]) and graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"} offset 1h) or (last_over_time(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[1h]) unless graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"} offset 1h))
+        >= 3
+      for: 0m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpHttp5xx:
+      alert: Office365McpHttp5xx
+      annotations:
+        summary: "Office 365 MCP answers HTTP 5xx in {{ $labels.namespace }}"
+        description: "More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, with at least 5 of them. Current ratio: {{ humanizePercentage $value }}."
+        runbook: |
+          1. Open the Office 365 MCP dashboard and find the path in "HTTP request rate by path and status"
+          2. Search the logs for "Traceback" and for "ready.database_unreachable"
+          3. 5xx on /token, /authorize or /auth/callback: the OAuth store in Postgres or the Entra sign-in fails
+      expr: |
+        (
+          sum by (namespace) ((increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) and python_http_requests_total{job="office-365-mcp", status_code=~"5.."} offset 15m) or (last_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) unless python_http_requests_total{job="office-365-mcp", status_code=~"5.."} offset 15m))
+          /
+          sum by (namespace) ((increase(python_http_requests_total{job="office-365-mcp"}[15m]) and python_http_requests_total{job="office-365-mcp"} offset 15m) or (last_over_time(python_http_requests_total{job="office-365-mcp"}[15m]) unless python_http_requests_total{job="office-365-mcp"} offset 15m))
+        ) > 0.05
+        and on (namespace)
+        sum by (namespace) ((increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) and python_http_requests_total{job="office-365-mcp", status_code=~"5.."} offset 15m) or (last_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) unless python_http_requests_total{job="office-365-mcp", status_code=~"5.."} offset 15m)) >= 5
+      for: 5m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpMemoryHigh:
+      alert: Office365McpMemoryHigh
+      annotations:
+        summary: "Office 365 MCP pod {{ $labels.pod }} uses more than 80% of its memory limit"
+        description: "Pod {{ $labels.pod }} uses {{ humanizePercentage $value }} of its memory limit. At the limit, the pod is OOM-killed and all open calls fail."
+        runbook: |
+          1. Open the Office 365 MCP dashboard and look at "Memory usage vs limit"
+          2. A steady climb over days: the process keeps memory. A rollout or a restart of the pod sets it back
+          3. A fast jump: look for large file reads in "Tool call rate by tool", for example sharepoint_read_file
+          4. If the pod is near the limit with normal load, increase resources.limits.memory and resources.requests.memory
+      expr: |
+        max by (namespace, pod) (container_memory_working_set_bytes{container="office-365-mcp"})
+        /
+        max by (namespace, pod) (kube_pod_container_resource_limits{container="office-365-mcp", resource="memory"})
+        > 0.8
+      for: 30m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+
 networkPolicy:
   enabled: false
   flavor: cilium
