@@ -206,6 +206,7 @@ export class IngestionService {
 
       return deleted;
     } catch (err) {
+      this.metrics.recordContentDeleted(contentKeys.length, 'failure');
       this.logger.error({
         contentKeys,
         err,
