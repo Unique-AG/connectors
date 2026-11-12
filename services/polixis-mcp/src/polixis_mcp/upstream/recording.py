@@ -15,6 +15,7 @@ from typing import ClassVar, override
 
 import httpx2
 from mcp_configs import shared_config
+from mcp_openapi.upstream import UpstreamError
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
@@ -54,12 +55,20 @@ class RecordingSettings(BaseSettings):
         return self
 
 
-class CassetteMissingError(Exception):
-    """Replay found no saved answer for a request."""
+class CassetteMissingError(UpstreamError):
+    """Replay found no saved answer for a request. An `UpstreamError`, so the agent reads why
+    the tool failed instead of a masked error, and stops trying other arguments.
+    """
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
-class RecordingRefusedError(Exception):
+class RecordingRefusedError(UpstreamError):
     """Record mode did not send a request: the budget is spent or a quota 429 halted it."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
 class CassetteTransport(httpx2.AsyncBaseTransport):
@@ -228,8 +237,10 @@ def _save(cassette: Path, key: _RequestKey, *, response: httpx2.Response, conten
 def _replayed(cassette: Path, key: _RequestKey) -> httpx2.Response:
     if not cassette.exists():
         raise CassetteMissingError(
-            f"No recording for {key.method} {key.path}?{key.query} body={key.body!r} "
-            f"(expected {cassette})"
+            "This MCP is replaying recorded Polixis answers, and has no recording of this "
+            f"request: {key.method} {key.path}?{key.query} body={key.body!r}. Only calls "
+            "recorded before answer; others fail the same way, so do not retry with other "
+            "arguments. Tell the user which call has no recording."
         )
     saved = _Cassette.model_validate_json(cassette.read_text()).response
     if saved.is_json:

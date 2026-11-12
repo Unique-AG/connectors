@@ -62,6 +62,7 @@ from polixis_mcp.upstream.generated.vendor_responses import VirtualSubgraph
 from polixis_mcp.upstream.quota import PolixisQuotaSpentError
 from polixis_mcp.upstream.recording import ledger_count
 from polixis_mcp.upstream.recording import RecordingMode
+from polixis_mcp.upstream.recording import RecordingSettings
 from polixis_mcp.upstream.rejections import PolixisRejectedError
 from polixis_mcp.upstream.settings import UpstreamSettings
 
@@ -115,6 +116,7 @@ __all__ = [
     "PolixisQuotaSpentError",
     "PolixisRejectedError",
     "RecordingMode",
+    "RecordingSettings",
     "ledger_count",
     "Profile",
     "CorporateNodeData",

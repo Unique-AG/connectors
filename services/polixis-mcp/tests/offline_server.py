@@ -17,6 +17,8 @@ from pydantic import SecretStr
 
 from polixis_mcp.mcp import create_server
 from polixis_mcp.persistence import Persistence
+from polixis_mcp.upstream import RecordingMode
+from polixis_mcp.upstream import RecordingSettings
 from polixis_mcp.upstream import UpstreamSettings
 
 
@@ -32,6 +34,8 @@ def fake_upstream_settings() -> UpstreamSettings:
         token_url=AnyHttpUrl("https://auth.example.com/token"),
         timeout_seconds=30,
         retry=RetrySettings(max_attempts=3, max_wait_seconds=0, statuses=frozenset({429, 503})),
+        # Off whatever a developer's `.env` says, so no test reads or writes the recordings.
+        recording=RecordingSettings(mode=RecordingMode.OFF),
     )
 
 

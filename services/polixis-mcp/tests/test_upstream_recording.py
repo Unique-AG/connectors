@@ -2,9 +2,11 @@ import gzip
 import json
 from pathlib import Path
 
+from fastmcp import Client
 import httpx2
 import pytest
 
+from polixis_mcp.mcp import create_server
 from polixis_mcp.upstream.recording import CassetteMissingError
 from polixis_mcp.upstream.recording import CassetteTransport
 from polixis_mcp.upstream.recording import ledger_count
@@ -12,6 +14,9 @@ from polixis_mcp.upstream.recording import RecordingMode
 from polixis_mcp.upstream.recording import RecordingRefusedError
 from polixis_mcp.upstream.recording import RecordingSettings
 from polixis_mcp.upstream.settings import UpstreamSettings
+from tests.offline_server import fake_upstream_settings
+from tests.offline_server import open_fake_persistence
+from tests.tool_calls import tool_error
 
 API = "https://api.example.com"
 PROFILE = {"pid": "O00000000000000000000000000000100", "name": "Kestrel Marine Services Ltd"}
@@ -52,7 +57,9 @@ async def test_replays_what_it_recorded(tmp_path: Path) -> None:
 
 
 async def test_replay_without_a_recording_fails(tmp_path: Path) -> None:
-    with pytest.raises(CassetteMissingError, match="/api/completion/O1"):
+    with pytest.raises(
+        CassetteMissingError, match="no recording of this request: POST /api/completion/O1"
+    ):
         _ = await post(CassetteTransport(settings(tmp_path, RecordingMode.REPLAY)), {"id": 2})
 
 
@@ -143,3 +150,14 @@ def test_replay_needs_no_polixis_credentials(tmp_path: Path) -> None:
 def test_record_needs_the_polixis_credentials(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="UPSTREAM_CLIENT_ID, UPSTREAM_CLIENT_SECRET"):
         _ = UpstreamSettings(recording=settings(tmp_path, RecordingMode.RECORD))
+
+
+async def test_a_replay_miss_reaches_the_agent_with_its_reason(tmp_path: Path) -> None:
+    upstream = fake_upstream_settings().model_copy(
+        update={"recording": settings(tmp_path, RecordingMode.REPLAY)}
+    )
+    async with Client(create_server(upstream, open_fake_persistence)) as client:
+        error = await tool_error(client, "search_entities", {"name": "Kestrel Marine Services"})
+
+    assert "has no recording of this request: POST /search/api" in error
+    assert "do not retry with other arguments" in error
