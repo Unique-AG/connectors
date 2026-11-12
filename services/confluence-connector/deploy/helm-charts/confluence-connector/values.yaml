@@ -152,21 +152,13 @@ prometheus:
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
       # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
-      # The "unless ... offset 75m" terms add the first value of new series, which increase() skips.
+      # A new error series is missed by increase() until its second error. A failing sync is
+      # caught on the first failure by ConfluenceConnectorSyncFailing.
       expr: |
-        (
-          sum by (namespace) (
-            (increase(confluence_connector_unique_api_errors_total[75m]) + (min_over_time(confluence_connector_unique_api_errors_total[75m]) unless confluence_connector_unique_api_errors_total offset 75m))
-            or increase(confluence_connector_unique_api_errors_total[75m])
-            or (min_over_time(confluence_connector_unique_api_errors_total[75m]) unless confluence_connector_unique_api_errors_total offset 75m)
-          )
-          /
-          sum by (namespace) (
-            (increase(confluence_connector_unique_api_requests_total[75m]) + (min_over_time(confluence_connector_unique_api_requests_total[75m]) unless confluence_connector_unique_api_requests_total offset 75m))
-            or increase(confluence_connector_unique_api_requests_total[75m])
-            or (min_over_time(confluence_connector_unique_api_requests_total[75m]) unless confluence_connector_unique_api_requests_total offset 75m)
-          )
-        ) > 0.01
+        sum by (namespace) (increase(confluence_connector_unique_api_requests_total{result="error"}[75m]))
+        /
+        sum by (namespace) (increase(confluence_connector_unique_api_requests_total[75m]))
+        > 0.01
       for: 5m
       labels:
         severity: warning
