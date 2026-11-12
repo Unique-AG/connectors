@@ -313,13 +313,13 @@ The ingestion pipeline follows a 3-step process for each item: register, upload,
 
 For each new or updated page:
 
-1. **Fetch content** -- The connector retrieves the full page content (HTML storage representation). The page is skipped if it is not found, if fetching fails, or if the page body is empty.
+1. **Fetch content** -- The connector retrieves the full page content (HTML storage representation). The page is skipped if it is not found or if its body is empty. If the request fails or Confluence returns an unexpected response, the page counts as failed.
 2. **Extract labels** -- Confluence labels are extracted from the page, excluding the configured sync labels. Labels are sorted alphabetically for deterministic ordering.
 3. **Register** -- Sends metadata to the Unique ingestion API.
 4. **Upload** -- The page body (Confluence storage format HTML) is uploaded to Unique.
 5. **Finalize** -- Triggers downstream processing in Unique.
 
-If any step fails for a page, the error is logged and that page is skipped. Other pages continue processing.
+If any step fails for a page, the error is logged and the page counts as failed. It is retried on the next sync. Other pages continue processing.
 
 ### Attachment Ingestion
 
@@ -368,7 +368,8 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Root scope belongs to a different Confluence instance | `scopeId` reused across tenants or the tenant's Confluence instance was reassigned | Abort the entire tenant sync cycle |
 | Discovery failure | Error during page or attachment fetching from Confluence | Abort the sync cycle to avoid submitting partial results to file-diff, which could cause unnecessary deletions and re-ingestion costs |
 | Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
-| Page unavailable | Page deleted between discovery and content fetch, or transient API error | Log, skip the page, continue other pages |
+| Page not found | Page deleted between discovery and content fetch | Log, skip the page, continue other pages |
+| Page fetch failure | API error or a response that does not match the expected page shape | Log the status code or the failing fields, count the page as failed, continue other pages |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
 | Page ingestion failure | Upload error, registration error | Clean up partial content from KB, log error, skip the page |
