@@ -20,6 +20,7 @@ from mcp_openapi.openapi import route_map
 from mcp_openapi.retry import RetryAfterPolicy
 from mcp_openapi.upstream import OperationClient
 from mcp_types import ToolAnnotations
+from pydantic import SecretStr
 import yaml
 
 from polixis_mcp.upstream.quota import QuotaAwareRetryPolicy
@@ -75,9 +76,9 @@ def upstream_http(
         event_hooks={"request": [quota.refuse_while_spent], "response": [quota.record]},
         transport=api_transport,
         auth=ClientCredentialsAuth(
-            client_id=settings.client_id,
-            client_secret=settings.client_secret,
-            api_key=settings.api_key,
+            client_id=settings.client_id or _NOT_NEEDED_TO_REPLAY,
+            client_secret=settings.client_secret or _NOT_NEEDED_TO_REPLAY,
+            api_key=settings.api_key or _NOT_NEEDED_TO_REPLAY,
             token_url=str(settings.token_url),
             timeout=settings.timeout_seconds,
             transport=auth_transport,
@@ -130,3 +131,7 @@ def _read_only_hints(
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+# Settings leave the credentials out only to replay, where no request reaches Polixis.
+_NOT_NEEDED_TO_REPLAY = SecretStr("not-needed-to-replay")

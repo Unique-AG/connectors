@@ -195,6 +195,6 @@ puts `upstream/recording.py` between the client and Polixis:
 
 The answers go to `UPSTREAM_RECORDING_DIRECTORY`, `.mock-server-data/cassettes/` by default, one
 file per request, and each sent request is a line in its `ledger.jsonl`. `.mock-server-data/` is
-gitignored: it holds licensed data about real people, so it never leaves your machine. The
+gitignored but for its README: it holds licensed data about real people, so it never leaves your machine or the team's download location, which `.mock-server-data/README.md` names, with what the folder holds and how to replay it. The
 server refuses either mode unless `MCP_AUTH_MODE=none`. The client-credentials token is fetched
 past the recorder, so no secret is ever saved.

@@ -11,6 +11,7 @@ from polixis_mcp.upstream.recording import ledger_count
 from polixis_mcp.upstream.recording import RecordingMode
 from polixis_mcp.upstream.recording import RecordingRefusedError
 from polixis_mcp.upstream.recording import RecordingSettings
+from polixis_mcp.upstream.settings import UpstreamSettings
 
 API = "https://api.example.com"
 PROFILE = {"pid": "O00000000000000000000000000000100", "name": "Kestrel Marine Services Ltd"}
@@ -121,3 +122,24 @@ async def test_record_answers_a_recorded_request_without_sending_it(tmp_path: Pa
     assert again.json() == PROFILE
     assert len(sent) == 1
     assert ledger_count(tmp_path) == 1
+
+
+@pytest.fixture
+def no_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Neither the environment nor a `.env` gives the Polixis credentials."""
+    monkeypatch.chdir(tmp_path)
+    for name in ("UPSTREAM_CLIENT_ID", "UPSTREAM_CLIENT_SECRET", "UPSTREAM_API_KEY"):
+        monkeypatch.delenv(name, raising=False)
+
+
+@pytest.mark.usefixtures("no_credentials")
+def test_replay_needs_no_polixis_credentials(tmp_path: Path) -> None:
+    upstream = UpstreamSettings(recording=settings(tmp_path, RecordingMode.REPLAY))
+
+    assert (upstream.client_id, upstream.client_secret, upstream.api_key) == (None, None, None)
+
+
+@pytest.mark.usefixtures("no_credentials")
+def test_record_needs_the_polixis_credentials(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="UPSTREAM_CLIENT_ID, UPSTREAM_CLIENT_SECRET"):
+        _ = UpstreamSettings(recording=settings(tmp_path, RecordingMode.RECORD))
