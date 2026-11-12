@@ -1,12 +1,4 @@
-/**
- * Behavior: Confluence Cloud folders.
- *
- * A folder only groups content. It has no body, and Confluence Cloud returns
- * it with an empty `body` object that the page schema rejects. The connector
- * therefore skips folders at discovery and never fetches them, but the pages
- * inside a folder are still discovered and ingested at any depth, whether the
- * ingest-all label sits on a page above the folder or on the folder itself.
- */
+// Behavior: folders are never fetched, and the pages inside them are ingested at any depth.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ContentType } from '../../../src/confluence-api';
 import { page, space } from '../scenario/confluence-builders';

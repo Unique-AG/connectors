@@ -57,7 +57,7 @@ flowchart TB
 
 ### Sequence Diagram
 
-The connector is **stateless** -- it does not maintain local state between sync cycles. Change detection is performed by the Unique platform's file diff API, called once per Confluence space.
+The connector keeps no persistent state. Change detection is performed by the Unique platform's file diff API, called once per Confluence space. The only state kept in memory between sync cycles is, for each page that had an empty body, the version it had at that time. The connector does not fetch that page again until its version changes. A restart clears this record.
 
 ```mermaid
 sequenceDiagram

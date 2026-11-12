@@ -36,9 +36,7 @@ describe('failure isolation', () => {
     ctx = undefined;
   });
 
-  // One page failing to load from Confluence must not stop the whole sync. The
-  // page counts as failed, not skipped, so it reaches the failure metrics, and
-  // the rest keep going.
+  // One failing page must not stop the sync. It counts as failed.
   it('continues syncing other pages when one page fails to fetch from Confluence', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { confluence } = ctx;

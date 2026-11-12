@@ -1,11 +1,4 @@
-/**
- * Behavior: empty pages.
- *
- * A page with an empty body has nothing to ingest, so it never reaches Unique
- * and the file diff reports it as new on every sync. The connector remembers
- * the version it saw empty and does not fetch it again until the page has a
- * new version, at which point it is fetched and ingested like any other page.
- */
+// Behavior: an empty page is fetched once per version and ingested after an edit.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
