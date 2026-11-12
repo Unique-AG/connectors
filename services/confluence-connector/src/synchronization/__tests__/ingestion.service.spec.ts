@@ -96,6 +96,7 @@ function makeService(): {
   service: IngestionService;
   uniqueApiClient: UniqueApiClient;
   confluenceApiClient: ConfluenceApiClient;
+  metrics: ReturnType<typeof createNoopMetrics>;
 } {
   const uniqueApiClient = {
     ingestion: {
@@ -141,16 +142,18 @@ function makeService(): {
     },
   } as unknown as TenantConfig;
 
+  const metrics = createNoopMetrics();
   return {
     service: new IngestionService(
       tenantConfig,
       TENANT_NAME,
       uniqueApiClient,
       confluenceApiClient,
-      createNoopMetrics(),
+      metrics,
     ),
     uniqueApiClient,
     confluenceApiClient,
+    metrics,
   };
 }
 
@@ -250,9 +253,7 @@ describe('IngestionService', () => {
   });
 
   it('records recordContentDeleted with success and failure counts for partial delete', async () => {
-    const { service, uniqueApiClient } = makeService();
-    const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
-      .metrics;
+    const { service, uniqueApiClient, metrics } = makeService();
     const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
     vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([
       { id: 'content-1' },
@@ -269,9 +270,7 @@ describe('IngestionService', () => {
   });
 
   it('records every requested key as a failed deletion when the lookup throws', async () => {
-    const { service, uniqueApiClient } = makeService();
-    const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
-      .metrics;
+    const { service, uniqueApiClient, metrics } = makeService();
     const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
     vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('API error'));
 
@@ -286,9 +285,7 @@ describe('IngestionService', () => {
   });
 
   it('records only the resolved files as failed deletions when deleteByIds throws', async () => {
-    const { service, uniqueApiClient } = makeService();
-    const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
-      .metrics;
+    const { service, uniqueApiClient, metrics } = makeService();
     const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
     const resolvedFile = {
       id: 'c1',

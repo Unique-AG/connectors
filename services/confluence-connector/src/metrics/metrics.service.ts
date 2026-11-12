@@ -36,7 +36,7 @@ export class Metrics {
 
   private readonly syncPhaseState = new Map<string, SyncPhase>();
   private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
-  private readonly lastSuccessfulSyncSeconds = new Map<string, number>();
+  private readonly lastSuccessfulSyncSecondsByTenant = new Map<string, number>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -144,10 +144,10 @@ export class Metrics {
 
     const lastSuccessfulSyncGauge = metricService.getObservableGauge(
       'cfc_last_successful_sync_timestamp_seconds',
-      { description: 'Unix time of the last sync cycle that finished without an error' },
+      { description: 'Unix time of the last successful sync cycle' },
     );
     lastSuccessfulSyncGauge.addCallback((observable) => {
-      for (const [tenant, timestampSeconds] of this.lastSuccessfulSyncSeconds) {
+      for (const [tenant, timestampSeconds] of this.lastSuccessfulSyncSecondsByTenant) {
         observable.observe(timestampSeconds, { tenant });
       }
     });
@@ -174,7 +174,7 @@ export class Metrics {
     this.syncDuration.record(durationSeconds, { tenant, result });
     this.syncsTotal.add(1, { tenant, result });
     if (result === 'success') {
-      this.lastSuccessfulSyncSeconds.set(tenant, Date.now() / 1000);
+      this.lastSuccessfulSyncSecondsByTenant.set(tenant, Date.now() / 1000);
     }
   }
 
