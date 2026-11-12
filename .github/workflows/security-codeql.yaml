@@ -1,0 +1,53 @@
+name: "[Security] CodeQL"
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - "pnpm-lock.yaml"
+      - "**/uv.lock"
+      - "docs/**"
+      - "**/*.md"
+  schedule:
+    - cron: "0 4 * * *" # Every night at 4 AM UTC
+
+permissions:
+  contents: read # to read the repository
+
+concurrency:
+  group: security-codeql-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    if: >-
+      !(startsWith(github.head_ref, 'release-please--branches--main--components--') &&
+      github.event.pull_request.user.login == 'github-actions[bot]')
+    permissions:
+      actions: read # to read the workflow run that CodeQL reports on
+      contents: read # to read the repository
+      security-events: write # to upload the results to code scanning
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        language:
+          - actions
+          - javascript-typescript
+          - python
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}

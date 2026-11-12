@@ -83,7 +83,7 @@ flowchart LR
 
 | Alert | Source | Where you see it | Updates |
 |---|---|---|---|
-| Code | CodeQL | Security tab, Code scanning, tool CodeQL. A PR that adds an alert cannot merge. | On each PR and each push to `main` |
+| Code | CodeQL | Security tab, Code scanning, tool CodeQL. A PR that adds an alert cannot merge. | On each PR to `main` that changes code, and every night |
 | A new vulnerable dependency in a PR | Dependency review | The check `dependency-review` on the PR | On each PR |
 | Lock files | Trivy, category `trivy-lockfiles` | Security tab, Code scanning. The Slack report, in the line "Repository (main)". | Every night |
 | Images | Trivy, categories `trivy-image/<service>` | Security tab, Code scanning. Each message starts with the image and the tag. The Slack report. | Every night, and at each release build |

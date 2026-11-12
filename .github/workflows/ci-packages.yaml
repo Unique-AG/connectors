@@ -7,8 +7,12 @@ on:
   pull_request:
     paths:
       - "packages/**"
+      - "!packages/mcp-architecture/**"
+      - "!packages/mcp-configs/**"
       - "!packages/mcp-credential-auth/**"
+      - "!packages/mcp-observability/**"
       - "!packages/mcp-openapi/**"
+      - "!packages/mcp-scaffold/**"
       - "pnpm-lock.yaml"
       - "pnpm-workspace.yaml"
       - "turbo.json"

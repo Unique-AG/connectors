@@ -17,6 +17,9 @@ concurrency:
 
 jobs:
   helm-schema:
+    if: >-
+      !(startsWith(github.head_ref, 'release-please--branches--main--components--') &&
+      github.event.pull_request.user.login == 'github-actions[bot]')
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:
