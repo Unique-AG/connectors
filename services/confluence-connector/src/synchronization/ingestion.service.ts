@@ -178,6 +178,7 @@ export class IngestionService {
       return 0;
     }
 
+    let attemptedCount = contentKeys.length;
     try {
       const files = await this.uniqueApiClient.files.getByKeys(contentKeys);
       if (files.length === 0) {
@@ -189,6 +190,7 @@ export class IngestionService {
       }
 
       const contentIds = files.map((f) => f.id);
+      attemptedCount = contentIds.length;
       const { deleted, failed } = await this.uniqueApiClient.files.deleteByIds(contentIds);
       if (deleted > 0) {
         this.metrics.recordContentDeleted(deleted, 'success');
@@ -206,7 +208,7 @@ export class IngestionService {
 
       return deleted;
     } catch (err) {
-      this.metrics.recordContentDeleted(contentKeys.length, 'failure');
+      this.metrics.recordContentDeleted(attemptedCount, 'failure');
       this.logger.error({
         contentKeys,
         err,
