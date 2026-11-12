@@ -36,9 +36,9 @@ describe('failure isolation', () => {
     ctx = undefined;
   });
 
-  // One page failing to load from Confluence must not stop the whole sync.
-  // ConfluenceContentFetcher catches the error and returns null, so the page is
-  // skipped and the rest keep going.
+  // One page failing to load from Confluence must not stop the whole sync. The
+  // page counts as failed, not skipped, so it reaches the failure metrics, and
+  // the rest keep going.
   it('continues syncing other pages when one page fails to fetch from Confluence', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { confluence } = ctx;
@@ -49,6 +49,7 @@ describe('failure isolation', () => {
       }
       return fetchPage(pageId);
     });
+    const recordPagesProcessed = vi.spyOn(ctx.metrics, 'recordPagesProcessed');
 
     const result = await ctx.runSync();
 
@@ -57,6 +58,8 @@ describe('failure isolation', () => {
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
     expectNotIngested(state, { pages: ['tenant1/space-1_SP/p2'] });
+    expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
+    expect(recordPagesProcessed).not.toHaveBeenCalledWith(1, 'skipped');
   });
 
   // When Unique rejects registerContent for one page, IngestionService catches
