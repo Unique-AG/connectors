@@ -37,7 +37,7 @@ Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suit
 
 To run the same commands on your machine, use Helm v3.19.0. This is the version that CI uses, and a newer version can report more problems. Install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the commands in the chart directory, as CI does.
 
-The pull request CI runs the Helm and Terraform checks only when a file in `services/<service>/deploy/` changed, or when a workflow that runs them changed. A change to a lock file or to the source code does not run them. A change in `services/<service>/docs` does not run the service CI.
+The pull request CI runs the Helm and Terraform checks only when a file in `services/<service>/deploy/` changed, or when a workflow that runs them changed. A change to a lock file or to the source code does not run them.
 
 ## Release Workflows
 

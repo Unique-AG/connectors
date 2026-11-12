@@ -11,9 +11,6 @@ permissions:
 
 jobs:
   release-please:
-    concurrency:
-      group: release-please
-      cancel-in-progress: false
     permissions:
       contents: write # to create the tags and the releases
       issues: write # to set the release labels

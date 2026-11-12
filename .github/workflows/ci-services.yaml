@@ -8,7 +8,6 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "services/**"
-      - "!services/*/docs/**"
       - "packages/**"
       - "!packages/mcp-architecture/**"
       - "!packages/mcp-configs/**"
@@ -63,7 +62,6 @@ jobs:
           filters: |
             services:
               - 'services/**'
-              - '!services/*/docs/**'
             deploy:
               - 'services/*/deploy/**'
             packages:

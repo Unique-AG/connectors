@@ -192,9 +192,6 @@ jobs:
       - name: Build and push container
         id: build-and-push
         if: steps.existing.outputs.digest == ''
-        env:
-          DOCKER_BUILD_SUMMARY: "false"
-          DOCKER_BUILD_RECORD_UPLOAD: "false"
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
