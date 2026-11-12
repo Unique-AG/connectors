@@ -231,7 +231,7 @@ Per-page memory is bounded by the inlined page size, the per-image `attachments.
 
 ### Content Type Ingestion Map
 
-The connector uses label-based discovery via CQL. After fetching, it skips three content types: database, whiteboard, and embed.
+The connector uses label-based discovery via CQL. After fetching, it skips four content types: database, whiteboard, embed, and folder.
 
 Content that passes the filter has its `body.storage` HTML extracted and ingested. Items with empty bodies are skipped. Descendants of skipped content types (such as sub-pages under a database) are still discovered and ingested.
 
@@ -245,7 +245,7 @@ Content that passes the filter has its `body.storage` HTML extracted and ingeste
 | Whiteboard | **No** | No (no body via API) | Explicitly skipped. API returns no body content. Descendants are still discovered. |
 | Database | **No** | No (structured data, not exposed) | Explicitly skipped. No body via API. Descendants (sub-pages) are still discovered and ingested. |
 | Embed / Smart Link | **No** | No (only has `embedUrl`) | Explicitly skipped. Only contains a URL reference, no renderable body. |
-| Folder | **No** (effectively) | No (organizational container) | Not explicitly skipped, but has no body -- skipped by the empty-body filter. Descendants are still discovered. |
+| Folder | **No** | No (organizational container) | Explicitly skipped. The API returns an empty `body` object for a folder. Descendants are still discovered. |
 | Comment (inline/footer) | **No** | Yes (`body.storage` / ADF) | Not discovered -- comments do not appear in label/ancestor CQL results. |
 | Live Doc (page subtype) | **Yes** (as page) | Yes (`body.storage` / ADF) | Subtype of page. Passes through as a regular page. |
 | Custom Content (app-defined) | **No** | Yes (`body.storage`) | Not discovered -- uses `ac:key:type` format, not matched by standard CQL. |
