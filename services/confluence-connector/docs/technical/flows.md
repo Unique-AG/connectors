@@ -319,7 +319,7 @@ For each new or updated page:
 4. **Upload** -- The page body (Confluence storage format HTML) is uploaded to Unique.
 5. **Finalize** -- Triggers downstream processing in Unique.
 
-If any step fails for a page, the error is logged and the page counts as failed. It is retried on the next sync. Other pages continue processing.
+If any step fails for a page, the error is logged and the page counts as failed. The registration is deleted, so the next sync retries the page. If that deletion also fails, the registration stays in Unique, and the page is only retried after its next edit in Confluence. Other pages continue processing.
 
 ### Attachment Ingestion
 
