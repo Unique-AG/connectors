@@ -1,6 +1,6 @@
 import type Dispatcher from 'undici/types/dispatcher';
 import { describe, expect, it, vi } from 'vitest';
-import { handleErrorStatus } from '../http-util';
+import { HttpStatusError, handleErrorStatus } from '../http-util';
 
 function makeBody(text = ''): Dispatcher.BodyMixin {
   return {
@@ -53,6 +53,15 @@ describe('handleErrorStatus', () => {
     await expect(
       handleErrorStatus(404, makeBody('Not Found'), 'https://example.com/resource'),
     ).rejects.toThrow(/Error response from/);
+  });
+
+  it('exposes the status code on the thrown error', async () => {
+    const error = await handleErrorStatus(404, makeBody(), 'https://example.com/resource').catch(
+      (err: unknown) => err,
+    );
+
+    expect(error).toBeInstanceOf(HttpStatusError);
+    expect(error).toMatchObject({ name: 'HttpStatusError', statusCode: 404 });
   });
 
   it('throws for 500 Internal Server Error', async () => {

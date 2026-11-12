@@ -4,6 +4,7 @@ import { chunk, isNullish, uniqueBy } from 'remeda';
 import { z } from 'zod';
 import type { ConfluenceAuth } from '../auth/confluence-auth/confluence-auth.abstract';
 import type { ConfluenceConfig } from '../config';
+import { HttpStatusError } from '../utils/http-util';
 import type { RateLimitedHttpClient } from '../utils/rate-limited-http-client';
 import {
   type ApiClientOptions,
@@ -80,12 +81,21 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return pages;
   }
 
+  // A missing or deleted page answers 404, so this returns null and the page is skipped.
+  // A response that fails the schema throws a ZodError, so the page counts as failed.
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
     const expand = 'body.storage,version,space,metadata.labels';
     const url = `${this.config.baseUrl}/rest/api/content/${pageId}?expand=${expand}`;
-    const raw = await this.makeAuthenticatedRequest(url);
-    const result = confluencePageSchema.safeParse(raw);
-    return result.success ? result.data : null;
+    let raw: unknown;
+    try {
+      raw = await this.makeAuthenticatedRequest(url);
+    } catch (err) {
+      if (err instanceof HttpStatusError && err.statusCode === 404) {
+        return null;
+      }
+      throw err;
+    }
+    return confluencePageSchema.parse(raw);
   }
 
   public async fetchAttachmentsByPageTitle(

@@ -1,6 +1,8 @@
 import { Logger } from '@nestjs/common';
+import { ZodError } from 'zod';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
+import { HttpStatusError } from '../utils/http-util';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
@@ -12,18 +14,7 @@ export class ConfluenceContentFetcher {
   ) {}
 
   public async fetchPageContent(page: DiscoveredPage): Promise<FetchedPage | null> {
-    let fullPage: ConfluencePage | null;
-    try {
-      fullPage = await this.apiClient.getPageById(page.id);
-    } catch (err) {
-      this.logger.error({
-        pageId: page.id,
-        title: page.title,
-        err,
-        msg: 'Failed to fetch page, possibly deleted in the meantime',
-      });
-      return null;
-    }
+    const fullPage = await this.fetchFullPage(page);
 
     if (!fullPage) {
       this.logger.warn({
@@ -65,6 +56,20 @@ export class ConfluenceContentFetcher {
     };
   }
 
+  private async fetchFullPage(page: DiscoveredPage): Promise<ConfluencePage | null> {
+    try {
+      return await this.apiClient.getPageById(page.id);
+    } catch (err) {
+      this.logger.error({
+        pageId: page.id,
+        title: page.title,
+        ...describeFetchError(err),
+        msg: 'Failed to fetch page',
+      });
+      throw err;
+    }
+  }
+
   private extractLabels(labels: Array<{ name: string }>): string[] {
     const ingestLabels = [
       this.confluenceConfig.ingestSingleLabel,
@@ -77,4 +82,18 @@ export class ConfluenceContentFetcher {
       .filter((name) => !ingestLabels.includes(name))
       .sort();
   }
+}
+
+// Error messages can carry Confluence response bodies, so only their shape is logged.
+function describeFetchError(err: unknown): Record<string, unknown> {
+  if (err instanceof HttpStatusError) {
+    return { errorName: err.name, statusCode: err.statusCode };
+  }
+  if (err instanceof ZodError) {
+    return {
+      errorName: err.name,
+      issues: err.issues.map(({ code, path }) => ({ code, path: path.map(String).join('.') })),
+    };
+  }
+  return { errorName: err instanceof Error ? err.name : typeof err };
 }
