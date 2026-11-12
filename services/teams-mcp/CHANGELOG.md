@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.0...teams-mcp@0.5.1) (2026-11-12)
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.12.0 to 5.13.0 ([#1572](https://github.com/Unique-AG/connectors/issues/1572)) ([697230b](https://github.com/Unique-AG/connectors/commit/697230b664bd3098f2a4902e2ae66c5cc028c478))
+* **deps:** bump node from 26.13.0-trixie@6d2c7d5d074b to 26.13.0-trixie@438603bbb5cd ([#1580](https://github.com/Unique-AG/connectors/issues/1580)) ([2e26f6b](https://github.com/Unique-AG/connectors/commit/2e26f6b75e6692aa38e4f7e423d758547c87c72b))
+* **deps:** bump node to 26.13.1 security release ([#1642](https://github.com/Unique-AG/connectors/issues/1642)) ([407761d](https://github.com/Unique-AG/connectors/commit/407761d268c76b3a57f755f245fd7e08bb674278))
+* **main:** bump @proventuslabs/nestjs-zod from 2.0.0 to 2.2.0 ([#1390](https://github.com/Unique-AG/connectors/issues/1390)) ([023787c](https://github.com/Unique-AG/connectors/commit/023787cc8c364d1c192d06192a1541940fa77b9e))
+
 ## [0.5.0](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.4.12...teams-mcp@0.5.0) (2026-11-10)
 
 
