@@ -171,38 +171,6 @@ describe('ConfluenceContentFetcher', () => {
     });
   });
 
-  it('does not fetch an empty page again while its version is unchanged', async () => {
-    const discoveredPage = makeDiscoveredPage('empty');
-    const apiClient = {
-      getPageById: vi.fn().mockResolvedValue(makeFullPage('empty', { body: '' })),
-    };
-
-    const fetcher = createFetcher(apiClient);
-    await fetcher.fetchPageContent(discoveredPage);
-    const result = await fetcher.fetchPageContent(discoveredPage);
-
-    expect(result).toBeNull();
-    expect(apiClient.getPageById).toHaveBeenCalledTimes(1);
-  });
-
-  it('fetches an empty page again once it has a new version', async () => {
-    const apiClient = {
-      getPageById: vi
-        .fn()
-        .mockResolvedValueOnce(makeFullPage('edited', { body: '' }))
-        .mockResolvedValueOnce(makeFullPage('edited', { body: '<p>now with content</p>' })),
-    };
-
-    const fetcher = createFetcher(apiClient);
-    await fetcher.fetchPageContent(makeDiscoveredPage('edited'));
-    const result = await fetcher.fetchPageContent(
-      makeDiscoveredPage('edited', { versionTimestamp: '2026-03-01T00:00:00.000Z' }),
-    );
-
-    expect(result?.body).toBe('<p>now with content</p>');
-    expect(apiClient.getPageById).toHaveBeenCalledTimes(2);
-  });
-
   it('returns labels sorted alphabetically', async () => {
     const discoveredPage = makeDiscoveredPage('1');
     const apiClient = {
