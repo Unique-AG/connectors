@@ -107,7 +107,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Time since each tenant last finished a sync without an error. Orange after 2 hours, red after 3. Always looks back 24 hours, whatever the selected time range, and shows \"none in 24h\" when there was no successful sync.",
+      "description": "Time since each tenant's last successful sync. Orange after 2 hours, red after 3. Always looks back 24 hours, whatever the selected time range, and shows \"none in 24h\" when there was no successful sync.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -416,7 +416,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Syncs that finished without an error. Counted over the selected time range.",
+      "description": "Successful syncs, including those with single failed items. Counted over the selected time range.",
       "fieldConfig": {
         "defaults": {
           "color": {
