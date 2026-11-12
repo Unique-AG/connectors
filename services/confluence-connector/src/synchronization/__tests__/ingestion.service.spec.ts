@@ -1,5 +1,5 @@
 import { Readable } from 'node:stream';
-import type { IngestionApiResponse, UniqueApiClient } from '@unique-ag/unique-api';
+import type { IngestionApiResponse, UniqueApiClient, UniqueFile } from '@unique-ag/unique-api';
 import { Smeared } from '@unique-ag/utils';
 
 vi.mock('@unique-ag/utils', async (importOriginal) => {
@@ -268,7 +268,7 @@ describe('IngestionService', () => {
     expect(recordSpy).toHaveBeenCalledWith(2, 'failure');
   });
 
-  it('records every key as a failed deletion when the delete call throws', async () => {
+  it('records every requested key as a failed deletion when the lookup throws', async () => {
     const { service, uniqueApiClient } = makeService();
     const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
       .metrics;
@@ -283,6 +283,32 @@ describe('IngestionService', () => {
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ msg: 'Failed to delete content, skipping' }),
     );
+  });
+
+  it('records only the resolved files as failed deletions when deleteByIds throws', async () => {
+    const { service, uniqueApiClient } = makeService();
+    const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
+      .metrics;
+    const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
+    const resolvedFile = {
+      id: 'c1',
+      key: 'k1',
+      fileAccess: [],
+      ownerType: 'SCOPE',
+      ownerId: 'space-scope-1',
+      byteSize: 10,
+      expiresAt: null,
+      ingestionState: 'FINISHED',
+      metadata: null,
+    } satisfies UniqueFile;
+    vi.mocked(uniqueApiClient.files.getByKeys).mockResolvedValue([resolvedFile]);
+    vi.mocked(uniqueApiClient.files.deleteByIds).mockRejectedValue(new Error('API error'));
+
+    const result = await service.deleteContentByKeys(['k1', 'k2']);
+
+    expect(result).toBe(0);
+    expect(recordSpy).toHaveBeenCalledOnce();
+    expect(recordSpy).toHaveBeenCalledWith(1, 'failure');
   });
 
   it('logs warning and returns 0 when no content is found for delete keys', async () => {
