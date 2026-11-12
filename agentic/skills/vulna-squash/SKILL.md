@@ -54,7 +54,7 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 
 ## Slack message (mode `findings`)
 
-At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Write one line for each PR with its URL and its status (`green`, `red`, `timed_out` or `held`). For a stop, write the reason, for example "the scan is older than 24 hours". Mode `pr` posts no Slack message.
+At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Write at most 5 lines. Write one line for each PR with its URL and its status (`green`, `red`, `timed_out` or `held`). For a stop, write one line with the reason, for example "the scan is older than 24 hours". Do not list the dropped packages or the scan details. Add only the lines that step 2 and step 3 of Part A require. Mode `pr` posts no Slack message.
 
 ## Part B: Entry check (both modes)
 
