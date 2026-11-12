@@ -563,4 +563,21 @@ class CorporateProfileResponse(BaseModel):
     )
 
 
+class CorporateProfilesResponse(BaseModel):
+    related: dict[str, CorporateProfileResponse] | None = Field(
+        None,
+        description="Related entities keyed by publisher (data source); each value is a page of results.",
+    )
+    root: EntityData | None = Field(
+        None, description="The requested entity — the subject of the profile."
+    )
+    error: str | None = Field(
+        None, description="Why Polixis rejected the request, sent with a 200 in place of the body."
+    )
+    code: str | None = Field(
+        None,
+        description="The kind of rejection, such as VALIDATION for an id Polixis does not know.",
+    )
+
+
 UboNode.model_rebuild()

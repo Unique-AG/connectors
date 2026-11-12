@@ -24,6 +24,9 @@ import yaml
 
 from polixis_mcp.upstream.quota import QuotaAwareRetryPolicy
 from polixis_mcp.upstream.quota import QuotaGate
+from polixis_mcp.upstream.recording import CassetteTransport
+from polixis_mcp.upstream.recording import RecordingMode
+from polixis_mcp.upstream.recording import token_transport
 from polixis_mcp.upstream.rejections import reject_error_body
 from polixis_mcp.upstream.routes import EXPOSED
 from polixis_mcp.upstream.settings import UpstreamSettings
@@ -52,22 +55,32 @@ def upstream_http(
 
     `now` is the clock the client-credentials token's expiry and the quota cooldown are read
     against.
+
+    With `UPSTREAM_RECORDING_MODE` set, and no `transport` given, requests go through a
+    `CassetteTransport`, which saves Polixis's answers or replays them.
     """
     clock = now or _utc_now
+    limits = httpx2.Limits(max_connections=settings.max_concurrent_requests)
+    api_transport, auth_transport = transport, transport
+    if transport is None and settings.recording.mode is not RecordingMode.OFF:
+        api_transport = CassetteTransport(
+            settings.recording, httpx2.AsyncHTTPTransport(limits=limits)
+        )
+        auth_transport = token_transport(settings.recording)
     quota = QuotaGate(cooldown=timedelta(seconds=settings.quota_cooldown_seconds), now=clock)
     return httpx2.AsyncClient(
         base_url=str(settings.api_url).rstrip("/"),
         timeout=settings.timeout_seconds,
-        limits=httpx2.Limits(max_connections=settings.max_concurrent_requests),
+        limits=limits,
         event_hooks={"request": [quota.refuse_while_spent], "response": [quota.record]},
-        transport=transport,
+        transport=api_transport,
         auth=ClientCredentialsAuth(
             client_id=settings.client_id,
             client_secret=settings.client_secret,
             api_key=settings.api_key,
             token_url=str(settings.token_url),
             timeout=settings.timeout_seconds,
-            transport=transport,
+            transport=auth_transport,
             now=clock,
         ),
         headers={"Accept": "application/json"},

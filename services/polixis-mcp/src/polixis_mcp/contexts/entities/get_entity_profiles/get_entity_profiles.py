@@ -12,6 +12,7 @@ from polixis_mcp.contexts.formats import dates_by_kind
 from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.risks import is_hidden_alert
+from polixis_mcp.contexts.risks import polixis_flags
 from polixis_mcp.upstream import CompletionRequestInput
 from polixis_mcp.upstream import GET_PROFILE_FIELDS
 from polixis_mcp.upstream import GetProfileFieldsPath
@@ -76,7 +77,7 @@ def _entity_profile(*, pid: str, profile: Profile, sections: set[ProfileSection]
             entry.en or entry.original for entry in profile.eac_entries or []
         ),
         addresses=unique(profile.addresses or []),
-        flags=unique(profile.flags or []),
+        flags=polixis_flags(profile.flags or []),
         alerts=[
             ProfileAlert(category=alert.category, message=alert.message)
             for alert in profile.alert_list or []

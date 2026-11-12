@@ -11,7 +11,7 @@ decisions.
 |---|---|---|
 | `search_entities` | `POST /search/api` | Polixis' own pages |
 | `get_entity_profiles` | `POST /api/completion/{id}`, once per pid, up to 10 at once | |
-| `get_related_parties` | `POST /api/corporate/byPublisher?page=&size=` | Polixis' own pages |
+| `get_related_parties` | `POST /api/corporate/byPublisher?page=&size=40` | Polixis's page of each source, merged per party, then pages by tokens from the cache |
 | `get_ultimate_beneficial_owners` | `GET /api/graph/ubo/{id}` | Ours, one row per owner |
 | `get_top_down_ownership` | `GET /api/graph/topdown/{id}` | Ours, one row per holding |
 | `find_linked_companies` | `POST /api/graph/smart`, with `/api/graph/subgraph` for `scope: all` | Ours, over the companies |
@@ -47,8 +47,11 @@ the tools aim for three things:
   design shrinks that, short of returning fewer fields per row.
 
 `page_size` caps the rows on a page for an agent that wants only the first few.
-`search_entities` and `get_related_parties` are paged by Polixis, which counts rows, so their
-default page sizes are set to come to about the same 8,000 tokens.
+`search_entities` is paged by Polixis, which counts rows, so its default page size is set to
+come to about the same 8,000 tokens. `get_related_parties` asks Polixis for 40 parties of each
+source, which is one response of up to a few hundred parties for a large group, merges a party
+several sources report into one, and pages that by tokens from the cache; past the last party it
+asks Polixis for its next page.
 
 Measured over the live Polixis responses saved in November 2026: a large group whose one-hop
 graph has 527 parties, a sanctioned PEP, and a second person for the paths and court decisions,
@@ -64,11 +67,11 @@ upper bounds.
 | `get_ultimate_beneficial_owners` | 8,165 (66 owners) | 8,165, one page | **Page 1:** who holds 25% or more, who is at the end of each chain, which owners are flagged, the sanctioned owners' shares for the 50% rule. **Every page:** the full owner table, which for most companies is this one page anyway. |
 | `get_top_down_ownership` | 100,648 (488 holdings) | about 8,500, 12 pages | **Page 1:** the controlled subsidiaries, and whether the group holds anything flagged or state-owned, since the flagged list covers the whole tree. **Every page:** mapping the whole group or listing every minority stake. The answer is the list. |
 | `find_linked_companies` | 38,049 (455 companies) | about 8,600, 5 pages | **Page 1:** the companies tied directly, the flagged ones and the totals. **Every page:** every company tied through people, for a full report. |
-| `find_flagged_parties` | 57,475 (282 flagged) | about 8,600, 7 pages | **Page 1:** whether any sanctioned, PEP or state-owned party is near, the nearest ones with their paths, and how many there are. **Every page:** a list of every flagged party with its path. |
+| `find_flagged_parties` | 57,475 (282 flagged, at radius 2; the default is 1) | about 8,600, 7 pages at radius 2 | **Page 1:** whether any sanctioned, PEP or state-owned party is near, the most severe ones with their paths, and how many there are. **Every page:** a list of every flagged party with its path. |
 | `get_sanctions_exposure` | 18,501 (85 parties) | about 8,600, 3 pages | **Page 1:** whether the entity is listed itself, the nearest sanctioned parties and how many there are. **Every page:** every sanctioned party with its path, for a report. |
 | `find_court_decisions` | 2,044 (20 decisions) | 2,044, one page | **Page 1:** every decision with its court, year and snippets, which often show what it is about. |
 | `get_court_decision` | 4,662 for the median decision; about 31,000 for the longest, of 62,000 Cyrillic characters | 8,000 at most, 1 to 4 parts | **First part:** usually the whole decision. **Every part:** reading a long decision in full; check the snippets of `find_court_decisions` first. |
-| `get_related_parties` | ≈106,000 (587 parties) | about 7,200 for the default 40 | Polixis pages and orders it, so nothing ranks it. **One page:** a small company's parties, or a large one's narrowed by `categories`. For flagged parties among them, `find_flagged_parties` with `radius` 1 answers in one call. **Every page:** screening every party of a large company, 15 pages for this one. |
+| `get_related_parties` | ≈106,000 (587 parties) | about 8,800 (a large group's first Polixis page: 30 parties of 22 sources over 6 pages) | Parties with a current relation come first, then those most sources report. **One page:** a small company's parties, or a large one's narrowed by `categories`. For flagged parties among them, `find_flagged_parties` with `radius` 1 answers in one call. **Every page:** screening every party of a large company, 15 pages for this one. |
 | `search_entities` | ≈809,000 (1,010 hits for one common name) | about 8,000 for the default 10 | **Page 1:** the closest matches, which Polixis ranks first. Narrow a common name by country, date or type rather than page through it. **Every page:** never needed in practice; say how many hits there were. |
 | `find_connections` | 358 | one result | **One call:** the shortest path Polixis finds. |
 | `get_entity_profiles` | 760 to 1,192 per pid, about 12,000 for 10 | not paged | **One call:** up to 10 profiles. Ten large organizations with the key sections pass the 10,000 warning but stay well under the 25,000 cap; the `sanctions` and `positions` sections make each profile larger, so ask for fewer pids with them. |
@@ -77,13 +80,13 @@ upper bounds.
 
 | Tool | What it combines, and what else it does |
 |---|---|
-| `find_flagged_parties` | Joins the smart graph, which names the parties, with the subgraph, which holds every relation; searches the network for every party with a sanctions, PEP or state-ownership marker (282 of 526) and gives the path to each, nearest and sanctioned first; counts them by marker on every page, so a 0 settles a question such as "is any of them state-owned?" in one call; says when Polixis cut the graph short |
+| `find_flagged_parties` | Joins the smart graph, which names the parties, with the subgraph, which holds every relation; searches the network for every party with a sanctions, PEP or state-ownership marker (282 of 526) and gives the path to each, the most severe risk first (sanctioned, PEP, restricted, REP, state-owned) and the nearest first within each; counts them by marker on every page, so a 0 settles a question such as "is any of them state-owned?" in one call; says when Polixis cut the graph short |
 | `find_linked_companies` | Finds the companies tied to the entity directly or through people in between, which no Polixis endpoint answers, with the chain of people and links behind each, the flagged ones counted by marker. The default two hops reads a larger graph than the one-hop sample measured |
 | `get_top_down_ownership` | One row per holding (488 entities, 97 of them reached by more than one chain), with the share carried summed over every chain, ranked by it, and its 213 flagged holdings counted by marker, with the first 25 up front, the sanctioned first |
 | `get_court_decision` | One decision's text, in parts of about 8,000 tokens, read from the cache `find_court_decisions` filled: Polixis has no route for one decision |
 | `find_court_decisions` | The decisions without their texts, those naming the entity first and the newest next, with the snippets cleared of Polixis's `<em>` highlighting |
 | `get_sanctions_exposure` | Each sanctioned party's lists, status, programmes and listing date, with listing dates read from the four forms the lists write them in, and the parties nearest first |
-| `get_related_parties` | Sends `category` and `page`, without which Polixis answers a 500 or another shape; flattens its flags, share text, dates and countries; keeps a party without a pid, with `pid` null, when it has a name. At Polixis's maximum page of 200 its response is about 135,000 tokens |
+| `get_related_parties` | Sends `category` and `page`, without which Polixis answers a 500; merges the groups Polixis returns per source, which it keeps even with `page`, into one entry per party with every source's relations, and counts each source's parties in `relations_by_source`; flattens its flags, share text, dates and countries; keeps a party without a pid, with `pid` null, when it has a name. At Polixis's maximum page of 200 its response is about 135,000 tokens |
 | `get_ultimate_beneficial_owners` | One row per owner with its share summed over every distinct chain, ranked by it, so a 25% question stops at the first share below it once `total_share_unknown` shows no unread owner whose share may be higher; the end of each chain marked; the flagged owners counted by marker, with the first 25 up front, the sanctioned first |
 | `search_entities` | Turns `1978-02` into Polixis's `19780200`, leaves out unset filters, which Polixis would read as null, and keeps ten names of a hit, its typed name records first and no spelling twice, and three addresses, of up to 60 and 20 |
 | `find_connections` | Orders the path's links from the first entity, which Polixis lists in no order, folds the repeated composite nodes, and names every party on it with its flags |
@@ -178,3 +181,20 @@ It opens Postgres at `DATABASE_URL` even without sign-in, so start one first, fo
 `docker run -e POSTGRES_PASSWORD=dummy-password -e POSTGRES_USER=dummy-user -e POSTGRES_DB=polixis_mcp -p 5432:5432 postgres:17`.
 
 `uv run poe ci` runs every check CI runs.
+
+### Record Polixis once, replay it after
+
+The API key's quota is small, so develop against recorded answers. `UPSTREAM_RECORDING_MODE`
+puts `upstream/recording.py` between the client and Polixis:
+
+| Mode | |
+|---|---|
+| `off` | The default, and the only mode a deployment uses |
+| `record` | Answers a request already recorded from its recording, so nothing is paid twice; delete a recording to have it asked again. Sends the others, waiting `UPSTREAM_RECORDING_MIN_INTERVAL_SECONDS` (2 by default) between two, and saves the answer. Needs `UPSTREAM_RECORDING_BUDGET`, the most requests `ledger.jsonl` may hold across every run: past it nothing is sent. The first quota 429 writes `HALT`, and nothing is sent until you delete it |
+| `replay` | Answers from the saved answers and sends nothing, the token request included. A request with no saved answer fails |
+
+The answers go to `UPSTREAM_RECORDING_DIRECTORY`, `.mock-server-data/cassettes/` by default, one
+file per request, and each sent request is a line in its `ledger.jsonl`. `.mock-server-data/` is
+gitignored: it holds licensed data about real people, so it never leaves your machine. The
+server refuses either mode unless `MCP_AUTH_MODE=none`. The client-credentials token is fetched
+past the recorder, so no secret is ever saved.

@@ -4,6 +4,16 @@ from polixis_mcp.contexts.formats import unique
 from polixis_mcp.upstream import AlertEntry
 
 _RISK_FLAGS = frozenset({"SANCTION", "PEP", "FORMER_PEP", "REP"})
+_SEVERITY = {
+    "SANCTION": 0,
+    "PEP": 1,
+    "RESTRICTION": 2,
+    "SANCTIONTERRITORY": 2,
+    "FORMER_PEP": 3,
+    "REP": 3,
+    "STATECO": 4,
+}
+_FLAG_ALIASES = {"SANCTIONED": "SANCTION"}
 _RISK_ALERTS = frozenset({"SANCTION", "SANCTIONTERRITORY", "RESTRICTION", "STATECO"})
 
 FLAGS_DESCRIPTION = (
@@ -43,9 +53,24 @@ RISK_COUNTS_DESCRIPTION = (
 )
 
 
+def polixis_flags(flags: Iterable[str]) -> list[str]:
+    """Flags as the graph and corporate routes name them. The profile and identifier routes
+    send `SANCTIONED` for `SANCTION`, and some with a `#`, such as `#REP`.
+    """
+    return unique(_FLAG_ALIASES.get(name, name) for flag in flags if (name := flag.lstrip("#")))
+
+
 def risk_markers(*, flags: Iterable[str], alerts: Iterable[str]) -> list[str]:
     """The sanctions, PEP and state-ownership markers among a party's flags and alerts."""
     return sorted({*(_RISK_FLAGS & set(flags)), *(_RISK_ALERTS & set(alerts))})
+
+
+def risk_severity(markers: Iterable[str]) -> int:
+    """0 for the most severe: a sanction, then a PEP, then a restriction or a sanction-sensitive
+    address, then a former PEP or REP, and state ownership last, which a subsidiary of a
+    state-owned group shares with most of its group.
+    """
+    return min((_SEVERITY[marker] for marker in markers), default=len(_SEVERITY))
 
 
 def risk_counts(markers: Iterable[list[str]]) -> dict[str, int]:

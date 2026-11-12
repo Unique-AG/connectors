@@ -79,7 +79,7 @@ PROFILE: dict[str, object] = {
     "countries": {"countryCitizenship": ["ch"]},
     "dates": {"Date of Birth": [{"y": 1971, "m": 3}]},
     "gender": "f",
-    "flags": ["PEP"],
+    "flags": ["PEP", "SANCTIONED", "#REP", "#PEP"],
     "alertList": [
         {"category": "PEP", "message": "Member of an example parliament"},
         {"category": "hidden", "message": "An internal marker"},
@@ -103,52 +103,91 @@ PROFILE: dict[str, object] = {
     ],
 }
 
+_ANNA = {
+    "id": "entity_ch_registry__p_1",
+    "pid": "P00000000000000000000000000000200",
+    "type": "PERSON",
+    "names": [{"original": "Anna Beispiel", "en": "Anna Example", "language": "de"}],
+    "countries": {"country": ["ch"], "countryCitizenship": ["ch", "li"]},
+    "flags": [{"PEP": {"value": "#PEP"}}],
+    "alerts": [
+        {"description": "Politically exposed person", "type": ["pep"]},
+        {"description": "An internal marker", "type": ["hidden"]},
+    ],
+    "uni": {"National ID": "756.0000.0000.01"},
+}
+
+# Live, the paged profile stays grouped by publisher, each group paged on its own, and a party
+# two publishers report comes in both groups.
 RELATED_PARTIES: dict[str, object] = {
-    "data": [
-        {
-            "entity": {
-                "id": "entity_ch_registry__p_1",
-                "pid": "P00000000000000000000000000000200",
-                "type": "PERSON",
-                "names": [{"original": "Anna Beispiel", "en": "Anna Example", "language": "de"}],
-                "countries": {"country": ["ch"], "countryCitizenship": ["ch", "li"]},
-                "flags": [{"PEP": {"value": "#PEP"}}],
-                "alerts": [
-                    {"description": "Politically exposed person", "type": ["pep"]},
-                    {"description": "An internal marker", "type": ["hidden"]},
-                ],
-                "uni": {"National ID": "756.0000.0000.01"},
-            },
-            "relation": [
+    "root": {"pid": "O00000000000000000000000000000100", "type": "ORGANIZATION"},
+    "related": {
+        "Example Commercial Register": {
+            "data": [
                 {
-                    "type": "shareholding_ownership",
-                    "relationProperty": [
+                    "entity": {"type": "PERSON", "names": [{"en": "Pat Signatory"}]},
+                    "relation": [
                         {
-                            "title": "shareholder",
-                            "dates": {
-                                "Start Date": {"y": 2019, "m": 5},
-                                "Date of Information": {"y": 2026, "m": 10, "d": 1},
-                            },
-                            "properties": {"Share": ["60.00000"], "Share capital": ["100000"]},
-                            "metadata": {
-                                "sourceCode": "#CH_REGISTRY",
-                                "sourceName": "Example Commercial Register",
-                            },
+                            "type": "signature",
+                            "relationProperty": [{"title": "signatory", "former": True}],
+                        }
+                    ],
+                },
+                {
+                    "entity": _ANNA,
+                    "relation": [
+                        {
+                            "type": "shareholding_ownership",
+                            "relationProperty": [
+                                {
+                                    "title": "shareholder",
+                                    "dates": {
+                                        "Start Date": {"y": 2019, "m": 5},
+                                        "Date of Information": {"y": 2026, "m": 10, "d": 1},
+                                    },
+                                    "properties": {
+                                        "Share": ["60.00000"],
+                                        "Share capital": ["100000"],
+                                    },
+                                    "metadata": {
+                                        "sourceCode": "#CH_REGISTRY",
+                                        "sourceName": "Example Commercial Register",
+                                    },
+                                }
+                            ],
+                        }
+                    ],
+                },
+                {"entity": {"type": "ORGANIZATION", "names": []}, "relation": []},
+            ],
+            "currentPage": 0,
+            "pageSize": 3,
+            "totalElements": 3,
+            "hasNext": False,
+        },
+        "Example PEP List": {
+            "data": [
+                {
+                    "entity": {**_ANNA, "countries": {"country": ["de"]}},
+                    "relation": [
+                        {
+                            "type": "board",
+                            "relationProperty": [
+                                {
+                                    "title": "board member",
+                                    "metadata": {"sourceName": "Example PEP List"},
+                                }
+                            ],
                         }
                     ],
                 }
             ],
+            "currentPage": 0,
+            "pageSize": 1,
+            "totalElements": 41,
+            "hasNext": True,
         },
-        {
-            "entity": {"type": "PERSON", "names": [{"en": "Pat Signatory"}]},
-            "relation": [{"type": "signature", "relationProperty": [{"title": "signatory"}]}],
-        },
-        {"entity": {"type": "ORGANIZATION", "names": []}, "relation": []},
-    ],
-    "currentPage": 0,
-    "pageSize": 25,
-    "totalElements": 26,
-    "hasNext": True,
+    },
 }
 
 OWNERS: dict[str, object] = {

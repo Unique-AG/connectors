@@ -1,15 +1,19 @@
+from collections.abc import Iterable
 from typing import Literal
 
 from pydantic import BaseModel
 from pydantic import Field
 
+from polixis_mcp.contexts.cached_calls import cached_call
 from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.pages import encode_cursor
+from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 from polixis_mcp.contexts.risks import visible_alert_texts
+from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import CorporateNodeData
 from polixis_mcp.upstream import CorporateRequestInput
 from polixis_mcp.upstream import GET_CORPORATE_PROFILE
@@ -31,25 +35,78 @@ RelationCategory = Literal[
 
 
 async def get_related_parties(
-    *, upstream: Upstream, query: RelatedPartiesQuery
+    *, upstream: Upstream, persistence: Persistence, query: RelatedPartiesQuery
 ) -> RelatedPartiesPage:
-    response = await upstream.call(
-        GET_CORPORATE_PROFILE,
-        GetCorporateProfileRequest(
-            query=GetCorporateProfileQuery(page=query.page, size=query.page_size),
+    """Polixis groups the parties by publisher even when paged, and pages each group on its
+    own: its page `n` holds up to `_PER_PUBLISHER` parties of every publisher, so a party
+    several publishers report comes once per group. This merges them into one party with every
+    relation, and pages the merged list by tokens; the next page reads Polixis's from the cache.
+    A party can come again on a later Polixis page, when a publisher with more lists it there.
+    Parties with a current relation come first, then those most sources report.
+    """
+    response = await cached_call(
+        upstream=upstream,
+        persistence=persistence,
+        operation=GET_CORPORATE_PROFILE,
+        request=GetCorporateProfileRequest(
+            query=GetCorporateProfileQuery(page=query.polixis_page, size=_PER_PUBLISHER),
             body=CorporateRequestInput(id=query.pid, category=list(query.categories)),
         ),
     )
-    return RelatedPartiesPage(
-        pid=query.pid,
-        total_parties=response.total_elements,
-        parties=[party for item in response.data or [] if (party := _party(item)) is not None],
-        next_cursor=(
-            encode_cursor(query.model_copy(update={"page": query.page + 1}))
-            if response.has_next
-            else None
+    groups = response.related or {}
+    parties = sorted(
+        _merged(
+            party
+            for group in groups.values()
+            for item in group.data or []
+            if (party := _party(item)) is not None
+        ),
+        key=lambda party: (
+            all(relation.former for relation in party.relations),
+            -len(party.relations),
+            party.name or "",
         ),
     )
+    more_at_polixis = any(group.has_next for group in groups.values())
+    page, next_offset = page_of(parties, offset=query.offset, size=query.page_size)
+    if next_offset is not None:
+        next_query = query.model_copy(update={"offset": next_offset})
+    elif more_at_polixis:
+        next_query = query.model_copy(update={"polixis_page": query.polixis_page + 1, "offset": 0})
+    else:
+        next_query = None
+    return RelatedPartiesPage(
+        pid=query.pid,
+        total_parties=(len(parties) if query.polixis_page == 0 and not more_at_polixis else None),
+        relations_by_source={
+            publisher: group.total_elements or 0 for publisher, group in groups.items()
+        },
+        parties=page,
+        next_cursor=encode_cursor(next_query) if next_query is not None else None,
+    )
+
+
+def _merged(parties: Iterable[RelatedPartyView]) -> list[RelatedPartyView]:
+    """One party per pid, or per type and name for a party without a pid, with the relations
+    every publisher reports.
+    """
+    merged: dict[tuple[str | None, str | None, str | None], RelatedPartyView] = {}
+    for party in parties:
+        key = (party.pid, None, None) if party.pid else (None, party.entity_type, party.name)
+        known = merged.get(key)
+        merged[key] = (
+            party
+            if known is None
+            else known.model_copy(
+                update={
+                    "countries": unique([*known.countries, *party.countries]),
+                    "flags": unique([*known.flags, *party.flags]),
+                    "alerts": unique([*known.alerts, *party.alerts]),
+                    "relations": [*known.relations, *party.relations],
+                }
+            )
+        )
+    return list(merged.values())
 
 
 def _party(item: CorporateNodeData) -> RelatedPartyView | None:
@@ -108,11 +165,16 @@ _ALL_CATEGORIES: tuple[RelationCategory, ...] = (
 )
 
 
+# Polixis's page size, which it applies to each publisher's group.
+_PER_PUBLISHER = 40
+
+
 class RelatedPartiesQuery(PageQuery):
     pid: str = Field(min_length=1)
     categories: tuple[RelationCategory, ...] = Field(default=_ALL_CATEGORIES, min_length=1)
-    page: int = Field(default=0, ge=0)
-    page_size: int = Field(default=40, ge=1, le=45)
+    page_size: int | None = Field(default=None, ge=1, le=100)
+    polixis_page: int = Field(default=0, ge=0)
+    offset: int = Field(default=0, ge=0)
 
 
 class RelationView(BaseModel):
@@ -165,8 +227,13 @@ class RelatedPartiesPage(BaseModel):
 
     pid: str = Field(description="The entity asked about.")
     total_parties: int | None = Field(
-        description="Related parties across every page, or null when Polixis does not say. "
-        "It counts the parties with neither a pid nor a name, which the pages leave out."
+        description="Computed by this MCP: the related parties across every page, each counted "
+        "once however many sources report it. Null when Polixis holds more than one of its "
+        "pages, so they cannot be counted without fetching them all."
+    )
+    relations_by_source: dict[str, int] = Field(
+        description="Polixis's count of related parties each source (register or list) "
+        "reports, across every page. A party several sources report counts in each."
     )
     parties: list[RelatedPartyView] = Field(description="The parties of this page.")
     next_cursor: str | None = Field(

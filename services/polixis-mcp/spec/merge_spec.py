@@ -304,10 +304,18 @@ def _corporate(vendor: JsonObject) -> list[Edit]:
         set_(*corporate, "parameters", value=_required_page(_at(vendor, *corporate, "parameters"))),
         set_(
             *corporate,
-            *("responses", "200", "content", "application/json", "schema"),
-            value=ref("CorporateProfileResponse"),
+            *("responses", "200", "description"),
+            value="Corporate profile, grouped by publisher. Live, it stays grouped with `page` "
+            "too: `page` and `size` page each publisher's group on its own.",
         ),
-        append(*corporate, "description", value=" A request without `category` fails with a 500."),
+        append(
+            *corporate,
+            "description",
+            value=" Live, `page` does not flatten the response: it stays grouped by publisher, "
+            "and `page` and `size` apply to each group separately, so one page holds up to "
+            "`size` entities per publisher and an entity several publishers report appears in "
+            "each of their groups. A request without `category` fails with a 500.",
+        ),
         set_(*schema("CorporateRequest", "required"), value=["id", "category"]),
         append(
             *schema("CorporateRequest", "properties", "category", "description"),
@@ -330,14 +338,14 @@ def _corporate(vendor: JsonObject) -> list[Edit]:
 
 
 def _required_page(parameters: Json) -> Json:
-    """The corporate profile's parameters with `page` required: the tools use the flat page."""
+    """The corporate profile's parameters with `page` required: the tools page each group."""
     assert isinstance(parameters, list)
     edits = [
         set_("required", value=True),
         append(
             "description",
-            value=" Required here: the tools use the flat page. Without it the response is a "
-            "CorporateProfilesResponse instead.",
+            value=" Required here, so every group is paged. Live, it pages each publisher's "
+            "group on its own rather than giving a flat list.",
         ),
         set_("schema", "minimum", value=0),
     ]

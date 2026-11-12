@@ -170,24 +170,24 @@ async def test_find_connections_says_when_none_was_found(mcp_client: McpClient) 
     assert (connections.connected, connections.hops, connections.paths) == (False, None, [])
 
 
-async def test_find_flagged_parties_lists_the_nearest_first_with_the_path_to_each(
+async def test_find_flagged_parties_lists_the_most_severe_first_with_the_path_to_each(
     mcp_client: McpClient,
 ) -> None:
     found = await call_tool(
         mcp_client,
         "find_flagged_parties",
-        {"pid": "O00000000000000000000000000000100"},
+        {"pid": "O00000000000000000000000000000100", "radius": 2},
         returns=contexts.FlaggedPartiesPage,
     )
 
     assert found.parties_checked == 8
     assert [(flagged.party.pid, flagged.risks, len(flagged.path)) for flagged in found.flagged] == [
+        ("P00000000000000000000000000000400", ["SANCTION"], 2),
         ("P00000000000000000000000000000200", ["PEP"], 1),
         ("O00000000000000000000000000000500", ["STATECO"], 1),
-        ("P00000000000000000000000000000400", ["SANCTION"], 2),
         ("O00000000000000000000000000000310", ["STATECO"], 2),
     ]
-    assert found.flagged[1].party.name is None
+    assert found.flagged[2].party.name is None
     assert found.total_by_risk == {
         "FORMER_PEP": 0,
         "PEP": 1,
@@ -220,3 +220,34 @@ async def test_find_flagged_parties_reports_the_polixis_error_of_a_failed_graph(
     assert error.startswith(
         "500 Internal Server Error for POST https://api.example.com/api/graph/subgraph"
     )
+
+
+async def test_find_flagged_parties_has_polixis_filter_both_graphs_on_every_hop(
+    mcp_client: McpClient, upstream_requests: list[httpx2.Request]
+) -> None:
+    await call_tool(
+        mcp_client,
+        "find_flagged_parties",
+        {
+            "pid": "O00000000000000000000000000000100",
+            "radius": 2,
+            "current_only": True,
+            "sanctioned_only": True,
+        },
+        returns=contexts.FlaggedPartiesPage,
+    )
+
+    rule = {"direction": "BOTH", "onlyActual": True, "requireSanction": True}
+    graphs = {
+        request.url.path: json.loads(request.content)
+        for request in upstream_requests
+        if request.url.path in {"/api/graph/smart", "/api/graph/subgraph"}
+    }
+    assert graphs == {
+        path: {
+            "id": "O00000000000000000000000000000100",
+            "radius": 2,
+            "filter": {"rules": {"1": rule, "2": rule}},
+        }
+        for path in ("/api/graph/smart", "/api/graph/subgraph")
+    }

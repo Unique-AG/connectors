@@ -122,7 +122,7 @@ async def test_get_entity_profiles_looks_up_every_pid_and_marks_an_unknown_one(
     assert (known.pid, known.rejected, known.flags) == (
         "P00000000000000000000000000000200",
         None,
-        ["PEP"],
+        ["PEP", "SANCTION", "REP"],
     )
     assert known.dates == {"Date of Birth": ["1971-03"]}
     assert unknown.pid == UNKNOWN_PID

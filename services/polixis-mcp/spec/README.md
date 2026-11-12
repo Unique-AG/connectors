@@ -36,7 +36,7 @@ schema or field shows up when you run the merge, not later in the codegen.
 | `_rejections` | `error` and `code` on the responses of every endpoint that takes an id, and the `RejectionMessage` and `RejectionCode` schemas | An id Polixis does not know gets a 200 with that body in place of the response; the client's `response_check` turns it into a `PolixisRejectedError` on every call |
 | `_timestamps` | `at`, `startDate` and `endDate` described as epoch seconds | Their spec says milliseconds; every live value was in seconds |
 | | Direction of an edge | The source holds each detail's role in the target |
-| `_corporate` | `page` required on the corporate profile, with its flat response | Without `page` the response takes another shape; the tools use the flat one |
+| `_corporate` | `page` required on the corporate profile; its response stays the grouped `CorporateProfilesResponse` | Polixis's spec says `page` flattens the response, but live it stays grouped by publisher and `page` and `size` page each group on its own |
 | | `category` required | A request without it gets a 500 |
 | | Relation type names and the shape of `flags` | The live API sends names and a shape their spec does not give |
 | `_graph` | `NodeMeta` and `NodeMetaMap` typed, and used as the graphs' and trees' `meta` | Their spec leaves `meta` a free-form object |

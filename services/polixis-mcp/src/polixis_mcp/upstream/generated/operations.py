@@ -13,7 +13,7 @@ from polixis_mcp.upstream.generated.vendor_requests import GetTopDownOwnershipRe
 from polixis_mcp.upstream.generated.vendor_requests import GetUltimateBeneficialOwnersRequest
 from polixis_mcp.upstream.generated.vendor_requests import ResolvePermanentIdRequest
 from polixis_mcp.upstream.generated.vendor_requests import SearchEntitiesRequest
-from polixis_mcp.upstream.generated.vendor_responses import CorporateProfileResponse
+from polixis_mcp.upstream.generated.vendor_responses import CorporateProfilesResponse
 from polixis_mcp.upstream.generated.vendor_responses import JudicialRecords
 from polixis_mcp.upstream.generated.vendor_responses import PathResponse
 from polixis_mcp.upstream.generated.vendor_responses import PidMembers
@@ -27,8 +27,8 @@ from polixis_mcp.upstream.generated.vendor_responses import VirtualSubgraph
 SEARCH_ENTITIES = Operation[SearchResponse, SearchEntitiesRequest](
     "searchEntities", TypeAdapter(SearchResponse)
 )
-GET_CORPORATE_PROFILE = Operation[CorporateProfileResponse, GetCorporateProfileRequest](
-    "getCorporateProfile", TypeAdapter(CorporateProfileResponse)
+GET_CORPORATE_PROFILE = Operation[CorporateProfilesResponse, GetCorporateProfileRequest](
+    "getCorporateProfile", TypeAdapter(CorporateProfilesResponse)
 )
 GET_SMART_GRAPH = Operation[SmartGraphResponse, GetSmartGraphRequest](
     "getSmartGraph", TypeAdapter(SmartGraphResponse)

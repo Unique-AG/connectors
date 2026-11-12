@@ -42,7 +42,7 @@ async def test_another_tool_on_the_same_entity_reuses_the_graph(
     await call_tool(
         mcp_client,
         "find_flagged_parties",
-        {"pid": "O00000000000000000000000000000100"},
+        {"pid": "O00000000000000000000000000000100", "radius": 2},
         returns=contexts.FlaggedPartiesPage,
     )
     linked = await call_tool(

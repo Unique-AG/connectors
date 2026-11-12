@@ -44,7 +44,7 @@ class CorporateRequestInput(RequestModel):
 class GetCorporateProfileQuery(RequestModel):
     page: int = Field(
         ...,
-        description="Zero-based page index. Omit for the full per-publisher grouped response; provide it for a flat paginated response across publishers. Required here: the tools use the flat page. Without it the response is a CorporateProfilesResponse instead.",
+        description="Zero-based page index. Omit for the full per-publisher grouped response; provide it for a flat paginated response across publishers. Required here, so every group is paged. Live, it pages each publisher's group on its own rather than giving a flat list.",
         ge=0,
     )
     publisher: str | None = Field(

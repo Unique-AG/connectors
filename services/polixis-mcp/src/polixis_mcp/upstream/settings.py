@@ -11,6 +11,8 @@ from pydantic import UrlConstraints
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
+from polixis_mcp.upstream.recording import RecordingSettings
+
 # The client credentials, the token and the API key travel to these, so plain http is refused.
 type _HttpsUrl = Annotated[AnyHttpUrl, UrlConstraints(allowed_schemes=["https"])]
 
@@ -36,3 +38,5 @@ class UpstreamSettings(BaseSettings):
     quota_cooldown_seconds: float = Field(default=15 * 60, ge=0)
     # Read from UPSTREAM_RETRY_*, with the defaults every MCP shares.
     retry: RetrySettings = Field(default_factory=RetrySettings)
+    # Read from UPSTREAM_RECORDING_*: off unless a developer records or replays Polixis's answers.
+    recording: RecordingSettings = Field(default_factory=RecordingSettings)

@@ -16,7 +16,9 @@ from polixis_mcp.upstream import GET_SMART_GRAPH
 from polixis_mcp.upstream import GET_SUBGRAPH
 from polixis_mcp.upstream import GetSmartGraphRequest
 from polixis_mcp.upstream import GetSubgraphRequest
+from polixis_mcp.upstream import HopFilterMapInput
 from polixis_mcp.upstream import NodeMeta
+from polixis_mcp.upstream import RadiusFilterInput
 from polixis_mcp.upstream import SmartGraphResponse
 from polixis_mcp.upstream import SubgraphRequestInput
 from polixis_mcp.upstream import Upstream
@@ -29,14 +31,30 @@ GraphScope = Literal["key", "all"]
 
 
 async def fetch_network(
-    *, upstream: Upstream, persistence: Persistence, pid: str, radius: int, scope: GraphScope
+    *,
+    upstream: Upstream,
+    persistence: Persistence,
+    pid: str,
+    radius: int,
+    scope: GraphScope,
+    rule: RadiusFilterInput | None = None,
 ) -> Network:
     """The network around `pid`. Only the key graph carries names, so `all` asks for both and
     names the full graph's nodes from the key one; a node only the full graph has stays unnamed.
     Polixis returns it whole, so the next page reads it from the cache. It is `truncated` when
-    Polixis cut either graph short.
+    Polixis cut either graph short. `rule` filters both graphs at Polixis.
     """
-    request = SubgraphRequestInput(id=pid, radius=radius)
+    request = (
+        SubgraphRequestInput(id=pid, radius=radius)
+        if rule is None
+        # Polixis keys the rules by hop, but a rule keyed to one hop filtered the others too,
+        # so the same rule goes on every hop.
+        else SubgraphRequestInput(
+            id=pid,
+            radius=radius,
+            filter=HopFilterMapInput(rules={str(hop): rule for hop in range(1, radius + 1)}),
+        )
+    )
     if scope == "key":
         key = await cached_call(
             upstream=upstream,

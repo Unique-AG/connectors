@@ -13,16 +13,34 @@ from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import RISK_COUNTS_DESCRIPTION
 from polixis_mcp.contexts.risks import risk_markers
 from polixis_mcp.contexts.risks import RISK_MARKERS_DESCRIPTION
+from polixis_mcp.contexts.risks import risk_severity
 from polixis_mcp.persistence import Persistence
+from polixis_mcp.upstream import RadiusFilterInput
 from polixis_mcp.upstream import Upstream
 
 
 async def find_flagged_parties(
     *, upstream: Upstream, persistence: Persistence, query: FlaggedPartiesQuery
 ) -> FlaggedPartiesPage:
-    """Nearest first; among equally near ones the sanctioned first, then by name, unnamed last."""
+    """The most severe risk first, so a sanctioned party two hops away comes before the
+    state-owned companies of the entity's own group; then the nearest, then by name, unnamed
+    last.
+    """
     network = await fetch_network(
-        upstream=upstream, persistence=persistence, pid=query.pid, radius=query.radius, scope="all"
+        upstream=upstream,
+        persistence=persistence,
+        pid=query.pid,
+        radius=query.radius,
+        scope="all",
+        rule=(
+            RadiusFilterInput(
+                direction="BOTH",
+                only_actual=query.current_only or None,
+                require_sanction=query.sanctioned_only or None,
+            )
+            if query.current_only or query.sanctioned_only
+            else None
+        ),
     )
     paths = first_shortest_paths(network, start=query.pid)
     flagged = sorted(
@@ -34,8 +52,8 @@ async def find_flagged_parties(
             and (risks := risk_markers(flags=party.flags, alerts=party.alerts))
         ),
         key=lambda found: (
+            risk_severity(found.risks),
             len(found.path),
-            "SANCTION" not in found.risks,
             found.party.name is None,
             found.party.name or "",
             found.party.pid,
@@ -59,7 +77,9 @@ async def find_flagged_parties(
 
 class FlaggedPartiesQuery(PageQuery):
     pid: str = Field(min_length=1)
-    radius: int = Field(default=2, ge=1, le=3)
+    radius: int = Field(default=1, ge=1, le=3)
+    current_only: bool = False
+    sanctioned_only: bool = False
     page_size: int | None = Field(default=None, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 

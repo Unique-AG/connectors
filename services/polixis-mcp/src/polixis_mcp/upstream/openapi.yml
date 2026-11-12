@@ -113,15 +113,17 @@ paths:
         affiliates (auditors, liquidators, etc.). Without `page`/`size`, the response groups related entities
         by publisher (data source); with `page` (and optional `size`, default 10) it returns a flat paginated
         list across publishers. For PEP, sanctions, or other AML profiles, only basic information is returned
-        when there is no established business relationship with the entity. A request without `category`
-        fails with a 500.
+        when there is no established business relationship with the entity. Live, `page` does not flatten
+        the response: it stays grouped by publisher, and `page` and `size` apply to each group separately,
+        so one page holds up to `size` entities per publisher and an entity several publishers report
+        appears in each of their groups. A request without `category` fails with a 500.
       tags:
       - Corporate
       parameters:
       - description: >-
           Zero-based page index. Omit for the full per-publisher grouped response; provide it for a flat
-          paginated response across publishers. Required here: the tools use the flat page. Without it
-          the response is a CorporateProfilesResponse instead.
+          paginated response across publishers. Required here, so every group is paged. Live, it pages
+          each publisher's group on its own rather than giving a flat list.
         name: page
         in: query
         schema:
@@ -151,11 +153,13 @@ paths:
         required: true
       responses:
         '200':
-          description: Corporate profile — grouped by publisher, or flat-paginated when `page` is provided.
+          description: >-
+            Corporate profile, grouped by publisher. Live, it stays grouped with `page` too: `page` and
+            `size` page each publisher's group on its own.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/CorporateProfileResponse'
+                $ref: '#/components/schemas/CorporateProfilesResponse'
         '400':
           description: Bad Request
       operationId: getCorporateProfile

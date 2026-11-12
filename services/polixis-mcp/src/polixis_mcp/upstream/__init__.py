@@ -34,7 +34,9 @@ from polixis_mcp.upstream.generated.vendor_requests import GetTopDownOwnershipPa
 from polixis_mcp.upstream.generated.vendor_requests import GetTopDownOwnershipRequest
 from polixis_mcp.upstream.generated.vendor_requests import GetUltimateBeneficialOwnersPath
 from polixis_mcp.upstream.generated.vendor_requests import GetUltimateBeneficialOwnersRequest
+from polixis_mcp.upstream.generated.vendor_requests import HopFilterMapInput
 from polixis_mcp.upstream.generated.vendor_requests import PathRequestInput
+from polixis_mcp.upstream.generated.vendor_requests import RadiusFilterInput
 from polixis_mcp.upstream.generated.vendor_requests import SearchEntitiesRequest
 from polixis_mcp.upstream.generated.vendor_requests import SearchRequestInput
 from polixis_mcp.upstream.generated.vendor_requests import SubgraphRequestInput
@@ -58,6 +60,8 @@ from polixis_mcp.upstream.generated.vendor_responses import VirtualEdge
 from polixis_mcp.upstream.generated.vendor_responses import VirtualNode
 from polixis_mcp.upstream.generated.vendor_responses import VirtualSubgraph
 from polixis_mcp.upstream.quota import PolixisQuotaSpentError
+from polixis_mcp.upstream.recording import ledger_count
+from polixis_mcp.upstream.recording import RecordingMode
 from polixis_mcp.upstream.rejections import PolixisRejectedError
 from polixis_mcp.upstream.settings import UpstreamSettings
 
@@ -72,6 +76,8 @@ __all__ = [
     "GetSanctionExposurePath",
     "GetSanctionExposureRequest",
     "PathRequestInput",
+    "HopFilterMapInput",
+    "RadiusFilterInput",
     "AlertEntry",
     "ConnectionDetail",
     "GraphPath",
@@ -108,6 +114,8 @@ __all__ = [
     "UboResult",
     "PolixisQuotaSpentError",
     "PolixisRejectedError",
+    "RecordingMode",
+    "ledger_count",
     "Profile",
     "CorporateNodeData",
     "SearchEntitiesRequest",

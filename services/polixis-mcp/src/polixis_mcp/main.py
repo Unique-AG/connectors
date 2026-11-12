@@ -16,6 +16,7 @@ from polixis_mcp.mcp import run_server
 from polixis_mcp.persistence import open_persistence
 from polixis_mcp.persistence import PersistenceSettings
 from polixis_mcp.telemetry import init_telemetry
+from polixis_mcp.upstream import RecordingMode
 from polixis_mcp.upstream import UpstreamSettings
 
 
@@ -29,9 +30,13 @@ def main() -> None:
     persistence = partial(open_persistence, persistence_settings)
     # Without sign-in there is no user to count tool calls under.
     rate_limit = RateLimitSettings() if auth is not None else None
-    server = create_server(
-        from_environment(UpstreamSettings), persistence, auth=auth, rate_limit=rate_limit
+    upstream = from_environment(UpstreamSettings)
+    # Recordings are licensed data about real people: only a developer's own loopback server
+    # may save or serve them.
+    assert upstream.recording.mode is RecordingMode.OFF or auth is None, (
+        "UPSTREAM_RECORDING_MODE needs MCP_AUTH_MODE=none"
     )
+    server = create_server(upstream, persistence, auth=auth, rate_limit=rate_limit)
     run_server(server, server_settings)
 
 

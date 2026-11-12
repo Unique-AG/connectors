@@ -460,10 +460,15 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Sanctioned, PEP, state-owned and restricted parties near an organization or person,\neach with its markers and the path to it: who holds what in whom at every step.\n\nPolixis returns the network around the entity, both its smart graph and its full graph\nwith signatories, third parties and historic ties. This MCP picks the parties whose flags\nor alerts carry a risk marker and finds a shortest path to each over Polixis's links.\n\nUse it for PEP and state-ownership exposure nearby; for sanctions at any distance use\n`get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker across\nevery page, and every page repeats it, so a question such as \"is any of them\nstate-owned?\" is settled by a 0 there. The nearest come first, the sanctioned before the\nothers at the same distance, so stop once they are farther than the question cares about.\nWhen `truncated_by_polixis` is true, Polixis cut the network short: do not report that\nnone was found. When `next_cursor` is set, pass it back as `cursor` for the next page.",
+    "description": "Sanctioned, PEP, state-owned and restricted parties near an organization or person,\neach with its markers and the path to it: who holds what in whom at every step.\n\nPolixis returns the network around the entity, both its smart graph and its full graph\nwith signatories, third parties and historic ties. This MCP picks the parties whose flags\nor alerts carry a risk marker and finds a shortest path to each over Polixis's links.\n\nUse it for PEP and state-ownership exposure nearby; for sanctions at any distance use\n`get_sanctions_exposure`. `total_by_risk` counts every flagged party by marker across\nevery page, and every page repeats it, so a question such as \"is any of them\nstate-owned?\" is settled by a 0 there. The most severe come first: sanctioned, then PEP,\nthen restricted or in a sanction-sensitive territory, then former PEP or REP, and\nstate-owned last; the nearest first within each. So stop once the risks are milder than\nthe question cares about.\nWhen `truncated_by_polixis` is true, Polixis cut the network short: do not report that\nnone was found. When `next_cursor` is set, pass it back as `cursor` for the next page.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "current_only": {
+          "default": false,
+          "description": "Only ties Polixis holds as current, leaving out former directors, shareholders and other ended relations. Polixis filters the network itself.",
+          "type": "boolean"
+        },
         "cursor": {
           "anyOf": [
             {
@@ -504,11 +509,16 @@
           "description": "The entity's pid, from `search_entities`, or one the user gave once `resolve_permanent_id` confirmed it. Required unless `cursor` is."
         },
         "radius": {
-          "default": 2,
-          "description": "Hops to look out from the entity. Polixis documents no maximum and stopped at 2 in every walk we tried, so 3 may find nothing more, from a much larger graph.",
+          "default": 1,
+          "description": "Hops to look out from the entity. 1, the default, covers its own owners, directors, signatories and holdings, and fits on one page for most companies. 2 reaches their ties too, but Polixis can leave parties out of a graph that large without saying so, and for a subsidiary it mostly adds the state-owned companies of its own group. Polixis stopped at 2 in every walk we tried, so 3 may find nothing more, from a much larger graph.",
           "maximum": 3,
           "minimum": 1,
           "type": "integer"
+        },
+        "sanctioned_only": {
+          "default": false,
+          "description": "Only sanctioned parties, filtered by Polixis itself, which makes a large network much smaller. It drops the unsanctioned parties too, so a sanctioned party reached only through one is missed; it can also find some the unfiltered network leaves out. For sanctions at any distance, with the listings, use `get_sanctions_exposure` instead.",
+          "type": "boolean"
         }
       },
       "type": "object"
@@ -1860,7 +1870,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "The directors, executives, signatories, shareholders, holdings and other parties\nrelated to an organization or person, with their roles, shares, dates, sources and flags.\n\nPolixis pages them itself: when `next_cursor` is set, pass it back as `cursor` for the\nnext page. For the shares carried through several layers of owners, use\n`get_ultimate_beneficial_owners` instead.",
+    "description": "The directors, executives, signatories, shareholders, holdings and other parties\nrelated to an organization or person, with their roles, shares, dates, sources and flags.\n\nEach party comes once, with the relations every source reports; those with a current\nrelation come first. When `next_cursor` is set, pass it back as `cursor` for the next\npage. For the shares carried through several layers of owners, use\n`get_ultimate_beneficial_owners` instead.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1904,11 +1914,18 @@
           "description": "The `next_cursor` of the previous page, to get the next one. Pass it alone: it carries every argument of the first call, and the others are ignored."
         },
         "page_size": {
-          "default": 40,
-          "description": "Related parties per page, at most 45. Polixis pages them itself; the default of 40 comes to about 7,000 tokens.",
-          "maximum": 45,
-          "minimum": 1,
-          "type": "integer"
+          "anyOf": [
+            {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "At most this many rows on a page. Leave it out: a page then holds as many of the ranked rows as fit in about 8,000 tokens."
         },
         "pid": {
           "anyOf": [
@@ -2119,6 +2136,13 @@
           "description": "The entity asked about.",
           "type": "string"
         },
+        "relations_by_source": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Polixis's count of related parties each source (register or list) reports, across every page. A party several sources report counts in each.",
+          "type": "object"
+        },
         "total_parties": {
           "anyOf": [
             {
@@ -2128,12 +2152,13 @@
               "type": "null"
             }
           ],
-          "description": "Related parties across every page, or null when Polixis does not say. It counts the parties with neither a pid nor a name, which the pages leave out."
+          "description": "Computed by this MCP: the related parties across every page, each counted once however many sources report it. Null when Polixis holds more than one of its pages, so they cannot be counted without fetching them all."
         }
       },
       "required": [
         "pid",
         "total_parties",
+        "relations_by_source",
         "parties",
         "next_cursor"
       ],

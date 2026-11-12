@@ -7,10 +7,13 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from polixis_mcp import contexts
+from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
+from polixis_mcp.mcp.inputs.cursor import PageSize
 from polixis_mcp.mcp.inputs.pid import EntityPid
+from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -42,23 +45,17 @@ async def get_related_parties(
             ),
         ),
     ] = None,
-    page_size: Annotated[
-        int,
-        Field(
-            ge=1,
-            le=45,
-            description="Related parties per page, at most 45. Polixis pages them itself; the "
-            "default of 40 comes to about 7,000 tokens.",
-        ),
-    ] = 40,
+    page_size: PageSize = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.RelatedPartiesPage:
     """The directors, executives, signatories, shareholders, holdings and other parties
     related to an organization or person, with their roles, shares, dates, sources and flags.
 
-    Polixis pages them itself: when `next_cursor` is set, pass it back as `cursor` for the
-    next page. For the shares carried through several layers of owners, use
+    Each party comes once, with the relations every source reports; those with a current
+    relation come first. When `next_cursor` is set, pass it back as `cursor` for the next
+    page. For the shares carried through several layers of owners, use
     `get_ultimate_beneficial_owners` instead.
     """
     query = page_query(
@@ -68,4 +65,6 @@ async def get_related_parties(
         categories=tuple(categories) if categories else None,
         page_size=page_size,
     )
-    return await contexts.get_related_parties(upstream=upstream, query=query)
+    return await contexts.get_related_parties(
+        upstream=upstream, persistence=persistence, query=query
+    )

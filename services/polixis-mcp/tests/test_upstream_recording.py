@@ -1,0 +1,123 @@
+import gzip
+import json
+from pathlib import Path
+
+import httpx2
+import pytest
+
+from polixis_mcp.upstream.recording import CassetteMissingError
+from polixis_mcp.upstream.recording import CassetteTransport
+from polixis_mcp.upstream.recording import ledger_count
+from polixis_mcp.upstream.recording import RecordingMode
+from polixis_mcp.upstream.recording import RecordingRefusedError
+from polixis_mcp.upstream.recording import RecordingSettings
+
+API = "https://api.example.com"
+PROFILE = {"pid": "O00000000000000000000000000000100", "name": "Kestrel Marine Services Ltd"}
+
+
+def polixis(sent: list[httpx2.Request], response: httpx2.Response) -> httpx2.MockTransport:
+    def answer(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        return response
+
+    return httpx2.MockTransport(answer)
+
+
+def settings(directory: Path, mode: RecordingMode, budget: int | None = 10) -> RecordingSettings:
+    return RecordingSettings(mode=mode, directory=directory, budget=budget, min_interval_seconds=0)
+
+
+async def post(transport: httpx2.AsyncBaseTransport, body: dict[str, object]) -> httpx2.Response:
+    async with httpx2.AsyncClient(base_url=API, transport=transport) as http:
+        return await http.post("/api/completion/O1", json=body, params={"lang": "en"})
+
+
+async def test_replays_what_it_recorded(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD),
+        polixis(sent, httpx2.Response(200, json=PROFILE)),
+    )
+    recorded = await post(recorder, {"fields": ["names"], "id": 1})
+
+    replayed = await post(
+        CassetteTransport(settings(tmp_path, RecordingMode.REPLAY)), {"id": 1, "fields": ["names"]}
+    )
+
+    assert (recorded.json(), replayed.json(), replayed.status_code) == (PROFILE, PROFILE, 200)
+    assert len(sent) == 1
+    assert ledger_count(tmp_path) == 1
+
+
+async def test_replay_without_a_recording_fails(tmp_path: Path) -> None:
+    with pytest.raises(CassetteMissingError, match="/api/completion/O1"):
+        _ = await post(CassetteTransport(settings(tmp_path, RecordingMode.REPLAY)), {"id": 2})
+
+
+async def test_record_sends_nothing_past_the_budget(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD, budget=1),
+        polixis(sent, httpx2.Response(200, json=PROFILE)),
+    )
+    _ = await post(recorder, {"id": 1})
+
+    with pytest.raises(RecordingRefusedError, match="budget is 1"):
+        _ = await post(recorder, {"id": 2})
+    assert len(sent) == 1
+
+
+async def test_a_spent_quota_halts_every_later_run(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    spent = httpx2.Response(
+        429,
+        json={"message": "Limit Exceeded"},
+        headers={"x-amzn-errortype": "LimitExceededException:"},
+    )
+    _ = await post(
+        CassetteTransport(settings(tmp_path, RecordingMode.RECORD), polixis(sent, spent)), {"id": 1}
+    )
+
+    later = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD),
+        polixis(sent, httpx2.Response(200, json=PROFILE)),
+    )
+    with pytest.raises(RecordingRefusedError, match="quota 429"):
+        _ = await post(later, {"id": 2})
+    assert len(sent) == 1
+    assert ledger_count(tmp_path) == 1
+    assert not list(tmp_path.glob("post_*.json"))
+
+
+def test_recording_needs_a_budget(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="BUDGET is required"):
+        _ = settings(tmp_path, RecordingMode.RECORD, budget=None)
+
+
+async def test_returns_a_compressed_answer_decoded(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    compressed = httpx2.Response(
+        200,
+        content=gzip.compress(json.dumps(PROFILE).encode()),
+        headers={"content-encoding": "gzip"},
+    )
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD), polixis(sent, compressed)
+    )
+
+    assert (await post(recorder, {"id": 1})).json() == PROFILE
+
+
+async def test_record_answers_a_recorded_request_without_sending_it(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD), polixis(sent, httpx2.Response(200, json=PROFILE))
+    )
+    _ = await post(recorder, {"id": 1})
+
+    again = await post(recorder, {"id": 1})
+
+    assert again.json() == PROFILE
+    assert len(sent) == 1
+    assert ledger_count(tmp_path) == 1
