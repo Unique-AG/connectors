@@ -211,13 +211,13 @@ describe('IngestionService', () => {
     });
   });
 
-  it('logs and skips page ingestion when registration fails', async () => {
+  it('logs and rethrows when page registration fails', async () => {
     const { service, uniqueApiClient } = makeService();
     vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
       new Error('register failed'),
     );
 
-    await service.ingestPage(pageFixture, 'space-scope-1');
+    await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow();
 
     expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
     expect(mockLogger.error).toHaveBeenCalledWith(
@@ -225,7 +225,7 @@ describe('IngestionService', () => {
         pageId: '42',
         title: new Smeared('Architecture', false),
         err: expect.anything(),
-        msg: 'Failed to ingest page, skipping',
+        msg: 'Failed to ingest page',
       }),
     );
   });
@@ -330,7 +330,7 @@ describe('IngestionService', () => {
       const { service, uniqueApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 500 });
 
-      await service.ingestPage(pageFixture, 'space-scope-1');
+      await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
       expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -348,7 +348,7 @@ describe('IngestionService', () => {
         new Error('finalize failed'),
       );
 
-      await service.ingestPage(pageFixture, 'space-scope-1');
+      await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
       expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -365,17 +365,17 @@ describe('IngestionService', () => {
         new Error('register failed'),
       );
 
-      await service.ingestPage(pageFixture, 'space-scope-1');
+      await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
     });
 
-    it('continues pipeline when cleanup delete fails', async () => {
+    it('rethrows the ingestion error when cleanup delete fails', async () => {
       const { service, uniqueApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 500 });
       vi.mocked(uniqueApiClient.files.deleteByIds).mockRejectedValue(new Error('network error'));
 
-      await service.ingestPage(pageFixture, 'space-scope-1');
+      await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -653,13 +653,13 @@ describe('IngestionService', () => {
       );
     });
 
-    it('logs and skips when attachment registration fails', async () => {
+    it('logs and rethrows when attachment registration fails', async () => {
       const { service, uniqueApiClient } = makeService();
       vi.mocked(uniqueApiClient.ingestion.registerContent).mockRejectedValue(
         new Error('register failed'),
       );
 
-      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+      await expect(service.ingestAttachment(attachmentFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -667,40 +667,40 @@ describe('IngestionService', () => {
           attachmentId: 'att-100',
           title: new Smeared('diagram.png', false),
           err: expect.anything(),
-          msg: 'Failed to ingest attachment, skipping',
+          msg: 'Failed to ingest attachment',
         }),
       );
     });
 
-    it('logs and skips when download stream fails', async () => {
+    it('logs and rethrows when download stream fails', async () => {
       const { service, uniqueApiClient, confluenceApiClient } = makeService();
       vi.mocked(confluenceApiClient.getAttachmentDownloadStream).mockRejectedValue(
         new Error('download failed'),
       );
 
-      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+      await expect(service.ingestAttachment(attachmentFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(mockRequest).not.toHaveBeenCalled();
       expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           attachmentId: 'att-100',
-          msg: 'Failed to ingest attachment, skipping',
+          msg: 'Failed to ingest attachment',
         }),
       );
     });
 
-    it('logs and skips when upload fails', async () => {
+    it('logs and rethrows when upload fails', async () => {
       const { service, uniqueApiClient } = makeService();
       mockRequest.mockResolvedValueOnce({ statusCode: 500 });
 
-      await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+      await expect(service.ingestAttachment(attachmentFixture, 'space-scope-1')).rejects.toThrow();
 
       expect(uniqueApiClient.ingestion.finalizeIngestion).not.toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           attachmentId: 'att-100',
-          msg: 'Failed to ingest attachment, skipping',
+          msg: 'Failed to ingest attachment',
         }),
       );
     });
@@ -710,7 +710,9 @@ describe('IngestionService', () => {
         const { service, uniqueApiClient } = makeService();
         mockRequest.mockResolvedValueOnce({ statusCode: 500 });
 
-        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+        await expect(
+          service.ingestAttachment(attachmentFixture, 'space-scope-1'),
+        ).rejects.toThrow();
 
         expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
         expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -728,7 +730,9 @@ describe('IngestionService', () => {
           new Error('finalize failed'),
         );
 
-        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+        await expect(
+          service.ingestAttachment(attachmentFixture, 'space-scope-1'),
+        ).rejects.toThrow();
 
         expect(uniqueApiClient.files.deleteByIds).toHaveBeenCalledWith(['id-1']);
         expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -745,7 +749,9 @@ describe('IngestionService', () => {
           new Error('register failed'),
         );
 
-        await service.ingestAttachment(attachmentFixture, 'space-scope-1');
+        await expect(
+          service.ingestAttachment(attachmentFixture, 'space-scope-1'),
+        ).rejects.toThrow();
 
         expect(uniqueApiClient.files.deleteByIds).not.toHaveBeenCalled();
       });

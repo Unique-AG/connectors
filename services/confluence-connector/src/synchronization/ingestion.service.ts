@@ -84,11 +84,12 @@ export class IngestionService {
         pageId: page.id,
         title: page.title,
         err,
-        msg: 'Failed to ingest page, skipping',
+        msg: 'Failed to ingest page',
       });
       if (contentId) {
         await this.cleanupFailedRegistration(contentId, { pageId: page.id, title: page.title });
       }
+      throw err;
     }
   }
 
@@ -139,7 +140,7 @@ export class IngestionService {
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),
         err,
-        msg: 'Failed to ingest attachment, skipping',
+        msg: 'Failed to ingest attachment',
       });
       if (contentId) {
         await this.cleanupFailedRegistration(contentId, {
@@ -147,6 +148,7 @@ export class IngestionService {
           title: createSmeared(attachment.title),
         });
       }
+      throw err;
     }
   }
 
