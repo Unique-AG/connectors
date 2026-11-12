@@ -163,10 +163,10 @@ prometheus:
       labels:
         severity: warning
         alertGroup: confluence-connector
-    # Each sync rule window must hold at least two sync outcomes, or one failed sync is enough to
-    # fire. The windows fit syncs that start at least hourly (scanIntervalCron) and finish within
-    # the interval. A sync that runs longer than the interval makes the scheduler skip the next
-    # start, so widen the windows for slow or infrequent syncs.
+    # The sync rules need at least two outcomes in their window, so one failed sync, for example
+    # the first after a pod start, does not fire them. The windows fit syncs that start at least
+    # hourly (scanIntervalCron) and finish within the interval. A sync that runs longer than the
+    # interval makes the scheduler skip the next start, so widen the windows for slower syncs.
     ConfluenceConnectorSyncFailing:
       alert: ConfluenceConnectorSyncFailing
       annotations:
@@ -181,6 +181,10 @@ prometheus:
       expr: |
         (
           sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[3h])) > 0
+        )
+        and on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total[3h])) > 1.5
         )
         unless on (namespace, tenant)
         (
@@ -198,7 +202,7 @@ prometheus:
         runbook: |
           1. Search the connector logs for "Sync failed" with this tenantName
           2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side
-      # The unless clause is the ConfluenceConnectorSyncFailing condition, so the two never fire together.
+      # The unless clause leaves a tenant without any success in 3 hours to ConfluenceConnectorSyncFailing.
       expr: |
         (
           sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[6h]))
@@ -232,20 +236,21 @@ prometheus:
       alert: ConfluenceConnectorContentFailures
       annotations:
         summary: "Confluence Connector cannot ingest or delete content for tenant {{ $labels.tenant }}"
-        description: "Tenant {{ $labels.tenant }} syncs complete, but pages, attachments or deletions keep failing. {{ $value }} failures in the last 90 minutes."
+        description: "Tenant {{ $labels.tenant }} syncs complete, but pages, attachments or deletions keep failing. {{ $value }} failures in the last 2 hours."
         runbook: |
           1. Search the connector logs for "Failed to" with this tenantName
           2. Check the failing items in the "Page ingestion summary" and "Attachment ingestion summary" log lines
           3. Unique ingestion errors also show in ConfluenceConnectorUniqueAPIErrors
-      # Failed items are retried on the next sync, so failures that last 2 hours recur on every sync.
+      # Two hourly syncs can record their failures almost 2 hours apart, so the 2h window stays true
+      # while failures recur. for: 3h is longer than the window, so one bad sync does not fire.
       # The connector zeroes all three counters at startup, so each side of + has a series.
       expr: |
         (
-          sum by (namespace, tenant) (increase(cfc_pages_processed_total{result="failure"}[90m]))
-          + sum by (namespace, tenant) (increase(cfc_attachments_processed_total{result="failure"}[90m]))
-          + sum by (namespace, tenant) (increase(cfc_content_deleted_total{result="failure"}[90m]))
+          sum by (namespace, tenant) (increase(cfc_pages_processed_total{result="failure"}[2h]))
+          + sum by (namespace, tenant) (increase(cfc_attachments_processed_total{result="failure"}[2h]))
+          + sum by (namespace, tenant) (increase(cfc_content_deleted_total{result="failure"}[2h]))
         ) > 0
-      for: 2h
+      for: 3h
       labels:
         severity: warning
         alertGroup: confluence-connector
@@ -260,6 +265,10 @@ prometheus:
       expr: |
         (
           sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="failure"}[3h])) > 0
+        )
+        and on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total[3h])) > 1.5
         )
         unless on (namespace, tenant)
         (
