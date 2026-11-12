@@ -501,7 +501,7 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `ConfluenceConnectorSyncFailing` | At least two syncs of a tenant in the last 3 hours, and all of them failed | `15m` | `critical` |
 | `ConfluenceConnectorSyncDegraded` | More than half of a tenant's syncs in the last 6 hours failed, and at least one in the last 3 hours succeeded | `15m` | `warning` |
 | `ConfluenceConnectorSyncStuck` | A sync has run for more than 6 hours. Later syncs of the tenant are skipped meanwhile | `6h` | `warning` |
-| `ConfluenceConnectorContentFailures` | Pages, attachments or deletions fail on every sync for 3 hours, while the syncs themselves finish | `3h` | `warning` |
+| `ConfluenceConnectorContentFailures` | Pages, attachments or deletions fail on every sync for 3 hours | `3h` | `warning` |
 | `ConfluenceConnectorTenantCleanupFailing` | At least two cleanup runs of a tenant with status `deleted` in the last 3 hours, and all of them failed | `15m` | `warning` |
 
 The sync alerts expect syncs that start at least hourly and finish within the interval. For slower schedules, widen the windows so each holds at least two sync outcomes.
