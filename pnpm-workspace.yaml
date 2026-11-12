@@ -13,7 +13,7 @@ packages:
 # peerDependencies stay as ranges in each package.json: they are not exact versions, and pnpm
 # does not validate a catalog reference in that section.
 catalog:
-  "@golevelup/nestjs-rabbitmq": 9.1.1
+  "@golevelup/nestjs-rabbitmq": 9.1.2
   "@microsoft/microsoft-graph-client": 3.0.7
   "@modelcontextprotocol/sdk": 1.32.2
   "@nestjs/cache-manager": 3.1.3
