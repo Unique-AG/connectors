@@ -57,7 +57,7 @@ flowchart TB
 
 ### Sequence Diagram
 
-The connector keeps no persistent state. Change detection is performed by the Unique platform's file diff API, called once per Confluence space. The only state kept in memory between sync cycles is, for each page that had an empty body, the version it had at that time. The connector does not fetch that page again until its version changes. A restart clears this record.
+The connector keeps no persistent state. Change detection is performed by the Unique platform's file diff API, called once per Confluence space. Some state lives in memory across sync cycles and is cleared by a restart: the OAuth token cache, the Confluence instance identifier, and a record of each page that had an empty body. That record holds the page ID and its version, and the connector does not fetch the page again until its version changes.
 
 ```mermaid
 sequenceDiagram
