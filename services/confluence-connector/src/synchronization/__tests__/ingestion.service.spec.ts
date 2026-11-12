@@ -268,17 +268,18 @@ describe('IngestionService', () => {
     expect(recordSpy).toHaveBeenCalledWith(2, 'failure');
   });
 
-  it('does not record recordContentDeleted when delete throws (no confirmed count)', async () => {
+  it('records every key as a failed deletion when the delete call throws', async () => {
     const { service, uniqueApiClient } = makeService();
     const metrics = (service as unknown as { metrics: ReturnType<typeof createNoopMetrics> })
       .metrics;
     const recordSpy = vi.spyOn(metrics, 'recordContentDeleted');
     vi.mocked(uniqueApiClient.files.getByKeys).mockRejectedValue(new Error('API error'));
 
-    const result = await service.deleteContentByKeys(['k1']);
+    const result = await service.deleteContentByKeys(['k1', 'k2']);
 
     expect(result).toBe(0);
-    expect(recordSpy).not.toHaveBeenCalled();
+    expect(recordSpy).toHaveBeenCalledOnce();
+    expect(recordSpy).toHaveBeenCalledWith(2, 'failure');
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ msg: 'Failed to delete content, skipping' }),
     );
