@@ -7,6 +7,9 @@ import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
   private readonly logger = new Logger(ConfluenceContentFetcher.name);
+  // An empty page never reaches Unique, so the file diff reports it as new on every sync.
+  // Remembering the version it was empty at avoids fetching it again until it is edited.
+  private readonly emptyPageVersions = new Map<string, string>();
 
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
@@ -14,6 +17,15 @@ export class ConfluenceContentFetcher {
   ) {}
 
   public async fetchPageContent(page: DiscoveredPage): Promise<FetchedPage | null> {
+    if (this.emptyPageVersions.get(page.id) === page.versionTimestamp) {
+      this.logger.debug({
+        pageId: page.id,
+        title: page.title,
+        msg: 'Page had no body at this version, skipping without fetching',
+      });
+      return null;
+    }
+
     const fullPage = await this.fetchFullPage(page);
 
     if (!fullPage) {
@@ -27,6 +39,7 @@ export class ConfluenceContentFetcher {
 
     const body = fullPage.body?.storage?.value || '';
     if (!body) {
+      this.emptyPageVersions.set(page.id, page.versionTimestamp);
       this.logger.debug({
         pageId: page.id,
         title: page.title,
@@ -34,6 +47,7 @@ export class ConfluenceContentFetcher {
       });
       return null;
     }
+    this.emptyPageVersions.delete(page.id);
 
     const confluenceLabels = this.extractLabels(fullPage.metadata.labels.results);
     const metadata = confluenceLabels.length > 0 ? { confluenceLabels } : undefined;
