@@ -84,7 +84,7 @@ class CalendarGroups(BaseModel):
 
 
 async def list_calendar_groups(client: GraphServiceClient) -> CalendarGroups:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         user = await identity.signed_in_user(client)
         with graph_step(STEP_GROUPS):
             first_page = await client.me.calendar_groups.get()

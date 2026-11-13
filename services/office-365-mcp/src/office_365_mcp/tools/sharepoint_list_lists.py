@@ -101,7 +101,7 @@ async def list_lists(client: GraphServiceClient, *, site: str, limit: int) -> Si
     if site_path is None:
         raise ToolError(not_a_site(TOOL_NAME))
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_SITE):
             resolved = await site_by_path(client, site_path)
         assert resolved is not None and resolved.id is not None, "Graph returned a site with no id"

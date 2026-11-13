@@ -284,7 +284,7 @@ async def update_draft(
 
     asked: InputRequiredResult | None = None
     updated: Message | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ_DRAFT):
             draft = await reached.messages.by_message_id(handle.message_id).get(
                 request_configuration=RequestConfiguration[_MessageQuery](

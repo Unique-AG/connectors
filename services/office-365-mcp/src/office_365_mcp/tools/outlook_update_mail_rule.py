@@ -159,7 +159,7 @@ async def update_mail_rule(
 
     asked: InputRequiredResult | None = None
     written: MessageRule | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         current = await read_rule(client, handle)
         refused = _refusal(current, changes_actions=changes_actions)
         folders = await rule_folders(client, given) if refused is None else None

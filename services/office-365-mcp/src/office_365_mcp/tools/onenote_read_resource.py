@@ -12,7 +12,11 @@ from kiota_abstractions.request_information import RequestInformation
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import GraphResponseTooLarge, download_to_file, graph_errors
+from office_365_mcp.graph_client import (
+    GraphResponseTooLarge,
+    download_to_file,
+    graph_step,
+)
 from office_365_mcp.shared.handles import OnenoteOwner
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
@@ -111,7 +115,7 @@ async def _fetch(
 ) -> tuple[bytes, str]:
     with (
         owner_refused(owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME, step=STEP_RESOURCE_CONTENT),
+        graph_step(STEP_RESOURCE_CONTENT),
     ):
         async with download_to_file(
             client,

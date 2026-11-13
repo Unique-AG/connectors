@@ -105,7 +105,7 @@ async def send_channel_message_with_files(
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         files = await attachable_files(client, handles)
         if isinstance(files, str):
             refused = f"{CHANNEL_POST.nothing_sent} {files}"

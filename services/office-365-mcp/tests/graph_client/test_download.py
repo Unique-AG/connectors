@@ -21,6 +21,7 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
     download_to_file,
     graph_errors,
+    measured_graph_operation,
 )
 
 _MESSAGE_ID = "AAMkAGI2SYNTHETIC-immutable-0001="
@@ -175,7 +176,7 @@ class TestTheSpoolFileNeverOutlivesTheBlock:
         )
         directory = _spool(tmp_path)
 
-        with pytest.raises(GraphForbidden), graph_errors(_OPERATION):
+        with pytest.raises(GraphForbidden), measured_graph_operation(_OPERATION), graph_errors():
             async with download_to_file(
                 client, transport, _request_info(client), directory=directory, max_bytes=_MAX_BYTES
             ):
@@ -255,7 +256,7 @@ class TestAFailureIsClassifiedByWhatGraphSaidAboutIt:
             )
         )
 
-        with pytest.raises(failure) as raised, graph_errors(_OPERATION):
+        with pytest.raises(failure) as raised, measured_graph_operation(_OPERATION), graph_errors():
             async with download_to_file(
                 client,
                 transport,
@@ -290,7 +291,7 @@ class TestAFailureIsClassifiedByWhatGraphSaidAboutIt:
             )
         )
 
-        with pytest.raises(failure), graph_errors(_OPERATION):
+        with pytest.raises(failure), measured_graph_operation(_OPERATION), graph_errors():
             async with download_to_file(
                 client,
                 transport,

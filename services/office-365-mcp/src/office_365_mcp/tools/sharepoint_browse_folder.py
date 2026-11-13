@@ -108,7 +108,7 @@ async def browse_folder(
     handle = _folder_to_browse(folder)
     top, read = (limit, limit) if order_by is None else (None, MAX_SCANNED_ITEMS)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         target = await _my_drive_root(client) if handle is None else handle
         with graph_step(STEP_CHILDREN):
             first_page = await _children(client, target, top=top)

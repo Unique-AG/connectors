@@ -15,7 +15,7 @@ from msgraph.generated.users.item.calendar.get_schedule.get_schedule_post_reques
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import (
     EventTime,
     WorkingHoursSummary,
@@ -205,7 +205,7 @@ async def check_availability(
         raise ToolError(_ENDS_BEFORE_STARTS)
     zone = zone_named(time_zone) or _FALLBACK_ZONE
 
-    with graph_errors(TOOL_NAME, step=STEP_SCHEDULE):
+    with graph_step(STEP_SCHEDULE):
         answered = await client.me.calendar.get_schedule.post(
             GetSchedulePostRequestBody(
                 schedules=list(trimmed),

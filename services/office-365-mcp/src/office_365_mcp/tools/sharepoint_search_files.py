@@ -21,7 +21,7 @@ from msgraph.generated.search.query.query_post_response import QueryPostResponse
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared import kql
 from office_365_mcp.shared.files import DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -174,7 +174,7 @@ async def sharepoint_search_files(
             )
         ]
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         response = await client.search.query.post(body)
 
     assert response is not None, "Graph answered POST /search/query with no response"

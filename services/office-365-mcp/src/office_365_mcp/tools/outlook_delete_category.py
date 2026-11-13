@@ -90,7 +90,7 @@ async def delete_category(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     found_name = name
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_FIND):
             first_page = await client.me.outlook.master_categories.get(
                 request_configuration=RequestConfiguration[_CategoriesQuery](

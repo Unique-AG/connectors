@@ -138,7 +138,7 @@ async def delete_folder(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     moved: MailFolder | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ_FOLDER):
             folder = await folders.by_mail_folder_id(handle.folder_id).get(
                 request_configuration=_select(_FOLDER_FIELDS)

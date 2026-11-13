@@ -15,7 +15,7 @@ from msgraph.generated.models.team import Team
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_my_teams"
@@ -79,7 +79,7 @@ class TeamList(BaseModel):
 async def teams_list_my_teams(client: GraphServiceClient, *, limit: int) -> TeamList:
     assert limit >= 1, f"limit must be at least 1, got {limit}"
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.me.joined_teams.get()
         assert first_page is not None, "Graph answered GET /me/joinedTeams with no collection"
         collected = await collect_pages(first_page, client, limit=limit)

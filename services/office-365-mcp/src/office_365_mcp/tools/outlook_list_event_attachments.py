@@ -11,7 +11,7 @@ from msgraph.generated.users.item.calendars.item.events.item.attachments.attachm
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.attachments import (
     ATTACHMENT_FIELDS,
     AttachmentSummary,
@@ -87,7 +87,7 @@ async def list_event_attachments(client: GraphServiceClient, *, uri: str) -> Eve
     if handle is None:
         raise ToolError(_BAD_HANDLE)
 
-    with graph_errors(TOOL_NAME), graph_step(STEP_ATTACHMENTS):
+    with graph_step(STEP_ATTACHMENTS):
         first_page = await (
             client.me.calendars.by_calendar_id(handle.calendar_id)
             .events.by_event_id(handle.event_id)

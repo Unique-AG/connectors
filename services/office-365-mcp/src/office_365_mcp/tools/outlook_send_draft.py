@@ -170,7 +170,7 @@ async def send_draft(
     reached = graph_mailbox(client, mailbox)
 
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         draft = await _read(reached, handle)
         refused: str | None = _NOT_A_DRAFT
         if draft is not None and draft.is_draft is True:

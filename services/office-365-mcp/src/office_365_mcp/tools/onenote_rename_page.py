@@ -126,7 +126,7 @@ async def rename_page(
     previous_title: str | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         previous_title = pre_read.page.title
         if answer_pending or pre_read.audience.reaches_others:

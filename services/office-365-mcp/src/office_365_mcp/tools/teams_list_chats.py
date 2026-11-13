@@ -25,7 +25,7 @@ from msgraph.generated.users.item.chats.chats_request_builder import ChatsReques
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
 from office_365_mcp.shared.messages import MessageSender
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -241,7 +241,7 @@ async def list_recent_chats(
             top=limit,
         )
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.me.chats.get(request_configuration=configuration)
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
         collected = await collect_pages(

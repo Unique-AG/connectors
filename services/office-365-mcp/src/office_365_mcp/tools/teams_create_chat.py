@@ -180,7 +180,7 @@ async def create_chat(
 
     created: Chat | None = None
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         user = await identity.signed_in_user(client)
         assert user.id is not None, "identity.signed_in_user returned a user with no id"
         own = {one.casefold() for one in (user.mail, user.user_principal_name) if one}

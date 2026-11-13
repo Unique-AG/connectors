@@ -1380,6 +1380,100 @@ Two things can go wrong:
 - If the Terraform output names more permissions than the pod uses, the tenant carries standing
   access that no tool spends.
 
+## Monitoring
+
+### Dashboard
+
+The Helm chart installs the Grafana dashboard "Office 365 MCP" as a ConfigMap. Grafana puts it in
+the folder that `grafana.dashboard.folder` names.
+
+```yaml
+grafana:
+  dashboard:
+    enabled: true
+    folder: mcp-servers
+```
+
+The dashboard has these rows:
+
+- **Right now**: the firing alerts, the ready pods, the memory use, and one panel for each alert
+  below, with the alert threshold as the red color.
+- **Totals for the selected time range**: tool calls, tool errors, Graph operations, Graph
+  failures, HTTP 5xx answers, and pod restarts.
+- **MCP tool calls**: calls and errors for each tool, and the call duration.
+- **Microsoft Graph**: operations by status, failures for each operation and step, the duration,
+  the operations over 30 and 60 seconds, throttling, and pages read.
+- **HTTP transport**: MCP and OAuth requests by path and status, the duration, and the open
+  requests.
+- **Pod**: ready pods, restarts, memory against the limit, CPU against the request, probe
+  failures, and OOM kills.
+
+### Alerts
+
+The Helm chart ships these alerts under `prometheus.additionalAlerts`:
+
+| Alert | Fires when | `for` | Severity |
+|---|---|---|---|
+| `Office365McpDown` | The deployment has no available replica. All tool calls and sign-ins fail | `10m` | `critical` |
+| `Office365McpToolErrors` | More than 20% of the tool calls in the last hour failed, and at least 10 failed | `15m` | `warning` |
+| `Office365McpGraphFailing` | More than 20% of the Graph operations in the last hour got status `unavailable`, `failed`, `error` or `paging_unending`, and at least 10 did | `15m` | `warning` |
+| `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
+| `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour got 429 after the SDK used all its retries | `15m` | `warning` |
+| `Office365McpGraphSlow` | At least 3 Graph operations in the last hour took more than 60 seconds. Kong and the chat close the request at 60 seconds | `0m` | `warning` |
+| `Office365McpHttp5xx` | More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, and at least 5 did | `5m` | `warning` |
+| `Office365McpMemoryHigh` | A pod uses more than 80% of its memory limit | `30m` | `warning` |
+
+`Office365McpToolErrors` does not count the caller errors `ValidationError`, `NotFoundError` and
+`Advised`. The status `ToolError` also includes Graph errors, so `Office365McpToolErrors` stays
+silent while `Office365McpGraphFailing` or `Office365McpGraphForbidden` is pending or firing. The
+tool and Graph alerts need a minimum number of failures, so one failed call at a time of low
+traffic does not fire an alert. Each alert has a `runbook` annotation with the steps to find the
+cause.
+
+The alerts select the series with `job="office-365-mcp"` and `deployment="office-365-mcp"`. These
+names come from `fullnameOverride`. Helm does not apply templates to alert values, so a deployment
+that changes `fullnameOverride` must also change the selectors. The selectors have no namespace, so
+the rules of one release also match an office-365-mcp release in a different namespace of the same
+cluster. Each alert has the label `namespace`.
+
+The single replica has no available pod for a short time when Kubernetes replaces the pod. In QA
+this took up to 5.5 minutes, so `Office365McpDown` waits 10 minutes.
+
+The base chart also ships these alerts for the pods of this deployment, in the alert groups
+`kubernetes-application` and `kubernetes-resources`:
+
+| Alert | Fires when | `for` | Severity |
+|---|---|---|---|
+| `KubePodCrashLooping` | A container restarts again and again | `5m` | `warning` |
+| `KubePodFrequentRestarts` | A container restarted more than 5 times in one hour | `5m` | `critical` |
+| `KubeDeploymentReplicasMismatch` | The deployment has fewer available replicas than it asks for | `15m` | `warning` |
+| `KubeDeploymentRolloutStuck` | A rollout makes no progress | `15m` | `warning` |
+| `KubernetesPodNearMemoryLimit` | A pod uses more than 90% of its memory limit | `5m` | `critical` |
+| `KubernetesContainerOOMKilled` | The kernel stopped a container because it used all its memory | `0m` | `warning` |
+| `KubernetesPodOOMKilled` | A pod was OOM-killed | `0m` | `warning` |
+
+The container has no CPU limit, so `KubernetesPodHighCPUUsage` and `KubernetesPodThrottled` do not
+fire for this service.
+
+#### Alert Configuration
+
+```yaml
+prometheus:
+  additionalAlerts:
+    Office365McpToolErrors:
+      for: 30m
+      labels:
+        severity: critical
+  defaultAlerts:
+    additionalLabels:
+      team: connectors
+```
+
+`defaultAlerts.additionalLabels` is added to every alert, including these.
+
+Alerts require the `monitoring.coreos.com/v1` API (Prometheus Operator) to be available in the
+cluster.
+
 ## Reference: every tool
 
 This reference lists all 129 tools. Use it to build an `enabled` list, or to find the permissions of one tool.

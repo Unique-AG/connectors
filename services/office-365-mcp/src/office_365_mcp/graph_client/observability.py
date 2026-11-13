@@ -106,8 +106,8 @@ _pages_scanned = _meter.create_histogram(
     ),
 )
 
-# How `collect_pages` learns which operation it is walking for, set by `graph_errors` around the
-# block that makes the call.
+# How `collect_pages` learns which operation it is walking for, set by `measured_graph_operation`
+# around the tool call.
 _OPERATION: ContextVar[str | None] = ContextVar("office_365_mcp_graph_operation", default=None)
 
 

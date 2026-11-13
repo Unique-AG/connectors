@@ -150,7 +150,7 @@ async def search_mail(
         ],
     )
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_SEARCH):
             page = await reached.messages.get(
                 request_configuration=RequestConfiguration(

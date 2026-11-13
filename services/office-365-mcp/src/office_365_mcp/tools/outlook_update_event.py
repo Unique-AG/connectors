@@ -359,7 +359,7 @@ async def update_event(
 
     updated: Event | None = None
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(
             client,
             calendar_id=handle.calendar_id,

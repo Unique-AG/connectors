@@ -9,7 +9,7 @@ from msgraph.generated.users.item.contacts.contacts_request_builder import Conta
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.contacts import SUMMARY_FIELDS, ContactSummary
 from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import ONE_ADDRESS
@@ -72,7 +72,7 @@ async def list_contacts(
         raise ToolError(_NOT_ONE_ADDRESS)
 
     headers = immutable_id_headers()
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.me.contacts.get(
             request_configuration=RequestConfiguration[_ContactsQuery](
                 query_parameters=_ContactsQuery(

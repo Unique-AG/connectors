@@ -181,7 +181,7 @@ async def edit_page(
     summary: PageSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         if answer_pending or pre_read.audience.reaches_others or destructive:
             with not_graph():

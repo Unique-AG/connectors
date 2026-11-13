@@ -155,7 +155,7 @@ async def create_share_link(
     created: Permission | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, handle.drive_id, handle.item_id)
         with not_graph():
             answer = await confirm(_question(found, access, audience), about)

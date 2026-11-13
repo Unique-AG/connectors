@@ -93,7 +93,7 @@ async def list_items(
     if any(given) and not all(given):
         raise ToolError(_FILTER_IS_ALL_OR_NOTHING)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         clause = None
         if column is not None and operator is not None and value is not None:
             with graph_step(STEP_COLUMNS):

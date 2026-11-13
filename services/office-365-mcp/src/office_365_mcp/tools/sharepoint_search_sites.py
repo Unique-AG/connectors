@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import (
     collect_pages,
-    graph_errors,
+    graph_step,
     request_with_query,
     send_parsed,
 )
@@ -89,7 +89,7 @@ class SiteList(BaseModel):
 
 async def search_sites(client: GraphServiceClient, *, query: str, limit: int) -> SiteList:
     assert limit >= 1, f"limit must be at least 1, got {limit}"
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(client, query)
         assert first_page is not None, "Graph answered a site search with no collection"
         collected = await collect_pages(first_page, client, limit=limit)

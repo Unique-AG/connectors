@@ -124,12 +124,8 @@ class SignedInUser(BaseModel):
 
 
 async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
-    """Return the caller's profile.
-
-    `graph_errors` takes no `step=` here: the Graph call lives in `shared/identity.py`, which opens
-    its own `graph_step`.
-    """
-    with graph_errors(TOOL_NAME):
+    """Return the caller's profile."""
+    with graph_errors():
         return SignedInUser.from_user(await identity.signed_in_user(client))
 
 

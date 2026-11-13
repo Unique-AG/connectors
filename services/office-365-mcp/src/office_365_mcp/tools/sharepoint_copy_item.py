@@ -200,7 +200,7 @@ async def copy_item(
     started: CopyStarted | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         original = await item_for_a_question(client, source.drive_id, source.item_id)
         target = await item_for_a_question(client, destination.drive_id, destination.item_id)
         refused = _cannot_copy(original, target)

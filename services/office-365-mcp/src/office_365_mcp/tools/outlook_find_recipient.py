@@ -161,7 +161,7 @@ async def find_recipient(
     if not _tokens(query):
         raise ToolError(_NO_QUERY)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         caller = _Caller.of(await identity.signed_in_user(client))
         found = await _people(client, query, caller=caller, limit=limit)
         if not found:

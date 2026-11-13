@@ -8,7 +8,7 @@ from msgraph.generated.models.onenote_page_preview import OnenotePagePreview
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import onenote_page_handle
 from office_365_mcp.shared.notes import OWNED_REFUSED, onenote_root
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
@@ -82,7 +82,7 @@ async def preview_page(client: GraphServiceClient, *, page: str) -> PagePreview:
 
     with (
         owner_refused(handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME, step=STEP_PREVIEW),
+        graph_step(STEP_PREVIEW),
     ):
         fetched = await (
             onenote_root(client, handle.owner)

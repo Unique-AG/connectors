@@ -112,7 +112,7 @@ async def delete_meeting(
     found: OnlineMeeting | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await resolve_meeting(client, handle)
         if found is None or found.id is None:
             refused = _NO_SUCH_MEETING

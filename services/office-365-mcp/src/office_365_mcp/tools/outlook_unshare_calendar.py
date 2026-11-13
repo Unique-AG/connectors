@@ -128,7 +128,7 @@ async def unshare_calendar(
     calendar = CalendarHandle(handle.calendar_id)
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_PERMISSION):
             permission = await share.get()
         assert permission is not None, "Graph answered a calendar permission read with nothing"

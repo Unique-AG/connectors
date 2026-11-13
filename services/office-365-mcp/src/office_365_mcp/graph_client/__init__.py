@@ -30,6 +30,7 @@ from office_365_mcp.graph_client.errors import (
     GraphUnavailable,
     graph_errors,
     graph_step,
+    measured_graph_operation,
     not_graph,
 )
 from office_365_mcp.graph_client.observability import (
@@ -77,6 +78,7 @@ __all__ = [
     "graph_client_for",
     "graph_errors",
     "graph_step",
+    "measured_graph_operation",
     "native_response",
     "no_retry",
     "not_graph",

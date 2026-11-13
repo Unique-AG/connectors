@@ -103,7 +103,7 @@ async def onenote_read_page(
 
     refused: str | None = None
     content: bytes | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         summary = await page_summary(client, handle.page_id, owner=handle.owner)
 
         try:
