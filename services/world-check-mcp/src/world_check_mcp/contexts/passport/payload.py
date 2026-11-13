@@ -1,11 +1,9 @@
 from datetime import date
 
-from pydantic.alias_generators import to_snake
-
 from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Passport
 from world_check_mcp.contexts.screening import FieldValue
-from world_check_mcp.contexts.screening import ScreeningError
+from world_check_mcp.contexts.screening import normalized
 from world_check_mcp.contexts.screening import validate_fields
 from world_check_mcp.upstream import CaseTemplateResponse
 from world_check_mcp.upstream import FieldDefinition
@@ -39,11 +37,9 @@ def passport_arguments(
     """Passport Check save-and-screen body. Media Check is never requested."""
     _require_case_group(template=template, group_id=group_id)
     providers = ["WATCHLIST", "PASSPORT_CHECK"] if include_watchlist else ["PASSPORT_CHECK"]
-    mandatory = {
-        _normalized(value=provider) for provider in template.mandatory_provider_types or []
-    }
+    mandatory = {normalized(value=provider) for provider in template.mandatory_provider_types or []}
     if not mandatory.issubset(providers):
-        raise ScreeningError(
+        raise PassportError(
             "The group requires additional providers. Enable include_watchlist or choose another "
             "group. Media Check is unsupported."
         )
@@ -102,7 +98,7 @@ def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) 
         matches = [
             field
             for field in definitions
-            if _normalized(value=field.label) == label and field.field_value_type == value_type
+            if normalized(value=field.label) == label and field.field_value_type == value_type
         ]
         if len(matches) != 1:
             raise PassportError(
@@ -121,15 +117,13 @@ def _passport_fields(*, passport: Passport, definitions: list[FieldDefinition]) 
 
 def _entity_fields(*, template: CaseTemplateResponse, provider: str) -> list[FieldDefinition]:
     by_provider = template.secondary_fields_by_provider or {}
-    matched = [
-        fields for name, fields in by_provider.items() if _normalized(value=name) == provider
-    ]
+    matched = [fields for name, fields in by_provider.items() if normalized(value=name) == provider]
     if len(matched) != 1:
         raise PassportError(f"This group does not uniquely define {provider} secondary fields.")
     individuals = [
         fields
         for name, fields in matched[0].secondary_fields_by_entity.items()
-        if _normalized(value=name) == "INDIVIDUAL"
+        if normalized(value=name) == "INDIVIDUAL"
     ]
     if len(individuals) != 1:
         raise PassportError(f"This group does not uniquely define {provider} individual fields.")
@@ -138,8 +132,4 @@ def _entity_fields(*, template: CaseTemplateResponse, provider: str) -> list[Fie
 
 def _require_case_group(*, template: CaseTemplateResponse, group_id: str) -> None:
     if template.group_id != group_id or template.group_screening_type != "CASE_MANAGEMENT_AUDIT":
-        raise ScreeningError("Passport Check requires a persistent case-management group.")
-
-
-def _normalized(*, value: str) -> str:
-    return to_snake(value).upper().replace(" ", "_")
+        raise PassportError("Passport Check requires a persistent case-management group.")
