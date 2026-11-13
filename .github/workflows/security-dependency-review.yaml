@@ -23,7 +23,10 @@ jobs:
     name: dependency-review
     runs-on: ubuntu-slim
     timeout-minutes: 10
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'security-exception') }}
+    if: >-
+      !contains(github.event.pull_request.labels.*.name, 'security-exception') &&
+      !(startsWith(github.head_ref, 'release-please--branches--main--components--') &&
+      github.event.pull_request.user.login == 'github-actions[bot]')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -6,7 +6,7 @@ For the whole process, read [SECURITY-PROCESS.md](../../SECURITY-PROCESS.md).
 
 ## What runs
 
-CodeQL scans our workflow files, our JavaScript and TypeScript, and our Python. It runs on every PR and on every push to `main`. A repository ruleset requires the CodeQL result. A PR that adds an alert cannot merge. As a result, unsafe (newly added) code does not reach `main`.
+CodeQL scans our workflow files, our JavaScript and TypeScript, and our Python. The workflow `security-codeql.yaml` runs it on every PR to `main` and every night on `main`. A release PR does not run it, because it changes only versions and changelogs. A PR that changes only lock files or documentation does not run it either. The gatekeeper waits for the CodeQL result. A PR that adds an alert cannot merge. As a result, the scan stops much unsafe (newly added) code before it reaches `main`. It does not find every flaw.
 
 ```mermaid
 flowchart LR

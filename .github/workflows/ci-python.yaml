@@ -19,7 +19,6 @@ on:
       - ".gitcommitizen"
       - "release-please-config.json"
       - ".github/workflows/release-rerun.yaml"
-      - "pnpm-workspace.yaml"
       - "services/**"
       - "scripts/check-python-service.sh"
       - "scripts/report-python-version-drift.py"
@@ -45,6 +44,9 @@ concurrency:
 jobs:
   detect-changes:
     name: Detect changes (Python)
+    if: >-
+      !(startsWith(github.head_ref, 'release-please--branches--main--components--') &&
+      github.event.pull_request.user.login == 'github-actions[bot]')
     runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
@@ -56,6 +58,7 @@ jobs:
       mcp-observability-changed: ${{ steps.filter.outputs.mcp_observability }}
       mcp-scaffold-changed: ${{ steps.filter.outputs.mcp_scaffold }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
+      deploy-checks: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.deploy == 'true' || steps.filter.outputs.workflow == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -69,6 +72,8 @@ jobs:
           filters: |
             services:
               - 'services/**'
+            deploy:
+              - 'services/*/deploy/**'
             shared_auth:
               - 'packages/mcp-credential-auth/**'
             mcp_architecture:
@@ -92,7 +97,6 @@ jobs:
               - '.gitcommitizen'
               - 'release-please-config.json'
               - '.github/workflows/release-rerun.yaml'
-              - 'pnpm-workspace.yaml'
             workflow:
               - '.github/workflows/ci-python.yaml'
               - 'scripts/check-python-service.sh'
@@ -183,6 +187,9 @@ jobs:
   # versions drift between alignments. This lists the drift as a warning and never fails.
   version-drift:
     name: Report Python version drift
+    if: >-
+      !(startsWith(github.head_ref, 'release-please--branches--main--components--') &&
+      github.event.pull_request.user.login == 'github-actions[bot]')
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
@@ -489,7 +496,7 @@ jobs:
   validate-helm:
     name: Helm ${{ matrix.package }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.packages != '[]'
+    if: needs.detect-changes.outputs.packages != '[]' && needs.detect-changes.outputs.deploy-checks == 'true'
     strategy:
       fail-fast: false
       matrix:
@@ -505,7 +512,7 @@ jobs:
   validate-terraform:
     name: Terraform ${{ matrix.package }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.packages != '[]'
+    if: needs.detect-changes.outputs.packages != '[]' && needs.detect-changes.outputs.deploy-checks == 'true'
     strategy:
       fail-fast: false
       matrix:
