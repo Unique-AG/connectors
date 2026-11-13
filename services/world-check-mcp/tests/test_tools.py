@@ -216,6 +216,21 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _json(200, {"id": "g1", "name": "KYC"})
     if "/references/cases/" in path and path.endswith("ext-1"):
         return _json(200, {"caseId": "ext-1", "caseSystemId": _ext_1_maps_to[-1]})
+    if "/references/cases/" in path and path.endswith("ext-nosys"):
+        return _json(200, {"caseId": "ext-nosys", "caseSystemId": "sys-nosys"})
+    if path.endswith("/cases/ext-nosys"):
+        return httpx2.Response(404)
+    if path.endswith("/cases/sys-nosys"):
+        return _json(
+            200,
+            {
+                "caseId": "ext-nosys",
+                "name": "Ada Lovelace",
+                "entityType": "INDIVIDUAL",
+                "groupId": "g1",
+                "providerTypes": [],
+            },
+        )
     if path.endswith("/cases/ext-1"):
         return httpx2.Response(404)
     if path.endswith("/cases/media-1"):
@@ -538,6 +553,15 @@ async def test_get_case_resolves_an_external_id_after_the_internal_lookup_misses
     assert details is not None
     assert details["case_system_id"] == "sys-1"
     assert details["name"] == "Ada Lovelace"
+
+
+async def test_get_case_falls_back_to_the_resolved_system_id_when_upstream_omits_it() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case", {"case": "ext-nosys"})
+
+    details = result.structured_content
+    assert details is not None
+    assert details["case_system_id"] == "sys-nosys"
 
 
 async def test_get_case_reference_returns_the_internal_id() -> None:

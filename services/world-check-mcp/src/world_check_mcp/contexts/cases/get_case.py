@@ -12,6 +12,7 @@ from world_check_mcp.upstream import UpstreamError
 @traced(arguments=("case",), result=lambda d: {"entity_type": d.entity_type})
 async def get_case(*, upstream: Upstream, case: str) -> CaseDetails:
     """Case details for an internal caseSystemId, or an external caseId when that misses."""
+    resolved_system_id = case
     try:
         found = await upstream.call_untyped(GET_CASE, caseSystemId=case)
     except UpstreamError as error:
@@ -21,8 +22,9 @@ async def get_case(*, upstream: Upstream, case: str) -> CaseDetails:
             reference = await get_case_reference(upstream=upstream, case_id=case)
         except CaseNotFoundError:
             raise CaseNotFoundError(case=case) from error
-        found = await upstream.call_untyped(GET_CASE, caseSystemId=reference.case_system_id)
-    return _details(case=found, fallback_system_id=case)
+        resolved_system_id = reference.case_system_id
+        found = await upstream.call_untyped(GET_CASE, caseSystemId=resolved_system_id)
+    return _details(case=found, fallback_system_id=resolved_system_id)
 
 
 def _details(*, case: CaseWire, fallback_system_id: str) -> CaseDetails:
