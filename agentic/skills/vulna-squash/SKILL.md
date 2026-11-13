@@ -54,10 +54,13 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 
 ## Slack message (mode `findings`)
 
-At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Do not list the dropped packages or the scan details. Pipe one line for each item to `bash agentic/skills/vulna-squash/scripts/slack-message.sh`:
+At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Do not name the dropped packages. Pipe one line for each item to `bash agentic/skills/vulna-squash/scripts/slack-message.sh`. The script adds the prefix of each kind:
 - `pr <url> <status>` for each PR. The status is `green`, `red`, `timed_out` or `held`.
-- `stop <reason>` for a stop, for example "the scan is older than 24 hours".
-- `note <text>` for each line that step 2 or step 3 of Part A requires.
+- `stop <reason>` for a stop. Add the URL of the scan run, for example "nothing left to patch. Scan: <url>", or "the scan is older than 24 hours".
+- `app <text>` with the count of dropped application packages and the reason.
+- `os <text>` with the count of dropped operating system packages and the reason. Name each held rebuild PR.
+- `lockfiles <text>` with the count of CRITICAL and HIGH lockfile findings that have a fix. If step 2 did not read the lockfile findings, say so.
+- `note <text>` for each other line that step 2 or step 3 of Part A requires, for example an open release PR that a person must merge.
 
 The script prints the message, with at most 5 lines. Post its output without a change. If it exits with a non-zero code, read the error. If there are too many note lines, merge notes into fewer `note` lines and keep all of their facts. If a line is too long, shorten it. Then run it again. Mode `pr` posts no Slack message.
 

@@ -3,18 +3,25 @@ set -euo pipefail
 
 awk -v max_lines=5 -v max_chars=200 '
 function die(msg) { print msg > "/dev/stderr"; failed = 1; exit 1 }
+BEGIN {
+  prefix["stop"] = "Stopped: "
+  prefix["app"] = "App: "
+  prefix["os"] = "OS: "
+  prefix["lockfiles"] = "Lockfiles: "
+  prefix["note"] = ""
+}
 NF == 0 { next }
 {
   kind = $1
   text = $0
   sub(/^[ \t]*[^ \t]+[ \t]*/, "", text)
   if (text == "") die("A " kind " line has no text.")
-  if (kind == "stop") text = "Stopped: " text
+  if (kind in prefix) text = prefix[kind] text
   if (length(text) > max_chars) die("A " kind " line is longer than " max_chars " characters.")
 }
 kind == "pr" { prs[++pr_count] = text; next }
-kind == "note" || kind == "stop" { extra[++extra_count] = text; next }
-{ die("Unknown line kind: " kind ". Use pr, note or stop.") }
+kind in prefix { extra[++extra_count] = text; next }
+{ die("Unknown line kind: " kind ". Use pr, stop, app, os, lockfiles or note.") }
 END {
   if (failed) exit 1
   if (pr_count + extra_count == 0) die("The message is empty.")
