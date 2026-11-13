@@ -17,6 +17,7 @@ from mcp_observability import RateLimitMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
+from world_check_mcp import contexts
 from world_check_mcp.mcp.approval import ApprovalGate
 from world_check_mcp.mcp.approval import request_state_security
 from world_check_mcp.persistence import Persistence
@@ -42,6 +43,7 @@ def create_server(
 ) -> FastMCP:
     """Build the server. `open_persistence` opens every store, so the tests can open their own."""
     http = upstream_http(upstream, transport)
+    case_locks = contexts.CaseLocks()
 
     @asynccontextmanager
     async def lifespan(_: FastMCP) -> AsyncGenerator[dict[str, object]]:
@@ -52,6 +54,7 @@ def create_server(
             yield {
                 "upstream": upstream_resource,
                 "persistence": persistence_resource,
+                "case_locks": case_locks,
                 # A saved match decision or passport check is a regulatory record, so its
                 # approval is asked for even when `for_data_modification` is disabled.
                 "approvals": ApprovalGate(

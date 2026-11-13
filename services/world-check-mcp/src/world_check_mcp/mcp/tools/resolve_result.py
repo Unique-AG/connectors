@@ -13,6 +13,7 @@ from world_check_mcp import contexts
 from world_check_mcp.mcp.approval import ApprovalGate
 from world_check_mcp.mcp.approval import resolution_message
 from world_check_mcp.mcp.dependencies import get_approvals
+from world_check_mcp.mcp.dependencies import get_case_locks
 from world_check_mcp.mcp.dependencies import get_reviewer
 from world_check_mcp.mcp.dependencies import get_upstream
 from world_check_mcp.mcp.inputs.identifiers import CaseArgument
@@ -57,6 +58,7 @@ async def resolve_result(
     note: Note = "",
     upstream: Upstream = Depends(get_upstream),
     approvals: ApprovalGate = Depends(get_approvals),
+    locks: contexts.CaseLocks = Depends(get_case_locks),
     actor: str = Depends(get_reviewer),
 ) -> contexts.ResolutionOutcome | InputRequiredResult:
     request = contexts.ResolutionRequest(
@@ -73,7 +75,7 @@ async def resolve_result(
             ),
             message=resolution_message,
             apply=lambda plan: contexts.apply_resolution(
-                upstream=upstream, request=request, plan=plan, actor=actor
+                upstream=upstream, request=request, plan=plan, actor=actor, locks=locks
             ),
         )
     except contexts.CaseNotFoundError as error:

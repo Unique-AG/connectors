@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import cast
 
@@ -943,6 +944,38 @@ async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_afte
 
     _ext_1_maps_to[:] = ["sys-1"]
     assert _writes == []
+
+
+async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case() -> None:
+    _writes.clear()
+    first_write_arrived = asyncio.Event()
+    release_first_write = asyncio.Event()
+
+    async def held_first_write(request: httpx2.Request) -> httpx2.Response:
+        if request.method == "PUT":
+            first_write_arrived.set()
+            await release_first_write.wait()
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore()),
+        httpx2.MockTransport(held_first_write),
+    )
+    arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}
+
+    async with (
+        Client(server, elicitation_handler=_approve) as first,
+        Client(server, elicitation_handler=_approve) as second,
+    ):
+        first_call = asyncio.create_task(first.call_tool("resolve_result", arguments))
+        await first_write_arrived.wait()
+        with pytest.raises(ToolError, match="Another decision on this case is being saved"):
+            await second.call_tool("resolve_result", arguments)
+        release_first_write.set()
+        await first_call
+
+    assert len(_writes) == 1
 
 
 async def test_resolve_result_decline_does_not_write() -> None:
