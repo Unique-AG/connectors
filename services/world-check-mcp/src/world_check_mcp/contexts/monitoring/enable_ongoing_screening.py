@@ -22,7 +22,16 @@ async def enable_ongoing_screening(*, upstream: Upstream, case: str) -> OngoingS
             )
         ),
     )
-    if result is None:
+    failed_cases = [
+        failed
+        for failed in (result.failed_cases if result else None) or []
+        if failed.case_system_id in {None, found.case_system_id}
+    ]
+    summary = result.summary if result else None
+    summary_rules_out_success = summary is not None and (
+        bool(summary.failed) or summary.success == 0
+    )
+    if not failed_cases and not summary_rules_out_success:
         return OngoingScreening(
             case_system_id=found.case_system_id,
             enabled=True,
@@ -31,8 +40,7 @@ async def enable_ongoing_screening(*, upstream: Upstream, case: str) -> OngoingS
         )
     failures = [
         error.message or error.code or "LSEG did not enable monitoring."
-        for failed in result.failed_cases or []
-        if failed.case_system_id in {None, found.case_system_id}
+        for failed in failed_cases
         for error in failed.errors or []
     ]
     return OngoingScreening(
