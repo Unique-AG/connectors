@@ -1,5 +1,12 @@
 # Changelog
 
+## [3.1.1](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.1.0...confluence-connector@3.1.1) (2026-11-13)
+
+
+### Bug Fixes
+
+* **confluence-connector:** point Unique API error alert at emitted metrics ([#1620](https://github.com/Unique-AG/connectors/issues/1620)) ([56ebf68](https://github.com/Unique-AG/connectors/commit/56ebf68a3dd91833c7c124b708dd1350a1a9429e))
+
 ## [3.1.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.4...confluence-connector@3.1.0) (2026-11-12)
 
 
