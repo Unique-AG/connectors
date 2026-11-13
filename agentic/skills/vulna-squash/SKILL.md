@@ -55,14 +55,14 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 ## Slack message (mode `findings`)
 
 At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Do not name the dropped packages. Pipe one line for each item to `bash agentic/skills/vulna-squash/scripts/slack-message.sh`. The script adds the prefix of each kind:
-- `pr <number> <status>` for each PR that this run opened or refreshed. The status is `green`, `red`, `timed_out` or `held`. The script puts these PRs on one line at the end.
-- `stop <reason>` for a stop. Add the URL of the scan run, for example "nothing left to patch. Scan: <url>", or "the scan is older than 24 hours".
+- `pr <number> <status>` for each PR that this run opened or refreshed. The status is `green`, `red`, `timed_out` or `held`. The script puts these PRs on the last line, and on more lines when they do not fit on one.
+- `stop <reason>` for a stop. Add the URL of the scan run, for example "nothing left to patch. Scan: https://github.com/Unique-AG/connectors/actions/runs/1", or "the scan is older than 24 hours".
 - `app <text>` with the count of dropped application packages and the reason.
 - `os <text>` with the count of dropped operating system packages and the reason. End the line with each held rebuild PR, for example "(#1473, #1481)".
 - `lockfiles <text>` with the count of CRITICAL and HIGH lockfile findings that have a fix. If step 2 did not read the lockfile findings, say so.
 - `note <text>` for each other line that step 2 or step 3 of Part A requires, for example "Merge release PR #1650 to ship the patch."
 
-Write a PR as `#<number>` in the text of a line. The script turns each one into a link.
+Write a PR as `#<number>` in the text of a line. The script turns each one into a Markdown link. Write any other URL as plain text, with no angle brackets.
 
 The script prints the message, with at most 5 lines. Post its output without a change. If it exits with a non-zero code, read the error. If there are too many note lines, merge notes into fewer `note` lines and keep all of their facts. If a line is too long, shorten it. Then run it again. Mode `pr` posts no Slack message.
 

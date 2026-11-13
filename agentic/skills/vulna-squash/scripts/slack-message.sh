@@ -6,7 +6,7 @@ function die(msg) { print msg > "/dev/stderr"; failed = 1; exit 1 }
 function link(s,   out, num) {
   while (match(s, /#[0-9]+/)) {
     num = substr(s, RSTART + 1, RLENGTH - 1)
-    out = out substr(s, 1, RSTART - 1) "<https://github.com/" repo "/pull/" num "|#" num ">"
+    out = out substr(s, 1, RSTART - 1) "[#" num "](https://github.com/" repo "/pull/" num ")"
     s = substr(s, RSTART + RLENGTH)
   }
   return out s
@@ -27,7 +27,9 @@ NF == 0 { next }
 }
 kind == "pr" {
   if (split(text, part, " ") != 2 || part[1] !~ /^[0-9]+$/) die("A pr line needs a PR number and a status.")
-  prs[++pr_count] = link("#" part[1]) " " part[2]
+  pr_count++
+  pr_plain[pr_count] = "#" part[1] " " part[2]
+  pr_linked[pr_count] = link("#" part[1]) " " part[2]
   next
 }
 kind in prefix {
@@ -40,11 +42,23 @@ kind in prefix {
 END {
   if (failed) exit 1
   if (pr_count + extra_count == 0) die("The message is empty.")
-  if (extra_count + (pr_count > 0) > max_lines) die("The message has more than " max_lines " lines.")
-  for (i = 1; i <= extra_count; i++) print extra[i]
   if (pr_count > 0) {
-    line = "PRs: " prs[1]
-    for (i = 2; i <= pr_count; i++) line = line " · " prs[i]
-    print line
+    plain = "PRs:"
+    linked = "PRs:"
+    for (i = 1; i <= pr_count; i++) {
+      sep = (plain == "PRs:") ? " " : " · "
+      if (length(plain sep pr_plain[i]) > max_chars) {
+        pr_lines[++pr_line_count] = linked
+        plain = pr_plain[i]
+        linked = pr_linked[i]
+      } else {
+        plain = plain sep pr_plain[i]
+        linked = linked sep pr_linked[i]
+      }
+    }
+    pr_lines[++pr_line_count] = linked
   }
+  if (extra_count + pr_line_count > max_lines) die("The message has more than " max_lines " lines.")
+  for (i = 1; i <= extra_count; i++) print extra[i]
+  for (i = 1; i <= pr_line_count; i++) print pr_lines[i]
 }'
