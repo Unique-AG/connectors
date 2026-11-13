@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { reportUncaughtFailure } from './annotate.mjs';
 import { assertAllowedChanges, assertRequirementEdits, readChanges } from './patch.mjs';
@@ -12,7 +12,6 @@ reportUncaughtFailure(`Publish ${entry.slug} failed`);
 const pyprojects = () => readFiles(trackedFiles(/(^|\/)pyproject\.toml$/));
 const before = ecosystem === 'uv' ? pyprojects() : {};
 const lockBefore = lockFiles(ecosystem);
-const gitcommitizen = readFileSync('.gitcommitizen', 'utf8');
 
 runOrThrow('git', ['apply', join(process.env.PATCH_DIR, 'changes.patch')]);
 assertAllowedChanges({ ecosystem, ...readChanges() });
@@ -23,7 +22,6 @@ const { title, body } = renderPr({
   files: changedFiles(),
   before: lockBefore,
   after: lockFiles(ecosystem),
-  gitcommitizen,
   cooldownDays: config.cooldownDays,
 });
 mkdirSync(process.env.PR_DIR, { recursive: true });

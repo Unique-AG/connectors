@@ -65,11 +65,11 @@ const fromTo = ({ from, to }) =>
     .map(([old, target]) => `from ${old} to ${target}`)
     .join(' and ');
 
-export function renderTitle(entry, scope) {
+export function renderTitle(entry) {
   const subject = entry.isGroup
     ? `bump ${entry.name} packages`
     : `bump ${entry.name} ${fromTo(entry.members[0])}`;
-  return `build(${scope}): ${subject}`;
+  return `build: ${subject}`;
 }
 
 function listed(lines) {

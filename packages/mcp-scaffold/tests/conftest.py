@@ -12,7 +12,6 @@ type UseVenv = Callable[[str], None]
 REPO = Path(__file__).parents[3]
 # What the scaffold registers a new MCP in. The tests register in copies.
 REGISTRIES = [
-    ".gitcommitizen",
     "release-please-config.json",
     ".release-please-manifest.json",
     ".github/workflows/release-dev.yaml",

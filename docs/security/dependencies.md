@@ -18,20 +18,12 @@ flowchart LR
 | Scope | Direct and indirect dependencies in pnpm (Node) and uv (Python), GitHub Actions, Docker base images, and Terraform providers |
 | One PR for | One dependency, or one group that must move together, for example `opentelemetry-*`. A major bump of a group member gets its own PR. |
 | Only that package | A PR changes only the packages that it names and the packages that they need. If another package changes, the job fails and opens no PR. Put packages that must move together in one group in `.github/deps-groups.json`. |
-| Title | The title names each version change, for example `bump @babel/parser from 7.29.11 to 7.29.12 and from 8.0.8 to 8.0.10`. |
+| Title | The title has no scope. It names each version change, for example `build: bump @babel/parser from 7.29.11 to 7.29.12 and from 8.0.8 to 8.0.10`. |
 | Cooldown | A version younger than 3 days waits. The job passes `--config.minimumReleaseAge=4320` to pnpm and `--exclude-newer "3 days"` to uv. |
 | Labels | `dependencies`, and the ecosystem: `npm`, `uv`, `github-actions`, `docker`, or `terraform` |
 | Limit | 250 PRs in one night, because GitHub allows 256 jobs in a matrix. The job summary lists the rest under "Left for the next night". |
 | Ignore | See [Skip, close, or ignore](#skip-close-or-ignore). |
 | Merge | A person merges, after a green CI. The agent never merges. See [Merge a dependency PR](#merge-a-dependency-pr). |
-
-| Title scope | When |
-|---|---|
-| `deps` | The PR changes only dependency files. |
-| The name of a service | The bump needs a code fix in that one service. |
-| `main` | Any other mix of files. |
-
-After the agent pushes a code fix, it sets the scope again from the files of the PR. It uses `.github/scripts/deps-nightly/scope.cli.mjs`.
 
 | Risk | Control |
 |---|---|
@@ -61,7 +53,7 @@ flowchart TD
   assess --> ci{State of the checks}
   ci -->|green| verdict{Verdict}
   ci -->|red| cause{"Did the bump cause it, is the fix in scope, and is it attempt 1 or 2?"}
-  cause -->|yes| fix[Push a fix, then set the title scope]
+  cause -->|yes| fix[Push a fix]
   fix --> ci
   cause -->|no| handoff["Remove ai-assisted, add human-required, then write the Hand-off section with a ticket draft"]
   ci -->|timed out or held| handoff
@@ -99,7 +91,6 @@ These causes give the label `human-required`:
 - The CI is red after 2 fix attempts.
 - The CI timed out, or a run waits for approval.
 - The cause is unclear, or the fix is outside the PR scope.
-- A command that sets the scope of the PR title failed.
 
 | Rule | Value |
 |---|---|
@@ -276,7 +267,6 @@ The job lists each ignored update in its summary. Pins are `override-dependencie
 | A handled PR has a conflict with `main`. The nightly job warns in its summary. | Resolve the conflict, or close the PR to skip that version. |
 | A bump job is red. The job `Bump <slug>` shows the cause as an error annotation. No PR opens. | Read the cause. If a package pins the new version, wait for a release of that package. If other packages move too, put them in one group. |
 | The report says "safe with a gap". | Run the check that the report names. Then merge. |
-| The agent title step failed. The PR has `human-required` and a red title check. | Set the title scope by hand, from the files of the PR. |
 
 ## Checks on a PR
 
@@ -325,7 +315,6 @@ Every night, Trivy scans `pnpm-lock.yaml` and every `uv.lock` on `main`, develop
 |---|---|
 | `.github/workflows/deps-nightly.yaml` | The nightly job |
 | `.github/workflows/deps-rebase.yaml` | The `/rebase` and `/recreate` commands |
-| `.github/scripts/deps-nightly/scope.cli.mjs` | The title scope of a PR |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill that handles every dependency PR in one run |
 | `agentic/skills/dependency-pr-review/SKILL.md` | The skill for the review of a dependency PR |
 | `.github/workflows/security-dependency-review.yaml` | The dependency review |
