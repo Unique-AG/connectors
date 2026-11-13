@@ -173,7 +173,7 @@ async def share_calendar(
     refused: str | None = None
     created: CalendarPermission | None = None
     about = confirmation_id_for(handle.uri, TOOL_NAME, recipient.casefold(), role)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_CALENDAR):
             calendar = await target.get(
                 request_configuration=RequestConfiguration[_CalendarQuery](

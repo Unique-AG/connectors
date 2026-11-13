@@ -97,7 +97,7 @@ async def read_thread(
     client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
 ) -> MailThread:
     reached = graph_mailbox(client, mailbox)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_ANCHOR):
             anchor = await reached.messages.by_message_id(handle.message_id).get(
                 request_configuration=_anchor_request()

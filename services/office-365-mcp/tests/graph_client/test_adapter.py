@@ -16,6 +16,7 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
     graph_errors,
+    measured_graph_operation,
     no_retry,
     request_with_json_body,
     request_with_query,
@@ -111,7 +112,11 @@ class TestSendParsed:
             )
         )
 
-        with pytest.raises(GraphNotFound), graph_errors("test_send_parsed"):
+        with (
+            pytest.raises(GraphNotFound),
+            measured_graph_operation("test_send_parsed"),
+            graph_errors(),
+        ):
             await send_parsed(client, _create_folder(client), DriveItem)
 
     @pytest.mark.usefixtures("retry_sleeps")
@@ -122,7 +127,11 @@ class TestSendParsed:
         request = _create_folder(client)
         request.add_request_options(no_retry())
 
-        with pytest.raises(GraphUnavailable), graph_errors("test_send_parsed"):
+        with (
+            pytest.raises(GraphUnavailable),
+            measured_graph_operation("test_send_parsed"),
+            graph_errors(),
+        ):
             await send_parsed(client, request, DriveItem)
 
         assert route.call_count == 1
@@ -146,7 +155,11 @@ class TestSendNoResponseContent:
             )
         )
 
-        with pytest.raises(GraphForbidden), graph_errors("test_send_no_response_content"):
+        with (
+            pytest.raises(GraphForbidden),
+            measured_graph_operation("test_send_no_response_content"),
+            graph_errors(),
+        ):
             await send_no_response_content(client, _copy(client))
 
 

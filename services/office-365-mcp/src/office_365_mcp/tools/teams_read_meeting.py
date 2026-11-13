@@ -297,7 +297,7 @@ class MeetingAttendance(BaseModel):
 async def teams_read_meeting(
     client: GraphServiceClient, *, handle: MeetingHandle
 ) -> MeetingAttendance:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingAttendance(

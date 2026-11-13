@@ -86,7 +86,7 @@ async def create_list_item(
     handle = list_handle(list_uri)
     if handle is None:
         raise ToolError(f"{TOOL_NAME} {NOT_A_LIST_HANDLE}")
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         outcome = await _create(client, handle, fields, confirm)
     if isinstance(outcome, str):
         raise ToolError(outcome)

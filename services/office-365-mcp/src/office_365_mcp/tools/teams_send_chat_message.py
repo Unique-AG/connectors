@@ -79,7 +79,7 @@ async def send_chat_message(
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         members = await mentioned_members(client, chat_id, mentions)
         if isinstance(members, str):
             refused = members

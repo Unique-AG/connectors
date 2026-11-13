@@ -234,7 +234,7 @@ async def teams_search_messages(
             )
         ]
     )
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_SEARCH):
             response = await _search(client, body)
 

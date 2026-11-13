@@ -62,7 +62,7 @@ _HANDLE_SOURCES = (
 
 
 async def teams_read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         message = await get_message(client, handle)
 
     assert message is not None, "Graph answered a message read with no message"

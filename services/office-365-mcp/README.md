@@ -277,7 +277,13 @@ Once the service runs, it exposes these endpoints:
   - `graph_throttled_total{operation,retried}`
   - `graph_pages_scanned{operation}`
 
-  The label `operation` is always the tool's own name, never a URL. The label `step` names one
+  Two middlewares record them. `GraphOperationMiddleware` wraps each MCP tool call and counts it
+  under `graph_operations_total` when the call sent at least one Graph request.
+  `GraphCallObserver` is the first handler in the Graph SDK pipeline. It sees each Graph answer
+  after the SDK's retries, and counts throttling under `graph_throttled_total`. A tool marks each
+  Graph call with `graph_step`, which also turns SDK errors into the `GraphFailure` types.
+
+  The label `operation` is always the registered tool name, never a URL. The label `step` names one
   Graph call inside the tool. A label taken from a Graph URL
   creates one time series for each chat, so this service does not use one. The label `status` names
   the remedy a failure needs, for example `forbidden`, `not_found`, `throttled`, or `unavailable`,

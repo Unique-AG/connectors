@@ -154,7 +154,7 @@ async def update_contact(
     checked = _checked(change)
     contact = client.me.contacts.by_contact_id(handle.contact_id)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         current = await _current_lists(contact) if checked.changes_a_list else Contact()
         with graph_step(STEP_UPDATE):
             updated = await contact.patch(

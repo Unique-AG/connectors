@@ -247,7 +247,7 @@ async def create_page(
     refused: str | None = None
     with (
         owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
     ):
         audience = await _notebook_audience_for(client, handle)
         if answer_pending or audience.reaches_others:

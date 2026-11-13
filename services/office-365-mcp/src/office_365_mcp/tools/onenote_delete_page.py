@@ -123,7 +123,7 @@ async def delete_page(
     found: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         found = pre_read.page
         with not_graph():

@@ -178,7 +178,7 @@ async def list_event_instances(
         raise ToolError(_ENDS_BEFORE_STARTS)
     opens, closes = window_bounds(starts_on, ends_on, zone=zone)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
         collected = (
             await _instances_of(client, handle, opens=opens, closes=closes, limit=limit)

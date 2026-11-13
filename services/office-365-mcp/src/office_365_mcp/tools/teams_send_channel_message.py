@@ -12,7 +12,7 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.messages import (
     CHANNEL_ID_FIELD,
@@ -102,11 +102,7 @@ async def send_channel_message(
     )
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
-    measured = (
-        graph_errors(TOOL_NAME, step=STEP_SEND)
-        if reply_to_id is None
-        else graph_errors(TOOL_NAME, step=STEP_REPLY)
-    )
+    measured = graph_step(STEP_SEND) if reply_to_id is None else graph_step(STEP_REPLY)
     with measured:
         with not_graph():
             answer = await confirm(question, about)

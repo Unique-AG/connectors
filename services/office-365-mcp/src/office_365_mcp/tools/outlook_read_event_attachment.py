@@ -134,7 +134,7 @@ async def read_event_attachment(client: GraphServiceClient, *, uri: str) -> File
                 )
             )
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         fetched = await fetch_file_or_refusal(
             describe, download, uri=handle.uri, refusals=_REFUSALS
         )

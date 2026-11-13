@@ -12,7 +12,7 @@ from msgraph.generated.models.email_address import EmailAddress
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry
+from office_365_mcp.graph_client import graph_step, no_retry
 from office_365_mcp.shared.contacts import (
     COMPANY_NAME_FIELD,
     GIVEN_NAME_FIELD,
@@ -82,7 +82,7 @@ async def create_contact(client: GraphServiceClient, *, details: NewContact) -> 
         raise ToolError(_NOTHING_TO_CREATE)
     checked = replace(details, email_addresses=_addresses(details.email_addresses))
 
-    with graph_errors(TOOL_NAME, step=STEP_CREATE):
+    with graph_step(STEP_CREATE):
         created = await client.me.contacts.post(
             _body(checked),
             request_configuration=RequestConfiguration[QueryParameters](

@@ -9,7 +9,7 @@ from typing import TypeGuard, cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context
+from fastmcp import Client, Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_http.middleware import retry_handler
 from mcp.shared.exceptions import MCPError
@@ -19,6 +19,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
 
+from office_365_mcp.cardinality import UNRESOLVED_NAME, BoundedNameMiddleware
 from office_365_mcp.config import AppConfig
 from office_365_mcp.graph_client import (
     GRAPH_OPERATION_DURATION_SECONDS,
@@ -36,7 +37,9 @@ from office_365_mcp.graph_client import (
     graph_client_for,
     graph_errors,
     graph_step,
+    measured_graph_operation,
 )
+from office_365_mcp.graph_operations import TOOL_REFUSALS, GraphOperationMiddleware
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.shared import transcripts
 from office_365_mcp.shared.handles import TranscriptHandle
@@ -162,7 +165,7 @@ class TestAGraphCallIsCountedAndTimed:
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="ok")
         timed = _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_count", operation="get_me")
 
-        with graph_errors("get_me"):
+        with measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="ok") == before + 1
@@ -178,7 +181,7 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
-        with graph_errors("get_me"), graph_step("signed_in_user"):
+        with measured_graph_operation("get_me"), graph_errors(), graph_step("signed_in_user"):
             _ = await client.me.get()
 
         boundaries = _boundaries(histogram)
@@ -194,7 +197,7 @@ class TestAGraphCallIsCountedAndTimed:
         _ = graph.get("/me").mock(return_value=httpx.Response(403, json={}))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden")
 
-        with pytest.raises(GraphForbidden), graph_errors("get_me"):
+        with pytest.raises(GraphForbidden), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden") == before + 1
@@ -217,7 +220,10 @@ class TestAGraphCallIsCountedAndTimed:
             GRAPH_STEPS_TOTAL, operation=TRANSCRIPT_TOOL, step=STEP_ATTRIBUTED, status="too_large"
         )
 
-        with pytest.raises(ToolError):
+        with (
+            pytest.raises(ToolError),
+            measured_graph_operation(TRANSCRIPT_TOOL, not_failures=TOOL_REFUSALS),
+        ):
             _ = await teams_read_transcript(
                 client,
                 transport,
@@ -257,7 +263,10 @@ class TestAGraphCallIsCountedAndTimed:
             assert mailbox is None
             return "Nothing was sent."
 
-        with pytest.raises(ToolError):
+        with (
+            pytest.raises(ToolError),
+            measured_graph_operation("outlook_send_draft", not_failures=TOOL_REFUSALS),
+        ):
             _ = await send_draft(
                 client, confirm=declines, message_ref=f"outlook:///messages/{draft_id}"
             )
@@ -352,7 +361,7 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
             f"{GRAPH_STEP_DURATION_SECONDS}_count", operation="get_me", step="signed_in_user"
         )
 
-        with graph_errors("get_me"), graph_step("signed_in_user"):
+        with measured_graph_operation("get_me"), graph_errors(), graph_step("signed_in_user"):
             _ = await client.me.get()
 
         assert (
@@ -379,7 +388,8 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
         answered = _value(GRAPH_STEPS_TOTAL, **labels, status="ok")
         missing = _value(GRAPH_STEPS_TOTAL, **labels, status="not_found")
 
-        found = await teams_list_call_transcripts(client, limit=20)
+        with measured_graph_operation(CALL_TRANSCRIPTS_TOOL, not_failures=TOOL_REFUSALS):
+            found = await teams_list_call_transcripts(client, limit=20)
 
         assert found.status == "none_found"
         assert _value(GRAPH_STEPS_TOTAL, **labels, status="ok") == answered + 1
@@ -402,7 +412,7 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
             status="forbidden",
         )
 
-        with graph_errors("teams_read_transcript"):
+        with measured_graph_operation("teams_read_transcript"), graph_errors():
             try:
                 with graph_step("transcript_attributed"):
                     _ = await client.me.get()
@@ -436,7 +446,7 @@ class TestTheOperationLabelIsANameThisCodeChose:
         chat_id = "19%3Aunbounded-cardinality%40thread.v2"
         _ = graph.get(f"/chats/{chat_id}").mock(return_value=httpx.Response(200, json={"id": "c"}))
 
-        with graph_errors("teams_list_chats"):
+        with measured_graph_operation("teams_list_chats"), graph_errors():
             _ = await client.chats.by_chat_id("19:unbounded-cardinality@thread.v2").get()
 
         families = (
@@ -467,7 +477,7 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "7"}))
         before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true")
 
-        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true") == before + 1
@@ -481,7 +491,7 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         counted = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="throttled")
         outages = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="unavailable")
 
-        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true") == throttled + 1
@@ -495,7 +505,7 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "600"}))
         before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false")
 
-        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false") == before + 1
@@ -516,7 +526,7 @@ class TestAPagedWalkReportsWhatItRead:
         )
         before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats")
 
-        with graph_errors("teams_list_chats"):
+        with measured_graph_operation("teams_list_chats"), graph_errors():
             await _walk_chats(client, limit=50)
 
         assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == before + 3
@@ -535,7 +545,7 @@ class TestAPagedWalkReportsWhatItRead:
 
         steps = _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
 
-        with graph_errors("teams_list_chats"), graph_step("chats"):
+        with measured_graph_operation("teams_list_chats"), graph_errors(), graph_step("chats"):
             await _walk_chats(client, limit=50)
 
         assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == pages + 2
@@ -597,32 +607,78 @@ def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
     return isinstance(called, ast.Attribute) and called.attr == name
 
 
-class TestEveryToolNamesItselfWhenItCallsGraph:
-    def test_the_tools_are_actually_there(self) -> None:
-        sources = _tool_sources()
-        assert len(sources) > 1, f"no tool modules found under {_TOOLS}"
-        assert any(_graph_errors_calls(_parsed(source)) for source in sources)
-
-    @pytest.mark.parametrize("source", _tool_sources(), ids=_source_id)
-    def test_every_graph_call_is_named_after_the_tool_that_makes_it(
-        self, source: pathlib.Path
-    ) -> None:
-        unnamed = [
-            call.lineno
-            for call in _graph_errors_calls(_parsed(source))
-            if [argument for argument in call.args if _names_the_tool(argument)] == []
-            and [keyword for keyword in call.keywords if _names_the_tool(keyword.value)] == []
-        ]
-        assert not unnamed, (
-            f"{source.name} calls graph_errors without its own TOOL_NAME at line(s) "
-            + f"{unnamed}. Every Graph call a tool makes is counted under `operation`, and a call "
-            + "that names nothing is counted nowhere — the tool goes missing from "
-            + f"{GRAPH_OPERATIONS_TOTAL} rather than showing up under a wrong name."
+class TestTheServerCountsEachToolCallUnderItsRegisteredName:
+    @staticmethod
+    def _server(client: GraphServiceClient) -> FastMCP[None]:
+        server: FastMCP[None] = FastMCP(
+            "probe", middleware=[BoundedNameMiddleware(), GraphOperationMiddleware()]
         )
 
+        @server.tool(name="zz_reads_me")
+        async def reads_me() -> str:
+            with graph_errors():
+                me = await client.me.get()
+            assert me is not None
+            return "read"
 
-def _names_the_tool(argument: ast.expr) -> bool:
-    return isinstance(argument, ast.Name) and argument.id == "TOOL_NAME"
+        @server.tool(name="zz_refused_by_graph")
+        async def refused_by_graph() -> str:
+            try:
+                with graph_errors():
+                    _ = await client.me.get()
+            except GraphForbidden as refusal:
+                raise ToolError("Microsoft refused") from refusal
+            return "unreachable"
+
+        @server.tool(name="zz_refused_after_graph")
+        async def refused_after_graph() -> str:
+            refused = "unreachable"
+            try:
+                with graph_errors():
+                    _ = await client.me.get()
+            except GraphForbidden:
+                refused = "Microsoft refused"
+            raise ToolError(refused)
+
+        @server.tool(name="zz_never_calls_graph")
+        async def never_calls_graph() -> str:
+            raise ToolError("refused before any Graph call")
+
+        return server
+
+    async def test_a_call_that_reached_graph_is_counted_under_the_tool_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation="zz_reads_me", status="ok")
+
+        async with Client(self._server(client)) as mcp:
+            _ = await mcp.call_tool("zz_reads_me", {})
+
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation="zz_reads_me", status="ok") == before + 1
+
+    @pytest.mark.parametrize("tool", ["zz_refused_by_graph", "zz_refused_after_graph"])
+    async def test_a_refusal_behind_a_graph_failure_is_counted_under_its_remedy(
+        self, client: GraphServiceClient, graph: respx.MockRouter, tool: str
+    ) -> None:
+        _ = graph.get("/me").mock(return_value=httpx.Response(403, json={}))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="forbidden")
+
+        async with Client(self._server(client)) as mcp:
+            _ = await mcp.call_tool(tool, {}, raise_on_error=False)
+
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="forbidden") == before + 1
+
+    async def test_a_call_that_never_reached_graph_is_not_counted(
+        self, client: GraphServiceClient
+    ) -> None:
+        async with Client(self._server(client)) as mcp:
+            _ = await mcp.call_tool("zz_never_calls_graph", {}, raise_on_error=False)
+            _ = await mcp.call_tool("zz_no_such_tool", {}, raise_on_error=False)
+
+        counted = {dict(labels)["operation"] for labels in _samples(GRAPH_OPERATIONS_TOTAL)}
+        assert "zz_never_calls_graph" not in counted
+        assert not {"zz_no_such_tool", UNRESOLVED_NAME} & counted
 
 
 class TestNoOperationNameIsTakenFromData:
@@ -638,37 +694,6 @@ class TestNoOperationNameIsTakenFromData:
             "every measured Graph call is under tools/, so this asserts nothing the tools-only "
             + "rule did not — find the caller that moved before narrowing the glob back"
         )
-
-    @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)
-    def test_the_operation_is_a_name_this_code_chose(self, source: pathlib.Path) -> None:
-        module = _parsed(source)
-        chosen = frozenset(_module_level_strings(module))
-        derived = [
-            (call.lineno, ast.unparse(named))
-            for call in _graph_errors_calls(module)
-            if (named := _operation_named(call)) is not None
-            and not _is_chosen_in_code(named, chosen)
-        ]
-        assert not derived, (
-            f"{_source_id(source)} passes graph_errors an operation it did not choose in code, at "
-            + f"(line, expression) {derived}. `operation` is a Prometheus label: a URL, a path, or "
-            + "anything read off an argument is a new time series per chat, per message and per "
-            + f"meeting, and an unbounded label set on {GRAPH_OPERATIONS_TOTAL} takes the "
-            + "Prometheus down rather than showing up as a bad dashboard. Pass a constant this "
-            + "module binds "
-            + "at its top level, the way every tool passes its own TOOL_NAME."
-        )
-
-
-def _operation_named(call: ast.Call) -> ast.expr | None:
-    if call.args:
-        return call.args[0]
-    for keyword in call.keywords:
-        if keyword.arg == "operation":
-            return keyword.value
-        if keyword.arg is None:
-            return keyword.value
-    return None
 
 
 def _module_level_strings(module: ast.Module) -> dict[str, str]:

@@ -12,7 +12,12 @@ from msgraph.generated.users.item.outlook.supported_time_zones.supported_time_zo
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, send_parsed
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    collect_pages,
+    graph_step,
+    send_parsed,
+)
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -85,7 +90,7 @@ class TimeZones(BaseModel):
 async def list_time_zones(
     client: GraphServiceClient, *, standard: Standard = "windows"
 ) -> TimeZones:
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(client, standard)
         assert first_page is not None, "Graph answered a time zone listing with no collection"
         collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)

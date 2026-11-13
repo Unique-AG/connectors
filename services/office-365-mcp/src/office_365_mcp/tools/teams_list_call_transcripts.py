@@ -223,7 +223,7 @@ async def teams_list_call_transcripts(
         created = transcript.created_date_time
         return created is None or opens <= as_utc(created) <= closes
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         user = await signed_in_user(client)
         assert user.id is not None, "signed_in_user returns a user with an id"
         listed, listing_capped = await _listing(client, user.id, opens, closes)

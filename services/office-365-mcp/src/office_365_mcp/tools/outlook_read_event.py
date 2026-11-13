@@ -27,7 +27,7 @@ from msgraph.generated.users.item.calendars.item.events.item.event_item_request_
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import (
     SUMMARY_FIELDS,
     EventAttendee,
@@ -236,7 +236,7 @@ async def read_event(
     if zone is None:
         raise ToolError(_BAD_ZONE)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         event = (
             await client.me.calendars.by_calendar_id(handle.calendar_id)
             .events.by_event_id(handle.event_id)

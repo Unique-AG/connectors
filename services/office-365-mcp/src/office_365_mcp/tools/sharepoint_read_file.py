@@ -152,7 +152,7 @@ async def _fetched(
     *,
     convert_to: ConvertTo | None,
 ) -> File | str:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_ITEM):
             item = await _item(client, handle)
 

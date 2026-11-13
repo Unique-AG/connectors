@@ -105,7 +105,7 @@ async def create_folder(
 
     answer: Confirmed = None
     created: MailFolder | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if mailbox is not None:
             with not_graph():
                 answer = await confirm(

@@ -124,7 +124,7 @@ async def rename_item(
     previous_name: str | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, handle.drive_id, handle.item_id)
         previous_name = found.name
         if found.root is not None:

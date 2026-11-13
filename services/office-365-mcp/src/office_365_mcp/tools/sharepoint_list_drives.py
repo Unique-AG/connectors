@@ -153,7 +153,7 @@ async def list_drives(client: GraphServiceClient, *, site: str | None = None) ->
     if site is not None and site_path is None:
         raise ToolError(not_a_site(TOOL_NAME))
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if site_path is None:
             with graph_step(STEP):
                 first_page = await client.me.drives.get(

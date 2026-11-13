@@ -7,7 +7,7 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import ListHandle, list_handle
 from office_365_mcp.shared.lists import NOT_A_LIST_HANDLE, ListColumn, list_columns
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -47,7 +47,7 @@ async def get_list(client: GraphServiceClient, *, list_uri: str) -> ListSchema:
     handle = list_handle(list_uri)
     if handle is None:
         raise ToolError(f"{TOOL_NAME} {NOT_A_LIST_HANDLE}")
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         columns = await list_columns(client, handle)
     return ListSchema(columns=columns)
 

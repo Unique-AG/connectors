@@ -438,7 +438,7 @@ async def create_event_on_behalf(
 
     created: Event | None = None
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         calendar = await calendar_of(client, calendar_id=handle.calendar_id)
         assert calendar.id is not None, "Graph answered a calendar read with a calendar with no id"
         draft = with_default_online_meeting(draft, calendar)
@@ -456,8 +456,6 @@ async def create_event_on_behalf(
                 client, calendar_id=calendar.id, draft=draft, transaction=transaction
             )
 
-    # Decided inside the block, raised outside it: `graph_errors` reads an escaping `ToolError` as a
-    # Graph failure, and neither a refusal nor a question still waiting for its answer is one.
     if asked is not None:
         return asked
     if refused is not None:
