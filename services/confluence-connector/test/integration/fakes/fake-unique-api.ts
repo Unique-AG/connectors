@@ -47,6 +47,7 @@ export interface StoredFile extends UniqueFile {
  */
 export class FakeUniqueApi implements UniqueApiClient {
   public readonly auth: UniqueApiClient['auth'];
+  public readonly health: UniqueApiClient['health'];
   public readonly scopes: UniqueApiClient['scopes'];
   public readonly files: UniqueApiClient['files'];
   public readonly users: UniqueApiClient['users'];
@@ -80,7 +81,14 @@ export class FakeUniqueApi implements UniqueApiClient {
       });
     }
 
-    this.auth = { getToken: async () => 'fake-token' };
+    this.auth = {
+      getToken: async () => 'fake-token',
+      getAuthHeaders: async () => ({ Authorization: 'Bearer fake-token' }),
+    };
+    this.health = {
+      checkIngestion: notImplemented('health.checkIngestion'),
+      checkScopeManagement: notImplemented('health.checkScopeManagement'),
+    } as unknown as UniqueApiClient['health'];
     this.scopes = this.buildScopesFacade();
     this.files = this.buildFilesFacade();
     this.users = {
