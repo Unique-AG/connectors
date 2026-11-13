@@ -37,6 +37,7 @@ from kb_mcp.common.icons import tool_icons
 from kb_mcp.common.references import (
     MIME_TYPE_JSON,
     MIME_TYPE_PDF,
+    UNEXPECTED_ERROR_MESSAGE,
     file_reference_url,
     markdown_citation_link,
 )
@@ -395,5 +396,6 @@ async def read_file(
             type(exc).__name__,
         )
         return ToolResult(
-            content=[TextContent(type="text", text=str(exc))], is_error=True
+            content=[TextContent(type="text", text=UNEXPECTED_ERROR_MESSAGE)],
+            is_error=True,
         )

@@ -47,6 +47,7 @@ from kb_mcp.common.metadata_filter import (
 )
 from kb_mcp.common.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    UNEXPECTED_ERROR_MESSAGE,
     MetadataFilterArgument,
     file_reference_url,
     markdown_citation_link,
@@ -798,5 +799,6 @@ async def content_tree(
             type(exc).__name__,
         )
         return ToolResult(
-            is_error=True, content=[TextContent(type="text", text=str(exc))]
+            is_error=True,
+            content=[TextContent(type="text", text=UNEXPECTED_ERROR_MESSAGE)],
         )
