@@ -480,7 +480,7 @@ Confluence API request histogram buckets: 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
 ### Grafana Dashboard
 
-A Grafana dashboard ConfigMap is available in the Helm chart. The dashboard visualizes sync durations, content throughput, attachment uploads, Confluence API performance, Unique API performance, and Node.js runtime metrics. Enable it with:
+The Helm chart creates a Grafana dashboard ConfigMap by default. Grafana's dashboard sidecar loads it from the `grafana_dashboard` label. The dashboard shows current sync health per tenant, totals for the selected time range, sync and content flow, Confluence and Unique API traffic and errors, and pod resources. Choose the folder or turn it off with:
 
 ```yaml
 grafana:

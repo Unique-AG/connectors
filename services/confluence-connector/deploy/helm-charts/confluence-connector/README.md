@@ -93,7 +93,7 @@ spec:
 | envVars | list | `[]` | Environment variables from secrets. Example for loading secrets (uncomment and customize as needed):   envVars:     # For Zitadel authentication (required when authMode is 'external')     - name: ZITADEL_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: ZITADEL_CLIENT_SECRET     # For Confluence OAuth 2.0 (2LO) client secret     - name: CONFLUENCE_CLIENT_SECRET       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: CONFLUENCE_CLIENT_SECRET     # For proxy basic auth password (required when proxy.authMode is 'username_password')     - name: PROXY_PASSWORD       valueFrom:         secretKeyRef:           name: confluence-connector-secret           key: PROXY_PASSWORD |
 | extraEnvCM | list | `["confluence-connector-proxy-config"]` | List of ConfigMaps to load as environment variables. |
 | fullnameOverride | string | `"confluence-connector"` |  |
-| grafana.dashboard.enabled | bool | `false` | Enable Grafana dashboard ConfigMap creation |
+| grafana.dashboard.enabled | bool | `true` | Create the Grafana dashboard ConfigMap. Grafana's dashboard sidecar picks it up by the grafana_dashboard label |
 | grafana.dashboard.folder | string | `"connectors"` | Grafana folder where the dashboard will be placed |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.registry | string | `"ghcr.io"` |  |
