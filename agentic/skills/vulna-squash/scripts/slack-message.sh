@@ -9,13 +9,11 @@ NF == 0 { next }
   text = $0
   sub(/^[ \t]*[^ \t]+[ \t]*/, "", text)
   if (text == "") die("A " kind " line has no text.")
+  if (kind == "stop") text = "Stopped: " text
+  if (length(text) > max_chars) die("A " kind " line is longer than " max_chars " characters.")
 }
 kind == "pr" { prs[++pr_count] = text; next }
-kind == "note" || kind == "stop" {
-  if (length(text) > max_chars) die("A " kind " line is longer than " max_chars " characters.")
-  extra[++extra_count] = (kind == "stop" ? "Stopped: " : "") text
-  next
-}
+kind == "note" || kind == "stop" { extra[++extra_count] = text; next }
 { die("Unknown line kind: " kind ". Use pr, note or stop.") }
 END {
   if (failed) exit 1
