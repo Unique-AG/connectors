@@ -41,6 +41,7 @@ from kb_mcp.common.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
     SEARCH_SYSTEM_PROMPT,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
+    UNEXPECTED_ERROR_MESSAGE,
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     MetadataFilterArgument,
     chunk_to_text_content,
@@ -227,7 +228,8 @@ async def search(
             sdk_detail,
         )
         return ToolResult(
-            content=[TextContent(type="text", text=str(exc))], is_error=True
+            content=[TextContent(type="text", text=UNEXPECTED_ERROR_MESSAGE)],
+            is_error=True,
         )
 
     frontend_base_url = kb_settings.frontend_base_url_str()

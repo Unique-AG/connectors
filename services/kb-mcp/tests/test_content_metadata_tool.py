@@ -15,6 +15,7 @@ from pydantic import SecretStr
 
 from kb_mcp.common import cached_walk
 from kb_mcp.common import tree_cache as ct_cache
+from kb_mcp.common.references import UNEXPECTED_ERROR_MESSAGE
 from kb_mcp.tools.content_metadata import ContentMetadataToolConfig, content_metadata
 from kb_mcp.tools.content_metadata.tool import _flatten_metadata_value
 
@@ -716,7 +717,7 @@ async def test_identity_refusal_surfaces_as_tool_error(identity):
     result = await content_metadata(config=ContentMetadataToolConfig())
 
     assert result.is_error is True
-    assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio

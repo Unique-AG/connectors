@@ -39,6 +39,7 @@ from kb_mcp.common.metadata_filter import (
     DEFAULT_METADATA_FILTER_STATEMENT,
     merge_request_metadata_filter,
 )
+from kb_mcp.common.references import UNEXPECTED_ERROR_MESSAGE
 from kb_mcp.common.scoped_walk import ScopedContentTree
 from kb_mcp.common.tree_cache import get_tree_cache
 from kb_mcp.settings import get_settings
@@ -545,5 +546,6 @@ async def content_metadata(
             type(exc).__name__,
         )
         return ToolResult(
-            is_error=True, content=[TextContent(type="text", text=str(exc))]
+            is_error=True,
+            content=[TextContent(type="text", text=UNEXPECTED_ERROR_MESSAGE)],
         )

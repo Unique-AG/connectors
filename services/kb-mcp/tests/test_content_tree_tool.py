@@ -33,6 +33,7 @@ from kb_mcp.common.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    UNEXPECTED_ERROR_MESSAGE,
     UNIQUEQL_EQUALS_PDF,
     UNIQUEQL_EQUALS_PDF_WRAPPED,
     MetadataFilterArgument,
@@ -751,7 +752,7 @@ async def test_identity_refusal_surfaces_as_tool_error(identity):
     result = await content_tree(mode="tree", config=ContentTreeToolConfig())
 
     assert result.is_error is True
-    assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio

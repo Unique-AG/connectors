@@ -25,6 +25,7 @@ from kb_mcp.common.references import (
     SEARCH_SYSTEM_PROMPT,
     SERVER_INSTRUCTIONS_CITATION_GUIDANCE,
     TOOL_DESCRIPTION_CITATION_GUIDANCE,
+    UNEXPECTED_ERROR_MESSAGE,
     UNIQUE_AI_RESULT_CITATION_INSTRUCTION,
     UNIQUE_AI_TOOL_FORMAT_INFORMATION,
     UNIQUEQL_EQUALS_PDF,
@@ -569,7 +570,7 @@ async def test_search_returns_error_result_on_service_failure():
         )
 
     assert result.is_error is True
-    assert "KB unavailable" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio
@@ -630,7 +631,7 @@ async def test_search_returns_error_result_on_post_processor_failure():
         )
 
     assert result.is_error is True
-    assert "post-processor failed" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio
@@ -645,7 +646,7 @@ async def test_search_returns_error_when_identity_unresolvable():
         )
 
     assert result.is_error is True
-    assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 def test_is_unique_ai_client_true_for_node_chats_own_client_name():
