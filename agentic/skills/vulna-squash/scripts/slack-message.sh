@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-awk -v max_lines=5 -v max_chars=200 '
+awk -v max_lines=5 -v max_chars=200 -v repo=Unique-AG/connectors '
 function die(msg) { print msg > "/dev/stderr"; failed = 1; exit 1 }
+function link(s,   out, num) {
+  while (match(s, /#[0-9]+/)) {
+    num = substr(s, RSTART + 1, RLENGTH - 1)
+    out = out substr(s, 1, RSTART - 1) "<https://github.com/" repo "/pull/" num "|#" num ">"
+    s = substr(s, RSTART + RLENGTH)
+  }
+  return out s
+}
 BEGIN {
   prefix["stop"] = "Stopped: "
   prefix["app"] = "App: "
@@ -16,24 +24,27 @@ NF == 0 { next }
   text = $0
   sub(/^[ \t]*[^ \t]+[ \t]*/, "", text)
   if (text == "") die("A " kind " line has no text.")
-  if (kind in prefix) text = prefix[kind] text
-  if (length(text) > max_chars) die("A " kind " line is longer than " max_chars " characters.")
 }
-kind == "pr" { prs[++pr_count] = text; next }
-kind in prefix { extra[++extra_count] = text; next }
+kind == "pr" {
+  if (split(text, part, " ") != 2 || part[1] !~ /^[0-9]+$/) die("A pr line needs a PR number and a status.")
+  prs[++pr_count] = link("#" part[1]) " " part[2]
+  next
+}
+kind in prefix {
+  text = prefix[kind] text
+  if (length(text) > max_chars) die("A " kind " line is longer than " max_chars " characters.")
+  extra[++extra_count] = link(text)
+  next
+}
 { die("Unknown line kind: " kind ". Use pr, stop, app, os, lockfiles or note.") }
 END {
   if (failed) exit 1
   if (pr_count + extra_count == 0) die("The message is empty.")
-  room = max_lines - extra_count
-  if (pr_count > 0 && room < 1) die("The note and stop lines leave no room for the PR lines.")
-  if (extra_count > max_lines) die("There are more than " max_lines " note and stop lines.")
-  keep = (pr_count <= room) ? pr_count : room - 1
-  for (i = 1; i <= keep; i++) print prs[i]
-  if (keep < pr_count) {
-    rest = prs[keep + 1]
-    for (i = keep + 2; i <= pr_count; i++) rest = rest " ; " prs[i]
-    print rest
-  }
+  if (extra_count + (pr_count > 0) > max_lines) die("The message has more than " max_lines " lines.")
   for (i = 1; i <= extra_count; i++) print extra[i]
+  if (pr_count > 0) {
+    line = "PRs: " prs[1]
+    for (i = 2; i <= pr_count; i++) line = line " · " prs[i]
+    print line
+  }
 }'
