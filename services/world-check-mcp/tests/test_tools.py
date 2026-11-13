@@ -1,4 +1,8 @@
+import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 import json
+import socket
 from typing import cast
 
 from fastmcp import Client
@@ -7,13 +11,18 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
+from mcp.client import session
 from mcp.shared.exceptions import MCPError
+from mcp_configs import ServerSettings
 from mcp_types import ElicitResult
+from pydantic import AnyHttpUrl
 from pydantic import TypeAdapter
 import pytest
+import uvicorn
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.mcp import http_app
 from world_check_mcp.persistence import Persistence
 
 
@@ -1051,3 +1060,49 @@ async def test_get_ogs_updates_rejects_a_future_end() -> None:
                 "get_ogs_updates",
                 {"since": "2026-10-20T00:00:00Z", "until": "2999-01-01T00:00:00Z"},
             )
+
+
+@asynccontextmanager
+async def _serve_over_http(server: FastMCP) -> AsyncGenerator[str]:
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        port = cast(int, reserved.getsockname()[1])
+        settings = ServerSettings(
+            host="127.0.0.1",
+            port=port,
+            mcp_base_url=AnyHttpUrl(f"http://127.0.0.1:{port}"),
+            mcp_allowed_origins=[],
+        )
+        config = uvicorn.Config(http_app(server, settings), log_config=None)
+        http_server = uvicorn.Server(config)
+        serving = asyncio.create_task(http_server.serve(sockets=[reserved]))
+        try:
+            async with asyncio.timeout(10):
+                while not http_server.started and not serving.done():
+                    await asyncio.sleep(0.01)
+            assert http_server.started, "the server stopped before it started"
+            yield f"http://127.0.0.1:{port}/mcp"
+        finally:
+            http_server.should_exit = True
+            await asyncio.gather(serving, return_exceptions=True)
+
+
+@pytest.mark.parametrize("protocol_version", ["2025-06-18", "2025-11-25"])
+async def test_verify_passport_check_saves_after_approval_over_http(
+    protocol_version: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _writes.clear()
+    monkeypatch.setattr(session, "LATEST_HANDSHAKE_VERSION", protocol_version)
+    async with (
+        _serve_over_http(_server()) as url,
+        Client(url, mode="legacy", elicitation_handler=_approve) as client,
+    ):
+        assert client.protocol_version == protocol_version
+        result = await client.call_tool(
+            "verify_passport_check", {"case": "sys-pass", "mrz_matched": True}
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["recorded"] is True
+    assert len(_writes) == 1

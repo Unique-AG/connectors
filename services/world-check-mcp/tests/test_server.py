@@ -20,7 +20,16 @@ from world_check_mcp.mcp import http_app
 from world_check_mcp.mcp import run_server
 
 MCP_HEADERS = {"Accept": "application/json, text/event-stream"}
-PING = {"jsonrpc": "2.0", "id": 1, "method": "ping"}
+PING = {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+        "protocolVersion": "2025-11-25",
+        "capabilities": {},
+        "clientInfo": {"name": "probe", "version": "0"},
+    },
+}
 LOCAL_HOST = "127.0.0.1:8000"
 POD_IP_HOST = "10.1.2.3:8000"
 DEPLOYED = ServerSettings(
