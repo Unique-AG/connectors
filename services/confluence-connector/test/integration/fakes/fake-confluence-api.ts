@@ -148,7 +148,7 @@ export class FakeConfluenceApi extends CloudConfluenceApiClient {
     const includeBody = expand.includes('body.storage');
     const includeAttachments = expand.includes('children.attachment');
     const results = this.matchPages(cql).map((page) =>
-      this.toConfluencePage(page, { includeBody, includeAttachments }),
+      this.toConfluenceContent(page, { includeBody, includeAttachments }),
     );
     return { results, _links: {} };
   }
@@ -210,6 +210,18 @@ export class FakeConfluenceApi extends CloudConfluenceApiClient {
     const page = this.state.pages.find((p) => p.id === pageId);
     assert.ok(page, `Unknown page "${pageId}"`);
     return page;
+  }
+
+  private toConfluenceContent(
+    page: ScenarioPage,
+    options: { includeBody: boolean; includeAttachments: boolean },
+  ): unknown {
+    const content = this.toConfluencePage(page, options);
+    // Confluence Cloud returns a folder's body as an empty object, which the page schema rejects.
+    if (page.type === ContentType.FOLDER && options.includeBody) {
+      return { ...content, body: {} };
+    }
+    return content;
   }
 
   private toConfluencePage(

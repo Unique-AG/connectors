@@ -193,11 +193,13 @@ describe('ConfluenceSynchronizationService', () => {
       );
     });
 
-    it('logs individual page failures without aborting the sync', async () => {
+    it('fails the sync when no page could be ingested, after finishing cleanup', async () => {
       vi.mocked(mockContentFetcher.fetchPageContent).mockRejectedValue(new Error('fetch failure'));
 
-      await tenantStorage.run(tenant, () => service.synchronize());
+      const result = await tenantStorage.run(tenant, () => service.synchronize());
 
+      expect(result).toEqual({ status: 'failure' });
+      expect(mockScopeManagementService.cleanupRemovedSpaces).toHaveBeenCalledWith(new Set(['SP']));
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
@@ -484,8 +486,9 @@ describe('ConfluenceSynchronizationService', () => {
         new Error('attachment ingestion boom'),
       );
 
-      await tenantStorage.run(tenant, () => service.synchronize());
+      const result = await tenantStorage.run(tenant, () => service.synchronize());
 
+      expect(result).toEqual({ status: 'failure' });
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
@@ -493,7 +496,56 @@ describe('ConfluenceSynchronizationService', () => {
         failed: 1,
         msg: 'Attachment ingestion summary',
       });
+      expect(mockLogger.error).toHaveBeenCalledWith({
+        msg: 'Sync failed: no page or attachment could be ingested',
+      });
+    });
+
+    it('keeps the sync successful when some items are ingested and others fail', async () => {
+      const attachment: DiscoveredAttachment = {
+        id: 'att-fail',
+        title: 'broken.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 1024,
+        downloadPath: '/download/attachments/1/broken.pdf',
+        versionTimestamp: '2026-02-01T00:00:00.000Z',
+        pageId: '1',
+        spaceId: 'space-1',
+        spaceKey: 'SP',
+        spaceName: 'Space',
+        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-fail`,
+      };
+      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
+        pages: discoveredPagesFixture,
+        attachments: [attachment],
+      });
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: ['1', '1::att-fail'],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+      vi.mocked(mockIngestionService.ingestAttachment).mockRejectedValue(
+        new Error('attachment ingestion boom'),
+      );
+
+      const result = await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(result).toEqual({ status: 'success' });
       expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
+    });
+
+    it('keeps the sync successful when there is nothing to ingest', async () => {
+      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
+        newItemIds: [],
+        updatedItemIds: [],
+        deletedItems: [],
+        movedItemIds: [],
+      });
+
+      const result = await tenantStorage.run(tenant, () => service.synchronize());
+
+      expect(result).toEqual({ status: 'success' });
     });
   });
 
@@ -597,6 +649,25 @@ describe('ConfluenceSynchronizationService', () => {
       expect(metrics.recordAttachmentsProcessed).toHaveBeenCalledWith(1, 'success');
       expect(metrics.recordAttachmentsProcessed).toHaveBeenCalledWith(1, 'failure');
       expect(vi.mocked(metrics.recordAttachmentsProcessed).mock.calls).toHaveLength(2);
+    });
+
+    it('records a failed sync result when no item could be ingested', async () => {
+      vi.mocked(mockIngestionService.ingestPage).mockRejectedValue(new Error('ingest boom'));
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(metrics.recordSyncResult).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Number),
+        'failure',
+      );
     });
 
     it('walks through sync phases and ends on Idle', async () => {

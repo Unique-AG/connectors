@@ -12,7 +12,7 @@ const noop = () => {};
  */
 export function createNoopMetrics(): Metrics {
   const noopRecord: Record<PublicMethodKeys<Metrics>, () => void> = {
-    recordSyncDuration: noop,
+    recordSyncResult: noop,
     recordScanDuration: noop,
     recordPagesProcessed: noop,
     recordAttachmentsProcessed: noop,
@@ -22,7 +22,7 @@ export function createNoopMetrics(): Metrics {
     recordApiRequestDuration: noop,
     recordApiError: noop,
     recordApiThrottleEvent: noop,
-    recordCleanupDuration: noop,
+    recordCleanupResult: noop,
     recordCleanupContentDeleted: noop,
     recordCleanupScopesDeleted: noop,
     recordOrphanedScopesCleaned: noop,

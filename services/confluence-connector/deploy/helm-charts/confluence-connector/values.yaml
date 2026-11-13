@@ -163,6 +163,122 @@ prometheus:
       labels:
         severity: warning
         alertGroup: confluence-connector
+    # The sync rules need at least two outcomes in their window, so one failed sync, for example
+    # the first after a pod start, does not fire them. The windows fit syncs that start at least
+    # hourly (scanIntervalCron) and finish within the interval. A sync that runs longer than the
+    # interval makes the scheduler skip the next start, so widen the windows for slower syncs.
+    ConfluenceConnectorSyncFailing:
+      alert: ConfluenceConnectorSyncFailing
+      annotations:
+        summary: "Confluence Connector sync failing for tenant {{ $labels.tenant }}"
+        description: "Every sync of tenant {{ $labels.tenant }} in the last 3 hours failed. Nothing new from Confluence reaches Unique."
+        runbook: |
+          1. Search the connector logs for "Sync failed" with this tenantName
+          2. "Scope with id ... not found": the root folder in Unique was deleted. Create a new one and update ingestion.scopeId
+          3. "Root scope ownership mismatch" or "Failed to claim root scope ownership": another Confluence instance owns the folder
+          4. 401/403 from Confluence or Zitadel: rotate the client secret
+          5. Network errors: check NetworkPolicy, proxy and DNS
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[3h])) > 0
+        )
+        and on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total[3h])) > 1.5
+        )
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="success"}[3h])) > 0
+        )
+      for: 15m
+      labels:
+        severity: critical
+        alertGroup: confluence-connector
+    ConfluenceConnectorSyncDegraded:
+      alert: ConfluenceConnectorSyncDegraded
+      annotations:
+        summary: "Confluence Connector sync degraded for tenant {{ $labels.tenant }}"
+        description: "More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ humanizePercentage $value }}."
+        runbook: |
+          1. Search the connector logs for "Sync failed" with this tenantName
+          2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side
+      # The unless clause leaves a tenant without any success in 3 hours to ConfluenceConnectorSyncFailing.
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[6h]))
+          /
+          sum by (namespace, tenant) (increase(cfc_syncs_total[6h]))
+        ) > 0.5
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="success"}[3h])) == 0
+        )
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    ConfluenceConnectorSyncStuck:
+      alert: ConfluenceConnectorSyncStuck
+      annotations:
+        summary: "Confluence Connector sync of tenant {{ $labels.tenant }} has not finished for 6 hours"
+        description: "A sync of tenant {{ $labels.tenant }} started more than 6 hours ago and has not finished. While a sync runs, every scheduled sync of the tenant is skipped."
+        runbook: |
+          1. Check the connector logs for the last progress line of this tenant
+          2. A very large first sync can take this long. Check whether pages are still being ingested
+          3. If nothing moves, restart the pod
+      expr: |
+        max by (namespace, tenant) (cfc_sync_phase{phase!="idle"}) == 1
+      for: 6h
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    ConfluenceConnectorContentFailures:
+      alert: ConfluenceConnectorContentFailures
+      annotations:
+        summary: "Confluence Connector cannot ingest or delete content for tenant {{ $labels.tenant }}"
+        description: "Pages, attachments or deletions of tenant {{ $labels.tenant }} keep failing on every sync. {{ $value }} failures in the last 2 hours."
+        runbook: |
+          1. Search the connector logs for "Failed to" with this tenantName
+          2. Check the failing items in the "Page ingestion summary" and "Attachment ingestion summary" log lines
+          3. Unique ingestion errors also show in ConfluenceConnectorUniqueAPIErrors
+          4. If the same item fails on every sync (for example too large, or rejected by Unique), the alert keeps firing until that item is fixed or removed in Confluence
+      # Two hourly syncs can record their failures almost 2 hours apart, so the 2h window stays true
+      # while failures recur. for: 3h is longer than the window, so one bad sync does not fire.
+      # The connector zeroes all three counters at startup, so each side of + has a series.
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_pages_processed_total{result="failure"}[2h]))
+          + sum by (namespace, tenant) (increase(cfc_attachments_processed_total{result="failure"}[2h]))
+          + sum by (namespace, tenant) (increase(cfc_content_deleted_total{result="failure"}[2h]))
+        ) > 0
+      for: 3h
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    ConfluenceConnectorTenantCleanupFailing:
+      alert: ConfluenceConnectorTenantCleanupFailing
+      annotations:
+        summary: "Confluence Connector cannot clean up deleted tenant {{ $labels.tenant }}"
+        description: "Tenant {{ $labels.tenant }} has status deleted, and every cleanup in the last 3 hours failed. Its content stays in Unique."
+        runbook: |
+          1. Search the connector logs for "cleanup" with this tenantName
+          2. Check that the service user can still manage the tenant's root folder
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="failure"}[3h])) > 0
+        )
+        and on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total[3h])) > 1.5
+        )
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="success"}[3h])) > 0
+        )
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
 
 connectorConfig:
   enabled: true

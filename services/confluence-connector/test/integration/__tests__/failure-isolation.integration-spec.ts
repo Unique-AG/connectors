@@ -36,9 +36,7 @@ describe('failure isolation', () => {
     ctx = undefined;
   });
 
-  // One page failing to load from Confluence must not stop the whole sync.
-  // ConfluenceContentFetcher catches the error and returns null, so the page is
-  // skipped and the rest keep going.
+  // One failing page must not stop the sync. It counts as failed.
   it('continues syncing other pages when one page fails to fetch from Confluence', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { confluence } = ctx;
@@ -49,6 +47,7 @@ describe('failure isolation', () => {
       }
       return fetchPage(pageId);
     });
+    const recordPagesProcessed = vi.spyOn(ctx.metrics, 'recordPagesProcessed');
 
     const result = await ctx.runSync();
 
@@ -57,6 +56,8 @@ describe('failure isolation', () => {
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
     expectNotIngested(state, { pages: ['tenant1/space-1_SP/p2'] });
+    expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
+    expect(recordPagesProcessed).not.toHaveBeenCalledWith(1, 'skipped');
   });
 
   // When Unique rejects registerContent for one page, IngestionService catches
@@ -101,5 +102,20 @@ describe('failure isolation', () => {
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
     expectNotIngested(state, { attachments: ['tenant1/space-1_SP/p1::att-1'] });
+  });
+
+  // A sync in which no page could be fetched is a failed sync, not a successful one with skips.
+  it('fails the sync when every page fails to fetch from Confluence', async () => {
+    ctx = buildScenarioContext(threePagesOneSpaceScenario);
+    vi.spyOn(ctx.confluence, 'getPageById').mockRejectedValue(new Error('500 from Confluence'));
+    const recordSyncResult = vi.spyOn(ctx.metrics, 'recordSyncResult');
+
+    const result = await ctx.runSync();
+
+    expect(result).toEqual({ status: 'failure' });
+    expect(recordSyncResult).toHaveBeenCalledWith(expect.any(Number), 'failure');
+    expectNotIngested(getUniqueState(ctx.unique), {
+      pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p2', 'tenant1/space-1_SP/p3'],
+    });
   });
 });

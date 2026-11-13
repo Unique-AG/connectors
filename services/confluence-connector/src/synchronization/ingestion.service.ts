@@ -84,11 +84,12 @@ export class IngestionService {
         pageId: page.id,
         title: page.title,
         err,
-        msg: 'Failed to ingest page, skipping',
+        msg: 'Failed to ingest page',
       });
       if (contentId) {
         await this.cleanupFailedRegistration(contentId, { pageId: page.id, title: page.title });
       }
+      throw err;
     }
   }
 
@@ -139,7 +140,7 @@ export class IngestionService {
         attachmentId: attachment.id,
         title: createSmeared(attachment.title),
         err,
-        msg: 'Failed to ingest attachment, skipping',
+        msg: 'Failed to ingest attachment',
       });
       if (contentId) {
         await this.cleanupFailedRegistration(contentId, {
@@ -147,6 +148,7 @@ export class IngestionService {
           title: createSmeared(attachment.title),
         });
       }
+      throw err;
     }
   }
 
@@ -176,6 +178,7 @@ export class IngestionService {
       return 0;
     }
 
+    let attemptedCount = contentKeys.length;
     try {
       const files = await this.uniqueApiClient.files.getByKeys(contentKeys);
       if (files.length === 0) {
@@ -187,6 +190,7 @@ export class IngestionService {
       }
 
       const contentIds = files.map((f) => f.id);
+      attemptedCount = contentIds.length;
       const { deleted, failed } = await this.uniqueApiClient.files.deleteByIds(contentIds);
       if (deleted > 0) {
         this.metrics.recordContentDeleted(deleted, 'success');
@@ -204,6 +208,7 @@ export class IngestionService {
 
       return deleted;
     } catch (err) {
+      this.metrics.recordContentDeleted(attemptedCount, 'failure');
       this.logger.error({
         contentKeys,
         err,

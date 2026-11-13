@@ -17,6 +17,7 @@ export enum SyncPhase {
 @Injectable()
 export class Metrics {
   private readonly syncDuration: Histogram;
+  private readonly syncsTotal: Counter;
   private readonly scanDuration: Histogram;
   private readonly pagesProcessed: Counter;
   private readonly attachmentsProcessed: Counter;
@@ -27,6 +28,7 @@ export class Metrics {
   private readonly confluenceApiThrottleEvents: Counter;
   private readonly confluenceApiErrors: Counter;
   private readonly cleanupDuration: Histogram;
+  private readonly tenantCleanupsTotal: Counter;
   private readonly cleanupContentDeleted: Counter;
   private readonly cleanupScopesDeleted: Counter;
   private readonly orphanedScopesCleaned: Counter;
@@ -34,10 +36,15 @@ export class Metrics {
 
   private readonly syncPhaseState = new Map<string, SyncPhase>();
   private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
+  private readonly lastSuccessfulSyncSecondsByTenant = new Map<string, number>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
       description: 'Duration of Confluence synchronization cycles',
+    });
+
+    this.syncsTotal = metricService.getCounter('cfc_syncs_total', {
+      description: 'Number of finished sync cycles by result',
     });
 
     this.scanDuration = metricService.getHistogram('cfc_scan_duration_seconds', {
@@ -95,6 +102,10 @@ export class Metrics {
       description: 'Duration of deleted tenant content cleanup',
     });
 
+    this.tenantCleanupsTotal = metricService.getCounter('cfc_tenant_cleanups_total', {
+      description: 'Number of finished deleted tenant cleanup runs by result',
+    });
+
     this.cleanupContentDeleted = metricService.getCounter('cfc_cleanup_content_deleted_total', {
       description: 'Number of content items deleted during tenant cleanup',
     });
@@ -131,6 +142,16 @@ export class Metrics {
       }
     });
 
+    const lastSuccessfulSyncGauge = metricService.getObservableGauge(
+      'cfc_last_successful_sync_timestamp_seconds',
+      { description: 'Unix time of the last successful sync cycle' },
+    );
+    lastSuccessfulSyncGauge.addCallback((observable) => {
+      for (const [tenant, timestampSeconds] of this.lastSuccessfulSyncSecondsByTenant) {
+        observable.observe(timestampSeconds, { tenant });
+      }
+    });
+
     const syncAttachmentsTotalGauge = metricService.getObservableGauge(
       'cfc_sync_attachments_total',
       {
@@ -148,11 +169,13 @@ export class Metrics {
     return getCurrentTenant().name;
   }
 
-  public recordSyncDuration(durationSeconds: number, result: 'success' | 'failure'): void {
-    this.syncDuration.record(durationSeconds, {
-      tenant: this.tenantName,
-      result,
-    });
+  public recordSyncResult(durationSeconds: number, result: 'success' | 'failure'): void {
+    const tenant = this.tenantName;
+    this.syncDuration.record(durationSeconds, { tenant, result });
+    this.syncsTotal.add(1, { tenant, result });
+    if (result === 'success') {
+      this.lastSuccessfulSyncSecondsByTenant.set(tenant, Date.now() / 1000);
+    }
   }
 
   public recordScanDuration(durationSeconds: number): void {
@@ -206,8 +229,10 @@ export class Metrics {
     });
   }
 
-  public recordCleanupDuration(durationSeconds: number, result: 'success' | 'failure'): void {
-    this.cleanupDuration.record(durationSeconds, { tenant: this.tenantName, result });
+  public recordCleanupResult(durationSeconds: number, result: 'success' | 'failure'): void {
+    const tenant = this.tenantName;
+    this.cleanupDuration.record(durationSeconds, { tenant, result });
+    this.tenantCleanupsTotal.add(1, { tenant, result });
   }
 
   public recordCleanupContentDeleted(count: number, result: 'success' | 'failure'): void {
@@ -256,6 +281,8 @@ export class Metrics {
   public initializeCounters(): void {
     const tenantName = this.tenantName;
     const tenant = { tenant: tenantName };
+    this.syncsTotal.add(0, { ...tenant, result: 'success' });
+    this.syncsTotal.add(0, { ...tenant, result: 'failure' });
     this.pagesProcessed.add(0, { ...tenant, result: 'success' });
     this.pagesProcessed.add(0, { ...tenant, result: 'failure' });
     this.pagesProcessed.add(0, { ...tenant, result: 'skipped' });
@@ -277,6 +304,8 @@ export class Metrics {
 
   public initializeCleanupCounters(): void {
     const tenant = { tenant: this.tenantName };
+    this.tenantCleanupsTotal.add(0, { ...tenant, result: 'success' });
+    this.tenantCleanupsTotal.add(0, { ...tenant, result: 'failure' });
     this.cleanupContentDeleted.add(0, { ...tenant, result: 'success' });
     this.cleanupContentDeleted.add(0, { ...tenant, result: 'failure' });
     this.cleanupScopesDeleted.add(0, { ...tenant, result: 'success' });

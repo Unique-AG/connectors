@@ -43,7 +43,7 @@
 
 ### Which Confluence content types are synced?
 
-**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, and `embed` are explicitly skipped because their APIs expose no renderable body. Folders have no body and are effectively skipped by the empty-body filter. When a skipped content type (such as a database) carries the all-descendants label, its child pages are still discovered and ingested; only the skipped parent itself is excluded. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full Cloud and Data Center breakdown.
+**Answer:** The connector ingests `page` and `blogpost` content (including Live Docs, which are a page subtype). Attachments are ingested conditionally when `attachments.mode=enabled`. Content types `database`, `whiteboard`, `embed`, and `folder` are skipped during discovery because they have no renderable body. When a skipped content type (such as a database) carries the all-descendants label, its child pages are still discovered and ingested; only the skipped parent itself is excluded. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full Cloud and Data Center breakdown.
 
 ### What format is the page content exported in?
 
@@ -214,7 +214,7 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 1. Does the page have the `ai-ingest` or `ai-ingest-all` label? (Check that the label names match your tenant configuration.)
 2. Does the service account have access to the page's space? On Data Center, access can optionally be restricted to specific spaces. If space restrictions are configured, pages in excluded spaces are silently excluded from CQL results.
 3. Is the page in a global space? (Cloud: also includes collaboration spaces.)
-4. Is the page a standard page type? (Databases, whiteboards, and embeds are skipped.)
+4. Is the page a standard page type? (Databases, whiteboards, embeds, and folders are skipped.)
 5. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
 6. Is the tenant status set to `active` in the YAML config?
 7. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.
