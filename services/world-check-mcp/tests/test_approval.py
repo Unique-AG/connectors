@@ -234,5 +234,14 @@ async def test_a_tampered_request_state_is_refused() -> None:
 
 def test_request_state_keys_seal_state_any_replica_opens() -> None:
     settings = ElicitationSettings(request_state_keys=[SecretStr("k" * 32)])
+    first_replica = request_state_security(settings)
+    second_replica = request_state_security(settings)
+    sealed = first_replica.codec.seal(b"approval")
+    assert second_replica.codec.unseal(sealed) == b"approval"
+
+
+def test_request_state_without_keys_stays_with_the_sealing_process() -> None:
+    settings = ElicitationSettings(request_state_keys=[])
     sealed = request_state_security(settings).codec.seal(b"approval")
-    assert request_state_security(settings).codec.unseal(sealed) == b"approval"
+    with pytest.raises(Exception):  # noqa: B017, PT011
+        request_state_security(settings).codec.unseal(sealed)
