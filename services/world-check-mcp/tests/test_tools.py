@@ -484,13 +484,14 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "sort": [{"columnName": "updateDate", "order": "ASCENDING"}],
                 "totalResultCount": 1,
                 "results": [
+                    {"caseId": "ext-0", "groupId": "g1", "updateDate": "2026-10-22T06:40:00Z"},
                     {
                         "caseSystemId": "sys-1",
                         "caseId": "ext-1",
                         "groupId": "g1",
                         "updateDate": "2026-10-22T06:47:00Z",
                         "watchlistResults": {"numberOfNewResults": 1, "numberOfUpdatedResults": 0},
-                    }
+                    },
                 ],
                 "pagination": {"pageReferences": {"next": "page-2"}},
             },
@@ -759,6 +760,8 @@ async def test_get_ogs_updates_returns_watchlist_counts() -> None:
 
     page = result.structured_content
     assert page is not None
+    updates = cast(list[dict[str, object]], page["updates"])
+    assert [update["case_system_id"] for update in updates] == ["sys-1"]
     assert page["updates"][0]["new_results"] == 1
     assert page["next_page"] == "page-2"
     assert page["window"]["until"] == "2026-10-22T00:00:00Z"
