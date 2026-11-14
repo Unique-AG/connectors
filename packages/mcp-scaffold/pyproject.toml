@@ -32,7 +32,7 @@ dev = [
 # so the nightly dependency job bumping them here is what keeps the next MCP current. A shared package from
 # packages/ is not listed: the scaffold pins its version from that package's pyproject.toml.
 service = [
-    "fastmcp==4.1.6",
+    "fastmcp==4.1.8",
     "httpx2==2.16.0",
     "mcp-types==2.3.0",
     "pydantic==2.14.3",
