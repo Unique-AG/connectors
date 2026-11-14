@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
+from mcp_credential_auth import RedirectTarget
 
 _PROFILE_INSTRUCTIONS = "Main Menu > System Tools > Administrative > Update Your Profile"
 _DOCS_URL = "https://backstopsolutions.elevio.help/en/articles/236"
@@ -14,6 +15,7 @@ _ENV = Environment(
 def render_login_form(
     request_id: str,
     csrf_token: str,
+    redirect_target: RedirectTarget,
     *,
     client_name: str | None = None,
     username: str = "",
@@ -28,10 +30,13 @@ def render_login_form(
     will reject. `username` is re-filled on a failed attempt so the user
     doesn't have to retype it — the API token never is. Values are autoescaped by Jinja2 since
     `client_name` comes from a dynamically-registered (and therefore untrusted) OAuth client.
+    `redirect_target` is required for the same reason as `csrf_token`: the self-chosen client
+    name proves nothing, so the page always names the host the authorization code is sent to.
     """
     return _ENV.get_template("login.html").render(
         request_id=request_id,
         csrf_token=csrf_token,
+        redirect_target=redirect_target,
         client_name=client_name,
         username=username,
         error=error,

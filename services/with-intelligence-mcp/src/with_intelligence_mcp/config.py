@@ -8,6 +8,7 @@ from importlib.metadata import version as pkg_version
 from pathlib import Path
 from typing import ClassVar, Literal, Self, TypedDict, cast
 
+from mcp_credential_auth import RedirectAllowlistSettings
 from pydantic import (
     Field,
     HttpUrl,
@@ -249,7 +250,7 @@ class DatabaseConfig(BaseSettings):
         return self._connect_args
 
 
-class AuthConfig(BaseSettings):
+class AuthConfig(RedirectAllowlistSettings):
     """OAuth retention, cleanup, and login throttling settings."""
 
     model_config: ClassVar[SettingsConfigDict] = SettingsConfigDict(env_prefix="AUTH_")

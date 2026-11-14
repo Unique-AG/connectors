@@ -114,6 +114,22 @@
 
     button:hover { background: var(--primary-variant); }
 
+    .destination {
+      margin: 0 0 1.25rem;
+      padding: 0.7rem 0.85rem;
+      border: 1px solid var(--control);
+      border-radius: 0.5rem;
+      color: var(--on-background-dimmed);
+      font-size: 0.875rem;
+      line-height: 1.45;
+    }
+
+    .destination strong { color: var(--on-background); }
+
+    .destination p { margin: 0; }
+
+    .destination p + p { margin-top: 0.4rem; }
+
     .error {
       margin: 0 0 1rem;
       padding: 0.7rem 0.85rem;
@@ -172,6 +188,11 @@
           {% if client_name %}{{ client_name }} wants to connect to your Backstop account.{% else %}Connect your Backstop account.{% endif %}
         </p>
       </div>
+    </div>
+
+    <div class="destination">
+      <p>After you sign in, you will be sent to <strong>{{ redirect_target.host }}</strong>{% if redirect_target.on_this_device %}, an app on this computer{% endif %}.</p>
+      <p>Not the app you started this from? Close this page without signing in.</p>
     </div>
 
     {% if error %}<p class="error">{{ error }}</p>{% endif %}

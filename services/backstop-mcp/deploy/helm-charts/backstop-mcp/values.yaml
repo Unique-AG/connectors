@@ -24,6 +24,17 @@ mcpConfig:
     relationshipTypeMarkers: null
     formerRelationshipTypeIds: null
     formerRelationshipTypeMarkers: null
+  # Where a dynamically registered OAuth client may send the browser after login. null leaves the
+  # variable unset, so the app's default list of hosted clients applies. Loopback http on any port
+  # is always accepted.
+  auth:
+    # AUTH_ALLOWED_REDIRECT_HOSTS. A list replaces the app default and is the whole allowlist.
+    allowedRedirectHosts: null
+    # AUTH_ALLOWED_REDIRECT_SCHEMES. A list replaces the app default, [cursor].
+    allowedRedirectSchemes: null
+    # AUTH_EXTRA_REDIRECT_HOSTS. Appended to the app default, such as a single tenant's chat host.
+    # Cannot be combined with allowedRedirectHosts.
+    extraRedirectHosts: []
   # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. The chart ships tenant-neutral.
   tenantGuidance: {}
   logging:
@@ -49,7 +60,8 @@ env:
   APP_ENV: production
   PORT: "8000"
   # PUBLIC_BASE_URL, BACKSTOP_BASE_URL, BACKSTOP_UI_BASE_URL, the employment relationship
-  # types, BACKSTOP_MCP_TENANT_GUIDANCE and the logging settings (LOG_LEVEL, LIBRARY_LOG_LEVELS,
+  # types, the redirect allowlist (AUTH_ALLOWED_REDIRECT_HOSTS, AUTH_ALLOWED_REDIRECT_SCHEMES),
+  # BACKSTOP_MCP_TENANT_GUIDANCE and the logging settings (LOG_LEVEL, LIBRARY_LOG_LEVELS,
   # LOGS_DIAGNOSTICS_DATA_POLICY, ERROR_DETAILS_POLICY) are set through mcpConfig above.
 
   # In-memory catalog caches, one flag per feature. A catalog is a small instance-wide
