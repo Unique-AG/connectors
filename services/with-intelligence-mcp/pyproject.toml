@@ -24,7 +24,7 @@ dependencies = [
     "typing-extensions==4.16.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
-    "unique-mcp==2026.46.0",
+    "unique-mcp==2026.46.2",
     "starlette==1.10.0",
     "mcp==2.3.0",
     "mcp-credential-auth==0.1.0",
