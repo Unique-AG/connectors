@@ -2,7 +2,7 @@ name: "[CI] Gatekeeper"
 
 on:
   pull_request:
-    types: [opened, edited, synchronize, labeled, unlabeled]
+    types: [opened, edited, synchronize, labeled, unlabeled, ready_for_review]
 
 concurrency:
   group: ci-gatekeeper-${{ github.event.pull_request.number }}
@@ -11,8 +11,9 @@ concurrency:
 jobs:
   conventional-pr-title:
     name: Validate PR title and scope
-    # These labels skip the job: the two release-please labels and the title exception.
+    # A draft pull request skips the job. These labels also skip it: the two release-please labels and the title exception.
     if: >-
+      github.event.pull_request.draft != true &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: pending') &&
       !contains(github.event.pull_request.labels.*.name, 'autorelease: tagged') &&
       !contains(github.event.pull_request.labels.*.name, 'title-exception')
@@ -62,6 +63,7 @@ jobs:
           fi
 
   gatekeeper:
+    if: github.event.pull_request.draft != true
     permissions:
       checks: read # to read the check runs of the pull request
       statuses: read # to read the commit statuses of the pull request

@@ -2,6 +2,7 @@ name: "[CI] Helm Schema"
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "services/*/deploy/helm-charts/**"
       - "scripts/render-values-schema.sh"
@@ -17,6 +18,7 @@ concurrency:
 
 jobs:
   helm-schema:
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-slim
     timeout-minutes: 10
     steps:

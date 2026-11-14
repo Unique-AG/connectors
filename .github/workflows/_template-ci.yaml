@@ -11,6 +11,11 @@ on:
         description: "Path to the service directory (e.g., services/sharepoint-connector)"
         required: true
         type: string
+      validate-deploy:
+        description: "Run the Helm and Terraform validation"
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: _template-ci-${{ github.workflow }}-${{ inputs.service-name }}-${{ github.event.pull_request.number || github.ref }}
@@ -86,6 +91,7 @@ jobs:
         run: pnpm test:integration
 
   validate-helm:
+    if: inputs.validate-deploy
     permissions:
       contents: read # to let the called workflow read the repository
       packages: read # to let the called workflow pull the base chart from GHCR
@@ -95,6 +101,7 @@ jobs:
       service-path: ${{ inputs.service-path }}
 
   validate-terraform:
+    if: inputs.validate-deploy
     permissions:
       contents: read # to let the called workflow read the repository
     uses: ./.github/workflows/_template-terraform.yaml
