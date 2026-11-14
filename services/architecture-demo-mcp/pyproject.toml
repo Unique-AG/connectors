@@ -21,9 +21,9 @@ dependencies = [
     "sqlalchemy[asyncio]==2.1.8",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.46.0",
-    "unique-sdk==2026.46.0",
-    "unique-toolkit[monitoring,otel]==2026.46.0",
+    "unique-mcp==2026.46.2",
+    "unique-sdk==2026.46.2",
+    "unique-toolkit[monitoring,otel]==2026.46.2",
     "uvicorn[standard]==0.54.0",
 ]
 
