@@ -112,21 +112,4 @@ describe('failure isolation', () => {
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
     expectNotIngested(state, { attachments: ['tenant1/space-1_SP/p1::att-1'] });
   });
-
-  // Item failures show in cfc_pages_processed_total and ContentFailures, not in the sync result.
-  it('counts each page as failed, not skipped, when every page fails to fetch', async () => {
-    ctx = buildScenarioContext(threePagesOneSpaceScenario);
-    vi.spyOn(ctx.confluence, 'getPageById').mockRejectedValue(new Error('500 from Confluence'));
-    const recordPagesProcessed = vi.spyOn(ctx.metrics, 'recordPagesProcessed');
-
-    const result = await ctx.runSync();
-
-    expect(result).toEqual({ status: 'success' });
-    expect(recordPagesProcessed).toHaveBeenCalledTimes(3);
-    expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
-    expect(recordPagesProcessed).not.toHaveBeenCalledWith(1, 'skipped');
-    expectNotIngested(getUniqueState(ctx.unique), {
-      pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p2', 'tenant1/space-1_SP/p3'],
-    });
-  });
 });

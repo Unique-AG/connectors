@@ -277,8 +277,7 @@ describe('IngestionService', () => {
     const result = await service.deleteContentByKeys(['k1', 'k2']);
 
     expect(result).toBe(0);
-    expect(recordSpy).toHaveBeenCalledOnce();
-    expect(recordSpy).toHaveBeenCalledWith(2, 'failure');
+    expect(recordSpy).toHaveBeenCalledExactlyOnceWith(2, 'failure');
     expect(mockLogger.error).toHaveBeenCalledWith(
       expect.objectContaining({ msg: 'Failed to delete content, skipping' }),
     );
@@ -304,8 +303,7 @@ describe('IngestionService', () => {
     const result = await service.deleteContentByKeys(['k1', 'k2']);
 
     expect(result).toBe(0);
-    expect(recordSpy).toHaveBeenCalledOnce();
-    expect(recordSpy).toHaveBeenCalledWith(1, 'failure');
+    expect(recordSpy).toHaveBeenCalledExactlyOnceWith(1, 'failure');
   });
 
   it('logs warning and returns 0 when no content is found for delete keys', async () => {

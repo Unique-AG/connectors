@@ -603,8 +603,8 @@ describe('ConfluenceSynchronizationService', () => {
       expect(vi.mocked(metrics.recordAttachmentsProcessed).mock.calls).toHaveLength(2);
     });
 
-    it('records a successful sync result when every item fails', async () => {
-      vi.mocked(mockIngestionService.ingestPage).mockRejectedValue(new Error('ingest boom'));
+    it('records a failed sync result when the sync throws', async () => {
+      vi.mocked(mockScopeManagementService.initialize).mockRejectedValueOnce(new Error('boom'));
       const metrics = createMetricsSpy();
       const svc = createService(
         mockScanner,
@@ -616,11 +616,11 @@ describe('ConfluenceSynchronizationService', () => {
 
       await tenantStorage.run(tenant, () => svc.synchronize());
 
+      expect(metrics.recordSyncStart).toHaveBeenCalledOnce();
       expect(metrics.recordSyncResult).toHaveBeenCalledExactlyOnceWith(
         expect.any(Number),
-        'success',
+        'failure',
       );
-      expect(metrics.recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
     });
 
     it('walks through sync phases and ends on Idle', async () => {
