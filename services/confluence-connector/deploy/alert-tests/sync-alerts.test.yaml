@@ -1,0 +1,196 @@
+# Each test starts at time 0, which stands for a pod start. Syncs run hourly at minute 10.
+# A counter step in a series is one finished sync, scraped every minute.
+rule_files:
+  - rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: a single failed sync after a pod start fires nothing
+    interval: 1m
+    input_series:
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x9 1x239'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="success"}'
+        values: '0x249'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts: []
+      - eval_time: 240m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts: []
+      - eval_time: 240m
+        alertname: ConfluenceConnectorSyncDegraded
+        exp_alerts: []
+
+  - name: repeated failed syncs fire SyncFailing
+    interval: 1m
+    input_series:
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x9 1x59 2x59 3x59'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="success"}'
+        values: '0x189'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts: []
+      - eval_time: 100m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: critical
+              alertGroup: confluence-connector
+
+  - name: SyncFailing waits until the last success leaves the 3h window
+    interval: 1m
+    input_series:
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="success"}'
+        values: '0x9 1x299'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x69 1x59 2x59 3x59 4x59'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts: []
+      - eval_time: 220m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: critical
+              alertGroup: confluence-connector
+      - eval_time: 220m
+        alertname: ConfluenceConnectorSyncDegraded
+        exp_alerts: []
+
+  - name: failed syncs on both sides of a pod restart fire SyncFailing
+    interval: 1m
+    input_series:
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", pod="old", result="failure"}'
+        values: '0x9 1x20 stale'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", pod="old", result="success"}'
+        values: '0x30 stale'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", pod="new", result="failure"}'
+        values: '_x39 0x9 1x100'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", pod="new", result="success"}'
+        values: '_x39 0x110'
+    alert_rule_test:
+      - eval_time: 80m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: critical
+              alertGroup: confluence-connector
+
+  - name: mostly failing syncs with a recent success fire SyncDegraded only
+    interval: 1m
+    input_series:
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x9 1x59 2x59 3x119 4x59 5x59'
+      - series: 'cfc_syncs_total{namespace="ns", tenant="t1", result="success"}'
+        values: '0x189 1x179'
+    alert_rule_test:
+      - eval_time: 345m
+        alertname: ConfluenceConnectorSyncDegraded
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: warning
+              alertGroup: confluence-connector
+      - eval_time: 345m
+        alertname: ConfluenceConnectorSyncFailing
+        exp_alerts: []
+
+  - name: a sync running for more than 6 hours fires SyncStuck
+    interval: 1m
+    input_series:
+      - series: 'cfc_sync_start_timestamp_seconds{namespace="ns", tenant="t1"}'
+        values: '_x9 600x400'
+    alert_rule_test:
+      - eval_time: 365m
+        alertname: ConfluenceConnectorSyncStuck
+        exp_alerts: []
+      - eval_time: 380m
+        alertname: ConfluenceConnectorSyncStuck
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: warning
+              alertGroup: confluence-connector
+
+  - name: back-to-back syncs that each finish in time do not fire SyncStuck
+    interval: 1m
+    input_series:
+      - series: 'cfc_sync_start_timestamp_seconds{namespace="ns", tenant="t1"}'
+        values: '_x9 600x59 4200x59 7800x59 11400x59 15000x59 18600x59 22200x59'
+    alert_rule_test:
+      - eval_time: 420m
+        alertname: ConfluenceConnectorSyncStuck
+        exp_alerts: []
+
+  - name: pages failing on every sync fire ContentFailures
+    interval: 1m
+    input_series:
+      - series: 'cfc_pages_processed_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x9 1x59 2x59 3x59 4x59 5x59'
+      - series: 'cfc_attachments_processed_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x309'
+      - series: 'cfc_content_deleted_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x309'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ConfluenceConnectorContentFailures
+        exp_alerts: []
+      - eval_time: 200m
+        alertname: ConfluenceConnectorContentFailures
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: warning
+              alertGroup: confluence-connector
+
+  - name: one sync with failed pages does not fire ContentFailures
+    interval: 1m
+    input_series:
+      - series: 'cfc_pages_processed_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x9 3x299'
+      - series: 'cfc_attachments_processed_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x309'
+      - series: 'cfc_content_deleted_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x309'
+    alert_rule_test:
+      - eval_time: 125m
+        alertname: ConfluenceConnectorContentFailures
+        exp_alerts: []
+      - eval_time: 200m
+        alertname: ConfluenceConnectorContentFailures
+        exp_alerts: []
+
+  - name: a single failed cleanup fires nothing, repeated ones fire TenantCleanupFailing
+    interval: 1m
+    input_series:
+      - series: 'cfc_tenant_cleanups_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x9 1x59 2x59'
+      - series: 'cfc_tenant_cleanups_total{namespace="ns", tenant="t1", result="success"}'
+        values: '0x129'
+    alert_rule_test:
+      - eval_time: 60m
+        alertname: ConfluenceConnectorTenantCleanupFailing
+        exp_alerts: []
+      - eval_time: 100m
+        alertname: ConfluenceConnectorTenantCleanupFailing
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: warning
+              alertGroup: confluence-connector
