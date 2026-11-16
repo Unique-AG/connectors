@@ -193,12 +193,14 @@ describe('ConfluenceSynchronizationService', () => {
       );
     });
 
-    it('fails the sync when no page could be ingested, after finishing cleanup', async () => {
+    // A failed item is new again on the next sync. If it were the only change and failed the sync,
+    // one broken page would fail every sync of a quiet tenant.
+    it('keeps the sync successful when every page fails, after finishing cleanup', async () => {
       vi.mocked(mockContentFetcher.fetchPageContent).mockRejectedValue(new Error('fetch failure'));
 
       const result = await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(result).toEqual({ status: 'failure' });
+      expect(result).toEqual({ status: 'success' });
       expect(mockScopeManagementService.cleanupRemovedSpaces).toHaveBeenCalledWith(new Set(['SP']));
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
@@ -488,16 +490,13 @@ describe('ConfluenceSynchronizationService', () => {
 
       const result = await tenantStorage.run(tenant, () => service.synchronize());
 
-      expect(result).toEqual({ status: 'failure' });
+      expect(result).toEqual({ status: 'success' });
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
         ingested: 0,
         failed: 1,
         msg: 'Attachment ingestion summary',
-      });
-      expect(mockLogger.error).toHaveBeenCalledWith({
-        msg: 'Sync failed: no page or attachment could be ingested',
       });
     });
 
@@ -651,7 +650,7 @@ describe('ConfluenceSynchronizationService', () => {
       expect(vi.mocked(metrics.recordAttachmentsProcessed).mock.calls).toHaveLength(2);
     });
 
-    it('records a failed sync result when no item could be ingested', async () => {
+    it('records a successful sync result when every item fails', async () => {
       vi.mocked(mockIngestionService.ingestPage).mockRejectedValue(new Error('ingest boom'));
       const metrics = createMetricsSpy();
       const svc = createService(
@@ -666,8 +665,9 @@ describe('ConfluenceSynchronizationService', () => {
 
       expect(metrics.recordSyncResult).toHaveBeenCalledExactlyOnceWith(
         expect.any(Number),
-        'failure',
+        'success',
       );
+      expect(metrics.recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
     });
 
     it('walks through sync phases and ends on Idle', async () => {

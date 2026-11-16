@@ -12,6 +12,7 @@ const noop = () => {};
  */
 export function createNoopMetrics(): Metrics {
   const noopRecord: Record<PublicMethodKeys<Metrics>, () => void> = {
+    recordSyncStart: noop,
     recordSyncResult: noop,
     recordScanDuration: noop,
     recordPagesProcessed: noop,

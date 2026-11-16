@@ -90,6 +90,33 @@ describe('Metrics', () => {
       });
     });
 
+    it('reports the start time of a running sync until it finishes', () => {
+      vi.useFakeTimers({ now: new Date('2026-11-11T10:00:00Z') });
+      const { metricService, gauges } = makeMetricService();
+      const metrics = new Metrics(metricService);
+      const gauge = getOrThrow(gauges, 'cfc_sync_start_timestamp_seconds');
+      // biome-ignore lint/style/noNonNullAssertion: The gauge registers its callback in the constructor
+      const callback = gauge.addCallback.mock.calls[0]![0] as (obs: { observe: Mock }) => void;
+
+      tenantStorage.run(tenant, () => {
+        metrics.recordSyncStart();
+      });
+      const whileRunning = vi.fn();
+      callback({ observe: whileRunning });
+
+      tenantStorage.run(tenant, () => {
+        metrics.recordSyncResult(1.5, 'failure');
+      });
+      const afterFinish = vi.fn();
+      callback({ observe: afterFinish });
+
+      expect(whileRunning).toHaveBeenCalledExactlyOnceWith(
+        Date.parse('2026-11-11T10:00:00Z') / 1000,
+        { tenant: 'test-tenant' },
+      );
+      expect(afterFinish).not.toHaveBeenCalled();
+    });
+
     it('reports no last successful sync before the first success', () => {
       const { metricService, gauges } = makeMetricService();
       const metrics = new Metrics(metricService);

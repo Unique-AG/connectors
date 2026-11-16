@@ -15,13 +15,6 @@ import type { PageImageInliner } from './page-image-inliner';
 import type { ScopeManagementService } from './scope-management.service';
 import type { DiscoveredAttachment, DiscoveredPage } from './sync.types';
 
-interface IngestionCounts {
-  ingested: number;
-  failed: number;
-}
-
-const NOTHING_TO_INGEST: IngestionCounts = { ingested: 0, failed: 0 };
-
 const INGESTION_PROGRESS_LOG_INTERVAL = 100;
 
 export class ConfluenceSynchronizationService {
@@ -50,8 +43,8 @@ export class ConfluenceSynchronizationService {
 
     tenant.isScanning = true;
     const startTime = Date.now();
+    this.metrics.recordSyncStart();
     let syncResult: 'success' | 'failure' = 'success';
-    let everyIngestionFailed = false;
 
     try {
       this.logger.log({ tenantName: tenant.name, msg: 'Starting sync' });
@@ -115,7 +108,7 @@ export class ConfluenceSynchronizationService {
         );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingPages);
-        const pages = await this.fetchAndIngestPages(
+        await this.fetchAndIngestPages(
           pagesToFetch,
           spaceScopes,
           tenant.config.processing.concurrency,
@@ -123,16 +116,11 @@ export class ConfluenceSynchronizationService {
         );
 
         this.metrics.setSyncPhase(SyncPhase.IngestingAttachments);
-        const attachments = await this.ingestAttachments(
+        await this.ingestAttachments(
           attachmentsToIngest,
           spaceScopes,
           tenant.config.processing.concurrency,
         );
-
-        // Single failed items are retried on the next sync and do not fail it. A sync where nothing
-        // could be ingested is a failed sync, so it does not count as the last successful one.
-        everyIngestionFailed =
-          pages.failed + attachments.failed > 0 && pages.ingested + attachments.ingested === 0;
       }
 
       if (diffResult.deletedItems.length > 0) {
@@ -148,12 +136,6 @@ export class ConfluenceSynchronizationService {
 
       this.metrics.setSyncPhase(SyncPhase.CleaningUp);
       await this.scopeManagementService.cleanupRemovedSpaces(new Set(allSpaceKeyToSpaceId.keys()));
-
-      if (everyIngestionFailed) {
-        syncResult = 'failure';
-        this.logger.error({ msg: 'Sync failed: no page or attachment could be ingested' });
-        return { status: 'failure' };
-      }
 
       this.logger.log({ msg: 'Sync work done' });
       return { status: 'success' };
@@ -173,12 +155,12 @@ export class ConfluenceSynchronizationService {
     spaceScopes: Map<string, string>,
     concurrency: number,
     imageAttachmentsByPageId: Readonly<Partial<Record<string, DiscoveredAttachment[]>>>,
-  ): Promise<IngestionCounts> {
+  ): Promise<void> {
     const limit = pLimit(concurrency);
 
     if (pages.length === 0) {
       this.logger.log({ msg: 'No pages to ingest' });
-      return NOTHING_TO_INGEST;
+      return;
     }
 
     let processed = 0;
@@ -235,17 +217,15 @@ export class ConfluenceSynchronizationService {
       failed,
       msg: 'Page ingestion summary',
     });
-
-    return { ingested, failed };
   }
 
   private async ingestAttachments(
     attachments: DiscoveredAttachment[],
     spaceScopes: Map<string, string>,
     concurrency: number,
-  ): Promise<IngestionCounts> {
+  ): Promise<void> {
     if (attachments.length === 0) {
-      return NOTHING_TO_INGEST;
+      return;
     }
 
     const total = attachments.length;
@@ -290,8 +270,6 @@ export class ConfluenceSynchronizationService {
       failed,
       msg: 'Attachment ingestion summary',
     });
-
-    return { ingested, failed };
   }
 
   private buildSpaceKeyToSpaceIdMap(

@@ -153,7 +153,7 @@ prometheus:
           4. Verify service user settings and permissions within Unique
       # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
       # A new error series is missed by increase() until its second error. A failing sync is
-      # caught on the first failure by ConfluenceConnectorSyncFailing.
+      # caught from the second failed sync by ConfluenceConnectorSyncFailing.
       expr: |
         sum by (namespace) (increase(confluence_connector_unique_api_requests_total{result="error"}[75m]))
         /
@@ -226,9 +226,11 @@ prometheus:
           1. Check the connector logs for the last progress line of this tenant
           2. A very large first sync can take this long. Check whether pages are still being ingested
           3. If nothing moves, restart the pod
+      # The start time is reported only while a sync runs, so back-to-back syncs that each finish
+      # in time never add up to 6 hours.
       expr: |
-        max by (namespace, tenant) (cfc_sync_phase{phase!="idle"}) == 1
-      for: 6h
+        time() - max by (namespace, tenant) (cfc_sync_start_timestamp_seconds) > 6 * 3600
+      for: 5m
       labels:
         severity: warning
         alertGroup: confluence-connector

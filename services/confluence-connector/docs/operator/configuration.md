@@ -432,7 +432,8 @@ Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique pl
 |-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
 | `cfc_sync_duration_seconds`               | Histogram | `tenant`, `result` | Duration of a full synchronization cycle per tenant     |
 | `cfc_syncs_total`                         | Counter   | `tenant`, `result` | Finished sync cycles. Starts at 0 for both results, so the first sync after a pod start is counted |
-| `cfc_last_successful_sync_timestamp_seconds` | Gauge  | `tenant`          | Unix time of the last successful sync cycle. A sync with single failed items still counts as successful. Absent until the pod's first successful sync |
+| `cfc_sync_start_timestamp_seconds`        | Gauge     | `tenant`          | Unix time the running sync cycle started. Absent while no sync runs |
+| `cfc_last_successful_sync_timestamp_seconds` | Gauge  | `tenant`          | Unix time of the last successful sync cycle. A sync with failed pages or attachments still counts as successful. Absent until the pod's first successful sync |
 | `cfc_scan_duration_seconds`               | Histogram | `tenant`          | Duration of the page discovery (scan) phase              |
 | `cfc_attachment_upload_duration_seconds`   | Histogram | `tenant`          | Duration of a single attachment upload to Unique         |
 
@@ -500,7 +501,7 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `ConfluenceConnectorUniqueAPIErrors` | More than 1% of the requests to the Unique API (GraphQL and REST) failed in the last 75 minutes | `5m` | `warning` |
 | `ConfluenceConnectorSyncFailing` | At least two syncs of a tenant in the last 3 hours, and all of them failed | `15m` | `critical` |
 | `ConfluenceConnectorSyncDegraded` | More than half of a tenant's syncs in the last 6 hours failed, and at least one in the last 3 hours succeeded | `15m` | `warning` |
-| `ConfluenceConnectorSyncStuck` | A sync has run for more than 6 hours. Later syncs of the tenant are skipped meanwhile | `6h` | `warning` |
+| `ConfluenceConnectorSyncStuck` | A sync has run for more than 6 hours. Later syncs of the tenant are skipped meanwhile | `5m` | `warning` |
 | `ConfluenceConnectorContentFailures` | Pages, attachments or deletions fail on every sync for 3 hours | `3h` | `warning` |
 | `ConfluenceConnectorTenantCleanupFailing` | At least two cleanup runs of a tenant with status `deleted` in the last 3 hours, and all of them failed | `15m` | `warning` |
 
@@ -540,7 +541,7 @@ The endpoint runs three checks on every request:
 
 **Sync** -- Evaluates each active tenant's sync history from a sliding window of the last N runs (configurable via `HEALTH_SYNC_HISTORY_SIZE`). Each tenant's failure ratio is computed independently as `failures / appearances`. If any tenant exceeds `HEALTH_SYNC_TENANT_FAILURE_THRESHOLD`, the check is `down`. When no sync has completed yet (e.g. shortly after startup), this check reports `up` with `message: "No sync records yet"`. A single transient failure is absorbed by the window and does not trigger an alert. Skipped runs caused by an in-progress sync overlap are not recorded so they cannot dilute the window.
 
-Sync health is evaluated at tenant level. In the Confluence connector, each tenant owns its own cron job, configuration, credentials, and operational lifecycle, so a tenant is the smallest unit that can independently fail or recover. Per-item ingestion failures are exposed through logs and metrics and do not fail the sync, because the items are retried on the next one. A sync in which no page or attachment could be ingested counts as failed. `/health.sync` answers whether each active tenant's scheduled sync is consistently succeeding.
+Sync health is evaluated at tenant level. In the Confluence connector, each tenant owns its own cron job, configuration, credentials, and operational lifecycle, so a tenant is the smallest unit that can independently fail or recover. Per-item ingestion failures are exposed through logs and metrics and do not fail the sync, because the items are retried on the next one. This holds even when every item of a sync fails: a page that always fails comes back on every sync, and it would otherwise fail every sync of a quiet tenant. `ConfluenceConnectorContentFailures` alerts on item failures. `/health.sync` answers whether each active tenant's scheduled sync is consistently succeeding.
 
 **Connectivity** -- Performs unauthenticated HTTP requests to the Atlassian API host (`https://api.atlassian.com/`, only when at least one Cloud tenant is configured) and to each unique active tenant `confluence.baseUrl`. Any HTTP response (including 401/403) proves the endpoint is reachable -- only transport-level failures (DNS, TLS, timeout, connection refused) are treated as unhealthy. Deleted tenants are excluded because they no longer talk to Confluence.
 

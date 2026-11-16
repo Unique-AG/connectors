@@ -37,6 +37,7 @@ export class Metrics {
   private readonly syncPhaseState = new Map<string, SyncPhase>();
   private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
   private readonly lastSuccessfulSyncSecondsByTenant = new Map<string, number>();
+  private readonly runningSyncStartSecondsByTenant = new Map<string, number>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -152,6 +153,15 @@ export class Metrics {
       }
     });
 
+    const syncStartGauge = metricService.getObservableGauge('cfc_sync_start_timestamp_seconds', {
+      description: 'Unix time the running sync cycle started. Absent while no sync runs',
+    });
+    syncStartGauge.addCallback((observable) => {
+      for (const [tenant, timestampSeconds] of this.runningSyncStartSecondsByTenant) {
+        observable.observe(timestampSeconds, { tenant });
+      }
+    });
+
     const syncAttachmentsTotalGauge = metricService.getObservableGauge(
       'cfc_sync_attachments_total',
       {
@@ -169,8 +179,13 @@ export class Metrics {
     return getCurrentTenant().name;
   }
 
+  public recordSyncStart(): void {
+    this.runningSyncStartSecondsByTenant.set(this.tenantName, Date.now() / 1000);
+  }
+
   public recordSyncResult(durationSeconds: number, result: 'success' | 'failure'): void {
     const tenant = this.tenantName;
+    this.runningSyncStartSecondsByTenant.delete(tenant);
     this.syncDuration.record(durationSeconds, { tenant, result });
     this.syncsTotal.add(1, { tenant, result });
     if (result === 'success') {
