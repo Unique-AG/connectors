@@ -69,5 +69,3 @@ async def passport_check(
         )
     except contexts.PassportError as error:
         raise ToolError(str(error)) from error
-    except contexts.ScreeningError as error:
-        raise ToolError(str(error)) from error
