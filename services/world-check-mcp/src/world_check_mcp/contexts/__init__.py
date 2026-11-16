@@ -48,6 +48,7 @@ from world_check_mcp.contexts.resolution import ResolutionError
 from world_check_mcp.contexts.resolution import ResolutionOutcome
 from world_check_mcp.contexts.resolution import ResolutionPlan
 from world_check_mcp.contexts.resolution import ResolutionRequest
+from world_check_mcp.contexts.screening import DateOfBirth
 from world_check_mcp.contexts.screening import EntityType
 from world_check_mcp.contexts.screening import FieldValue
 from world_check_mcp.contexts.screening import Gender
@@ -64,6 +65,7 @@ __all__ = [
     "CasePage",
     "CaseReferenceDetails",
     "CaseResults",
+    "DateOfBirth",
     "EntityType",
     "FieldValue",
     "Gender",

@@ -23,6 +23,17 @@ ExternalCaseId = Annotated[
         description="External caseId. `get_case_reference` returns its caseSystemId.",
     ),
 ]
+ExternalId = Annotated[
+    str,
+    Field(
+        min_length=1,
+        pattern=r"^[^/]+(/[^/]+)*$",
+        description=(
+            "Stable external caseId. It cannot start or end with a slash or hold two in a row. "
+            "An existing id is refused."
+        ),
+    ),
+]
 ReferenceId = Annotated[
     str,
     Field(

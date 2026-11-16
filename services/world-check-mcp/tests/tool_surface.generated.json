@@ -1599,8 +1599,9 @@
         "case_id": {
           "anyOf": [
             {
-              "description": "Stable external caseId. An existing id is refused.",
+              "description": "Stable external caseId. It cannot start or end with a slash or hold two in a row. An existing id is refused.",
               "minLength": 1,
+              "pattern": "^[^/]+(/[^/]+)*$",
               "type": "string"
             },
             {
@@ -2575,8 +2576,9 @@
         "case_id": {
           "anyOf": [
             {
-              "description": "Stable external caseId. An existing id is refused.",
+              "description": "Stable external caseId. It cannot start or end with a slash or hold two in a row. An existing id is refused.",
               "minLength": 1,
+              "pattern": "^[^/]+(/[^/]+)*$",
               "type": "string"
             },
             {
