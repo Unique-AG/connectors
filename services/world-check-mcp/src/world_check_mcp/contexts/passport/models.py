@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from world_check_mcp.contexts.screening import DateOfBirth
 from world_check_mcp.contexts.screening import Gender
 from world_check_mcp.contexts.screening import ScreeningMatch
 
@@ -15,7 +16,7 @@ class Passport(BaseModel):
     given_name: str = Field(description="Given names as printed on the document.")
     last_name: str = Field(description="Surname as printed on the document.")
     gender: Gender = Field(description="MALE, FEMALE, or UNSPECIFIED.")
-    date_of_birth: date = Field(description="Date of birth as printed. Not in the future.")
+    date_of_birth: DateOfBirth = Field(description="Date of birth as printed. Not in the future.")
     issuing_state: str = Field(description="Issuing-state code from reference nationalities.")
     nationality: str = Field(description="Nationality code from reference nationalities.")
     identification_number: str = Field(description="Document number as printed.")

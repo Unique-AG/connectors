@@ -1,3 +1,5 @@
+from datetime import date
+from datetime import timedelta
 import json
 from typing import cast
 
@@ -104,7 +106,13 @@ def _template(group_id: str, providers: list[str], *, required: bool) -> httpx2.
                                 "fieldValueType": "COUNTRY",
                                 "label": "NATIONALITY",
                                 "fieldRequired": required,
-                            }
+                            },
+                            {
+                                "typeId": "SFCT_3",
+                                "fieldValueType": "DATE",
+                                "label": "DATE_OF_BIRTH",
+                                "fieldRequired": False,
+                            },
                         ]
                     }
                 }
@@ -428,7 +436,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             )
         assert providers == ["WATCHLIST"]
         assert body["caseScreeningState"] == {"WATCHLIST": "INITIAL"}
-        assert body["secondaryFields"] == [{"typeId": "SFCT_2", "value": "GBR"}]
+        assert {"typeId": "SFCT_2", "value": "GBR"} in cast(list[object], body["secondaryFields"])
         return _json(
             200,
             _screened(
@@ -695,6 +703,55 @@ async def test_screen_entity_persists_a_watchlist_case_and_truncates_matches() -
     assert outcome["passport_matches"] == []
 
 
+@pytest.mark.parametrize("days_from_today", [-1, 0])
+async def test_screen_entity_accepts_a_dob_up_to_today(days_from_today: int) -> None:
+    born = (date.today() + timedelta(days=days_from_today)).isoformat()
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+                "dob": born,
+            },
+        )
+
+    assert result.structured_content is not None
+
+
+async def test_screen_entity_refuses_a_future_dob() -> None:
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "nationality": "GBR",
+                    "dob": tomorrow,
+                },
+            )
+
+
+async def test_screen_entity_refuses_a_malformed_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="String should match pattern"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "case_id": "a//b",
+                    "nationality": "GBR",
+                },
+            )
+
+
 async def test_screen_entity_refuses_an_existing_case_id() -> None:
     async with Client(_server()) as client:
         with pytest.raises(ToolError, match="already exists"):
@@ -862,6 +919,40 @@ async def test_passport_check_refuses_an_existing_case_id() -> None:
             await client.call_tool(
                 "passport_check",
                 {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "ext-1"},
+            )
+
+
+@pytest.mark.parametrize("days_from_today", [-1, 0])
+async def test_passport_check_accepts_a_date_of_birth_up_to_today(days_from_today: int) -> None:
+    born = (date.today() + timedelta(days=days_from_today)).isoformat()
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "passport_check",
+            {"passport": {**_PASSPORT, "date_of_birth": born}, "group_id": "g-passport"},
+        )
+
+    assert result.structured_content is not None
+
+
+async def test_passport_check_refuses_a_future_date_of_birth() -> None:
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+            await client.call_tool(
+                "passport_check",
+                {
+                    "passport": {**_PASSPORT, "date_of_birth": tomorrow},
+                    "group_id": "g-passport",
+                },
+            )
+
+
+async def test_passport_check_refuses_a_malformed_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="String should match pattern"):
+            await client.call_tool(
+                "passport_check",
+                {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "/a"},
             )
 
 
