@@ -10,12 +10,11 @@ from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.section_group import SectionGroup
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph, send_parsed
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -197,15 +196,13 @@ async def _post_section_group(
     nested = root.section_groups.by_section_group_id(handle.section_group_id).section_groups
     request = RequestInformation(Method.POST, nested.url_template, dict(nested.path_parameters))
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         SectionGroup(display_name=name),
     )
     request.add_request_options(no_retry())
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, SectionGroup, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, SectionGroup)
 
 
 def _answer(
@@ -227,7 +224,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Section Group",
+        title="OneNote: Create a Section Group",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

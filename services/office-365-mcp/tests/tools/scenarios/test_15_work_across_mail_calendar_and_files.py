@@ -68,6 +68,9 @@ DESIGN_REVIEW = "WEBVTT\n\n" + "\n\n".join(
 )
 
 
+_REPLIED_ID = "HBgJVrRVMIFBPGFTQleeAf2pyPDcHG-TGu6Hi3Wurp81EyNDPh9A7luhgjZK8bEygUPD"
+
+
 def _fault(status: int, body: str, **headers: str) -> httpx.Response:
     return response({"status": status, "body": body, "headers": headers})
 
@@ -99,9 +102,11 @@ def _failure(kind: str) -> httpx.Response | Exception:
 THREE_FAILURES = ["fails-with-an-internal-error", "no-answer-in-time", "unreadable-answer"]
 
 
-def _fresh(graph: MockRouter, name: str) -> dict[tuple[str, str], Route]:
+def _fresh(
+    graph: MockRouter, name: str, renamed: Mapping[str, str] | None = None
+) -> dict[tuple[str, str], Route]:
     graph.routes.clear()
-    return serve(graph, f"rec-tool-{name}")
+    return serve(graph, f"rec-tool-{name}", renamed)
 
 
 def _requests(graph: MockRouter) -> list[tuple[str, str]]:
@@ -198,8 +203,12 @@ async def _read_file(uri: str) -> EmbeddedResource:
     return block
 
 
-def _patched(routes: Mapping[tuple[str, str], Route]) -> Route:
-    return next(route for (method, _), route in routes.items() if method == "PATCH")
+def _reply_created(routes: Mapping[tuple[str, str], Route]) -> Route:
+    return next(
+        route
+        for (method, path), route in routes.items()
+        if method == "POST" and path.endswith("/createReply")
+    )
 
 
 def _draft(graph: MockRouter) -> Route:
@@ -302,7 +311,11 @@ class TestAReplyUsesADocumentFromSharePoint:
         mail = await _read_mail(graph, _list(question, "messages")[0]["uri"])
         plan = await _plan_file(graph)
         price_list = await _read_file(cast("str", plan["uri"]))
-        routes = _fresh(graph, "outlook_draft_reply-reply")
+        routes = _fresh(
+            graph,
+            "outlook_draft_reply-reply",
+            {_REPLIED_ID: cast("str", mail["uri"]).removeprefix("outlook:///messages/")},
+        )
         draft = await call(
             "outlook_draft_reply",
             message_ref=mail["uri"],
@@ -314,8 +327,9 @@ class TestAReplyUsesADocumentFromSharePoint:
         assert _list(question, "messages")[0]["uri"] == mail["uri"]
         assert isinstance(price_list.resource, BlobResourceContents)
         assert price_list.resource.mime_type == DOCX
-        written = cast("Mapping[str, Mapping[str, str]]", _sent_json(_patched(routes)))
-        assert "The Standard list price is 100." in written["body"]["content"]
+        assert _sent_json(_reply_created(routes)) == {
+            "Comment": "<p>The Standard list price is 100.</p>"
+        }
         assert draft["mode"] == "reply"
         assert draft["to"] == [{"name": "Anna Meier", "address": ANNA}]
         assert _nothing_was_sent(graph)

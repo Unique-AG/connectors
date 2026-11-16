@@ -106,7 +106,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Rename a Teams Chat",
+        title="Teams: Rename a Chat",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

@@ -120,7 +120,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Recent Notebooks",
+        title="OneNote: List Recent Notebooks",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

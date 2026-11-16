@@ -260,7 +260,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Move an Item",
+        title="SharePoint: Move an Item",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

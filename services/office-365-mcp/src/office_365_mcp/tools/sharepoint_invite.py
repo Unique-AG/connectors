@@ -320,7 +320,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Invite People to an Item",
+        title="SharePoint: Invite People to an Item",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

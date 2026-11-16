@@ -31,6 +31,7 @@ export function resolveTenantConfig(scenario: ScenarioTenantConfig): TenantConfi
       maxItemsToScan: scenario.maxItemsToScan,
     },
     ingestion: {
+      inlineImagesEnabled: false,
       ingestionMode: 'flat',
       scopeId: scenario.rootScopeId,
       storeInternally: scenario.storeInternally,

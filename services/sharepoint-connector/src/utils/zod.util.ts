@@ -7,8 +7,8 @@ export const urlWithoutTrailingSlashSchema = (description: string, message: stri
     .describe(description)
     .refine((url) => !url.endsWith('/'), { message });
 
-export const coercedPositiveIntSchema = z.coerce.number().int().positive();
-export const coercedPositiveNumberSchema = z.coerce.number().positive();
+export const coercedPositiveIntSchema = z.coerce.number<string | undefined>().int().positive();
+export const coercedPositiveNumberSchema = z.coerce.number<string | undefined>().positive();
 export const requiredStringSchema = z.string().trim().min(1);
 
 export const redactedStringSchema = z.string().transform((val) => new Redacted(val));

@@ -78,7 +78,9 @@ def response(spec: Mapping[str, object], bodies: Path = E2E / "bodies") -> httpx
     return httpx.Response(cast("int", spec["status"]), content=content, headers=headers)
 
 
-def serve(router: respx.MockRouter, name: str) -> dict[tuple[str, str], respx.Route]:
+def serve(
+    router: respx.MockRouter, name: str, renamed: Mapping[str, str] | None = None
+) -> dict[tuple[str, str], respx.Route]:
     """One route per method and path of the fixture, answering in the recorded order. An entry
     with a `host` key (a download on the SharePoint host) routes by that host and its own path."""
     answers: dict[tuple[str, str], list[httpx.Response]] = defaultdict(list)
@@ -89,6 +91,8 @@ def serve(router: respx.MockRouter, name: str) -> dict[tuple[str, str], respx.Ro
             if not path.startswith(V1):
                 raise ValueError(f"{name}: {path} is not a Graph v1.0 path")
             path = path.removeprefix(V1)
+            for recorded, used in (renamed or {}).items():
+                path = path.replace(recorded, used)
         key = (method, path if host is None else f"https://{host}{path}")
         answers[key].append(response(spec))
         routes[key] = {"method": method, "path": path} | ({"host": host} if host else {})

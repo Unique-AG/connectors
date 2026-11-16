@@ -1,5 +1,28 @@
 # Changelog
 
+## [3.1.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.4...confluence-connector@3.1.0) (2026-11-12)
+
+
+### Features
+
+* **ci,main:** gate releases, scan images nightly, and update dependencies nightly ([#1305](https://github.com/Unique-AG/connectors/issues/1305)) ([b3b274c](https://github.com/Unique-AG/connectors/commit/b3b274cf0ab3cecc3a1dece3eff5c116d24d9418))
+* **confluence-connector:** redact the deployment's secrets from every log line ([#1445](https://github.com/Unique-AG/connectors/issues/1445)) ([464b934](https://github.com/Unique-AG/connectors/commit/464b934b666cd93d79646ad54daf613648cc21e2))
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.11.0 to 5.12.0 ([#1395](https://github.com/Unique-AG/connectors/issues/1395)) ([582a096](https://github.com/Unique-AG/connectors/commit/582a09693c5656b9b016ea8e42a1317f0fd090de))
+* **deps:** bump azurerm from 5.12.0 to 5.13.0 ([#1572](https://github.com/Unique-AG/connectors/issues/1572)) ([697230b](https://github.com/Unique-AG/connectors/commit/697230b664bd3098f2a4902e2ae66c5cc028c478))
+* **deps:** bump node from 26.12.1-trixie@a98e6fda54fd to 26.13.0-trixie@6d2c7d5d074b ([#1430](https://github.com/Unique-AG/connectors/issues/1430)) ([72e4fc2](https://github.com/Unique-AG/connectors/commit/72e4fc26b28c855225a14e83c57ce575f8d77ff4))
+* **deps:** bump node from 26.13.0-trixie@6d2c7d5d074b to 26.13.0-trixie@438603bbb5cd ([#1580](https://github.com/Unique-AG/connectors/issues/1580)) ([2e26f6b](https://github.com/Unique-AG/connectors/commit/2e26f6b75e6692aa38e4f7e423d758547c87c72b))
+* **deps:** bump node to 26.13.1 security release ([#1642](https://github.com/Unique-AG/connectors/issues/1642)) ([407761d](https://github.com/Unique-AG/connectors/commit/407761d268c76b3a57f755f245fd7e08bb674278))
+* **main:** bump @proventuslabs/nestjs-zod from 2.0.0 to 2.2.0 ([#1390](https://github.com/Unique-AG/connectors/issues/1390)) ([023787c](https://github.com/Unique-AG/connectors/commit/023787cc8c364d1c192d06192a1541940fa77b9e))
+
 ## [3.0.4](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.3...confluence-connector@3.0.4) (2026-10-28)
 
 

@@ -296,7 +296,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="React to a Teams Message",
+        title="Teams: React to a Message",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

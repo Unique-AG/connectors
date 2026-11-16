@@ -7,20 +7,20 @@ import { z } from 'zod';
 
 const ConfigSchema = z.object({
   connectivityTimeoutMs: z.coerce
-    .number()
+    .number<string | undefined>()
     .int()
-    .prefault(3000)
+    .default(3000)
     .describe('Timeout (ms) for the unauthenticated MS Graph connectivity ping.'),
   amqpCheckTimeoutMs: z.coerce
-    .number()
+    .number<string | undefined>()
     .int()
-    .prefault(5000)
+    .default(5000)
     .describe('Timeout (ms) for the RabbitMQ exchange check.'),
   subscriptionExpiredThreshold: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(0)
     .max(1)
-    .prefault(0.15)
+    .default(0.15)
     .describe(
       'Ratio of expired transcript subscriptions (expired ÷ total) above which the subscription health indicator reports `down`.',
     ),

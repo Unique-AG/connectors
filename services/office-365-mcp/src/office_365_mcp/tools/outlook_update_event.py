@@ -639,7 +639,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Update a Calendar Event",
+        title="Outlook: Update a Calendar Event",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

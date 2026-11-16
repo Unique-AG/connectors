@@ -13,15 +13,15 @@ import { coercedPositiveIntSchema } from '../utils/zod.util';
 
 export const ProcessingConfigSchema = z.object({
   stepTimeoutSeconds: coercedPositiveIntSchema
-    .prefault(DEFAULT_STEP_TIMEOUT_SECONDS)
+    .default(DEFAULT_STEP_TIMEOUT_SECONDS)
     .describe(
       'Sets a time limit for a file processing step before it will stop and skip processing the file',
     ),
   concurrency: coercedPositiveIntSchema
-    .prefault(DEFAULT_PROCESSING_CONCURRENCY)
+    .default(DEFAULT_PROCESSING_CONCURRENCY)
     .describe('Sets the concurrency of how many files you want to ingest into unique at once'),
   maxFileSizeToIngestBytes: coercedPositiveIntSchema
-    .prefault(DEFAULT_MAX_FILE_SIZE_BYTES)
+    .default(DEFAULT_MAX_FILE_SIZE_BYTES)
     .describe('Maximum file size in bytes to ingest. Files larger than this will be skipped'),
   allowedMimeTypes: z
     .union([
@@ -39,7 +39,7 @@ export const ProcessingConfigSchema = z.object({
   maxFilesToScan: z
     .preprocess(
       (val) => (val === '' ? undefined : val),
-      z.coerce.number().int().positive().optional(),
+      z.coerce.number<string | undefined>().int().positive().optional(),
     )
     .describe(
       'For testing purposes. Limit the number of files scanned. Limit is per site in case ' +

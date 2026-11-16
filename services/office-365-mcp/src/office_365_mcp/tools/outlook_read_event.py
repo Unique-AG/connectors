@@ -307,7 +307,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Calendar Event",
+        title="Outlook: Read a Calendar Event",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
