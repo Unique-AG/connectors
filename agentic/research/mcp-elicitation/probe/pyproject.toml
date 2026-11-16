@@ -1,0 +1,13 @@
+[project]
+name = "mcp-elicitation-probe"
+version = "0.0.0"
+description = "Throwaway probe: calls MCP tools directly and logs every elicitation request"
+requires-python = ">=3.13"
+dependencies = [
+    "markdown>=3.11.3",
+    "mcp==2.3.0",
+    "pydantic>=2.11",
+]
+
+[tool.uv]
+package = false
