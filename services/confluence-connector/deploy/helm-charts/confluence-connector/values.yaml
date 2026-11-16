@@ -231,10 +231,10 @@ prometheus:
       alert: ConfluenceConnectorContentFailures
       annotations:
         summary: "Confluence Connector cannot ingest or delete content for tenant {{ $labels.tenant }}"
-        description: "Pages, attachments or deletions of tenant {{ $labels.tenant }} keep failing on every sync. {{ $value }} failures in the last 2 hours."
+        description: "Pages, attachments or deletions of tenant {{ $labels.tenant }} keep failing on every sync. {{ $value | humanize }} failures in the last 2 hours."
         runbook: |
           1. Search the connector logs for "Failed to" with this tenantName
-          2. Check the failing items in the "Page ingestion summary" and "Attachment ingestion summary" log lines
+          2. Find the failing pageId or attachmentId in the "Failed to fetch page", "Failed to ingest page", "Failed to ingest attachment" and "Failed to delete content" log lines
           3. Unique ingestion errors also show in ConfluenceConnectorUniqueAPIErrors
           4. If the same item fails on every sync (for example too large, or rejected by Unique), the alert keeps firing until that item is fixed or removed in Confluence
       # Hourly failures can land almost 2h apart, so the 2h window holds while they recur, and for: 3h
