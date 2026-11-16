@@ -56,7 +56,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/kyckr-mcp
-  tag: 0.1.1-alpha # x-release-please-version
+  tag: 0.1.1 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:

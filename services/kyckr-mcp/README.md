@@ -116,6 +116,32 @@ The MCP endpoint is `http://127.0.0.1:8000/mcp`. Without sign-in no database is 
 
 `uv run poe ci` runs every check CI runs.
 
-## Not ported
+## Metrics and spans
 
-The old service exported `kyckr_api_requests_total`, `kyckr_api_request_duration_ms` and `kyckr_credits_consumed_total`, and traced each Kyckr call. This service has the shared per-tool metrics of `mcp-observability` only.
+`/metrics` carries the per-tool metrics every MCP exports (`mcp_calls_total`, `mcp_call_duration_seconds`) and three metrics of this service for calls to Kyckr. They keep the names the NestJS service used.
+
+| Metric | Type | Labels |
+|---|---|---|
+| `kyckr_api_requests_total` | counter | `method`, `path`, `status` |
+| `kyckr_api_request_duration_ms` | histogram | `method`, `path` |
+| `kyckr_credits_consumed_total` | counter | `tool` |
+
+- `path` is the route with ids replaced by placeholders: `/companies/:kyckrId/lite`, `/companies/:kyckrId/enhanced`, `/companies/:kyckrId/documents`, `/companies`, `/orders/:orderId`, `/orders/:orderId/download` and `/orders`. The route is read from the encoded path without its query, so an id with a `/` stays one segment. A path outside that list is labelled `[unknown]`. No label carries an id, the Kyckr key or user data.
+- `status` is the HTTP status Kyckr answered with, or `0` when it gave no answer, for example on a timeout.
+- Each attempt counts, so a request retried after a 429 adds one count per attempt.
+- The histogram buckets end at 120 000 ms, the longest timeout the chart allows.
+- `kyckr_credits_consumed_total` adds the `cost.value` of a successful call to `get_lite_profile`, `get_enhanced_profile`, `create_document_order` or `get_order`. A call that fails, or whose answer has no cost or a cost below 0, adds nothing.
+- Each call to Kyckr is a client span named `<method> <route>`, with `http.request.method`, `url.template` and `http.response.status_code`. A status of 400 or more, or no answer, sets the span to error, and no exception message or stack goes on it. Spans export when tracing is on (`OTEL_*`).
+- Each attempt that Kyckr answers with an error, or that gets no answer, logs one `WARNING` with its method, route and status, so a retried call can log several.
+
+The old `kyckr_tool_call_duration_ms{tool,result}` is replaced by `mcp_call_duration_seconds{kind,name}`, with the outcome in `mcp_calls_total{status}`.
+
+## Refreshing the spec
+
+The patched spec is vendored at `src/kyckr_mcp/upstream/openapi.yml`, so a restart never depends on Kyckr's site. Lines marked `patched` differ from the published file at `https://developer.kyckr.com/openapi/company_v2.yaml` because the API answers differently.
+
+1. Run `grep -n patched src/kyckr_mcp/upstream/openapi.yml` to list the patched lines, and note the header comment.
+2. Download the published file over `openapi.yml`.
+3. Apply the `patched` changes again and restore the header comment, or drop a change that Kyckr has fixed.
+4. Run `uv run poe codegen`.
+5. Review the diff of `src/kyckr_mcp/upstream/generated/`, then run `uv run poe ci`.

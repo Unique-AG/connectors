@@ -2,5 +2,7 @@
 
 from kyckr_mcp.telemetry.setup import init_telemetry
 from kyckr_mcp.telemetry.setup import instrument
+from kyckr_mcp.telemetry.upstream_calls import record_credits
+from kyckr_mcp.telemetry.upstream_calls import RecordedTransport
 
-__all__ = ["init_telemetry", "instrument"]
+__all__ = ["init_telemetry", "instrument", "record_credits", "RecordedTransport"]
