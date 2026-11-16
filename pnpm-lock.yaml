@@ -4000,8 +4000,8 @@ packages:
       bare-buffer:
         optional: true
 
-  bare-path@3.1.2:
-    resolution: {integrity: sha512-ZyKbsuuqK6Ag0K8pX6V5Txq6XeJRvY+wXucnFGRjiyVYP9YWDpIQugk/b+enRYrEYBJaqLzghRQpXPMR7341Nw==}
+  bare-path@3.1.3:
+    resolution: {integrity: sha512-8r+FVU/o4zcFmpCDqbqAYhHHbtXPP+cyZKo7DRGRWc7OLlNs4TMaSQEpXL/sIdzyEG0M7RHw4B7xYMGrTc+qrg==}
 
   bare-stream@2.13.4:
     resolution: {integrity: sha512-PcrQ8lVLbiJscNm1Kez+Yp4Gy4AHGcN1lzwjvf5NybWen7VvEgUfyfnXYJ2zNqWnzOfCb1Abq6lH8ti0syQszA==}
@@ -9153,7 +9153,7 @@ snapshots:
   bare-fs@4.8.4:
     dependencies:
       bare-events: 2.9.2
-      bare-path: 3.1.2
+      bare-path: 3.1.3
       bare-stream: 2.13.4(bare-events@2.9.2)
       bare-url: 2.5.5
       fast-fifo: 1.3.2
@@ -9162,7 +9162,7 @@ snapshots:
       - react-native-b4a
     optional: true
 
-  bare-path@3.1.2:
+  bare-path@3.1.3:
     optional: true
 
   bare-stream@2.13.4(bare-events@2.9.2):
@@ -9178,7 +9178,7 @@ snapshots:
 
   bare-url@2.5.5:
     dependencies:
-      bare-path: 3.1.2
+      bare-path: 3.1.3
     optional: true
 
   base64-js@1.5.1: {}
@@ -11417,7 +11417,7 @@ snapshots:
       tar-stream: 3.1.7
     optionalDependencies:
       bare-fs: 4.8.4
-      bare-path: 3.1.2
+      bare-path: 3.1.3
     transitivePeerDependencies:
       - bare-abort-controller
       - bare-buffer
