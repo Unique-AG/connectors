@@ -226,10 +226,10 @@ prometheus:
           1. Check the connector logs for the last progress line of this tenant
           2. A very large first sync can take this long. Check whether pages are still being ingested
           3. If nothing moves, restart the pod
-      # The start time is reported only while a sync runs, so back-to-back syncs that each finish
-      # in time never add up to 6 hours.
+      # The gauge is 0 while no sync runs, so only a running sync counts, and back-to-back syncs
+      # that each finish in time never add up to 6 hours.
       expr: |
-        time() - max by (namespace, tenant) (cfc_sync_start_timestamp_seconds) > 6 * 3600
+        time() - max by (namespace, tenant) (cfc_sync_start_timestamp_seconds > 0) > 6 * 3600
       for: 5m
       labels:
         severity: warning

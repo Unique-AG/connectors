@@ -432,7 +432,7 @@ Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique pl
 |-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
 | `cfc_sync_duration_seconds`               | Histogram | `tenant`, `result` | Duration of a full synchronization cycle per tenant     |
 | `cfc_syncs_total`                         | Counter   | `tenant`, `result` | Finished sync cycles. Starts at 0 for both results, so the first sync after a pod start is counted |
-| `cfc_sync_start_timestamp_seconds`        | Gauge     | `tenant`          | Unix time the running sync cycle started. Absent while no sync runs |
+| `cfc_sync_start_timestamp_seconds`        | Gauge     | `tenant`          | Unix time the running sync cycle started. 0 while no sync runs |
 | `cfc_last_successful_sync_timestamp_seconds` | Gauge  | `tenant`          | Unix time of the last successful sync cycle. A sync with failed pages or attachments still counts as successful. Absent until the pod's first successful sync |
 | `cfc_scan_duration_seconds`               | Histogram | `tenant`          | Duration of the page discovery (scan) phase              |
 | `cfc_attachment_upload_duration_seconds`   | Histogram | `tenant`          | Duration of a single attachment upload to Unique         |

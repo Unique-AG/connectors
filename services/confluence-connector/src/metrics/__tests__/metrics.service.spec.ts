@@ -90,7 +90,7 @@ describe('Metrics', () => {
       });
     });
 
-    it('reports the start time of a running sync until it finishes', () => {
+    it('reports the start time of a running sync, and 0 once it finishes', () => {
       vi.useFakeTimers({ now: new Date('2026-11-11T10:00:00Z') });
       const { metricService, gauges } = makeMetricService();
       const metrics = new Metrics(metricService);
@@ -114,7 +114,7 @@ describe('Metrics', () => {
         Date.parse('2026-11-11T10:00:00Z') / 1000,
         { tenant: 'test-tenant' },
       );
-      expect(afterFinish).not.toHaveBeenCalled();
+      expect(afterFinish).toHaveBeenCalledExactlyOnceWith(0, { tenant: 'test-tenant' });
     });
 
     it('reports no last successful sync before the first success', () => {

@@ -164,7 +164,7 @@ spec:
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.description | string | `"A sync of tenant {{ $labels.tenant }} started more than 6 hours ago and has not finished. While a sync runs, every scheduled sync of the tenant is skipped."` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.runbook | string | `"1. Check the connector logs for the last progress line of this tenant\n2. A very large first sync can take this long. Check whether pages are still being ingested\n3. If nothing moves, restart the pod\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.annotations.summary | string | `"Confluence Connector sync of tenant {{ $labels.tenant }} has not finished for 6 hours"` |  |
-| prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.expr | string | `"time() - max by (namespace, tenant) (cfc_sync_start_timestamp_seconds) > 6 * 3600\n"` |  |
+| prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.expr | string | `"time() - max by (namespace, tenant) (cfc_sync_start_timestamp_seconds > 0) > 6 * 3600\n"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.for | string | `"5m"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.labels.alertGroup | string | `"confluence-connector"` |  |
 | prometheus.additionalAlerts.ConfluenceConnectorSyncStuck.labels.severity | string | `"warning"` |  |

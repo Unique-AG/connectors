@@ -37,7 +37,7 @@ export class Metrics {
   private readonly syncPhaseState = new Map<string, SyncPhase>();
   private readonly syncItemTotals = new Map<string, { pages: number; attachments: number }>();
   private readonly lastSuccessfulSyncSecondsByTenant = new Map<string, number>();
-  private readonly runningSyncStartSecondsByTenant = new Map<string, number>();
+  private readonly syncStartSecondsByTenant = new Map<string, number>();
 
   public constructor(metricService: MetricService) {
     this.syncDuration = metricService.getHistogram('cfc_sync_duration_seconds', {
@@ -154,10 +154,10 @@ export class Metrics {
     });
 
     const syncStartGauge = metricService.getObservableGauge('cfc_sync_start_timestamp_seconds', {
-      description: 'Unix time the running sync cycle started. Absent while no sync runs',
+      description: 'Unix time the running sync cycle started, 0 while no sync runs',
     });
     syncStartGauge.addCallback((observable) => {
-      for (const [tenant, timestampSeconds] of this.runningSyncStartSecondsByTenant) {
+      for (const [tenant, timestampSeconds] of this.syncStartSecondsByTenant) {
         observable.observe(timestampSeconds, { tenant });
       }
     });
@@ -180,12 +180,14 @@ export class Metrics {
   }
 
   public recordSyncStart(): void {
-    this.runningSyncStartSecondsByTenant.set(this.tenantName, Date.now() / 1000);
+    this.syncStartSecondsByTenant.set(this.tenantName, Date.now() / 1000);
   }
 
   public recordSyncResult(durationSeconds: number, result: 'success' | 'failure'): void {
     const tenant = this.tenantName;
-    this.runningSyncStartSecondsByTenant.delete(tenant);
+    // The exporter keeps a tenant's last value once the callback stops observing it, so a
+    // finished sync reports 0 instead of dropping the tenant.
+    this.syncStartSecondsByTenant.set(tenant, 0);
     this.syncDuration.record(durationSeconds, { tenant, result });
     this.syncsTotal.add(1, { tenant, result });
     if (result === 'success') {

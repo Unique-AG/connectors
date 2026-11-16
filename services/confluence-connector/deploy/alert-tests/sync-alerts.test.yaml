@@ -112,7 +112,7 @@ tests:
     interval: 1m
     input_series:
       - series: 'cfc_sync_start_timestamp_seconds{namespace="ns", tenant="t1"}'
-        values: '_x9 600x400'
+        values: '0x9 600x400'
     alert_rule_test:
       - eval_time: 365m
         alertname: ConfluenceConnectorSyncStuck
@@ -125,6 +125,16 @@ tests:
               tenant: t1
               severity: warning
               alertGroup: confluence-connector
+
+  - name: a finished sync does not fire SyncStuck, however long until the next one
+    interval: 1m
+    input_series:
+      - series: 'cfc_sync_start_timestamp_seconds{namespace="ns", tenant="t1"}'
+        values: '0x9 600x50 0x500'
+    alert_rule_test:
+      - eval_time: 480m
+        alertname: ConfluenceConnectorSyncStuck
+        exp_alerts: []
 
   - name: back-to-back syncs that each finish in time do not fire SyncStuck
     interval: 1m

@@ -372,9 +372,9 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Page fetch failure | API error or a response that does not match the expected page shape | Log the status code or the failing fields, count the page as failed, continue other pages |
 | Page with empty body | Page has no content (e.g., newly created) | Log, skip the page, and do not fetch it again until it has a new version or the connector restarts |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
-| Page ingestion failure | Upload error, registration error | Clean up partial content from KB, log error, skip the page |
-| Attachment ingestion failure | Download error, upload error | Destroy stream, clean up partial content from KB, log error, skip the attachment |
-| Content deletion failure | Unique API error | Log error, continue |
+| Page ingestion failure | Upload error, registration error | Clean up partial content from KB, log error, count the page as failed |
+| Attachment ingestion failure | Download error, upload error | Destroy stream, clean up partial content from KB, log error, count the attachment as failed |
+| Content deletion failure | Unique API error | Log error, count the items as failed, continue |
 | Unhandled sync error | Unexpected exception | Caught at top level, logged, sync state reset |
 
 ### Retry Logic
