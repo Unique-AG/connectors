@@ -1,4 +1,3 @@
-from datetime import date
 from typing import Annotated
 
 from fastmcp.dependencies import Depends
@@ -7,17 +6,16 @@ from fastmcp.tools import tool
 from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
+from pydantic import PastDate
 
 from world_check_mcp import contexts
 from world_check_mcp.mcp.dependencies import get_upstream
+from world_check_mcp.mcp.inputs.identifiers import ExternalId
 from world_check_mcp.mcp.inputs.identifiers import GroupId
 from world_check_mcp.upstream import Upstream
 
 Name = Annotated[str, Field(min_length=1, max_length=1000, description="Name to screen.")]
 Country = Annotated[str, Field(pattern=r"^[A-Za-z]{3}$", description="ISO alpha-3 country code.")]
-ExternalId = Annotated[
-    str, Field(min_length=1, description="Stable external caseId. An existing id is refused.")
-]
 PageSize = Annotated[int, Field(ge=1, le=100, description="Matches to return.")]
 
 
@@ -42,7 +40,7 @@ async def screen_entity(
     case_id: Annotated[
         ExternalId | None, Field(description="External caseId. Existing ids are refused.")
     ] = None,
-    dob: Annotated[date | None, Field(description="Date of birth. Individuals only.")] = None,
+    dob: Annotated[PastDate | None, Field(description="Date of birth. Individuals only.")] = None,
     nationality: Annotated[
         Country | None, Field(description="Individual nationality, ISO alpha-3.")
     ] = None,

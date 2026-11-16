@@ -9,12 +9,10 @@ from pydantic import Field
 
 from world_check_mcp import contexts
 from world_check_mcp.mcp.dependencies import get_upstream
+from world_check_mcp.mcp.inputs.identifiers import ExternalId
 from world_check_mcp.mcp.inputs.identifiers import GroupId
 from world_check_mcp.upstream import Upstream
 
-ExternalId = Annotated[
-    str, Field(min_length=1, description="Stable external caseId. An existing id is refused.")
-]
 PageSize = Annotated[int, Field(ge=1, le=100, description="WATCHLIST matches to return.")]
 
 

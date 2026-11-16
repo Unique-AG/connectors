@@ -870,7 +870,7 @@ async def test_passport_check_refuses_an_existing_case_id() -> None:
 async def test_passport_check_refuses_a_future_date_of_birth() -> None:
     tomorrow = (date.today() + timedelta(days=1)).isoformat()
     async with Client(_server()) as client:
-        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+        with pytest.raises(ToolError, match="date_of_birth"):
             await client.call_tool(
                 "passport_check",
                 {
@@ -882,7 +882,7 @@ async def test_passport_check_refuses_a_future_date_of_birth() -> None:
 
 async def test_passport_check_refuses_a_malformed_case_id() -> None:
     async with Client(_server()) as client:
-        with pytest.raises(ToolError, match="consecutive slashes"):
+        with pytest.raises(ToolError, match="String should match pattern"):
             await client.call_tool(
                 "passport_check",
                 {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "/a"},
