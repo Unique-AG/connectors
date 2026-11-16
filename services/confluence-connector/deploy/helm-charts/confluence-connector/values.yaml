@@ -152,7 +152,8 @@ prometheus:
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
       # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
-      # increase() misses a new error series until its second error; SyncFailing covers that case.
+      # increase() misses a new error series until its second error; SyncFailing and ContentFailures
+      # catch errors that keep coming back.
       expr: |
         sum by (namespace) (increase(confluence_connector_unique_api_requests_total{result="error"}[75m]))
         /

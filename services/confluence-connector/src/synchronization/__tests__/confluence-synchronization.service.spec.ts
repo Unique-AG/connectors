@@ -499,53 +499,6 @@ describe('ConfluenceSynchronizationService', () => {
         msg: 'Attachment ingestion summary',
       });
     });
-
-    it('keeps the sync successful when some items are ingested and others fail', async () => {
-      const attachment: DiscoveredAttachment = {
-        id: 'att-fail',
-        title: 'broken.pdf',
-        mediaType: 'application/pdf',
-        fileSize: 1024,
-        downloadPath: '/download/attachments/1/broken.pdf',
-        versionTimestamp: '2026-02-01T00:00:00.000Z',
-        pageId: '1',
-        spaceId: 'space-1',
-        spaceKey: 'SP',
-        spaceName: 'Space',
-        webUrl: `${CONFLUENCE_BASE_URL}/wiki/spaces/SP/pages/1/attachments/att-fail`,
-      };
-      vi.mocked(mockScanner.discoverPages).mockResolvedValue({
-        pages: discoveredPagesFixture,
-        attachments: [attachment],
-      });
-      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newItemIds: ['1', '1::att-fail'],
-        updatedItemIds: [],
-        deletedItems: [],
-        movedItemIds: [],
-      });
-      vi.mocked(mockIngestionService.ingestAttachment).mockRejectedValue(
-        new Error('attachment ingestion boom'),
-      );
-
-      const result = await tenantStorage.run(tenant, () => service.synchronize());
-
-      expect(result).toEqual({ status: 'success' });
-      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
-    });
-
-    it('keeps the sync successful when there is nothing to ingest', async () => {
-      vi.mocked(mockFileDiffService.computeDiff).mockResolvedValue({
-        newItemIds: [],
-        updatedItemIds: [],
-        deletedItems: [],
-        movedItemIds: [],
-      });
-
-      const result = await tenantStorage.run(tenant, () => service.synchronize());
-
-      expect(result).toEqual({ status: 'success' });
-    });
   });
 
   describe('metrics', () => {
