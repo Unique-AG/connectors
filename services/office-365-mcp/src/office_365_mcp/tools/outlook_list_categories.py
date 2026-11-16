@@ -91,7 +91,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Categories",
+        title="Outlook: List Categories",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

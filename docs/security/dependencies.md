@@ -55,7 +55,7 @@ The skill `vulna-squash` does the whole job for a dependency PR in one run, in m
 
 ```mermaid
 flowchart TD
-  opened[Event: label dependencies added] --> labels{"Label dependencies, and no agent label?"}
+  opened[Event: label dependencies added] --> labels{"Label dependencies, and no agent label or rebuild label?"}
   labels -->|no| stop[Stop with no change]
   labels -->|yes| assess[Assess the bump with the skill dependency-pr-review]
   assess --> ci{State of the checks}
@@ -89,7 +89,7 @@ Only the event "Label added" starts a run. This table shows when a PR gets a new
 
 ### The daily findings run
 
-The cron automation `connectors-vulna-patchy` runs the same skill in mode `findings` at 05:00 UTC. It reads the Trivy findings. It skips a package that an open PR with the label `dependencies` already changes. It opens each fix PR with the labels `dependencies` and `ai-assisted`, so the PR automation stops at its entry check. It posts one Slack message with the PR URLs and the status, or with the reason to stop. See [Patch a finding](./image-vulnerabilities.md#patch-a-finding).
+The cron automation `connectors-vulna-patchy` runs the same skill in mode `findings` at 05:00 UTC. It reads the Trivy findings. It skips a package that an open PR with the label `dependencies` already changes, except an operating system package. It opens each fix PR with the labels `dependencies` and `ai-assisted`, so the PR automation stops at its entry check. It opens or refreshes a rebuild PR with the labels `dependencies` and `rebuild`, so the PR automation stops at its entry check. See [Rebuild rules](./image-vulnerabilities.md#rebuild-rules). It posts one Slack message with the PR URLs and the status, or with the reason to stop. See [Patch a finding](./image-vulnerabilities.md#patch-a-finding).
 
 ### Hand-off
 

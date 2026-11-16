@@ -138,7 +138,7 @@ async def list_reminders(
     view = client.me.reminder_view_with_start_date_time_with_end_date_time(
         end_date_time=closes, start_date_time=opens
     )
-    base_url = view.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+    base_url = view.request_adapter.base_url
     documented_view = view.with_url(
         f"{base_url}/me/reminderView(startDateTime='{opens}',endDateTime='{closes}')"
     )
@@ -165,7 +165,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Reminders",
+        title="Outlook: List Reminders",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

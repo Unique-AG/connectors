@@ -9,18 +9,18 @@ import { coercedPositiveIntSchema } from '../utils/zod.util';
 
 export const HealthConfigSchema = z.object({
   syncHistorySize: coercedPositiveIntSchema
-    .prefault(DEFAULT_HEALTH_SYNC_HISTORY_SIZE)
+    .default(DEFAULT_HEALTH_SYNC_HISTORY_SIZE)
     .describe('Number of recent sync runs kept per tenant in the sliding window for health checks'),
   syncTenantFailureThreshold: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(0)
     .max(1)
-    .prefault(DEFAULT_HEALTH_SYNC_TENANT_FAILURE_THRESHOLD)
+    .default(DEFAULT_HEALTH_SYNC_TENANT_FAILURE_THRESHOLD)
     .describe(
       'Per-tenant failure ratio (0-1) across the window that marks the service unhealthy when exceeded',
     ),
   connectivityTimeoutMs: coercedPositiveIntSchema
-    .prefault(DEFAULT_HEALTH_CONNECTIVITY_TIMEOUT_MS)
+    .default(DEFAULT_HEALTH_CONNECTIVITY_TIMEOUT_MS)
     .describe(
       'Timeout in milliseconds for each unauthenticated reachability ping used in health checks',
     ),

@@ -98,7 +98,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Set Focused Inbox Override",
+        title="Outlook: Set Focused Inbox Override",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

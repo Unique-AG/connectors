@@ -42,17 +42,17 @@ const recoveryCronSchedule = z
   );
 
 const stalenessThresholdHours = z.coerce
-  .number()
+  .number<string | undefined>()
   .int()
   .positive()
-  .prefault(24)
+  .default(24)
   .describe('Hours after which a delegated access account is considered stale for health checks.');
 
 const delegatedAccessFailureThreshold = z.coerce
-  .number()
+  .number<string | undefined>()
   .min(0)
   .max(1)
-  .prefault(0.15)
+  .default(0.15)
   .describe(
     'Fraction of eligible delegated users that may be stale before the check is marked down.',
   );

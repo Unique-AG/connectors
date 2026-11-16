@@ -89,7 +89,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Get an Operation's Status",
+        title="OneNote: Get an Operation's Status",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

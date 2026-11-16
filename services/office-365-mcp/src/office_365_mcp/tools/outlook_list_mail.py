@@ -345,7 +345,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Mail in a Folder",
+        title="Outlook: List Mail in a Folder",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

@@ -29,6 +29,9 @@ env:
 # - every secret in .env.example, from a secret through envVars: UPSTREAM_API_KEY,
 #   UPSTREAM_API_SECRET, ZITADEL_CLIENT_ID, ZITADEL_JWT_SIGNING_KEY (at least 32 characters),
 #   and ZITADEL_CLIENT_SECRET, which stays unset for a public client with PKCE
+# - ELICITATION_REQUEST_STATE_KEYS does not block startup: unset, each process seals approvals under
+#   a key of its own, so an approval answered on another replica fails. Set it from a secret to a
+#   JSON list shared by every replica.
 envVars: []
 
 image:

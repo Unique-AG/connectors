@@ -219,7 +219,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Get Mail Tips",
+        title="Outlook: Get Mail Tips",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

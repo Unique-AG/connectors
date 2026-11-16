@@ -63,6 +63,7 @@ flowchart LR
 | `dependencies` | Nightly job | PR automation, person | The PR comes from the nightly job. |
 | `npm`, `uv`, `github-actions`, `docker`, `terraform` | Nightly job | A person | The ecosystem of the update. |
 | `superseded` | Nightly job | Nightly job | The job closed this PR. A newer version replaced it, or no update targets it any more. A person did not reject it. Do not add it by hand. |
+| `rebuild` | Agent, Rebuild Service workflow | PR automation, workflow | The PR only rebuilds an image for operating system patches. It has the label `dependencies` too. The PR automation stops at its entry check, and no agent run handles it. |
 | `ai-assisted` | Agent | Agent | An agent run owns the PR and posted its report. |
 | `human-required` | Agent | Agent, person | The agent cannot finish the PR. It removes `ai-assisted` first, so a PR never has both labels. A person finishes the PR. |
 | `security-exception` | Person | Release gate, dependency review | Skip the gate on this PR. |

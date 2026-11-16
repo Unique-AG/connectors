@@ -133,7 +133,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a List Item",
+        title="SharePoint: Create a List Item",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )
