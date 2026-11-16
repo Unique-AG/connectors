@@ -24,8 +24,8 @@ from kyckr_mcp.upstream import UpstreamSettings
             "Use only after the user has explicitly approved both the document and the credit cost "
             "shown by `list_company_documents`. The only tool that spends credits *and* creates "
             "state on Kyckr - never call speculatively, never retry on transient failure without a "
-            "fresh confirmation. After a successful call, poll `get_order(data.orderId)` until it "
-            "resolves."
+            "fresh confirmation. After a successful call, poll `get_order(data.orderId)` until "
+            "`status` is `Success` or `Failed`."
         ),
     )
 )
@@ -40,14 +40,14 @@ async def create_document_order(
     """Place a paid Kyckr order for an official registry document. Every successful call
     spends credits and creates a real registry order; it is the only write-side tool.
     Required: `kyckr_id` (from `search_companies`) and `product_id` (from
-    `list_company_documents`). Call directly once the user has named or chosen a
-    specific filing; do not ask for a separate confirmation, the cost is already known.
+    `list_company_documents`). Call only after the user has approved the document and
+    the credit cost shown there; naming a filing is not approval.
     Returns `data.orderId` and `data.status`. On `status: "Success"` the JSON view of
     the document is inlined under `data.documentJson`; render it to the user as a
     readable summary. If `data.documentJson` is absent, `details` says the document is
     PDF-only and PDF delivery is not yet supported; relay that message. On `status:
-    "Pending"`, poll `get_order(data.orderId)` until `data.documentJson` is populated or
-    `status` is `Failed`. Never mention download URLs.
+    "Pending"`, poll `get_order(data.orderId)`. Stop once `status` is `Success` or `Failed`,
+    whether or not `data.documentJson` is present. Never mention download URLs.
     """
     result = await contexts.create_document_order(
         upstream=upstream,

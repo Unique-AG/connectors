@@ -16,7 +16,7 @@ An MCP server that searches official company registries and orders registry docu
 
 When the order has finished, `create_document_order` and `get_order` also call `GET /orders/{orderId}/download?format=json`. A finished order comes back with its JSON document under `data.documentJson`. Download links are removed. If the filing is PDF only, `details` says so.
 
-The tool descriptions tell the agent to confirm with the user before it calls a tool that spends credits.
+The tool descriptions tell the agent to get the user's approval before it calls a tool that spends credits. `create_document_order` needs the user to approve the document and the cost shown by `list_company_documents`.
 
 ## Errors
 
@@ -62,7 +62,7 @@ The overlay must set `app.publicBaseUrl`, `zitadel.baseUrl` and `kyckr.apiUrl`: 
 | `app.publicBaseUrl` | `MCP_BASE_URL` | The public https origin. Must match `routes.hostname`. Mandatory. |
 | `zitadel.baseUrl` | `ZITADEL_BASE_URL` | The Zitadel issuer. Mandatory. |
 | `zitadel.orgId` | `ZITADEL_ORG_ID` | Restricts sign-in to one organisation. See below. |
-| `kyckr.apiUrl` | `UPSTREAM_API_URL` | Mandatory, with no default, so no deployment calls the test API by accident. Production is `https://api.kyckr.com/v2`, test is `https://test-api.kyckr.com/v2`. |
+| `kyckr.apiUrl` | `UPSTREAM_API_URL` | Mandatory, with no default, so no deployment calls the test API by accident. Production is `https://api.kyckr.com/v2`, test is `https://test-api.kyckr.com/v2`. The app rejects every scheme but https, since the Kyckr key goes to this origin. |
 | `kyckr.timeoutSeconds` | `UPSTREAM_TIMEOUT_SECONDS` | Pinned at 30. At most 120. |
 | `kyckr.defaultCustomerReference` | `UPSTREAM_DEFAULT_CUSTOMER_REFERENCE` | Sent to Kyckr for usage reconciliation when a call gives none. |
 | `kyckr.defaultContactEmail` | `UPSTREAM_DEFAULT_CONTACT_EMAIL` | The contact on a document order when a call gives none. |
