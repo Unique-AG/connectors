@@ -990,14 +990,20 @@ async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case(
     arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}
 
     async with (
+        asyncio.timeout(10),
         Client(server, elicitation_handler=_approve) as first,
         Client(server, elicitation_handler=_approve) as second,
     ):
         first_call = asyncio.create_task(first.call_tool("resolve_result", arguments))
-        await first_write_arrived.wait()
-        with pytest.raises(ToolError, match="Another decision on this case is being saved"):
-            await second.call_tool("resolve_result", arguments)
-        release_first_write.set()
+        arrived = asyncio.create_task(first_write_arrived.wait())
+        try:
+            await asyncio.wait({first_call, arrived}, return_when=asyncio.FIRST_COMPLETED)
+            assert first_write_arrived.is_set(), "the first call ended before it wrote"
+            with pytest.raises(ToolError, match="Another decision on this case is being saved"):
+                await second.call_tool("resolve_result", arguments)
+        finally:
+            release_first_write.set()
+            arrived.cancel()
         await first_call
 
     assert len(_writes) == 1
