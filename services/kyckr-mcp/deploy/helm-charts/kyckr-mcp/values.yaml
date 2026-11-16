@@ -13,23 +13,44 @@ podLabels:
 
 env:
   HOST: "0.0.0.0"
-  PORT: "8000"
   LOG_LEVEL: info
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
   DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
-  # zitadel is the default and needs the ZITADEL_* variables below, or the app fails at startup.
+  # zitadel is the default and needs mcpConfig.zitadel and the secrets (see README) to start.
   # none serves without sign-in, on loopback only: HOST must then be a loopback address, not 0.0.0.0.
   MCP_AUTH_MODE: zitadel
 
-# Set per deployment in the overlay. The app refuses to start without them.
-# - MCP_BASE_URL: the public https origin, matching routes.hostname
-# - ZITADEL_BASE_URL: the Zitadel issuer, https outside localhost (env in the overlay)
-# - ZITADEL_ORG_ID: optional, restricts sign-in to one organisation (env in the overlay)
-# - every secret in .env.example, from a secret through envVars: UPSTREAM_API_KEY,
-#   ZITADEL_CLIENT_ID, ZITADEL_JWT_SIGNING_KEY (at least 32 characters, the same on every
-#   replica), and ZITADEL_CLIENT_SECRET, which stays unset for a public client with PKCE
-# - UPSTREAM_API_URL, which defaults to the Kyckr test API, so credits are not spent by accident
+# One replica: the rate limit counts per replica, and replicas that start together on an empty
+# database race to create the sign-in table (one pod restarts once).
+replicaCount: 1
+
+# Restarts the pods when a secret they read changes, so a rotated Kyckr key takes effect.
+deployment:
+  metadata:
+    annotations:
+      reloader.stakater.com/auto: "true"
+
+# Non-secret settings, mapped to environment variables. The app refuses to start without
+# publicBaseUrl and zitadel.baseUrl, so the overlay sets them. Unset values use the app default.
+mcpConfig:
+  app:
+    publicBaseUrl: "" # MCP_BASE_URL, e.g. https://kyckr-mcp.<tenant>.unique.app. Must match routes.hostname
+  zitadel:
+    baseUrl: "" # ZITADEL_BASE_URL, e.g. https://id.<tenant>.unique.app
+    # ZITADEL_ORG_ID, optional. Verify in Zitadel that the id token carries the resourceowner
+    # claim, or every sign-in is refused.
+    orgId: ""
+  kyckr:
+    # UPSTREAM_API_URL. The test API, so the egress rule has a host. Production is https://api.kyckr.com/v2
+    apiUrl: https://test-api.kyckr.com/v2
+    defaultCustomerReference: ""
+    defaultContactEmail: ""
+  # Per signed-in user and per replica: N replicas allow N times toolCallsPerWindow.
+  rateLimit: {}
+
+# Secrets stay out of mcpConfig: set extraEnvSecrets (or envVars) with UPSTREAM_API_KEY,
+# ZITADEL_CLIENT_ID, ZITADEL_JWT_SIGNING_KEY and, if needed, ZITADEL_CLIENT_SECRET. See README.
 envVars: []
 
 image:
@@ -133,7 +154,8 @@ routes:
     jwt: false
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
-# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+# connection.url hides the Postgres host, so no Postgres egress renders: set connection.host, or
+# postgresql.networkPolicyEgressManaged: true plus a networkPolicy.egress[] rule.
 networkPolicy:
   enabled: false
   flavor: cilium

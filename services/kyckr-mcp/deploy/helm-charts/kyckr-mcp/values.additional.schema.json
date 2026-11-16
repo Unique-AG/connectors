@@ -4,5 +4,80 @@
   "title": "Kyckr MCP Values",
   "description": "Values for the Kyckr MCP Helm chart. A Python FastMCP server on the base chart. Exposure uses base chart Gateway API routes (no custom Ingress).",
   "type": "object",
-  "properties": {}
+  "properties": {
+    "mcpConfig": {
+      "type": "object",
+      "description": "Non-secret settings, mapped to environment variables. Unset values use the app default. The secrets come from a Secret through extraEnvSecrets or envVars (see README).",
+      "properties": {
+        "app": {
+          "type": "object",
+          "properties": {
+            "publicBaseUrl": {
+              "type": "string",
+              "description": "MCP_BASE_URL: the public https origin. Must match routes.hostname."
+            }
+          },
+          "additionalProperties": false
+        },
+        "zitadel": {
+          "type": "object",
+          "properties": {
+            "baseUrl": {
+              "type": "string",
+              "description": "ZITADEL_BASE_URL: the Zitadel issuer. Its host gets Cilium egress on port 443, so the URL is https without a port.",
+              "pattern": "^$|^https://[^/:]+(/.*)?$"
+            },
+            "orgId": {
+              "type": "string",
+              "description": "ZITADEL_ORG_ID: optional, restricts sign-in to one organisation."
+            }
+          },
+          "additionalProperties": false
+        },
+        "kyckr": {
+          "type": "object",
+          "properties": {
+            "apiUrl": {
+              "type": "string",
+              "description": "UPSTREAM_API_URL. Its host gets Cilium egress on port 443, so the URL is https without a port.",
+              "pattern": "^$|^https://[^/:]+(/.*)?$"
+            },
+            "timeoutSeconds": {
+              "type": "number",
+              "description": "UPSTREAM_TIMEOUT_SECONDS.",
+              "exclusiveMinimum": 0,
+              "maximum": 120
+            },
+            "defaultCustomerReference": {
+              "type": "string",
+              "description": "UPSTREAM_DEFAULT_CUSTOMER_REFERENCE: sent to Kyckr for usage reconciliation when a call names none."
+            },
+            "defaultContactEmail": {
+              "type": "string",
+              "description": "UPSTREAM_DEFAULT_CONTACT_EMAIL: the contact on a document order when a call names none."
+            }
+          },
+          "additionalProperties": false
+        },
+        "rateLimit": {
+          "type": "object",
+          "description": "Tool calls per signed-in user, counted per replica: N replicas allow N times toolCallsPerWindow.",
+          "properties": {
+            "toolCallsPerWindow": {
+              "type": "integer",
+              "description": "MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW.",
+              "minimum": 1
+            },
+            "windowSeconds": {
+              "type": "number",
+              "description": "MCP_RATE_LIMIT_WINDOW_SECONDS.",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
 }

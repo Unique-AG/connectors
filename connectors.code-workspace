@@ -9,9 +9,9 @@
     { "path": "packages/mcp-scaffold" },
     { "path": "services/architecture-demo-mcp" },
     { "path": "services/backstop-mcp" },
-    { "path": "services/exp-kyckr-mcp" },
     { "path": "services/exp-tiingo-mcp" },
     { "path": "services/kb-mcp" },
+    { "path": "services/kyckr-mcp" },
     { "path": "services/office-365-mcp" },
     { "path": "services/with-intelligence-mcp" }
   ],
