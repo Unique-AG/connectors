@@ -189,6 +189,33 @@ describe('parseAttachmentUri', () => {
       );
     });
 
+    it('parses a percent-encoded octet that is not valid UTF-8', async () => {
+      const result = await parseAttachmentUri('data:application/octet-stream,%FF');
+
+      expect(result).toEqual({
+        type: 'data',
+        mimeType: 'application/octet-stream',
+        data: Buffer.from([0xff]),
+      });
+    });
+
+    it('parses a percent-encoded Word file that contains a non-UTF-8 octet', async () => {
+      const zip = await buildWordFile();
+      expect(zip.some((byte) => byte > 0x7f)).toBe(true);
+
+      const result = await parseAttachmentUri(`data:${WORD_MIME_TYPE},${percentEncodeBytes(zip)}`);
+
+      expect(result).toEqual({
+        type: 'data',
+        mimeType: WORD_MIME_TYPE,
+        data: zip,
+      });
+    });
+
+    it('rejects a percent-encoded data URI whose escape is cut off', async () => {
+      await expect(parseAttachmentUri('data:text/plain,Hello%2')).rejects.toThrow(URIError);
+    });
+
     it('parses a complete zip sent as application/octet-stream', async () => {
       const zip = await buildWordFile();
       const result = await parseAttachmentUri(
@@ -252,6 +279,10 @@ function buildWordFile(options?: { compress?: boolean; directory?: boolean }): P
   });
   zip.end();
   return buffer(zip.outputStream);
+}
+
+function percentEncodeBytes(data: Buffer): string {
+  return Array.from(data, (byte) => `%${byte.toString(16).padStart(2, '0')}`).join('');
 }
 
 function truncateZip(zip: Buffer): Buffer {

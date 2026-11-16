@@ -51,7 +51,7 @@ export async function parseAttachmentUri(
     const isBase64 = dataMatch[2] === ';base64';
     const data = isBase64
       ? decodeBase64Attachment(rawData)
-      : Buffer.from(decodeURIComponent(rawData));
+      : decodePercentEncodedAttachment(rawData);
 
     await assertZipIsReadable(mimeType, data, maxUncompressedSize);
 
@@ -64,6 +64,33 @@ export async function parseAttachmentUri(
 // TypeScript 5.9 does not declare Uint8Array.fromBase64, which Node 26 provides.
 interface Uint8ArrayFromBase64 extends Uint8ArrayConstructor {
   fromBase64(input: string): Uint8Array;
+}
+
+// Data URIs percent-encode octets. decodeURIComponent rejects bytes that are not UTF-8.
+function decodePercentEncodedAttachment(rawData: string): Buffer {
+  const bytes: number[] = [];
+  let index = 0;
+  while (index < rawData.length) {
+    if (rawData[index] !== '%') {
+      const runStart = index;
+      index += 1;
+      while (index < rawData.length && rawData[index] !== '%') {
+        index += 1;
+      }
+      for (const byte of Buffer.from(rawData.slice(runStart, index), 'utf8')) {
+        bytes.push(byte);
+      }
+      continue;
+    }
+
+    const hex = rawData.slice(index + 1, index + 3);
+    if (!/^[0-9a-fA-F]{2}$/.test(hex)) {
+      throw new URIError('URI malformed');
+    }
+    bytes.push(Number.parseInt(hex, 16));
+    index += 3;
+  }
+  return Buffer.from(bytes);
 }
 
 function decodeBase64Attachment(rawData: string): Buffer {

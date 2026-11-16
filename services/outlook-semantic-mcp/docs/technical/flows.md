@@ -249,8 +249,13 @@ sequenceDiagram
 
     opt Attachments provided
         loop For each attachment
-            OutlookMCP->>MSGraph: POST /me/messages/{draftId}/attachments
-            MSGraph->>OutlookMCP: Attachment added
+            OutlookMCP->>OutlookMCP: Decode the attachment and check Office files
+            alt File can be opened
+                OutlookMCP->>MSGraph: POST /me/messages/{draftId}/attachments
+                MSGraph->>OutlookMCP: Attachment added
+            else File is rejected
+                OutlookMCP->>OutlookMCP: Record the failure on attachmentsFailed
+            end
         end
     end
 
@@ -261,7 +266,8 @@ sequenceDiagram
 
 - The draft is created in the user's Outlook Drafts folder via Microsoft Graph — it is **not** sent automatically.
 - The `webLink` in the response lets the user open the draft directly in Outlook to review and send.
-- If one or more attachments fail to upload, the draft is still returned with a list of failed attachments.
+- Each attachment is decoded and checked before upload. A truncated or invalid Office file is not stored; it is listed on `attachmentsFailed`.
+- If one or more attachments fail, the draft is still returned with that list.
 
 ## Related Documentation
 
