@@ -92,7 +92,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List My Teams",
+        title="Teams: List My Teams",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

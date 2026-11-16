@@ -232,7 +232,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Share a Calendar",
+        title="Outlook: Share a Calendar",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

@@ -739,6 +739,22 @@ class TestTheToolsThisServerAdvertises:
         assert _properties(tools["get_me"].input_schema) == {}
         assert tools["get_me"].input_schema.get("required", []) == []
 
+    async def test_every_title_but_get_me_names_the_service_its_tool_belongs_to(
+        self, every_tool: Client[FastMCPTransport]
+    ) -> None:
+        services = {
+            "outlook": "Outlook",
+            "teams": "Teams",
+            "onenote": "OneNote",
+            "sharepoint": "SharePoint",
+        }
+        tools = _named(await every_tool.list_tools())
+
+        assert tools["get_me"].title == "Get My Profile"
+        for name, tool in tools.items():
+            if name != "get_me":
+                assert (tool.title or "").startswith(f"{services[name.split('_')[0]]}: "), name
+
     async def test_teams_list_chats_bounds_its_limit_where_graph_bounds_it(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:

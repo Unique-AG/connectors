@@ -373,7 +373,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Respond to a Calendar Invitation",
+        title="Outlook: Respond to a Calendar Invitation",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

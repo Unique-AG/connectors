@@ -3,15 +3,15 @@ import * as z from 'zod';
 /** Tool-call limit per key. The count is held in each process. */
 export const mcpRateLimitConfigSchema = z.object({
   toolCallsPerWindow: z.coerce
-    .number()
+    .number<string | undefined>()
     .int()
     .min(1)
-    .prefault(60)
+    .default(60)
     .describe('Tool calls one key may make within the window.'),
   windowSeconds: z.coerce
-    .number()
+    .number<string | undefined>()
     .positive()
-    .prefault(60)
+    .default(60)
     .describe('Length of the sliding window, in seconds.'),
 });
 

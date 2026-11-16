@@ -105,8 +105,7 @@ class TestTheGraphBaseUrlIsSetInOnePlace:
     ) -> None:
         """An unset transport base_url is what lets the adapter emit an absolute URL httpx never
         joins onto; the adapter's missing trailing slash keeps the join clean if it ever does."""
-        # The ignore is for the SDK leaving `request_adapter`'s generic parameter unbound.
-        base_url: str = client.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+        base_url: str = client.request_adapter.base_url
 
         assert str(transport.base_url) == ""
         assert base_url == GRAPH_V1

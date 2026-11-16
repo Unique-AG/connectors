@@ -11,7 +11,7 @@ def outcome(*, screened: ScreenedCaseWire, limit: int) -> ScreeningOutcome:
             "LSEG completed the screening request but returned no caseSystemId. "
             "Inspect the case before retrying."
         )
-    watchlist = [item for item in screened.results if item.provider_type != "PASSPORT_CHECK"]
+    watchlist = watchlist_results(screened.results)
     passport = [item for item in screened.results if item.provider_type == "PASSPORT_CHECK"]
     return ScreeningOutcome(
         case_id=screened.case_id,
@@ -24,6 +24,10 @@ def outcome(*, screened: ScreenedCaseWire, limit: int) -> ScreeningOutcome:
         watchlist_truncated=len(watchlist) > limit,
         passport_matches=[match_from_result(item=item) for item in passport[:limit]],
     )
+
+
+def watchlist_results(results: list[ResultWire]) -> list[ResultWire]:
+    return [item for item in results if item.provider_type == "WATCHLIST"]
 
 
 def match_from_result(*, item: ResultWire) -> ScreeningMatch:

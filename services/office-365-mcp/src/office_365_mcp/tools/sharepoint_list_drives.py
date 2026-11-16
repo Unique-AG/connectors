@@ -179,7 +179,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Drives",
+        title="SharePoint: List Drives",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

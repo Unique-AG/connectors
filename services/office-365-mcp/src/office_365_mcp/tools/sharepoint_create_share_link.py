@@ -210,7 +210,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Sharing Link",
+        title="SharePoint: Create a Sharing Link",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

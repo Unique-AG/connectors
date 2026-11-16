@@ -36,4 +36,4 @@ Do not dismiss an alert without a reason. The next scan of `main` closes a fixed
 
 The ruleset is created as code, here: https://github.com/unique-ag/infrastructure/blob/0a6f17440184c3238b67c2537591a0d043ca816d/providers/github/unique-ag/repos/connectors.yaml
 
-It requires the check `gatekeeper`. The gatekeeper waits for every other check, CodeQL included.
+It requires the check `gatekeeper`. The gatekeeper waits for every other check, CodeQL included. It does not wait for the check `Cursor Automation: Connectors Dependency PR Assess`. That check is the agent that watches the PR for up to 45 minutes, and the gatekeeper stops after 20 minutes.

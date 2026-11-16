@@ -103,7 +103,7 @@ async def teams_browse_channel(
             )
         )
     else:
-        base_url = channel_messages.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+        base_url = channel_messages.request_adapter.base_url
         channel_messages = channel_messages.with_url(
             _own_continuation(page_token, base_url=base_url, team_id=team_id, channel_id=channel_id)
         )
@@ -176,7 +176,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Browse a Teams Channel",
+        title="Teams: Browse a Channel",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

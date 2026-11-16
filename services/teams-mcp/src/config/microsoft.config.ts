@@ -36,7 +36,7 @@ const ConfigSchema = z.object({
       'The public webhook URL reachable from external network used by Microsoft Graph subscription for pushes. Optional - defaults to SELF_URL environment variable if not provided.',
     ),
   subscriptionExpirationTimeHoursUTC: z.coerce
-    .number()
+    .number<string | undefined>()
     .min(0)
     .max(23)
     .default(3)

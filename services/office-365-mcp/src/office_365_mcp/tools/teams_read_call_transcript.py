@@ -129,7 +129,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Call Transcript",
+        title="Teams: Read a Call Transcript",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

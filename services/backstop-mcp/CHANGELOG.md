@@ -1,5 +1,56 @@
 # Changelog
 
+## [3.1.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@3.0.0...backstop-mcp@3.1.0) (2026-11-12)
+
+
+### Features
+
+* **backstop-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,teams-mcp,with-intelligence-mcp:** advertise the new server icon in serverInfo ([#1377](https://github.com/Unique-AG/connectors/issues/1377)) ([19e8a00](https://github.com/Unique-AG/connectors/commit/19e8a009ff76826a0d606c241197cea432cfcebe))
+* **backstop-mcp:** redact the deployment's secrets and each caller's tokens from every log line ([#1331](https://github.com/Unique-AG/connectors/issues/1331)) ([4013788](https://github.com/Unique-AG/connectors/commit/40137881f0e793831195241dec8e33ff0982c435))
+* **mcp-server-module,mcp-observability:** rate-limit MCP tool calls per user ([#1358](https://github.com/Unique-AG/connectors/issues/1358)) ([bbe4bc0](https://github.com/Unique-AG/connectors/commit/bbe4bc07bde6b67cecee762e25a16cfeac6cc67a))
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+* **backstop-mcp,mcp-credential-auth,with-intelligence-mcp:** keep oauth clients that signed in once ([#1367](https://github.com/Unique-AG/connectors/issues/1367)) ([4cdd25f](https://github.com/Unique-AG/connectors/commit/4cdd25f8da0a1b6fc090c694231f1a057defde8a))
+* **backstop-mcp,with-intelligence-mcp,kb-mcp,office-365-mcp:** mask unexpected tool error details ([#1344](https://github.com/Unique-AG/connectors/issues/1344)) ([5144918](https://github.com/Unique-AG/connectors/commit/5144918b0f113a024e7e19237832a315d97febce))
+* **backstop-mcp,with-intelligence-mcp:** add upstream FQDN egress rules to Helm charts ([#1349](https://github.com/Unique-AG/connectors/issues/1349)) ([1849d59](https://github.com/Unique-AG/connectors/commit/1849d59d7f11562df90c71df0c55e3f701fc0477))
+* deny egress to RFC1918 and link-local ranges in every MCP chart ([#1353](https://github.com/Unique-AG/connectors/issues/1353)) ([5949e66](https://github.com/Unique-AG/connectors/commit/5949e6698615dfd7de48116cd09c0550467485f1))
+* **teams-mcp,outlook-semantic-mcp,kb-mcp,backstop-mcp,with-intelligence-mcp,kyckr-mcp,temenos-mcp:** mark upstream content as untrusted in tool descriptions ([#1355](https://github.com/Unique-AG/connectors/issues/1355)) ([8aeef96](https://github.com/Unique-AG/connectors/commit/8aeef9675771f2f121e2dafae722d8bfdc4b294b))
+
+
+### Dependencies
+
+* **deps:** bump anyio from 4.15.1 to 4.16.0 ([#1458](https://github.com/Unique-AG/connectors/issues/1458)) ([2b73dd3](https://github.com/Unique-AG/connectors/commit/2b73dd33d14cf060ab83a3460e29ecd23d6dc563))
+* **deps:** bump authlib from 1.9.1 to 1.9.2 ([#1472](https://github.com/Unique-AG/connectors/issues/1472)) ([4643f78](https://github.com/Unique-AG/connectors/commit/4643f78a9015c7e90937357387c3644b3361a05f))
+* **deps:** bump authlib from 1.9.1 to 1.9.5 ([#1564](https://github.com/Unique-AG/connectors/issues/1564)) ([970fd93](https://github.com/Unique-AG/connectors/commit/970fd930ee2a9e14a0039158602384dd54772466))
+* **deps:** bump click from 8.5.0 to 8.5.1 ([#1594](https://github.com/Unique-AG/connectors/issues/1594)) ([6b63621](https://github.com/Unique-AG/connectors/commit/6b636210023b5042d1431856495d42ea4e41bfac))
+* **deps:** bump cyclopts from 5.2.0 to 5.3.3 ([#1509](https://github.com/Unique-AG/connectors/issues/1509)) ([2e82f58](https://github.com/Unique-AG/connectors/commit/2e82f58d7147237e1fe5d76884ca42b104097322))
+* **deps:** bump cyclopts from 5.3.3 to 5.4.0 ([#1640](https://github.com/Unique-AG/connectors/issues/1640)) ([fb15e80](https://github.com/Unique-AG/connectors/commit/fb15e80557f0e19c6dfbcdaece0075f225f0b370))
+* **deps:** bump dnspython from 2.9.0 to 2.9.1 ([#1420](https://github.com/Unique-AG/connectors/issues/1420)) ([34b87f1](https://github.com/Unique-AG/connectors/commit/34b87f1602afb436aa18a969a61b8e4b74c8fdd8))
+* **deps:** bump dnspython from 2.9.0 to 2.9.2 ([#1533](https://github.com/Unique-AG/connectors/issues/1533)) ([a7972c0](https://github.com/Unique-AG/connectors/commit/a7972c0eae54fc0dbcb801dc61b39b02c55e1998))
+* **deps:** bump fastmcp packages ([#1469](https://github.com/Unique-AG/connectors/issues/1469)) ([87007fa](https://github.com/Unique-AG/connectors/commit/87007fa84170bfd31d4840de0054648ebbb4af04))
+* **deps:** bump fastmcp packages ([#1530](https://github.com/Unique-AG/connectors/issues/1530)) ([eee2af2](https://github.com/Unique-AG/connectors/commit/eee2af2eb2ff4943ac89016ac463f86c192c5a67))
+* **deps:** bump joserfc from 1.7.7 to 1.8.0 ([#1538](https://github.com/Unique-AG/connectors/issues/1538)) ([70bf11d](https://github.com/Unique-AG/connectors/commit/70bf11d7a2115d25496f8c56e8344296e1da7d02))
+* **deps:** bump opentelemetry packages ([#1397](https://github.com/Unique-AG/connectors/issues/1397)) ([c21a413](https://github.com/Unique-AG/connectors/commit/c21a41371d79e6297883de2a261e031b5ad93159))
+* **deps:** bump platformdirs from 4.13.5 to 4.14.5 ([#1548](https://github.com/Unique-AG/connectors/issues/1548)) ([1afb94c](https://github.com/Unique-AG/connectors/commit/1afb94c03fd6fb2c3a5b86a07a4ebdc7351ae096))
+* **deps:** bump platformdirs from 4.13.7 to 4.14.3 ([#1464](https://github.com/Unique-AG/connectors/issues/1464)) ([cdbdc5a](https://github.com/Unique-AG/connectors/commit/cdbdc5a7db6193e9f5be8752043a2e01270b36bb))
+* **deps:** bump pydantic packages ([#1453](https://github.com/Unique-AG/connectors/issues/1453)) ([34b557d](https://github.com/Unique-AG/connectors/commit/34b557d1e2ab15c11b8352b2e53742be333cf147))
+* **deps:** bump pydantic packages ([#1563](https://github.com/Unique-AG/connectors/issues/1563)) ([53901f0](https://github.com/Unique-AG/connectors/commit/53901f05119b7baf41e3936a84dfdeb4f4c04808))
+* **deps:** bump pydantic-settings from 2.16.1 to 2.16.2 ([#1399](https://github.com/Unique-AG/connectors/issues/1399)) ([934dbf8](https://github.com/Unique-AG/connectors/commit/934dbf81de0c317803914e8925181f0198ad38f7))
+* **deps:** bump pytest-asyncio from 1.4.1 to 1.4.1.post1 ([#1470](https://github.com/Unique-AG/connectors/issues/1470)) ([60b236e](https://github.com/Unique-AG/connectors/commit/60b236e3aa2bf21a0be755b13a37b9869ce415ed))
+* **deps:** bump python-multipart from 0.0.32 to 0.0.33 ([#1425](https://github.com/Unique-AG/connectors/issues/1425)) ([d7f3c58](https://github.com/Unique-AG/connectors/commit/d7f3c582cf0e4dc891ebd0857a7a436af2eca1da))
+* **deps:** bump ruff from 0.17.3 to 0.17.4 ([#1573](https://github.com/Unique-AG/connectors/issues/1573)) ([7aad996](https://github.com/Unique-AG/connectors/commit/7aad99614439067376d84c4b79c0085a5a213b25))
+* **deps:** bump soupsieve from 3.0.4 to 4.0.1 ([#1549](https://github.com/Unique-AG/connectors/issues/1549)) ([888e78b](https://github.com/Unique-AG/connectors/commit/888e78b10f5e981271bd652bc1fe034879d28c63))
+* **deps:** bump sqlalchemy from 2.1.6 to 2.1.8 ([#1543](https://github.com/Unique-AG/connectors/issues/1543)) ([8b81423](https://github.com/Unique-AG/connectors/commit/8b814234d8263d5f2ec3edc09868c4a22be32dbf))
+* **deps:** bump sse-starlette from 3.5.0 to 3.7.0 ([#1601](https://github.com/Unique-AG/connectors/issues/1601)) ([0205d12](https://github.com/Unique-AG/connectors/commit/0205d12bd183e60b7655137546e9f7482c747226))
+* **deps:** bump typing-inspection from 0.4.4 to 0.4.5 ([#1561](https://github.com/Unique-AG/connectors/issues/1561)) ([b5ba8b6](https://github.com/Unique-AG/connectors/commit/b5ba8b6a22630bdf68c55628c3ab5d3c8e258140))
+* **deps:** bump uncalled-for from 0.4.1 to 0.6.0 ([#1565](https://github.com/Unique-AG/connectors/issues/1565)) ([952417d](https://github.com/Unique-AG/connectors/commit/952417dd3595afbc4e4d73f893b7fa675775c936))
+* **deps:** bump websockets from 17.3 to 17.4 ([#1428](https://github.com/Unique-AG/connectors/issues/1428)) ([2781cd5](https://github.com/Unique-AG/connectors/commit/2781cd5e512f40f900442bdffda2c5c029b4a1ef))
+* **deps:** bump wrapt from 2.5.1 to 2.5.2 ([#1429](https://github.com/Unique-AG/connectors/issues/1429)) ([3d2d6de](https://github.com/Unique-AG/connectors/commit/3d2d6dec00baa79a1d87c5a1e38317b7ccf94ad3))
+* **main:** align the python base image digest in every Dockerfile ([#1628](https://github.com/Unique-AG/connectors/issues/1628)) ([39e8acc](https://github.com/Unique-AG/connectors/commit/39e8accc2659fc07af97f2c23ea5910d984dcb7b))
+
 ## [3.0.0](https://github.com/Unique-AG/connectors/compare/backstop-mcp@2.0.0...backstop-mcp@3.0.0) (2026-10-29)
 
 

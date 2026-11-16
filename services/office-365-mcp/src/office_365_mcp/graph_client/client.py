@@ -19,6 +19,8 @@ from kiota_abstractions.method import Method
 from kiota_abstractions.native_response_handler import NativeResponseHandler
 from kiota_abstractions.request_information import RequestInformation
 from kiota_abstractions.request_option import RequestOption
+from kiota_abstractions.serialization.parsable import Parsable
+from kiota_abstractions.serialization.parsable_factory import ParsableFactory
 from kiota_http.httpx_request_adapter import HttpxRequestAdapter
 from kiota_http.kiota_client_factory import KiotaClientFactory
 from kiota_http.middleware.middleware import BaseMiddleware
@@ -38,6 +40,9 @@ from opentelemetry.trace import Span, SpanContext, Status, StatusCode
 from opentelemetry.util.types import AttributeValue
 
 from office_365_mcp.graph_client.settings import GraphSettings
+
+type GraphErrorMap = dict[str, type[ParsableFactory[Parsable]]]
+GRAPH_ERROR_MAP: GraphErrorMap = cast("GraphErrorMap", {"XXX": ODataError})
 
 _GRAPH_ORIGIN = str(NationalClouds.Global)
 _GRAPH_BASE_URL = f"{_GRAPH_ORIGIN}/{APIVersion.v1}"
@@ -188,13 +193,7 @@ class _QuietUrlReplaceHandler(UrlReplaceHandler):
 
     @override
     def _create_observability_span(self, request: httpx.Request, span_name: str) -> Span:
-        # The ignore is for the base method's unannotated `request` parameter. Its return type is
-        # annotated, hence the `Span` above.
-        return _SpanWithoutTheUrl(
-            super()._create_observability_span(  # pyright: ignore[reportUnknownMemberType]
-                request, span_name
-            )
-        )
+        return _SpanWithoutTheUrl(super()._create_observability_span(request, span_name))
 
 
 def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]:
@@ -305,18 +304,14 @@ async def fetch_response(
     )
     response = cast(
         "object",
-        await adapter.send_primitive_async(  # pyright: ignore[reportUnknownMemberType]
-            request, "bytes", {"XXX": ODataError}
-        ),
+        await adapter.send_primitive_async(request, "bytes", GRAPH_ERROR_MAP),
     )
     assert isinstance(response, httpx.Response), (
         "the native response handler must hand back the raw httpx.Response, not a decoded body"
     )
     span = adapter.start_tracing_span(request, "fetch_response")
     try:
-        await adapter.throw_failed_responses(  # pyright: ignore[reportUnknownMemberType]
-            response, {"XXX": ODataError}, span, span
-        )
+        await adapter.throw_failed_responses(response, GRAPH_ERROR_MAP, span, span)
     finally:
         span.end()
     return FetchedResponse(

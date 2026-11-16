@@ -324,7 +324,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Find Pages",
+        title="OneNote: List Pages",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

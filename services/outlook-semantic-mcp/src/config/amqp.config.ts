@@ -21,7 +21,12 @@ const syntaxBindingConfigSchema = z
     username: z.string().min(1).describe('The AMQP username.'),
     password: redacted(z.string().min(1)).describe('The AMQP password.'),
     host: z.string().min(1).describe('The AMQP host.'),
-    port: z.coerce.number().int().positive().default(5672).describe('The AMQP port.'),
+    port: z.coerce
+      .number<string | undefined>()
+      .int()
+      .positive()
+      .default(5672)
+      .describe('The AMQP port.'),
     vhost: z.string().optional().describe('The AMQP virtual host.'),
   })
   .transform((config) => {

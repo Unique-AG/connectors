@@ -1,6 +1,8 @@
 {
   "cooldownDays": 3,
-  "ignore": [],
+  "ignore": [
+    { "ecosystem": "npm", "name": "https-proxy-agent", "updateTypes": ["major"], "reason": "Version 8 and later is ESM only. The repo builds with moduleResolution node, so the types do not resolve." }
+  ],
   "terraformPlatforms": ["linux_amd64", "linux_arm64", "darwin_arm64"],
   "groups": [
     { "name": "nestjs", "ecosystem": "npm", "patterns": ["@nestjs/*", "nestjs-*"] },
