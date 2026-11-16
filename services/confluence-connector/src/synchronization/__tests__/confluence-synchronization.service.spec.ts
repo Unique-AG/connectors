@@ -19,6 +19,7 @@ import {
 import type { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { ConfluencePageScanner } from '../confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../confluence-synchronization.service';
+import { EmptyPageRegistry } from '../empty-page-registry';
 import type { FileDiffService } from '../file-diff.service';
 import type { IngestionService } from '../ingestion.service';
 import { PageImageInliner } from '../page-image-inliner';
@@ -66,6 +67,7 @@ function createService(
   >,
   metrics: Metrics = createNoopMetrics(),
   pageImageInliner: Pick<PageImageInliner, 'inlineImagesInPage'> = passthroughPageImageInliner,
+  emptyPages: EmptyPageRegistry = new EmptyPageRegistry(),
 ): ConfluenceSynchronizationService {
   return new ConfluenceSynchronizationService(
     scanner as ConfluencePageScanner,
@@ -75,6 +77,7 @@ function createService(
     pageImageInliner as PageImageInliner,
     mockScopeManagementService,
     metrics,
+    emptyPages,
   );
 }
 
@@ -532,6 +535,29 @@ describe('ConfluenceSynchronizationService', () => {
 
       expect(result).toEqual({ status: 'success' });
       expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
+    });
+
+    it('forgets empty pages that discovery no longer returns', async () => {
+      // biome-ignore lint/style/noNonNullAssertion: fixture has at least one entry by construction
+      const stillDiscovered = discoveredPagesFixture[0]!;
+      const removedFromConfluence = { ...stillDiscovered, id: 'removed' };
+      const emptyPages = new EmptyPageRegistry();
+      emptyPages.markEmpty(stillDiscovered);
+      emptyPages.markEmpty(removedFromConfluence);
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        createNoopMetrics(),
+        passthroughPageImageInliner,
+        emptyPages,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(emptyPages.isKnownEmpty(stillDiscovered)).toBe(true);
+      expect(emptyPages.isKnownEmpty(removedFromConfluence)).toBe(false);
     });
 
     it('keeps the sync successful when there is nothing to ingest', async () => {

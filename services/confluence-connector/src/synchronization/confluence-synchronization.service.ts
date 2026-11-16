@@ -8,6 +8,7 @@ import { type Metrics, SyncPhase } from '../metrics';
 import { getCurrentTenant } from '../tenant';
 import type { ConfluenceContentFetcher } from './confluence-content-fetcher';
 import type { ConfluencePageScanner } from './confluence-page-scanner';
+import type { EmptyPageRegistry } from './empty-page-registry';
 import type { FileDiffService } from './file-diff.service';
 import type { IngestionService } from './ingestion.service';
 import { isImageMimeType } from './mime-type';
@@ -28,6 +29,7 @@ export class ConfluenceSynchronizationService {
     private readonly pageImageInliner: PageImageInliner,
     private readonly scopeManagementService: ScopeManagementService,
     private readonly metrics: Metrics,
+    private readonly emptyPages: EmptyPageRegistry,
   ) {}
 
   public async synchronize(): Promise<SyncResult> {
@@ -57,6 +59,7 @@ export class ConfluenceSynchronizationService {
         await this.scanner.discoverPages();
 
       this.metrics.recordScanDuration(elapsedSeconds(scanStartTime));
+      this.emptyPages.retainOnly(discoveredPages);
       this.logger.log({
         count: discoveredPages.length,
         msg: 'Discovery completed',

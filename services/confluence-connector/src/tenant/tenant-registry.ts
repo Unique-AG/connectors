@@ -20,6 +20,7 @@ import { ProxyService } from '../proxy';
 import { ConfluenceContentFetcher } from '../synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../synchronization/confluence-synchronization.service';
+import { EmptyPageRegistry } from '../synchronization/empty-page-registry';
 import { FileDiffService } from '../synchronization/file-diff.service';
 import { IngestionService } from '../synchronization/ingestion.service';
 import { PageImageInliner } from '../synchronization/page-image-inliner';
@@ -146,7 +147,8 @@ export class TenantRegistry implements OnModuleInit {
     );
     this.serviceRegistry.register(tenantName, ConfluencePageScanner, scanner);
 
-    const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient);
+    const emptyPages = new EmptyPageRegistry();
+    const fetcher = new ConfluenceContentFetcher(config.confluence, apiClient, emptyPages);
     this.serviceRegistry.register(tenantName, ConfluenceContentFetcher, fetcher);
 
     const fileDiffService = new FileDiffService(
@@ -194,6 +196,7 @@ export class TenantRegistry implements OnModuleInit {
       pageImageInliner,
       scopeManagementService,
       this.metrics,
+      emptyPages,
     );
     this.serviceRegistry.register(tenantName, ConfluenceSynchronizationService, syncService);
 

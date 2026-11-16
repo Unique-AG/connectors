@@ -6,6 +6,7 @@ import type { ConfluencePage } from '../../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../../confluence-api';
 import { HttpStatusError } from '../../utils/http-util';
 import { ConfluenceContentFetcher } from '../confluence-content-fetcher';
+import { EmptyPageRegistry } from '../empty-page-registry';
 import type { DiscoveredPage } from '../sync.types';
 
 const mockLogger = vi.hoisted(() => ({
@@ -85,10 +86,12 @@ function makeFullPage(
 
 function createFetcher(
   apiClient: Pick<ConfluenceApiClient, 'getPageById'>,
+  emptyPages = new EmptyPageRegistry(),
 ): ConfluenceContentFetcher {
   return new ConfluenceContentFetcher(
     baseConfluenceConfig,
     apiClient as unknown as ConfluenceApiClient,
+    emptyPages,
   );
 }
 
@@ -168,6 +171,75 @@ describe('ConfluenceContentFetcher', () => {
       pageId: 'empty',
       title: new Smeared('Page empty', false),
       msg: 'Page has no body, skipping',
+    });
+  });
+
+  describe('empty pages', () => {
+    it('skips an empty page without a request until its version changes', async () => {
+      const apiClient = {
+        getPageById: vi.fn().mockResolvedValue(makeFullPage('empty', { body: '' })),
+      };
+      const fetcher = createFetcher(apiClient);
+
+      await fetcher.fetchPageContent(makeDiscoveredPage('empty'));
+      const unchanged = await fetcher.fetchPageContent(makeDiscoveredPage('empty'));
+
+      expect(unchanged).toBeNull();
+      expect(apiClient.getPageById).toHaveBeenCalledOnce();
+    });
+
+    it('fetches an empty page again once it is edited, and returns its content', async () => {
+      const apiClient = {
+        getPageById: vi
+          .fn()
+          .mockResolvedValueOnce(makeFullPage('edited', { body: '' }))
+          .mockResolvedValueOnce(makeFullPage('edited', { body: '<p>now filled</p>' })),
+      };
+      const fetcher = createFetcher(apiClient);
+
+      await fetcher.fetchPageContent(makeDiscoveredPage('edited'));
+      const edited = await fetcher.fetchPageContent(
+        makeDiscoveredPage('edited', { versionTimestamp: '2026-03-01T00:00:00.000Z' }),
+      );
+
+      expect(edited?.body).toBe('<p>now filled</p>');
+      expect(apiClient.getPageById).toHaveBeenCalledTimes(2);
+    });
+
+    it('fetches a page again when it was emptied after having content', async () => {
+      const apiClient = {
+        getPageById: vi
+          .fn()
+          .mockResolvedValueOnce(makeFullPage('page', { body: '' }))
+          .mockResolvedValueOnce(makeFullPage('page'))
+          .mockResolvedValueOnce(makeFullPage('page')),
+      };
+      const fetcher = createFetcher(apiClient);
+      const emptyAtFirstVersion = makeDiscoveredPage('page');
+
+      await fetcher.fetchPageContent(emptyAtFirstVersion);
+      await fetcher.fetchPageContent(
+        makeDiscoveredPage('page', { versionTimestamp: '2026-03-01T00:00:00.000Z' }),
+      );
+      const result = await fetcher.fetchPageContent(emptyAtFirstVersion);
+
+      expect(result?.body).toBe('<p>content</p>');
+      expect(apiClient.getPageById).toHaveBeenCalledTimes(3);
+    });
+
+    it('does not record a page whose fetch failed', async () => {
+      const apiClient = {
+        getPageById: vi
+          .fn()
+          .mockRejectedValueOnce(new HttpStatusError(500, 'Error response'))
+          .mockResolvedValueOnce(makeFullPage('flaky')),
+      };
+      const fetcher = createFetcher(apiClient);
+
+      await expect(fetcher.fetchPageContent(makeDiscoveredPage('flaky'))).rejects.toThrow();
+      const result = await fetcher.fetchPageContent(makeDiscoveredPage('flaky'));
+
+      expect(result?.body).toBe('<p>content</p>');
     });
   });
 

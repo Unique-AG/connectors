@@ -4,6 +4,7 @@ import { createNoopMetrics } from '../../../src/metrics/__mocks__/noop-metrics';
 import { ConfluenceContentFetcher } from '../../../src/synchronization/confluence-content-fetcher';
 import { ConfluencePageScanner } from '../../../src/synchronization/confluence-page-scanner';
 import { ConfluenceSynchronizationService } from '../../../src/synchronization/confluence-synchronization.service';
+import { EmptyPageRegistry } from '../../../src/synchronization/empty-page-registry';
 import { FileDiffService } from '../../../src/synchronization/file-diff.service';
 import { IngestionService } from '../../../src/synchronization/ingestion.service';
 import { PageImageInliner } from '../../../src/synchronization/page-image-inliner';
@@ -55,7 +56,12 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     tenantConfig.ingestion.attachments,
   );
 
-  const contentFetcher = new ConfluenceContentFetcher(tenantConfig.confluence, fakeConfluence);
+  const emptyPages = new EmptyPageRegistry();
+  const contentFetcher = new ConfluenceContentFetcher(
+    tenantConfig.confluence,
+    fakeConfluence,
+    emptyPages,
+  );
 
   const fileDiffService = new FileDiffService(
     tenantConfig.confluence,
@@ -93,6 +99,7 @@ export function buildScenarioContext(scenario: Scenario): ScenarioContext {
     pageImageInliner,
     scopeManagementService,
     metrics,
+    emptyPages,
   );
 
   const deleteService = new TenantDeleteService(

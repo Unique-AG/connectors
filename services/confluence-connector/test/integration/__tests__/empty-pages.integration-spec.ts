@@ -1,4 +1,5 @@
-// Behavior: an empty page is skipped on every sync and ingested once it has content.
+// Behavior: an empty page is fetched once, skipped without a request until it is edited, and
+// ingested once it has content.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, space } from '../scenario/confluence-builders';
 import { defineScenario } from '../scenario/scenario.builder';
@@ -22,6 +23,7 @@ describe('empty pages', () => {
     });
     ctx = buildScenarioContext(scenario);
     const recordPagesProcessed = vi.spyOn(ctx.metrics, 'recordPagesProcessed');
+    const getPageById = vi.spyOn(ctx.confluence, 'getPageById');
 
     expect(await ctx.runSync()).toEqual({ status: 'success' });
     expectIngested(getUniqueState(ctx.unique), { pages: ['tenant1/space-1_SP/filled'] });
@@ -29,9 +31,11 @@ describe('empty pages', () => {
     expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'skipped');
 
     recordPagesProcessed.mockClear();
+    getPageById.mockClear();
     expect(await ctx.runSync()).toEqual({ status: 'success' });
     expectNotIngested(getUniqueState(ctx.unique), { pages: ['tenant1/space-1_SP/blank'] });
     expect(recordPagesProcessed.mock.calls).toEqual([[1, 'skipped']]);
+    expect(getPageById).not.toHaveBeenCalled();
 
     ctx.confluence.updatePage('blank', {
       body: '<p>Now with content</p>',

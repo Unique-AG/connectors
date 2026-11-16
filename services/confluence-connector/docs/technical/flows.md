@@ -57,7 +57,7 @@ flowchart TB
 
 ### Sequence Diagram
 
-The connector is **stateless** -- it does not maintain local state between sync cycles. Change detection is performed by the Unique platform's file diff API, called once per Confluence space.
+Change detection is performed by the Unique platform's file diff API, called once per Confluence space. The only state the connector keeps between sync cycles is in memory, per tenant: the version at which each page had an empty body. An empty page is never stored in Unique, so the file diff reports it as new on every sync. The connector skips it without a request until its version changes. The record holds only pages that the last discovery returned, and it is lost on restart, which costs one extra fetch per empty page.
 
 ```mermaid
 sequenceDiagram
@@ -370,7 +370,7 @@ The connector applies scenario-specific behavior to keep sync cycles stable:
 | Accidental full deletion detected | Bug in page fetching or key format change | Abort the entire tenant sync cycle |
 | Page not found | Page deleted between discovery and content fetch | Log, skip the page, continue other pages |
 | Page fetch failure | API error or a response that does not match the expected page shape | Log the status code or the failing fields, count the page as failed, continue other pages |
-| Page with empty body | Page has no content (e.g., newly created) | Log, skip the page |
+| Page with empty body | Page has no content (e.g., newly created) | Log, skip the page, and do not fetch it again until it has a new version or the connector restarts |
 | Attachment with zero bytes | Empty attachment | Log, skip the attachment |
 | Page ingestion failure | Upload error, registration error | Clean up partial content from KB, log error, skip the page |
 | Attachment ingestion failure | Download error, upload error | Destroy stream, clean up partial content from KB, log error, skip the attachment |
