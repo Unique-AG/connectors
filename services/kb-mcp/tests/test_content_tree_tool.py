@@ -52,6 +52,13 @@ from kb_mcp.tools.content_tree import tool as ct_module
 pytestmark = pytest.mark.ai
 
 
+def test_content_tree_limits_reject_non_positive_values():
+    with pytest.raises(ValueError):
+        ContentTreeToolConfig(default_limit=0)
+    with pytest.raises(ValueError):
+        ContentTreeToolConfig(default_tree_limit=-1)
+
+
 def _make_settings(company_id: str = "company-1", user_id: str = "user-1"):
     settings = MagicMock()
     settings.authcontext.get_confidential_company_id.return_value = company_id

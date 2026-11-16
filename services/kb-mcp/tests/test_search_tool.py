@@ -1149,7 +1149,15 @@ async def test_search_applies_merged_filter_even_when_chat_context_is_present(
         ),
         app=MagicMock(),
         api=MagicMock(),
-        chat=ChatContext(chat_id="chat-1", assistant_id="asst-1"),
+        chat=ChatContext(
+            chat_id="chat-1",
+            assistant_id="asst-1",
+            metadata_filter={
+                "operator": "equals",
+                "path": ["team"],
+                "value": "Alpha",
+            },
+        ),
     )
 
     mock_service = MagicMock()
@@ -1193,6 +1201,11 @@ async def test_search_applies_merged_filter_even_when_chat_context_is_present(
     assert {"operator": "in", "path": ["folderId"], "value": ["scope_env"]} in clauses
     assert {"operator": "equals", "path": ["region"], "value": "EU"} in clauses
     assert {"operator": "equals", "path": ["dept"], "value": "Legal"} in clauses
+    assert {
+        "operator": "equals",
+        "path": ["team"],
+        "value": "Alpha",
+    } in clauses
     bound = mock_service.bind_settings.call_args.args[0]
     assert bound.authcontext.get_confidential_user_id() == "user-token"
     assert bound.authcontext.get_confidential_company_id() == "comp-token"

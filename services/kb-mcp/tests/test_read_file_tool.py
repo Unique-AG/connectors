@@ -12,7 +12,7 @@ from unique_toolkit.content.schemas import Content, ContentChunk
 
 from kb_mcp.common.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
 from kb_mcp.tools.read_file import ReadFileToolConfig, read_file
-from kb_mcp.tools.read_file.tool import _download_with_retry
+from kb_mcp.tools.read_file.tool import _download_with_retry, _render_chunked
 
 pytestmark = pytest.mark.ai
 
@@ -385,6 +385,21 @@ async def test_chunked_single_page_request_exempt_from_cap():
     text = result.content[0].text  # type: ignore[union-attr]
     assert "word" in text
     assert "short intro" not in text
+
+
+def test_chunked_single_page_request_honors_explicit_ceiling():
+    chunks = [_make_chunk("word " * 50, 0, 1, 1)]
+
+    is_error, text = _render_chunked(
+        chunks,
+        start_page=1,
+        end_page=1,
+        max_tokens_per_call=10,
+        enforce_token_limit=True,
+    )
+
+    assert is_error is True
+    assert "per-call limit" in text
 
 
 @pytest.mark.asyncio

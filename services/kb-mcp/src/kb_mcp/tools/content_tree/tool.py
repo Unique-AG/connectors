@@ -443,11 +443,12 @@ async def content_tree(
     limit: Annotated[
         int | None,
         Field(
+            gt=0,
             description=(
                 "Maximum files/matches to return. In mode='tree' it also caps "
                 "folders (files too, unless folders_only=true), each reported "
                 "separately if it truncated."
-            )
+            ),
         ),
     ] = None,
     min_score: Annotated[

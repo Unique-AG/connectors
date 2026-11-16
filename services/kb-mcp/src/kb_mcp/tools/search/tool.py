@@ -223,14 +223,9 @@ async def search(
             service_config
         ).bind_settings(settings)
         service.state.search_queries = [search_string]
-        if (
-            folder_ids
-            or parsed_llm_filter is not None
-            or isinstance(
-                getattr(getattr(settings, "context", None), "chat", None),
-                ChatContext,
-            )
-        ):
+        chat = getattr(getattr(settings, "context", None), "chat", None)
+        has_chat_context = isinstance(chat, ChatContext)
+        if folder_ids or parsed_llm_filter is not None or has_chat_context:
             # Override skips toolkit folding of deprecated config.scope_ids
             # and prevents chat-context fallback from dropping admin policy.
             scope_ids = resolved_config.service_config.scope_ids
@@ -240,6 +235,9 @@ async def search(
                     folder_ids=folder_ids,
                     include_subfolders=include_subfolders,
                     llm_metadata_filter=parsed_llm_filter,
+                    chat_metadata_filter=chat.metadata_filter
+                    if has_chat_context
+                    else None,
                     admin_scope_ids=scope_ids if isinstance(scope_ids, list) else None,
                 )
             )

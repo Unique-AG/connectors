@@ -1,10 +1,4 @@
-"""Deployment-baseline and request-metadata tool config resolution for kb-mcp.
-
-Explicit environment configuration (``UNIQUE_MCP_TOOL_*_CONFIG``) is the
-deployment/admin baseline. Request ``_meta["unique.app/config"]`` may fill unset
-fields or narrow filters, exact ``scope_ids``, and explicit environment limits,
-never clear or widen them.
-"""
+"""Resolve kb-mcp tool config from the environment baseline and request metadata."""
 
 from __future__ import annotations
 

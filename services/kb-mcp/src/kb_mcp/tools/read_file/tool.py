@@ -99,6 +99,8 @@ def _render_chunked(
     start_page: int | None,
     end_page: int | None,
     max_tokens_per_call: int,
+    *,
+    enforce_token_limit: bool = False,
 ) -> tuple[bool, str]:
     """Return ``(is_error, text)``."""
     if not chunks:
@@ -139,15 +141,13 @@ def _render_chunked(
         )
 
     text = _render_with_page_markers(selected)
-    # Single-page requests always succeed even if one page exceeds the token cap.
-    if s < e:
-        selected_tokens = count_tokens(text)
-        if selected_tokens > max_tokens_per_call:
-            return True, (
-                f"pages {s}-{e} span ~{selected_tokens} tokens, over the "
-                f"{max_tokens_per_call}-token per-call limit; request a "
-                "narrower range (a single page is always allowed)."
-            )
+    selected_tokens = count_tokens(text)
+    if selected_tokens > max_tokens_per_call and (s < e or enforce_token_limit):
+        return True, (
+            f"pages {s}-{e} span ~{selected_tokens} tokens, over the "
+            f"{max_tokens_per_call}-token per-call limit; request a "
+            "narrower range."
+        )
     return False, text
 
 
@@ -362,7 +362,14 @@ async def read_file(
         if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))
             is_error, text = _render_chunked(
-                chunks, start_page, end_page, effective_max_tokens
+                chunks,
+                start_page,
+                end_page,
+                effective_max_tokens,
+                enforce_token_limit=(
+                    env_policy is not None
+                    and "max_tokens_per_call" in env_policy.model_fields_set
+                ),
             )
         else:
             try:
