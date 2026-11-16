@@ -27,7 +27,6 @@ RUN rm -rf /usr/local/lib/python*/site-packages/pip \
            /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.* \
  && ! python -c "import pip" 2>/dev/null
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
-COPY --from=builder --chown=app:app /workspace/services/kyckr-mcp/src /app/src
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER app
 EXPOSE 8000
