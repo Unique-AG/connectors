@@ -226,6 +226,8 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _case("empty-failures-1", ["WATCHLIST"])
     if path.endswith("/cases/summary-failed-1"):
         return _case("summary-failed-1", ["WATCHLIST"])
+    if path.endswith("/cases/no-cases-1"):
+        return _case("no-cases-1", ["WATCHLIST"])
     if path.endswith("/cases/other-failed-1"):
         return _case("other-failed-1", ["WATCHLIST"])
     if request.method == "GET" and path.endswith("/cases/sys-pass"):
@@ -472,6 +474,8 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 200,
                 {"summary": {"totalCases": 1, "success": 0, "failed": 1}, "failedCases": []},
             )
+        if body["caseSystemIds"] == ["no-cases-1"]:
+            return _json(200, {"summary": {"totalCases": 0, "failed": 0}})
         if body["caseSystemIds"] == ["other-failed-1"]:
             return _json(
                 200,
@@ -775,14 +779,24 @@ async def test_enable_ongoing_screening_treats_an_empty_failed_cases_list_as_ena
     assert screening["failures"] == []
 
 
-async def test_enable_ongoing_screening_ignores_failures_of_other_cases() -> None:
+async def test_enable_ongoing_screening_reports_failure_for_a_failure_of_another_case() -> None:
     async with Client(_server()) as client:
         result = await client.call_tool("enable_ongoing_screening", {"case": "other-failed-1"})
 
     screening = result.structured_content
     assert screening is not None
-    assert screening["enabled"] is True
-    assert screening["failures"] == []
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["Not this case."]
+
+
+async def test_enable_ongoing_screening_reports_failure_when_the_summary_counts_no_cases() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "no-cases-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["LSEG did not enable monitoring."]
 
 
 async def test_enable_ongoing_screening_reports_failure_when_the_summary_rules_out_success() -> (

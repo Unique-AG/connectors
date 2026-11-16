@@ -22,14 +22,10 @@ async def enable_ongoing_screening(*, upstream: Upstream, case: str) -> OngoingS
             )
         ),
     )
-    failed_cases = [
-        failed
-        for failed in (result.failed_cases if result else None) or []
-        if failed.case_system_id in {None, found.case_system_id}
-    ]
+    failed_cases = (result.failed_cases if result else None) or []
     summary = result.summary if result else None
     summary_rules_out_success = summary is not None and (
-        bool(summary.failed) or summary.success == 0
+        bool(summary.failed) or summary.success == 0 or summary.total_cases == 0
     )
     if not failed_cases and not summary_rules_out_success:
         return OngoingScreening(
