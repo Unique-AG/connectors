@@ -125,7 +125,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Contact",
+        title="Outlook: Create a Contact",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

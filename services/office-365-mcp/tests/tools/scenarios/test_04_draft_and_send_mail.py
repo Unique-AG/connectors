@@ -37,6 +37,8 @@ _Q3_MESSAGE = (
     "outlook:///messages/UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW"
 )
 _Q3_MESSAGE_ID = "UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW"
+_REPLIED_ID = "HBgJVrRVMIFBPGFTQleeAf2pyPDcHG-TGu6Hi3Wurp81EyNDPh9A7luhgjZK8bEygUPD"
+_REPLIED = f"outlook:///messages/{_REPLIED_ID}"
 _DRAFT_TOOLS = (
     "outlook_draft_mail",
     "outlook_update_draft",
@@ -506,21 +508,52 @@ class TestAReplyKeepsTheConversation:
 
         draft = await call(
             "outlook_draft_reply",
-            message_ref=_Q3_MESSAGE,
+            message_ref=_REPLIED,
             mode="reply",
             body="Friday works.",
         )
 
         assert _addresses(draft) == [_ANNA]
         assert _addresses(draft, "cc") == []
-        assert sent_json(graph, "PATCH", "")["body"] == {
-            "contentType": "html",
-            "content": "<p>Friday works.</p>",
-        }
         assert (
             times_asked(graph, "POST", "/createReply"),
             times_asked(graph, "POST", "/createReplyAll"),
         ) == (1, 0)
+
+    async def test_the_text_of_a_reply_goes_above_the_quoted_message(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
+
+        draft = await call(
+            "outlook_draft_reply", message_ref=_REPLIED, mode="reply", body="Friday works."
+        )
+
+        assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
+        assert times_asked(graph, "PATCH", "") == 0
+        assert draft["body"] == _created_body("rec-tool-outlook_draft_reply-reply")
+        assert (draft["body_written"], draft["failure"]) == (True, None)
+
+    async def test_the_text_of_a_forward_goes_above_the_quoted_message(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-forward")
+
+        draft = await call(
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="forward",
+            to=["tom@example.test"],
+            body="Please read this.",
+        )
+
+        assert sent_json(graph, "POST", "/createForward") == {
+            "ToRecipients": [_recipient("tom@example.test")],
+            "Comment": "<p>Please read this.</p>",
+        }
+        assert times_asked(graph, "PATCH", "") == 0
+        assert draft["body"] == _created_body("rec-tool-outlook_draft_reply-forward")
+        assert (draft["body_written"], draft["failure"]) == (True, None)
 
     async def test_a_forward_is_made_from_the_message_and_so_carries_its_attachments(
         self, graph: respx.MockRouter
@@ -528,7 +561,7 @@ class TestAReplyKeepsTheConversation:
         _ = serve(graph, "rec-tool-outlook_draft_reply-forward")
         forward = await call(
             "outlook_draft_reply",
-            message_ref=_Q3_MESSAGE,
+            message_ref=_REPLIED,
             mode="forward",
             to=["tom@example.test"],
             body="Please read this.",
@@ -958,15 +991,17 @@ _OTHER = "tom@example.test"
 _ORIGINAL = r".*/messages/UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW$"
 
 
-def _the_original(graph: respx.MockRouter, **fields: object) -> respx.Route:
+def _the_original(
+    graph: respx.MockRouter, *, message_id: str = _Q3_MESSAGE_ID, **fields: object
+) -> respx.Route:
     stored: dict[str, object] = {
-        "id": _Q3_MESSAGE_ID,
+        "id": message_id,
         "subject": "Q3 budget review",
         "from": {"emailAddress": {"name": _ANNA_MEIER, "address": _ANNA}},
         "toRecipients": [{"emailAddress": {"name": "Tom", "address": _OTHER}}],
         "ccRecipients": [],
     } | fields
-    return graph.route(method="GET", path__regex=_ORIGINAL).mock(
+    return graph.route(method="GET", path__regex=rf".*/messages/{message_id}$").mock(
         return_value=httpx.Response(200, json=stored)
     )
 
@@ -1204,11 +1239,11 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
     async def test_a_blind_copy_to_someone_else_is_written_on_the_reply(
         self, graph: respx.MockRouter
     ) -> None:
+        _ = _the_original(graph, message_id=_REPLIED_ID)
         _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
-        _ = _the_original(graph)
 
         _ = await call(
-            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", bcc=[_PRIYA], body="Hi"
+            "outlook_draft_reply", message_ref=_REPLIED, mode="reply", bcc=[_PRIYA], body="Hi"
         )
 
         assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
@@ -1218,7 +1253,7 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
 
         _ = await call(
             "outlook_draft_reply",
-            message_ref=_Q3_MESSAGE,
+            message_ref=_REPLIED,
             mode="forward",
             to=[_ANNA],
             bcc=[_PRIYA],
@@ -1252,12 +1287,12 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
     async def test_a_copy_to_someone_else_is_read_back_from_the_stored_draft(
         self, graph: respx.MockRouter
     ) -> None:
+        _ = _the_original(graph, message_id=_REPLIED_ID)
         _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
-        _ = _the_original(graph)
 
         draft = await call(
             "outlook_draft_reply",
-            message_ref=_Q3_MESSAGE,
+            message_ref=_REPLIED,
             mode="reply",
             cc=[_OTHER],
             body="Hi",
@@ -1269,11 +1304,20 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         ]
 
 
+def _created_body(fixture: str) -> object:
+    created = cast("dict[str, object]", answer_of(fixture, "POST", "/me/messages/")["body"])
+    return created["content"]
+
+
 def _draft_shared(tool: str) -> tuple[dict[str, object], str]:
     if tool == "outlook_draft_reply":
-        return {"message_ref": _Q3_MESSAGE, "mode": "forward", "to": [_ANNA], "body": "Hi"}, (
-            "Create a forward draft"
-        )
+        return {
+            "message_ref": _REPLIED,
+            "mode": "forward",
+            "to": [_ANNA],
+            "cc": ["nina@example.test"],
+            "body": "Hi",
+        }, "Create a forward draft"
     if tool == "outlook_draft_reply_all":
         return {"message_ref": _Q3_MESSAGE, "body": "Hi", "cc": ["nina@example.test"]}, (
             "Create a reply-all draft"
@@ -1289,8 +1333,10 @@ def _a_shared_mailbox_that_holds(graph: respx.MockRouter, tool: str) -> None:
         "outlook_draft_reply_all": "rec-tool-outlook_draft_reply_all-everyone",
     }.get(tool)
     if fixture is not None:
+        _ = _the_original(
+            graph, message_id=_REPLIED_ID if tool == "outlook_draft_reply" else _Q3_MESSAGE_ID
+        )
         _ = serve_as(graph, fixture, _SHARED)
-        _ = _the_original(graph)
         return
     _ = graph.route(method="GET", path__regex=_ORIGINAL).mock(
         return_value=httpx.Response(
@@ -1407,13 +1453,13 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
     async def test_a_message_with_no_subject_and_no_sender_is_named_by_the_question(
         self, graph: respx.MockRouter
     ) -> None:
+        _ = _the_original(graph, message_id=_REPLIED_ID, subject=None, **{"from": None})
         _ = serve_as(graph, "rec-tool-outlook_draft_reply-reply", _SHARED)
-        _ = _the_original(graph, subject=None, **{"from": None})
         person = Person()
 
         _ = await invoke_as(
             "outlook_draft_reply",
-            {"message_ref": _Q3_MESSAGE, "mode": "reply", "body": "Hi", "mailbox": _SHARED},
+            {"message_ref": _REPLIED, "mode": "reply", "body": "Hi", "mailbox": _SHARED},
             person=person,
         )
 
@@ -1421,10 +1467,11 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
         assert "an address that Microsoft chooses" in person.asked[0]
 
 
-class TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved:
-    async def test_a_reply_keeps_the_draft_and_says_the_text_is_missing(
+class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:
+    async def test_a_reply_keeps_the_draft_and_says_the_blind_copy_is_missing(
         self, graph: respx.MockRouter
     ) -> None:
+        _ = _the_original(graph, message_id=_REPLIED_ID)
         routes = serve(graph, "rec-tool-outlook_draft_reply-reply")
         patch = next(route for key, route in routes.items() if key[0] == "PATCH")
         _ = patch.mock(
@@ -1435,11 +1482,15 @@ class TestAReplyWhoseTextMicrosoftCannotSaveIsReportedAsNotSaved:
         )
 
         draft = await call(
-            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", body="Friday works."
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="reply",
+            bcc=[_PRIYA],
+            body="Friday works.",
         )
 
         assert draft["body_written"] is False
-        assert draft["body"] is None
+        assert draft["body"] == _created_body("rec-tool-outlook_draft_reply-reply")
         assert draft["failure"] == "Microsoft Graph returned 400 (ErrorBodyTooLarge)"
         assert draft["uri"]
 

@@ -490,43 +490,31 @@ grafana:
 
 #### Default Alerts
 
-The Helm chart provides one default alert:
+The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 
-| Category    | Alert Name                              | Description                                                                          |
-|-------------|-----------------------------------------|--------------------------------------------------------------------------------------|
-| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors`    | Fires when the Unique API error rate (4xx/5xx responses) exceeds the configured threshold |
+| Alert | Fires when | `for` | Severity |
+|---|---|---|---|
+| `ConfluenceConnectorUniqueAPIErrors` | More than 1% of the requests to the Unique API (GraphQL and REST) failed in the last 75 minutes | `5m` | `warning` |
 
-**Default alert parameters:**
-
-| Parameter   | Default Value          |
-|-------------|------------------------|
-| `threshold` | `0.01` (1% error rate) |
-| `for`       | `30s`                  |
-| `severity`  | `warning`              |
+Requests to Unique only happen during a sync, so the 75-minute window must be longer than the sync interval (`scanIntervalCron`). For schedules slower than hourly, override the rule's `expr` with a wider window, or the alert resolves between failing syncs.
 
 #### Alert Configuration
 
-Enable alerts and customize per-alert parameters in Helm `values.yaml`:
+Each alert is a complete rule under `prometheus.additionalAlerts`. Override any field in your values, or replace the whole rule:
 
 ```yaml
-alerts:
-  enabled: true
+prometheus:
+  additionalAlerts:
+    ConfluenceConnectorUniqueAPIErrors:
+      for: 15m
+      labels:
+        severity: critical
   defaultAlerts:
-    uniqueApi:
-      enabled: true
-      # Disable specific alerts:
-      disabled: {}
-        # ConfluenceConnectorUniqueAPIErrors: true
-      # Override alert parameters:
-      customRules: {}
-        # ConfluenceConnectorUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+    additionalLabels:
+      team: data-flow
 ```
+
+`defaultAlerts.additionalLabels` is added to every alert, including these.
 
 Alerts require the `monitoring.coreos.com/v1` API (Prometheus Operator) to be available in the cluster.
 

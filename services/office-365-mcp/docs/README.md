@@ -634,7 +634,7 @@ Messages, folders, drafts, and sending.
 | `outlook_rename_folder` | 🟠 Add | 🤝 Shared mailbox | Renames one mail folder. Refused for a folder that every mailbox has, such as Inbox. |
 | `outlook_set_focused_override` | 🟠 Add | — | Sets the inbox tab, Focused or Other, for all future mail from one sender. |
 | `outlook_draft_mail` | 🟠 Add | 🤝 Shared mailbox | Composes a new message into Drafts. It cannot send it and cannot add files. |
-| `outlook_draft_reply` | 🟠 Add | 🤝 Shared mailbox | Composes a reply or a forward into Drafts. A forward keeps the attachments of the original. |
+| `outlook_draft_reply` | 🟠 Add | 🤝 Shared mailbox | Composes a reply or a forward into Drafts. The text goes above the quoted original message. A forward keeps the attachments of the original. |
 | `outlook_draft_reply_all` | 🟠 Add | 🤝 Shared mailbox | Composes a reply to everyone on one message into Drafts. |
 | `outlook_update_draft` | 🔴 Change | 🤝 Shared mailbox | Changes the subject, text, recipients, importance, or categories of one draft. |
 

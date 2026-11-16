@@ -85,7 +85,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Mail Attachments",
+        title="Outlook: List Mail Attachments",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

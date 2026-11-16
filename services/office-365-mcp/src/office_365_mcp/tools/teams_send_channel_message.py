@@ -157,7 +157,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Send a Teams Channel Message",
+        title="Teams: Send a Channel Message",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

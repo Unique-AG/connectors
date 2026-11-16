@@ -166,6 +166,18 @@ def test_call_untyped_builds_the_request_from_the_spec() -> None:
     assert request.headers["authorization"] == "Token k"
 
 
+def test_call_untyped_sends_the_length_of_the_empty_body_it_adds() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={})
+
+    asyncio.run(api(handler).call_untyped(Operation("patchThing", OBJECT), name="a"))
+
+    assert (seen[0].content, seen[0].headers["content-length"]) == (b"{}", "2")
+
+
 def test_only_listed_headers_leave_and_fixed_ones_are_set() -> None:
     request = httpx2.Request(
         "GET",
