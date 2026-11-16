@@ -1,10 +1,13 @@
 """Tests for the read_file tool — extension dispatch, size cutoff, page ranges."""
 
+import json
 import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from fastmcp import FastMCP
+from unique_mcp.meta.keys import CONFIG_META_KEY
 from unique_toolkit.content.schemas import Content, ContentChunk
 
 from kb_mcp.common.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
@@ -655,3 +658,61 @@ async def test_max_tokens_per_call_uses_request_or_admin_default(
         )
 
     assert render.call_args.args[3] == expected
+
+
+@pytest.mark.asyncio
+async def test_read_file_clamps_per_call_and_meta_against_env_ceiling(monkeypatch):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_READ_FILE_TOOL_CONFIG",
+        json.dumps({"max_tokens_per_call": 400}),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {CONFIG_META_KEY: {"max_tokens_per_call": 10_000}},
+    )
+    chunks = [_make_chunk("hello", 0, 1, 1)]
+    content = _make_content("doc.pdf", chunks)
+    mcp = FastMCP("test")
+    mcp.add_tool(read_file)
+
+    with (
+        _patch_search_contents(content),
+        patch(
+            "kb_mcp.tools.read_file.tool._render_chunked", return_value=(False, "ok")
+        ) as render,
+    ):
+        await mcp.call_tool(
+            "read_file", {"content_id": "cont_abc", "max_tokens_per_call": 99_999}
+        )
+        assert render.call_args.args[3] == 400
+
+        await mcp.call_tool(
+            "read_file", {"content_id": "cont_abc", "max_tokens_per_call": 150}
+        )
+        assert render.call_args.args[3] == 150
+
+
+@pytest.mark.asyncio
+async def test_read_file_allows_meta_above_default_when_env_unset(monkeypatch):
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {CONFIG_META_KEY: {"max_tokens_per_call": 15_000}},
+    )
+    chunks = [_make_chunk("hello", 0, 1, 1)]
+    content = _make_content("doc.pdf", chunks)
+    mcp = FastMCP("test")
+    mcp.add_tool(read_file)
+
+    with (
+        _patch_search_contents(content),
+        patch(
+            "kb_mcp.tools.read_file.tool._render_chunked", return_value=(False, "ok")
+        ) as render,
+    ):
+        await mcp.call_tool("read_file", {"content_id": "cont_abc"})
+        assert render.call_args.args[3] == 15_000
+
+        await mcp.call_tool(
+            "read_file", {"content_id": "cont_abc", "max_tokens_per_call": 25_000}
+        )
+        assert render.call_args.args[3] == 25_000

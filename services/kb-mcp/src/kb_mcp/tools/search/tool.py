@@ -20,11 +20,11 @@ from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
     MetaKeys,
-    get_tool_config,
     get_unique_settings_async,
     merge_tool_meta,
 )
 from unique_sdk import UniqueError
+from unique_toolkit.app.unique_settings import ChatContext
 from unique_toolkit.experimental.components.internal_search import (
     InternalSearchPostProcessor,
     KnowledgeBaseInternalSearchConfig,
@@ -47,6 +47,11 @@ from kb_mcp.common.references import (
     citation_instruction_content,
     is_unique_ai_client,
 )
+from kb_mcp.common.tool_config import (
+    ResolvedToolConfig,
+    get_kb_tool_config,
+    unwrap_tool_config,
+)
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.search.config import SearchToolConfig
 from kb_mcp.tools.search.scope_resolver import resolve_scope_ids
@@ -59,11 +64,18 @@ def _effective_service_config(
     *,
     limit: int | None,
     score_threshold: float | None,
+    env_limit: int | None = None,
 ) -> KnowledgeBaseInternalSearchConfig:
-    """Non-mutating override of filtering.limit/score_threshold."""
+    """Non-mutating override of filtering.limit/score_threshold, clamped by env."""
+    effective_limit = (
+        min(limit, env_limit) if limit is not None and env_limit is not None else limit
+    )
     overrides = {
         k: v
-        for k, v in {"limit": limit, "score_threshold": score_threshold}.items()
+        for k, v in {
+            "limit": effective_limit,
+            "score_threshold": score_threshold,
+        }.items()
         if v is not None
     }
     if not overrides:
@@ -167,7 +179,9 @@ async def search(
             ),
         ),
     ] = None,
-    config: SearchToolConfig = Depends(get_tool_config(SearchToolConfig)),
+    config: ResolvedToolConfig[SearchToolConfig] | SearchToolConfig = Depends(
+        get_kb_tool_config(SearchToolConfig)
+    ),
 ) -> ToolResult:
     """Search the knowledge base using ``SearchToolConfig`` from the config meta key."""
     kb_settings = get_settings()
@@ -185,19 +199,44 @@ async def search(
         )
         _LOGGER.info("search start correlation_id=%s", cid)
 
+        resolved_config, env_policy = unwrap_tool_config(config)
+        env_filtering = (
+            env_policy.service_config.filtering
+            if env_policy is not None
+            and "service_config" in env_policy.model_fields_set
+            and "filtering" in env_policy.service_config.model_fields_set
+            else None
+        )
+        env_limit = (
+            env_filtering.limit
+            if env_filtering is not None and "limit" in env_filtering.model_fields_set
+            else None
+        )
+
         service_config = _effective_service_config(
-            config.service_config, limit=limit, score_threshold=score_threshold
+            resolved_config.service_config,
+            limit=limit,
+            score_threshold=score_threshold,
+            env_limit=env_limit,
         )
         service = KnowledgeBaseInternalSearchService.from_config(
             service_config
         ).bind_settings(settings)
         service.state.search_queries = [search_string]
-        if folder_ids or parsed_llm_filter is not None:
-            # Override skips toolkit folding of deprecated config.scope_ids.
-            scope_ids = config.service_config.scope_ids
+        if (
+            folder_ids
+            or parsed_llm_filter is not None
+            or isinstance(
+                getattr(getattr(settings, "context", None), "chat", None),
+                ChatContext,
+            )
+        ):
+            # Override skips toolkit folding of deprecated config.scope_ids
+            # and prevents chat-context fallback from dropping admin policy.
+            scope_ids = resolved_config.service_config.scope_ids
             service.state.metadata_filter_override = (  # pyright: ignore[reportAttributeAccessIssue]
                 merge_request_metadata_filter(
-                    admin_metadata_filter=config.service_config.metadata_filter,
+                    admin_metadata_filter=resolved_config.service_config.metadata_filter,
                     folder_ids=folder_ids,
                     include_subfolders=include_subfolders,
                     llm_metadata_filter=parsed_llm_filter,
@@ -208,7 +247,7 @@ async def search(
         result = await service.run()
 
         post_processor = InternalSearchPostProcessor.from_settings(
-            settings, config=config.post_processing
+            settings, config=resolved_config.post_processing
         )
         chunks = await post_processor.process(result)
     except Exception as exc:

@@ -20,7 +20,6 @@ from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
     MetaKeys,
-    get_tool_config,
     get_unique_settings_async,
     merge_tool_meta,
 )
@@ -39,6 +38,11 @@ from kb_mcp.common.references import (
     MIME_TYPE_PDF,
     file_reference_url,
     markdown_citation_link,
+)
+from kb_mcp.common.tool_config import (
+    ResolvedToolConfig,
+    get_kb_tool_config,
+    unwrap_tool_config,
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.read_file.config import ReadFileToolConfig
@@ -270,7 +274,9 @@ async def read_file(
             ),
         ),
     ] = None,
-    config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
+    config: ResolvedToolConfig[ReadFileToolConfig] | ReadFileToolConfig = Depends(
+        get_kb_tool_config(ReadFileToolConfig)
+    ),
 ) -> ToolResult:
     """Read a specific knowledge-base file's text content. Requires
     `content_id` (from a prior content_tree 'list'/'search' call).
@@ -341,7 +347,17 @@ async def read_file(
                 is_error=True,
             )
 
-        effective_max_tokens = max_tokens_per_call or config.max_tokens_per_call
+        resolved_config, env_policy = unwrap_tool_config(config)
+        effective_max_tokens = (
+            max_tokens_per_call or resolved_config.max_tokens_per_call
+        )
+        if (
+            env_policy is not None
+            and "max_tokens_per_call" in env_policy.model_fields_set
+        ):
+            effective_max_tokens = min(
+                effective_max_tokens, env_policy.max_tokens_per_call
+            )
 
         if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))

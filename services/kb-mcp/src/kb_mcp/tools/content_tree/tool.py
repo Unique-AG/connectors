@@ -22,7 +22,6 @@ from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
     MetaKeys,
-    get_tool_config,
     get_unique_settings_async,
     merge_tool_meta,
 )
@@ -52,6 +51,11 @@ from kb_mcp.common.references import (
     markdown_citation_link,
 )
 from kb_mcp.common.scoped_walk import ScopedContentTree
+from kb_mcp.common.tool_config import (
+    ResolvedToolConfig,
+    get_kb_tool_config,
+    unwrap_tool_config,
+)
 from kb_mcp.common.tree_cache import get_tree_cache
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_tree.config import (
@@ -491,7 +495,9 @@ async def content_tree(
         ),
     ] = None,
     metadata_filter: MetadataFilterArgument = None,
-    config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
+    config: ResolvedToolConfig[ContentTreeToolConfig] | ContentTreeToolConfig = Depends(
+        get_kb_tool_config(ContentTreeToolConfig)
+    ),
 ) -> ToolResult:
     """Browse the knowledge base's folder/file structure — use this only when
     you need to know what files or folders exist, not to find information
@@ -612,10 +618,12 @@ async def content_tree(
         if refresh:
             tree_svc.invalidate_cache()
 
+        resolved_config, env_policy = unwrap_tool_config(config)
+
         # Only the LLM's half varies, so only it stays out of the walk's
         # cache key. The two AND together exactly as the merged filter did.
         admin_metadata_filter = merge_request_metadata_filter(
-            admin_metadata_filter=config.metadata_filter
+            admin_metadata_filter=resolved_config.metadata_filter
             or DEFAULT_METADATA_FILTER_STATEMENT,
         )
         llm_only_metadata_filter = merge_request_metadata_filter(
@@ -640,7 +648,7 @@ async def content_tree(
             post_filter=snapshot_post_filter,
             max_depth=walk_depth,
             timeout=wait,
-            max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
+            max_concurrent_directory_listings=resolved_config.max_concurrent_scope_lookups,
         )
 
         fallback_filtered = bool(folder_path) and root_scope_id is None
@@ -656,9 +664,19 @@ async def content_tree(
         if mode == "tree":
             # Files and folders each get their own cap and notice (never one
             # shared count), but `limit` sizes both by default so a small ask stays small.
+            effective_tree_limit = (
+                limit if limit is not None else resolved_config.default_tree_limit
+            )
+            if (
+                env_policy is not None
+                and "default_tree_limit" in env_policy.model_fields_set
+            ):
+                effective_tree_limit = min(
+                    effective_tree_limit, env_policy.default_tree_limit
+                )
             capped = _cap_tree(
                 snapshot,
-                limit=limit if limit is not None else config.default_tree_limit,
+                limit=effective_tree_limit,
                 max_depth=max_depth,
                 folders_only=folders_only,
             )
@@ -699,7 +717,14 @@ async def content_tree(
         if mode == "list":
             # No post-walk path filtering: folder_path already rooted the walk,
             # so everything in the snapshot is in scope.
-            effective_limit = limit if limit is not None else config.default_limit
+            effective_limit = (
+                limit if limit is not None else resolved_config.default_limit
+            )
+            if (
+                env_policy is not None
+                and "default_limit" in env_policy.model_fields_set
+            ):
+                effective_limit = min(effective_limit, env_policy.default_limit)
             rows = list(snapshot.files)[:effective_limit]
             frontend_base_url = kb_settings.frontend_base_url_str()
             lines = [
@@ -728,17 +753,19 @@ async def content_tree(
             return ToolResult(content=[TextContent(type="text", text=text)])
 
         assert query is not None and mode == "search"
-        effective_limit = limit if limit is not None else config.default_limit
+        effective_limit = limit if limit is not None else resolved_config.default_limit
+        if env_policy is not None and "default_limit" in env_policy.model_fields_set:
+            effective_limit = min(effective_limit, env_policy.default_limit)
         effective_min_score = (
-            min_score if min_score is not None else config.default_min_score
+            min_score if min_score is not None else resolved_config.default_min_score
         )
         effective_match_on = (
-            match_on if match_on is not None else config.default_match_on
+            match_on if match_on is not None else resolved_config.default_match_on
         )
         effective_case_sensitive = (
             case_sensitive
             if case_sensitive is not None
-            else config.default_case_sensitive
+            else resolved_config.default_case_sensitive
         )
         keep = uniqueql_predicate(llm_only_metadata_filter)
         if snapshot.complete and not fallback_filtered:
@@ -751,7 +778,7 @@ async def content_tree(
                 match_on=effective_match_on,
                 case_sensitive=effective_case_sensitive,
                 metadata_filter=admin_metadata_filter,
-                max_concurrent_scope_lookups=config.max_concurrent_scope_lookups,
+                max_concurrent_scope_lookups=resolved_config.max_concurrent_scope_lookups,
             )
             matches = [m for m in scored if keep(m.content_info)][:effective_limit]
         else:

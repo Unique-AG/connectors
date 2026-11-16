@@ -11,20 +11,42 @@ differently, see Admin Configuration below.
 
 ## Admin Configuration
 
-Business rules per tool, a `metadata_filter`, a folder allowlist, a result `limit`, live in one of
-two places depending on who's calling.
+Business rules per tool — a `metadata_filter`, a folder allowlist, a result `limit` — come from two
+sources:
 
-### Unique AI
+1. **Deployment environment (`UNIQUE_MCP_TOOL_*_CONFIG`)**: the deployment/admin baseline set on the
+   server (from process environment or `ENVIRONMENT_FILE_PATH` / `unique_mcp.env` / `.env`,
+   preferring server-prefixed `UNIQUE_MCP_TOOL_<SERVER>_<CONFIG>_CONFIG` over
+   `UNIQUE_MCP_TOOL_<CONFIG>_CONFIG`).
+2. **Request metadata (`_meta["unique.app/config"]`)**: a caller-level constraint injected per call
+   (for example by Unique AI). Request metadata may narrow policy or fill fields left unset in the
+   environment, but cannot relax or bypass explicit environment settings.
 
-Injected into every call automatically from the admin's settings in the Unique AI app. Nothing to
-set here; changes take effect immediately, no restart.
+### Precedence and Merge Rules
 
-### Other Clients
+Explicit environment settings always establish the deployment baseline for filters, exact scopes,
+and configured limits. Model defaults remain fallbacks rather than hard ceilings when the
+environment leaves a limit unset.
 
-A standalone deployment, Claude Desktop, Cursor: no app to inject settings, so each tool falls back
-to an environment variable instead, a JSON object shaped like that tool's config. Only the fields
-you set need to appear; anything left out keeps its own class default, and the variable left unset
-keeps all of them.
+- **`metadata_filter`**: Combined with `AND` when both environment and request metadata specify a
+  filter; request `null` or omission never clears an explicit environment filter.
+- **`scope_ids`** (`search`): Both environment and request `scope_ids` keep exact `folderId in`
+  semantics without hierarchy expansion. Request `null`, `[]`, or omission never clears an
+  explicit environment `scope_ids` allowlist, and when both specify scopes, both exact clauses are
+  combined with `AND`.
+- **`folder_ids`** (`search`, tool argument): Combined with `AND`; when `include_subfolders=true`
+  (the default), `folder_ids` continues to match `folderIdPath contains` for nested folders.
+- **Result, token, and value limits** (`limit`, `default_limit`, `default_tree_limit`,
+  `max_values_per_field`, `max_tokens_per_call`, `max_tokens_for_sources`,
+  `percentage_of_input_tokens_for_sources`): When an explicit environment ceiling is set, request
+  metadata and per-call tool arguments can narrow (lower) it but cannot exceed it.
+- **Other fields**: Request metadata fills fields left unset by the environment and continues to
+  override non-restricted fields when explicitly provided.
+
+### Environment Variables
+
+Each variable holds a JSON object shaped like that tool's config. Only the fields you set act as
+deployment policy; anything left out falls back to request metadata or the model default.
 
 #### `search`
 

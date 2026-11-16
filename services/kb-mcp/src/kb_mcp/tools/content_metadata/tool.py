@@ -26,7 +26,6 @@ from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
     MetaKeys,
-    get_tool_config,
     get_unique_settings_async,
     merge_tool_meta,
 )
@@ -40,6 +39,11 @@ from kb_mcp.common.metadata_filter import (
     merge_request_metadata_filter,
 )
 from kb_mcp.common.scoped_walk import ScopedContentTree
+from kb_mcp.common.tool_config import (
+    ResolvedToolConfig,
+    get_kb_tool_config,
+    unwrap_tool_config,
+)
 from kb_mcp.common.tree_cache import get_tree_cache
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.content_metadata.config import ContentMetadataToolConfig
@@ -337,8 +341,9 @@ async def content_metadata(
             ),
         ),
     ] = None,
-    config: ContentMetadataToolConfig = Depends(
-        get_tool_config(ContentMetadataToolConfig)
+    config: ResolvedToolConfig[ContentMetadataToolConfig]
+    | ContentMetadataToolConfig = Depends(
+        get_kb_tool_config(ContentMetadataToolConfig)
     ),
 ) -> ToolResult:
     """Discover metadata fields and values on the knowledge base's visible
@@ -374,6 +379,8 @@ async def content_metadata(
         cid = correlation_id(user_id, company_id)
         _LOGGER.info("content_metadata start correlation_id=%s", cid)
 
+        resolved_config, _ = unwrap_tool_config(config)
+
         cache = get_tree_cache(kb_settings)
 
         # Resolved up front so the rest of the function treats them as folder
@@ -385,7 +392,7 @@ async def content_metadata(
                 folder_ids,
                 user_id=user_id,
                 company_id=company_id,
-                concurrency=config.max_concurrent_scope_lookups,
+                concurrency=resolved_config.max_concurrent_scope_lookups,
             )
             if unreadable:
                 return ToolResult(
@@ -407,7 +414,7 @@ async def content_metadata(
                 folder_paths,
                 user_id=user_id,
                 company_id=company_id,
-                concurrency=config.max_concurrent_scope_lookups,
+                concurrency=resolved_config.max_concurrent_scope_lookups,
             )
             if unresolved:
                 return ToolResult(
@@ -454,7 +461,7 @@ async def content_metadata(
             tree_svc.invalidate_cache()
 
         metadata_filter = merge_request_metadata_filter(
-            admin_metadata_filter=config.metadata_filter
+            admin_metadata_filter=resolved_config.metadata_filter
             or DEFAULT_METADATA_FILTER_STATEMENT,
         )
         wait = kb_settings.clamped_walk_timeout(timeout)
@@ -466,10 +473,10 @@ async def content_metadata(
             post_filter=None,
             max_depth=walk_depth if use_scoped_walk else None,
             timeout=wait,
-            max_concurrent_directory_listings=config.max_concurrent_scope_lookups,
+            max_concurrent_directory_listings=resolved_config.max_concurrent_scope_lookups,
         )
 
-        excluded = set(config.excluded_fields)
+        excluded = set(resolved_config.excluded_fields)
         # [] is a request for no fields, not an omission.
         requested = set(fields) if fields is not None else None
         field_file_counts: Counter[str] = Counter()
@@ -496,7 +503,7 @@ async def content_metadata(
             if snapshot.complete
             else []
         )
-        value_limit = _value_limit(limit, config.max_values_per_field)
+        value_limit = _value_limit(limit, resolved_config.max_values_per_field)
         if counts_only:
             output = ContentMetadataOutput(
                 complete=snapshot.complete,

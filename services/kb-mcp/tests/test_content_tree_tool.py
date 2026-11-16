@@ -3,6 +3,7 @@
 import asyncio
 import gc
 import inspect
+import json
 import logging
 import weakref
 from dataclasses import dataclass, field
@@ -12,9 +13,11 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastmcp import FastMCP
 from fastmcp.server.providers.filesystem_discovery import import_module_from_file
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
+from unique_mcp.meta.keys import CONFIG_META_KEY
 from unique_toolkit.content.schemas import ContentInfo
 from unique_toolkit.content.smart_rules import parse_uniqueql
 from unique_toolkit.experimental.components.content_tree.schemas import (
@@ -1616,3 +1619,129 @@ async def test_tree_scopes_to_a_bracket_stripped_folder_path():
     assert "a.pdf" in text
     assert "b.pdf" not in text
     assert "c.pdf" not in text
+
+
+@pytest.mark.asyncio
+async def test_content_tree_enforces_env_policy_across_meta_and_per_call_args(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_CONTENT_TREE_TOOL_CONFIG",
+        json.dumps(
+            {
+                "metadata_filter": {
+                    "operator": "equals",
+                    "path": ["dept"],
+                    "value": "Legal",
+                },
+                "default_limit": 2,
+                "default_tree_limit": 2,
+                "default_min_score": 0.7,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {
+            CONFIG_META_KEY: {
+                "metadata_filter": None,
+                "default_limit": 100,
+                "default_tree_limit": 100,
+                "default_min_score": 0.1,
+            }
+        },
+    )
+
+    rows = [(_make_content_info(f"c{i}"), PurePosixPath(f"f{i}.pdf")) for i in range(5)]
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=rows))
+    mcp = FastMCP("test")
+    mcp.add_tool(content_tree)
+
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        list_res = await mcp.call_tool("content_tree", {"mode": "list", "limit": 50})
+        tree_res = await mcp.call_tool("content_tree", {"mode": "tree", "limit": 50})
+        await mcp.call_tool(
+            "content_tree",
+            {"mode": "search", "query": "f", "limit": 50, "min_score": 0.2},
+        )
+
+    assert _walk_filter(mock_tree) == {
+        "operator": "equals",
+        "path": ["dept"],
+        "value": "Legal",
+    }
+    assert "first 2 of 5 files" in list_res.content[0].text  # type: ignore[union-attr]
+    assert "first 2 of 5 files" in tree_res.content[0].text  # type: ignore[union-attr]
+    _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
+    assert fuzzy_kwargs["limit"] == 2
+    assert fuzzy_kwargs["min_score"] == 0.2
+
+
+@pytest.mark.asyncio
+async def test_content_tree_ands_env_and_meta_filters_and_allows_narrowing(monkeypatch):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_CONTENT_TREE_TOOL_CONFIG",
+        json.dumps(
+            {
+                "metadata_filter": {
+                    "operator": "equals",
+                    "path": ["dept"],
+                    "value": "Legal",
+                },
+                "default_limit": 10,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {
+            CONFIG_META_KEY: {
+                "metadata_filter": {
+                    "operator": "equals",
+                    "path": ["mimeType"],
+                    "value": "application/pdf",
+                },
+                "default_limit": 3,
+            }
+        },
+    )
+
+    rows = [(_make_content_info(f"c{i}"), PurePosixPath(f"f{i}.pdf")) for i in range(5)]
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=rows))
+    mcp = FastMCP("test")
+    mcp.add_tool(content_tree)
+
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        list_res = await mcp.call_tool("content_tree", {"mode": "list"})
+
+    assert _walk_filter(mock_tree) == {
+        "and": [
+            {"operator": "equals", "path": ["mimeType"], "value": "application/pdf"},
+            {"operator": "equals", "path": ["dept"], "value": "Legal"},
+        ]
+    }
+    assert "first 3 of 5 files" in list_res.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_content_tree_leaves_per_call_args_unclamped_without_env_policy(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: None,
+    )
+    rows = [(_make_content_info(f"c{i}"), PurePosixPath(f"f{i}.pdf")) for i in range(5)]
+    mock_tree = _make_mock_tree(snapshot=FakeSnapshot(files=rows))
+    mcp = FastMCP("test")
+    mcp.add_tool(content_tree)
+
+    with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
+        await mcp.call_tool(
+            "content_tree",
+            {"mode": "search", "query": "f", "limit": 2000, "min_score": 0.1},
+        )
+
+    _, fuzzy_kwargs = mock_tree.search_visible_files_fuzzy_async.call_args
+    assert fuzzy_kwargs["limit"] == 2000
+    assert fuzzy_kwargs["min_score"] == 0.1

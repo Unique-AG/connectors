@@ -10,8 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import unique_sdk
+from fastmcp import FastMCP
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
+from unique_mcp.meta.keys import CONFIG_META_KEY
 
 from kb_mcp.common import cached_walk
 from kb_mcp.common import tree_cache as ct_cache
@@ -1069,3 +1071,82 @@ async def test_incomplete_scan_caps_values_without_a_withheld_count():
     assert len(body["notice"]) == 1
     assert body["notice"][0].startswith("This scan is incomplete.")
     assert "showing" not in body["notice"][0]
+
+
+@pytest.mark.asyncio
+async def test_content_metadata_enforces_env_filter_and_limit_ceiling(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_CONTENT_METADATA_TOOL_CONFIG",
+        json.dumps(
+            {
+                "metadata_filter": {
+                    "operator": "equals",
+                    "path": ["dept"],
+                    "value": "Legal",
+                },
+                "excluded_fields": ["secret"],
+                "max_values_per_field": 3,
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {
+            CONFIG_META_KEY: {
+                "metadata_filter": None,
+                "max_values_per_field": 500,
+            }
+        },
+    )
+
+    mock_tree = _make_mock_tree(
+        snapshot=FakeSnapshot(
+            files=_files(
+                *(
+                    {"secret": "x", "kind": f"v{i}", "department": "Legal"}
+                    for i in range(6)
+                )
+            )
+        )
+    )
+    mcp = FastMCP("test")
+    mcp.add_tool(content_metadata)
+
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        res = await mcp.call_tool("content_metadata", {"limit": 100})
+
+    assert _walk_filter(mock_tree) == {
+        "operator": "equals",
+        "path": ["dept"],
+        "value": "Legal",
+    }
+    body = json.loads(res.content[0].text)  # type: ignore[union-attr]
+    field_names = [next(iter(entry)) for entry in body["metadata"]]
+    assert "secret" not in field_names
+    kind_entry = next(entry["kind"] for entry in body["metadata"] if "kind" in entry)
+    assert len(kind_entry) == 3
+
+
+@pytest.mark.asyncio
+async def test_content_metadata_allows_meta_above_model_default_when_env_unset(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {CONFIG_META_KEY: {"max_values_per_field": 1500}},
+    )
+    mock_tree = _make_mock_tree(snapshot=_kind_files(*(f"v{i}" for i in range(1200))))
+    mcp = FastMCP("test")
+    mcp.add_tool(content_metadata)
+
+    with patch(
+        "kb_mcp.tools.content_metadata.tool.ContentTree", return_value=mock_tree
+    ):
+        res = await mcp.call_tool("content_metadata", {"limit": 1200})
+
+    body = json.loads(res.content[0].text)  # type: ignore[union-attr]
+    assert len(body["metadata"][0]["kind"]) == 1200
