@@ -9,9 +9,15 @@ from world_check_mcp.persistence.case_locks import PostgresCaseLocks
 class _Connection:
     def __init__(self, *, free: bool) -> None:
         self.free: bool = free
+        self.closed: bool = False
         self.statements: list[str] = []
 
+    def is_closed(self) -> bool:
+        return self.closed
+
     async def fetchval(self, query: str, *_args: object) -> bool:
+        if self.closed:
+            raise asyncpg.InterfaceError("connection is closed")
         self.statements.append(query)
         return self.free
 
@@ -89,3 +95,26 @@ async def test_the_connection_goes_back_to_the_pool() -> None:
             pytest.fail("the body must not run")
 
     assert pool.released == 1
+
+
+async def test_a_lock_connection_that_closed_mid_hold_refuses_the_write() -> None:
+    connection = _Connection(free=True)
+    written = False
+
+    with pytest.raises(ValueError, match="busy"):
+        async with _locks(connection).hold("sys-1", refuse=ValueError("busy")) as lease:
+            connection.closed = True
+            await lease.ensure_held()
+            written = True
+
+    assert not written
+    assert not any("pg_advisory_unlock" in statement for statement in connection.statements)
+
+
+async def test_a_live_lock_connection_lets_the_write_through() -> None:
+    connection = _Connection(free=True)
+
+    async with _locks(connection).hold("sys-1", refuse=ValueError("busy")) as lease:
+        await lease.ensure_held()
+
+    assert "SELECT 1" in connection.statements

@@ -10,6 +10,7 @@ from world_check_mcp.contexts.resolution.models import ResolutionChoice
 from world_check_mcp.contexts.resolution.models import ResolutionOutcome
 from world_check_mcp.contexts.resolution.models import ResolutionPlan
 from world_check_mcp.contexts.resolution.models import ResolutionRequest
+from world_check_mcp.persistence import CaseLease
 from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
 from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
@@ -107,8 +108,10 @@ async def apply_resolution(
     refusal = ResolutionError(
         "Another decision on this case is being saved. Review the case and request fresh approval."
     )
-    async with locks.hold(plan.case_system_id, refuse=refusal):
-        return await _apply_resolution(upstream=upstream, request=request, plan=plan, actor=actor)
+    async with locks.hold(plan.case_system_id, refuse=refusal) as lease:
+        return await _apply_resolution(
+            upstream=upstream, request=request, plan=plan, actor=actor, lease=lease
+        )
 
 
 async def _apply_resolution(
@@ -117,6 +120,7 @@ async def _apply_resolution(
     request: ResolutionRequest,
     plan: ResolutionPlan,
     actor: str,
+    lease: CaseLease,
 ) -> ResolutionOutcome:
     current = await prepare_resolution(upstream=upstream, request=request, actor=actor)
     if current != plan:
@@ -132,6 +136,7 @@ async def _apply_resolution(
     }
     if plan.reason is not None:
         arguments["reasonId"] = plan.reason.id
+    await lease.ensure_held()
     await upstream.call_untyped(RESOLVE_RESULTS, **arguments)
     return ResolutionOutcome(
         resolved=True,
