@@ -81,7 +81,9 @@ describe('failure isolation', () => {
     expect(result).toEqual({ status: 'success' });
     expect(recordPagesProcessed).toHaveBeenCalledTimes(3);
     expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
-    expect(recordPagesProcessed.mock.calls.filter(([, result]) => result === 'success')).toHaveLength(2);
+    expect(
+      recordPagesProcessed.mock.calls.filter(([, result]) => result === 'success'),
+    ).toHaveLength(2);
 
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
