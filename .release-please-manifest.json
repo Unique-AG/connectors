@@ -8,5 +8,5 @@
   "services/office-365-mcp": "0.4.0",
   "services/with-intelligence-mcp": "0.2.1",
   "services/world-check-mcp": "0.0.0",
-  "services/kyckr-mcp": "0.1.1-alpha"
+  "services/kyckr-mcp": "0.1.1"
 }

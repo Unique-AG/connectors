@@ -11,6 +11,8 @@ from mcp_openapi.retry import RetryAfterPolicy
 from mcp_openapi.upstream import OperationClient
 import yaml
 
+from kyckr_mcp.telemetry import record_credits
+from kyckr_mcp.telemetry import RecordedTransport
 from kyckr_mcp.upstream.settings import UpstreamSettings
 
 # The name the contexts and tools import the client by, kept the same in every MCP whatever
@@ -37,10 +39,12 @@ def upstream_http(
     return httpx2.AsyncClient(
         base_url=base_url,
         timeout=settings.timeout_seconds,
-        transport=transport,
+        # An explicit transport turns off httpx's HTTP_PROXY mounts, which the chart does not set.
+        transport=RecordedTransport(transport or httpx2.AsyncHTTPTransport()),
         headers={"Accept": "application/json"},
         event_hooks={
             "request": [only_headers(_FORWARDED_HEADERS, authorization, origin=base_url)],
+            "response": [record_credits],
         },
     )
 
