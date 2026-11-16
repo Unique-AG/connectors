@@ -7,8 +7,8 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
 from fastmcp.server.dependencies import get_access_token
 
-from world_check_mcp import contexts
 from world_check_mcp.mcp.approval import ApprovalGate
+from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import Upstream
 
@@ -25,8 +25,8 @@ def get_approvals(ctx: Context = CurrentContext()) -> ApprovalGate:
     return cast(ApprovalGate, ctx.lifespan_context["approvals"])
 
 
-def get_case_locks(ctx: Context = CurrentContext()) -> contexts.CaseLocks:
-    return cast(contexts.CaseLocks, ctx.lifespan_context["case_locks"])
+def get_case_locks(ctx: Context = CurrentContext()) -> CaseLocks:
+    return get_persistence(ctx).case_locks
 
 
 def get_reviewer(ctx: Context = CurrentContext()) -> str:

@@ -16,6 +16,7 @@ from pydantic import AnyHttpUrl
 from pydantic import SecretStr
 
 from world_check_mcp.mcp import create_server
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import UpstreamSettings
 
@@ -46,7 +47,7 @@ def unanswered_upstream() -> httpx2.MockTransport:
 @asynccontextmanager
 async def open_fake_persistence() -> AsyncGenerator[Persistence]:
     """An in-memory store in place of Postgres, which CI does not run."""
-    yield Persistence(store=MemoryStore())
+    yield Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks())
 
 
 def build_server(

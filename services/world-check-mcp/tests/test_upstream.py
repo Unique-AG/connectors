@@ -13,6 +13,7 @@ from pydantic import AnyHttpUrl
 from pydantic import SecretStr
 
 from tests.offline_server import build_server
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import GET_API_INFO
 from world_check_mcp.upstream import open_upstream
@@ -196,7 +197,9 @@ async def test_get_api_info_does_not_ask_for_credentials() -> None:
         )
 
     server = build_server(
-        _settings(), Persistence(store=MemoryStore()), httpx2.MockTransport(respond)
+        _settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(respond),
     )
     async with Client(server) as client:
         tools = await client.list_tools()

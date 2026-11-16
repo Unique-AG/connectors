@@ -15,6 +15,7 @@ import pytest
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 
 
@@ -507,7 +508,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
 def _server() -> FastMCP:
     return build_server(
         fake_upstream_settings(),
-        Persistence(store=MemoryStore()),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
         httpx2.MockTransport(_world_check),
     )
 
@@ -959,7 +960,7 @@ async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case(
 
     server = build_server(
         fake_upstream_settings(),
-        Persistence(store=MemoryStore()),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
         httpx2.MockTransport(held_first_write),
     )
     arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}

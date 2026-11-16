@@ -2,7 +2,6 @@ from mcp_observability import traced
 
 from world_check_mcp.contexts.attribution import AttributionError
 from world_check_mcp.contexts.attribution import reviewer_note
-from world_check_mcp.contexts.case_locks import CaseLocks
 from world_check_mcp.contexts.cases import get_case
 from world_check_mcp.contexts.pages import all_case_results
 from world_check_mcp.contexts.pages import ResultPageError
@@ -11,6 +10,7 @@ from world_check_mcp.contexts.resolution.models import ResolutionChoice
 from world_check_mcp.contexts.resolution.models import ResolutionOutcome
 from world_check_mcp.contexts.resolution.models import ResolutionPlan
 from world_check_mcp.contexts.resolution.models import ResolutionRequest
+from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
 from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
 from world_check_mcp.upstream import GetResolutionToolkitsForGroupRequest
@@ -107,7 +107,7 @@ async def apply_resolution(
     refusal = ResolutionError(
         "Another decision on this case is being saved. Review the case and request fresh approval."
     )
-    with locks.hold(plan.case_system_id, refuse=refusal):
+    async with locks.hold(plan.case_system_id, refuse=refusal):
         return await _apply_resolution(upstream=upstream, request=request, plan=plan, actor=actor)
 
 

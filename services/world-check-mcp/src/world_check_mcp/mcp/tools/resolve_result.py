@@ -17,6 +17,7 @@ from world_check_mcp.mcp.dependencies import get_case_locks
 from world_check_mcp.mcp.dependencies import get_reviewer
 from world_check_mcp.mcp.dependencies import get_upstream
 from world_check_mcp.mcp.inputs.identifiers import CaseArgument
+from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.upstream import Upstream
 
 Choice = Annotated[
@@ -58,7 +59,7 @@ async def resolve_result(
     note: Note = "",
     upstream: Upstream = Depends(get_upstream),
     approvals: ApprovalGate = Depends(get_approvals),
-    locks: contexts.CaseLocks = Depends(get_case_locks),
+    locks: CaseLocks = Depends(get_case_locks),
     actor: str = Depends(get_reviewer),
 ) -> contexts.ResolutionOutcome | InputRequiredResult:
     request = contexts.ResolutionRequest(

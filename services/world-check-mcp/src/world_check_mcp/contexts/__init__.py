@@ -1,6 +1,5 @@
 # mcp-scaffold-version: 0.0.1, timestamp: 2026-10-22T06:27:45+00:00
 
-from world_check_mcp.contexts.case_locks import CaseLocks
 from world_check_mcp.contexts.cases import AuditPage
 from world_check_mcp.contexts.cases import CaseDetails
 from world_check_mcp.contexts.cases import CaseNotFoundError
@@ -58,7 +57,6 @@ from world_check_mcp.contexts.screening import ScreeningError
 from world_check_mcp.contexts.screening import ScreeningOutcome
 
 __all__ = [
-    "CaseLocks",
     "AuditPage",
     "CaseDetails",
     "CaseNotFoundError",
