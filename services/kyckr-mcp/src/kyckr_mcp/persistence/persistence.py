@@ -4,37 +4,37 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import ClassVar
 
+import httpx2
+from key_value.aio.stores.postgresql import PostgreSQLStore
+from mcp_configs import from_environment
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
-from sqlalchemy import make_url
 
-from kyckr_mcp.persistence.database import Database
-from kyckr_mcp.persistence.database import DatabaseSettings
-from kyckr_mcp.persistence.database import open_database
+from kyckr_mcp.persistence.store import StoreSettings
 
 
 class PersistenceSettings(BaseModel):
     """Each store reads its own settings from the environment."""
 
-    database: DatabaseSettings = Field(default_factory=DatabaseSettings)
+    store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
 
     def passwords(self) -> tuple[str, ...]:
-        password = make_url(self.database.connection_url).password
+        password = httpx2.URL(self.store.connection_url).password
         return (password,) if password else ()
 
 
 class Persistence(BaseModel):
-    """What the contexts receive: every store the MCP owns, opened once by the server lifespan."""
+    """What the contexts receive. Empty: no context stores anything yet."""
 
-    model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True, frozen=True)
-
-    database: Database
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
 
 
 @asynccontextmanager
-async def open_persistence(settings: PersistenceSettings) -> AsyncGenerator[Persistence]:
-    async with (
-        open_database(settings.database) as database,
-    ):
-        yield Persistence(database=database)
+async def open_persistence(sign_in: PostgreSQLStore | None = None) -> AsyncGenerator[Persistence]:
+    """Closes the sign-in store's pool, if it opened one, when the server stops."""
+    try:
+        yield Persistence()
+    finally:
+        if sign_in is not None:
+            await sign_in.close()

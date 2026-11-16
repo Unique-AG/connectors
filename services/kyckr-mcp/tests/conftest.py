@@ -114,3 +114,23 @@ def call_tool_with(
 def structured(result: CallToolResult) -> dict[str, object]:
     assert result.structured_content is not None
     return dict(result.structured_content)
+
+
+@pytest.fixture
+def zitadel_discovery(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Answers the proxy's discovery requests without a network, for any issuer."""
+
+    def get(url: str, **_: object) -> httpx2.Response:
+        issuer = url.removesuffix("/.well-known/openid-configuration")
+        configuration = {
+            "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/oauth/v2/authorize",
+            "token_endpoint": f"{issuer}/oauth/v2/token",
+            "jwks_uri": f"{issuer}/oauth/v2/keys",
+            "response_types_supported": ["code"],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+        }
+        return httpx2.Response(200, json=configuration, request=httpx2.Request("GET", url))
+
+    monkeypatch.setattr(httpx2, "get", get)

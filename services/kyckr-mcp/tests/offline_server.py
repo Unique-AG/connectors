@@ -8,15 +8,13 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from fastmcp.server.auth import AuthProvider
 import httpx2
+from mcp_configs import RateLimitSettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
-from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.pool import StaticPool
 
 from kyckr_mcp.mcp import create_server
-from kyckr_mcp.persistence import Base
 from kyckr_mcp.persistence import Persistence
 from kyckr_mcp.upstream import UpstreamSettings
 
@@ -42,18 +40,16 @@ def unanswered_upstream() -> httpx2.MockTransport:
 
 @asynccontextmanager
 async def open_fake_persistence() -> AsyncGenerator[Persistence]:
-    """SQLite in place of Postgres, which CI does not run."""
-    engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-    yield Persistence(database=async_sessionmaker(engine, expire_on_commit=False))
-    await engine.dispose()
+    yield Persistence()
 
 
 def build_server(
     upstream_settings: UpstreamSettings,
     persistence: Persistence,
     upstream_transport: httpx2.MockTransport,
+    *,
+    auth: AuthProvider | None = None,
+    rate_limit: RateLimitSettings | None = None,
 ) -> FastMCP:
     """Every client of the server shares `persistence`, as the server's clients share the real
     stores.
@@ -63,7 +59,9 @@ def build_server(
     async def open_persistence() -> AsyncGenerator[Persistence]:
         yield persistence
 
-    return create_server(upstream_settings, open_persistence, upstream_transport)
+    return create_server(
+        upstream_settings, open_persistence, upstream_transport, auth=auth, rate_limit=rate_limit
+    )
 
 
 @asynccontextmanager
