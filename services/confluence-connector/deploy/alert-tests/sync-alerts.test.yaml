@@ -168,6 +168,29 @@ tests:
               severity: warning
               alertGroup: confluence-connector
 
+  - name: syncs that fail at alternating times within the hour still fire ContentFailures
+    # Failures at 00:01, 01:59, 02:01, 03:59 and 04:01: the longest gap stays under the 2h window.
+    interval: 1m
+    input_series:
+      - series: 'cfc_pages_processed_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0 1x117 2x1 3x117 4x1 5x60'
+      - series: 'cfc_attachments_processed_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x301'
+      - series: 'cfc_content_deleted_total{namespace="ns", tenant="t1", result="failure"}'
+        values: '0x301'
+    alert_rule_test:
+      - eval_time: 150m
+        alertname: ConfluenceConnectorContentFailures
+        exp_alerts: []
+      - eval_time: 200m
+        alertname: ConfluenceConnectorContentFailures
+        exp_alerts:
+          - exp_labels:
+              namespace: ns
+              tenant: t1
+              severity: warning
+              alertGroup: confluence-connector
+
   - name: one sync with failed pages does not fire ContentFailures
     interval: 1m
     input_series:
