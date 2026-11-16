@@ -1307,7 +1307,14 @@ async def _serve_over_http(server: FastMCP) -> AsyncGenerator[str]:
         )
         config = uvicorn.Config(http_app(server, settings), log_config=None)
         http_server = uvicorn.Server(config)
-        serving = asyncio.create_task(http_server.serve(sockets=[reserved]))
+
+        async def serve() -> None:
+            try:
+                await http_server.serve(sockets=[reserved])
+            except SystemExit as error:
+                raise RuntimeError("the server exited during startup") from error
+
+        serving = asyncio.create_task(serve())
         try:
             async with asyncio.timeout(10):
                 while not http_server.started and not serving.done():
