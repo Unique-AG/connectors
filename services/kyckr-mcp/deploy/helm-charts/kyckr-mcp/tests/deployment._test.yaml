@@ -56,14 +56,20 @@ tests:
           path: spec.template.spec.containers[0].env
           content: { name: MCP_RATE_LIMIT_WINDOW_SECONDS, value: "11" }
 
-  - it: sets the test Kyckr URL by default
+  - it: pins the Kyckr timeout and the rate limit
     documentSelector:
       path: kind
       value: Deployment
     asserts:
       - contains:
           path: spec.template.spec.containers[0].env
-          content: { name: UPSTREAM_API_URL, value: https://test-api.kyckr.com/v2 }
+          content: { name: UPSTREAM_TIMEOUT_SECONDS, value: "30" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW, value: "60" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_RATE_LIMIT_WINDOW_SECONDS, value: "60" }
 
   - it: rejects a secret in mcpConfig
     set:
@@ -79,6 +85,51 @@ tests:
       mcpConfig:
         zitadel:
           baseUrl: https://id.example.com:8443
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects an empty Kyckr URL
+    set:
+      mcpConfig:
+        kyckr:
+          apiUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects an empty Zitadel URL
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects an empty public URL
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: minLength
+
+  - it: rejects a Kyckr URL that is not https
+    set:
+      mcpConfig:
+        kyckr:
+          apiUrl: http://api.kyckr.com/v2
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects a Zitadel URL that is not https
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: http://id.example.com
     asserts:
       - failedTemplate:
           errorPattern: does not match pattern

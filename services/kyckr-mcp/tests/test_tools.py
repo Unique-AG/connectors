@@ -204,6 +204,54 @@ async def test_a_rate_limit_that_outlasts_the_retries_keeps_kyckrs_message(
     assert len(kyckr.requests) == 3
 
 
+@pytest.mark.parametrize(
+    ("headers", "message"),
+    [
+        ({"Retry-After": "120"}, "Rate limit (retry after 120s)"),
+        ({"Retry-After": "0"}, "Rate limit (retry after 0s)"),
+        ({"Retry-After": "Wed, 21 Oct 2099 07:28:00 GMT"}, "Rate limit"),
+        ({"Retry-After": "-5"}, "Rate limit"),
+        ({"Retry-After": "soon"}, "Rate limit"),
+        ({"Retry-After": "1" * 10}, "Rate limit"),
+        ({}, "Rate limit"),
+    ],
+)
+async def test_a_rate_limit_answer_names_the_seconds_kyckr_asked_for(
+    call_tool: CallTool, kyckr: FakeKyckr, *, headers: dict[str, str], message: str
+) -> None:
+    kyckr.handler = lambda _: httpx2.Response(
+        429, json={"data": {"detail": "Rate limit"}}, headers=headers
+    )
+
+    result = await call_tool("search_companies", {"name": "Acme"})
+
+    assert structured(result)["message"] == message
+
+
+async def test_a_retry_after_in_non_ascii_digits_is_not_passed_on(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.handler = lambda _: httpx2.Response(
+        429, json={"data": {"detail": "Rate limit"}}, headers={b"Retry-After": "٣".encode()}
+    )
+
+    result = await call_tool("search_companies", {"name": "Acme"})
+
+    assert structured(result)["message"] == "Rate limit"
+
+
+async def test_a_retry_after_on_another_status_is_not_passed_on(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.handler = lambda _: httpx2.Response(
+        503, json={"data": {"detail": "busy"}}, headers={"Retry-After": "30"}
+    )
+
+    result = await call_tool("search_companies", {"name": "Acme"})
+
+    assert structured(result)["message"] == "busy"
+
+
 async def test_a_paid_read_is_not_sent_again_on_a_503(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:

@@ -68,3 +68,8 @@ def test_a_setting_that_is_empty_or_malformed_is_rejected_at_startup(
 
     with pytest.raises(ValidationError):
         UpstreamSettings.model_validate(fields)
+
+
+def test_the_api_url_has_no_default() -> None:
+    with pytest.raises(ValidationError, match="api_url"):
+        UpstreamSettings.model_validate({"api_key": "dummy-api-key"})

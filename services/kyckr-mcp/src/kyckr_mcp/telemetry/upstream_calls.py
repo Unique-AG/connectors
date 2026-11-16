@@ -4,6 +4,7 @@ import math
 import re
 import time
 from typing import cast, override
+import weakref
 
 import httpx2
 from mcp_observability import MetricNamespace
@@ -47,6 +48,9 @@ _duration = _metrics.histogram(
     ["method", "path"],
     buckets=_DURATION_BUCKETS_MS,
 )
+_retries = _metrics.counter(
+    "api_retries_total", "Kyckr API requests sent again after a failed attempt", ["method", "path"]
+)
 _credits = _metrics.counter(
     "credits_consumed_total", "Kyckr credits consumed, by the tool that paid", ["tool"]
 )
@@ -85,11 +89,16 @@ class RecordedTransport(httpx2.AsyncBaseTransport):
 
     def __init__(self, transport: httpx2.AsyncBaseTransport) -> None:
         self._transport: httpx2.AsyncBaseTransport = transport
+        # The retry loop sends one request object again, so a second sight of it is a retry.
+        self._sent: weakref.WeakSet[httpx2.Request] = weakref.WeakSet()
 
     @override
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         method = request.method
         route = _route(request)
+        if request in self._sent:
+            _retries.labels(method=method, path=route).inc()
+        self._sent.add(request)
         status = 0
         started = time.perf_counter()
         with _tracer.start_as_current_span(

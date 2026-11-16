@@ -31,23 +31,29 @@ deployment:
     annotations:
       reloader.stakater.com/auto: "true"
 
-# Non-secret settings, mapped to environment variables. The app refuses to start without
-# publicBaseUrl and zitadel.baseUrl, so the overlay sets them. Unset values use the app default.
+# Non-secret settings, mapped to environment variables. The overlay must set publicBaseUrl,
+# zitadel.baseUrl and kyckr.apiUrl: Helm fails without them. The rest use the values pinned here.
 mcpConfig:
   app:
-    publicBaseUrl: "" # MCP_BASE_URL, e.g. https://kyckr-mcp.<tenant>.unique.app. Must match routes.hostname
+    # MCP_BASE_URL, e.g. https://kyckr-mcp.<tenant>.unique.app. Must match routes.hostname
+    publicBaseUrl: '{{ fail "mcpConfig.app.publicBaseUrl is mandatory. Override in your deployment values." }}'
   zitadel:
-    baseUrl: "" # ZITADEL_BASE_URL, e.g. https://id.<tenant>.unique.app
+    # ZITADEL_BASE_URL, e.g. https://id.<tenant>.unique.app
+    baseUrl: '{{ fail "mcpConfig.zitadel.baseUrl is mandatory. Override in your deployment values." }}'
     # ZITADEL_ORG_ID, optional. Verify in Zitadel that the id token carries the resourceowner
     # claim, or every sign-in is refused.
     orgId: ""
   kyckr:
-    # UPSTREAM_API_URL. The test API, so the egress rule has a host. Production is https://api.kyckr.com/v2
-    apiUrl: https://test-api.kyckr.com/v2
+    # UPSTREAM_API_URL. No default, so no deployment calls the Kyckr test API by accident:
+    # production is https://api.kyckr.com/v2, test is https://test-api.kyckr.com/v2.
+    apiUrl: '{{ fail "mcpConfig.kyckr.apiUrl is mandatory. Override in your deployment values." }}'
+    timeoutSeconds: 30 # UPSTREAM_TIMEOUT_SECONDS
     defaultCustomerReference: ""
     defaultContactEmail: ""
   # Per signed-in user and per replica: N replicas allow N times toolCallsPerWindow.
-  rateLimit: {}
+  rateLimit:
+    toolCallsPerWindow: 60 # MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW
+    windowSeconds: 60 # MCP_RATE_LIMIT_WINDOW_SECONDS
 
 # Secrets stay out of mcpConfig: set extraEnvSecrets (or envVars) with UPSTREAM_API_KEY,
 # ZITADEL_CLIENT_ID, ZITADEL_JWT_SIGNING_KEY and, if needed, ZITADEL_CLIENT_SECRET. See README.

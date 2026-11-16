@@ -21,7 +21,7 @@ class UpstreamSettings(BaseSettings):
     model_config: ClassVar[SettingsConfigDict] = shared_config("UPSTREAM_")
 
     api_key: SecretStr = Field(min_length=1)
-    api_url: AnyHttpUrl = AnyHttpUrl("https://test-api.kyckr.com/v2")
+    api_url: AnyHttpUrl
     timeout_seconds: float = Field(default=30, gt=0, le=120)
     default_customer_reference: str | None = None
     default_contact_email: EmailStr | None = None

@@ -33,6 +33,7 @@ def deployment(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ZITADEL_CLIENT_SECRET", ZITADEL_CLIENT_SECRET)
     monkeypatch.setenv("ZITADEL_JWT_SIGNING_KEY", ZITADEL_JWT_SIGNING_KEY)
     monkeypatch.setenv("UPSTREAM_API_KEY", UPSTREAM_API_KEY)
+    monkeypatch.setenv("UPSTREAM_API_URL", "https://test-api.kyckr.com/v2")
     monkeypatch.setenv("DATABASE_URL", "postgresql://kyckr:db%2Fpassword-1@db:5432/kyckr")
 
 

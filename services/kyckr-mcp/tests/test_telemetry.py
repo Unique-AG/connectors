@@ -36,6 +36,20 @@ def requests_total(method: str, path: str, status: str) -> float:
     return sample("kyckr_api_requests_total", {"method": method, "path": path, "status": status})
 
 
+def retries_total(method: str, path: str) -> float:
+    return sample("kyckr_api_retries_total", {"method": method, "path": path})
+
+
+def kyckr_label_values(metric_name: str = "kyckr_") -> list[str]:
+    return [
+        value
+        for metric in REGISTRY.collect()
+        if metric.name.startswith(metric_name)
+        for s in metric.samples
+        for value in s.labels.values()
+    ]
+
+
 def credits_of(tool: str) -> float:
     return sample("kyckr_credits_consumed_total", {"tool": tool})
 
@@ -208,6 +222,52 @@ async def test_a_retried_request_counts_once_per_attempt(
     assert len(kyckr.requests) == 3
 
 
+async def test_each_attempt_after_the_first_counts_as_a_retry(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    answers = iter([httpx2.Response(429), httpx2.Response(200, json={"data": []})])
+    kyckr.handler = lambda _: next(answers)
+    before = retries_total("GET", "/companies")
+
+    await call_tool("search_companies", {"name": "Acme"})
+
+    assert retries_total("GET", "/companies") == before + 1
+
+
+async def test_a_call_answered_at_the_first_attempt_counts_no_retry(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.answers({"data": []})
+    before = retries_total("GET", "/companies")
+
+    await call_tool("search_companies", {"name": "Acme"})
+
+    assert retries_total("GET", "/companies") == before
+
+
+async def test_a_rate_limit_that_outlasts_the_retries_counts_every_attempt_after_the_first(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.answers({}, status=429)
+    before = retries_total("GET", "/companies")
+
+    await call_tool("search_companies", {"name": "Acme"})
+
+    assert retries_total("GET", "/companies") == before + 2
+
+
+async def test_two_separate_calls_to_one_route_count_no_retry(
+    upstream_settings: UpstreamSettings,
+) -> None:
+    before = retries_total("GET", "/companies")
+
+    async with upstream_http(upstream_settings, httpx2.MockTransport(answering(200))) as client:
+        await client.get("/companies")
+        await client.get("/companies")
+
+    assert retries_total("GET", "/companies") == before
+
+
 async def test_a_paid_call_retried_after_a_429_counts_each_attempt_and_its_credits_once(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
@@ -378,19 +438,25 @@ async def test_the_key_and_the_ids_are_in_no_label_or_span(
     with contextlib.suppress(RuntimeError):
         await get(upstream_settings, handler, "/companies/RO%7CJ40%2F8%2F12345678/lite")
 
-    labels = [
-        value
-        for metric in REGISTRY.collect()
-        if metric.name.startswith("kyckr_")
-        for s in metric.samples
-        for value in s.labels.values()
-    ]
     recorded = [
-        *labels,
+        *kyckr_label_values(),
         *(str((s.attributes, s.events, s.status.description)) for s in spans.get_finished_spans()),
     ]
     assert recorded
     assert not any(secret in text for text in recorded for secret in SECRETS)
+
+
+async def test_the_key_and_the_ids_are_in_no_retry_label(
+    upstream_settings: UpstreamSettings,
+) -> None:
+    async with upstream_http(upstream_settings, httpx2.MockTransport(answering(429))) as client:
+        request = client.build_request("GET", "/companies/RO%7CJ40%2F8%2F12345678/lite")
+        await client.send(request)
+        await client.send(request)
+
+    labels = kyckr_label_values("kyckr_api_retries")
+    assert LITE in labels
+    assert not any(secret in text for text in labels for secret in SECRETS)
 
 
 async def test_the_key_and_the_ids_are_in_no_log_line(
