@@ -44,6 +44,34 @@ async def test_system_prompts_use_the_argument_names_the_tools_take(server: Fast
             assert camel not in prompt, (name, camel)
 
 
+async def test_ordering_a_document_requires_the_approval_of_the_user(server: FastMCP) -> None:
+    tools = await list_tools(server)
+    order = tools["create_document_order"]
+    meta = cast(dict[str, object], order.meta)
+
+    assert order.description
+    assert "approved the document and" in order.description
+    assert "do not ask" not in order.description.lower()
+    assert "approved both the document" in str(meta["unique.app/system-prompt"])
+    instructions = server.instructions
+    assert instructions
+    assert "only after the user has approved" in instructions
+    assert "directly" not in instructions
+
+
+async def test_polling_stops_at_success_or_failed_with_or_without_a_document(
+    server: FastMCP,
+) -> None:
+    order = (await list_tools(server))["create_document_order"]
+
+    assert order.description
+    assert "Stop once `status` is `Success` or `Failed`" in order.description
+    meta = cast(dict[str, object], order.meta)
+    assert "until `status` is `Success` or `Failed`" in str(meta["unique.app/system-prompt"])
+    assert server.instructions
+    assert "poll `get_order` until `Success` or `Failed`" in server.instructions
+
+
 async def test_a_server_can_run_two_sessions_one_after_the_other(server: FastMCP) -> None:
     counts: list[int] = []
     for _ in range(2):

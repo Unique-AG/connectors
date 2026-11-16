@@ -33,7 +33,10 @@ def as_order(details: OrderDetails | None) -> OrderData | None:
 
 def created_order(response: PostOrdersResponse) -> OrderData | None:
     if response.data is not None:
-        return as_order(response.data)
+        data = response.data
+        order_id = data.order_id if data.order_id is not None else response.order_id
+        status = data.status if data.status is not None else response.status
+        return as_order(data.model_copy(update={"order_id": order_id, "status": status}))
     if response.status is None and response.order_id is None:
         return None
     return OrderData.model_validate({"orderId": response.order_id, "status": response.status})

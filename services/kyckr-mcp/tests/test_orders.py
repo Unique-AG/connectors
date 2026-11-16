@@ -83,6 +83,60 @@ async def test_an_order_reported_at_the_top_level_is_read_as_well(
     assert structured(result)["data"] == {"orderId": "9", "status": "Pending"}
 
 
+@pytest.mark.parametrize(
+    ("data", "expected_id"),
+    [
+        ({"status": "Success"}, "123"),
+        ({"orderId": "9", "status": "Success"}, "9"),
+    ],
+)
+async def test_the_envelope_order_id_only_fills_in_a_missing_one(
+    call_tool: CallTool, kyckr: FakeKyckr, *, data: dict[str, object], expected_id: str
+) -> None:
+    kyckr.handler = lambda request: (
+        httpx2.Response(200, json={"Data": {"companyName": "Acme"}})
+        if is_download(request)
+        else httpx2.Response(201, json={"orderId": "123", "data": data})
+    )
+
+    result = await call_tool("create_document_order", ORDER)
+
+    assert kyckr.requests[-1].url.path == f"/v2/orders/{expected_id}/download"
+    assert structured(result)["data"] == {
+        "orderId": expected_id,
+        "status": "Success",
+        "documentJson": {"companyName": "Acme"},
+    }
+
+
+async def test_an_empty_order_id_in_the_data_is_not_replaced_by_the_envelope_one(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.answers({"orderId": "123", "data": {"orderId": "", "status": "Success"}}, status=201)
+
+    await call_tool("create_document_order", ORDER)
+
+    assert [request.url.path for request in kyckr.requests] == ["/v2/orders"]
+
+
+async def test_the_envelope_status_fills_in_a_missing_one(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.handler = lambda request: (
+        httpx2.Response(200, json={"Data": {"companyName": "Acme"}})
+        if is_download(request)
+        else httpx2.Response(201, json={"status": "Success", "data": {"orderId": "9"}})
+    )
+
+    result = await call_tool("create_document_order", ORDER)
+
+    assert structured(result)["data"] == {
+        "orderId": "9",
+        "status": "Success",
+        "documentJson": {"companyName": "Acme"},
+    }
+
+
 @pytest.mark.parametrize("details", [{}, {"details": None}])
 async def test_an_order_without_upstream_details_has_no_details(
     call_tool: CallTool, kyckr: FakeKyckr, details: dict[str, object]

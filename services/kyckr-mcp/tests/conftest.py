@@ -1,6 +1,8 @@
 # mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
 
 from collections.abc import AsyncGenerator, Awaitable, Callable
+import os
+from pathlib import Path
 from typing import Protocol
 
 from fastmcp import Client
@@ -16,6 +18,18 @@ from kyckr_mcp.upstream import UpstreamSettings
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
 from tests.offline_server import open_fake_persistence
+
+_ENV_PREFIXES = ("UPSTREAM_", "MCP_", "ZITADEL_", "PG_", "DB_", "LOGS_", "OTEL_")
+_ENV_NAMES = {"DATABASE_URL", "HOST", "PORT", "LOG_LEVEL"}
+
+
+@pytest.fixture(autouse=True)
+def isolated_environment(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """No setting of the developer's shell or `.env` reaches a test. A test sets what it needs."""
+    for name in os.environ:
+        if name in _ENV_NAMES or name.startswith(_ENV_PREFIXES):
+            monkeypatch.delenv(name)
+    monkeypatch.chdir(tmp_path)
 
 
 @pytest.fixture

@@ -13,8 +13,8 @@ INSTRUCTIONS = """
 ### Credit usage
 - `search_companies` is free. Profile and document ordering calls can spend Kyckr credits.
 - Do not call paid endpoints speculatively. Confirm the company identity with a search first.
-- Once the user has named or chosen a filing from `list_company_documents`, call
-  `create_document_order` directly. Do not stage a separate confirmation step.
+- Call `create_document_order` only after the user has approved the document and the credit cost
+  shown by `list_company_documents`. Naming a filing is not approval.
 
 ### Document polling and presentation
 - After `create_document_order`, inspect `data.status`. On `Success` the document arrives with the

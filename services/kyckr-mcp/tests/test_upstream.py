@@ -1,4 +1,5 @@
 import httpx2
+from mcp_configs import from_environment
 from pydantic import ValidationError
 import pytest
 
@@ -70,6 +71,28 @@ def test_a_setting_that_is_empty_or_malformed_is_rejected_at_startup(
         UpstreamSettings.model_validate(fields)
 
 
-def test_the_api_url_has_no_default() -> None:
+def test_the_api_url_has_no_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("UPSTREAM_API_KEY", "dummy-api-key")
+
     with pytest.raises(ValidationError, match="api_url"):
-        UpstreamSettings.model_validate({"api_key": "dummy-api-key"})
+        from_environment(UpstreamSettings)
+
+
+def test_a_plain_http_api_url_is_rejected(upstream_settings: UpstreamSettings) -> None:
+    fields = {**upstream_settings.model_dump(), "api_url": "http://test-api.kyckr.com/v2"}
+
+    with pytest.raises(ValidationError, match="api_url"):
+        UpstreamSettings.model_validate(fields)
+
+
+def test_an_override_of_one_retry_field_keeps_the_paid_read_statuses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("UPSTREAM_API_KEY", "dummy-api-key")
+    monkeypatch.setenv("UPSTREAM_API_URL", "https://test-api.kyckr.com/v2")
+    monkeypatch.setenv("UPSTREAM_RETRY", '{"max_attempts": 3}')
+
+    settings = from_environment(UpstreamSettings)
+
+    assert settings.retry.max_attempts == 3
+    assert settings.retry.statuses == {429}
