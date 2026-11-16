@@ -6,7 +6,6 @@ from fastmcp.tools import tool
 from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 from pydantic import Field
-from pydantic import PastDate
 
 from world_check_mcp import contexts
 from world_check_mcp.mcp.dependencies import get_upstream
@@ -40,7 +39,9 @@ async def screen_entity(
     case_id: Annotated[
         ExternalId | None, Field(description="External caseId. Existing ids are refused.")
     ] = None,
-    dob: Annotated[PastDate | None, Field(description="Date of birth. Individuals only.")] = None,
+    dob: Annotated[
+        contexts.DateOfBirth | None, Field(description="Date of birth. Individuals only.")
+    ] = None,
     nationality: Annotated[
         Country | None, Field(description="Individual nationality, ISO alpha-3.")
     ] = None,
