@@ -1,0 +1,9 @@
+# mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
+# A placeholder for the connection the overlay supplies, so `helm template` clears the base
+# chart's schema.
+postgresql:
+  connection:
+    url:
+      fromSecret:
+        name: kyckr-mcp-ci-dummy
+        key: database-url
