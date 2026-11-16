@@ -5,6 +5,8 @@ import httpx2
 from mcp_openapi.upstream import UpstreamError
 
 _MAX_RAW_MESSAGE = 200
+_TOO_MANY_REQUESTS = 429
+_MAX_RETRY_DIGITS = 9
 
 
 def kyckr_error(error: UpstreamError) -> tuple[str, str | None]:
@@ -14,9 +16,21 @@ def kyckr_error(error: UpstreamError) -> tuple[str, str | None]:
         return str(error), None
     raw = cause.response.text
     body = _parse_json(raw)
-    return _error_message(body, cause.response.status_code, raw), _string_field(
-        body, "correlationId"
-    )
+    message = _error_message(body, cause.response.status_code, raw)
+    return message + _retry_hint(cause.response), _string_field(body, "correlationId")
+
+
+def _retry_hint(response: httpx2.Response) -> str:
+    """The `Retry-After` of a 429 as seconds, the only form the old service passed on."""
+    seconds = response.headers.get("Retry-After", "")
+    if (
+        response.status_code == _TOO_MANY_REQUESTS
+        and seconds.isascii()
+        and seconds.isdigit()
+        and len(seconds) <= _MAX_RETRY_DIGITS
+    ):
+        return f" (retry after {seconds}s)"
+    return ""
 
 
 def _field(value: object, key: str) -> object | None:

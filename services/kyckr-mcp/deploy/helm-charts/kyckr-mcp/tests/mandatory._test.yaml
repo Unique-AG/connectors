@@ -1,0 +1,103 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: kyckr-mcp mandatory values
+templates:
+  - all.yaml
+values:
+  - values/no-urls.yaml
+capabilities:
+  apiVersions:
+    - cilium.io/v2
+tests:
+  - it: fails the render when the overlay sets no URL
+    asserts:
+      - failedTemplate:
+          errorPattern: mcpConfig.app.publicBaseUrl is mandatory. Override in your deployment values.
+
+  - it: fails the render when the overlay leaves out the public URL
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: https://id.example.com
+        kyckr:
+          apiUrl: https://api.kyckr.com/v2
+    asserts:
+      - failedTemplate:
+          errorPattern: mcpConfig.app.publicBaseUrl is mandatory. Override in your deployment values.
+
+  - it: fails the render when the overlay leaves out the Zitadel URL
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com
+        kyckr:
+          apiUrl: https://api.kyckr.com/v2
+    asserts:
+      - failedTemplate:
+          errorPattern: mcpConfig.zitadel.baseUrl is mandatory. Override in your deployment values.
+
+  - it: fails the render when the overlay leaves out the Kyckr URL
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com
+        zitadel:
+          baseUrl: https://id.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: mcpConfig.kyckr.apiUrl is mandatory. Override in your deployment values.
+
+  - it: fails the render when the public URL is null
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: null
+        zitadel:
+          baseUrl: https://id.example.com
+        kyckr:
+          apiUrl: https://api.kyckr.com/v2
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'publicBaseUrl'
+
+  - it: fails the render when the Zitadel URL is null
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com
+        zitadel:
+          baseUrl: null
+        kyckr:
+          apiUrl: https://api.kyckr.com/v2
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'baseUrl'
+
+  - it: fails the render when the Kyckr URL is null
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com
+        zitadel:
+          baseUrl: https://id.example.com
+        kyckr:
+          apiUrl: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'apiUrl'
+
+  - it: renders once the overlay sets all three
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com
+        zitadel:
+          baseUrl: https://id.example.com
+        kyckr:
+          apiUrl: https://api.kyckr.com/v2
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_API_URL, value: https://api.kyckr.com/v2 }

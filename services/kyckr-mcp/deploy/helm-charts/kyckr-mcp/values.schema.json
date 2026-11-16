@@ -2185,16 +2185,20 @@
     },
     "mcpConfig": {
       "type": "object",
-      "description": "Non-secret settings, mapped to environment variables. Unset values use the app default. The secrets come from a Secret through extraEnvSecrets or envVars (see README).",
+      "description": "Non-secret settings, mapped to environment variables. publicBaseUrl, zitadel.baseUrl and kyckr.apiUrl are mandatory. The secrets come from a Secret through extraEnvSecrets or envVars (see README).",
       "properties": {
         "app": {
           "type": "object",
           "properties": {
             "publicBaseUrl": {
               "type": "string",
-              "description": "MCP_BASE_URL: the public https origin. Must match routes.hostname."
+              "minLength": 1,
+              "description": "MCP_BASE_URL: the public https origin. Mandatory: the overlay sets it. Must match routes.hostname."
             }
           },
+          "required": [
+            "publicBaseUrl"
+          ],
           "additionalProperties": false
         },
         "zitadel": {
@@ -2202,14 +2206,17 @@
           "properties": {
             "baseUrl": {
               "type": "string",
-              "description": "ZITADEL_BASE_URL: the Zitadel issuer. Its host gets Cilium egress on port 443, so the URL is https without a port.",
-              "pattern": "^$|^https://[^/:]+(/.*)?$"
+              "description": "ZITADEL_BASE_URL: the Zitadel issuer. Mandatory: the overlay sets it. Its host gets Cilium egress on port 443, so the URL is https without a port.",
+              "pattern": "^(https://[^/:]+(/.*)?|\\{\\{.*\\}\\})$"
             },
             "orgId": {
               "type": "string",
               "description": "ZITADEL_ORG_ID: optional, restricts sign-in to one organisation."
             }
           },
+          "required": [
+            "baseUrl"
+          ],
           "additionalProperties": false
         },
         "kyckr": {
@@ -2217,12 +2224,12 @@
           "properties": {
             "apiUrl": {
               "type": "string",
-              "description": "UPSTREAM_API_URL. Its host gets Cilium egress on port 443, so the URL is https without a port.",
-              "pattern": "^$|^https://[^/:]+(/.*)?$"
+              "description": "UPSTREAM_API_URL. Mandatory, with no default: https://api.kyckr.com/v2 is production, https://test-api.kyckr.com/v2 is test. Its host gets Cilium egress on port 443, so the URL is https without a port.",
+              "pattern": "^(https://[^/:]+(/.*)?|\\{\\{.*\\}\\})$"
             },
             "timeoutSeconds": {
               "type": "number",
-              "description": "UPSTREAM_TIMEOUT_SECONDS.",
+              "description": "UPSTREAM_TIMEOUT_SECONDS: how long one request to Kyckr may take.",
               "exclusiveMinimum": 0,
               "maximum": 120
             },
@@ -2235,6 +2242,9 @@
               "description": "UPSTREAM_DEFAULT_CONTACT_EMAIL: the contact on a document order when a call names none."
             }
           },
+          "required": [
+            "apiUrl"
+          ],
           "additionalProperties": false
         },
         "rateLimit": {
@@ -2243,12 +2253,12 @@
           "properties": {
             "toolCallsPerWindow": {
               "type": "integer",
-              "description": "MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW.",
+              "description": "MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW: tool calls one user may make in a window, on one replica.",
               "minimum": 1
             },
             "windowSeconds": {
               "type": "number",
-              "description": "MCP_RATE_LIMIT_WINDOW_SECONDS.",
+              "description": "MCP_RATE_LIMIT_WINDOW_SECONDS: the length of the window.",
               "exclusiveMinimum": 0
             }
           },

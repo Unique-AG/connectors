@@ -28,7 +28,7 @@ A failed Kyckr call does not raise an MCP error. The tool answers:
 
 `correlationId` is the Kyckr id of the request. Quote it to Kyckr support.
 
-Only a `429` from Kyckr is retried. A `503` can come after Kyckr has charged a paid read, so it is not retried.
+On a final `429`, one that is not retried or outlasts the retries, the message ends with `(retry after Ns)` when Kyckr sent a whole number of seconds in `Retry-After`. Only a `429` from Kyckr is retried. A `503` can come after Kyckr has charged a paid read, so it is not retried.
 
 ## Single tenant
 
@@ -55,19 +55,21 @@ With `networkPolicy.enabled`, set `postgresql.connection.host` so the base chart
 
 ### `mcpConfig` (Helm values)
 
-Unset values use the app default.
+The overlay must set `app.publicBaseUrl`, `zitadel.baseUrl` and `kyckr.apiUrl`: Helm fails with "... is mandatory" without them. The other values are pinned in the chart, and an overlay may change them. An overlay that relied on the old test API default now fails at upgrade and must set `kyckr.apiUrl`.
 
 | Value | Variable | Notes |
 |---|---|---|
-| `app.publicBaseUrl` | `MCP_BASE_URL` | The public https origin. Must match `routes.hostname`. Required. |
-| `zitadel.baseUrl` | `ZITADEL_BASE_URL` | The Zitadel issuer. Required. |
+| `app.publicBaseUrl` | `MCP_BASE_URL` | The public https origin. Must match `routes.hostname`. Mandatory. |
+| `zitadel.baseUrl` | `ZITADEL_BASE_URL` | The Zitadel issuer. Mandatory. |
 | `zitadel.orgId` | `ZITADEL_ORG_ID` | Restricts sign-in to one organisation. See below. |
-| `kyckr.apiUrl` | `UPSTREAM_API_URL` | The chart sets the test API, `https://test-api.kyckr.com/v2`. Production is `https://api.kyckr.com/v2`. |
-| `kyckr.timeoutSeconds` | `UPSTREAM_TIMEOUT_SECONDS` | At most 120. |
+| `kyckr.apiUrl` | `UPSTREAM_API_URL` | Mandatory, with no default, so no deployment calls the test API by accident. Production is `https://api.kyckr.com/v2`, test is `https://test-api.kyckr.com/v2`. |
+| `kyckr.timeoutSeconds` | `UPSTREAM_TIMEOUT_SECONDS` | Pinned at 30. At most 120. |
 | `kyckr.defaultCustomerReference` | `UPSTREAM_DEFAULT_CUSTOMER_REFERENCE` | Sent to Kyckr for usage reconciliation when a call gives none. |
 | `kyckr.defaultContactEmail` | `UPSTREAM_DEFAULT_CONTACT_EMAIL` | The contact on a document order when a call gives none. |
-| `rateLimit.toolCallsPerWindow` | `MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW` | Tool calls per signed-in user and window. |
-| `rateLimit.windowSeconds` | `MCP_RATE_LIMIT_WINDOW_SECONDS` | |
+| `rateLimit.toolCallsPerWindow` | `MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW` | Pinned at 60. Tool calls per signed-in user and window. |
+| `rateLimit.windowSeconds` | `MCP_RATE_LIMIT_WINDOW_SECONDS` | Pinned at 60. |
+
+An `UPSTREAM_API_URL` with a path prefix other than `/vN` makes every route `[unknown]` and records no credits.
 
 With `networkPolicy.enabled`, the hosts of `zitadel.baseUrl` and `kyckr.apiUrl` get a Cilium egress rule on port 443, so both URLs are https without a port.
 
@@ -112,23 +114,24 @@ uv sync
 uv run kyckr-mcp
 ```
 
-The MCP endpoint is `http://127.0.0.1:8000/mcp`. Without sign-in no database is needed: the dummy `DATABASE_URL` in `.env.example` is enough. The default `UPSTREAM_API_URL` is the Kyckr test API, so no real credits are spent by accident.
+The MCP endpoint is `http://127.0.0.1:8000/mcp`. Without sign-in no database is needed: the dummy `DATABASE_URL` in `.env.example` is enough. `.env.example` sets `UPSTREAM_API_URL` to the Kyckr test API, so no real credits are spent by accident. The app has no default for it and refuses to start without one.
 
 `uv run poe ci` runs every check CI runs.
 
 ## Metrics and spans
 
-`/metrics` carries the per-tool metrics every MCP exports (`mcp_calls_total`, `mcp_call_duration_seconds`) and three metrics of this service for calls to Kyckr. They keep the names the NestJS service used.
+`/metrics` carries the per-tool metrics every MCP exports (`mcp_calls_total`, `mcp_call_duration_seconds`) and four metrics of this service for calls to Kyckr. They keep the names the NestJS service used.
 
 | Metric | Type | Labels |
 |---|---|---|
 | `kyckr_api_requests_total` | counter | `method`, `path`, `status` |
 | `kyckr_api_request_duration_ms` | histogram | `method`, `path` |
+| `kyckr_api_retries_total` | counter | `method`, `path` |
 | `kyckr_credits_consumed_total` | counter | `tool` |
 
 - `path` is the route with ids replaced by placeholders: `/companies/:kyckrId/lite`, `/companies/:kyckrId/enhanced`, `/companies/:kyckrId/documents`, `/companies`, `/orders/:orderId`, `/orders/:orderId/download` and `/orders`. The route is read from the encoded path without its query, so an id with a `/` stays one segment. A path outside that list is labelled `[unknown]`. No label carries an id, the Kyckr key or user data.
 - `status` is the HTTP status Kyckr answered with, or `0` when it gave no answer, for example on a timeout.
-- Each attempt counts, so a request retried after a 429 adds one count per attempt.
+- Each attempt counts, so a request retried after a 429 adds one count per attempt. `kyckr_api_retries_total` adds one for each attempt after the first, so it counts the retries alone.
 - The histogram buckets end at 120 000 ms, the longest timeout the chart allows.
 - `kyckr_credits_consumed_total` adds the `cost.value` of a successful call to `get_lite_profile`, `get_enhanced_profile`, `create_document_order` or `get_order`. A call that fails, or whose answer has no cost or a cost below 0, adds nothing.
 - Each call to Kyckr is a client span named `<method> <route>`, with `http.request.method`, `url.template` and `http.response.status_code`. A status of 400 or more, or no answer, sets the span to error, and no exception message or stack goes on it. Spans export when tracing is on (`OTEL_*`).
