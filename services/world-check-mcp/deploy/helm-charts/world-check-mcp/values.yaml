@@ -19,7 +19,7 @@ env:
   # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
   DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
   # zitadel is the default and needs the ZITADEL_* variables below, or the app fails at startup.
-  # none serves without sign-in, on loopback only.
+  # none serves without sign-in, on loopback only: HOST must then be a loopback address, not 0.0.0.0.
   MCP_AUTH_MODE: zitadel
 
 # Set per deployment in the overlay. The app refuses to start without them.
