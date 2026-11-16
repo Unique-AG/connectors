@@ -399,7 +399,9 @@ describe('IngestionService', () => {
       mockRequest.mockResolvedValueOnce({ statusCode: 500 });
       vi.mocked(uniqueApiClient.files.deleteByIds).mockRejectedValue(new Error('network error'));
 
-      await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow('Upload failed with status 500');
+      await expect(service.ingestPage(pageFixture, 'space-scope-1')).rejects.toThrow(
+        'Upload failed with status 500',
+      );
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
