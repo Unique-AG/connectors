@@ -215,7 +215,7 @@ To move a tenant to a different Confluence instance, create a new root scope in 
 2. Does the service account have access to the page's space? On Data Center, access can optionally be restricted to specific spaces. If space restrictions are configured, pages in excluded spaces are silently excluded from CQL results.
 3. Is the page in a global space? (Cloud: also includes collaboration spaces.)
 4. Is the page a standard page type? (Databases, whiteboards, embeds, and folders are skipped.)
-5. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion. After an edit gives the page content, it is ingested on the next sync.
+5. Does the page have a non-empty body? Pages with empty bodies are discovered but skipped during content ingestion.
 6. Is the tenant status set to `active` in the YAML config?
 7. Check connector logs for errors related to authentication, API rate limits, or Unique API failures.
 

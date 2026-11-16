@@ -3,7 +3,6 @@ import { ZodError } from 'zod';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
 import { HttpStatusError } from '../utils/http-util';
-import type { EmptyPageRegistry } from './empty-page-registry';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
@@ -12,19 +11,9 @@ export class ConfluenceContentFetcher {
   public constructor(
     private readonly confluenceConfig: ConfluenceConfig,
     private readonly apiClient: ConfluenceApiClient,
-    private readonly emptyPages: EmptyPageRegistry,
   ) {}
 
   public async fetchPageContent(page: DiscoveredPage): Promise<FetchedPage | null> {
-    if (this.emptyPages.isKnownEmpty(page)) {
-      this.logger.debug({
-        pageId: page.id,
-        title: page.title,
-        msg: 'Page had no body at this version, skipping without fetching',
-      });
-      return null;
-    }
-
     const fullPage = await this.fetchFullPage(page);
 
     if (!fullPage) {
@@ -38,7 +27,6 @@ export class ConfluenceContentFetcher {
 
     const body = fullPage.body?.storage?.value || '';
     if (!body) {
-      this.emptyPages.markEmpty(page);
       this.logger.debug({
         pageId: page.id,
         title: page.title,
@@ -46,7 +34,6 @@ export class ConfluenceContentFetcher {
       });
       return null;
     }
-    this.emptyPages.forget(page.id);
 
     const confluenceLabels = this.extractLabels(fullPage.metadata.labels.results);
     const metadata = confluenceLabels.length > 0 ? { confluenceLabels } : undefined;
