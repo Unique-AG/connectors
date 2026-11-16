@@ -443,9 +443,9 @@ Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 2
 
 | Metric                                | Type    | Labels                        | Description                                                                      |
 |---------------------------------------|---------|-------------------------------|----------------------------------------------------------------------------------|
-| `cfc_pages_processed_total`           | Counter | `tenant`, `result`            | Pages ingested per sync cycle                                                    |
-| `cfc_attachments_processed_total`     | Counter | `tenant`, `result`            | Attachments ingested per sync cycle                                              |
-| `cfc_content_deleted_total`           | Counter | `tenant`, `result`            | Content items deleted from Unique                                                |
+| `cfc_pages_processed_total`           | Counter | `tenant`, `result`            | Pages processed per sync cycle. `result` is `success`, `failure` or `skipped` (missing or empty page) |
+| `cfc_attachments_processed_total`     | Counter | `tenant`, `result`            | Attachments processed per sync cycle. `result` is `success` or `failure`        |
+| `cfc_content_deleted_total`           | Counter | `tenant`, `result`            | Content items deleted from Unique. `result="failure"` counts deletions that failed |
 | `cfc_file_diff_events_total`         | Counter | `tenant`, `diff_result_type`  | File change detection events (`new`, `updated`, `deleted`, `moved`)              |
 | `cfc_orphaned_scopes_cleaned_total`   | Counter | `tenant`, `result`            | Space scopes removed after their Confluence space was removed or unlabeled       |
 | `cfc_orphaned_files_cleaned_total`    | Counter | `tenant`                      | Files removed during orphaned space cleanup                                      |
@@ -505,7 +505,9 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `ConfluenceConnectorContentFailures` | Pages, attachments or deletions fail on every sync for 3 hours | `3h` | `warning` |
 | `ConfluenceConnectorTenantCleanupFailing` | At least two cleanup runs of a tenant with status `deleted` in the last 3 hours, and all of them failed | `15m` | `warning` |
 
-The sync alerts expect syncs that start at least hourly and finish within the interval. For slower schedules, widen the windows so each holds at least two sync outcomes.
+The sync alerts expect syncs that start at least hourly and finish within the interval. `SyncFailing`, `SyncDegraded` and `TenantCleanupFailing` need at least two outcomes in their window, so one failed sync, such as the first after a pod start, does not fire them. A sync that runs longer than the interval makes the scheduler skip the next start. For slower schedules or longer syncs, widen the windows so each holds at least two sync outcomes.
+
+`ContentFailures` uses a 2-hour window because two hourly syncs that finish at different minutes can record their failures almost 2 hours apart. Its `for: 3h` is longer than the window, so the failures of one sync alone never fire it.
 
 Requests to Unique only happen during a sync, so the 75-minute window must be longer than the sync interval (`scanIntervalCron`). For schedules slower than hourly, override the rule's `expr` with a wider window, or the alert resolves between failing syncs.
 

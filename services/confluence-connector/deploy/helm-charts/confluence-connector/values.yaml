@@ -152,8 +152,7 @@ prometheus:
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
       # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
-      # A new error series is missed by increase() until its second error. A failing sync is
-      # caught from the second failed sync by ConfluenceConnectorSyncFailing.
+      # increase() misses a new error series until its second error; SyncFailing covers that case.
       expr: |
         sum by (namespace) (increase(confluence_connector_unique_api_requests_total{result="error"}[75m]))
         /
@@ -163,10 +162,8 @@ prometheus:
       labels:
         severity: warning
         alertGroup: confluence-connector
-    # The sync rules need at least two outcomes in their window, so one failed sync, for example
-    # the first after a pod start, does not fire them. The windows fit syncs that start at least
-    # hourly (scanIntervalCron) and finish within the interval. A sync that runs longer than the
-    # interval makes the scheduler skip the next start, so widen the windows for slower syncs.
+    # The sync rules need two outcomes in their window, so one failed sync does not fire them.
+    # The windows assume hourly syncs; docs/operator/configuration.md covers slower schedules.
     ConfluenceConnectorSyncFailing:
       alert: ConfluenceConnectorSyncFailing
       annotations:
@@ -244,9 +241,8 @@ prometheus:
           2. Check the failing items in the "Page ingestion summary" and "Attachment ingestion summary" log lines
           3. Unique ingestion errors also show in ConfluenceConnectorUniqueAPIErrors
           4. If the same item fails on every sync (for example too large, or rejected by Unique), the alert keeps firing until that item is fixed or removed in Confluence
-      # Two hourly syncs can record their failures almost 2 hours apart, so the 2h window stays true
-      # while failures recur. for: 3h is longer than the window, so one bad sync does not fire.
-      # The connector zeroes all three counters at startup, so each side of + has a series.
+      # Hourly failures can land almost 2h apart, so the 2h window holds while they recur, and for: 3h
+      # stops one bad sync from firing. The counters start at 0, so each side of + has a series.
       expr: |
         (
           sum by (namespace, tenant) (increase(cfc_pages_processed_total{result="failure"}[2h]))

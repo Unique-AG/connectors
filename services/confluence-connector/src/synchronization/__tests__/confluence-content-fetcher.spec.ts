@@ -276,6 +276,24 @@ describe('ConfluenceContentFetcher', () => {
     });
   });
 
+  it('rethrows a network error and logs its name and code without the message', async () => {
+    const networkError = Object.assign(new Error('connect ECONNRESET 10.0.0.1:443 secret detail'), {
+      code: 'ECONNRESET',
+    });
+    const apiClient = { getPageById: vi.fn().mockRejectedValue(networkError) };
+    const fetcher = createFetcher(apiClient);
+
+    await expect(fetcher.fetchPageContent(makeDiscoveredPage('reset'))).rejects.toBe(networkError);
+
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      pageId: 'reset',
+      title: new Smeared('Page reset', false),
+      errorName: 'Error',
+      errorCode: 'ECONNRESET',
+      msg: 'Failed to fetch page',
+    });
+  });
+
   it('rethrows an unexpected response and logs where it failed validation', async () => {
     const validationError = new ZodError([
       {

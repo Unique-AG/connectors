@@ -264,7 +264,7 @@ If your intent really was to replace all pages in a space with a completely new 
 
 ### How does the connector handle errors during ingestion?
 
-**Answer:** Individual item failures are logged and skipped without aborting the entire sync cycle. At the end of each batch, a summary is logged showing how many items succeeded and how many failed.
+**Answer:** Individual item failures are logged and counted as failed, without aborting the entire sync cycle. They are retried on the next sync. At the end of each batch, a summary is logged showing how many items succeeded and how many failed.
 
 ## Multi-Tenancy
 

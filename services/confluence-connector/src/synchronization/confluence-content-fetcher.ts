@@ -108,5 +108,9 @@ function describeFetchError(err: unknown): Record<string, unknown> {
       issues: err.issues.map(({ code, path }) => ({ code, path: path.map(String).join('.') })),
     };
   }
-  return { errorName: err instanceof Error ? err.name : typeof err };
+  if (err instanceof Error) {
+    const errorCode = 'code' in err && typeof err.code === 'string' ? err.code : undefined;
+    return errorCode ? { errorName: err.name, errorCode } : { errorName: err.name };
+  }
+  return { errorName: typeof err };
 }
