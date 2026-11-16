@@ -177,10 +177,6 @@ prometheus:
           5. Network errors: check NetworkPolicy, proxy and DNS
       expr: |
         (
-          sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[3h])) > 0
-        )
-        and on (namespace, tenant)
-        (
           sum by (namespace, tenant) (increase(cfc_syncs_total[3h])) > 1.5
         )
         unless on (namespace, tenant)
@@ -262,10 +258,6 @@ prometheus:
           1. Search the connector logs for "cleanup" with this tenantName
           2. Check that the service user can still manage the tenant's root folder
       expr: |
-        (
-          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="failure"}[3h])) > 0
-        )
-        and on (namespace, tenant)
         (
           sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total[3h])) > 1.5
         )

@@ -81,8 +81,7 @@ export class DataCenterConfluenceApiClient extends ConfluenceApiClient {
     return pages;
   }
 
-  // A missing or deleted page answers 404, so this returns null and the page is skipped.
-  // A response that fails the schema throws a ZodError, so the page counts as failed.
+  // Returns null on 404. Throws on other HTTP errors and on a response that fails the schema.
   public async getPageById(pageId: string): Promise<ConfluencePage | null> {
     const expand = 'body.storage,version,space,metadata.labels';
     const url = `${this.config.baseUrl}/rest/api/content/${pageId}?expand=${expand}`;
