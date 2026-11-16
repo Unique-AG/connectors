@@ -27,7 +27,6 @@ revert = Reverts a previous commit
 polixis-mcp = services/polixis-mcp/**
 world-check-mcp = services/world-check-mcp/**
 architecture-demo-mcp = services/architecture-demo-mcp/**
-kyckr-mcp = services/kyckr-mcp/**
 exp-kyckr-mcp = services/exp-kyckr-mcp/**
 outlook-semantic-mcp = services/outlook-semantic-mcp/**
 sharepoint-connector = services/sharepoint-connector/**
