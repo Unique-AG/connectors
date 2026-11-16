@@ -23,7 +23,6 @@ from world_check_mcp.upstream.generated.operations import GET_GROUP_BY_ID
 from world_check_mcp.upstream.generated.operations import GET_GROUPS
 from world_check_mcp.upstream.generated.operations import GET_MRZ_DATA
 from world_check_mcp.upstream.generated.operations import GET_NATIONALITIES
-from world_check_mcp.upstream.generated.operations import GET_ONGOING_SCREENING_UPDATES
 from world_check_mcp.upstream.generated.operations import GET_PROVIDERS
 from world_check_mcp.upstream.generated.operations import GET_RECORD
 from world_check_mcp.upstream.generated.operations import GET_RESOLUTION_TOOLKITS_FOR_GROUP
@@ -74,6 +73,7 @@ from world_check_mcp.upstream.generated.vendor_responses import ResolutionToolki
 from world_check_mcp.upstream.generated.vendor_responses import SearchParameterCollection
 from world_check_mcp.upstream.generated.vendor_responses import StatusResolutionField
 from world_check_mcp.upstream.generated.vendor_responses import WatchlistResults
+from world_check_mcp.upstream.queries import GET_ONGOING_SCREENING_UPDATES
 from world_check_mcp.upstream.queries import GET_RESULTS
 from world_check_mcp.upstream.queries import GET_SCREENING_STATUS
 from world_check_mcp.upstream.queries import next_page
