@@ -20,7 +20,8 @@ silently. A good answer always names the `pid` it used and the sources Polixis g
 > We're onboarding Elena Varga, born March 1971, Hungarian national. Is she sanctioned or a PEP?
 
 - `search_entities` with `entity_type` `PERSON` and `countries` `["hu"]`. The tool takes no date,
-  so the agent compares each match's birth date with 1971-03 itself.
+  so the agent compares each match's birth date with 1971-03 itself, on every page of hits
+  before it reports no match.
 - `get_key_identifiers` on the match, for flags, alerts and sanction statuses.
 - If she is a PEP: `get_profile_fields` with `positions`.
 
@@ -51,10 +52,11 @@ roles are marked as former. Any flagged party is called out above the table.
   run it.
 
 A good answer lists the natural persons at the top of each chain, multiplying shares through
-intermediate holdings, and the ones at or above 25%. When nobody reaches 25%, it names the
-senior managers, as the controlling-person rules then require. It flags control by other means,
-such as one person signing for the company while a nominee holds the shares, as a lead to
-assess and not a finding: a shared address or network is not control.
+intermediate holdings and adding up each person's chains, and the ones whose total reaches 25%,
+even when no single chain does. When nobody reaches 25%, it names the senior managers, as the
+controlling-person rules then require. It flags control by other means, such as one person
+signing for the company while a nominee holds the shares, as a lead to assess and not a finding:
+a shared address or network is not control.
 
 ### 4. Corroborate source of wealth
 
@@ -78,10 +80,12 @@ Polixis shows from what it doesn't, and says that the size of a sale is not in t
 - `get_ultimate_beneficial_owners`.
 - `get_key_identifiers` for each owner without flags in the tree.
 
-A good answer adds up, per sanctions regime, the shares held directly or indirectly by listed
-owners, since OFAC aggregates stakes of several listed persons, and says whether the total
-reaches 50%. It shows the chain behind each stake. It notes that the EU also blocks an entity
-controlled without a majority, which share data alone cannot settle.
+A good answer applies OFAC's rule one level at a time, from the listed owners down: a company in
+which blocked persons together hold 50% or more is blocked itself, and its own stake then counts
+in full at the next level, so a 50% holding of a 50% subsidiary blocks the target where the
+multiplied 25% would not. It adds up the stakes of listed owners per sanctions regime and shows
+the chain behind each. It notes that the EU also blocks an entity controlled without a majority,
+which share data alone cannot settle.
 
 ### 6. Sanctioned parties anywhere near a client
 
@@ -239,7 +243,8 @@ using it.
 > company.
 
 - `search_entities`, `get_corporate_profile`, `get_ultimate_beneficial_owners`, and
-  `get_subgraph` with `requireSanction` at `radius` 2.
+  `get_subgraph` at `radius` 2 twice, once with `requireSanction` and once with `requireSoe`,
+  since a rule follows only the links it requires.
 
 A good answer is short: who owns it, who runs it, the flags on any of them, and the nearest
 sanctioned or state-owned link. It ends with what the brief doesn't cover: adverse media and

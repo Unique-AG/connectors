@@ -64,11 +64,15 @@ retrieved, and all of it comes from public sources.
    but also asks whether someone controls "by other discernible means", and Form K now asks
    for date of birth and nationality. Polixis argues it is "a data project": relations must be
    typed, sourced and dated, and conflicting values kept rather than overwritten.
-3. **Indirect sanctions exposure.** A company not on any list is still blocked when listed
-   parties own 50% or more of it, directly or indirectly, alone or together (OFAC), or when a
-   listed person controls it (EU). Banks walk the ownership chain up from the client and the
-   graph out from it. Polixis' news follows the court cases that draw this line, such as informal
-   political control (Inter RAO Lietuva) and state-owned payees (DNO Yemen).
+3. **Indirect sanctions exposure.** A company not on any list is still blocked when blocked
+   persons own 50% or more of it, directly or indirectly, alone or together (OFAC). An owner
+   under sectoral restrictions only, such as a Directive 3 debt and equity ban, passes those
+   restrictions on, not a block. In the EU, a company more than 50% owned or otherwise
+   controlled by a listed person is presumed to pass on what it receives to that person, a
+   presumption the bank can rebut case by case, and neither control nor its rebuttal shows in
+   share data alone. Banks walk the ownership chain up from the client and the graph out from
+   it. Polixis' news follows the court cases that draw this line, such as informal political
+   control (Inter RAO Lietuva) and state-owned payees (DNO Yemen).
 4. **PEP and RCA identification.** Find whether a client, or someone behind it, holds or held a
    prominent public function, or is family or a close associate of someone who does, and which
    positions, since the bank applies enhanced due diligence and its own rules on former PEPs.
