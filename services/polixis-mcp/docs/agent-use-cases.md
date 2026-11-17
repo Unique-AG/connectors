@@ -151,7 +151,8 @@ current or former, and the relation they hold to the company.
 > her?
 
 - `get_subgraph` around her with `radius` 2. `get_smart_graph` leaves out signatory and
-  third-party relations, where associates often sit.
+  third-party relations, where associates often sit. The subgraph's `meta` holds only the
+  `fields` asked for, so `get_basic_identifiers` names the parties the answer lists.
 
 A good answer lists the companies she owns or runs, and those of the people linked to her, with
 the relation at each step. Because the documentation doesn't say how relatives are marked, it
