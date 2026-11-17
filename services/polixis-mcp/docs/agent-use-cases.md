@@ -12,6 +12,7 @@ Every case starts the same way: `search_entities` turns a name into a `pid`, and
 tool takes that `pid` as its `id`. When the search returns several plausible matches, the
 agent narrows them by country, date of birth or identifier, or asks, and never picks one
 silently. A good answer always names the `pid` it used and the sources Polixis gives.
+An ownership tree with `truncated` true is incomplete, and an answer built on it says so.
 
 ## Onboarding
 
@@ -21,7 +22,7 @@ silently. A good answer always names the `pid` it used and the sources Polixis g
 
 - `search_entities` with `entity_type` `PERSON` and `countries` `["hu"]`. The tool takes no date,
   so the agent compares each match's birth date with 1971-03 itself, on every page of hits
-  before it reports no match.
+  before it reports no match. A match without a birth date stays a possible match.
 - `get_key_identifiers` on the match, for flags, alerts and sanction statuses.
 - If she is a PEP: `get_profile_fields` with `positions`.
 
@@ -47,7 +48,8 @@ roles are marked as former. Any flagged party is called out above the table.
 > Who are the beneficial owners of Aurelia Trading SA, Geneva, above 25%? And is anyone
 > controlling it without holding shares?
 
-- `get_ultimate_beneficial_owners`, then each owner's effective share through the chain.
+- `get_ultimate_beneficial_owners`, then each owner's effective share through the chain. Its
+  nodes carry pids, not names, so `get_basic_identifiers` names the owners the answer lists.
 - `get_corporate_profile` with `executive`, `executiveSenior` and `signature`, for the people who
   run it.
 
@@ -148,7 +150,8 @@ current or former, and the relation they hold to the company.
 > Elena Varga is a PEP. Which companies is she connected to, directly or through people around
 > her?
 
-- `get_smart_graph` around her with `radius` 2.
+- `get_subgraph` around her with `radius` 2. `get_smart_graph` leaves out signatory and
+  third-party relations, where associates often sit.
 
 A good answer lists the companies she owns or runs, and those of the people linked to her, with
 the relation at each step. Because the documentation doesn't say how relatives are marked, it
