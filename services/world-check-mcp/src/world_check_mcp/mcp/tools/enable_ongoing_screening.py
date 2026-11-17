@@ -13,9 +13,11 @@ from world_check_mcp.upstream import Upstream
 @tool(
     title="Enable Ongoing Screening",
     description=(
-        "Enable WATCHLIST monitoring for one case. A 200 body can still mean it failed.\n"
+        "Enable WATCHLIST monitoring for one case.\n"
         "\n"
-        "This changes the case's screening state. Media Check is not enabled."
+        "This changes the case's screening state. LSEG can answer 200 without enabling it, so "
+        "read enabled in the result: false means monitoring is off, and failures says why. "
+        "Media Check is not enabled."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=True, destructive_hint=False, open_world_hint=True

@@ -6,7 +6,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Enable WATCHLIST monitoring for one case. A 200 body can still mean it failed.\n\nThis changes the case's screening state. Media Check is not enabled.",
+    "description": "Enable WATCHLIST monitoring for one case.\n\nThis changes the case's screening state. LSEG can answer 200 without enabling it, so read enabled in the result: false means monitoring is off, and failures says why. Media Check is not enabled.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
