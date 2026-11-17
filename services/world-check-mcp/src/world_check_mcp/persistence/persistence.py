@@ -9,6 +9,8 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from world_check_mcp.persistence.case_locks import CaseLocks
+from world_check_mcp.persistence.case_locks import PostgresCaseLocks
 from world_check_mcp.persistence.store import open_store
 from world_check_mcp.persistence.store import Store
 from world_check_mcp.persistence.store import StoreSettings
@@ -26,6 +28,7 @@ class Persistence(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
     store: Store
+    case_locks: CaseLocks
 
 
 @asynccontextmanager
@@ -33,4 +36,4 @@ async def open_persistence(settings: PersistenceSettings) -> AsyncGenerator[Pers
     async with (
         open_store(settings.store) as store,
     ):
-        yield Persistence(store=store)
+        yield Persistence(store=store, case_locks=PostgresCaseLocks(store.pool))

@@ -10,6 +10,8 @@ from world_check_mcp.contexts.passport.models import PassportMrz
 from world_check_mcp.contexts.passport.models import PassportVerification
 from world_check_mcp.contexts.passport.models import PassportVerificationPlan
 from world_check_mcp.contexts.passport.models import PassportVerificationRequest
+from world_check_mcp.persistence import CaseLease
+from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.upstream import Upstream
 from world_check_mcp.upstream import VERIFY_PASSPORT
 
@@ -73,15 +75,35 @@ async def apply_passport_verification(
     request: PassportVerificationRequest,
     plan: PassportVerificationPlan,
     actor: str,
+    locks: CaseLocks,
 ) -> PassportVerification:
     """Save an already approved comparison, after reading the case once more. A case id that now
-    maps to another case changes the plan, so it is refused too.
+    maps to another case changes the plan, so it is refused too. The case stays locked from that
+    read to the write, and a second approval on it is refused.
     """
+    refusal = PassportError(
+        "Another decision on this case is being saved. Review the case and request fresh approval."
+    )
+    async with locks.hold(plan.case_system_id, refuse=refusal) as lease:
+        return await _apply_passport_verification(
+            upstream=upstream, request=request, plan=plan, actor=actor, lease=lease
+        )
+
+
+async def _apply_passport_verification(
+    *,
+    upstream: Upstream,
+    request: PassportVerificationRequest,
+    plan: PassportVerificationPlan,
+    actor: str,
+    lease: CaseLease,
+) -> PassportVerification:
     current = await prepare_passport_verification(upstream=upstream, request=request, actor=actor)
     if current != plan:
         raise PassportError(
             "Case or passport results changed during approval. Review and request fresh approval."
         )
+    await lease.ensure_held()
     await upstream.call_untyped(
         VERIFY_PASSPORT,
         caseSystemId=plan.case_system_id,

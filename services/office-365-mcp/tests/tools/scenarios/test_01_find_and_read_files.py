@@ -13,7 +13,13 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
-from mcp.types import BlobResourceContents, EmbeddedResource, TextResourceContents
+from mcp.types import (
+    BlobResourceContents,
+    ContentBlock,
+    EmbeddedResource,
+    ResourceLink,
+    TextResourceContents,
+)
 
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from tests.conftest import RecordedSleeps
@@ -33,6 +39,12 @@ _PDF = "application/pdf"
 _MEGABYTE = 1024 * 1024
 _FIRST_EDIT = datetime(2026, 1, 1, tzinfo=UTC)
 _BUSY = {"error": {"code": "activityLimitReached", "message": "busy"}}
+_RAW_ADDRESS = (
+    "https://contoso.sharepoint.invalid/sites/Sales/Freigegebene Dokumente/SLA_DE[80].docx"
+)
+_ESCAPED_ADDRESS = (
+    "https://contoso.sharepoint.invalid/sites/Sales/Freigegebene%20Dokumente/SLA_DE%5B80%5D.docx"
+)
 _REJECTED = {
     "error": {"code": "invalidRequest", "message": "the item is not valid for this operation"}
 }
@@ -43,12 +55,20 @@ def _server() -> FastMCP[None]:
     return build_server()
 
 
-async def _resource(file: str, **arguments: object) -> TextResourceContents | BlobResourceContents:
+async def _read_blocks(file: str, **arguments: object) -> list[ContentBlock]:
     with pytest.MonkeyPatch.context() as patch:
         patch_obo(patch)
         async with Client(FastMCPTransport(_server()), mode="legacy") as client:
             answer = await client.call_tool("sharepoint_read_file", {"file": file, **arguments})
-    [block] = answer.content
+    return answer.content
+
+
+async def _resource(file: str, **arguments: object) -> TextResourceContents | BlobResourceContents:
+    [block] = [
+        block
+        for block in await _read_blocks(file, **arguments)
+        if not isinstance(block, ResourceLink)
+    ]
     assert isinstance(block, EmbeddedResource)
     return block.resource
 
@@ -90,13 +110,17 @@ def _query_string(route: respx.Route) -> str:
 
 
 def _item(
-    facets: Mapping[str, object] | None = None, *, size: int | None = 4, mime_type: str = _PDF
+    facets: Mapping[str, object] | None = None,
+    *,
+    size: int | None = 4,
+    mime_type: str = _PDF,
+    web_url: str = "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
 ) -> Row:
     return {
         "id": _FILE_ID,
         "name": "Brightway Launch Plan.pdf",
         "size": size,
-        "webUrl": "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
+        "webUrl": web_url,
         "parentReference": {"driveId": "b!SYNTHETICDRIVE"},
         **(facets or {"file": {"mimeType": mime_type}}),
     }
@@ -113,10 +137,13 @@ def _serve_file(
     *,
     handle: str = _FILE,
     mime_type: str = _PDF,
+    web_url: str = "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
 ) -> respx.Route:
     path = _item_path(handle)
     _ = graph.get(path).mock(
-        return_value=httpx.Response(200, json=_item(size=len(content), mime_type=mime_type))
+        return_value=httpx.Response(
+            200, json=_item(size=len(content), mime_type=mime_type, web_url=web_url)
+        )
     )
     return graph.get(f"{path}/content").mock(return_value=httpx.Response(200, content=content))
 
@@ -322,6 +349,28 @@ class TestReadingAFile:
 
         assert _names(found, "files") == [named]
         assert (mime_type, content[:2]) == (_DOCX, b"PK")
+
+    async def test_a_read_file_comes_with_a_link_that_opens_it_in_a_browser(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _serve_file(graph)
+
+        [link] = [block for block in await _read_blocks(_FILE) if isinstance(block, ResourceLink)]
+
+        assert (link.name, link.uri, link.mime_type) == (
+            "Brightway Launch Plan.pdf",
+            "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
+            _PDF,
+        )
+
+    async def test_the_link_of_a_read_file_escapes_the_spaces_and_brackets_of_its_address(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _serve_file(graph, web_url=_RAW_ADDRESS)
+
+        [link] = [block for block in await _read_blocks(_FILE) if isinstance(block, ResourceLink)]
+
+        assert link.uri == _ESCAPED_ADDRESS
 
     async def test_a_file_of_exactly_ten_megabytes_is_read_as_a_whole(
         self, graph: respx.MockRouter
@@ -738,6 +787,20 @@ def _search_answer(*containers: Row) -> Row:
 
 
 class TestWhatTheSearchAndTheListingsShow:
+    @pytest.mark.parametrize(
+        ("web_url", "shown"),
+        [(_RAW_ADDRESS, _ESCAPED_ADDRESS), (_ESCAPED_ADDRESS, _ESCAPED_ADDRESS)],
+        ids=["raw", "already-escaped"],
+    )
+    async def test_a_listed_address_holds_no_space_or_bracket_and_is_never_escaped_twice(
+        self, graph: respx.MockRouter, web_url: str, shown: str
+    ) -> None:
+        _ = _serve_children(graph, _item(web_url=web_url))
+
+        level = await call("sharepoint_browse_folder", folder=_FOLDER)
+
+        assert [row["web_url"] for row in _rows(level, "items")] == [shown]
+
     async def test_a_search_on_a_site_names_the_site(self, graph: respx.MockRouter) -> None:
         sales = "https://contoso.sharepoint.invalid/sites/Sales"
         mine = "https://contoso-my.sharepoint.invalid/personal/mia"

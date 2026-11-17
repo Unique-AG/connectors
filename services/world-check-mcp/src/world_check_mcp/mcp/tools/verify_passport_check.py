@@ -13,9 +13,11 @@ from world_check_mcp import contexts
 from world_check_mcp.mcp.approval import ApprovalGate
 from world_check_mcp.mcp.approval import passport_message
 from world_check_mcp.mcp.dependencies import get_approvals
+from world_check_mcp.mcp.dependencies import get_case_locks
 from world_check_mcp.mcp.dependencies import get_reviewer
 from world_check_mcp.mcp.dependencies import get_upstream
 from world_check_mcp.mcp.inputs.identifiers import CaseArgument
+from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.upstream import Upstream
 
 Note = Annotated[
@@ -48,6 +50,7 @@ async def verify_passport_check(
     note: Note = "",
     upstream: Upstream = Depends(get_upstream),
     approvals: ApprovalGate = Depends(get_approvals),
+    locks: CaseLocks = Depends(get_case_locks),
     actor: str = Depends(get_reviewer),
 ) -> contexts.PassportVerification | InputRequiredResult:
     request = contexts.PassportVerificationRequest(case=case, mrz_matched=mrz_matched, note=note)
@@ -62,7 +65,7 @@ async def verify_passport_check(
             ),
             message=passport_message,
             apply=lambda plan: contexts.apply_passport_verification(
-                upstream=upstream, request=request, plan=plan, actor=actor
+                upstream=upstream, request=request, plan=plan, actor=actor, locks=locks
             ),
         )
     except contexts.CaseNotFoundError as error:

@@ -96,6 +96,8 @@
         utilPkgs = with pkgs; [
           jq
           yq-go
+          secretspec
+          _1password-cli
         ];
       in
       {
