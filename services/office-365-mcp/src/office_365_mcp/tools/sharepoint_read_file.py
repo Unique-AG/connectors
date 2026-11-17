@@ -170,7 +170,7 @@ async def _fetched(
         if item.size is None:
             return _NO_SIZE
         if item.size > MAX_BYTES:
-            return _too_large(size=item.size, web_url=browser_url(item.web_url))
+            return _too_large(size=item.size, web_url=item.web_url)
 
         try:
             with graph_step(STEP_CONTENT):
@@ -187,7 +187,7 @@ async def _fetched(
                         extra={"item_bytes": item.size, "downloaded_bytes": downloaded.size},
                     )
         except GraphResponseTooLarge:
-            return _too_large(size=None, web_url=browser_url(item.web_url))
+            return _too_large(size=None, web_url=item.web_url)
         except GraphFailure as failure:
             if convert_to is not None and failure.status == HTTPStatus.NOT_ACCEPTABLE:
                 return _NOT_CONVERTIBLE
@@ -204,12 +204,11 @@ async def _fetched(
 
 
 def _browser_link(item: DriveItem) -> ResourceLink | None:
-    url = browser_url(item.web_url)
-    if url is None:
+    if item.web_url is None:
         return None
     return ResourceLink(
         name=item.name or UNNAMED_ITEM_LABEL,
-        uri=url,
+        uri=browser_url(item.web_url),
         description="Opens this file in a browser. Cite the file with this address.",
         mime_type=item.file.mime_type if item.file is not None else None,
     )
@@ -281,7 +280,7 @@ def _too_large(*, size: int | None, web_url: str | None) -> str:
         f"{_megabytes(size)} MB" if size is not None else f"more than {_megabytes(MAX_BYTES)} MB"
     )
     where = (
-        "Tell the user to open the file in a browser instead, at " + web_url + "."
+        "Tell the user to open the file in a browser instead, at " + browser_url(web_url) + "."
         if web_url is not None
         else "Microsoft gave no web address for this file. Tell the user to open the file from "
         + "the site itself."

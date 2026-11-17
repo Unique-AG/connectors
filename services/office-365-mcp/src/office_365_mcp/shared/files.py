@@ -70,14 +70,12 @@ _ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
 
 _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
 
-# The chat drops a citation link that holds whitespace, so escape what a URL cannot hold, such as
-# spaces and brackets in a file name. Every character with a meaning stays, `%` included, so an
-# address that is already escaped comes out unchanged.
+# Keeps every character with a meaning, `%` included, so an already escaped address is unchanged.
 _URL_CHARACTERS_TO_KEEP = ":/?#@!$&'()*+,;=%~"
 
 
-def browser_url(url: str | None) -> str | None:
-    return None if url is None else quote(url, safe=_URL_CHARACTERS_TO_KEEP)
+def browser_url(url: str) -> str:
+    return quote(url, safe=_URL_CHARACTERS_TO_KEEP)
 
 
 class DriveItemSummary(BaseModel):
@@ -204,7 +202,7 @@ class DriveItemSummary(BaseModel):
             name=item.name,
             is_folder=is_folder,
             size=item.size,
-            web_url=browser_url(item.web_url),
+            web_url=None if item.web_url is None else browser_url(item.web_url),
             created_at=item.created_date_time,
             created_by=display_name(item.created_by),
             last_modified_at=item.last_modified_date_time,
