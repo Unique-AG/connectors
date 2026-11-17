@@ -8,9 +8,11 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import ToolResult
 from fastmcp.utilities.types import File
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.request_information import RequestInformation
+from mcp.types import ResourceLink
 from msgraph.generated.drives.item.items.item.content.content_request_builder import (
     ContentRequestBuilder,
 )
@@ -28,7 +30,7 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
-from office_365_mcp.shared.files import ITEM_FIELDS
+from office_365_mcp.shared.files import ITEM_FIELDS, UNNAMED_ITEM_LABEL, browser_url
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
@@ -64,6 +66,8 @@ Notes:
 Word or Excel file comes back as a Word or Excel file. You may not be able to read a file in that \
 form. A PDF may be readable, but that is not sure. If you cannot read the content, tell the user \
 so, and give the web address of the file. Never guess what the file says.
+- Next to the file, this tool returns a link that opens it in a browser. Cite the file with that \
+link, and copy it exactly: never decode its `%` escapes.
 - This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
 message.
 """
@@ -134,7 +138,7 @@ async def sharepoint_read_file(
     *,
     file: str,
     convert_to: ConvertTo | None = None,
-) -> File:
+) -> ToolResult:
     handle = drive_file_handle(file)
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)
@@ -142,7 +146,9 @@ async def sharepoint_read_file(
     fetched = await _fetched(client, transport, handle, convert_to=convert_to)
     if isinstance(fetched, str):
         raise ToolError(fetched)
-    return fetched
+    content, item = fetched
+    link = _browser_link(item)
+    return ToolResult(content=[content] if link is None else [content, link])
 
 
 async def _fetched(
@@ -151,7 +157,7 @@ async def _fetched(
     handle: DriveFileHandle,
     *,
     convert_to: ConvertTo | None,
-) -> File | str:
+) -> tuple[File, DriveItem] | str:
     with graph_errors(TOOL_NAME):
         with graph_step(STEP_ITEM):
             item = await _item(client, handle)
@@ -190,8 +196,22 @@ async def _fetched(
         if body == b"" and item.size > 0:
             return _NOTHING_CAME_BACK
         if convert_to is None:
-            return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
-        return FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
+            return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body)), item
+        return (
+            FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE),
+            item,
+        )
+
+
+def _browser_link(item: DriveItem) -> ResourceLink | None:
+    if item.web_url is None:
+        return None
+    return ResourceLink(
+        name=item.name or UNNAMED_ITEM_LABEL,
+        uri=browser_url(item.web_url),
+        description="Opens this file in a browser. Cite the file with this address.",
+        mime_type=item.file.mime_type if item.file is not None else None,
+    )
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:
@@ -260,7 +280,7 @@ def _too_large(*, size: int | None, web_url: str | None) -> str:
         f"{_megabytes(size)} MB" if size is not None else f"more than {_megabytes(MAX_BYTES)} MB"
     )
     where = (
-        "Tell the user to open the file in a browser instead, at " + web_url + "."
+        "Tell the user to open the file in a browser instead, at " + browser_url(web_url) + "."
         if web_url is not None
         else "Microsoft gave no web address for this file. Tell the user to open the file from "
         + "the site itself."
@@ -319,5 +339,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         client: GraphServiceClient = graph,
-    ) -> File:
+    ) -> ToolResult:
         return await sharepoint_read_file(client, transport, file=file, convert_to=convert_to)
