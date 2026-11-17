@@ -125,11 +125,12 @@ at once (the ownership trees, the graphs, the sanctions exposure, the court deci
 path between two parties), the next page, or another tool on the same entity, reads the response
 from the cache instead of asking Polixis again.
 
-Every tool of our own keeps Polixis's answers in Postgres (`persistence/response_cache.py`), for
-`RESPONSE_CACHE_TTL_SECONDS`, 15 minutes by default, so the same request within that time spares
-the API key's quota. The answers are licensed data about real people, which Polixis updates in
-real time, so the TTL cannot exceed an hour. The server deletes the expired entries when it
-starts and once per TTL after, so an answer stays in Postgres at most twice the TTL.
+Every tool of our own reuses Polixis's answers from Postgres (`persistence/response_cache.py`)
+for `RESPONSE_CACHE_TTL_SECONDS`, 15 minutes by default, so the same request within that time
+spares the API key's quota. The answers are licensed data about real people, which Polixis
+updates in real time, so the TTL cannot exceed an hour. The TTL limits reuse, not storage: the
+server deletes the expired entries when it starts and once per TTL after, so an answer normally
+leaves Postgres within twice the TTL, later when a cleanup fails.
 `RESPONSE_CACHE_ENABLED=false` turns the cache off, and a new `RESPONSE_CACHE_KEY_PREFIX` stops
 reading every answer cached so far, which then expires. The cache is shared by every user of the
 deployment, who share the one set of Polixis credentials anyway. `resolve_permanent_id`, served

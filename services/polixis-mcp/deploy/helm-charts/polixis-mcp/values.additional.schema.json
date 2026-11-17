@@ -120,7 +120,7 @@
         },
         "responseCache": {
           "type": "object",
-          "description": "The Postgres cache of Polixis's answers, which spares the API key's quota. They are licensed data about real people, so an answer is kept at most an hour.",
+          "description": "The Postgres cache of Polixis's answers, which spares the API key's quota. They are licensed data about real people, so an answer is reused for an hour at most, then deleted by a periodic, best-effort cleanup.",
           "properties": {
             "enabled": {
               "type": ["boolean", "null"],
@@ -131,7 +131,7 @@
               "type": ["integer", "null"],
               "minimum": 1,
               "maximum": 3600,
-              "description": "RESPONSE_CACHE_TTL_SECONDS. How long an answer is reused; it stays in Postgres at most twice as long. App default: 900."
+              "description": "RESPONSE_CACHE_TTL_SECONDS. How long an answer is reused. A cleanup once per TTL deletes it, normally within twice the TTL. App default: 900."
             },
             "keyPrefix": {
               "type": "string",

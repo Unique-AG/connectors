@@ -18,8 +18,8 @@ from polixis_mcp.persistence.store import StoreSettings
 
 
 class ResponseCacheSettings(BaseSettings):
-    """How long Polixis's answers are kept to answer the same request again, which spares the API
-    key's quota. They are licensed data about real people, which Polixis updates in real time,
+    """How long Polixis's answers are reused to answer the same request again, which spares the
+    API key's quota. They are licensed data about real people, which Polixis updates in real time,
     so the time is capped at an hour. A changed `key_prefix` leaves every answer cached under the
     old one unread, until it expires and the cull deletes it.
     """

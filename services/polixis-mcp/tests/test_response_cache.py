@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime
+from datetime import timedelta
 from datetime import UTC
 from typing import override
 
@@ -400,6 +401,36 @@ async def test_an_entry_cached_in_an_older_form_is_fetched_again(
     await store.put(key, CachedResponse.model_validate(entry).response, collection=collection)
 
     refetched = await _owners(mcp_client)
+
+    assert refetched.freshness.cached_at is None
+    assert len(_polixis_paths(upstream_requests)) == 2
+
+
+async def test_an_entry_cached_longer_ago_than_a_shortened_ttl_is_fetched_again(
+    upstream_settings: UpstreamSettings,
+    upstream_transport: httpx2.MockTransport,
+    upstream_requests: list[httpx2.Request],
+) -> None:
+    store = FakeStore()
+    async with Client(
+        build_server(
+            upstream_settings,
+            Persistence(store=store, response_cache=fake_response_cache()),
+            upstream_transport,
+        )
+    ) as client:
+        await _owners(client)
+    [collection] = await store.collections()
+    [key] = await store.keys(collection)
+    entry = await store.get(key, collection=collection)
+    assert entry is not None
+    ten_minutes_ago = datetime.now(UTC) - timedelta(minutes=10)
+    aged = CachedResponse.model_validate(entry).model_copy(update={"cached_at": ten_minutes_ago})
+    await store.put(key, aged.model_dump(mode="json"), collection=collection, ttl=15 * 60)
+
+    shortened = Persistence(store=store, response_cache=fake_response_cache(ttl_seconds=5 * 60))
+    async with Client(build_server(upstream_settings, shortened, upstream_transport)) as client:
+        refetched = await _owners(client)
 
     assert refetched.freshness.cached_at is None
     assert len(_polixis_paths(upstream_requests)) == 2
