@@ -6235,8 +6235,8 @@ packages:
     resolution: {integrity: sha512-yEFYrVhod+hdNyx7g5Bnkkb0G6si8HJurOoOEgC8B/O0uXLHlaey/65KRv6cuWBNhBgHKAROVpc7QyYqE5gFng==}
     engines: {node: '>=20'}
 
-  tapable@2.3.3:
-    resolution: {integrity: sha512-uxc/zpqFg6x7C8vOE7lh6Lbda8eEL9zmVm/PLeTPBRhh1xCgdWaQ+J1CUieGpIfm2HdtsUpRv+HshiasBMcc6A==}
+  tapable@2.3.4:
+    resolution: {integrity: sha512-NHFiWnAbMJxNNpBwiO7jJVGDuqMxT9/oV8v57RR+fgBQShkJil5inGD8/xWy0hjLyHQyX1tu27QANhlz3KBqCg==}
     engines: {node: '>=6'}
 
   tar-fs@2.1.5:
@@ -9662,7 +9662,7 @@ snapshots:
   enhanced-resolve@5.27.0:
     dependencies:
       graceful-fs: 4.2.12
-      tapable: 2.3.3
+      tapable: 2.3.4
 
   entities@4.5.0: {}
 
@@ -9944,7 +9944,7 @@ snapshots:
       node-abort-controller: 3.1.1
       schema-utils: 3.3.0
       semver: 7.8.6
-      tapable: 2.3.3
+      tapable: 2.3.4
       typescript: 5.9.3
       webpack: 5.106.2(@swc/core@1.16.22)(esbuild@0.28.2)
 
@@ -11402,7 +11402,7 @@ snapshots:
 
   tagged-tag@1.0.0: {}
 
-  tapable@2.3.3: {}
+  tapable@2.3.4: {}
 
   tar-fs@2.1.5:
     dependencies:
@@ -11547,7 +11547,7 @@ snapshots:
     dependencies:
       chalk: 4.1.2
       enhanced-resolve: 5.27.0
-      tapable: 2.3.3
+      tapable: 2.3.4
       tsconfig-paths: 4.2.0
 
   tsconfig-paths@4.2.0:
@@ -11763,7 +11763,7 @@ snapshots:
       mime-db: 1.54.0
       neo-async: 2.6.2
       schema-utils: 4.8.3(webpack@5.106.2(@swc/core@1.16.22)(esbuild@0.28.2))
-      tapable: 2.3.3
+      tapable: 2.3.4
       terser-webpack-plugin: 5.6.1(@swc/core@1.16.22)(esbuild@0.28.2)(webpack@5.106.2(@swc/core@1.16.22)(esbuild@0.28.2))
       watchpack: 2.6.4
       webpack-sources: 3.7.0
