@@ -96,6 +96,8 @@
         utilPkgs = with pkgs; [
           jq
           yq-go
+          secretspec # resolves a service's secrets, e.g. services/world-check-mcp/secretspec.toml
+          _1password-cli # the 1Password provider of secretspec
         ];
       in
       {
