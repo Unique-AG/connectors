@@ -3,6 +3,8 @@ from itertools import pairwise
 from pydantic import BaseModel
 from pydantic import Field
 
+from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.graph.network import fetch_network
 from polixis_mcp.contexts.graph.network import GraphScope
 from polixis_mcp.contexts.graph.network import Link
@@ -63,6 +65,7 @@ async def find_linked_companies(
             if next_offset is not None
             else None
         ),
+        freshness=freshness(),
     )
 
 
@@ -207,3 +210,4 @@ class LinkedCompaniesPage(BaseModel):
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )
+    freshness: Freshness

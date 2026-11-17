@@ -311,5 +311,5 @@ the brief doesn't cover: adverse media, which this MCP doesn't reach.
 - **The final decision.** The agent shows evidence and possible matches. Whether a hit is the
   client, and whether to onboard, block or file a report, is the compliance officer's.
 - **Polixis is not the client file.** Every user shares one set of Polixis credentials, and a
-  Polixis response is reused for five minutes at most and deleted within hours, on a best-effort
-  cleanup, so the bank's own record of the check stays its job.
+  Polixis response is reused for the cache's TTL, an hour at most, and deleted by a periodic,
+  best-effort cleanup after that, so the bank's own record of the check stays its job.

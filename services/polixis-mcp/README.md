@@ -99,8 +99,8 @@ Every one of them also gets, from the shared client and context code:
   Polixis wrote them);
 - an id Polixis does not know reported as an error, where Polixis answers a 200 with an error
   body;
-- the five-minute response cache below, so paging or a second tool on the same entity does
-  not ask Polixis again;
+- the response cache below, so paging, a second tool on the same entity, or the same search or
+  profile asked again does not ask Polixis again;
 - at most four requests to Polixis at once per process, and no request at all for a while once
   Polixis says the quota is spent, with an error that says so.
 - the alerts Polixis marks `hidden` left out, as its documentation says to ignore them.
@@ -122,11 +122,24 @@ A tool that can return more than one page answers with a `next_cursor`, and the 
 back alone as `cursor`: it carries every argument of the first call, base64-encoded. Where
 Polixis pages a list itself, the cursor asks it for the next page. Where it returns everything
 at once (the ownership trees, the graphs, the sanctions exposure, the court decisions and the
-path between two parties), the response is kept in Postgres for five minutes
-(`persistence/response_cache.py`), so the next page, or another tool on the same entity, reads
-it from there instead of asking Polixis again. The server deletes the expired entries when it
-starts and every four hours after. The cache is shared by every user of the deployment, who
-share the one set of Polixis credentials anyway.
+path between two parties), the next page, or another tool on the same entity, reads the response
+from the cache instead of asking Polixis again.
+
+Every tool of our own reuses Polixis's answers from Postgres (`persistence/response_cache.py`)
+for `RESPONSE_CACHE_TTL_SECONDS`, 15 minutes by default, so the same request within that time
+spares the API key's quota. The answers are licensed data about real people, which Polixis
+updates in real time, so the TTL cannot exceed an hour. The TTL limits reuse, not storage: the
+server deletes the expired entries when it starts and once per TTL after, so an answer normally
+leaves Postgres within twice the TTL, later when a cleanup fails.
+`RESPONSE_CACHE_ENABLED=false` turns the cache off, and a new `RESPONSE_CACHE_KEY_PREFIX` stops
+reading every answer cached so far, which then expires. The cache is shared by every user of the
+deployment, who share the one set of Polixis credentials anyway. `resolve_permanent_id`, served
+straight from the spec, is not cached.
+
+Every result of our tools says how fresh it is in `freshness`: `fetched_at`, when the server put
+it together, and `cached_at`, null when all of it came from Polixis on that call, else when the
+oldest cached answer it used was cached. The server instructions tell the agent to give the user
+that as-of time when the data's age matters, as for sanctions or PEP status.
 
 ## The spec
 
@@ -149,7 +162,7 @@ those edits add to or correct in their spec and why, and how to take a new spec 
 | `UPSTREAM_QUOTA_COOLDOWN_SECONDS` | Once Polixis answers that the API key's quota is spent (a 429 with `x-amzn-errortype: LimitExceededException`), the process sends it nothing for this long, 900 by default, and every tool fails at once with a message saying so. Each process learns it on its own, so a spent quota costs one request per process per cooldown |
 | `MCP_AUTH_MODE` | `zitadel` in a deployment, `none` locally |
 | `ZITADEL_*` | Zitadel sign-in for the MCP's users |
-| `DATABASE_URL` | Postgres, which holds the encrypted Zitadel sign-in state and the Polixis responses the tools page through, each reused for five minutes and deleted by a cleanup every four hours |
+| `DATABASE_URL` | Postgres, which holds the encrypted Zitadel sign-in state and the Polixis responses the tools reuse, each for at most an hour, deleted by a cleanup that runs once per cache TTL |
 
 Every signed-in user shares the one set of Polixis credentials. A user's Zitadel token never
 reaches Polixis.

@@ -1,6 +1,8 @@
 from pydantic import BaseModel
 from pydantic import Field
 
+from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.court_records.decisions import DecisionSubject
 from polixis_mcp.contexts.court_records.decisions import fetch_decisions
 from polixis_mcp.contexts.pages import encode_cursor
@@ -50,6 +52,7 @@ async def get_court_decision(
             if next_offset is not None
             else None
         ),
+        freshness=freshness(),
     )
 
 
@@ -75,6 +78,7 @@ class CourtDecisionText(BaseModel):
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next part; null on the last."
     )
+    freshness: Freshness
 
 
 class CourtDecisionNotFoundError(Exception):

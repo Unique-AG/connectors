@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from polixis_mcp.contexts.cached_calls import cached_call
+from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.pages import encode_cursor
@@ -90,6 +92,7 @@ async def get_related_parties(
         },
         parties=page,
         next_cursor=encode_cursor(next_query) if next_query is not None else None,
+        freshness=freshness(),
     )
 
 
@@ -254,3 +257,4 @@ class RelatedPartiesPage(BaseModel):
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )
+    freshness: Freshness

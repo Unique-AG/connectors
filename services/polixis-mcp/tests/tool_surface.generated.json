@@ -34,6 +34,33 @@
           "description": "Computed by this MCP: whether Polixis returned a path with links. False is not proof there is none: a relation Polixis lacks can still connect them.",
           "type": "boolean"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "from_pid": {
           "description": "The entity the path starts at.",
           "type": "string"
@@ -282,7 +309,8 @@
         "connected",
         "hops",
         "paths",
-        "parties"
+        "parties",
+        "freshness"
       ],
       "type": "object"
     },
@@ -419,6 +447,33 @@
           },
           "type": "array"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -448,7 +503,8 @@
         "total_decisions",
         "total_naming_entity",
         "decisions",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -749,6 +805,33 @@
           },
           "type": "array"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -791,7 +874,8 @@
         "total_flagged",
         "total_by_risk",
         "flagged",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -1186,6 +1270,33 @@
           },
           "type": "array"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -1233,7 +1344,8 @@
         "total_by_risk",
         "truncated_by_polixis",
         "companies",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -1320,6 +1432,33 @@
           "description": "The decision's id.",
           "type": "string"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -1372,7 +1511,8 @@
         "year",
         "total_characters",
         "text",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -1441,6 +1581,33 @@
     "outputSchema": {
       "description": "The profiles of the entities asked for, in the order asked.",
       "properties": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "profiles": {
           "description": "One profile per distinct pid.",
           "items": {
@@ -1874,7 +2041,8 @@
         }
       },
       "required": [
-        "profiles"
+        "profiles",
+        "freshness"
       ],
       "type": "object"
     },
@@ -1963,6 +2131,33 @@
     "outputSchema": {
       "description": "One page of the parties related to an entity.",
       "properties": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -2176,7 +2371,8 @@
         "total_parties",
         "relations_by_source",
         "parties",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -2238,6 +2434,33 @@
     "outputSchema": {
       "description": "An entity's own sanctions listings and the sanctioned parties related to it, one page of\nthe latter.",
       "properties": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -2532,7 +2755,8 @@
         "own_listings",
         "total_related",
         "related",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -2799,6 +3023,33 @@
           },
           "type": "array"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -2847,7 +3098,8 @@
         "total_by_risk",
         "flagged",
         "entities",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -3114,6 +3366,33 @@
           },
           "type": "array"
         },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "next_cursor": {
           "anyOf": [
             {
@@ -3162,7 +3441,8 @@
         "total_by_risk",
         "flagged",
         "entities",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },
@@ -3325,6 +3605,33 @@
     "outputSchema": {
       "description": "One page of matches, best first: Polixis puts exact matches first, then those one and\nthen two edits away, and ranks each group by its own logic, which favours entities with\nrisks and prominent ones.",
       "properties": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. The cache answers only within its TTL, an hour at most, of this time. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
         "matches": {
           "description": "The matches on this page.",
           "items": {
@@ -3523,7 +3830,8 @@
       "required": [
         "matches",
         "total_matches",
-        "next_cursor"
+        "next_cursor",
+        "freshness"
       ],
       "type": "object"
     },

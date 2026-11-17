@@ -17,6 +17,7 @@ from pydantic import SecretStr
 
 from polixis_mcp.mcp import create_server
 from polixis_mcp.persistence import Persistence
+from polixis_mcp.persistence import ResponseCacheSettings
 from polixis_mcp.upstream import RecordingMode
 from polixis_mcp.upstream import RecordingSettings
 from polixis_mcp.upstream import UpstreamSettings
@@ -52,10 +53,16 @@ class FakeStore(MemoryStore):
         self.culls += 1
 
 
+def fake_response_cache(**changes: object) -> ResponseCacheSettings:
+    """Every field given, so neither the environment nor `.env` changes what the tests see."""
+    settings = ResponseCacheSettings(enabled=True, ttl_seconds=15 * 60, key_prefix="v1")
+    return settings.model_copy(update=changes)
+
+
 @asynccontextmanager
 async def open_fake_persistence() -> AsyncGenerator[Persistence]:
     """An in-memory store in place of Postgres, which CI does not run."""
-    yield Persistence(store=FakeStore())
+    yield Persistence(store=FakeStore(), response_cache=fake_response_cache())
 
 
 def build_server(
