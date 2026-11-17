@@ -1,4 +1,4 @@
-import { Client } from '@microsoft/microsoft-graph-client';
+import { Client, type GraphRequest } from '@microsoft/microsoft-graph-client';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { Temporal } from 'temporal-polyfill';
@@ -363,18 +363,11 @@ export class SearchCalendarEventsQuery {
     let fetched = 0;
 
     while (nextPath !== undefined && pages < MAX_CALENDAR_VIEW_PAGES) {
-      const request = input.client.api(nextPath).header('Prefer', prefer);
-      const first = request
-        .query({
-          startDateTime: encodeGraphQueryInstant(input.resolvedWindow.startDateTime),
-          endDateTime: encodeGraphQueryInstant(input.resolvedWindow.endDateTime),
-        })
-        .select(EVENT_SELECT)
-        .orderby(EVENT_ORDER_BY)
-        .top(CALENDAR_VIEW_TOP);
+      // A nextLink already carries every query option, percent-encoded as %24select and so on. The
+      // SDK does not recognise those as its own $select, so adding the options again sends both.
       const raw = isFirst
-        ? await (input.graphFilter === undefined ? first : first.filter(input.graphFilter)).get()
-        : await request.get();
+        ? await this.firstPageRequest({ ...input, path: nextPath, prefer }).get()
+        : await input.client.api(nextPath).header('Prefer', prefer).get();
       isFirst = false;
       pages += 1;
       const parsed = GraphEventCollectionSchema.parse(raw);
@@ -407,6 +400,26 @@ export class SearchCalendarEventsQuery {
     });
 
     return { events, fetched, hasMore: nextPath !== undefined, notes: [] };
+  }
+
+  private firstPageRequest(input: {
+    client: Client;
+    path: string;
+    prefer: string;
+    resolvedWindow: ResolvedWindow;
+    graphFilter: string | undefined;
+  }): GraphRequest {
+    const request = input.client
+      .api(input.path)
+      .header('Prefer', input.prefer)
+      .query({
+        startDateTime: encodeGraphQueryInstant(input.resolvedWindow.startDateTime),
+        endDateTime: encodeGraphQueryInstant(input.resolvedWindow.endDateTime),
+      })
+      .select(EVENT_SELECT)
+      .orderby(EVENT_ORDER_BY)
+      .top(CALENDAR_VIEW_TOP);
+    return input.graphFilter === undefined ? request : request.filter(input.graphFilter);
   }
 }
 
