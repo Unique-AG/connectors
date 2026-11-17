@@ -120,12 +120,15 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
                 self._append_ledger(key, None, None)
                 raise
             spent = is_quota_spent(response)
-            self._append_ledger(key, response.status_code, None if spent else cassette.name)
+            # A throttled or unavailable answer says nothing about the request, so it is not
+            # replayed; the next run asks again.
+            saved = not spent and response.status_code not in _TRANSIENT_STATUSES
+            self._append_ledger(key, response.status_code, cassette.name if saved else None)
             if spent:
                 (self._directory / _HALT).write_text(
                     f"Polixis answered a quota 429 at {_now()}. Delete this file to record again.\n"
                 )
-            else:
+            elif saved:
                 _save(cassette, key, response=response, content=content)
         # `content` is decoded already, so the headers that describe the encoded body go.
         headers = [
@@ -262,4 +265,5 @@ def _now() -> str:
 
 _JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 _LEDGER = "ledger.jsonl"
+_TRANSIENT_STATUSES = frozenset({429, 503})
 _HALT = "HALT"

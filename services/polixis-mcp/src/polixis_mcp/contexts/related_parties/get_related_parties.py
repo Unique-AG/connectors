@@ -10,6 +10,7 @@ from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 from polixis_mcp.contexts.risks import visible_alert_texts
@@ -180,7 +181,7 @@ _PER_PUBLISHER = 40
 
 
 class RelatedPartiesQuery(PageQuery):
-    pid: str = Field(min_length=1)
+    pid: QueryPid
     categories: tuple[RelationCategory, ...] = Field(default=_ALL_CATEGORIES, min_length=1)
     page_size: int | None = Field(default=None, ge=1, le=100)
     polixis_page: int = Field(default=0, ge=0)

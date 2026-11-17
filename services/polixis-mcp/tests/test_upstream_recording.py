@@ -113,6 +113,20 @@ async def test_counts_a_request_that_got_no_answer_against_the_budget(tmp_path: 
     assert ledger_count(tmp_path) == 1
 
 
+async def test_does_not_replay_a_throttled_or_unavailable_answer(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD),
+        polixis(sent, httpx2.Response(503, json={"message": "Service Unavailable"})),
+    )
+
+    for _ in range(2):
+        _ = await post(recorder, {"id": 1})
+
+    assert (len(sent), ledger_count(tmp_path)) == (2, 2)
+    assert not list(tmp_path.glob("post_*.json"))
+
+
 async def test_a_spent_quota_halts_every_later_run(tmp_path: Path) -> None:
     sent: list[httpx2.Request] = []
     spent = httpx2.Response(

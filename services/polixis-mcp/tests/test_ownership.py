@@ -2,6 +2,7 @@ import httpx2
 import pytest
 
 from polixis_mcp import contexts
+from polixis_mcp.contexts.pages import encode_cursor
 from tests import polixis_responses
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
@@ -229,3 +230,34 @@ async def test_ownership_reaches_the_owners_behind_a_node_without_an_id(
     assert [(entity.pid, entity.effective_share_percent) for entity in page.entities] == [
         ("P00000000000000000000000000000700", 40.0)
     ]
+
+
+async def test_ownership_refuses_a_cursor_carrying_a_malformed_pid(mcp_client: McpClient) -> None:
+    forged = encode_cursor(
+        contexts.OwnershipQuery.model_construct(
+            pid="../../api/sanction/O1", direction="owners", page_size=None, offset=0
+        )
+    )
+
+    error = await tool_error(mcp_client, "get_ultimate_beneficial_owners", {"cursor": forged})
+
+    assert error == "The cursor is not one this tool returned. Call the tool again without it."
+
+
+async def test_ownership_keeps_apart_two_owners_without_an_id_on_the_way_to_one_owner(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = {"id": "P00000000000000000000000000000700", "type": "PERSON", "sharePercent": 50.0}
+    roots = [{"type": "ORGANIZATION", "sharePercent": 50.0, "children": [owner]} for _ in range(2)]
+    monkeypatch.setattr(polixis_responses, "OWNERS", {"roots": roots})
+
+    page = await call_tool(
+        mcp_client,
+        "get_ultimate_beneficial_owners",
+        {"pid": "O00000000000000000000000000000100"},
+        returns=contexts.OwnershipPage,
+    )
+
+    assert [
+        (entity.pid, entity.effective_share_percent, entity.chains) for entity in page.entities
+    ] == [("P00000000000000000000000000000700", 50.0, 2)]

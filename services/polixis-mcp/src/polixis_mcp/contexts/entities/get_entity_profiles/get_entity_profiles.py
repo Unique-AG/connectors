@@ -59,12 +59,16 @@ async def _profile(
     return _entity_profile(pid=pid, profile=profile, sections=set(sections))
 
 
+def _names(names: dict[str, list[str]]) -> list[str]:
+    """Every name, the English ones first, then the original ones, then any other key's."""
+    keys = sorted(names, key=lambda key: (key != "en", key != "original"))
+    return unique(name for key in keys for name in names[key])
+
+
 def _entity_profile(*, pid: str, profile: Profile, sections: set[ProfileSection]) -> EntityProfile:
     mapped = EntityProfile(
         pid=pid,
-        names=unique(
-            [*(profile.names or {}).get("en", []), *(profile.names or {}).get("original", [])]
-        ),
+        names=_names(profile.names or {}),
         name_records=unique(name_record(record) for record in profile.name_records or []),
         identifiers=profile.unis or {},
         countries=profile.countries or {},

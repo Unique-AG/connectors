@@ -31,6 +31,7 @@ from polixis_mcp.contexts.ownership import OwnershipQuery
 from polixis_mcp.contexts.pages import decode_cursor
 from polixis_mcp.contexts.pages import InvalidCursorError
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.pages import PID_PATTERN
 from polixis_mcp.contexts.related_parties import get_related_parties
 from polixis_mcp.contexts.related_parties import RelatedPartiesPage
 from polixis_mcp.contexts.related_parties import RelatedPartiesQuery
@@ -60,6 +61,7 @@ __all__ = [
     "OwnershipPage",
     "OwnershipQuery",
     "PageQuery",
+    "PID_PATTERN",
     "PartialDate",
     "ProfileSection",
     "RelatedPartiesPage",

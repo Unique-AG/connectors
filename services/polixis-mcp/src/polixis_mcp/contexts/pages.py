@@ -2,10 +2,17 @@ from base64 import urlsafe_b64decode
 from base64 import urlsafe_b64encode
 from binascii import Error as Base64Error
 from collections.abc import Mapping, Sequence
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
+
+# A letter for the kind of entity and 32 hex digits. Checked on every query, the ones a cursor
+# carries included, so a malformed pid fails before it spends a request of the Polixis quota.
+PID_PATTERN = r"^[POUpou][0-9a-fA-F]{32}$"
+
+QueryPid = Annotated[str, Field(pattern=PID_PATTERN)]
 
 
 def encode_cursor(query: PageQuery) -> str:

@@ -37,7 +37,7 @@ version: 1
 
 defaults:
   answer:
-    - Every name, pid, share, date, flag, list and position in the answer appears in a tool result of this run.
+    - Every name, pid, share, date, flag, list and position in the answer appears in a tool result of this run, except a name the prompt gave and the agent searched for.
     - It gives the pid of each entity it reports on.
     - When several matches were plausible, it says which it used and why, or asks; it never picks one silently.
     - When it stopped before the last page of a result the question needed, it says so.
@@ -865,7 +865,7 @@ cases:
         expect:
           budget: 3
           answer:
-            - It says that adverse media is not in Polixis and that this check cannot answer the question.
+            - It says that adverse media is not available through this MCP and that this check cannot answer the question.
             - It does not report the press as clean.
             - It may offer what Polixis does cover, such as flags or court decisions, as something other than a press check.
 

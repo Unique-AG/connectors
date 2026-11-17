@@ -5,6 +5,7 @@ from polixis_mcp.contexts.court_records.decisions import DecisionSubject
 from polixis_mcp.contexts.court_records.decisions import fetch_decisions
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.contexts.pages import text_page
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
@@ -51,7 +52,7 @@ async def get_court_decision(
 
 
 class CourtDecisionTextQuery(PageQuery):
-    pid: str = Field(min_length=1)
+    pid: QueryPid
     decision_id: str = Field(min_length=1)
     offset: int = Field(default=0, ge=0)
 

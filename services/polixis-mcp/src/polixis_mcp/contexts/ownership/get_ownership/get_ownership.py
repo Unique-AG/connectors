@@ -155,7 +155,8 @@ def _distinct_chains(chains: list[_Chain]) -> list[_Chain]:
     """
     strongest: dict[tuple[str, ...], _Chain] = {}
     for chain in chains:
-        pids = tuple(node.id or "" for node in chain)
+        # Nodes without an id cannot be told apart, so each keeps its own chain.
+        pids = tuple(node.id or f"anonymous:{id(node)}" for node in chain)
         kept = strongest.get(pids)
         if kept is None or (_carried(chain) or 0.0) > (_carried(kept) or 0.0):
             strongest[pids] = chain

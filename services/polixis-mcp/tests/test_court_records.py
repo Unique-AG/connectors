@@ -1,6 +1,8 @@
 import httpx2
+import pytest
 
 from polixis_mcp import contexts
+from tests import polixis_responses
 from tests.tool_calls import call_tool
 from tests.tool_calls import McpClient
 from tests.tool_calls import tool_error
@@ -88,3 +90,19 @@ async def test_find_court_decisions_refuses_a_cursor_of_get_sanctions_exposure(
     error = await tool_error(mcp_client, "find_court_decisions", {"cursor": exposure.next_cursor})
 
     assert error == "The cursor is not one this tool returned. Call the tool again without it."
+
+
+async def test_find_court_decisions_lists_a_decision_whose_year_is_not_a_number(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    decision = {"id": "ch_x", "country": "ch", "year": "2\u00b2", "snippet": ["a"], "content": "C"}
+    monkeypatch.setattr(polixis_responses, "JUDICIAL", {"rootJudicialDetails": {"ch": [decision]}})
+
+    found = await call_tool(
+        mcp_client,
+        "find_court_decisions",
+        {"pid": "O00000000000000000000000000000100"},
+        returns=contexts.CourtDecisionsPage,
+    )
+
+    assert [decision.decision_id for decision in found.decisions] == ["ch_x"]

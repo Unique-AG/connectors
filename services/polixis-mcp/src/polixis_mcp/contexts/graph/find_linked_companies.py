@@ -11,6 +11,7 @@ from polixis_mcp.contexts.graph.network import Party
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import RISK_COUNTS_DESCRIPTION
 from polixis_mcp.contexts.risks import risk_markers
@@ -131,7 +132,7 @@ def _people_chains(network: Network, *, pid: str, longest: int) -> dict[str, lis
 
 
 class LinkedCompaniesQuery(PageQuery):
-    pid: str = Field(min_length=1)
+    pid: QueryPid
     radius: int = Field(default=2, ge=2, le=3)
     scope: GraphScope = "key"
     page_size: int | None = Field(default=None, ge=1, le=100)

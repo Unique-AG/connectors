@@ -7,9 +7,9 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from polixis_mcp import contexts
+from polixis_mcp.contexts import PID_PATTERN
 from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
-from polixis_mcp.mcp.inputs.pid import PID_PATTERN
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 

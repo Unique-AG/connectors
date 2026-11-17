@@ -8,6 +8,7 @@ from polixis_mcp.contexts.formats import unix_date
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import GET_SANCTION_EXPOSURE
 from polixis_mcp.upstream import GetSanctionExposurePath
@@ -120,7 +121,7 @@ def _path_link(hop: SanctionPathHop) -> SanctionPathLink | None:
 
 
 class SanctionsExposureQuery(PageQuery):
-    pid: str = Field(min_length=1)
+    pid: QueryPid
     page_size: int | None = Field(default=None, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 

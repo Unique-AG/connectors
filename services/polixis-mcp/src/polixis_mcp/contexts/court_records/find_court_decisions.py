@@ -7,6 +7,7 @@ from polixis_mcp.contexts.court_records.decisions import without_highlights
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
+from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
@@ -45,11 +46,11 @@ async def find_court_decisions(
 
 
 def _year(year: str | None) -> int:
-    return int(year) if year and year.isdigit() else 0
+    return int(year) if year and year.isdecimal() else 0
 
 
 class CourtDecisionsQuery(PageQuery):
-    pid: str = Field(min_length=1)
+    pid: QueryPid
     page_size: int | None = Field(default=None, ge=1, le=100)
     offset: int = Field(default=0, ge=0)
 

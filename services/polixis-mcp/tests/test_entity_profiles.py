@@ -1,8 +1,10 @@
 import json
 
 import httpx2
+import pytest
 
 from polixis_mcp import contexts
+from tests import polixis_responses
 from tests.polixis_responses import FAILING_PID
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
@@ -160,3 +162,19 @@ async def test_get_entity_profiles_refuses_a_malformed_pid_without_asking_polixi
 
     assert "O123" in error
     assert upstream_requests == []
+
+
+async def test_get_entity_profiles_lists_the_names_under_every_key(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    names = {"original": ["Anna Beispiel"], "de": ["Anna B."], "en": ["Anna Example"]}
+    monkeypatch.setattr(polixis_responses, "PROFILE", {"names": names})
+
+    result = await call_tool(
+        mcp_client,
+        "get_entity_profiles",
+        {"pids": ["P00000000000000000000000000000200"], "sections": ["names"]},
+        returns=contexts.EntityProfiles,
+    )
+
+    assert result.profiles[0].names == ["Anna Example", "Anna Beispiel", "Anna B."]
