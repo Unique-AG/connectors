@@ -86,9 +86,9 @@ class Freshness(BaseModel):
         description=(
             "Null when all of this result came from Polixis on this call. Otherwise some or all "
             "of it came from this server's cache, and this is when Polixis's answer was cached, "
-            "the oldest one when several were: the data is as of then, at most an hour before "
-            "`fetched_at`. When its age matters, as for sanctions or PEP status, tell the user "
-            "the data is as of this time."
+            "the oldest one when several were: the data is as of then. The cache answers only "
+            "within its TTL, an hour at most, of this time. When its age matters, as for "
+            "sanctions or PEP status, tell the user the data is as of this time."
         )
     )
 
