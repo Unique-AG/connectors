@@ -1,6 +1,10 @@
+import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import date
 from datetime import timedelta
 import json
+import socket
 from typing import cast
 
 from fastmcp import Client
@@ -9,13 +13,19 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
+from mcp.client import session
 from mcp.shared.exceptions import MCPError
+from mcp_configs import ServerSettings
 from mcp_types import ElicitResult
+from pydantic import AnyHttpUrl
 from pydantic import TypeAdapter
 import pytest
+import uvicorn
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.mcp import http_app
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 
 
@@ -563,7 +573,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
 def _server() -> FastMCP:
     return build_server(
         fake_upstream_settings(),
-        Persistence(store=MemoryStore()),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
         httpx2.MockTransport(_world_check),
     )
 
@@ -1138,6 +1148,44 @@ async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_afte
     assert _writes == []
 
 
+async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case() -> None:
+    _writes.clear()
+    first_write_arrived = asyncio.Event()
+    release_first_write = asyncio.Event()
+
+    async def held_first_write(request: httpx2.Request) -> httpx2.Response:
+        if request.method == "PUT":
+            first_write_arrived.set()
+            await release_first_write.wait()
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(held_first_write),
+    )
+    arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}
+
+    async with (
+        asyncio.timeout(10),
+        Client(server, elicitation_handler=_approve) as first,
+        Client(server, elicitation_handler=_approve) as second,
+    ):
+        first_call = asyncio.create_task(first.call_tool("resolve_result", arguments))
+        arrived = asyncio.create_task(first_write_arrived.wait())
+        try:
+            await asyncio.wait({first_call, arrived}, return_when=asyncio.FIRST_COMPLETED)
+            assert first_write_arrived.is_set(), "the first call ended before it wrote"
+            with pytest.raises(ToolError, match="Another decision on this case is being saved"):
+                await second.call_tool("resolve_result", arguments)
+        finally:
+            release_first_write.set()
+            arrived.cancel()
+        await first_call
+
+    assert len(_writes) == 1
+
+
 async def test_resolve_result_decline_does_not_write() -> None:
     _writes.clear()
     async with Client(_server(), elicitation_handler=_decline) as client:
@@ -1244,3 +1292,56 @@ async def test_get_ogs_updates_rejects_a_future_end() -> None:
                 "get_ogs_updates",
                 {"since": "2026-10-20T00:00:00Z", "until": "2999-01-01T00:00:00Z"},
             )
+
+
+@asynccontextmanager
+async def _serve_over_http(server: FastMCP) -> AsyncGenerator[str]:
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        port = cast(int, reserved.getsockname()[1])
+        settings = ServerSettings(
+            host="127.0.0.1",
+            port=port,
+            mcp_base_url=AnyHttpUrl(f"http://127.0.0.1:{port}"),
+            mcp_allowed_origins=[],
+        )
+        config = uvicorn.Config(http_app(server, settings), log_config=None)
+        http_server = uvicorn.Server(config)
+
+        async def serve() -> None:
+            try:
+                await http_server.serve(sockets=[reserved])
+            except SystemExit as error:
+                raise RuntimeError("the server exited during startup") from error
+
+        serving = asyncio.create_task(serve())
+        try:
+            async with asyncio.timeout(10):
+                while not http_server.started and not serving.done():
+                    await asyncio.sleep(0.01)
+            assert http_server.started, "the server stopped before it started"
+            yield f"http://127.0.0.1:{port}/mcp"
+        finally:
+            http_server.should_exit = True
+            await asyncio.gather(serving, return_exceptions=True)
+
+
+@pytest.mark.parametrize("protocol_version", ["2025-06-18", "2025-11-25"])
+async def test_verify_passport_check_saves_after_approval_over_http(
+    protocol_version: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _writes.clear()
+    monkeypatch.setattr(session, "LATEST_HANDSHAKE_VERSION", protocol_version)
+    async with (
+        _serve_over_http(_server()) as url,
+        Client(url, mode="legacy", elicitation_handler=_approve) as client,
+    ):
+        assert client.protocol_version == protocol_version
+        result = await client.call_tool(
+            "verify_passport_check", {"case": "sys-pass", "mrz_matched": True}
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["recorded"] is True
+    assert len(_writes) == 1
