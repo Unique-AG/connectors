@@ -23,9 +23,8 @@ _REQUIRED_SCOPES = [
     "urn:zitadel:iam:user:resourceowner",
 ]
 
-# Zitadel issues a refresh token only for offline_access, and only to an app
-# with the Refresh Token grant enabled. Without one, kb-mcp cannot issue its
-# own refresh token and the session ends with Zitadel's access token.
+# Zitadel issues a refresh token only for offline_access, and only to apps
+# with the Refresh Token grant.
 _AUTHORIZE_SCOPES = [*ZITADEL_DEFAULT_MCP_SCOPES, "offline_access"]
 
 
@@ -46,7 +45,4 @@ def build_auth(settings: Settings) -> OIDCProxy:
         extra_authorize_params={"scope": " ".join(_AUTHORIZE_SCOPES)},
         # Advertised and accepted from MCP clients at registration and /authorize.
         valid_scopes=list(_AUTHORIZE_SCOPES),
-        fastmcp_access_token_expiry_seconds=settings.access_token_expires_in_seconds,
-        # Zitadel sends no refresh_expires_in, so this always sets the lifetime.
-        fallback_refresh_token_expiry_seconds=settings.refresh_token_expires_in_seconds,
     )

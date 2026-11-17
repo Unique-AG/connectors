@@ -34,15 +34,14 @@ key, and the client never sees Zitadel's tokens.
 
 ## Token Refresh
 
-The access token lasts 60 seconds and the refresh token 30 days from sign-in. Set
-`AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` and `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` to change them.
-When the client refreshes, `kb-mcp` refreshes its stored Zitadel tokens and returns a new pair, and
-the old refresh token no longer works.
+The access token `kb-mcp` issues expires with Zitadel's. When the client refreshes, `kb-mcp`
+refreshes its stored Zitadel tokens and returns a new pair, and the old refresh token no longer
+works.
 
-Zitadel still decides how long the session can last. If it revokes or expires its own refresh
-token, the next refresh fails and the user signs in again. If the Zitadel app lacks the Refresh
-Token grant, `kb-mcp` issues no refresh token, and the access token still expires after 60
-seconds.
+Zitadel decides how long the session can last. If it revokes or expires its own refresh token, the
+next refresh fails and the user signs in again. If the Zitadel app lacks the Refresh Token grant,
+Zitadel still returns a refresh token but rejects it at refresh, so users sign in again whenever
+the access token expires.
 
 ## Tool Call
 

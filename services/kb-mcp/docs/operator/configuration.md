@@ -115,8 +115,6 @@ The chart neither creates nor owns that secret either way. See
 | `UNIQUE_MCP_FRONTEND_BASE_URL` | none | Web app origin for citation deep links. Without it, citations fall back to `unique://content/{id}` |
 | `UNIQUE_MCP_LOCAL_BASE_URL` | `http://0.0.0.0:8000` (chart) | Bind address inside the pod |
 | `LOG_LEVEL` | `info` | `DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL` |
-| `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Lifetime of the access token `kb-mcp` issues to MCP clients. In Helm, `mcpConfig.auth.accessTokenExpiresInSeconds` |
-| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` (30 days) | Lifetime of the refresh token, counted from sign-in. Zitadel's own expiry can end it earlier. In Helm, `mcpConfig.auth.refreshTokenExpiresInSeconds` |
 | `KB_MCP_HTTP_MAX_CONNECTIONS` | `100` | Outbound pool to the Unique API, shared by all tools |
 | `KB_MCP_HTTP_MAX_KEEPALIVE_CONNECTIONS` | `20` | Keepalive connections in that pool |
 | `KB_MCP_HTTP_POOL_TIMEOUT_SECONDS` | `60` | Pool checkout timeout, not request duration |
