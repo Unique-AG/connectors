@@ -23,14 +23,15 @@ NF == 0 { next }
   kind = $1
   text = $0
   sub(/^[ \t]*[^ \t]+[ \t]*/, "", text)
+  sub(/[ \t]+$/, "", text)
   if (text == "") die("A " kind " line has no text.")
 }
 kind == "pr" {
-  if (split(text, part, " ") != 2 || part[1] !~ /^[0-9]+$/) die("A pr line needs a PR number and a status.")
+  if (text !~ /^[0-9]+$/) die("A pr line needs only a PR number.")
   pr_count++
-  pr_plain[pr_count] = "#" part[1] " " part[2]
+  pr_plain[pr_count] = "#" text
   if (length("PRs: " pr_plain[pr_count]) > max_chars) die("A pr line is longer than " max_chars " characters.")
-  pr_linked[pr_count] = link("#" part[1]) " " part[2]
+  pr_linked[pr_count] = link("#" text)
   next
 }
 kind in prefix {
