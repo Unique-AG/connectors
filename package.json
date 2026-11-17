@@ -29,7 +29,7 @@
     "rimraf": "6.1.4",
     "skills": "1.8.1",
     "syncpack": "15.3.3",
-    "turbo": "2.11.10",
+    "turbo": "2.11.11",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
     "vite": "catalog:",
