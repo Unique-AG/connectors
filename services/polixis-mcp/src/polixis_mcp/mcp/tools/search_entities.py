@@ -7,9 +7,11 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from polixis_mcp import contexts
+from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
+from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -66,6 +68,7 @@ async def search_entities(
     ] = 10,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
+    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.EntitySearchResults:
     """Find organizations and people in Polixis by name or identifier, with their sanctions and
     PEP flags, dates, countries and identifiers to tell matches apart. Vessels and aircraft are
@@ -86,4 +89,4 @@ async def search_entities(
         dates=dates,
         page_size=page_size,
     )
-    return await contexts.search_entities(upstream=upstream, query=query)
+    return await contexts.search_entities(upstream=upstream, persistence=persistence, query=query)

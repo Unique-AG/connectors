@@ -21,6 +21,7 @@ other value when not null, so 0 and false still render.
   (list $zitadel.orgId "ZITADEL_ORG_ID")
   (list $config.polixis.apiUrl "UPSTREAM_API_URL")
   (list $config.polixis.tokenUrl "UPSTREAM_TOKEN_URL")
+  (list $config.responseCache.keyPrefix "RESPONSE_CACHE_KEY_PREFIX")
   (list $config.logging.level "LOG_LEVEL")
   (list $config.logging.diagnosticsDataPolicy "LOGS_DIAGNOSTICS_DATA_POLICY")
   (list $config.logging.errorDetailsPolicy "ERROR_DETAILS_POLICY")
@@ -38,6 +39,8 @@ other value when not null, so 0 and false still render.
   (list $config.polixis.retry.enabled "UPSTREAM_RETRY_ENABLED")
   (list $config.polixis.retry.maxAttempts "UPSTREAM_RETRY_MAX_ATTEMPTS")
   (list $config.polixis.retry.maxWaitSeconds "UPSTREAM_RETRY_MAX_WAIT_SECONDS")
+  (list $config.responseCache.enabled "RESPONSE_CACHE_ENABLED")
+  (list $config.responseCache.ttlSeconds "RESPONSE_CACHE_TTL_SECONDS")
   (list $config.rateLimit.toolCallsPerWindow "MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW")
   (list $config.rateLimit.windowSeconds "MCP_RATE_LIMIT_WINDOW_SECONDS")
 }}

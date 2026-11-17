@@ -15,9 +15,10 @@ _logger = logging.getLogger(__name__)
 async def cached_call[T: BaseModel, R: BaseModel](
     *, upstream: Upstream, persistence: Persistence, operation: Operation[T, R], request: R
 ) -> T:
-    """The response to the same request answered in the last few minutes, else Polixis's. Polixis
-    returns a whole tree, graph or set of records at once and the tools page through it, so the
-    next page, or another tool on the same entity, reads it from the cache.
+    """The response to the same request answered within the cache's TTL, else Polixis's, which
+    spares the API key's quota. Polixis returns a whole tree, graph or set of records at once and
+    the tools page through it, so the next page, or another tool on the same entity, reads it
+    from the cache, as does the same search or profile asked again.
 
     Only a successful response is cached: `upstream.call` returns one only after its status,
     its retries and the client's rejection check have passed, and raises otherwise. A cached
