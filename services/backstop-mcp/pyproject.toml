@@ -45,7 +45,7 @@ packages = ["src/backstop_mcp"]
 [dependency-groups]
 dev = [
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1.post1",
+    "pytest-asyncio==1.5.0",
     "hatchling==1.33.0",
     "ruff==0.17.5",
     "basedpyright==1.40.2",
