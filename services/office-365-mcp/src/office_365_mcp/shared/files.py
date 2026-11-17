@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Self
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
@@ -70,6 +70,15 @@ _ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
 
 _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
 
+# The chat drops a citation link that holds whitespace, so escape what a URL cannot hold, such as
+# spaces and brackets in a file name. Every character with a meaning stays, `%` included, so an
+# address that is already escaped comes out unchanged.
+_URL_CHARACTERS_TO_KEEP = ":/?#@!$&'()*+,;=%~"
+
+
+def browser_url(url: str | None) -> str | None:
+    return None if url is None else quote(url, safe=_URL_CHARACTERS_TO_KEEP)
+
 
 class DriveItemSummary(BaseModel):
     """One file or folder: what it is, where it lives, and the handle that reaches it again."""
@@ -109,7 +118,8 @@ class DriveItemSummary(BaseModel):
     web_url: str | None = Field(
         description=(
             "The address that opens this item in a browser. Always give this address to the user "
-            + "when you answer from this item or about it. It is not a download link, and this "
+            + "when you answer from this item or about it, and copy it exactly: never decode its "
+            + "`%` escapes. It is not a download link, and this "
             + "connector cannot read a file from it. Null when Graph gave no address."
         )
     )
@@ -194,7 +204,7 @@ class DriveItemSummary(BaseModel):
             name=item.name,
             is_folder=is_folder,
             size=item.size,
-            web_url=item.web_url,
+            web_url=browser_url(item.web_url),
             created_at=item.created_date_time,
             created_by=display_name(item.created_by),
             last_modified_at=item.last_modified_date_time,

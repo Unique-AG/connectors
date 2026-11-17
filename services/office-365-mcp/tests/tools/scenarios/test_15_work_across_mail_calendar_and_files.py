@@ -16,6 +16,7 @@ from mcp.types import (
     ElicitResult,
     EmbeddedResource,
     InputRequiredResult,
+    ResourceLink,
     TextResourceContents,
 )
 from respx import MockRouter, Route
@@ -198,8 +199,9 @@ async def _read_file(uri: str) -> EmbeddedResource:
         patch_obo(patch)
         async with Client(FastMCPTransport(_server()), mode="legacy") as client:
             answer = await client.call_tool("sharepoint_read_file", {"file": uri})
-    (block,) = answer.content
+    (block, link) = answer.content
     assert isinstance(block, EmbeddedResource)
+    assert isinstance(link, ResourceLink)
     return block
 
 
