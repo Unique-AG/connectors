@@ -48,7 +48,7 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
    - Python: change the manifests, then run `PROJECTS="<projects>" bash scripts/each-python-project.sh uv lock --upgrade-package <pkg>==<version>`.
    - Node: change the `catalog:` entry or the `package.json` files, then run `pnpm update -r --lockfile-only <name>`.
    - Operating system: write the PR body of step 7 to a file. Run `BODY_FILE=<file> bash .github/scripts/release-rebuild/rebuild.sh <service>`. The script runs `rebuild-plan.sh`. For the action `open`, it opens the PR from the branch `rebuild/<service>-<time>` with the labels `dependencies` and `rebuild`. For the action `refresh`, it adds a commit with a new date to the open rebuild PR. It leaves your checkout as it is. Skip steps 8 and 9 and Parts B to E for this PR. A person approves the held runs. In the Slack message, give an opened or refreshed PR the status `held`. If the script prints a notice and no PR, the state changed after step 3: give the notice as the reason in the Slack message.
-7. Give the PR a title that passes `cz --no-breaking-footer lint`. In the body, link the scan run and list the alert URLs, the CVE or GHSA IDs and the exact changes. For an operating system package, give the GHSA for the description and the Debian advisory (DSA or DLA) from the tracker row that step 3 used, each when it exists. If one is missing, give the CVE and the tracker URL. If a DSA or DLA exists, say that it is the source of the fix. Otherwise, if step 3 saw a fixed row, say that the fixed row and version of the Debian tracker are the source. If the tracker did not answer, say that the fix is not confirmed. A GHSA for an operating system package can list no patched version.
+7. Give the PR a title with no scope that passes `cz --no-breaking-footer lint`. In the body, link the scan run and list the alert URLs, the CVE or GHSA IDs and the exact changes. For an operating system package, give the GHSA for the description and the Debian advisory (DSA or DLA) from the tracker row that step 3 used, each when it exists. If one is missing, give the CVE and the tracker URL. If a DSA or DLA exists, say that it is the source of the fix. Otherwise, if step 3 saw a fixed row, say that the fixed row and version of the Debian tracker are the source. If the tracker did not answer, say that the fix is not confirmed. A GHSA for an operating system package can list no patched version.
 8. Open the PR with BOTH labels in the `gh pr create` call: `--label dependencies --label ai-assisted`. The label `dependencies` starts the PR automation. The label `ai-assisted` is set at open time, so that the automation stops at its entry check and this run keeps the PR.
 9. Skip Part B for a PR that this run opened. Go to Part C.
 
@@ -88,16 +88,13 @@ To make a fix:
 1. Check out the PR branch with `gh pr checkout <n>`.
 2. Change only what the bump broke. If the fix needs a change outside the PR scope, stop and go to Part E.
 3. Run the command that the failed job ran.
-4. Commit with `fix(<scope>): adapt to <pkg> <version>`. Push to the same branch.
-5. Set the scope of the PR title from the files of the PR. Keep the type and the subject of the title. Do this after every push.
-   - Run `bash agentic/skills/vulna-squash/scripts/set-pr-scope.sh <n>`.
-   - If the script fails, the result is `human-required`. Put the error in the hand-off section.
+4. Commit with `fix: adapt to <pkg> <version>`. Push to the same branch.
 
 After attempt 2, go to Part E.
 
 ## Part E: Verdict, report and hand-off
 
-1. If the bump caused a breaking change that we use, or CI is red after the attempts, or CI timed out, or the cause is unclear, or a fix is outside the PR scope, or the script in step 5 of Part D failed, or a run is held in `action_required` (reason: "a maintainer must approve the run"), or only `gatekeeper` failed (reason: "a maintainer must rerun gatekeeper"): the agent could not finish. The result is `human-required`.
+1. If the bump caused a breaking change that we use, or CI is red after the attempts, or CI timed out, or the cause is unclear, or a fix is outside the PR scope, or a run is held in `action_required` (reason: "a maintainer must approve the run"), or only `gatekeeper` failed (reason: "a maintainer must rerun gatekeeper"): the agent could not finish. The result is `human-required`.
 2. In all other cases, the result is `ai-assisted`.
 3. Run `bash agentic/skills/vulna-squash/scripts/set-result-label.sh <n> <result>`. It sets the result label and removes the other one.
 4. Write the report with the shape of `dependency-pr-review`. Start it with `<!-- vulna-squash-report -->`. Add the sections `What CI shows` and `What the agent changed`. Use the verdict that `dependency-pr-review` gives. A red CI that the bump caused means `do not merge`.

@@ -136,11 +136,11 @@ describe('uvLockArgs', () => {
 
 describe('renderTitle', () => {
   it('names the package and both versions', () => {
-    assert.strictEqual(renderTitle(single, 'deps'), 'build(deps): bump zod from 4.6.5 to 4.6.7');
+    assert.strictEqual(renderTitle(single), 'build: bump zod from 4.6.5 to 4.6.7');
   });
 
   it('names a group', () => {
-    assert.strictEqual(renderTitle(group, 'main'), 'build(main): bump rollup packages');
+    assert.strictEqual(renderTitle(group), 'build: bump rollup packages');
   });
 
   it('pairs the versions of a package that the lock holds in several versions', () => {
@@ -150,8 +150,8 @@ describe('renderTitle', () => {
       members: [{ name: 'parser', from: '7.1.0, 8.0.0', to: '7.1.1, 8.0.1', direct: false }],
     };
     assert.strictEqual(
-      renderTitle(several, 'deps'),
-      'build(deps): bump parser from 7.1.0 to 7.1.1 and from 8.0.0 to 8.0.1',
+      renderTitle(several),
+      'build: bump parser from 7.1.0 to 7.1.1 and from 8.0.0 to 8.0.1',
     );
   });
 });

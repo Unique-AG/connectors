@@ -16,7 +16,6 @@ on:
       - "packages/mcp-openapi/**"
       - "packages/mcp-scaffold/**"
       # What mcp-scaffold edits by matching its text when it registers a new MCP.
-      - ".gitcommitizen"
       - "release-please-config.json"
       - ".github/workflows/release-rerun.yaml"
       - "pnpm-workspace.yaml"
@@ -89,7 +88,6 @@ jobs:
               - 'packages/mcp-openapi/**'
               - 'packages/mcp-configs/**'
               - 'packages/mcp-observability/**'
-              - '.gitcommitizen'
               - 'release-please-config.json'
               - '.github/workflows/release-rerun.yaml'
               - 'pnpm-workspace.yaml'

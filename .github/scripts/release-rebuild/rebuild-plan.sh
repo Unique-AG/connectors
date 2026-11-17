@@ -2,7 +2,7 @@
 set -euo pipefail
 
 service=${1:?usage: rebuild-plan.sh <service>}
-title="build(${service}): rebuild for operating system patches"
+title="build: rebuild ${service} for operating system patches"
 release_branch="release-please--branches--main--components--${service}"
 cd "$(git rev-parse --show-toplevel)"
 

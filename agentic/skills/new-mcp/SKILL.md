@@ -9,7 +9,7 @@ metadata:
 
 `mcp-scaffold` (in `packages/mcp-scaffold`) generates the service. It has the layers, the
 architecture contracts, the server with its host and origin guard, the telemetry, the
-Dockerfile, the Helm chart, and the release and commit-scope registration. It is a command-line
+Dockerfile, the Helm chart, and the release registration. It is a command-line
 tool: never import from it. Your job is to find out what the MCP needs before running it, and to
 write what the scaffold cannot know afterwards: the upstream client when there is no OpenAPI
 spec, the auth, the persistence and the tools. Read `packages/mcp-architecture/ARCHITECTURE.md`
@@ -23,7 +23,7 @@ Never guess these. Ask them in one round, with the AskUserQuestion tool when you
 
 | Question | Becomes |
 |---|---|
-| Name, kebab-case, ending in `-mcp` (the scaffold refuses any other) | `<name>`, the first argument: the service folder, package, chart and commit scope |
+| Name, kebab-case, ending in `-mcp` (the scaffold refuses any other) | `<name>`, the first argument: the service folder, package and chart |
 | One or two sentences on what it does for the user | `--description`, the server instructions and the pyproject description |
 | Does it call an upstream, a system of its own such as a vendor API? If so, does it publish an OpenAPI 3.0 spec we can use? | `--upstream openapi` with `--spec`, `--upstream custom`, or no `--upstream` at all |
 | What does it store? Nothing, or any of Postgres and Redis (multi-select) | no `--persistence`, or every store chosen: `--persistence postgres redis` |
@@ -245,7 +245,7 @@ Replace the 404-only `upstream_transport` fixture in `tests/conftest.py` with th
 - Add `services/<name>` to the `folders` of `connectors.code-workspace`, so VS Code and Cursor
   type-check it with its own config and `.venv`.
 - Tell the user what is registered and what is still theirs to do:
-  - Registered: the `<name>` commit scope, and release-please, release-dev and release-rerun
-    unless it ran with `--no-release`. Commit with that scope, e.g. `feat(<name>): ...`.
+  - Registered: release-please, release-dev and release-rerun unless it ran with `--no-release`.
+    Title the PR without a scope, e.g. `feat: ...`.
   - Still to do: the Argo overlay with the hostname, `MCP_BASE_URL` and the secrets, and auth
     if it was left for later.

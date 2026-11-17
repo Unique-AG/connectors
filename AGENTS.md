@@ -2,7 +2,9 @@
 
 ## PR titles
 
-Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. Use the most specific scope that covers every changed file: one service or package gives its name (e.g. `packages/logger` → `logger`), several services give `services`, several packages give `packages`, only dependency files (`package.json`, lock files, `pyproject.toml`, Dockerfiles, Terraform, workflow pins) give `deps`, `docs/**` and root `*.md` give `docs`, and `agentic/**`, `.claude/**` and `.cursor/**` give `agentic`. Use `main` only when no other scope covers every file. A title always needs a scope, because `main` matches every file.
+A PR title has a type and no scope: `<type>: <subject>`. `cz` rejects a scope. Pick the type from
+`.gitcommitizen`: `ci` for the workflows and their scripts, `build` for dependency bumps, `docs`,
+`chore`, `fix`, `feat`, and the others it lists.
 
 ## Environment
 - Python services (any `services/*/pyproject.toml`) are driven by `uv`, not pnpm/turbo, and their

@@ -42,7 +42,7 @@ For the full cluster-to-service matrix, Argo CD URLs, and Slack communication ma
 
 ## Step 1: Audit Changelogs and Cut Releases in `Unique-AG/connectors`
 
-Once the code, dependency, or Dockerfile fix is merged to `Unique-AG/connectors` `main`, `release-please` opens or updates a `chore(main): release <service> <version>` PR per affected service.
+Once the code, dependency, or Dockerfile fix is merged to `Unique-AG/connectors` `main`, `release-please` opens or updates a `chore: release <service> <version>` PR per affected service.
 
 ### 1.1 Audit the Release-Please PR before merging
 
@@ -122,7 +122,7 @@ Verify that:
 
 ### 2.3 Review and merge
 
-- Name the PR `chore(<scope>): bump unique qa, uat01 and prod [UN-xxxxx]`.
+- Name the PR `chore: bump unique qa, uat01 and prod [UN-xxxxx]`.
 - Request review from a teammate in `#pod-connectors` (and check with the service owner if a chart migration is non-trivial).
 
 ---

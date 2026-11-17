@@ -43,7 +43,7 @@ for service in $services; do
       continue
       ;;
   esac
-  title="build(${service}): rebuild for operating system patches"
+  title="build: rebuild ${service} for operating system patches"
   body=${custom_body:-"This pull request rebuilds ${service}. It changes one date file and no code. The release build takes the newest operating system patches. GitHub holds the workflow runs on this pull request. Approve the runs. Then merge this pull request. Then merge the release pull request that release-please opens."}
   file="services/${service}/deploy/rebuild-date"
   if [ "$action" = refresh ]; then

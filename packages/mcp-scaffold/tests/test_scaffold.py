@@ -465,9 +465,7 @@ def test_a_name_too_long_for_its_chart_names_is_rejected() -> None:
         Options(name=f"{'a' * 30}-mcp", description="Probes.", persistence=frozenset())
 
 
-def test_the_scaffolds_registered_their_release_and_scope(
-    repo: Path, scaffolded: Scaffolded
-) -> None:
+def test_the_scaffolds_registered_their_release(repo: Path, scaffolded: Scaffolded) -> None:
     names = [scaffolded(name).name for name in PROBES]
     config = cast(Config, json.loads((repo / "release-please-config.json").read_text()))
     manifest = cast(
@@ -478,13 +476,12 @@ def test_the_scaffolds_registered_their_release_and_scope(
     for name in names:
         assert config["packages"][f"services/{name}"]["component"] == name
         assert manifest[f"services/{name}"] == "0.0.0"
-        assert f"{name} = services/{name}/**" in (repo / ".gitcommitizen").read_text()
         for workflow in ("release-dev.yaml", "release-rerun.yaml"):
             assert f"          - {name}\n" in (repo / ".github/workflows" / workflow).read_text()
         assert f'"!services/{name}"' in (repo / "pnpm-workspace.yaml").read_text()
 
 
-def test_a_name_a_removed_service_left_its_scope_under_is_listed_once(tmp_path: Path) -> None:
+def test_a_name_a_removed_service_left_its_exclusion_under_is_listed_once(tmp_path: Path) -> None:
     copy_registries(tmp_path)
     options = Options(
         name="probe-again-mcp",
@@ -498,7 +495,6 @@ def test_a_name_a_removed_service_left_its_scope_under_is_listed_once(tmp_path: 
     register(options, tmp_path, release=False)
 
     assert {registry: (tmp_path / registry).read_text() for registry in REGISTRIES} == registered
-    assert registered[".gitcommitizen"].count("probe-again-mcp = ") == 1
 
 
 @pytest.mark.parametrize(

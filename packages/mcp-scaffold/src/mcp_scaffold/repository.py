@@ -1,4 +1,4 @@
-"""The repository files a new service registers in: commit scope, workspace and release."""
+"""The repository files a new service registers in: workspace and release."""
 
 import json
 import re
@@ -13,8 +13,8 @@ from mcp_scaffold.pins import dependency_names
 def name_conflict(name: str, repo: Path) -> str | None:
     """Why `name` cannot be a new service in `repo`, or None when it can.
 
-    A scope that a service since removed left under the same name may be registered again, but
-    not a release: its version would carry on from the removed service's.
+    A release entry that a removed service left blocks the name: its version would carry on from
+    the removed service's.
     """
     service = f"services/{name}"
     if (repo / service).exists():
@@ -24,10 +24,6 @@ def name_conflict(name: str, repo: Path) -> str | None:
         )
     if name in dependency_names() or (repo / "packages" / name).exists():
         return f"{name} would shadow the package of that name"
-    scopes = (repo / ".gitcommitizen").read_text()
-    scope = re.search(rf"^{re.escape(name)} = (.+)$", scopes, flags=re.MULTILINE)
-    if scope is not None and scope.group(1) != f"{service}/**":
-        return f"{name} is already the commit scope of {scope.group(1)}"
     config = cast(dict[str, dict[str, object]], json.loads((repo / _RELEASE_CONFIG).read_text()))
     manifest = cast(dict[str, str], json.loads((repo / _RELEASE_MANIFEST).read_text()))
     releases = [
@@ -44,19 +40,12 @@ def name_conflict(name: str, repo: Path) -> str | None:
 
 
 def register(options: Options, repo: Path, *, release: bool) -> None:
-    """Commit scope, release, and the pnpm workspace exclusion every Python service has.
+    """Release, and the pnpm workspace exclusion every Python service has.
 
-    A scope and an exclusion that a service since removed left under the same name are not
-    listed twice. `name_conflict` has refused a name with a release entry left.
+    An exclusion that a service since removed left under the same name is not listed twice.
+    `name_conflict` has refused a name with a release entry left.
     """
     name = options.name
-
-    gitcommitizen = repo / ".gitcommitizen"
-    text = gitcommitizen.read_text()
-    assert "# Services\n" in text, ".gitcommitizen has no '# Services' section"
-    scope = f"{name} = services/{name}/**\n"
-    if scope not in text:
-        gitcommitizen.write_text(text.replace("# Services\n", f"# Services\n{scope}", 1))
 
     workspace = repo / "pnpm-workspace.yaml"
     text = workspace.read_text()

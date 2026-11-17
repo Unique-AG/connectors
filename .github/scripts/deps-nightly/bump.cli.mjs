@@ -175,11 +175,10 @@ if (files.length > 0) {
     files,
     before: lockBefore,
     after: lockFiles(entry.ecosystem),
-    gitcommitizen: readFileSync('.gitcommitizen', 'utf8'),
     cooldownDays: config.cooldownDays,
   });
   if (run('cz', ['--version']).status === 0) {
-    const lint = run('cz', ['--no-breaking-footer', 'lint', '--paths', files.join('\n')], {
+    const lint = run('cz', ['--no-breaking-footer', 'lint'], {
       input: title,
     });
     assert.strictEqual(

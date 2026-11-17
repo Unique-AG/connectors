@@ -196,5 +196,5 @@ An open release PR already rebuilds the image. The Rebuild Service workflow and 
 | `.github/scripts/release-rebuild/rebuild.sh` | Opens, refreshes, or closes the rebuild PR of each service. The workflow and the skill `vulna-squash` both run it. |
 | `.github/scripts/release-rebuild/rebuild-plan.sh` | Prints the action for one service as JSON: `open`, `refresh`, `close`, or `none`. A failed lookup exits non-zero. |
 | `agentic/skills/vulna-squash/SKILL.md` | The skill for the daily patch run |
-| `agentic/skills/vulna-squash/scripts/` | The shell scripts that the skill runs: the scan check, the entry check, the CI watch, the PR title scope, the result label, and the report comment |
+| `agentic/skills/vulna-squash/scripts/` | The shell scripts that the skill runs: the scan check, the entry check, the CI watch, the result label, and the report comment |
 | `.github/trivyignore.yaml` | Accepted findings, each with an expiry date. The nightly scan and the release gate skip them. |
