@@ -11,6 +11,7 @@ import pytest
 import respx
 from fastmcp import Client, Context, FastMCP
 from fastmcp.exceptions import ToolError
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_http.middleware import retry_handler
 from mcp.shared.exceptions import MCPError
 from mcp.types import METHOD_NOT_FOUND
@@ -38,6 +39,7 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
     measured_graph_operation,
+    no_retry,
 )
 from office_365_mcp.graph_operations import TOOL_REFUSALS, GraphOperationMiddleware
 from office_365_mcp.metrics import configure_metrics
@@ -508,6 +510,18 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
+        assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false") == before + 1
+
+    async def test_a_call_that_allows_no_retry_is_not_counted_as_retried(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        sent = graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "7"}))
+        before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false")
+
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
+            _ = await client.me.get(request_configuration=RequestConfiguration(options=no_retry()))
+
+        assert sent.call_count == 1
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false") == before + 1
 
 

@@ -22,8 +22,7 @@ import httpx
 from kiota_abstractions.api_error import APIError
 from kiota_http._exceptions import KiotaHTTPXError
 from kiota_http.middleware.middleware import BaseMiddleware
-from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
-from kiota_http.middleware.retry_handler import RetryHandler
+from kiota_http.middleware.retry_handler import RETRY_ATTEMPT, RetryHandler
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from opentelemetry import trace
 
@@ -236,8 +235,7 @@ class GraphCallObserver(BaseMiddleware):
         )
         if _is_throttling(response.status_code, retry_after_seconds):
             record_graph_throttled(
-                current_graph_operation(),
-                retried=_sdk_spent_its_retries(retry_after_seconds),
+                current_graph_operation(), retried=RETRY_ATTEMPT in response.request.headers
             )
         return response
 
@@ -355,20 +353,6 @@ def _status_of(failure: GraphFailure) -> str:
     return _STATUS.get(type(failure), _STATUS[GraphFailure])
 
 
-def _sdk_spent_its_retries(retry_after_seconds: float | None) -> bool:
-    """Whether the SDK retried this throttling before giving up on it.
-
-    The retry handler refuses to wait at all once the delay reaches its 180 s ceiling
-    (`kiota_http/middleware/retry_handler.py:97`), so a `Retry-After` that long means no attempt was
-    made. Anything shorter, or no header, means `GraphSettings.max_retries` were spent.
-
-    TRAP for whoever tunes `GraphSettings.max_retries`: that ceiling is per attempt, not cumulative.
-    `RetryHandlerOption` documents a `retry_time_limit` meant to bound the total, and never
-    implements one, so three retries of a `Retry-After: 179` is nine minutes inside one tool call.
-    """
-    return retry_after_seconds is None or retry_after_seconds < RetryHandlerOption.MAX_DELAY
-
-
 # Borrowed rather than restated so the two cannot disagree
 # (`kiota_http/middleware/retry_handler.py:54` declares the set, `:140` consults it). TRAP: copied
 # into a frozenset, not aliased. `DEFAULT_RETRY_STATUS_CODES` is a mutable class attribute and
@@ -383,10 +367,8 @@ _TOO_MANY_REQUESTS = 429
 def _is_throttling(status: int | None, retry_after_seconds: float | None) -> bool:
     """Whether Graph held this caller off, rather than a failure to serve it.
 
-    Restricted to the statuses the SDK retries, which is what keeps `_sdk_spent_its_retries`
-    accurate: the handler takes its delay from `Retry-After` only on those statuses. On any other
-    status the handler never waits out `Retry-After`, so marking it `retried` misreports a retry
-    that never happened.
+    Restricted to the statuses the SDK retries: the handler takes its delay from `Retry-After` only
+    on those statuses.
     """
     if status == _TOO_MANY_REQUESTS:
         return True

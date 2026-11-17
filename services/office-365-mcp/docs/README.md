@@ -1418,7 +1418,7 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `Office365McpToolErrors` | More than 20% of the tool calls in the last hour failed, and at least 10 failed | `15m` | `warning` |
 | `Office365McpGraphFailing` | More than 20% of the Graph operations in the last hour got status `unavailable`, `failed`, `error` or `paging_unending`, and at least 10 did | `15m` | `warning` |
 | `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
-| `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour got 429 after the SDK used all its retries | `15m` | `warning` |
+| `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour were throttled, and the callers got an error | `15m` | `warning` |
 | `Office365McpGraphSlow` | At least 3 Graph operations in the last hour took more than 60 seconds. Kong and the chat close the request at 60 seconds | `0m` | `warning` |
 | `Office365McpHttp5xx` | More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, and at least 5 did | `5m` | `warning` |
 | `Office365McpMemoryHigh` | A pod uses more than 80% of its memory limit | `30m` | `warning` |

@@ -280,15 +280,18 @@ Once the service runs, it exposes these endpoints:
   Two middlewares record them. `GraphOperationMiddleware` wraps each MCP tool call and counts it
   under `graph_operations_total` when the call sent at least one Graph request.
   `GraphCallObserver` is the first handler in the Graph SDK pipeline. It sees each Graph answer
-  after the SDK's retries, and counts throttling under `graph_throttled_total`. A tool marks each
-  Graph call with `graph_step`, which also turns SDK errors into the `GraphFailure` types.
+  after the SDK's retries, and counts throttling under `graph_throttled_total`. A tool can mark a
+  block of Graph calls as one named step with `graph_step`. One step can send several requests,
+  for example the pages of a list. A call outside a step has no step name and is not in
+  `graph_steps_total`. `graph_step` and `graph_errors` turn SDK errors into the `GraphFailure`
+  types.
 
   The label `operation` is always the registered tool name, never a URL. The label `step` names one
   Graph call inside the tool. A label taken from a Graph URL
   creates one time series for each chat, so this service does not use one. The label `status` names
   the remedy a failure needs, for example `forbidden`, `not_found`, `throttled`, or `unavailable`,
-  rather than the HTTP status code. The label `retried` states whether the SDK spent its retries on
-  the throttling, or refused the wait that Graph asked for.
+  rather than the HTTP status code. The label `retried` states whether the SDK retried the request
+  before the last throttling answer.
 - **Traces**. Off, unless an `OTEL_*` variable states where to send them.
   - `OTEL_TRACES_EXPORTER=console` prints spans to stderr.
   - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends spans to a collector, and needs no other
