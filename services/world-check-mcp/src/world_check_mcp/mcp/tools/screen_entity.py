@@ -23,9 +23,10 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="Matches to return.")]
     description=(
         "Create a persistent WATCHLIST case and screen it synchronously.\n"
         "\n"
-        "This writes a case. Repeated calls without case_id create new cases. An existing "
-        "case_id is refused, not rescreened. Matches are candidates, not confirmed "
-        "identities."
+        "This writes a case. Repeated calls without case_id create new cases, so pass a "
+        "case_id you chose: a retry then fails as an existing id instead of duplicating the "
+        "case. An existing case_id is refused, not rescreened. Matches are candidates, not "
+        "confirmed identities."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=False, open_world_hint=True
