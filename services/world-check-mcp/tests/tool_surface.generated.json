@@ -3110,7 +3110,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Search saved cases in one group with LSEG FIQL, for example query primaryName==\"John Smith\".\n\nUse get_reference_data kind search_filters for the fields. Quote values that contain reserved characters. EXACT is the mode for an exact caseId. The group filter is always added.",
+    "description": "Search saved cases in one group with LSEG FIQL, for example query primaryName==\"John Smith\".\n\nUse get_reference_data kind search_filters for the fields. Quote values that contain reserved characters. To look up one case by its caseId, use get_case_reference instead. The group filter is always added.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
