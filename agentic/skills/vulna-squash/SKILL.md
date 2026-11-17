@@ -40,7 +40,7 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
    - The package is an operating system package, and the Debian tracker lists no fix for the Debian release of the base image in the Dockerfile. The tracker lists Debian source packages, so use the row of the source package of the alerted package (for example, `libapt-pkg7.0` has the source package `apt`). A fix counts when the row of the release, or the row "<release> (security)", shows the status fixed. The tracker is `https://security-tracker.debian.org/tracker/<CVE>`. If the tracker does not answer, keep the alert.
    - `main` already holds the fixed version.
    - The package is not an operating system package, and an open PR with the label `dependencies` already changes it to a version that has the fix. Check the target version in the PR diff. The nightly job covers it.
-   - The package is an operating system package, and `bash .github/scripts/release-rebuild/rebuild-plan.sh <service>` prints the action `none` or `close`. The service is not released, or it has an open release PR, and that release rebuilds the image. For `close`, run `bash .github/scripts/release-rebuild/rebuild.sh <service>`: it closes the open rebuild PR. Name each open release PR in the Slack message, because a person must merge it to ship the patch. If the script fails, the lookup failed: go to the Slack message with that reason.
+   - The package is an operating system package, and `bash .github/scripts/release-rebuild/rebuild-plan.sh <service>` prints the action `none` or `close`. The service is not released, or it has an open release PR, and that release rebuilds the image. For `close`, run `bash .github/scripts/release-rebuild/rebuild.sh <service>`: it closes the open rebuild PR. Name each open release PR in the Slack message. If the script fails, the lookup failed: go to the Slack message with that reason.
    - A closed PR that was not merged names the same package and version. A person rejected it.
 4. If nothing is left, go to the Slack message with that reason.
 5. Group the rest into batches. Put patch and minor bumps of one ecosystem in one batch. Put each major bump in its own batch. Put the operating system packages of one service in one rebuild batch.
@@ -54,13 +54,13 @@ The skill `dependency-pr-review` assesses a dependency bump. Do not copy its ste
 
 ## Slack message (mode `findings`)
 
-At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Do not name the dropped packages. Pipe one line for each item to `bash agentic/skills/vulna-squash/scripts/slack-message.sh`. The script adds the prefix of each kind:
+At the end of the run, post ONE Slack message through the Slack action of the automation. Post it on every exit, also on a stop. Write facts only. Do not name the dropped packages. Do not tell a person what to do. Pipe one line for each item to `bash agentic/skills/vulna-squash/scripts/slack-message.sh`. The script adds the prefix of each kind:
 - `pr <number> <status>` for each PR that this run opened or refreshed. The status is `green`, `red`, `timed_out` or `held`. The script puts these PRs on the last line, and on more lines when they do not fit on one.
 - `stop <reason>` for a stop. Add the URL of the scan run, for example "nothing left to patch. Scan: https://github.com/Unique-AG/connectors/actions/runs/1", or "the scan is older than 24 hours".
 - `app <text>` with the count of dropped application packages and the reason.
-- `os <text>` with the count of dropped operating system packages and the reason. End the line with each held rebuild PR, for example "(#1473, #1481)".
+- `os <text>` with the count of dropped operating system packages and the reason. End the line with each held rebuild PR and each open release PR, for example "(#1473, #1481)".
 - `lockfiles <text>` with the count of CRITICAL and HIGH lockfile findings that have a fix. If step 2 did not read the lockfile findings, say so.
-- `note <text>` for each other line that step 2 or step 3 of Part A requires, for example "Merge release PR #1650 to ship the patch."
+- `note <text>` for each other fact that step 2 or step 3 of Part A requires.
 
 Write a PR as `#<number>` in the text of a line. The script turns each one into a Markdown link. Write any other URL as plain text, with no angle brackets.
 

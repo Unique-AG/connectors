@@ -29,6 +29,7 @@ kind == "pr" {
   if (split(text, part, " ") != 2 || part[1] !~ /^[0-9]+$/) die("A pr line needs a PR number and a status.")
   pr_count++
   pr_plain[pr_count] = "#" part[1] " " part[2]
+  if (length("PRs: " pr_plain[pr_count]) > max_chars) die("A pr line is longer than " max_chars " characters.")
   pr_linked[pr_count] = link("#" part[1]) " " part[2]
   next
 }
