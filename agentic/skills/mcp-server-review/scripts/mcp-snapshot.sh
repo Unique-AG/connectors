@@ -28,7 +28,7 @@ fi
 TOOLS_EXIT=$(run tools/list "--strict" "$@")
 if { [ "$TOOLS_EXIT" != "0" ] && [ "$TOOLS_EXIT" != "6" ]; } || ! jq -e '.result.tools | arrays' "$OUT/tools_list.json" >/dev/null 2>&1; then
   echo "tools/list failed (exit $TOOLS_EXIT): $(tail -n1 "$OUT/tools_list.err")" >&2
-  exit "${TOOLS_EXIT:-1}"
+  exit "$((TOOLS_EXIT == 0 ? 1 : TOOLS_EXIT))"
 fi
 RESOURCES_EXIT=$(run resources/list "" "$@")
 TEMPLATES_EXIT=$(run resources/templates/list "" "$@")
