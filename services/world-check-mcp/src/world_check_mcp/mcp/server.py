@@ -27,7 +27,14 @@ from world_check_mcp.upstream import UpstreamSettings
 
 INSTRUCTIONS = (
     "Screens people and organizations in LSEG World-Check One and returns sanctions, PEP, "
-    "and adverse-media results for KYC and third-party due diligence."
+    "and adverse-media results for KYC and third-party due diligence.\n"
+    "\n"
+    "Matches are candidates, not confirmed identities. Start with list_groups for a group id. "
+    "A case argument takes an internal caseSystemId or an external caseId, and get_case says "
+    "which one matched. screen_entity and passport_check create a case on every call, so pass "
+    "a case_id you chose to make a retry fail instead of duplicating it. resolve_result and "
+    "verify_passport_check save a regulatory record only after the user approves it in the "
+    "client. Every limit has a default and a maximum, and next_page continues a list."
 )
 
 
