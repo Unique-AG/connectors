@@ -107,6 +107,28 @@ def test_create_auth_lets_a_client_register_with_the_organisation_scope(
 
 
 @pytest.mark.usefixtures("zitadel_discovery")
+def test_create_auth_asks_zitadel_for_a_refresh_token_without_requiring_one(
+    server_settings: ServerSettings,
+) -> None:
+    zitadel = ZitadelSettings(
+        base_url=AnyHttpUrl(ISSUER),
+        client_id="polixis",
+        jwt_signing_key=SecretStr("k" * 32),
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=STORE)
+
+    assert isinstance(auth, OIDCProxy)
+    registration = auth.client_registration_options
+    assert registration is not None
+    assert registration.valid_scopes is not None
+    assert "offline_access" in auth._extra_authorize_params["scope"].split()
+    assert "offline_access" in registration.valid_scopes
+    assert "offline_access" not in auth.required_scopes
+
+
+@pytest.mark.usefixtures("zitadel_discovery")
 def test_create_auth_asks_for_consent_once_per_client(server_settings: ServerSettings) -> None:
     zitadel = ZitadelSettings(
         base_url=AnyHttpUrl(ISSUER),

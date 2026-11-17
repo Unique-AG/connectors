@@ -9,6 +9,8 @@ from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 from polixis_mcp.persistence import sign_in_store
 from polixis_mcp.persistence import StoreSettings
 
+_OFFLINE_ACCESS = "offline_access"
+
 
 def create_auth(
     *, zitadel: ZitadelSettings | None, server: ServerSettings, store: StoreSettings | None
@@ -25,7 +27,12 @@ def create_auth(
     signing_key = zitadel.jwt_signing_key.get_secret_value()
     # A client registers with the scopes the server requires, the organisation's among them
     # when ZITADEL_ORG_ID is set, so registration accepts every scope Zitadel is asked for.
-    scopes = list(dict.fromkeys([*ZITADEL_DEFAULT_MCP_SCOPES, *zitadel.required_scopes]))
+    # `offline_access` makes Zitadel send a refresh token, without which the proxy gives the
+    # client none and the user signs in again once the access token expires. It is asked for,
+    # not required: a required scope is checked on every token.
+    scopes = list(
+        dict.fromkeys([*ZITADEL_DEFAULT_MCP_SCOPES, _OFFLINE_ACCESS, *zitadel.required_scopes])
+    )
     return create_zitadel_oidc_proxy(
         mcp_server_base_url=server.base_url,
         zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(
