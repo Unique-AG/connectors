@@ -1,97 +1,33 @@
 # syntax=docker/dockerfile:1.7
+# mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
 
-ARG APP_NAME=kyckr-mcp
+FROM python:3.14-slim-trixie@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.12.10@sha256:2bb3ebca0a796a155094a27773d290c4b074572e6107f171d88d086682fd2500 /uv /bin/uv
+ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=0 UV_PROJECT_ENVIRONMENT=/app/.venv
+WORKDIR /workspace/services/kyckr-mcp
+COPY packages/mcp-configs /workspace/packages/mcp-configs
+COPY packages/mcp-observability /workspace/packages/mcp-observability
+COPY packages/mcp-openapi /workspace/packages/mcp-openapi
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=services/kyckr-mcp/uv.lock,target=uv.lock \
+    --mount=type=bind,source=services/kyckr-mcp/pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev --no-editable
+COPY services/kyckr-mcp /workspace/services/kyckr-mcp
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-editable
 
-# ------------------------------------------------------------------------------
-# Stage 1: base
-# Shared foundation for pruner, deps, and builder stages.
-# Using full trixie image (not slim) because we need build tools for native modules.
-# ------------------------------------------------------------------------------
-FROM node:26.13.1-trixie@sha256:e18c3ccdf7d71619990b0e85639f506e2028a95410999cab24cc373cbd10e0ac AS base
-ENV CI=1 \
-    PNPM_STORE_DIR=/root/.local/share/pnpm/store
-# Keep the version in sync with "packageManager" in the root and service package.json.
-RUN npm install -g pnpm@10.34.5 \
- && pnpm config set store-dir "$PNPM_STORE_DIR"
-
-# ------------------------------------------------------------------------------
-# Stage 2: pruner
-# Extracts only the files needed for this service from the monorepo.
-# Outputs to /app/out/json (package.jsons) and /app/out/full (source code).
-# ------------------------------------------------------------------------------
-FROM base AS pruner
-ARG APP_NAME
+FROM python:3.14-slim-trixie@sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f AS runtime
 WORKDIR /app
-# Bind mount is faster than COPY and doesn't add to image layers
-RUN --mount=type=bind,source=.,target=/src,ro \
-    pnpm dlx turbo prune @unique-ag/${APP_NAME} --docker --cwd /src --out-dir /app/out
-
-# ------------------------------------------------------------------------------
-# Stage 3: deps
-# Installs dependencies in a cached layer.
-# Only package.json files are copied first for better layer caching.
-# ------------------------------------------------------------------------------
-FROM base AS deps
-WORKDIR /app
-
-COPY --from=pruner /app/out/json/ .
-COPY ./pnpm-lock.yaml ./pnpm-lock.yaml
-COPY ./pnpm-workspace.yaml ./pnpm-workspace.yaml
-
-# Cache mount persists pnpm store between builds for faster installs
-RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
-    pnpm install --frozen-lockfile
-
-# ------------------------------------------------------------------------------
-# Stage 4: builder
-# Compiles TypeScript and creates a standalone deployment.
-# ------------------------------------------------------------------------------
-FROM base AS builder
-ARG APP_NAME
-WORKDIR /app
-
-COPY --from=deps /app/ .
-COPY ./tsconfig.json ./tsconfig.json
-COPY ./turbo.json ./turbo.json
-COPY --from=pruner /app/out/full/ .
-
-# Build this package and all workspace dependencies (...), then create standalone deployment
-RUN --mount=type=cache,target=/root/.cache/turbo \
-    pnpm turbo build --filter=@unique-ag/${APP_NAME}... && \
-    pnpm --filter=@unique-ag/${APP_NAME} deploy --prod out
-
-# ------------------------------------------------------------------------------
-# Stage 5: runner
-# Minimal production image. Only this stage is included in the final image.
-# ------------------------------------------------------------------------------
-FROM node:26.13.1-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS runner
-ARG APP_NAME
-WORKDIR /app
-
-# Baseline runtime packages:
-#   - procps/dumb-init/openssl/ca-certificates: signal forwarding, TLS, trust store
-#   - apt-get upgrade: pull newest OS security patches at build time
-RUN --mount=type=cache,target=/var/cache/apt \
-    apt-get update \
- && apt-get upgrade -y \
- && apt-get install -y --no-install-recommends \
-      procps \
-      dumb-init \
-      openssl \
-      ca-certificates \
- && dpkg --compare-versions "$(dpkg-query -W -f '${Version}' ca-certificates)" ge "20250419+deb13u1" \
- && rm -rf /var/lib/apt/lists/* \
- && rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
-
-ENV NODE_ENV=production
-
-COPY --from=builder --chown=node:node /app/services/${APP_NAME}/dist ./dist
-COPY --from=builder --chown=node:node /app/out/node_modules ./node_modules
-COPY --from=builder --chown=node:node /app/out/package.json ./package.json
-
-# Run as non-root for security
-USER node
-EXPOSE 9542
-
-ENTRYPOINT ["dumb-init", "--"]
-CMD ["sh", "-c", "node --enable-source-maps --max-old-space-size=${MAX_HEAP_MB:-850} dist/main.js"]
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --system --gid 1000 app && useradd --system --uid 1000 --gid app app
+RUN rm -rf /usr/local/lib/python*/site-packages/pip \
+           /usr/local/lib/python*/site-packages/pip-*.dist-info \
+           /usr/local/bin/pip /usr/local/bin/pip3 /usr/local/bin/pip3.* \
+ && ! python -c "import pip" 2>/dev/null
+COPY --from=builder --chown=app:app /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
+USER app
+EXPOSE 8000
+CMD ["kyckr-mcp"]

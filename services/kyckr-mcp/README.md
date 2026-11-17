@@ -1,143 +1,150 @@
-# Kyckr MCP Server
+# Kyckr MCP
 
-A NestJS-based microservice that exposes Kyckr's v2 company-registry API as MCP tools for KYC/KYB workflows. It lets an AI agent search companies, fetch profiles, list registry documents, and place document orders.
+An MCP server that searches official company registries and orders registry documents through [Kyckr](https://www.kyckr.com), for KYC and KYB work. Users sign in with Zitadel. Every call to Kyckr uses the one Kyckr API key of the deployment.
 
-## Table of Contents
-
-- [Quick Start](#quick-start)
-- [MCP Tools](#mcp-tools)
-- [Configuration](#configuration)
-- [Development](#development)
-- [Deployment](#deployment)
-- [Observability](#observability)
-
-## Quick Start
-
-```bash
-# Install dependencies
-pnpm install
-
-# Copy environment template
-cp .env.example .env
-# Edit .env: set KYCKR_API_KEY
-
-# Start development server
-pnpm dev
-```
-
-The MCP endpoint is then available at `http://localhost:9542/mcp`.
-
-## MCP Tools
+## Tools
 
 | Tool | Kyckr endpoint | Cost |
-|------|----------------|------|
-| `search_companies` | `GET /companies` | Free |
-| `get_lite_profile` | `GET /companies/{kyckrId}/lite` | Credits |
-| `get_enhanced_profile` | `GET /companies/{kyckrId}/enhanced` | Credits |
-| `list_company_documents` | `GET /companies/{kyckrId}/documents` | Free |
-| `create_document_order` | `POST /orders` | Credits |
-| `get_order` | `GET /orders/{orderId}` | Free |
-| `list_orders` | `GET /orders` | Free |
+|---|---|---|
+| `search_companies` | `GET /companies` | free |
+| `get_lite_profile` | `GET /companies/{kyckrId}/lite` | credits |
+| `get_enhanced_profile` | `GET /companies/{kyckrId}/enhanced` | credits |
+| `list_company_documents` | `GET /companies/{kyckrId}/documents` | free |
+| `create_document_order` | `POST /orders` | credits, and creates a real registry order |
+| `get_order` | `GET /orders/{orderId}` | free |
+| `list_orders` | `GET /orders` | free |
 
-All tools return `{ success: false, statusCode, message, correlationId }` on Kyckr 4xx/5xx so the agent can branch on `success` instead of catching exceptions. Successful responses pass the Kyckr payload through under `data` unchanged.
+When the order has finished, `create_document_order` and `get_order` also call `GET /orders/{orderId}/download?format=json`. A finished order comes back with its JSON document under `data.documentJson`. Download links are removed. If the filing is PDF only, `details` says so.
+
+The tool descriptions tell the agent to get the user's approval before it calls a tool that spends credits. `create_document_order` needs the user to approve the document and the cost shown by `list_company_documents`.
+
+## Errors
+
+A failed Kyckr call does not raise an MCP error. The tool answers:
+
+```json
+{ "success": false, "statusCode": 404, "message": "Company not found", "correlationId": "<kyckr-request-id>" }
+```
+
+`correlationId` is the Kyckr id of the request. Quote it to Kyckr support.
+
+On a final `429`, one that is not retried or outlasts the retries, the message ends with `(retry after Ns)` when Kyckr sent a whole number of seconds in `Retry-After`. Only a `429` from Kyckr is retried. A `503` can come after Kyckr has charged a paid read, so it is not retried.
+
+## Single tenant
+
+One deployment uses one Kyckr account. Every signed-in user shares its key and its credits. The key is never stored in the database. A deployment that must serve several Kyckr accounts needs a separate deployment per account.
 
 ## Configuration
 
-Copy `.env.example` to `.env` and configure the following.
+### Secrets
 
-### Required Variables
+Deliver these from a Kubernetes Secret, never through `values.yaml`, and list the Secret in `extraEnvSecrets` (or use `envVars` with `secretKeyRef`).
 
-| Variable | Description |
-|----------|-------------|
-| `KYCKR_API_KEY` | Kyckr API key, sent as `Bearer` to the Kyckr API |
-| `MCP_API_KEY` | Shared secret protecting the MCP endpoint. The service mounts at `/<MCP_API_KEY>/mcp`, so clients must use the api-key as the URL-path prefix. |
+| Variable | Notes |
+|---|---|
+| `UPSTREAM_API_KEY` | The Kyckr API key of this deployment. |
+| `ZITADEL_CLIENT_ID` | The client id of the Zitadel application of this MCP. |
+| `ZITADEL_JWT_SIGNING_KEY` | At least 32 characters, the same on every replica. It signs the tokens the MCP issues and encrypts the sign-in state in Postgres. Rotating it signs everyone out. |
+| `ZITADEL_CLIENT_SECRET` | Leave unset for a public client with PKCE. |
 
-### Optional Variables
+### Postgres
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `KYCKR_API_BASE_URL` | `https://test-api.kyckr.com/v2` | Kyckr API base URL. Point at `https://api.kyckr.com/v2` for production. |
-| `KYCKR_DEFAULT_CUSTOMER_REFERENCE` | - | Default `customerReference` forwarded on profile and order calls for usage reconciliation. Overridable per call. |
-| `KYCKR_DEFAULT_CONTACT_EMAIL` | - | Default contact email used when placing document orders. Overridable per call. |
-| `PORT` | `9542` | HTTP port. |
-| `LOG_LEVEL` | `info` | Pino log level (`fatal` / `error` / `warn` / `info` / `debug` / `trace` / `silent`). |
+The base chart sets `DATABASE_URL` and `PG_DATABASE_SSL_MODE` from `postgresql.connection`. The database user needs `CREATE TABLE` rights: the sign-in store creates its table on first use.
 
-### Generating Secrets
+With `networkPolicy.enabled`, set `postgresql.connection.host` so the base chart opens Postgres egress. With `connection.url` alone it renders none, because the host sits inside the secret. Then set `postgresql.networkPolicyEgressManaged: true` and add a Postgres rule under `networkPolicy.egress[]`.
 
-```bash
-# Generate a 64-char hex secret (for MCP_API_KEY)
-openssl rand -hex 32
+### `mcpConfig` (Helm values)
+
+The overlay must set `app.publicBaseUrl`, `zitadel.baseUrl` and `kyckr.apiUrl`: Helm fails with "... is mandatory" without them. The other values are pinned in the chart, and an overlay may change them. An overlay that relied on the old test API default now fails at upgrade and must set `kyckr.apiUrl`.
+
+| Value | Variable | Notes |
+|---|---|---|
+| `app.publicBaseUrl` | `MCP_BASE_URL` | The public https origin. Must match `routes.hostname`. Mandatory. |
+| `zitadel.baseUrl` | `ZITADEL_BASE_URL` | The Zitadel issuer. Mandatory. |
+| `zitadel.orgId` | `ZITADEL_ORG_ID` | Restricts sign-in to one organisation. See below. |
+| `kyckr.apiUrl` | `UPSTREAM_API_URL` | Mandatory, with no default, so no deployment calls the test API by accident. Production is `https://api.kyckr.com/v2`, test is `https://test-api.kyckr.com/v2`. The app rejects every scheme but https, since the Kyckr key goes to this origin. |
+| `kyckr.timeoutSeconds` | `UPSTREAM_TIMEOUT_SECONDS` | Pinned at 30. At most 120. |
+| `kyckr.defaultCustomerReference` | `UPSTREAM_DEFAULT_CUSTOMER_REFERENCE` | Sent to Kyckr for usage reconciliation when a call gives none. |
+| `kyckr.defaultContactEmail` | `UPSTREAM_DEFAULT_CONTACT_EMAIL` | The contact on a document order when a call gives none. |
+| `rateLimit.toolCallsPerWindow` | `MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW` | Pinned at 60. Tool calls per signed-in user and window. |
+| `rateLimit.windowSeconds` | `MCP_RATE_LIMIT_WINDOW_SECONDS` | Pinned at 60. |
+
+An `UPSTREAM_API_URL` with a path prefix other than `/vN` makes every route `[unknown]` and records no credits.
+
+With `networkPolicy.enabled`, the hosts of `zitadel.baseUrl` and `kyckr.apiUrl` get a Cilium egress rule on port 443, so both URLs are https without a port.
+
+The rate limit is counted in each pod's memory, so N replicas allow N times the limit. The chart keeps `replicaCount: 1` for that reason. With more replicas, divide the limit by the replica count.
+
+The chart also sets `HOST`, `MCP_AUTH_MODE=zitadel` and `DB_SSL_ROOT_CERT` (the CloudNativePG CA from the optional `kyckr-mcp-pg-cluster-ca` secret). `.env.example` lists the rest: log level, `MCP_ALLOWED_ORIGINS`, retry settings and tracing. `MCP_AUTH_MODE=none` turns sign-in off and keeps the server on loopback.
+
+## Sign-in and the organisation restriction
+
+Users sign in with Zitadel through the OIDC proxy of `unique_mcp`. The Zitadel application needs the redirect URI `<MCP_BASE_URL>/auth/callback`.
+
+With `ZITADEL_ORG_ID` set, the MCP reads `urn:zitadel:iam:user:resourceowner:id` from the verified id token and refuses any other organisation with a 401. If the claim is missing from the id token, every sign-in is refused. Verify in Zitadel which application setting puts it there (possibly "User Info inside ID Token") and check one sign-in before you set `ZITADEL_ORG_ID`.
+
+## Delivering and rotating the Kyckr key
+
+In the Unique QA overlay pattern, an ExternalSecret writes the secrets into a Kubernetes Secret from Azure Key Vault. The overlay lists that Secret in `extraEnvSecrets`, and each Secret key becomes an environment variable. An example, with placeholders:
+
+```yaml
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+spec:
+  target:
+    name: kyckr-mcp-secrets
+  data:
+    - secretKey: UPSTREAM_API_KEY
+      remoteRef:
+        key: <secret-name-in-the-store>
+      sourceRef:
+        storeRef:
+          kind: SecretStore
+          name: <secret-store-name>
 ```
 
-## Development
+Add one `data` entry for each of `ZITADEL_CLIENT_ID` and `ZITADEL_JWT_SIGNING_KEY`. To rotate the key, write the new value to the store. The Secret changes when the ExternalSecret next refreshes. The Deployment carries `reloader.stakater.com/auto: "true"`, so Reloader then restarts the pods.
 
-### Prerequisites
+## Run locally
 
-- Node.js 26
-- pnpm
-- A Kyckr API key (test or production)
-
-### Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm dev` | Start development server |
-| `pnpm build` | Build for production |
-| `pnpm test` | Run unit tests |
-| `pnpm test:e2e` | Run end-to-end tests |
-| `pnpm test:coverage` | Run tests with coverage |
-| `pnpm check-types` | Type-check with `tsc --noEmit` |
-| `pnpm style` | Check code style |
-| `pnpm style:fix` | Fix code style issues |
-
-E2E tests inject dummy env vars in `test/setup.ts`. The repo-wide `.gitignore` excludes `.env.*`, so a real `.env.test` is not committed.
-
-### Calling `/mcp`
-
-The MCP endpoint is mounted at `/<MCP_API_KEY>/mcp`. Clients must use the api-key as the URL-path prefix:
-
-```bash
-curl -X POST "http://localhost:9542/$MCP_API_KEY/mcp" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```sh
+cp .env.example .env
+# Set UPSTREAM_API_KEY. MCP_AUTH_MODE=none and HOST=127.0.0.1 are already set.
+uv sync
+uv run kyckr-mcp
 ```
 
-## Deployment
+The MCP endpoint is `http://127.0.0.1:8000/mcp`. Without sign-in no database is needed: the dummy `DATABASE_URL` in `.env.example` is enough. `.env.example` sets `UPSTREAM_API_URL` to the Kyckr test API, so no real credits are spent by accident. The app has no default for it and refuses to start without one.
 
-### Docker Compose (Production)
+`uv run poe ci` runs every check CI runs.
 
-```bash
-docker compose -f docker-compose.prod.yaml up -d
-```
+## Metrics and spans
 
-### Azure Lab (Demo)
+`/metrics` carries the per-tool metrics every MCP exports (`mcp_calls_total`, `mcp_call_duration_seconds`) and four metrics of this service for calls to Kyckr. They keep the names the NestJS service used.
 
-Demo deployment to the Unique [LAB](https://unique-ch.atlassian.net/wiki/spaces/DX/pages/1873739786/Labs) subscription as an App Service Web App. Demo only — no SLA, no client data, no production go-lives.
+| Metric | Type | Labels |
+|---|---|---|
+| `kyckr_api_requests_total` | counter | `method`, `path`, `status` |
+| `kyckr_api_request_duration_ms` | histogram | `method`, `path` |
+| `kyckr_api_retries_total` | counter | `method`, `path` |
+| `kyckr_credits_consumed_total` | counter | `tool` |
 
-```bash
-cp services/kyckr-mcp/deploy/.env.deploy.example services/kyckr-mcp/deploy/.env.deploy
-# Fill in KYCKR_API_KEY and MCP_API_KEY (generate: openssl rand -hex 32)
+- `path` is the route with ids replaced by placeholders: `/companies/:kyckrId/lite`, `/companies/:kyckrId/enhanced`, `/companies/:kyckrId/documents`, `/companies`, `/orders/:orderId`, `/orders/:orderId/download` and `/orders`. The route is read from the encoded path without its query, so an id with a `/` stays one segment. A path outside that list is labelled `[unknown]`. No label carries an id, the Kyckr key or user data.
+- `status` is the HTTP status Kyckr answered with, or `0` when it gave no answer, for example on a timeout.
+- Each attempt counts, so a request retried after a 429 adds one count per attempt. `kyckr_api_retries_total` adds one for each attempt after the first, so it counts the retries alone.
+- The histogram buckets end at 120 000 ms, the longest timeout the chart allows.
+- `kyckr_credits_consumed_total` adds the `cost.value` of a successful call to `get_lite_profile`, `get_enhanced_profile`, `create_document_order` or `get_order`. A call that fails, or whose answer has no cost or a cost below 0, adds nothing.
+- Each call to Kyckr is a client span named `<method> <route>`, with `http.request.method`, `url.template` and `http.response.status_code`. A status of 400 or more, or no answer, sets the span to error, and no exception message or stack goes on it. Spans export when tracing is on (`OTEL_*`).
+- Each attempt that Kyckr answers with an error, or that gets no answer, logs one `WARNING` with its method, route and status, so a retried call can log several.
 
-az login                                  # pick the LAB subscription
-./services/kyckr-mcp/deploy/deploy.sh
-```
+The old `kyckr_tool_call_duration_ms{tool,result}` is replaced by `mcp_call_duration_seconds{kind,name}`, with the outcome in `mcp_calls_total{status}`.
 
-The script provisions ACR (Basic) + B1 App Service Plan + Web App + Key Vault in `rg-lab-demo-001-kyckr-mcp` (swedencentral). Secrets (`KYCKR_API_KEY`, `MCP_API_KEY`) are stored in `kv-kyckr-mcp-lab` and pulled by the Web App via system-assigned managed identity, referenced from app settings as `@Microsoft.KeyVault(...)`. The script prints the MCP URL: `https://kyckr-mcp-app.azurewebsites.net/<MCP_API_KEY>/mcp`. Tail logs with `az webapp log tail -n kyckr-mcp-app -g rg-lab-demo-001-kyckr-mcp`.
+## Refreshing the spec
 
-## Observability
+The patched spec is vendored at `src/kyckr_mcp/upstream/openapi.yml`, so a restart never depends on Kyckr's site. Lines marked `patched` differ from the published file at `https://developer.kyckr.com/openapi/company_v2.yaml` because the API answers differently.
 
-The service emits:
-
-- **Logging**: Structured JSON logs via Pino with correlation IDs.
-- **Metrics**: `kyckr_api_requests_total` (counter) and `kyckr_api_request_duration_ms` (histogram), labelled with `method`, `path` (normalized so registry ids become `:id`), and `status`.
-- **Tracing**: Distributed traces via `nestjs-otel` and the shared `@unique-ag/instrumentation` package.
-- **Dashboards**: Grafana dashboard shipped with the Helm chart.
-
-Configure with the standard OpenTelemetry environment variables:
-
-```env
-OTEL_SERVICE_NAME=kyckr-mcp
-OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
-OTEL_EXPORTER_PROMETHEUS_PORT=8081
-```
+1. Run `grep -n patched src/kyckr_mcp/upstream/openapi.yml` to list the patched lines, and note the header comment.
+2. Download the published file over `openapi.yml`.
+3. Apply the `patched` changes again and restore the header comment, or drop a change that Kyckr has fixed.
+4. Run `uv run poe codegen`.
+5. Review the diff of `src/kyckr_mcp/upstream/generated/`, then run `uv run poe ci`.
