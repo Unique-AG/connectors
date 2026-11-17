@@ -28,8 +28,20 @@ sequenceDiagram
     C->>K: GET /mcp (token)
 ```
 
-Tokens are encrypted with `ENCRYPTION_KEY` before they reach Postgres. The access token `kb-mcp`
-returns is its own, signed with `ZITADEL_JWT_SIGNING_KEY`. Zitadel never sees that key.
+Tokens are encrypted with `ENCRYPTION_KEY` before they reach Postgres. The access and refresh
+tokens `kb-mcp` returns are its own, signed with `ZITADEL_JWT_SIGNING_KEY`. Zitadel never sees that
+key, and the client never sees Zitadel's tokens.
+
+## Token Refresh
+
+The access token `kb-mcp` issues expires with Zitadel's. When the client refreshes, `kb-mcp`
+refreshes its stored Zitadel tokens and returns a new pair, and the old refresh token no longer
+works.
+
+Zitadel decides how long the session can last. If it revokes or expires its own refresh token, the
+next refresh fails and the user signs in again. If the Zitadel app lacks the Refresh Token grant,
+Zitadel still returns a refresh token but rejects it at refresh, so users sign in again whenever
+the access token expires.
 
 ## Tool Call
 

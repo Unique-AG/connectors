@@ -15,7 +15,7 @@ Unique AI tenant already uses, never one you stand up yourself.
 - Helm 3.x with OCI support
 - Postgres 14+ for OAuth-proxy state
 - The public (PKCE) OIDC client id for `kb-mcp`, registered in your tenant's existing Zitadel
-  instance
+  instance, with Refresh Token ticked in the app's OIDC Settings
 - Network access from `kb-mcp`'s pod to the Unique API instance it calls
 
 ## Helm Chart
@@ -45,9 +45,10 @@ Deliver them through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through 
 via `extraEnvSecrets`.
 
 You'll also need `mcpConfig.zitadel.clientId`, the public (PKCE) OIDC client id for `kb-mcp`,
-registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback`. It is public, so it sits in
-plain chart values; see [Configuration](./configuration.md#Required) for the full required-variable
-reference.
+registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback` and the Refresh Token grant
+enabled. Without that grant, Zitadel rejects the refresh token it issued, so users sign in again
+whenever the access token expires. The client id is public, so it sits in plain chart values; see
+[Configuration](./configuration.md#Required) for the full required-variable reference.
 
 ## Minimal Values
 
@@ -165,3 +166,6 @@ entry, which builds the rule from `servicePort` and `podPort`. The chart does no
   the Service port instead of the pod port. See [Network Policies](#Network-Policies).
 - **Server refuses to boot**: `kb-mcp` requires both `DATABASE_URL` and `ENCRYPTION_KEY` unless
   `ALLOW_EPHEMERAL_OAUTH_STORAGE=true`.
+- **Users sign in again every time the access token expires**: Refresh Token is not ticked in the
+  Zitadel app's OIDC Settings, and the logs show
+  `unauthorized_client: grant_type "refresh_token" not allowed`. Tick it. `kb-mcp` needs no restart.
