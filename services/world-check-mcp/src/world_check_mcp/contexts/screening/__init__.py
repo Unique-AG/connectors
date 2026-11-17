@@ -1,6 +1,7 @@
 from world_check_mcp.contexts.screening.errors import ScreeningError
 from world_check_mcp.contexts.screening.fields import normalized
 from world_check_mcp.contexts.screening.fields import validate_fields
+from world_check_mcp.contexts.screening.models import DateOfBirth
 from world_check_mcp.contexts.screening.models import EntityType
 from world_check_mcp.contexts.screening.models import FieldValue
 from world_check_mcp.contexts.screening.models import Gender
@@ -13,6 +14,7 @@ from world_check_mcp.contexts.screening.screen_entity import refuse_existing_cas
 from world_check_mcp.contexts.screening.screen_entity import screen_entity
 
 __all__ = [
+    "DateOfBirth",
     "EntityType",
     "FieldValue",
     "Gender",

@@ -1,3 +1,5 @@
+from datetime import date
+from datetime import timedelta
 import json
 from typing import cast
 
@@ -104,7 +106,13 @@ def _template(group_id: str, providers: list[str], *, required: bool) -> httpx2.
                                 "fieldValueType": "COUNTRY",
                                 "label": "NATIONALITY",
                                 "fieldRequired": required,
-                            }
+                            },
+                            {
+                                "typeId": "SFCT_3",
+                                "fieldValueType": "DATE",
+                                "label": "DATE_OF_BIRTH",
+                                "fieldRequired": False,
+                            },
                         ]
                     }
                 }
@@ -237,6 +245,14 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _case("media-1", ["MEDIA_CHECK"])
     if path.endswith("/cases/fail-1"):
         return _case("fail-1", ["WATCHLIST"])
+    if path.endswith("/cases/empty-failures-1"):
+        return _case("empty-failures-1", ["WATCHLIST"])
+    if path.endswith("/cases/summary-failed-1"):
+        return _case("summary-failed-1", ["WATCHLIST"])
+    if path.endswith("/cases/no-cases-1"):
+        return _case("no-cases-1", ["WATCHLIST"])
+    if path.endswith("/cases/other-failed-1"):
+        return _case("other-failed-1", ["WATCHLIST"])
     if request.method == "GET" and path.endswith("/cases/sys-pass"):
         return _json(
             200,
@@ -428,7 +444,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             )
         assert providers == ["WATCHLIST"]
         assert body["caseScreeningState"] == {"WATCHLIST": "INITIAL"}
-        assert body["secondaryFields"] == [{"typeId": "SFCT_2", "value": "GBR"}]
+        assert {"typeId": "SFCT_2", "value": "GBR"} in cast(list[object], body["secondaryFields"])
         return _json(
             200,
             _screened(
@@ -471,6 +487,31 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                     ],
                 },
             )
+        if body["caseSystemIds"] == ["empty-failures-1"]:
+            return _json(
+                200,
+                {"summary": {"totalCases": 1, "success": 1, "failed": 0}, "failedCases": []},
+            )
+        if body["caseSystemIds"] == ["summary-failed-1"]:
+            return _json(
+                200,
+                {"summary": {"totalCases": 1, "success": 0, "failed": 1}, "failedCases": []},
+            )
+        if body["caseSystemIds"] == ["no-cases-1"]:
+            return _json(200, {"summary": {"totalCases": 0, "failed": 0}})
+        if body["caseSystemIds"] == ["other-failed-1"]:
+            return _json(
+                200,
+                {
+                    "summary": {"totalCases": 1, "success": 1, "failed": 0},
+                    "failedCases": [
+                        {
+                            "caseSystemId": "someone-else",
+                            "errors": [{"code": "DENIED", "message": "Not this case."}],
+                        }
+                    ],
+                },
+            )
         return httpx2.Response(204)
     if path.endswith("/cases/ongoing-screening-updates"):
         body = _body(request)
@@ -499,13 +540,14 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "sort": [{"columnName": "updateDate", "order": "ASCENDING"}],
                 "totalResultCount": 1,
                 "results": [
+                    {"caseId": "ext-0", "groupId": "g1", "updateDate": "2026-10-22T06:40:00Z"},
                     {
                         "caseSystemId": "sys-1",
                         "caseId": "ext-1",
                         "groupId": "g1",
                         "updateDate": "2026-10-22T06:47:00Z",
                         "watchlistResults": {"numberOfNewResults": 1, "numberOfUpdatedResults": 0},
-                    }
+                    },
                 ],
                 "pagination": {"pageReferences": {"next": "page-2"}},
             },
@@ -695,6 +737,55 @@ async def test_screen_entity_persists_a_watchlist_case_and_truncates_matches() -
     assert outcome["passport_matches"] == []
 
 
+@pytest.mark.parametrize("days_from_today", [-1, 0])
+async def test_screen_entity_accepts_a_dob_up_to_today(days_from_today: int) -> None:
+    born = (date.today() + timedelta(days=days_from_today)).isoformat()
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+                "dob": born,
+            },
+        )
+
+    assert result.structured_content is not None
+
+
+async def test_screen_entity_refuses_a_future_dob() -> None:
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "nationality": "GBR",
+                    "dob": tomorrow,
+                },
+            )
+
+
+async def test_screen_entity_refuses_a_malformed_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="String should match pattern"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "case_id": "a//b",
+                    "nationality": "GBR",
+                },
+            )
+
+
 async def test_screen_entity_refuses_an_existing_case_id() -> None:
     async with Client(_server()) as client:
         with pytest.raises(ToolError, match="already exists"):
@@ -760,6 +851,48 @@ async def test_enable_ongoing_screening_treats_an_empty_response_as_enabled() ->
     assert screening["provider_type"] == "WATCHLIST"
 
 
+async def test_enable_ongoing_screening_treats_an_empty_failed_cases_list_as_enabled() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "empty-failures-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is True
+    assert screening["failures"] == []
+
+
+async def test_enable_ongoing_screening_reports_failure_for_a_failure_of_another_case() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "other-failed-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["Not this case."]
+
+
+async def test_enable_ongoing_screening_reports_failure_when_the_summary_counts_no_cases() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "no-cases-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["LSEG did not enable monitoring."]
+
+
+async def test_enable_ongoing_screening_reports_failure_when_the_summary_rules_out_success() -> (
+    None
+):
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "summary-failed-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["LSEG did not enable monitoring."]
+
+
 async def test_enable_ongoing_screening_reports_a_failure_body() -> None:
     async with Client(_server()) as client:
         result = await client.call_tool("enable_ongoing_screening", {"case": "fail-1"})
@@ -783,6 +916,8 @@ async def test_get_ogs_updates_returns_watchlist_counts() -> None:
 
     page = result.structured_content
     assert page is not None
+    updates = cast(list[dict[str, object]], page["updates"])
+    assert [update["case_system_id"] for update in updates] == ["sys-1"]
     assert page["updates"][0]["new_results"] == 1
     assert page["next_page"] == "page-2"
     assert page["window"]["until"] == "2026-10-22T00:00:00Z"
@@ -862,6 +997,40 @@ async def test_passport_check_refuses_an_existing_case_id() -> None:
             await client.call_tool(
                 "passport_check",
                 {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "ext-1"},
+            )
+
+
+@pytest.mark.parametrize("days_from_today", [-1, 0])
+async def test_passport_check_accepts_a_date_of_birth_up_to_today(days_from_today: int) -> None:
+    born = (date.today() + timedelta(days=days_from_today)).isoformat()
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "passport_check",
+            {"passport": {**_PASSPORT, "date_of_birth": born}, "group_id": "g-passport"},
+        )
+
+    assert result.structured_content is not None
+
+
+async def test_passport_check_refuses_a_future_date_of_birth() -> None:
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+            await client.call_tool(
+                "passport_check",
+                {
+                    "passport": {**_PASSPORT, "date_of_birth": tomorrow},
+                    "group_id": "g-passport",
+                },
+            )
+
+
+async def test_passport_check_refuses_a_malformed_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="String should match pattern"):
+            await client.call_tool(
+                "passport_check",
+                {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "/a"},
             )
 
 
