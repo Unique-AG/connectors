@@ -1,5 +1,7 @@
+import assert from 'node:assert';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { map, partition, pipe, prop } from 'remeda';
 import { Config } from '../../config';
 import {
   type PartialSiteConfig,
@@ -66,12 +68,34 @@ export class SitesConfigurationService {
 
     const displayNameToNameMap = this.createDisplayNameToNameMap(columns);
 
-    const siteConfigs = listItems.map((item, index) => {
-      const partial = this.transformListItemToSiteConfig(item, index, displayNameToNameMap);
+    assert.ok(
+      displayNameToNameMap.siteId,
+      "SharePoint list has no column with display name 'siteId'. Was the column renamed?",
+    );
+
+    // A row without a siteId cannot refer to any site, so skipping it loses nothing. Such rows are
+    // typically added by accident and must not fail the whole sync. Rows that have a siteId but are
+    // otherwise invalid still fail loudly, so a misconfigured site is never silently dropped.
+    const [rowsWithSiteId, rowsWithoutSiteId] = pipe(
+      listItems,
+      map((item, index) => ({ item, rowNumber: index + 1 })),
+      partition(({ item }) => Boolean(readField(item, 'siteId', displayNameToNameMap))),
+    );
+
+    if (rowsWithoutSiteId.length > 0) {
+      const skippedRowNumbers = rowsWithoutSiteId.map(prop('rowNumber')).join(', ');
+      this.logger.warn({
+        msg: `Skipping SharePoint list rows without a siteId: ${skippedRowNumbers}`,
+        itemIds: rowsWithoutSiteId.map(prop('item', 'id')),
+      });
+    }
+
+    const siteConfigs = rowsWithSiteId.map(({ item, rowNumber }) => {
+      const partial = this.transformListItemToSiteConfig(item, rowNumber, displayNameToNameMap);
       return mergeSiteWithDefaults(
         partial,
         siteDefaults,
-        `sharepoint_list row ${index + 1} (siteId: ${partial.siteId})`,
+        `sharepoint_list row ${rowNumber} (siteId: ${partial.siteId})`,
       );
     });
 
@@ -93,17 +117,11 @@ export class SitesConfigurationService {
 
   private transformListItemToSiteConfig(
     item: ListItem,
-    index: number,
+    rowNumber: number,
     nameMap: Record<string, string>,
   ): PartialSiteConfig {
     try {
-      const fields = item.fields;
-
-      const getFieldValue = (displayName: string) => {
-        const internalName = nameMap[displayName];
-        const value = internalName ? fields[internalName] : undefined;
-        return typeof value === 'string' ? value.trim() : value;
-      };
+      const getFieldValue = (displayName: string) => readField(item, displayName, nameMap);
 
       const siteConfig = {
         siteId: getFieldValue('siteId'),
@@ -124,13 +142,19 @@ export class SitesConfigurationService {
       return PartialSiteConfigSchema.parse(siteConfig);
     } catch (error) {
       this.logger.error({
-        msg: `Failed to transform list item at index ${index} to PartialSiteConfig`,
+        msg: `Failed to transform list item at row ${rowNumber} to PartialSiteConfig`,
         itemId: item.id,
         error: sanitizeError(error),
       });
       throw new Error(
-        `Invalid site configuration at row ${index + 1}: ${normalizeError(error).message}`,
+        `Invalid site configuration at row ${rowNumber}: ${normalizeError(error).message}`,
       );
     }
   }
+}
+
+function readField(item: ListItem, displayName: string, nameMap: Record<string, string>): unknown {
+  const internalName = nameMap[displayName];
+  const value = internalName ? item.fields[internalName] : undefined;
+  return typeof value === 'string' ? value.trim() : value;
 }

@@ -357,6 +357,88 @@ describe('SitesConfigurationService', () => {
           /Invalid site configuration at row 1/,
         );
       });
+
+      describe('when the list contains rows without a siteId', () => {
+        const validRowFields = {
+          internal_ingestionMode: 'recursive',
+          internal_uniqueScopeId: 'scope_test',
+          internal_syncMode: 'content_only',
+        };
+
+        async function setupSharepointListService() {
+          const setup = await setupService({
+            sitesSource: 'sharepoint_list',
+            siteDefaults: SiteDefaultsSchema.parse({}),
+            sharepointList: {
+              siteId: createSmeared('test-site-id'),
+              listId: 'list-id-456',
+            },
+          });
+          setup.graphApi.getListColumns.mockResolvedValue(SHAREPOINT_LIST_COLUMNS);
+          return setup;
+        }
+
+        it('skips empty rows and loads the remaining sites', async () => {
+          const { service, graphApi } = await setupSharepointListService();
+          const warnSpy = vi.spyOn(service['logger'], 'warn');
+          graphApi.getListItems.mockResolvedValue([
+            { id: '1', fields: { internal_siteId: SITE_UUID, ...validRowFields } },
+            { id: '2', fields: { internal_maxFilesToIngest: 0 } },
+            { id: '3', fields: { internal_siteId: SECOND_SITE_UUID, ...validRowFields } },
+            { id: '4', fields: {} },
+          ] as unknown as ListItem[]);
+
+          const result = await service.loadSitesConfiguration();
+
+          expect(result.map((site) => site.siteId.value)).toEqual([SITE_UUID, SECOND_SITE_UUID]);
+          expect(warnSpy).toHaveBeenCalledWith(expect.objectContaining({ itemIds: ['2', '4'] }));
+        });
+
+        it('rejects when the list has no siteId column', async () => {
+          const { service, graphApi } = await setupSharepointListService();
+          graphApi.getListColumns.mockResolvedValue(
+            SHAREPOINT_LIST_COLUMNS.map((column) =>
+              column.displayName === 'siteId' ? { ...column, displayName: 'Site ID' } : column,
+            ),
+          );
+          graphApi.getListItems.mockResolvedValue([
+            { id: '1', fields: { internal_siteId: SITE_UUID, ...validRowFields } },
+          ] as unknown as ListItem[]);
+
+          await expect(service.loadSitesConfiguration()).rejects.toThrow(/no column.*'siteId'/);
+        });
+
+        it('skips a row whose siteId is whitespace only, even when other cells are filled', async () => {
+          const { service, graphApi } = await setupSharepointListService();
+          graphApi.getListItems.mockResolvedValue([
+            { id: '1', fields: { internal_siteId: '   ', ...validRowFields } },
+            { id: '2', fields: { internal_siteId: SITE_UUID, ...validRowFields } },
+          ] as unknown as ListItem[]);
+
+          const result = await service.loadSitesConfiguration();
+
+          expect(result.map((site) => site.siteId.value)).toEqual([SITE_UUID]);
+        });
+
+        it('reports the original row number when a later row is invalid', async () => {
+          const { service, graphApi } = await setupSharepointListService();
+          graphApi.getListItems.mockResolvedValue([
+            { id: '1', fields: {} },
+            {
+              id: '2',
+              fields: {
+                internal_siteId: SITE_UUID,
+                internal_ingestionMode: 'recursive',
+                internal_syncMode: 'content_only',
+              },
+            },
+          ] as unknown as ListItem[]);
+
+          await expect(service.loadSitesConfiguration()).rejects.toThrow(
+            /sharepoint_list row 2.*scopeId/,
+          );
+        });
+      });
     });
   });
 });
