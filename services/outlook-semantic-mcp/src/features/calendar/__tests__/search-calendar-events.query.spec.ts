@@ -1,4 +1,4 @@
-import { GraphError } from '@microsoft/microsoft-graph-client';
+import { Client, type Context, GraphError } from '@microsoft/microsoft-graph-client';
 import { Temporal } from 'temporal-polyfill';
 import { describe, expect, it, type Mock, vi } from 'vitest';
 import { CalendarMetricsService } from '~/features/metrics/calendar-metrics.service';
@@ -142,6 +142,7 @@ function createQuery(opts: {
   timezone?: ResolvedMailboxTimezone;
   get?: Mock;
   getByPath?: Record<string, unknown | Error>;
+  client?: Client;
 }) {
   const get = opts.get ?? vi.fn().mockResolvedValue({ value: [] });
   const measureSearch = vi.fn((_filters: unknown, fn: () => Promise<unknown>) => fn());
@@ -189,7 +190,9 @@ function createQuery(opts: {
           };
         });
   const query = new SearchCalendarEventsQuery(
-    { createClientForUser: vi.fn().mockReturnValue({ api }) } as unknown as GraphClientFactory,
+    {
+      createClientForUser: vi.fn().mockReturnValue(opts.client ?? { api }),
+    } as unknown as GraphClientFactory,
     {
       run: vi.fn().mockResolvedValue({
         id: USER_PROFILE_ID.toString(),
@@ -494,6 +497,32 @@ describe(SearchCalendarEventsQuery.name, () => {
     expect(result.searchNotes).toContain(
       'Results are capped at 100 events and more exist in this window. Narrow the date range or add filters.',
     );
+  });
+
+  it('requests a nextLink exactly as Graph returned it, without adding query options again', async () => {
+    const nextLink =
+      'https://graph.microsoft.com/v1.0/me/calendars/cal-own/calendarView?startDateTime=2026-08-25T00%3a00%3a00%2b02%3a00&endDateTime=2026-08-26T00%3a00%3a00%2b02%3a00&%24select=id%2csubject&%24orderby=start%2fdateTime&%24top=100&%24skip=100';
+    const requestedUrls: string[] = [];
+    const pages = [
+      { value: [graphEvent({ id: 'p1' })], '@odata.nextLink': nextLink },
+      { value: [graphEvent({ id: 'p2' })] },
+    ];
+    const client = Client.initWithMiddleware({
+      middleware: {
+        execute: async (context: Context) => {
+          requestedUrls.push(String(context.request));
+          context.response = Response.json(pages[requestedUrls.length - 1]);
+        },
+        setNext: () => undefined,
+      },
+    });
+    const { query } = createQuery({ client });
+
+    const result = await query.run(USER_PROFILE_ID, search());
+
+    expect(requestedUrls).toHaveLength(2);
+    expect(requestedUrls[1]).toBe(nextLink);
+    expect(result.events?.map((event) => event.eventRef.eventId)).toEqual(['p1', 'p2']);
   });
 
   it('reports no cap note when the window fits', async () => {
