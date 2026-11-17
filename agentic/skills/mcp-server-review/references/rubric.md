@@ -26,7 +26,7 @@ against the revision it targets. Report legacy/deprecated features as status, no
 
 | ID | Cls | Sev | Rule | Check |
 |----|-----|-----|------|-------|
-| AUTH-001 | N | P0 | Server validates the token was issued for **this** server (audience) | verifier config; token for another resource must fail |
+| AUTH-001 | N | P0 | When the server uses OAuth/bearer tokens, it validates the token was issued for **this** server (audience); n/a for unauthenticated servers and stdio (use environment credentials) | verifier config; token for another resource must fail |
 | AUTH-002 | N | P0 | No token passthrough: downstream API gets a separately issued token | downstream HTTP client code |
 | AUTH-003 | N | P0 | OAuth: PKCE, issuer validation (RFC 9207), redirect URI validation, no ID tokens as access tokens | AS metadata, callback code |
 | AUTH-004 | P/S | P0 | Per-tool and object-level authorization server-side, tenant isolation | user A with user B's id must fail without leakage |

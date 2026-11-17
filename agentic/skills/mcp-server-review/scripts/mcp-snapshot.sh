@@ -15,27 +15,30 @@ mkdir -p "$OUT"
 
 run() {
   local name="$1" extra="$2"; shift 2
-  pnpm --silent dlx "$INSPECTOR" --cli --method "$name" --format json $extra "$@" >"$OUT/${name//\//_}.json" 2>"$OUT/${name//\//_}.err"
+  pnpm --silent dlx "$INSPECTOR" --cli --stored-auth-only --method "$name" --format json $extra "$@" >"$OUT/${name//\//_}.json" 2>"$OUT/${name//\//_}.err"
   echo $?
 }
 
-declare -A CODE
-CODE[initialize]=$(run initialize "" "$@")
-if [ "${CODE[initialize]}" != "0" ]; then
-  echo "initialize failed (exit ${CODE[initialize]}): $(tail -n1 "$OUT/initialize.err")" >&2
+INIT_EXIT=$(run initialize "" "$@")
+if [ "$INIT_EXIT" != "0" ]; then
+  echo "initialize failed (exit $INIT_EXIT): $(tail -n1 "$OUT/initialize.err")" >&2
   echo "Exit codes: 3=auth required, 4=unreachable, 11=rate limited. See references/inspector-cli.md" >&2
-  exit "${CODE[initialize]}"
+  exit "$INIT_EXIT"
 fi
-CODE[tools/list]=$(run tools/list "--strict" "$@")
-CODE[resources/list]=$(run resources/list "" "$@")
-CODE[resources/templates/list]=$(run resources/templates/list "" "$@")
-CODE[prompts/list]=$(run prompts/list "" "$@")
+TOOLS_EXIT=$(run tools/list "--strict" "$@")
+if { [ "$TOOLS_EXIT" != "0" ] && [ "$TOOLS_EXIT" != "6" ]; } || ! jq -e '.result.tools | arrays' "$OUT/tools_list.json" >/dev/null 2>&1; then
+  echo "tools/list failed (exit $TOOLS_EXIT): $(tail -n1 "$OUT/tools_list.err")" >&2
+  exit "${TOOLS_EXIT:-1}"
+fi
+RESOURCES_EXIT=$(run resources/list "" "$@")
+TEMPLATES_EXIT=$(run resources/templates/list "" "$@")
+PROMPTS_EXIT=$(run prompts/list "" "$@")
 
 TOOLS="$OUT/tools_list.json"
 jq -n \
   --slurpfile init "$OUT/initialize.json" \
   --slurpfile tools "$TOOLS" \
-  --argjson strict_exit "${CODE[tools/list]}" '
+  --argjson strict_exit "$TOOLS_EXIT" '
   def depth: if type == "object" then ([.[] | depth] | max // 0) + 1
              elif type == "array" then ([.[] | depth] | max // 0) else 0 end;
   ($tools[0].result.tools // []) as $t
@@ -54,16 +57,17 @@ jq -n \
     missing_annotations: ($t | map(select(.annotations == null) | .name)),
     no_readOnlyHint_or_destructiveHint: ($t | map(select(.annotations != null and (.annotations.readOnlyHint == null and .annotations.destructiveHint == null)) | .name)),
     missing_outputSchema: ($t | map(select(.outputSchema == null) | .name)),
-    params_without_description: ($t | map({tool: .name, params: [(.inputSchema.properties // {}) | to_entries[] | select((.value.description // "") == "" and (.value.title // "") == "") | .key]} | select(.params | length > 0))),
+    params_without_description: ($t | map({tool: .name, params: [(.inputSchema.properties // {}) | to_entries[] | select((.value | type) == "object" and (.value.description // "") == "" and (.value.title // "") == "") | .key]} | select(.params | length > 0))),
     deep_schemas_gt_4: ($t | map({tool: .name, depth: (.inputSchema | depth)} | select(.depth > 4))),
     uses_anyOf_oneOf: ($t | map(select(.inputSchema | tojson | test("\"(anyOf|oneOf)\"")) | .name)),
     strict_exit: $strict_exit,
     strict_findings: ($tools[0].schemaFindings // {})
   }' >"$OUT/summary.json"
 
-for m in resources/list resources/templates/list prompts/list; do
+for entry in "resources/list:$RESOURCES_EXIT" "resources/templates/list:$TEMPLATES_EXIT" "prompts/list:$PROMPTS_EXIT"; do
+  m="${entry%%:*}"
   f="$OUT/${m//\//_}.json"
-  echo "$m exit=${CODE[$m]} count=$(jq '[.result[]? | arrays | length] | add // 0' "$f" 2>/dev/null)" >>"$OUT/summary.txt"
+  echo "$m exit=${entry##*:} count=$(jq '[.result[]? | arrays | length] | add // 0' "$f" 2>/dev/null)" >>"$OUT/summary.txt"
 done
 cat "$OUT/summary.json"
 cat "$OUT/summary.txt" >&2

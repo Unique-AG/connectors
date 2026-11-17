@@ -43,8 +43,9 @@ token as an env var and reference it as `$MCP_TOKEN`.
 | Target | Inspector flags |
 |--------|-----------------|
 | stdio | command last, e.g. `node build/index.js` |
-| Streamable HTTP | `--transport http --server-url <url>` |
-| SSE (deprecated) | `--transport sse --server-url <url>` |
+| Streamable HTTP | `--transport http --server-url <url> --protocol-era <era>` |
+| SSE (deprecated) | `--transport sse --server-url <url> --protocol-era legacy` |
+| Protocol era | `--protocol-era legacy\|auto\|modern`: ask which revision the server targets; use `modern` for `2026-07-28`, `legacy` for `<= 2025-11-25`, `auto` if unknown. Ad-hoc targets default to `legacy`. |
 | Auth header | `--header "Authorization: Bearer $MCP_TOKEN"` |
 
 Never put credentials in the URL or stdio args. Use a test tenant/account, not prod data.
@@ -58,7 +59,8 @@ bash <this skill's directory>/scripts/mcp-snapshot.sh "$SCRATCH/mcp-snap" <flags
 Runs `initialize`, `tools/list --strict`, `resources/list`, `resources/templates/list`,
 `prompts/list` through `pnpm dlx @modelcontextprotocol/inspector` (pinned, override with
 `MCP_INSPECTOR_PKG`). Prints a compact `summary.json` and saves raw JSON beside it.
-Exit codes 3 (auth), 4 (unreachable), 11 (rate limit): see
+The snapshot passes `--stored-auth-only`, so it never opens an OAuth flow; authenticate once
+in the Inspector web client or pass `--header`. Exit codes 3 (auth), 4 (unreachable), 11 (rate limit): see
 [references/inspector-cli.md](references/inspector-cli.md).
 
 Do not paste raw `tools_list.json` into context. Read it selectively (`jq` one tool)
@@ -69,8 +71,9 @@ only to quote evidence for a finding.
 Read [references/rubric.md](references/rubric.md) and apply it to `summary.json`, plus
 a sample of 3-5 tools (the riskiest and the vaguest). Judge by reading, not by counts:
 
-- **Protocol**: `protocolVersion` vs the target era. Do not flag handshake-era
-  (`initialize`, sessions) behaviour as a defect for servers targeting `<= 2025-11-25`.
+- **Protocol**: `protocolVersion` vs the target era. Do not hold servers targeting
+  `<= 2025-11-25` to modern requirements, but review their handshake (`initialize`,
+  sessions, returning the requested supported version) against their own revision.
 - **Selection sufficiency**: could an agent pick this tool over its nearest neighbour?
 - **Execution sufficiency**: can it build valid args and read the result without guessing?
 - **Capability overlap**: tools with similar resource/action/risk are interference
@@ -87,6 +90,8 @@ Offer, then wait for a yes. Show the exact commands. Details and flags in
 [references/inspector-cli.md](references/inspector-cli.md).
 
 - Call only tools with `readOnlyHint: true`, or ones the user names, with `--tool-args-json`.
+  The hint alone is not proof: read the handler or have the user confirm the tool does not
+  mutate, and skip the call when that cannot be established.
 - Call at least one tool with bad args and one with a missing resource to judge error
   semantics (`isError` set, message actionable, no stack trace or secrets). Exit 5 = tool error.
 - Check result size on a list-style tool (p50 and max bytes).
