@@ -17,3 +17,17 @@ Screens people and organizations in LSEG World-Check One and returns sanctions, 
 - Upstream: OpenAPI, from the vendor's spec in `upstream/openapi.yml`. The client exchanges the LSEG service account (`UPSTREAM_API_KEY` and `UPSTREAM_API_SECRET`) for a bearer token at `UPSTREAM_TOKEN_URL`. `Authorization` and `Date` are not tool arguments. `upstream/routes.py` lists the operations served as tools straight from the spec, and `operation-ids` in `[tool.mcp-openapi]` the ones our tools call through `Upstream`.
 - Persistence: Postgres as a key-value store (`py-key-value-aio`, its table made on first use, no migrations), as `Persistence.store`, for the single-use approval markers and the Zitadel sign-in state (`DATABASE_URL`). No screening records.
 - Auth: Zitadel sign-in through `unique_mcp`'s OIDC proxy, built in `mcp/auth/` and passed to `FastMCP(auth=...)`. Its clients and tokens sit encrypted in Postgres. `MCP_AUTH_MODE=none` turns sign-in off, and `run_server` then keeps the server on loopback. The LSEG service account is not that sign-in: every admitted caller shares it.
+
+## Running locally with secretspec
+
+[`secretspec.toml`](secretspec.toml) declares the two LSEG credentials, so they need not sit in your shell or a `.env` you pasted them into. Install [secretspec](https://secretspec.dev), then run from this folder:
+
+```bash
+# default profile: from 1Password, the "service account" section of the "LSEG World-Check One" item
+secretspec run -- uv run world-check-mcp
+
+# local profile: from UPSTREAM_API_KEY and UPSTREAM_API_SECRET in .env
+secretspec run --profile local -- uv run world-check-mcp
+```
+
+The default profile reads the `Employee` vault through the 1Password app, which asks you to approve the access. `UPSTREAM_API_KEY` is the short service-account id and `UPSTREAM_API_SECRET` its UUID password, not the item's `api key` or `product key`. When an agent runs secretspec it must pass `--reason "<why>"`. `secretspec check` lists what resolves.
