@@ -11,6 +11,7 @@ import threading
 import time
 from typing import ClassVar, override
 
+from fastmcp import Client
 import httpx2
 from pydantic import AnyHttpUrl
 import pytest
@@ -23,13 +24,23 @@ from polixis_mcp.upstream import SearchRequestInput
 from polixis_mcp.upstream import Upstream
 from polixis_mcp.upstream import upstream_http
 from polixis_mcp.upstream import UpstreamError
+from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from tests.offline_server import open_fake_persistence
+from tests.tool_calls import tool_error
 
 _WHEN = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
 _QUOTA_SPENT = httpx2.Response(
     429,
     headers={"x-amzn-errortype": "LimitExceededException"},
     json={"message": "Limit Exceeded"},
+)
+_QUOTA_SPENT_ANSWER = (
+    "The Polixis API request limit was exceeded. This server does not retry the request, since "
+    "Polixis answers no more requests until more are added to the limit. Do not call this tool "
+    "or any other Polixis tool again in this conversation. Tell the user that the Polixis API "
+    "request limit was exceeded and that they should ask their administrator to get more "
+    "Polixis API requests."
 )
 
 
@@ -41,21 +52,22 @@ async def _search_error(upstream: Upstream) -> UpstreamError:
     return raised.value
 
 
-async def test_a_spent_quota_is_not_retried_and_stops_every_call_until_the_cooldown_ends() -> None:
-    moments = [_WHEN]
-    sent = 0
-
+def _quota_spent_polixis(sent: list[httpx2.Request]) -> httpx2.MockTransport:
     def respond(request: httpx2.Request) -> httpx2.Response:
-        nonlocal sent
         if request.url.host == "auth.example.com":
             return httpx2.Response(200, json={"access_token": "token", "expires_in": 3600})
-        sent += 1
+        sent.append(request)
         return _QUOTA_SPENT
 
+    return httpx2.MockTransport(respond)
+
+
+async def test_a_spent_quota_is_not_retried_and_stops_every_call_until_the_cooldown_ends() -> None:
+    moments = [_WHEN]
+    sent: list[httpx2.Request] = []
     settings = fake_upstream_settings()
-    transport = httpx2.MockTransport(respond)
     async with (
-        upstream_http(settings, transport, now=lambda: moments[-1]) as http,
+        upstream_http(settings, _quota_spent_polixis(sent), now=lambda: moments[-1]) as http,
         open_upstream(http, settings) as upstream,
     ):
         answered = await _search_error(upstream)
@@ -63,14 +75,32 @@ async def test_a_spent_quota_is_not_retried_and_stops_every_call_until_the_coold
         moments.append(_WHEN + timedelta(minutes=15))
         answered_again = await _search_error(upstream)
 
-    assert sent == 2
-    assert (answered.status_code, type(answered_again)) == (429, UpstreamError)
-    assert isinstance(refused, PolixisQuotaSpentError)
-    assert str(refused) == (
-        "Polixis's request quota for this API key is spent. POST "
-        "https://api.example.com/search/api was not sent: this server does not ask Polixis "
-        "again before 12:15 UTC, and the quota itself may reset later than that."
+    assert len(sent) == 2
+    assert all(
+        isinstance(error, PolixisQuotaSpentError) and error.status_code == 429
+        for error in (answered, refused, answered_again)
     )
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments"),
+    [
+        ("search_entities", {"name": "Example"}),
+        ("resolve_permanent_id", {"pid": "O00000000000000000000000000000100"}),
+    ],
+)
+async def test_a_spent_quota_tells_the_agent_to_stop_and_send_the_user_to_an_administrator(
+    tool: str, arguments: dict[str, object]
+) -> None:
+    sent: list[httpx2.Request] = []
+    async with open_fake_persistence() as persistence:
+        server = build_server(fake_upstream_settings(), persistence, _quota_spent_polixis(sent))
+        async with Client(server) as client:
+            answered = await tool_error(client, tool, arguments)
+            refused = await tool_error(client, tool, arguments)
+
+    assert len(sent) == 1
+    assert answered == refused == _QUOTA_SPENT_ANSWER
 
 
 async def test_a_throttled_request_is_still_retried() -> None:

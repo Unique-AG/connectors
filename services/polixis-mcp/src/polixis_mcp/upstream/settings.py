@@ -38,6 +38,9 @@ class UpstreamSettings(BaseSettings):
     max_concurrent_requests: int = Field(default=4, ge=1, le=20)
     # How long a process stops calling Polixis after it answers that the quota is spent.
     quota_cooldown_seconds: float = Field(default=15 * 60, ge=0)
+    # Off sends every request to Polixis once: a throttled or unavailable answer fails the call.
+    # A spent quota is never retried either way.
+    retry_enabled: bool = True
     # Read from UPSTREAM_RETRY_*, with the defaults every MCP shares.
     retry: RetrySettings = Field(default_factory=RetrySettings)
     # Read from UPSTREAM_RECORDING_*: off unless a developer records or replays Polixis's answers.

@@ -23,7 +23,6 @@ from mcp_types import ToolAnnotations
 from pydantic import SecretStr
 import yaml
 
-from polixis_mcp.upstream.quota import QuotaAwareRetryPolicy
 from polixis_mcp.upstream.quota import QuotaGate
 from polixis_mcp.upstream.recording import CassetteTransport
 from polixis_mcp.upstream.recording import RecordingMode
@@ -98,12 +97,14 @@ async def open_upstream(
     while every in-memory client enters the lifespan again.
     """
     retry = settings.retry
-    policy = QuotaAwareRetryPolicy(
-        retry_after=RetryAfterPolicy(
+    policy = (
+        RetryAfterPolicy(
             max_attempts=retry.max_attempts,
             max_wait_seconds=retry.max_wait_seconds,
             statuses=retry.statuses,
         )
+        if settings.retry_enabled
+        else None
     )
     yield Upstream(SPEC, http, retry_policy=policy, response_check=reject_error_body)
 
