@@ -49,6 +49,7 @@ from polixis_mcp.upstream.generated.vendor_responses import JudicialRecord
 from polixis_mcp.upstream.generated.vendor_responses import NameRecord
 from polixis_mcp.upstream.generated.vendor_responses import NodeMeta
 from polixis_mcp.upstream.generated.vendor_responses import Profile
+from polixis_mcp.upstream.generated.vendor_responses import RelationProperty
 from polixis_mcp.upstream.generated.vendor_responses import SanctionedParty
 from polixis_mcp.upstream.generated.vendor_responses import SanctionPathHop
 from polixis_mcp.upstream.generated.vendor_responses import SanctionRecord
@@ -120,6 +121,7 @@ __all__ = [
     "ledger_count",
     "Profile",
     "CorporateNodeData",
+    "RelationProperty",
     "SearchEntitiesRequest",
     "SearchHit",
     "SmartGraphResponse",

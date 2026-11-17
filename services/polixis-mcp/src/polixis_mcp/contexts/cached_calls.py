@@ -22,9 +22,18 @@ async def cached_call[T: BaseModel, R: BaseModel](
     Only a successful response is cached: `upstream.call` returns one only after its status,
     its retries and the client's rejection check have passed, and raises otherwise. A cached
     response that no longer fits the model, such as after a deploy changed it, is fetched again.
+    The cache is optional: a failed read asks Polixis, and a failed write still returns its answer.
     """
     key = cache_key(operation, request)
-    cached = await cached_response(persistence=persistence, key=key)
+    try:
+        cached = await cached_response(persistence=persistence, key=key)
+    except Exception:
+        _logger.warning(
+            "Could not read the Polixis response cache, asking Polixis",
+            extra={"operation_id": operation.operation_id},
+            exc_info=True,
+        )
+        cached = None
     if cached is not None:
         try:
             return operation.adapter.validate_python(cached)
@@ -35,11 +44,19 @@ async def cached_call[T: BaseModel, R: BaseModel](
                 exc_info=True,
             )
     response = await upstream.call(operation, request)
-    await cache_response(
-        persistence=persistence,
-        key=key,
-        response=response.model_dump(mode="json", by_alias=True, exclude_none=True),
-    )
+    try:
+        await cache_response(
+            persistence=persistence,
+            key=key,
+            response=response.model_dump(mode="json", by_alias=True, exclude_none=True),
+        )
+    except Exception:
+        # The answer is paid for already; failing the call would only spend the quota again.
+        _logger.warning(
+            "Could not cache a Polixis response",
+            extra={"operation_id": operation.operation_id},
+            exc_info=True,
+        )
     return response
 
 

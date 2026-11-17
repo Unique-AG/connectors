@@ -1,5 +1,7 @@
 import asyncio
+from typing import override
 
+from fastmcp import Client
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
 import pytest
@@ -7,6 +9,8 @@ import pytest
 from polixis_mcp import contexts
 from polixis_mcp.persistence import cull_expired_entries_periodically
 from polixis_mcp.persistence import Persistence
+from polixis_mcp.upstream import UpstreamSettings
+from tests.offline_server import build_server
 from tests.offline_server import FakeStore
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
@@ -145,3 +149,55 @@ async def test_a_failed_cull_is_logged_and_the_culling_goes_on(
         assert caplog.messages == ["Could not delete the expired store entries"]
     finally:
         culling.cancel()
+
+
+class _FailingWriteStore(FakeStore):
+    """Fails every write, as a Postgres that went away does."""
+
+    @override
+    async def put(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("The connection is closed")
+
+
+async def test_a_failed_cache_write_still_returns_polixis_answer(
+    upstream_settings: UpstreamSettings,
+    upstream_transport: httpx2.MockTransport,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    persistence = Persistence(store=_FailingWriteStore())
+    async with Client(build_server(upstream_settings, persistence, upstream_transport)) as client:
+        owners = await call_tool(
+            client,
+            "get_ultimate_beneficial_owners",
+            {"pid": "O00000000000000000000000000000100"},
+            returns=contexts.OwnershipPage,
+        )
+
+    assert owners.entities
+    assert "Could not cache a Polixis response" in caplog.messages
+
+
+class _FailingReadStore(FakeStore):
+    """Fails every read, as a Postgres that went away does."""
+
+    @override
+    async def get(self, *args: object, **kwargs: object) -> None:
+        raise RuntimeError("The connection is closed")
+
+
+async def test_a_failed_cache_read_asks_polixis(
+    upstream_settings: UpstreamSettings,
+    upstream_transport: httpx2.MockTransport,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    persistence = Persistence(store=_FailingReadStore())
+    async with Client(build_server(upstream_settings, persistence, upstream_transport)) as client:
+        owners = await call_tool(
+            client,
+            "get_ultimate_beneficial_owners",
+            {"pid": "O00000000000000000000000000000100"},
+            returns=contexts.OwnershipPage,
+        )
+
+    assert owners.entities
+    assert "Could not read the Polixis response cache, asking Polixis" in caplog.messages

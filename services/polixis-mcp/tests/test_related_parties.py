@@ -143,7 +143,7 @@ async def test_get_related_parties_asks_polixis_for_its_next_page_after_the_last
     assert json.loads(request.content) == {"id": ORGANIZATION, "category": ["executive"]}
 
 
-def _publisher(*items: dict[str, object]) -> dict[str, object]:
+def _publisher(*items: Mapping[str, object]) -> dict[str, object]:
     return {"data": list(items), "hasNext": False}
 
 
@@ -233,4 +233,21 @@ async def test_get_related_parties_takes_a_name_only_a_later_publisher_gives(
 
     assert [(party.pid, party.name, party.entity_type) for party in page.parties] == [
         (pid, "Eve", "PERSON")
+    ]
+
+
+async def test_get_related_parties_keeps_a_relation_polixis_gives_no_details_for(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    pid = "P00000000000000000000000000000204"
+    item: dict[str, object] = {
+        "entity": {"pid": pid},
+        "relation": [{"type": "board"}, {"type": "executive", "relationProperty": []}],
+    }
+
+    page = await _page(mcp_client, monkeypatch, {"Register": _publisher(item)})
+
+    assert [relation.relation_type for relation in page.parties[0].relations] == [
+        "board",
+        "executive",
     ]

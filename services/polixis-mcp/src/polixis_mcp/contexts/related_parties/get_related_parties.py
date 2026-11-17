@@ -19,6 +19,7 @@ from polixis_mcp.upstream import CorporateRequestInput
 from polixis_mcp.upstream import GET_CORPORATE_PROFILE
 from polixis_mcp.upstream import GetCorporateProfileQuery
 from polixis_mcp.upstream import GetCorporateProfileRequest
+from polixis_mcp.upstream import RelationProperty
 from polixis_mcp.upstream import Upstream
 
 RelationCategory = Literal[
@@ -129,19 +130,25 @@ def _party(item: CorporateNodeData) -> RelatedPartyView | None:
         flags=unique(name for flag in entity.flags or [] for name in flag),
         alerts=visible_alert_texts(entity.alerts),
         relations=[
-            RelationView(
-                relation_type=relation.type,
-                title=detail.title,
-                share_percent=_share(detail.properties),
-                former=bool(detail.former),
-                start_date=partial_date((detail.dates or {}).get("Start Date")),
-                end_date=partial_date((detail.dates or {}).get("End Date")),
-                information_date=partial_date((detail.dates or {}).get("Date of Information")),
-                source=detail.metadata.source_name if detail.metadata is not None else None,
-            )
+            _relation(relation.type, detail)
             for relation in item.relation or []
-            for detail in relation.relation_property or []
+            # A relation without details still says how the party is related.
+            for detail in relation.relation_property or [RelationProperty.model_validate({})]
         ],
+    )
+
+
+def _relation(relation_type: str | None, detail: RelationProperty) -> RelationView:
+    dates = detail.dates or {}
+    return RelationView(
+        relation_type=relation_type,
+        title=detail.title,
+        share_percent=_share(detail.properties),
+        former=bool(detail.former),
+        start_date=partial_date(dates.get("Start Date")),
+        end_date=partial_date(dates.get("End Date")),
+        information_date=partial_date(dates.get("Date of Information")),
+        source=detail.metadata.source_name if detail.metadata is not None else None,
     )
 
 

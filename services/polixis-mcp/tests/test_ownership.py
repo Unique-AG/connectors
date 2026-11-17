@@ -2,6 +2,7 @@ import httpx2
 import pytest
 
 from polixis_mcp import contexts
+from tests import polixis_responses
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
 from tests.tool_calls import McpClient
@@ -209,3 +210,22 @@ async def test_a_malformed_pid_is_refused_without_asking_polixis(
 
     assert "O123" in error
     assert upstream_requests == []
+
+
+async def test_ownership_reaches_the_owners_behind_a_node_without_an_id(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    owner = {"id": "P00000000000000000000000000000700", "type": "PERSON", "sharePercent": 50.0}
+    anonymous = {"type": "ORGANIZATION", "sharePercent": 80.0, "children": [owner]}
+    monkeypatch.setattr(polixis_responses, "OWNERS", {"roots": [anonymous]})
+
+    page = await call_tool(
+        mcp_client,
+        "get_ultimate_beneficial_owners",
+        {"pid": "O00000000000000000000000000000100"},
+        returns=contexts.OwnershipPage,
+    )
+
+    assert [(entity.pid, entity.effective_share_percent) for entity in page.entities] == [
+        ("P00000000000000000000000000000700", 40.0)
+    ]

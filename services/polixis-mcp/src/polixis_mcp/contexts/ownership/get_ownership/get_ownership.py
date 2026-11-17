@@ -107,10 +107,10 @@ async def _tree(
 
 
 def _chains(nodes: list[UboNode], *, above: _Chain) -> Iterator[_Chain]:
-    """Every chain of links from the entity asked about to a node of the tree."""
+    """Every chain of links from the entity asked about to a node of the tree. A node without an
+    id gets no row of its own, but the chains through it still reach the nodes below.
+    """
     for node in nodes:
-        if not node.id:
-            continue
         chain = (*above, node)
         yield chain
         yield from _chains(node.children or [], above=chain)
