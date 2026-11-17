@@ -161,8 +161,8 @@ catalogs:
       specifier: 0.2.2
       version: 0.2.2
     remeda:
-      specifier: 2.60.0
-      version: 2.60.0
+      specifier: 2.61.0
+      version: 2.61.0
     rxjs:
       specifier: 7.8.2
       version: 7.8.2
@@ -320,7 +320,7 @@ importers:
     dependencies:
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       serialize-error-cjs:
         specifier: 'catalog:'
         version: 0.3.0
@@ -527,7 +527,7 @@ importers:
         version: 7.0.6
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       undici:
         specifier: 'catalog:'
         version: 8.12.4
@@ -579,7 +579,7 @@ importers:
         version: 7.4.0(graphql@17.1.0)
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       undici:
         specifier: 'catalog:'
         version: 8.12.4
@@ -622,7 +622,7 @@ importers:
     dependencies:
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
     devDependencies:
       '@swc/core':
         specifier: 'catalog:'
@@ -722,7 +722,7 @@ importers:
         version: 0.2.2
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -852,7 +852,7 @@ importers:
         version: 0.2.2
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -1051,7 +1051,7 @@ importers:
         version: 0.2.2
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -1226,7 +1226,7 @@ importers:
         version: 0.2.2
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -1549,7 +1549,7 @@ importers:
         version: 0.2.2
       remeda:
         specifier: 'catalog:'
-        version: 2.60.0
+        version: 2.61.0
       rxjs:
         specifier: 'catalog:'
         version: 7.8.2
@@ -5865,8 +5865,8 @@ packages:
   reflect-metadata@0.2.2:
     resolution: {integrity: sha512-urBwgfrvVP/eAyXx4hluJivBKzuEbSQs9rKWCrCkbSxNv8mxPcUZKeuoF3Uy4mJl3Lwprp6yy5/39VWigZ4K6Q==}
 
-  remeda@2.60.0:
-    resolution: {integrity: sha512-GdqZvbKL9ZuNeI1h+P6qH3w/Cc/H1/WasO6nuBmXG38qJEuf56aZCXBtybVUesgZCgWsroaBi+EHlps5FgLXvg==}
+  remeda@2.61.0:
+    resolution: {integrity: sha512-x8v7/slXeMnUy4izdZecOVlorISUQC5sHbc2GIdaf2pNYQUKt30NREbGa68Ag/3bjkaK64e9qDu1X4S47bUZAQ==}
     engines: {node: '>=18.0.0'}
 
   require-directory@2.1.1:
@@ -10979,7 +10979,7 @@ snapshots:
 
   reflect-metadata@0.2.2: {}
 
-  remeda@2.60.0: {}
+  remeda@2.61.0: {}
 
   require-directory@2.1.1: {}
 
