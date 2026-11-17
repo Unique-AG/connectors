@@ -2182,6 +2182,278 @@
           }
         }
       ]
+    },
+    "mcpConfig": {
+      "type": "object",
+      "description": "Per-deployment, non-secret settings mapped to environment variables on the app container. A field renders only when set, so an empty or null one keeps the app default. Takes precedence over the same variable under env. Secrets stay in envVars.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "If disabled, none of the fields below are mapped to environment variables.",
+          "default": true
+        },
+        "server": {
+          "type": "object",
+          "description": "Where clients reach this server.",
+          "properties": {
+            "baseUrl": {
+              "type": "string",
+              "pattern": "^(https://[^/?#@\\s]+/?)?$",
+              "description": "MCP_BASE_URL. The public https origin, without the MCP path. Must match routes.hostname."
+            }
+          },
+          "additionalProperties": false
+        },
+        "auth": {
+          "type": "object",
+          "description": "How users sign in. With mcpConfig enabled and mode zitadel, zitadel.baseUrl and zitadel.clientId are required.",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "zitadel",
+                "none"
+              ],
+              "default": "zitadel",
+              "description": "MCP_AUTH_MODE. zitadel signs users in through Zitadel. none serves without sign-in, which the app allows on loopback only: never for a deployment."
+            },
+            "zitadel": {
+              "type": "object",
+              "description": "The Zitadel sign-in, read when mode is zitadel. Its secrets, ZITADEL_CLIENT_SECRET and ZITADEL_JWT_SIGNING_KEY, stay in envVars.",
+              "properties": {
+                "baseUrl": {
+                  "type": "string",
+                  "pattern": "^(https?://.+)?$",
+                  "description": "ZITADEL_BASE_URL. The Zitadel issuer users sign in with, e.g. https://id.<tenant>.unique.app."
+                },
+                "clientId": {
+                  "type": "string",
+                  "pattern": "^[^\\s]*$",
+                  "description": "ZITADEL_CLIENT_ID. The client id of the MCP's OIDC application in Zitadel. Not a secret."
+                },
+                "orgId": {
+                  "type": "string",
+                  "pattern": "^[0-9]*$",
+                  "description": "ZITADEL_ORG_ID. Restricts sign-in to one organisation. Empty allows every organisation."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": false
+        },
+        "polixis": {
+          "type": "object",
+          "description": "How the server calls Polixis.",
+          "properties": {
+            "apiUrl": {
+              "type": "string",
+              "pattern": "^(https://.+)?$",
+              "description": "UPSTREAM_API_URL. App default: https://api-polixis.polixis.com."
+            },
+            "tokenUrl": {
+              "type": "string",
+              "pattern": "^(https://.+)?$",
+              "description": "UPSTREAM_TOKEN_URL. App default: Polixis's production Keycloak realm."
+            },
+            "timeoutSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0,
+              "maximum": 120,
+              "description": "UPSTREAM_TIMEOUT_SECONDS. App default: 30."
+            },
+            "maxConcurrentRequests": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "maximum": 20,
+              "description": "UPSTREAM_MAX_CONCURRENT_REQUESTS. Requests to Polixis at once, per process. App default: 4."
+            },
+            "quotaCooldownSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "description": "UPSTREAM_QUOTA_COOLDOWN_SECONDS. How long a process stops calling Polixis after it answers that the API request limit is exceeded. App default: 900."
+            },
+            "retry": {
+              "type": "object",
+              "description": "Retries of a throttled (429) or unavailable (503) answer. An exceeded API request limit is never retried.",
+              "properties": {
+                "enabled": {
+                  "type": [
+                    "boolean",
+                    "null"
+                  ],
+                  "description": "UPSTREAM_RETRY_ENABLED. false sends every request once. App default: true.",
+                  "default": true
+                },
+                "maxAttempts": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 1,
+                  "description": "UPSTREAM_RETRY_MAX_ATTEMPTS, the first attempt included. App default: 5."
+                },
+                "maxWaitSeconds": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0,
+                  "description": "UPSTREAM_RETRY_MAX_WAIT_SECONDS. The longest wait before a retry; an answer asking for longer is not retried. App default: 30."
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
+        "rateLimit": {
+          "type": "object",
+          "description": "Per-user limit on tool calls, counted in each replica.",
+          "properties": {
+            "toolCallsPerWindow": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1,
+              "description": "MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW. Chart and app default: 20."
+            },
+            "windowSeconds": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0,
+              "description": "MCP_RATE_LIMIT_WINDOW_SECONDS. Chart and app default: 60."
+            }
+          },
+          "additionalProperties": false
+        },
+        "logging": {
+          "type": "object",
+          "description": "Logging and error-detail settings. An empty value leaves its variable unset, which keeps the app default.",
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARNING",
+                "ERROR",
+                "CRITICAL",
+                "debug",
+                "info",
+                "warning",
+                "error",
+                "critical",
+                ""
+              ],
+              "description": "LOG_LEVEL. The level of polixis-mcp's own loggers. Chart default: info.",
+              "default": "info"
+            },
+            "libraryLevels": {
+              "type": "object",
+              "description": "LIBRARY_LOG_LEVELS, rendered as JSON. Logger name to level, merged over the app's defaults. A library not named logs at INFO. Empty keeps the defaults.",
+              "additionalProperties": {
+                "type": "string",
+                "enum": [
+                  "DEBUG",
+                  "INFO",
+                  "WARNING",
+                  "ERROR",
+                  "CRITICAL",
+                  "debug",
+                  "info",
+                  "warning",
+                  "error",
+                  "critical"
+                ]
+              },
+              "default": {}
+            },
+            "diagnosticsDataPolicy": {
+              "type": "string",
+              "enum": [
+                "conceal",
+                "disclose",
+                ""
+              ],
+              "description": "LOGS_DIAGNOSTICS_DATA_POLICY. conceal writes identifying values as hmac-sha256:<hex>; disclose writes the original, for debugging. Chart default: conceal.",
+              "default": "conceal"
+            },
+            "errorDetailsPolicy": {
+              "type": "string",
+              "enum": [
+                "redact",
+                "disclose",
+                ""
+              ],
+              "description": "ERROR_DETAILS_POLICY. redact keeps exception messages and stack text out of logs and spans; disclose keeps them, for debugging. Chart default: redact.",
+              "default": "redact"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "if": {
+        "properties": {
+          "enabled": {
+            "const": true
+          },
+          "auth": {
+            "properties": {
+              "mode": {
+                "const": "zitadel"
+              }
+            },
+            "required": [
+              "mode"
+            ]
+          }
+        },
+        "required": [
+          "auth"
+        ]
+      },
+      "then": {
+        "properties": {
+          "auth": {
+            "properties": {
+              "zitadel": {
+                "required": [
+                  "baseUrl",
+                  "clientId"
+                ],
+                "properties": {
+                  "baseUrl": {
+                    "minLength": 1
+                  },
+                  "clientId": {
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "required": [
+              "zitadel"
+            ]
+          }
+        }
+      }
     }
   },
   "$defs": {

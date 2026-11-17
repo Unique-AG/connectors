@@ -3,6 +3,7 @@
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
 from datetime import datetime
+from datetime import timedelta
 from datetime import UTC
 from pathlib import Path
 from typing import cast
@@ -19,8 +20,15 @@ from mcp_openapi.openapi import route_map
 from mcp_openapi.retry import RetryAfterPolicy
 from mcp_openapi.upstream import OperationClient
 from mcp_types import ToolAnnotations
+from pydantic import SecretStr
 import yaml
 
+from polixis_mcp.upstream.quota import AdmissionTransport
+from polixis_mcp.upstream.quota import QuotaGate
+from polixis_mcp.upstream.recording import CassetteTransport
+from polixis_mcp.upstream.recording import RecordingMode
+from polixis_mcp.upstream.recording import token_transport
+from polixis_mcp.upstream.rejections import reject_error_body
 from polixis_mcp.upstream.routes import EXPOSED
 from polixis_mcp.upstream.settings import UpstreamSettings
 from polixis_mcp.upstream.token import ClientCredentialsAuth
@@ -41,22 +49,40 @@ def upstream_http(
     *,
     now: Callable[[], datetime] | None = None,
 ) -> httpx2.AsyncClient:
-    """Every request to the upstream goes through it, from `Upstream` and the generated tools.
+    """Every request to the upstream goes through it, from `Upstream` and the generated tools,
+    so its admission caps the requests in flight and its quota gate stops them all once Polixis
+    says the quota is spent, the ones waiting for a slot included.
 
-    `now` is the clock the client-credentials token's expiry is read against.
+    `now` is the clock the client-credentials token's expiry and the quota cooldown are read
+    against.
+
+    With `UPSTREAM_RECORDING_MODE` set, and no `transport` given, requests go through a
+    `CassetteTransport`, which saves Polixis's answers or replays them.
     """
+    clock = now or _utc_now
+    network = httpx2.AsyncHTTPTransport(
+        limits=httpx2.Limits(max_connections=settings.max_concurrent_requests)
+    )
+    api_transport, auth_transport = transport or network, transport
+    if transport is None and settings.recording.mode is not RecordingMode.OFF:
+        api_transport = CassetteTransport(settings.recording, network)
+        auth_transport = token_transport(settings.recording)
+    quota = QuotaGate(cooldown=timedelta(seconds=settings.quota_cooldown_seconds), now=clock)
     return httpx2.AsyncClient(
         base_url=str(settings.api_url).rstrip("/"),
         timeout=settings.timeout_seconds,
-        transport=transport,
+        event_hooks={"response": [quota.record]},
+        transport=AdmissionTransport(
+            api_transport, slots=settings.max_concurrent_requests, quota=quota
+        ),
         auth=ClientCredentialsAuth(
-            client_id=settings.client_id,
-            client_secret=settings.client_secret,
-            api_key=settings.api_key,
+            client_id=settings.client_id or _NOT_NEEDED_TO_REPLAY,
+            client_secret=settings.client_secret or _NOT_NEEDED_TO_REPLAY,
+            api_key=settings.api_key or _NOT_NEEDED_TO_REPLAY,
             token_url=str(settings.token_url),
             timeout=settings.timeout_seconds,
-            transport=transport,
-            now=now or _utc_now,
+            transport=auth_transport,
+            now=clock,
         ),
         headers={"Accept": "application/json"},
     )
@@ -72,12 +98,16 @@ async def open_upstream(
     while every in-memory client enters the lifespan again.
     """
     retry = settings.retry
-    policy = RetryAfterPolicy(
-        max_attempts=retry.max_attempts,
-        max_wait_seconds=retry.max_wait_seconds,
-        statuses=retry.statuses,
+    policy = (
+        RetryAfterPolicy(
+            max_attempts=retry.max_attempts,
+            max_wait_seconds=retry.max_wait_seconds,
+            statuses=retry.statuses,
+        )
+        if settings.retry_enabled
+        else None
     )
-    yield Upstream(SPEC, http, retry_policy=policy)
+    yield Upstream(SPEC, http, retry_policy=policy, response_check=reject_error_body)
 
 
 def upstream_tools(http: httpx2.AsyncClient) -> OpenAPIProvider:
@@ -103,3 +133,7 @@ def _read_only_hints(
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+# Settings leave the credentials out only to replay, where no request reaches Polixis.
+_NOT_NEEDED_TO_REPLAY = SecretStr("not-needed-to-replay")

@@ -1,5 +1,6 @@
 # mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 
+import asyncio
 from collections.abc import AsyncGenerator, Callable
 from contextlib import AbstractAsyncContextManager
 from contextlib import asynccontextmanager
@@ -16,6 +17,8 @@ from mcp_observability import RateLimitMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
+from polixis_mcp.mcp.spec_tool_errors import SpecToolErrors
+from polixis_mcp.persistence import cull_expired_entries_periodically
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import open_upstream
 from polixis_mcp.upstream import upstream_http
@@ -23,9 +26,19 @@ from polixis_mcp.upstream import upstream_tools
 from polixis_mcp.upstream import UpstreamSettings
 
 INSTRUCTIONS = (
-    "Looks up organizations and people in Polixis corporate data: search, corporate "
-    "profiles with their related parties, relationship graphs, top-down ownership and "
-    "ultimate beneficial owners, and sanctions and PEP flags."
+    "Looks up organizations and people in Polixis corporate data: search, profiles with "
+    "sanctions and PEP flags, related parties, ultimate beneficial owners and top-down "
+    "ownership, linked companies, sanctions exposure, the path between two parties, the "
+    "flagged parties near one and court decisions. Start with `search_entities` when you have "
+    "a name or identifier: every other tool takes a match's `pid`. When the user gives a pid "
+    "from their own records, call `resolve_permanent_id` first and use the pid it returns. "
+    "Results come ranked so the first page usually answers the "
+    "question: a tool whose result has a `next_cursor` holds more, which you fetch by passing "
+    "it back alone as `cursor` only when the question needs what is left. A field whose "
+    "description starts with 'Computed by this MCP' is not sent by Polixis: this server derives "
+    "it from Polixis's data as the description says, so say so when you report it and explain "
+    "how from that description when asked. Every other field is Polixis's, renamed or "
+    "reformatted."
 )
 
 
@@ -45,8 +58,15 @@ def create_server(
         async with (
             open_upstream(http, upstream) as upstream_resource,
             open_persistence() as persistence_resource,
+            asyncio.TaskGroup() as background,
         ):
-            yield {"upstream": upstream_resource, "persistence": persistence_resource}
+            culling = background.create_task(
+                cull_expired_entries_periodically(persistence_resource)
+            )
+            try:
+                yield {"upstream": upstream_resource, "persistence": persistence_resource}
+            finally:
+                culling.cancel()
 
     # Every signed-in user shares the one set of Polixis credentials, whose rate limit and
     # circuit breaker one caller must not use up for the others.
@@ -65,7 +85,7 @@ def create_server(
         lifespan=lifespan,
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
+        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting, SpecToolErrors()],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")

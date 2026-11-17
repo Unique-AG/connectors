@@ -11,19 +11,77 @@ selectorComponentLabel: server
 podLabels:
   logging.unique.app/format: pino-json
 
+# Per-deployment, non-secret settings, mapped to environment variables on the app container. A
+# field renders only when set, so an empty or null one keeps the app default. Set here, a
+# variable wins over the same one under env. Secrets stay in envVars.
+mcpConfig:
+  enabled: true
+  server:
+    # MCP_BASE_URL, the public https origin, matching routes.hostname.
+    baseUrl: ""
+  auth:
+    # MCP_AUTH_MODE. zitadel signs users in; none serves without sign-in, which the app allows
+    # on loopback only, so a deployment keeps zitadel.
+    mode: zitadel
+    # Required when mode is zitadel. Its secrets, ZITADEL_CLIENT_SECRET for a confidential
+    # client and ZITADEL_JWT_SIGNING_KEY, stay in envVars.
+    zitadel:
+      # ZITADEL_BASE_URL, the issuer users sign in with.
+      baseUrl: ""
+      # ZITADEL_CLIENT_ID, the MCP's OIDC application. Not a secret.
+      clientId: ""
+      # ZITADEL_ORG_ID. Restricts sign-in to one organisation.
+      orgId: ""
+  polixis:
+    # UPSTREAM_API_URL. App default: https://api-polixis.polixis.com
+    apiUrl: ""
+    # UPSTREAM_TOKEN_URL. App default: Polixis's production Keycloak realm.
+    tokenUrl: ""
+    # UPSTREAM_TIMEOUT_SECONDS. App default: 30.
+    timeoutSeconds: null
+    # UPSTREAM_MAX_CONCURRENT_REQUESTS, per process. App default: 4.
+    maxConcurrentRequests: null
+    # UPSTREAM_QUOTA_COOLDOWN_SECONDS. How long a process stops calling Polixis after it answers
+    # that the API request limit is exceeded. App default: 900.
+    quotaCooldownSeconds: null
+    retry:
+      # UPSTREAM_RETRY_ENABLED. false sends every request once: a throttled (429) or unavailable
+      # (503) answer fails the call. An exceeded request limit is never retried.
+      enabled: true
+      # UPSTREAM_RETRY_MAX_ATTEMPTS, the first attempt included. App default: 5.
+      maxAttempts: null
+      # UPSTREAM_RETRY_MAX_WAIT_SECONDS. App default: 30.
+      maxWaitSeconds: null
+  rateLimit:
+    # MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW. Tool calls one user may make per window, counted in
+    # each replica.
+    toolCallsPerWindow: 20
+    # MCP_RATE_LIMIT_WINDOW_SECONDS.
+    windowSeconds: 60
+  logging:
+    # LOG_LEVEL, the level of polixis-mcp's own loggers.
+    level: info
+    # LIBRARY_LOG_LEVELS, rendered as JSON. Logger name to level, over the app's defaults, e.g.
+    # {httpx: INFO}. A library not named logs at INFO.
+    libraryLevels: {}
+    # LOGS_DIAGNOSTICS_DATA_POLICY. conceal: identifying strings in logs become hmac-sha256:<hex>.
+    # disclose: the original, for debugging.
+    diagnosticsDataPolicy: conceal
+    # ERROR_DETAILS_POLICY. redact: exception messages and stack text stay out of logs and spans.
+    # disclose: all, for debugging.
+    errorDetailsPolicy: redact
+
 env:
   HOST: "0.0.0.0"
   PORT: "8000"
-  LOG_LEVEL: info
-  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
   # The CloudNativePG CA, mounted below. Without it, the system trust store verifies.
   DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
 
 # Set per deployment in the overlay. The app refuses to start without them.
-# - MCP_BASE_URL: the public https origin, matching routes.hostname
+# - mcpConfig.server.baseUrl, and mcpConfig.auth.zitadel.baseUrl and clientId
 # - every secret in .env.example, from a secret through envVars: UPSTREAM_CLIENT_ID,
-#   UPSTREAM_CLIENT_SECRET, UPSTREAM_API_KEY, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET,
-#   ZITADEL_JWT_SIGNING_KEY
+#   UPSTREAM_CLIENT_SECRET, UPSTREAM_API_KEY, ZITADEL_JWT_SIGNING_KEY, and
+#   ZITADEL_CLIENT_SECRET for a confidential client
 envVars: []
 
 image:

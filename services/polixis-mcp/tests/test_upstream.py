@@ -11,6 +11,7 @@ from polixis_mcp.upstream import SEARCH_ENTITIES
 from polixis_mcp.upstream import SearchEntitiesRequest
 from polixis_mcp.upstream import SearchRequestInput
 from polixis_mcp.upstream import upstream_http
+from polixis_mcp.upstream import UpstreamError
 from polixis_mcp.upstream import UpstreamSettings
 from tests.offline_server import fake_upstream_settings
 
@@ -140,6 +141,28 @@ async def test_a_rate_limited_search_is_retried() -> None:
     assert response.pagination is not None
     assert response.pagination.total_hits == 0
     assert attempts == 2
+
+
+async def test_a_rate_limited_search_is_not_retried_with_retries_off() -> None:
+    attempts = 0
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        nonlocal attempts
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        attempts += 1
+        return httpx2.Response(429, headers={"Retry-After": "0"})
+
+    settings = fake_upstream_settings().model_copy(update={"retry_enabled": False})
+    transport = httpx2.MockTransport(respond)
+    async with (
+        upstream_http(settings, transport, now=lambda: _WHEN) as http,
+        open_upstream(http, settings) as upstream,
+    ):
+        with pytest.raises(UpstreamError) as raised:
+            await upstream.call(SEARCH_ENTITIES, _search())
+
+    assert (raised.value.status_code, attempts) == (429, 1)
 
 
 @pytest.mark.parametrize("field", ["api_url", "token_url"])
