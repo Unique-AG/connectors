@@ -43,6 +43,25 @@
           },
           "additionalProperties": false
         },
+        "auth": {
+          "type": "object",
+          "description": "Lifetimes of the tokens kb-mcp issues to MCP clients. kb-mcp only issues a refresh token when Zitadel returns one, which needs the Refresh Token grant on the Zitadel app.",
+          "properties": {
+            "accessTokenExpiresInSeconds": {
+              "type": "integer",
+              "description": "Lifetime of the access token, mapped to AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS. Without a Zitadel refresh token it is capped at Zitadel's own token lifetime.",
+              "minimum": 1,
+              "default": 60
+            },
+            "refreshTokenExpiresInSeconds": {
+              "type": "integer",
+              "description": "Lifetime of the refresh token, counted from sign-in, mapped to AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS. Zitadel's own refresh-token expiry can end the session earlier.",
+              "minimum": 1,
+              "default": 2592000
+            }
+          },
+          "additionalProperties": false
+        },
         "enabledTools": {
           "type": "array",
           "description": "MCP tool names to advertise on /mcp \u2014 joined into KB_MCP_ENABLED_TOOLS (see kb_mcp.settings.KNOWN_MCP_TOOLS for the allowlist). Server-wide. Empty/unset means all tools. Restart required for changes to take effect.",

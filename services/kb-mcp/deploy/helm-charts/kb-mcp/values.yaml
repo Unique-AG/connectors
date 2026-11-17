@@ -22,6 +22,11 @@ mcpConfig:
   zitadel:
     baseUrl: "" # e.g. https://id.<tenant>.unique.app
     clientId: ""
+  # -- Lifetimes of the tokens kb-mcp issues to MCP clients. Refresh needs
+  # the Refresh Token grant on the Zitadel app.
+  auth:
+    accessTokenExpiresInSeconds: 60
+    refreshTokenExpiresInSeconds: 2592000 # 30 days
   # -- MCP tool names to advertise, e.g. [search, read_file] to hide
   # content_tree. Server-wide. Empty means all tools.
   enabledTools: []

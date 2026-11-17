@@ -62,6 +62,26 @@ class Settings(BaseSettings):
         validation_alias="ZITADEL_JWT_SIGNING_KEY"
     )
 
+    # ── Tokens kb-mcp issues to MCP clients ──
+    access_token_expires_in_seconds: int = Field(
+        default=60,
+        ge=1,
+        description=(
+            "Lifetime of the access token kb-mcp issues. Without a Zitadel "
+            "refresh token it is capped at Zitadel's own token lifetime."
+        ),
+        validation_alias="AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS",
+    )
+    refresh_token_expires_in_seconds: int = Field(
+        default=30 * 24 * 60 * 60,
+        ge=1,
+        description=(
+            "Lifetime of the refresh token kb-mcp issues, counted from sign-in. "
+            "Zitadel's own refresh-token expiry still ends the session earlier."
+        ),
+        validation_alias="AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS",
+    )
+
     # ── Unique API ──
     # unique_toolkit reads it itself; declared here so logging redacts it.
     unique_app_key: SecretStr | None = Field(

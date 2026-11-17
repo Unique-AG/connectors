@@ -90,6 +90,57 @@ def test_build_auth_passes_required_scopes(durable_settings):
     assert kwargs["verify_id_token"] is True
 
 
+def test_build_auth_requests_offline_access_from_zitadel(durable_settings):
+    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
+        mock_create.return_value = MagicMock()
+        build_auth(durable_settings)
+
+    _, kwargs = mock_create.call_args
+    # Without offline_access Zitadel issues no refresh token, and kb-mcp none of its own.
+    assert "offline_access" in kwargs["extra_authorize_params"]["scope"].split()
+    assert "offline_access" in kwargs["valid_scopes"]
+    assert "offline_access" not in kwargs["required_scopes"]
+
+
+def test_build_auth_defaults_token_lifetimes(durable_settings):
+    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
+        mock_create.return_value = MagicMock()
+        build_auth(durable_settings)
+
+    _, kwargs = mock_create.call_args
+    assert kwargs["fastmcp_access_token_expiry_seconds"] == 60
+    assert kwargs["fallback_refresh_token_expiry_seconds"] == 30 * 24 * 60 * 60
+
+
+def test_build_auth_reads_token_lifetimes_from_env(monkeypatch, durable_settings):
+    monkeypatch.setenv("AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS", "300")
+    monkeypatch.setenv("AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS", "86400")
+    get_settings.cache_clear()
+    settings = get_settings()
+    get_settings.cache_clear()
+    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
+        mock_create.return_value = MagicMock()
+        build_auth(settings)
+
+    _, kwargs = mock_create.call_args
+    assert kwargs["fastmcp_access_token_expiry_seconds"] == 300
+    assert kwargs["fallback_refresh_token_expiry_seconds"] == 86400
+
+
+@pytest.mark.parametrize(
+    "variable",
+    ["AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS", "AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS"],
+)
+def test_token_lifetime_below_one_second_is_rejected(
+    monkeypatch, durable_settings, variable
+):
+    monkeypatch.setenv(variable, "0")
+    get_settings.cache_clear()
+    with pytest.raises(Exception, match="greater than or equal to 1"):
+        get_settings()
+    get_settings.cache_clear()
+
+
 def test_build_storage_treats_decryption_errors_as_misses(durable_settings):
     store = build_storage(durable_settings)
     assert store.raise_on_decryption_error is False

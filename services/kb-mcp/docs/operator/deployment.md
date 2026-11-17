@@ -45,8 +45,10 @@ Deliver them through `envVars[].valueFrom.secretKeyRef`, or, at Unique, through 
 via `extraEnvSecrets`.
 
 You'll also need `mcpConfig.zitadel.clientId`, the public (PKCE) OIDC client id for `kb-mcp`,
-registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback`. It is public, so it sits in
-plain chart values; see [Configuration](./configuration.md#Required) for the full required-variable
+registered in Zitadel with redirect URI `{publicBaseUrl}/auth/callback` and the Refresh Token grant
+enabled. Without that grant Zitadel returns no refresh token, so clients cannot refresh and must sign
+in again whenever the access token expires, after 60 seconds by default. The client id is public, so
+it sits in plain chart values; see [Configuration](./configuration.md#Required) for the full required-variable
 reference.
 
 ## Minimal Values

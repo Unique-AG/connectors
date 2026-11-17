@@ -24,6 +24,16 @@ envVars or secret refs.
 - name: ZITADEL_CLIENT_ID
   value: {{ tpl .Values.mcpConfig.zitadel.clientId . | quote }}
 {{- end }}
+{{- /* int: Helm renders large numbers as floats (2.592e+06), which pydantic rejects for an int. */ -}}
+{{- $auth := .Values.mcpConfig.auth | default dict }}
+{{- if $auth.accessTokenExpiresInSeconds }}
+- name: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS
+  value: {{ $auth.accessTokenExpiresInSeconds | int | quote }}
+{{- end }}
+{{- if $auth.refreshTokenExpiresInSeconds }}
+- name: AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS
+  value: {{ $auth.refreshTokenExpiresInSeconds | int | quote }}
+{{- end }}
 {{- if .Values.mcpConfig.enabledTools }}
 - name: KB_MCP_ENABLED_TOOLS
   value: {{ join "," .Values.mcpConfig.enabledTools | quote }}

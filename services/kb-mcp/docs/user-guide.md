@@ -15,8 +15,8 @@ base.
 
 The first time your assistant uses the knowledge base, it asks you to sign in. Sign in with your
 normal company account, the same one you use for the Unique web app, and approve the connection
-once. Exactly how long you stay connected depends on your client, anywhere from a few hours to
-several days; you'll be asked to sign in again once it lapses.
+once. Your client then stays connected for up to 30 days, as long as it can renew its session
+itself. Some clients cannot, and ask you to sign in again sooner.
 
 If you get signed out, the assistant will say the knowledge base is unavailable and ask you to
 connect again.
