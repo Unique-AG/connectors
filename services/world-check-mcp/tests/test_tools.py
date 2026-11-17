@@ -605,6 +605,17 @@ async def test_get_case_resolves_an_external_id_after_the_internal_lookup_misses
     assert details is not None
     assert details["case_system_id"] == "sys-1"
     assert details["name"] == "Ada Lovelace"
+    assert details["matched_by"] == "case_id"
+
+
+async def test_get_case_reports_an_internal_id_match() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case", {"case": "sys-1"})
+
+    details = result.structured_content
+    assert details is not None
+    assert details["case_system_id"] == "sys-1"
+    assert details["matched_by"] == "case_system_id"
 
 
 async def test_get_case_falls_back_to_the_resolved_system_id_when_upstream_omits_it() -> None:

@@ -5,6 +5,9 @@ from pydantic import Field
 
 
 class CaseDetails(BaseModel):
+    matched_by: Literal["case_system_id", "case_id"] = Field(
+        description="Which id the case argument matched. The internal id is tried first."
+    )
     case_id: str | None = Field(
         description="Client-provided external case ID, if the case has one."
     )

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from mcp_observability import traced
 
 from world_check_mcp.contexts.cases.errors import CaseNotFoundError
@@ -13,6 +15,7 @@ from world_check_mcp.upstream import UpstreamError
 async def get_case(*, upstream: Upstream, case: str) -> CaseDetails:
     """Case details for an internal caseSystemId, or an external caseId when that misses."""
     resolved_system_id = case
+    matched_by: Literal["case_system_id", "case_id"] = "case_system_id"
     try:
         found = await upstream.call_untyped(GET_CASE, caseSystemId=case)
     except UpstreamError as error:
@@ -23,12 +26,16 @@ async def get_case(*, upstream: Upstream, case: str) -> CaseDetails:
         except CaseNotFoundError:
             raise CaseNotFoundError(case=case) from error
         resolved_system_id = reference.case_system_id
+        matched_by = "case_id"
         found = await upstream.call_untyped(GET_CASE, caseSystemId=resolved_system_id)
-    return _details(case=found, fallback_system_id=resolved_system_id)
+    return _details(case=found, fallback_system_id=resolved_system_id, matched_by=matched_by)
 
 
-def _details(*, case: CaseWire, fallback_system_id: str) -> CaseDetails:
+def _details(
+    *, case: CaseWire, fallback_system_id: str, matched_by: Literal["case_system_id", "case_id"]
+) -> CaseDetails:
     return CaseDetails(
+        matched_by=matched_by,
         case_id=case.case_id,
         case_system_id=case.case_system_id or fallback_system_id,
         name=case.name,

@@ -212,7 +212,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get a saved case by its internal caseSystemId or its exact external caseId.\n\nAn internal id is tried first. Use the returned case_system_id with the other case tools.",
+    "description": "Get a saved case by its internal caseSystemId or its exact external caseId.\n\nAn internal id is tried first, and matched_by says which id matched. Use the returned case_system_id with the other case tools.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -265,6 +265,14 @@
           "default": null,
           "description": "Case lifecycle state, e.g. UNARCHIVED."
         },
+        "matched_by": {
+          "description": "Which id the case argument matched. The internal id is tried first.",
+          "enum": [
+            "case_system_id",
+            "case_id"
+          ],
+          "type": "string"
+        },
         "name": {
           "description": "Screened entity name.",
           "type": "string"
@@ -278,6 +286,7 @@
         }
       },
       "required": [
+        "matched_by",
         "case_id",
         "case_system_id",
         "name",
