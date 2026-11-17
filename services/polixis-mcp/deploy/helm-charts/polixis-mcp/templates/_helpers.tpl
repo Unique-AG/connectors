@@ -9,10 +9,16 @@ other value when not null, so 0 and false still render.
 */}}
 {{- define "chart.config.mcpEnv" -}}
 {{- $config := .Values.mcpConfig }}
+{{- $zitadel := dict }}
+{{- if eq $config.auth.mode "zitadel" }}
+{{- $zitadel = $config.auth.zitadel }}
+{{- end }}
 {{- $strings := list
   (list $config.server.baseUrl "MCP_BASE_URL")
-  (list $config.zitadel.baseUrl "ZITADEL_BASE_URL")
-  (list $config.zitadel.orgId "ZITADEL_ORG_ID")
+  (list $config.auth.mode "MCP_AUTH_MODE")
+  (list $zitadel.baseUrl "ZITADEL_BASE_URL")
+  (list $zitadel.clientId "ZITADEL_CLIENT_ID")
+  (list $zitadel.orgId "ZITADEL_ORG_ID")
   (list $config.polixis.apiUrl "UPSTREAM_API_URL")
   (list $config.polixis.tokenUrl "UPSTREAM_TOKEN_URL")
   (list $config.logging.level "LOG_LEVEL")

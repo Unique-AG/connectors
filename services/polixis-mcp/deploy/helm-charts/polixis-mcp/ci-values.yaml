@@ -7,3 +7,9 @@ postgresql:
       fromSecret:
         name: polixis-mcp-ci-dummy
         key: database-url
+# Placeholders for the Zitadel sign-in the overlay configures, which the schema requires.
+mcpConfig:
+  auth:
+    zitadel:
+      baseUrl: https://id.example.com
+      clientId: "000000000000000000@example"

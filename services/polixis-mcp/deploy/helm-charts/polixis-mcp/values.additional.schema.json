@@ -26,20 +26,62 @@
           },
           "additionalProperties": false
         },
-        "zitadel": {
+        "auth": {
           "type": "object",
-          "description": "Sign-in. The client id and secrets stay in envVars.",
+          "description": "How users sign in. With mode zitadel, zitadel.baseUrl and zitadel.clientId are required.",
           "properties": {
-            "baseUrl": {
+            "mode": {
               "type": "string",
-              "pattern": "^(https?://.+)?$",
-              "description": "ZITADEL_BASE_URL. The Zitadel issuer users sign in with."
+              "enum": ["zitadel", "none"],
+              "default": "zitadel",
+              "description": "MCP_AUTH_MODE. zitadel signs users in through Zitadel. none serves without sign-in, which the app allows on loopback only: never for a deployment."
             },
-            "orgId": {
-              "type": "string",
-              "pattern": "^[0-9]*$",
-              "description": "ZITADEL_ORG_ID. Restricts sign-in to one organisation. Empty allows every organisation."
+            "zitadel": {
+              "type": "object",
+              "description": "The Zitadel sign-in, read when mode is zitadel. Its secrets, ZITADEL_CLIENT_SECRET and ZITADEL_JWT_SIGNING_KEY, stay in envVars.",
+              "properties": {
+                "baseUrl": {
+                  "type": "string",
+                  "pattern": "^(https?://.+)?$",
+                  "description": "ZITADEL_BASE_URL. The Zitadel issuer users sign in with, e.g. https://id.<tenant>.unique.app."
+                },
+                "clientId": {
+                  "type": "string",
+                  "pattern": "^[^\\s]*$",
+                  "description": "ZITADEL_CLIENT_ID. The client id of the MCP's OIDC application in Zitadel. Not a secret."
+                },
+                "orgId": {
+                  "type": "string",
+                  "pattern": "^[0-9]*$",
+                  "description": "ZITADEL_ORG_ID. Restricts sign-in to one organisation. Empty allows every organisation."
+                }
+              },
+              "additionalProperties": false
             }
+          },
+          "required": ["mode"],
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "zitadel"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "zitadel": {
+                "required": ["baseUrl", "clientId"],
+                "properties": {
+                  "baseUrl": {
+                    "minLength": 1
+                  },
+                  "clientId": {
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "required": ["zitadel"]
           },
           "additionalProperties": false
         },

@@ -19,11 +19,19 @@ mcpConfig:
   server:
     # MCP_BASE_URL, the public https origin, matching routes.hostname.
     baseUrl: ""
-  zitadel:
-    # ZITADEL_BASE_URL, the issuer users sign in with.
-    baseUrl: ""
-    # ZITADEL_ORG_ID. Restricts sign-in to one organisation.
-    orgId: ""
+  auth:
+    # MCP_AUTH_MODE. zitadel signs users in; none serves without sign-in, which the app allows
+    # on loopback only, so a deployment keeps zitadel.
+    mode: zitadel
+    # Required when mode is zitadel. Its secrets, ZITADEL_CLIENT_SECRET for a confidential
+    # client and ZITADEL_JWT_SIGNING_KEY, stay in envVars.
+    zitadel:
+      # ZITADEL_BASE_URL, the issuer users sign in with.
+      baseUrl: ""
+      # ZITADEL_CLIENT_ID, the MCP's OIDC application. Not a secret.
+      clientId: ""
+      # ZITADEL_ORG_ID. Restricts sign-in to one organisation.
+      orgId: ""
   polixis:
     # UPSTREAM_API_URL. App default: https://api-polixis.polixis.com
     apiUrl: ""
@@ -70,10 +78,10 @@ env:
   DB_SSL_ROOT_CERT: /etc/postgresql-ca/ca.crt
 
 # Set per deployment in the overlay. The app refuses to start without them.
-# - mcpConfig.server.baseUrl and mcpConfig.zitadel.baseUrl
+# - mcpConfig.server.baseUrl, and mcpConfig.auth.zitadel.baseUrl and clientId
 # - every secret in .env.example, from a secret through envVars: UPSTREAM_CLIENT_ID,
-#   UPSTREAM_CLIENT_SECRET, UPSTREAM_API_KEY, ZITADEL_CLIENT_ID, ZITADEL_CLIENT_SECRET,
-#   ZITADEL_JWT_SIGNING_KEY
+#   UPSTREAM_CLIENT_SECRET, UPSTREAM_API_KEY, ZITADEL_JWT_SIGNING_KEY, and
+#   ZITADEL_CLIENT_SECRET for a confidential client
 envVars: []
 
 image:
