@@ -1,7 +1,7 @@
 # mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 
-"""Storage the MCP owns: Postgres holds the Zitadel sign-in state and, for five minutes, the
-Polixis responses the tools page through.
+"""Storage the MCP owns: Postgres holds the Zitadel sign-in state and the Polixis responses
+the tools page through, each reused for five minutes and deleted by a periodic cleanup.
 """
 
 from polixis_mcp.persistence.persistence import open_persistence

@@ -612,7 +612,7 @@ cases:
                 categories: {contains: [shareholdingInformation]}
           budget: 3
           answer:
-            - It says how many shareholders there are and that more pages remain.
+            - It says how many shareholders there are and, when the result has a `next_cursor`, that more pages remain.
       - prompt: Show me the rest.
         expect:
           calls:
@@ -827,6 +827,7 @@ cases:
             - tool: get_related_parties
             - tool: get_ultimate_beneficial_owners
             - tool: get_sanctions_exposure
+            - tool: find_flagged_parties
             - tool: find_court_decisions
           forbid:
             - tool: get_related_parties

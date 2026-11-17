@@ -149,7 +149,7 @@ those edits add to or correct in their spec and why, and how to take a new spec 
 | `UPSTREAM_QUOTA_COOLDOWN_SECONDS` | Once Polixis answers that the API key's quota is spent (a 429 with `x-amzn-errortype: LimitExceededException`), the process sends it nothing for this long, 900 by default, and every tool fails at once with a message saying so. Each process learns it on its own, so a spent quota costs one request per process per cooldown |
 | `MCP_AUTH_MODE` | `zitadel` in a deployment, `none` locally |
 | `ZITADEL_*` | Zitadel sign-in for the MCP's users |
-| `DATABASE_URL` | Postgres, which holds the encrypted Zitadel sign-in state and, for five minutes each, the Polixis responses the tools page through |
+| `DATABASE_URL` | Postgres, which holds the encrypted Zitadel sign-in state and the Polixis responses the tools page through, each reused for five minutes and deleted by a cleanup every four hours |
 
 Every signed-in user shares the one set of Polixis credentials. A user's Zitadel token never
 reaches Polixis.

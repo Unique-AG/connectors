@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from typing import Annotated
 
 from fastmcp.exceptions import ToolError
@@ -30,19 +31,25 @@ PageSize = Annotated[
 
 
 def page_query[Q: contexts.PageQuery](
-    query_type: type[Q], cursor: str | None, **arguments: object
+    query_type: type[Q],
+    cursor: str | None,
+    *,
+    fixed: Mapping[str, object] | None = None,
+    **arguments: object,
 ) -> Q:
-    """The query a cursor carries, or else the one the arguments make. A ToolError names the
-    arguments that are missing or invalid.
+    """The query a cursor carries, or else the one the arguments make. `fixed` holds what the
+    tool sets itself, so a cursor of another tool sharing the query type fails as well. A
+    ToolError names the arguments that are missing or invalid.
     """
+    fixed = fixed or {}
     if cursor:
         try:
-            return contexts.decode_cursor(cursor, query_type)
+            return contexts.decode_cursor(cursor, query_type, fixed=fixed)
         except contexts.InvalidCursorError as error:
             raise ToolError(str(error)) from error
     try:
         return query_type.model_validate(
-            {name: value for name, value in arguments.items() if value is not None}
+            {**{name: value for name, value in arguments.items() if value is not None}, **fixed}
         )
     except ValidationError as error:
         invalid = sorted({str(detail["loc"][0]) for detail in error.errors() if detail["loc"]})

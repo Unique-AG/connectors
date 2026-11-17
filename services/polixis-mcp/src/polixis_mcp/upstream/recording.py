@@ -103,14 +103,22 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
         self, request: httpx2.Request, key: _RequestKey, cassette: Path
     ) -> httpx2.Response:
         async with self._lock:
+            # The same request may have waited here while another recorded it.
+            if cassette.exists():
+                return _replayed(cassette, key)
             self._refuse_unless_allowed(key)
             wait = self._last_sent + self._settings.min_interval_seconds - time.monotonic()
             if wait > 0:
                 await asyncio.sleep(wait)
             self._last_sent = time.monotonic()
-            response = await self._inner.handle_async_request(request)
-            content = await response.aread()
-            await response.aclose()
+            try:
+                response = await self._inner.handle_async_request(request)
+                content = await response.aread()
+                await response.aclose()
+            except BaseException:
+                # Polixis may have counted it although no answer came back.
+                self._append_ledger(key, None, None)
+                raise
             spent = is_quota_spent(response)
             self._append_ledger(key, response.status_code, None if spent else cassette.name)
             if spent:
@@ -144,7 +152,7 @@ class CassetteTransport(httpx2.AsyncBaseTransport):
                 f"budget is {budget}. Raise UPSTREAM_RECORDING_BUDGET to send more."
             )
 
-    def _append_ledger(self, key: _RequestKey, status: int, cassette: str | None) -> None:
+    def _append_ledger(self, key: _RequestKey, status: int | None, cassette: str | None) -> None:
         line = {
             "at": _now(),
             "method": key.method,

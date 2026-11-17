@@ -4,6 +4,7 @@ import httpx2
 import pytest
 
 from polixis_mcp import contexts
+from tests import polixis_responses
 from tests.tool_calls import call_tool
 from tests.tool_calls import McpClient
 from tests.tool_calls import tool_error
@@ -119,6 +120,30 @@ async def test_search_entities_cursor_asks_for_the_next_page_of_the_same_search(
         "page": 2,
         "size": 5,
     }
+
+
+async def test_search_entities_names_a_match_by_a_current_name_past_the_records_listed(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    aliases = [{"en": f"Example Alias {number}", "type": "ALIAS"} for number in range(11)]
+    current = {"en": "Example Holdings AG", "type": "CURRENT_NAME"}
+    hit = {"pid": "O00000000000000000000000000000100", "nameRecords": [*aliases, current]}
+    monkeypatch.setattr(polixis_responses, "SEARCH", {"hits": [hit]})
+
+    results = await call_tool(
+        mcp_client,
+        "search_entities",
+        {"name": "Example Holdings"},
+        returns=contexts.EntitySearchResults,
+    )
+
+    match = results.matches[0]
+    assert (match.name, match.name_count, len(match.name_records), match.other_names) == (
+        "Example Holdings AG",
+        12,
+        10,
+        [],
+    )
 
 
 @pytest.mark.parametrize(

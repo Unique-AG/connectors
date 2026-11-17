@@ -82,6 +82,33 @@ async def test_a_spent_quota_is_not_retried_and_stops_every_call_until_the_coold
     )
 
 
+async def test_a_request_waiting_for_a_slot_is_not_sent_once_the_quota_is_spent() -> None:
+    sent: list[httpx2.Request] = []
+    answer = asyncio.Event()
+
+    async def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "auth.example.com":
+            return httpx2.Response(200, json={"access_token": "token", "expires_in": 3600})
+        sent.append(request)
+        await answer.wait()
+        return _QUOTA_SPENT
+
+    settings = fake_upstream_settings().model_copy(update={"max_concurrent_requests": 1})
+    async with (
+        upstream_http(settings, httpx2.MockTransport(respond), now=lambda: _WHEN) as http,
+        open_upstream(http, settings) as upstream,
+    ):
+        first = asyncio.create_task(_search_error(upstream))
+        waiting = asyncio.create_task(_search_error(upstream))
+        while not sent:
+            await asyncio.sleep(0)
+        answer.set()
+        errors = await asyncio.gather(first, waiting)
+
+    assert len(sent) == 1
+    assert all(isinstance(error, PolixisQuotaSpentError) for error in errors)
+
+
 @pytest.mark.parametrize(
     ("tool", "arguments"),
     [

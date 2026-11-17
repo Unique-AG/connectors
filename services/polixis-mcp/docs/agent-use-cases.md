@@ -159,7 +159,8 @@ sanctions where a regime targets state-owned companies of a country.
 
 - `find_flagged_parties` with `radius` 1: every PEP among the company's owners, directors and
   signatories, with the relation each holds. Its `total_by_risk` says how many there are, so a
-  0 settles the question in one call.
+  0 settles the question in one call, unless `truncated_by_polixis` is true: the network is
+  then incomplete, and the answer says so.
 - `get_entity_profiles` with `positions` for the flagged people, ten at a time.
 
 A good answer lists each PEP with the function, institution and dates, says whether they are
@@ -232,7 +233,7 @@ user should update.
   them; the others carry their flags on their own rows.
 
 A good answer gives the holdings with the share the group carries in each, the chain behind
-the main ones, and flags called out. If `truncated` is
+the main ones, and flags called out. If `truncated_by_polixis` is
 true, it says the group is larger than one request returns (300 nodes per level, 5,000 in all)
 and suggests starting from a sub-holding.
 
@@ -293,7 +294,8 @@ none, it says so and that a wrong pid also returns none.
 > company.
 
 - `search_entities`, `get_related_parties`, `get_ultimate_beneficial_owners`,
-  `get_sanctions_exposure` and `find_court_decisions`, each on its first page.
+  `get_sanctions_exposure`, `find_flagged_parties` for the state-owned links, which the
+  sanctions exposure leaves out, and `find_court_decisions`, each on its first page.
 
 A good answer is short: who owns it, who runs it, the flags on any of them, and the nearest
 sanctioned or state-owned link, and any court decision naming the company. It ends with what
@@ -309,5 +311,5 @@ the brief doesn't cover: adverse media, which this MCP doesn't reach.
 - **The final decision.** The agent shows evidence and possible matches. Whether a hit is the
   client, and whether to onboard, block or file a report, is the compliance officer's.
 - **Polixis is not the client file.** Every user shares one set of Polixis credentials, and a
-  Polixis response is kept five minutes at most, so the bank's own record of the check stays
-  its job.
+  Polixis response is reused for five minutes at most and deleted within hours, on a best-effort
+  cleanup, so the bank's own record of the check stays its job.

@@ -132,6 +132,21 @@ async def test_ownership_refuses_a_cursor_of_another_tool(mcp_client: McpClient)
     assert error == "The cursor is not one this tool returned. Call the tool again without it."
 
 
+async def test_top_down_ownership_refuses_a_cursor_of_the_beneficial_owners(
+    mcp_client: McpClient,
+) -> None:
+    owners = await call_tool(
+        mcp_client,
+        "get_ultimate_beneficial_owners",
+        {"pid": "O00000000000000000000000000000100", "page_size": 1},
+        returns=contexts.OwnershipPage,
+    )
+
+    error = await tool_error(mcp_client, "get_top_down_ownership", {"cursor": owners.next_cursor})
+
+    assert error == "The cursor is not one this tool returned. Call the tool again without it."
+
+
 @pytest.mark.parametrize(
     ("arguments", "error"),
     [

@@ -44,6 +44,10 @@ async def get_ultimate_beneficial_owners(
     When `next_cursor` is set, pass it back as `cursor` for the next page.
     """
     query = page_query(
-        contexts.OwnershipQuery, cursor, pid=pid, direction="owners", page_size=page_size
+        contexts.OwnershipQuery,
+        cursor,
+        fixed={"direction": "owners"},
+        pid=pid,
+        page_size=page_size,
     )
     return await contexts.get_ownership(upstream=upstream, persistence=persistence, query=query)

@@ -1,6 +1,8 @@
 import httpx2
+import pytest
 
 from polixis_mcp import contexts
+from tests import polixis_responses
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
 from tests.tool_calls import McpClient
@@ -70,3 +72,32 @@ async def test_get_sanctions_exposure_reports_an_id_polixis_rejects(
     error = await tool_error(mcp_client, "get_sanctions_exposure", {"pid": UNKNOWN_PID})
 
     assert error == f"Polixis rejected the request (VALIDATION): Invalid Ardis ID: {UNKNOWN_PID}"
+
+
+async def test_get_sanctions_exposure_leaves_the_distance_unknown_past_an_unnamed_party(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    unnamed = {"connection": {"role": "shareholder"}, "sourceName": "Example Holdings AG"}
+    named = {"connection": {"role": "director"}, "sourceName": "Bo", "targetName": "Example Ltd"}
+    monkeypatch.setattr(
+        polixis_responses,
+        "SANCTION_EXPOSURE",
+        {
+            "relatedSanctions": [
+                {"pid": "P00000000000000000000000000000401", "relationPaths": [unnamed, unnamed]},
+                {"pid": "P00000000000000000000000000000402", "relationPaths": [named]},
+            ]
+        },
+    )
+
+    exposure = await call_tool(
+        mcp_client,
+        "get_sanctions_exposure",
+        {"pid": "O00000000000000000000000000000100"},
+        returns=contexts.SanctionsExposurePage,
+    )
+
+    assert [(party.pid, party.hops) for party in exposure.related] == [
+        ("P00000000000000000000000000000402", 1),
+        ("P00000000000000000000000000000401", None),
+    ]

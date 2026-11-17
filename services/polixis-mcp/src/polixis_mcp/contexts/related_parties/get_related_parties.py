@@ -63,6 +63,7 @@ async def get_related_parties(
         ),
         key=lambda party: (
             all(relation.former for relation in party.relations),
+            -len({relation.source for relation in party.relations if relation.source}),
             -len(party.relations),
             party.name or "",
         ),
@@ -87,18 +88,20 @@ async def get_related_parties(
 
 
 def _merged(parties: Iterable[RelatedPartyView]) -> list[RelatedPartyView]:
-    """One party per pid, or per type and name for a party without a pid, with the relations
-    every publisher reports.
+    """One party per pid, with the relations every publisher reports. A party without a pid
+    stays on its own: two publishers' parties of the same name need not be the same person.
     """
-    merged: dict[tuple[str | None, str | None, str | None], RelatedPartyView] = {}
-    for party in parties:
-        key = (party.pid, None, None) if party.pid else (None, party.entity_type, party.name)
+    merged: dict[str | int, RelatedPartyView] = {}
+    for position, party in enumerate(parties):
+        key = party.pid or position
         known = merged.get(key)
         merged[key] = (
             party
             if known is None
             else known.model_copy(
                 update={
+                    "name": known.name or party.name,
+                    "entity_type": known.entity_type or party.entity_type,
                     "countries": unique([*known.countries, *party.countries]),
                     "flags": unique([*known.flags, *party.flags]),
                     "alerts": unique([*known.alerts, *party.alerts]),

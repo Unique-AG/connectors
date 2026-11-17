@@ -1,7 +1,7 @@
 from base64 import urlsafe_b64decode
 from base64 import urlsafe_b64encode
 from binascii import Error as Base64Error
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import ClassVar
 
 from pydantic import BaseModel
@@ -16,13 +16,21 @@ def encode_cursor(query: PageQuery) -> str:
     return urlsafe_b64encode(payload.encode()).decode().rstrip("=")
 
 
-def decode_cursor[Q: PageQuery](cursor: str, query_type: type[Q]) -> Q:
+def decode_cursor[Q: PageQuery](
+    cursor: str, query_type: type[Q], *, fixed: Mapping[str, object]
+) -> Q:
+    """`fixed` holds the fields the decoding tool sets itself, which the cursor's query must
+    match, so a cursor of another tool with the same query type fails too.
+    """
     padded = cursor + "=" * (-len(cursor) % 4)
     try:
-        kind, _, query = urlsafe_b64decode(padded.encode()).decode().partition(":")
+        kind, _, encoded = urlsafe_b64decode(padded.encode()).decode().partition(":")
         if kind != query_type.__name__:
             raise ValueError(f"A cursor of {kind}, not {query_type.__name__}")
-        return query_type.model_validate_json(query)
+        query = query_type.model_validate_json(encoded)
+        if any(getattr(query, name) != value for name, value in fixed.items()):
+            raise ValueError(f"A cursor of another tool's {kind}")
+        return query
     except (Base64Error, ValueError) as error:
         raise InvalidCursorError(
             "The cursor is not one this tool returned. Call the tool again without it."

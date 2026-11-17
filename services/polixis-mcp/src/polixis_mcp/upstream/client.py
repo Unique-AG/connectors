@@ -23,6 +23,7 @@ from mcp_types import ToolAnnotations
 from pydantic import SecretStr
 import yaml
 
+from polixis_mcp.upstream.quota import AdmissionTransport
 from polixis_mcp.upstream.quota import QuotaGate
 from polixis_mcp.upstream.recording import CassetteTransport
 from polixis_mcp.upstream.recording import RecordingMode
@@ -49,9 +50,8 @@ def upstream_http(
     now: Callable[[], datetime] | None = None,
 ) -> httpx2.AsyncClient:
     """Every request to the upstream goes through it, from `Upstream` and the generated tools,
-    so its connection limit caps the requests in flight and its quota gate stops them all once
-    Polixis says the quota is spent. `limits` applies to the default transport only, not to one
-    a test passes.
+    so its admission caps the requests in flight and its quota gate stops them all once Polixis
+    says the quota is spent, the ones waiting for a slot included.
 
     `now` is the clock the client-credentials token's expiry and the quota cooldown are read
     against.
@@ -60,20 +60,21 @@ def upstream_http(
     `CassetteTransport`, which saves Polixis's answers or replays them.
     """
     clock = now or _utc_now
-    limits = httpx2.Limits(max_connections=settings.max_concurrent_requests)
-    api_transport, auth_transport = transport, transport
+    network = httpx2.AsyncHTTPTransport(
+        limits=httpx2.Limits(max_connections=settings.max_concurrent_requests)
+    )
+    api_transport, auth_transport = transport or network, transport
     if transport is None and settings.recording.mode is not RecordingMode.OFF:
-        api_transport = CassetteTransport(
-            settings.recording, httpx2.AsyncHTTPTransport(limits=limits)
-        )
+        api_transport = CassetteTransport(settings.recording, network)
         auth_transport = token_transport(settings.recording)
     quota = QuotaGate(cooldown=timedelta(seconds=settings.quota_cooldown_seconds), now=clock)
     return httpx2.AsyncClient(
         base_url=str(settings.api_url).rstrip("/"),
         timeout=settings.timeout_seconds,
-        limits=limits,
-        event_hooks={"request": [quota.refuse_while_spent], "response": [quota.record]},
-        transport=api_transport,
+        event_hooks={"response": [quota.record]},
+        transport=AdmissionTransport(
+            api_transport, slots=settings.max_concurrent_requests, quota=quota
+        ),
         auth=ClientCredentialsAuth(
             client_id=settings.client_id or _NOT_NEEDED_TO_REPLAY,
             client_secret=settings.client_secret or _NOT_NEEDED_TO_REPLAY,

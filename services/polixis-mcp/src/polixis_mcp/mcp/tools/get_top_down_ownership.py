@@ -42,6 +42,10 @@ async def get_top_down_ownership(
     is set, pass it back as `cursor` for the next page.
     """
     query = page_query(
-        contexts.OwnershipQuery, cursor, pid=pid, direction="holdings", page_size=page_size
+        contexts.OwnershipQuery,
+        cursor,
+        fixed={"direction": "holdings"},
+        pid=pid,
+        page_size=page_size,
     )
     return await contexts.get_ownership(upstream=upstream, persistence=persistence, query=query)

@@ -1,7 +1,9 @@
+import asyncio
 from collections.abc import Callable
 from datetime import datetime
 from datetime import timedelta
 import logging
+from typing import override
 
 import httpx2
 from mcp_openapi.upstream import UpstreamError
@@ -19,8 +21,9 @@ class QuotaGate:
     been raised. Each process learns it on its own, so a spent quota costs one request per
     process per cooldown.
 
-    It raises from the client's hooks, so neither the retry policy, which only retries an
-    `HTTPStatusError`, nor the tools served from the spec ever see the 429 itself.
+    It raises from the client's transport and response hook, so neither the retry policy,
+    which only retries an `HTTPStatusError`, nor the tools served from the spec ever see the
+    429 itself.
     """
 
     def __init__(self, *, cooldown: timedelta, now: Callable[[], datetime]) -> None:
@@ -28,9 +31,7 @@ class QuotaGate:
         self._now: Callable[[], datetime] = now
         self._spent_until: datetime | None = None
 
-    async def refuse_while_spent(self, request: httpx2.Request) -> None:
-        """An httpx request hook."""
-        del request
+    def refuse_while_spent(self) -> None:
         if self._spent_until is not None and self._now() < self._spent_until:
             raise PolixisQuotaSpentError()
 
@@ -43,6 +44,29 @@ class QuotaGate:
                 extra={"refused_until": self._spent_until.isoformat()},
             )
             raise PolixisQuotaSpentError()
+
+
+class AdmissionTransport(httpx2.AsyncBaseTransport):
+    """Sends at most `slots` requests at once and asks the quota gate only once a request has
+    its slot, so the ones that waited for a slot are refused, not sent, after Polixis says the
+    quota is spent. The slot frees when the response headers arrive, after the client's
+    response hooks have recorded a spent quota and before any other request runs.
+    """
+
+    def __init__(self, inner: httpx2.AsyncBaseTransport, *, slots: int, quota: QuotaGate) -> None:
+        self._inner: httpx2.AsyncBaseTransport = inner
+        self._slots: asyncio.Semaphore = asyncio.Semaphore(slots)
+        self._quota: QuotaGate = quota
+
+    @override
+    async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
+        async with self._slots:
+            self._quota.refuse_while_spent()
+            return await self._inner.handle_async_request(request)
+
+    @override
+    async def aclose(self) -> None:
+        await self._inner.aclose()
 
 
 def is_quota_spent(response: httpx2.Response) -> bool:

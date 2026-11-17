@@ -60,11 +60,12 @@ def _match(*, hit: SearchHit) -> EntityMatch | None:
     if not hit.pid:
         return None
     names = unique(hit.names or [])
-    records = unique(name_record(record) for record in hit.name_records or [])[:_NAMES_LISTED]
-    in_records = {spelling for record in records for spelling in (record.name, record.original)}
+    all_records = unique(name_record(record) for record in hit.name_records or [])
+    records = all_records[:_NAMES_LISTED]
+    in_records = {spelling for record in all_records for spelling in (record.name, record.original)}
     other_names = [name for name in names if name not in in_records]
     addresses = hit.addresses or []
-    current = next((record.name for record in records if record.kind == "CURRENT_NAME"), None)
+    current = next((record.name for record in all_records if record.kind == "CURRENT_NAME"), None)
     return EntityMatch(
         pid=hit.pid,
         entity_type=hit.entity_type,

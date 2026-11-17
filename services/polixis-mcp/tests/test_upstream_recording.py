@@ -1,3 +1,4 @@
+import asyncio
 import gzip
 import json
 from pathlib import Path
@@ -74,6 +75,42 @@ async def test_record_sends_nothing_past_the_budget(tmp_path: Path) -> None:
     with pytest.raises(RecordingRefusedError, match="budget is 1"):
         _ = await post(recorder, {"id": 2})
     assert len(sent) == 1
+
+
+async def test_records_a_request_sent_twice_at_once_only_once(tmp_path: Path) -> None:
+    sent: list[httpx2.Request] = []
+    both_asked = asyncio.Barrier(2)
+
+    async def ask(body: dict[str, object]) -> httpx2.Response:
+        await both_asked.wait()
+        return await post(recorder, body)
+
+    async def answer(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request)
+        await asyncio.sleep(0)
+        return httpx2.Response(200, json=PROFILE)
+
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD), httpx2.MockTransport(answer)
+    )
+
+    answers = await asyncio.gather(ask({"id": 1}), ask({"id": 1}))
+
+    assert [answer.json() for answer in answers] == [PROFILE, PROFILE]
+    assert (len(sent), ledger_count(tmp_path)) == (1, 1)
+
+
+async def test_counts_a_request_that_got_no_answer_against_the_budget(tmp_path: Path) -> None:
+    def fail(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.ReadTimeout("no answer", request=request)
+
+    recorder = CassetteTransport(
+        settings(tmp_path, RecordingMode.RECORD), httpx2.MockTransport(fail)
+    )
+
+    with pytest.raises(httpx2.ReadTimeout):
+        _ = await post(recorder, {"id": 1})
+    assert ledger_count(tmp_path) == 1
 
 
 async def test_a_spent_quota_halts_every_later_run(tmp_path: Path) -> None:

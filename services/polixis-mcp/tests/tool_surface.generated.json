@@ -2311,8 +2311,15 @@
                 "type": "array"
               },
               "hops": {
-                "description": "Computed by this MCP: the distinct pairs of parties on its path, so the links between the entity and it; 1 is a direct relation.",
-                "type": "integer"
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Computed by this MCP: the distinct pairs of parties on its path, so the links between the entity and it; 1 is a direct relation. Null when Polixis leaves a party on the path unnamed, so the distance is unknown."
               },
               "listings": {
                 "description": "Its records on sanctions lists.",

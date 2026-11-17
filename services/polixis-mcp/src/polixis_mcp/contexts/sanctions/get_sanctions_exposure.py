@@ -37,7 +37,8 @@ async def get_sanctions_exposure(
     related = sorted(
         (_related(party) for party in exposure.related_sanctions or [] if party.pid),
         key=lambda party: (
-            party.hops,
+            party.hops is None,
+            party.hops or 0,
             not any(listing.status == "ACTIVE" for listing in party.listings),
             party.name is None,
             party.name or "",
@@ -72,9 +73,18 @@ def _related(party: SanctionedParty) -> SanctionedRelatedParty:
             for list_name, records in (party.sanctions or {}).items()
             for record in records
         ],
-        hops=len(unique((hop.source_name, hop.target_name) for hop in hops)),
+        hops=_distance(hops),
         path=[link for hop in hops if (link := _path_link(hop)) is not None],
     )
+
+
+def _distance(hops: list[SanctionPathHop]) -> int | None:
+    """The distinct pairs of named ends; None when a hop lacks a name, since Polixis gives the
+    ends no pid and unnamed ones cannot be told apart.
+    """
+    if not hops or not all(hop.source_name and hop.target_name for hop in hops):
+        return None
+    return len(unique((hop.source_name, hop.target_name) for hop in hops))
 
 
 def _listing(list_name: str, record: SanctionRecord) -> Listing:
@@ -156,9 +166,10 @@ class SanctionedRelatedParty(BaseModel):
     name: str | None = Field(description="Its English name.")
     countries: list[str] = Field(description="ISO 3166-1 alpha-2 codes it is tied to.")
     listings: list[Listing] = Field(description="Its records on sanctions lists.")
-    hops: int = Field(
+    hops: int | None = Field(
         description="Computed by this MCP: the distinct pairs of parties on its path, so the "
-        "links between the entity and it; 1 is a direct relation."
+        "links between the entity and it; 1 is a direct relation. Null when Polixis leaves a "
+        "party on the path unnamed, so the distance is unknown."
     )
     path: list[SanctionPathLink] = Field(
         description="Polixis's relations from the entity to it, in order. Two parties joined "
