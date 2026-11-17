@@ -64,7 +64,7 @@ At the end of the run, post ONE Slack message through the Slack action of the au
 
 Write a PR as `#<number>` in the text of a line. The script turns each one into a Markdown link. Write any other URL as plain text, with no angle brackets.
 
-The script prints the message, with at most 5 lines. Post its output without a change. If it exits with a non-zero code, read the error. If there are too many note lines, merge notes into fewer `note` lines and keep all of their facts. If a line is too long, shorten it. Then run it again. Mode `pr` posts no Slack message.
+The script prints the message, with at most 5 lines. Post its output without a change. If it exits with a non-zero code, read the error. If there are too many note lines, merge notes into fewer `note` lines and keep all of their facts. If a line is too long, shorten it. Then run it again. If the `pr` lines alone need more than 5 lines, split them into groups of 20. Run the script once for each group, and post each output as its own message. Put the other lines in the first message only. Mode `pr` posts no Slack message.
 
 ## Part B: Entry check (both modes)
 
