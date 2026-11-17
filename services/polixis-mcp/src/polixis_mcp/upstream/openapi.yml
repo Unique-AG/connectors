@@ -1,0 +1,879 @@
+# mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
+openapi: 3.0.3
+info:
+  title: Polixis Corporate Data & Graph API
+  version: 3.0.0
+  description: 'Hand-written from the vendor''s PDF documentation (version 3) while their own spec is
+    unavailable. Every response field is optional, since no response has been checked against the live
+    API yet. Fields whose shape the documentation leaves open (finance, stocks, properties, metadata,
+    meta, alertlist, nameEntries, alertEntries, publisher) are left out: the generated models ignore them
+    and the tools served from this spec pass them through. Replace this file with the vendor''s spec once
+    it arrives and run `uv run poe codegen`.
+
+    '
+servers:
+- url: https://api-polixis.polixis.com
+security:
+- clientCredentials: []
+  apiKey: []
+paths:
+  /search/api:
+    post:
+      operationId: searchEntities
+      summary: Search organizations and people by name or identifier
+      description: 'Finds profiles by name, registration number or ISIN, optionally narrowed by entity
+        type, countries and dates. Exact matches rank first, then fuzzy ones. Use the returned `pid` with
+        the other endpoints.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Matching profiles, one page of them.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: An unknown or misspelt request field.
+  /api/corporate/byPublisher:
+    post:
+      operationId: getCorporateProfile
+      summary: Corporate profile of an entity with its related parties
+      description: 'Returns the full profile of an organization or person and the parties related to it,
+        such as shareholders, board members, executives, signatories, third parties and subsidiaries,
+        limited to the relation categories requested.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CorporateRequest'
+      responses:
+        '200':
+          description: The profile and its related parties.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorporateResponse'
+  /api/graph/smart:
+    post:
+      operationId: getSmartGraph
+      summary: Relationship graph around an entity, reduced to its key relations
+      description: 'Walks the relationship network out from an entity up to `radius` hops. Leaves out
+        signatory, third-party and historic relations, and returns names and images for each node in `meta`
+        besides any `fields` requested.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GraphRequest'
+      responses:
+        '200':
+          description: The graph's nodes and edges.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphResponse'
+  /api/graph/subgraph:
+    post:
+      operationId: getSubgraph
+      summary: Full relationship graph around an entity
+      description: 'Walks every relation out from an entity up to `radius` hops. `meta` holds only the
+        `fields` requested.
+
+        '
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GraphRequest'
+      responses:
+        '200':
+          description: The graph's nodes and edges.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphResponse'
+  /api/graph/topdown/{id}:
+    get:
+      operationId: getTopDownOwnership
+      summary: Entities an entity owns, directly or indirectly
+      description: 'The ownership tree below an entity: its subsidiaries and the shares held at each layer.
+        Capped at 300 nodes per level and 5,000 per request; `truncated` says when a cap was hit.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/EntityId'
+      responses:
+        '200':
+          description: The ownership tree.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnershipTree'
+  /api/graph/ubo/{id}:
+    get:
+      operationId: getUltimateBeneficialOwners
+      summary: Ultimate beneficial owners of an entity
+      description: 'The ownership tree above an entity, followed up through its shareholders until the
+        ultimate beneficial owners. Capped at 300 nodes per level and 5,000 per request.
+
+        '
+      parameters:
+      - $ref: '#/components/parameters/EntityId'
+      responses:
+        '200':
+          description: The ownership tree.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OwnershipTree'
+  /api/completion/fields:
+    get:
+      operationId: listCompletionFields
+      summary: Profile fields the completion endpoint can return
+      responses:
+        '200':
+          description: The field names.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+  /api/completion/{id}:
+    post:
+      operationId: getProfileFields
+      summary: Chosen fields of an entity's profile
+      description: Returns only the profile fields named in `fields`; see `list_completion_fields`.
+      parameters:
+      - $ref: '#/components/parameters/EntityId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletionRequest'
+      responses:
+        '200':
+          description: The requested profile fields.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+  /api/basic-identifiers/{id}:
+    get:
+      operationId: getBasicIdentifiers
+      summary: Names, identifiers, countries, risk flags and addresses of an entity
+      parameters:
+      - $ref: '#/components/parameters/EntityId'
+      responses:
+        '200':
+          description: The entity's basic identifiers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicIdentifiers'
+  /api/key-identifiers/{id}:
+    get:
+      operationId: getKeyIdentifiers
+      summary: Names, name records, identifiers, dates and risk flags of an entity
+      parameters:
+      - $ref: '#/components/parameters/EntityId'
+      responses:
+        '200':
+          description: The entity's key identifiers.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/KeyIdentifiers'
+  /api/graph/pid/{pid}:
+    get:
+      operationId: resolvePermanentId
+      summary: Resolve a permanent ID that may have been merged into another
+      parameters:
+      - name: pid
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: The permanent ID's status and its member records.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermanentId'
+        '410':
+          description: The permanent ID's group was dissolved.
+components:
+  securitySchemes:
+    clientCredentials:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: https://auth.polixis.com/realms/plx-prod/protocol/openid-connect/token
+          scopes: {}
+    apiKey:
+      type: apiKey
+      in: header
+      name: x-api-key
+  parameters:
+    EntityId:
+      name: id
+      in: path
+      required: true
+      description: The entity's ID (ARDIS ID or pid).
+      schema:
+        type: string
+  schemas:
+    SearchRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: A name, unique identifier or ISIN.
+        entityType:
+          type: string
+          enum:
+          - ORGANIZATION
+          - PERSON
+        countries:
+          type: array
+          description: Lowercase ISO 3166-1 alpha-2 codes; a hit matches at least one.
+          items:
+            type: string
+        dates:
+          type: array
+          description: 'Dates as yyyyMMdd integers, with 00 for an unknown month or day (19780200 is February
+            1978, 19780000 the year 1978).
+
+            '
+          items:
+            type: integer
+        adaptiveLegalForms:
+          type: boolean
+          description: Also match translations and variants of legal forms in names.
+        size:
+          type: integer
+          minimum: 1
+          maximum: 50
+        page:
+          type: integer
+    SearchResponse:
+      type: object
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+    SearchHit:
+      type: object
+      properties:
+        pid:
+          type: string
+        entityType:
+          type: string
+        names:
+          type: array
+          items:
+            type: string
+        sanction:
+          type: boolean
+        pep:
+          type: boolean
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypedAlert'
+        nameRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/NameRecord'
+        dates:
+          $ref: '#/components/schemas/DatesByType'
+        images:
+          type: array
+          items:
+            type: string
+        unis:
+          $ref: '#/components/schemas/StringListMap'
+        sanctionStatuses:
+          $ref: '#/components/schemas/StringMap'
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        size:
+          type: integer
+        totalHits:
+          type: integer
+    CorporateRequest:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          description: The entity's ID (ARDIS ID or pid).
+        category:
+          type: array
+          description: Relation categories to include.
+          items:
+            type: string
+            enum:
+            - executive
+            - executiveSenior
+            - thirdParty
+            - signature
+            - ownershipInOtherEntities
+            - shareholdingInformation
+            - membership
+    CorporateResponse:
+      type: object
+      properties:
+        root:
+          $ref: '#/components/schemas/Entity'
+    Entity:
+      type: object
+      properties:
+        id:
+          type: string
+        ardisId:
+          type: string
+        type:
+          type: string
+          description: PERSON or ORGANIZATION; vessels and aircraft are organizations.
+        names:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocalizedText'
+        nameRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/NameRecord'
+        uni:
+          $ref: '#/components/schemas/StringListMap'
+        dates:
+          $ref: '#/components/schemas/DatesByType'
+        countries:
+          $ref: '#/components/schemas/StringListMap'
+        address:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        gender:
+          type: string
+          description: f, m or x.
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypedAlert'
+        legalTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocalizedText'
+        imageEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageEntry'
+        metadata:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceMetadata'
+        score:
+          type: integer
+        eac:
+          type: array
+          description: Economic activity categories.
+          items:
+            $ref: '#/components/schemas/LocalizedText'
+        flags:
+          type: array
+          description: 'Such as #PEP, #FORMER_PEP or #SANCTION.'
+          items:
+            type: string
+        related:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelatedEntity'
+    RelatedEntity:
+      type: object
+      properties:
+        entity:
+          $ref: '#/components/schemas/Entity'
+        relation:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relation'
+    Relation:
+      type: object
+      properties:
+        type:
+          type: string
+        relationProperty:
+          type: array
+          items:
+            $ref: '#/components/schemas/RelationProperty'
+    RelationProperty:
+      type: object
+      properties:
+        title:
+          type: string
+        dates:
+          $ref: '#/components/schemas/DatesByType'
+        properties:
+          $ref: '#/components/schemas/StringListMap'
+        former:
+          type: boolean
+    GraphRequest:
+      type: object
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          description: The entity the walk starts from.
+        radius:
+          type: integer
+          description: How many hops to walk out from the entity.
+        filter:
+          $ref: '#/components/schemas/GraphFilter'
+        fields:
+          type: array
+          description: Profile fields to return for each node in `meta`.
+          items:
+            type: string
+        truncate:
+          type: boolean
+          description: Return a reduced graph, recommended for large ones.
+    GraphFilter:
+      type: object
+      properties:
+        rules:
+          type: object
+          description: 'One rule per relation type to follow, keyed by the relation type. Relation types
+            without a rule are not followed. Without a filter the default rules apply.
+
+            '
+          additionalProperties:
+            $ref: '#/components/schemas/GraphRule'
+    GraphRule:
+      type: object
+      properties:
+        direction:
+          type: string
+          enum:
+          - IN
+          - OUT
+          - BOTH
+        allowedCtg:
+          type: string
+          description: Comma-separated relation categories to follow; empty follows all.
+        excludedCtg:
+          type: string
+          description: Comma-separated relation categories not to follow.
+        onlyActual:
+          type: boolean
+        requireSanction:
+          type: boolean
+        requireSoe:
+          type: boolean
+        requirePerson:
+          type: boolean
+        requireOrg:
+          type: boolean
+    GraphResponse:
+      type: object
+      properties:
+        root:
+          $ref: '#/components/schemas/GraphNode'
+        nodes:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/GraphNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphEdge'
+    GraphNode:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        composite:
+          type: boolean
+        flags:
+          type: array
+          items:
+            type: string
+        alertNames:
+          type: array
+          items:
+            type: string
+        radii:
+          type: array
+          items:
+            type: integer
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategorizedAlert'
+    GraphEdge:
+      type: object
+      properties:
+        sourceId:
+          type: string
+        targetId:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/EdgeDetail'
+    EdgeDetail:
+      type: object
+      properties:
+        originalSource:
+          type: string
+        originalTarget:
+          type: string
+        role:
+          type: string
+        ctg:
+          type: integer
+        share:
+          type: number
+        noi:
+          type: number
+        vshare:
+          type: number
+        cShare:
+          type: number
+        former:
+          type: boolean
+        at:
+          type: integer
+        startDate:
+          type: integer
+        endDate:
+          type: integer
+    OwnershipTree:
+      type: object
+      properties:
+        startId:
+          type: string
+        totalNodes:
+          type: integer
+        truncated:
+          type: boolean
+        roots:
+          type: array
+          description: Every node of the tree; `children` links them.
+          items:
+            $ref: '#/components/schemas/OwnershipNode'
+    OwnershipNode:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+        sharePercent:
+          type: number
+        role:
+          type: string
+        children:
+          type: array
+          items:
+            type: string
+        flags:
+          type: array
+          items:
+            type: string
+    CompletionRequest:
+      type: object
+      required:
+      - fields
+      properties:
+        fields:
+          type: array
+          items:
+            type: string
+    Profile:
+      type: object
+      properties:
+        names:
+          $ref: '#/components/schemas/StringListMap'
+        nameRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/NameRecord'
+        legalTypes:
+          $ref: '#/components/schemas/StringListMap'
+        legalTypeEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocalizedText'
+        countries:
+          $ref: '#/components/schemas/StringListMap'
+        unis:
+          $ref: '#/components/schemas/StringListMap'
+        dates:
+          $ref: '#/components/schemas/DatesByType'
+        gender:
+          type: string
+        flags:
+          type: array
+          items:
+            type: string
+        alertlist:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategorizedAlert'
+        addressEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/Address'
+        eacEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/LocalizedText'
+        images:
+          type: array
+          items:
+            type: string
+        imageEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImageEntry'
+        sanctionStatuses:
+          $ref: '#/components/schemas/StringMap'
+        sanctions:
+          type: object
+          description: Sanction records per sanctions list.
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/SanctionRecord'
+        positions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Position'
+    SanctionRecord:
+      type: object
+      properties:
+        country:
+          type: string
+        details:
+          $ref: '#/components/schemas/StringListMap'
+        source:
+          type: array
+          items:
+            type: string
+    Position:
+      type: object
+      properties:
+        position:
+          type: string
+        institution:
+          type: string
+        startDate:
+          $ref: '#/components/schemas/DatePart'
+        endDate:
+          $ref: '#/components/schemas/DatePart'
+        remark:
+          type: string
+    BasicIdentifiers:
+      type: object
+      properties:
+        pid:
+          type: string
+        names:
+          $ref: '#/components/schemas/StringListMap'
+        unis:
+          $ref: '#/components/schemas/StringListMap'
+        countries:
+          $ref: '#/components/schemas/StringListMap'
+        dates:
+          $ref: '#/components/schemas/DatesByType'
+        legalTypes:
+          $ref: '#/components/schemas/StringListMap'
+        flags:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategorizedAlert'
+        addresses:
+          type: array
+          items:
+            type: string
+        sanctionStatuses:
+          $ref: '#/components/schemas/StringMap'
+    KeyIdentifiers:
+      type: object
+      properties:
+        pid:
+          type: string
+        names:
+          $ref: '#/components/schemas/StringListMap'
+        nameRecords:
+          type: array
+          items:
+            $ref: '#/components/schemas/NameRecord'
+        unis:
+          $ref: '#/components/schemas/StringListMap'
+        countries:
+          $ref: '#/components/schemas/StringListMap'
+        dates:
+          $ref: '#/components/schemas/DatesByType'
+        legalTypes:
+          $ref: '#/components/schemas/StringListMap'
+        flags:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/CategorizedAlert'
+        addresses:
+          type: array
+          items:
+            type: string
+        sanctionStatuses:
+          $ref: '#/components/schemas/StringMap'
+    PermanentId:
+      type: object
+      properties:
+        pid:
+          type: string
+        status:
+          type: string
+          description: active, merged or unknown.
+        redir:
+          type: string
+          nullable: true
+          description: The pid that replaced this one when it was merged.
+        count:
+          type: integer
+        members:
+          type: array
+          items:
+            type: string
+    NameRecord:
+      type: object
+      properties:
+        original:
+          type: string
+        en:
+          type: string
+        language:
+          type: string
+        type:
+          type: string
+          description: Such as CURRENT_NAME, FORMER_NAME, TRADE_NAME or ALIAS.
+    LocalizedText:
+      type: object
+      properties:
+        original:
+          type: string
+        en:
+          type: string
+        ln:
+          type: string
+          description: ISO 639-1 code of `original`.
+    Address:
+      type: object
+      properties:
+        address:
+          type: string
+        en:
+          type: string
+        ln:
+          type: string
+    ImageEntry:
+      type: object
+      properties:
+        url:
+          type: string
+        cloudUrl:
+          type: string
+    SourceMetadata:
+      type: object
+      properties:
+        sourceCode:
+          type: string
+        sourceName:
+          type: string
+    TypedAlert:
+      type: object
+      properties:
+        description:
+          type: string
+        type:
+          type: array
+          items:
+            type: string
+    CategorizedAlert:
+      type: object
+      properties:
+        category:
+          type: string
+        message:
+          type: string
+    DatePart:
+      type: object
+      properties:
+        y:
+          type: integer
+        m:
+          type: integer
+        d:
+          type: integer
+    DatesByType:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          $ref: '#/components/schemas/DatePart'
+    StringListMap:
+      type: object
+      additionalProperties:
+        type: array
+        items:
+          type: string
+    StringMap:
+      type: object
+      additionalProperties:
+        type: string
