@@ -4,6 +4,7 @@
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    llm-agents.url = "github:numtide/llm-agents.nix";
   };
 
   outputs =
@@ -11,6 +12,7 @@
       self,
       nixpkgs,
       flake-utils,
+      llm-agents,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -96,6 +98,7 @@
         utilPkgs = with pkgs; [
           jq
           yq-go
+          llm-agents.packages.${system}.coderabbit-cli
         ];
       in
       {
