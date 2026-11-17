@@ -16,7 +16,7 @@ class CompletionRequestInput(RequestModel):
 
 
 class CorporateRequestInput(RequestModel):
-    id: str
+    id: str = Field(..., description="The entity's ID (ARDIS ID or pid).")
     category: (
         list[
             Literal[

@@ -1,14 +1,18 @@
 # mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
 from mcp_configs import RetrySettings
 from mcp_configs import shared_config
 from pydantic import AnyHttpUrl
 from pydantic import Field
 from pydantic import SecretStr
+from pydantic import UrlConstraints
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
+
+# The client credentials, the token and the API key travel to these, so plain http is refused.
+type _HttpsUrl = Annotated[AnyHttpUrl, UrlConstraints(allowed_schemes=["https"])]
 
 
 class UpstreamSettings(BaseSettings):
@@ -19,8 +23,8 @@ class UpstreamSettings(BaseSettings):
     client_id: SecretStr = Field(min_length=1)
     client_secret: SecretStr = Field(min_length=1)
     api_key: SecretStr = Field(min_length=1)
-    api_url: AnyHttpUrl = AnyHttpUrl("https://api-polixis.polixis.com")
-    token_url: AnyHttpUrl = AnyHttpUrl(
+    api_url: _HttpsUrl = AnyHttpUrl("https://api-polixis.polixis.com")
+    token_url: _HttpsUrl = AnyHttpUrl(
         "https://auth.polixis.com/realms/plx-prod/protocol/openid-connect/token"
     )
     timeout_seconds: float = Field(default=30, gt=0, le=120)

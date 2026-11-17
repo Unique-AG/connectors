@@ -148,6 +148,7 @@
           "type": "array"
         },
         "id": {
+          "description": "The entity's ID (ARDIS ID or pid).",
           "type": "string"
         }
       },

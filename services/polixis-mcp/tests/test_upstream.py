@@ -3,12 +3,15 @@ from datetime import timedelta
 from datetime import UTC
 
 import httpx2
+from pydantic import ValidationError
+import pytest
 
 from polixis_mcp.upstream import open_upstream
 from polixis_mcp.upstream import SEARCH_ENTITIES
 from polixis_mcp.upstream import SearchEntitiesRequest
 from polixis_mcp.upstream import SearchRequestInput
 from polixis_mcp.upstream import upstream_http
+from polixis_mcp.upstream import UpstreamSettings
 from tests.offline_server import fake_upstream_settings
 
 _WHEN = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
@@ -137,3 +140,11 @@ async def test_a_rate_limited_search_is_retried() -> None:
     assert response.pagination is not None
     assert response.pagination.total_hits == 0
     assert attempts == 2
+
+
+@pytest.mark.parametrize("field", ["api_url", "token_url"])
+def test_settings_refuse_a_plain_http_endpoint(field: str) -> None:
+    secrets = {"client_id": "id", "client_secret": "secret", "api_key": "key"}
+
+    with pytest.raises(ValidationError, match="URL scheme should be 'https'"):
+        UpstreamSettings.model_validate({**secrets, field: "http://api.example.com"})

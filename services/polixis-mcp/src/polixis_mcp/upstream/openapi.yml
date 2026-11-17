@@ -333,6 +333,7 @@ components:
       properties:
         id:
           type: string
+          description: The entity's ID (ARDIS ID or pid).
         category:
           type: array
           description: Relation categories to include.
