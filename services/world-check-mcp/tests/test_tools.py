@@ -1,3 +1,4 @@
+import asyncio
 from datetime import date
 from datetime import timedelta
 import json
@@ -16,6 +17,7 @@ import pytest
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 
 
@@ -563,7 +565,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
 def _server() -> FastMCP:
     return build_server(
         fake_upstream_settings(),
-        Persistence(store=MemoryStore()),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
         httpx2.MockTransport(_world_check),
     )
 
@@ -1136,6 +1138,44 @@ async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_afte
 
     _ext_1_maps_to[:] = ["sys-1"]
     assert _writes == []
+
+
+async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case() -> None:
+    _writes.clear()
+    first_write_arrived = asyncio.Event()
+    release_first_write = asyncio.Event()
+
+    async def held_first_write(request: httpx2.Request) -> httpx2.Response:
+        if request.method == "PUT":
+            first_write_arrived.set()
+            await release_first_write.wait()
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(held_first_write),
+    )
+    arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}
+
+    async with (
+        asyncio.timeout(10),
+        Client(server, elicitation_handler=_approve) as first,
+        Client(server, elicitation_handler=_approve) as second,
+    ):
+        first_call = asyncio.create_task(first.call_tool("resolve_result", arguments))
+        arrived = asyncio.create_task(first_write_arrived.wait())
+        try:
+            await asyncio.wait({first_call, arrived}, return_when=asyncio.FIRST_COMPLETED)
+            assert first_write_arrived.is_set(), "the first call ended before it wrote"
+            with pytest.raises(ToolError, match="Another decision on this case is being saved"):
+                await second.call_tool("resolve_result", arguments)
+        finally:
+            release_first_write.set()
+            arrived.cancel()
+        await first_call
+
+    assert len(_writes) == 1
 
 
 async def test_resolve_result_decline_does_not_write() -> None:

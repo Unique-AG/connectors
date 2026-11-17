@@ -41,6 +41,10 @@ class _PostgresStore(PostgreSQLStore):
         self._dsn = dsn
         self._statement_cache_size = statement_cache_size
 
+    @property
+    def pool(self) -> asyncpg.Pool:
+        return self._initialized_pool
+
     @override
     async def _create_pool(self) -> asyncpg.Pool:
         return await asyncpg.create_pool(  # pyright: ignore[reportUnknownMemberType]
@@ -53,7 +57,7 @@ class _PostgresStore(PostgreSQLStore):
 
 
 @asynccontextmanager
-async def open_store(settings: StoreSettings) -> AsyncGenerator[Store]:
+async def open_store(settings: StoreSettings) -> AsyncGenerator[_PostgresStore]:
     async with _PostgresStore(settings) as store:
         yield store
 

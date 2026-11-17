@@ -15,6 +15,7 @@ from pydantic import SecretStr
 import pytest
 
 from tests.offline_server import build_server
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import GET_API_INFO
 from world_check_mcp.upstream import open_upstream
@@ -198,7 +199,9 @@ async def test_get_api_info_does_not_ask_for_credentials() -> None:
         )
 
     server = build_server(
-        _settings(), Persistence(store=MemoryStore()), httpx2.MockTransport(respond)
+        _settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(respond),
     )
     async with Client(server) as client:
         tools = await client.list_tools()
@@ -231,7 +234,9 @@ async def test_a_malformed_token_response_raises_a_tool_error_naming_the_token_u
         return token_response
 
     server = build_server(
-        _settings(), Persistence(store=MemoryStore()), httpx2.MockTransport(respond)
+        _settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(respond),
     )
     async with Client(server) as client:
         with pytest.raises(ToolError, match=r"https://api\.risk\.lseg\.com/auth/oauth2/v1/token"):
@@ -248,7 +253,11 @@ async def test_a_malformed_token_response_error_omits_the_token_url_secrets() ->
     def respond(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, content=b"not json")
 
-    server = build_server(settings, Persistence(store=MemoryStore()), httpx2.MockTransport(respond))
+    server = build_server(
+        settings,
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(respond),
+    )
     async with Client(server) as client:
         with pytest.raises(ToolError) as raised:
             await client.call_tool("get_api_info", {})
