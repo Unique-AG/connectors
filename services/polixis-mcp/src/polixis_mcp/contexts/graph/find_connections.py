@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from polixis_mcp.contexts.cached_calls import cached_call
+from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import node_name
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.graph.network import Link
@@ -51,6 +53,7 @@ async def find_connections(
             for pid in on_paths
             if pid in nodes
         ],
+        freshness=freshness(),
     )
 
 
@@ -144,3 +147,4 @@ class Connections(BaseModel):
     parties: list[Party] = Field(
         description="Every party on the paths, with its flags; `distance` is null here."
     )
+    freshness: Freshness

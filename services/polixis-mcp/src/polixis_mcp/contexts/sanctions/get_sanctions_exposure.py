@@ -2,6 +2,8 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from polixis_mcp.contexts.cached_calls import cached_call
+from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import record_date
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.formats import unix_date
@@ -62,6 +64,7 @@ async def get_sanctions_exposure(
             if next_offset is not None
             else None
         ),
+        freshness=freshness(),
     )
 
 
@@ -203,3 +206,4 @@ class SanctionsExposurePage(BaseModel):
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )
+    freshness: Freshness

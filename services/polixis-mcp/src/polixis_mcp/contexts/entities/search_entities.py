@@ -4,6 +4,8 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from polixis_mcp.contexts.cached_calls import cached_call
+from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.entities.names import name_record
 from polixis_mcp.contexts.entities.names import NameRecordView
 from polixis_mcp.contexts.formats import dates_by_kind
@@ -61,6 +63,7 @@ async def search_entities(
         next_cursor=(
             encode_cursor(query.model_copy(update={"page": query.page + 1})) if has_next else None
         ),
+        freshness=freshness(),
     )
 
 
@@ -167,3 +170,4 @@ class EntitySearchResults(BaseModel):
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )
+    freshness: Freshness

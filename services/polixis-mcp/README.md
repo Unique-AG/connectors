@@ -135,6 +135,11 @@ reading every answer cached so far, which then expires. The cache is shared by e
 deployment, who share the one set of Polixis credentials anyway. `resolve_permanent_id`, served
 straight from the spec, is not cached.
 
+Every result of our tools says how fresh it is in `freshness`: `fetched_at`, when the server put
+it together, and `cached_at`, null when all of it came from Polixis on that call, else when the
+oldest cached answer it used was cached. The server instructions tell the agent to give the user
+that as-of time when the data's age matters, as for sanctions or PEP status.
+
 ## The spec
 
 `upstream/openapi.yml`, which the codegen reads, is built, never edited by hand: `uv run poe

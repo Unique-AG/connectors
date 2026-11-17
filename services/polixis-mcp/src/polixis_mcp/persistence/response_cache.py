@@ -1,17 +1,38 @@
 import asyncio
+from datetime import datetime
+from datetime import UTC
 import logging
+
+from pydantic import AwareDatetime
+from pydantic import BaseModel
+from pydantic import ValidationError
 
 from polixis_mcp.persistence.persistence import Persistence
 
 _logger = logging.getLogger(__name__)
 
 
-async def cached_response(*, persistence: Persistence, key: str) -> dict[str, object] | None:
-    """None when the cache is off, as when nothing is cached under `key`."""
+class CachedResponse(BaseModel):
+    """A Polixis answer as the cache holds it, with when it was cached."""
+
+    cached_at: AwareDatetime
+    response: dict[str, object]
+
+
+async def cached_response(*, persistence: Persistence, key: str) -> CachedResponse | None:
+    """None when the cache is off, when nothing is cached under `key`, and for an entry cached
+    in an older form, which is then fetched again.
+    """
     cache = persistence.response_cache
     if not cache.enabled:
         return None
-    return await persistence.store.get(f"{cache.key_prefix}:{key}", collection=_COLLECTION)
+    entry = await persistence.store.get(f"{cache.key_prefix}:{key}", collection=_COLLECTION)
+    if entry is None:
+        return None
+    try:
+        return CachedResponse.model_validate(entry)
+    except ValidationError:
+        return None
 
 
 async def cache_response(
@@ -19,8 +40,12 @@ async def cache_response(
 ) -> None:
     cache = persistence.response_cache
     if cache.enabled:
+        entry = CachedResponse(cached_at=datetime.now(UTC), response=response)
         await persistence.store.put(
-            f"{cache.key_prefix}:{key}", response, collection=_COLLECTION, ttl=cache.ttl_seconds
+            f"{cache.key_prefix}:{key}",
+            entry.model_dump(mode="json"),
+            collection=_COLLECTION,
+            ttl=cache.ttl_seconds,
         )
 
 

@@ -1,4 +1,6 @@
 import asyncio
+from datetime import datetime
+from datetime import UTC
 from typing import override
 
 from fastmcp import Client
@@ -9,6 +11,7 @@ from pydantic import ValidationError
 import pytest
 
 from polixis_mcp import contexts
+from polixis_mcp.persistence import CachedResponse
 from polixis_mcp.persistence import cull_expired_entries_periodically
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.persistence import ResponseCacheSettings
@@ -105,7 +108,9 @@ async def test_a_cached_response_that_no_longer_fits_is_fetched_again(
     assert isinstance(store, FakeStore)
     [collection] = await store.collections()
     [key] = await store.keys(collection)
-    await store.put(key, {"roots": "not a list"}, collection=collection)
+    entry = await store.get(key, collection=collection)
+    assert entry is not None
+    await store.put(key, {**entry, "response": {"roots": "not a list"}}, collection=collection)
 
     refetched = await call_tool(
         mcp_client, "get_ultimate_beneficial_owners", owners, returns=contexts.OwnershipPage
@@ -325,3 +330,76 @@ async def test_a_failed_cache_read_asks_polixis(
 
     assert owners.entities
     assert "Could not read the Polixis response cache, asking Polixis" in caplog.messages
+
+
+_OWNER = "O00000000000000000000000000000100"
+
+
+async def _owners(client: McpClient) -> contexts.OwnershipPage:
+    return await call_tool(
+        client, "get_ultimate_beneficial_owners", {"pid": _OWNER}, returns=contexts.OwnershipPage
+    )
+
+
+async def test_a_result_straight_from_polixis_has_no_cached_at(mcp_client: McpClient) -> None:
+    before = datetime.now(UTC)
+
+    fresh = await _owners(mcp_client)
+
+    assert fresh.freshness.cached_at is None
+    assert before <= fresh.freshness.fetched_at <= datetime.now(UTC)
+
+
+async def test_a_result_from_the_cache_says_when_it_was_cached(mcp_client: McpClient) -> None:
+    before = datetime.now(UTC)
+    fresh = await _owners(mcp_client)
+
+    cached = await _owners(mcp_client)
+
+    assert cached.freshness.cached_at is not None
+    assert before <= cached.freshness.cached_at <= fresh.freshness.fetched_at
+    assert cached.freshness.fetched_at >= fresh.freshness.fetched_at
+
+
+async def test_profiles_report_the_cached_one_among_fresh_ones(mcp_client: McpClient) -> None:
+    cached_pid, fresh_pid = _OWNER, "O00000000000000000000000000000101"
+    await call_tool(
+        mcp_client, "get_entity_profiles", {"pids": [cached_pid]}, returns=contexts.EntityProfiles
+    )
+
+    both = await call_tool(
+        mcp_client,
+        "get_entity_profiles",
+        {"pids": [cached_pid, fresh_pid]},
+        returns=contexts.EntityProfiles,
+    )
+
+    assert both.freshness.cached_at is not None
+
+
+async def test_with_the_cache_off_no_result_has_a_cached_at(
+    upstream_settings: UpstreamSettings, upstream_transport: httpx2.MockTransport
+) -> None:
+    persistence = Persistence(store=FakeStore(), response_cache=fake_response_cache(enabled=False))
+    async with Client(build_server(upstream_settings, persistence, upstream_transport)) as client:
+        results = [await _owners(client) for _ in range(2)]
+
+    assert [result.freshness.cached_at for result in results] == [None, None]
+
+
+async def test_an_entry_cached_in_an_older_form_is_fetched_again(
+    mcp_client: McpClient, persistence: Persistence, upstream_requests: list[httpx2.Request]
+) -> None:
+    await _owners(mcp_client)
+    store = persistence.store
+    assert isinstance(store, FakeStore)
+    [collection] = await store.collections()
+    [key] = await store.keys(collection)
+    entry = await store.get(key, collection=collection)
+    assert entry is not None
+    await store.put(key, CachedResponse.model_validate(entry).response, collection=collection)
+
+    refetched = await _owners(mcp_client)
+
+    assert refetched.freshness.cached_at is None
+    assert len(_polixis_paths(upstream_requests)) == 2

@@ -10,12 +10,14 @@ from polixis_mcp.persistence.persistence import PersistenceSettings
 from polixis_mcp.persistence.persistence import ResponseCacheSettings
 from polixis_mcp.persistence.response_cache import cache_response
 from polixis_mcp.persistence.response_cache import cached_response
+from polixis_mcp.persistence.response_cache import CachedResponse
 from polixis_mcp.persistence.response_cache import cull_expired_entries_periodically
 from polixis_mcp.persistence.store import sign_in_store
 from polixis_mcp.persistence.store import Store
 from polixis_mcp.persistence.store import StoreSettings
 
 __all__ = [
+    "CachedResponse",
     "Persistence",
     "PersistenceSettings",
     "ResponseCacheSettings",

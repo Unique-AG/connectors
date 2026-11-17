@@ -1,6 +1,7 @@
 from collections.abc import Iterator
 
 from polixis_mcp.contexts.cached_calls import cached_call
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import node_name
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.ownership.get_ownership.inputs import OwnershipQuery
@@ -85,6 +86,7 @@ async def get_ownership(
             if next_offset is not None
             else None
         ),
+        freshness=freshness(),
     )
 
 

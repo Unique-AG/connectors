@@ -17,6 +17,7 @@ from mcp_observability import RateLimitMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import validate_trace_declarations
 
+from polixis_mcp.mcp.freshness_tracking import FreshnessTracking
 from polixis_mcp.mcp.spec_tool_errors import SpecToolErrors
 from polixis_mcp.persistence import cull_expired_entries_periodically
 from polixis_mcp.persistence import Persistence
@@ -38,7 +39,9 @@ INSTRUCTIONS = (
     "description starts with 'Computed by this MCP' is not sent by Polixis: this server derives "
     "it from Polixis's data as the description says, so say so when you report it and explain "
     "how from that description when asked. Every other field is Polixis's, renamed or "
-    "reformatted."
+    "reformatted. Every result's `freshness` says when it was put together and, in "
+    "`cached_at`, when the cached Polixis answer it used was cached: when that is set and the "
+    "age matters, as for sanctions or PEP status, tell the user the data is as of then."
 )
 
 
@@ -85,7 +88,12 @@ def create_server(
         lifespan=lifespan,
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting, SpecToolErrors()],
+        middleware=[
+            ToolCallObservabilityMiddleware(),
+            *rate_limiting,
+            SpecToolErrors(),
+            FreshnessTracking(),
+        ],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")

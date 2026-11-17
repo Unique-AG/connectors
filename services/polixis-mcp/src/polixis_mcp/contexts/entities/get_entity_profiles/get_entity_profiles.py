@@ -1,6 +1,7 @@
 import asyncio
 
 from polixis_mcp.contexts.cached_calls import cached_call
+from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.entities.get_entity_profiles.inputs import KEY_SECTIONS
 from polixis_mcp.contexts.entities.get_entity_profiles.inputs import ProfileSection
 from polixis_mcp.contexts.entities.get_entity_profiles.outputs import EntityProfile
@@ -46,7 +47,7 @@ async def get_entity_profiles(
             ]
     except* UpstreamError as errors:
         raise errors.exceptions[0] from None
-    return EntityProfiles(profiles=[lookup.result() for lookup in lookups])
+    return EntityProfiles(profiles=[lookup.result() for lookup in lookups], freshness=freshness())
 
 
 async def _profile(
