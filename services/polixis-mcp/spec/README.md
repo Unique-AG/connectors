@@ -42,7 +42,7 @@ schema or field shows up when you run the merge, not later in the codegen.
 | `_graph` | `NodeMeta` and `NodeMetaMap` typed, and used as the graphs' and trees' `meta` | Their spec leaves `meta` a free-form object |
 | | Notes on `alertNames`, `flags`, `allowedCtg`, `excludedCtg`, `sharePercent` and `totalNodes` | What the live values look like, and what is still unconfirmed |
 | | The ownership caps, and what the smart graph leaves out | From their PDF |
-| `_completion` | The completion response typed as `Profile`, with `SanctionRecord` and `Position` | Their spec leaves it a free-form object |
+| `_completion` | The completion response typed as `Profile`, with `SanctionRecord`, `Position` and the `images` URLs | Their spec leaves it a free-form object |
 | `_names` | The live values of a name record's `type` | |
 | `_permanent_id` | The pid statuses, and the 400, 410 and 500 responses | Seen live, and the 410 from their PDF |
 | | The operation's description, written for an agent | It is served as the `resolve_permanent_id` tool, and theirs describes the HTTP answers, not when to call it |

@@ -29,10 +29,11 @@ async def test_get_sanctions_exposure_gives_the_own_listings_and_the_nearest_par
             "listed_on": "2022-02-24",
         }
     ]
-    assert exposure.total_related == 2
+    assert exposure.total_related == 3
     assert [(party.pid, party.hops) for party in exposure.related] == [
         ("O00000000000000000000000000000900", 1),
         ("P00000000000000000000000000000400", 2),
+        (None, None),
     ]
     assert exposure.related[0].path[0].start_date == "2013-12-31"
     assert exposure.related[0].listings[0].listed_on == "2024-06-13"
@@ -63,7 +64,7 @@ async def test_get_sanctions_exposure_keeps_every_relation_on_the_path(
         ("reported shareholder", False),
         ("director", True),
     ]
-    assert rest.next_cursor is None
+    assert rest.next_cursor is not None
 
 
 async def test_get_sanctions_exposure_reports_an_id_polixis_rejects(
@@ -100,4 +101,27 @@ async def test_get_sanctions_exposure_leaves_the_distance_unknown_past_an_unname
     assert [(party.pid, party.hops) for party in exposure.related] == [
         ("P00000000000000000000000000000402", 1),
         ("P00000000000000000000000000000401", None),
+    ]
+
+
+async def test_get_sanctions_exposure_keeps_a_sanctioned_party_without_a_pid(
+    mcp_client: McpClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = [{"connection": {"role": "director"}, "sourceName": "Bo", "targetName": "Example Ltd"}]
+    monkeypatch.setattr(
+        polixis_responses,
+        "SANCTION_EXPOSURE",
+        {"relatedSanctions": [{"nameEn": "Unregistered Sample", "relationPaths": path}]},
+    )
+
+    exposure = await call_tool(
+        mcp_client,
+        "get_sanctions_exposure",
+        {"pid": "O00000000000000000000000000000100"},
+        returns=contexts.SanctionsExposurePage,
+    )
+
+    assert exposure.total_related == 1
+    assert [(party.pid, party.name, party.hops) for party in exposure.related] == [
+        (None, "Unregistered Sample", 1)
     ]

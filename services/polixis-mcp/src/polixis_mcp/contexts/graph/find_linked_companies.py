@@ -12,6 +12,7 @@ from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
+from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import RISK_COUNTS_DESCRIPTION
 from polixis_mcp.contexts.risks import risk_markers
@@ -47,6 +48,7 @@ async def find_linked_companies(
             found.company.pid,
         ),
     )
+    snapshot = snapshot_for(query, companies)
     page, next_offset = page_of(companies, offset=query.offset, size=query.page_size)
     return LinkedCompaniesPage(
         pid=query.pid,
@@ -57,7 +59,7 @@ async def find_linked_companies(
         truncated_by_polixis=network.truncated,
         companies=page,
         next_cursor=(
-            encode_cursor(query.model_copy(update={"offset": next_offset}))
+            encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
             else None
         ),

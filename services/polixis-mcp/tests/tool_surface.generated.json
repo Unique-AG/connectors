@@ -1416,7 +1416,8 @@
                   "alerts",
                   "sanction_statuses",
                   "sanctions",
-                  "positions"
+                  "positions",
+                  "images"
                 ],
                 "type": "string"
               },
@@ -1428,7 +1429,7 @@
             }
           ],
           "default": null,
-          "description": "The parts of each profile to return. Leave it out for the key identifiers: name records, identifiers, countries, dates, flags, alerts and sanction statuses. Ask for `sanctions` for each listing's programme, listing and delisting dates, reference number and designation details, and `positions` for the offices a PEP holds or held, with their institutions and dates."
+          "description": "The parts of each profile to return. Leave it out for the key identifiers: name records, identifiers, countries, dates, flags, alerts and sanction statuses. Ask for `sanctions` for each listing's programme, listing and delisting dates, reference number and designation details, `positions` for the offices a PEP holds or held, with their institutions and dates, and `images` for the photo or logo URLs."
         }
       },
       "required": [
@@ -1592,6 +1593,21 @@
                 ],
                 "default": null,
                 "description": "Identifiers by type, such as LEI, TIN or registration number."
+              },
+              "images": {
+                "anyOf": [
+                  {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Image URLs: photos for a person, logos for an organization. Licensed data about real people: show them, do not store them."
               },
               "legal_forms": {
                 "anyOf": [
@@ -2483,8 +2499,15 @@
                 "type": "array"
               },
               "pid": {
-                "description": "Its pid, for the other Polixis tools.",
-                "type": "string"
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its pid, for the other Polixis tools; null when Polixis gives none."
               }
             },
             "required": [

@@ -109,6 +109,7 @@ def _entity_profile(*, pid: str, profile: Profile, sections: set[ProfileSection]
             for position in profile.positions or []
             if position.position
         ],
+        images=unique(profile.images or []),
     )
     # Every section is mapped above, then the ones not asked for go back to None, so a
     # section Polixis left out reads as empty and one not requested as null.
@@ -132,4 +133,5 @@ _POLIXIS_FIELDS: dict[ProfileSection, str] = {
     "sanction_statuses": "sanctionStatuses",
     "sanctions": "sanctions",
     "positions": "positions",
+    "images": "images",
 }

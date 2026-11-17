@@ -471,6 +471,9 @@ class Profile(BaseModel):
         None, description="Sanction records per sanctions list."
     )
     positions: list[Position] | None = None
+    images: list[str] | None = Field(
+        None, description="Image URLs: photos for persons, logos for organizations."
+    )
     error: str | None = Field(
         None, description="Why Polixis rejected the request, sent with a 200 in place of the body."
     )

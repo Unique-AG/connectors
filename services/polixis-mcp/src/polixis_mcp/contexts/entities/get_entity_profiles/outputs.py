@@ -96,6 +96,11 @@ class EntityProfile(BaseModel):
     positions: list[PositionHeld] | None = Field(
         default=None, description="Public and political positions held, for a PEP."
     )
+    images: list[str] | None = Field(
+        default=None,
+        description="Image URLs: photos for a person, logos for an organization. Licensed data "
+        "about real people: show them, do not store them.",
+    )
 
 
 class EntityProfiles(BaseModel):

@@ -15,6 +15,7 @@ ProfileSection = Literal[
     "sanction_statuses",
     "sanctions",
     "positions",
+    "images",
 ]
 
 # What tells entities apart and screens them, without the long sections.

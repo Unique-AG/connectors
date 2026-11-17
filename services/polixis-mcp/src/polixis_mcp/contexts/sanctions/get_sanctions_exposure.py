@@ -9,6 +9,7 @@ from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
+from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import GET_SANCTION_EXPOSURE
 from polixis_mcp.upstream import GetSanctionExposurePath
@@ -36,16 +37,17 @@ async def get_sanctions_exposure(
         request=GetSanctionExposureRequest(path=GetSanctionExposurePath(id=query.pid)),
     )
     related = sorted(
-        (_related(party) for party in exposure.related_sanctions or [] if party.pid),
+        (_related(party) for party in exposure.related_sanctions or []),
         key=lambda party: (
             party.hops is None,
             party.hops or 0,
             not any(listing.status == "ACTIVE" for listing in party.listings),
             party.name is None,
             party.name or "",
-            party.pid,
+            party.pid or "",
         ),
     )
+    snapshot = snapshot_for(query, related)
     page, next_offset = page_of(related, offset=query.offset, size=query.page_size)
     return SanctionsExposurePage(
         pid=query.pid,
@@ -56,7 +58,7 @@ async def get_sanctions_exposure(
         total_related=len(related),
         related=page,
         next_cursor=(
-            encode_cursor(query.model_copy(update={"offset": next_offset}))
+            encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
             else None
         ),
@@ -66,7 +68,7 @@ async def get_sanctions_exposure(
 def _related(party: SanctionedParty) -> SanctionedRelatedParty:
     hops = party.relation_paths or []
     return SanctionedRelatedParty(
-        pid=party.pid or "",
+        pid=party.pid or None,
         name=party.name_en,
         countries=unique(code for codes in (party.countries or {}).values() for code in codes),
         listings=[
@@ -163,7 +165,9 @@ class SanctionPathLink(BaseModel):
 class SanctionedRelatedParty(BaseModel):
     """A sanctioned party related to the entity, and the relations that lead to it."""
 
-    pid: str = Field(description="Its pid, for the other Polixis tools.")
+    pid: str | None = Field(
+        description="Its pid, for the other Polixis tools; null when Polixis gives none."
+    )
     name: str | None = Field(description="Its English name.")
     countries: list[str] = Field(description="ISO 3166-1 alpha-2 codes it is tied to.")
     listings: list[Listing] = Field(description="Its records on sanctions lists.")

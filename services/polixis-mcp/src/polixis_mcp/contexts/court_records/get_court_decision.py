@@ -6,6 +6,7 @@ from polixis_mcp.contexts.court_records.decisions import fetch_decisions
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
+from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.pages import text_page
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
@@ -33,6 +34,7 @@ async def get_court_decision(
             "`find_court_decisions` on the same pid."
         )
     text = decision.record.content or ""
+    snapshot = snapshot_for(query, [text])
     part, next_offset = text_page(text, offset=query.offset)
     return CourtDecisionText(
         pid=query.pid,
@@ -44,7 +46,7 @@ async def get_court_decision(
         total_characters=len(text),
         text=part,
         next_cursor=(
-            encode_cursor(query.model_copy(update={"offset": next_offset}))
+            encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
             else None
         ),

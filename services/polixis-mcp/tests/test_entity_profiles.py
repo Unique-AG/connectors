@@ -178,3 +178,22 @@ async def test_get_entity_profiles_lists_the_names_under_every_key(
     )
 
     assert result.profiles[0].names == ["Anna Example", "Anna Beispiel", "Anna B."]
+
+
+async def test_get_entity_profiles_returns_the_image_urls_when_asked(
+    mcp_client: McpClient,
+    monkeypatch: pytest.MonkeyPatch,
+    upstream_requests: list[httpx2.Request],
+) -> None:
+    image = "https://images.example.com/anna.jpeg"
+    monkeypatch.setattr(polixis_responses, "PROFILE", {"images": [image, image]})
+
+    result = await call_tool(
+        mcp_client,
+        "get_entity_profiles",
+        {"pids": ["P00000000000000000000000000000200"], "sections": ["images"]},
+        returns=contexts.EntityProfiles,
+    )
+
+    assert json.loads(upstream_requests[-1].content) == {"fields": ["images"]}
+    assert result.profiles[0].images == [image]

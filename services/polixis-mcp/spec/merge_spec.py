@@ -487,6 +487,10 @@ def _completion() -> list[Edit]:
                         "description": "Sanction records per sanctions list.",
                     },
                     "positions": array(ref("Position")),
+                    "images": {
+                        **array(STRING),
+                        "description": "Image URLs: photos for persons, logos for organizations.",
+                    },
                     **REJECTION_FIELDS,
                 },
             },

@@ -1,7 +1,8 @@
 from base64 import urlsafe_b64decode
 from base64 import urlsafe_b64encode
 from binascii import Error as Base64Error
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+import hashlib
 from typing import Annotated, ClassVar
 
 from pydantic import BaseModel
@@ -84,11 +85,36 @@ def estimated_tokens(value: BaseModel) -> int:
     return len(value.model_dump_json().encode()) // 4
 
 
+def snapshot_for(query: PageQuery, rows: Iterable[BaseModel | str]) -> str:
+    """A digest of `rows`, the whole ranked result a cursor pages through, to put in the next
+    cursor. A cursor issued over other rows, as when the cached answer expired between two pages
+    and Polixis answered differently, would skip or repeat rows at its offset, so it fails.
+    """
+    digest = hashlib.sha256()
+    for row in rows:
+        digest.update((row if isinstance(row, str) else row.model_dump_json()).encode())
+        digest.update(b"\0")
+    snapshot = digest.hexdigest()[:16]
+    if query.snapshot is not None and query.snapshot != snapshot:
+        raise ResultChangedError(
+            "The result changed since the previous page, so this cursor would skip or repeat "
+            "rows. Call the tool again without it."
+        )
+    return snapshot
+
+
 class PageQuery(BaseModel):
     """What a paged tool needs to fetch one page. A cursor of another tool fails to decode."""
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid", frozen=True)
 
+    # Set in a cursor only: the digest of the rows its offset counts into.
+    snapshot: str | None = None
+
 
 class InvalidCursorError(Exception):
     """A cursor that no paged tool of this MCP returned, or one for another tool."""
+
+
+class ResultChangedError(Exception):
+    """A cursor's rows are not the ones the result has now; paging has to start again."""

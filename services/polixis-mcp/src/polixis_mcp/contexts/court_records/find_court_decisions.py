@@ -8,6 +8,7 @@ from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
+from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
@@ -31,6 +32,7 @@ async def find_court_decisions(
             key=lambda decision: (decision.subject != "entity", -_year(decision.record.year)),
         )
     ]
+    snapshot = snapshot_for(query, decisions)
     page, next_offset = page_of(decisions, offset=query.offset, size=query.page_size)
     return CourtDecisionsPage(
         pid=query.pid,
@@ -38,7 +40,7 @@ async def find_court_decisions(
         total_naming_entity=sum(1 for decision in decisions if decision.subject == "entity"),
         decisions=page,
         next_cursor=(
-            encode_cursor(query.model_copy(update={"offset": next_offset}))
+            encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
             else None
         ),

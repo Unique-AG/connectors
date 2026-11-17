@@ -11,6 +11,7 @@ from polixis_mcp.contexts.ownership.get_ownership.outputs import OwnershipFlag
 from polixis_mcp.contexts.ownership.get_ownership.outputs import OwnershipPage
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
+from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.risks import is_hidden_alert
 from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import risk_markers
@@ -68,6 +69,7 @@ async def get_ownership(
         ),
         key=lambda flag: "SANCTION" not in flag.risks,
     )
+    snapshot = snapshot_for(query, entities)
     page, next_offset = page_of(entities, offset=query.offset, size=query.page_size)
     return OwnershipPage(
         pid=query.pid,
@@ -79,7 +81,7 @@ async def get_ownership(
         flagged=flagged[:FLAGGED_SHOWN] if query.offset == 0 else [],
         entities=page,
         next_cursor=(
-            encode_cursor(query.model_copy(update={"offset": next_offset}))
+            encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
             else None
         ),

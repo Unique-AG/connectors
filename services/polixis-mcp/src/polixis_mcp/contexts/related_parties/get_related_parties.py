@@ -11,6 +11,7 @@ from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
+from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 from polixis_mcp.contexts.risks import visible_alert_texts
@@ -71,11 +72,14 @@ async def get_related_parties(
         ),
     )
     more_at_polixis = any(group.has_next for group in groups.values())
+    snapshot = snapshot_for(query, parties)
     page, next_offset = page_of(parties, offset=query.offset, size=query.page_size)
     if next_offset is not None:
-        next_query = query.model_copy(update={"offset": next_offset})
+        next_query = query.model_copy(update={"offset": next_offset, "snapshot": snapshot})
     elif more_at_polixis:
-        next_query = query.model_copy(update={"polixis_page": query.polixis_page + 1, "offset": 0})
+        next_query = query.model_copy(
+            update={"polixis_page": query.polixis_page + 1, "offset": 0, "snapshot": None}
+        )
     else:
         next_query = None
     return RelatedPartiesPage(

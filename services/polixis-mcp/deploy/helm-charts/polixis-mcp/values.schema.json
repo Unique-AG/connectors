@@ -2198,7 +2198,7 @@
           "properties": {
             "baseUrl": {
               "type": "string",
-              "pattern": "^(https?://.+)?$",
+              "pattern": "^(https://[^/?#@\\s]+/?)?$",
               "description": "MCP_BASE_URL. The public https origin, without the MCP path. Must match routes.hostname."
             }
           },

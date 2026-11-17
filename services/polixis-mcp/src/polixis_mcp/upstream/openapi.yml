@@ -1508,6 +1508,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Position'
+        images:
+          type: array
+          items:
+            type: string
+          description: 'Image URLs: photos for persons, logos for organizations.'
         error:
           $ref: '#/components/schemas/RejectionMessage'
         code:

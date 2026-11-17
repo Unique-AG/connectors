@@ -261,3 +261,22 @@ async def test_ownership_keeps_apart_two_owners_without_an_id_on_the_way_to_one_
     assert [
         (entity.pid, entity.effective_share_percent, entity.chains) for entity in page.entities
     ] == [("P00000000000000000000000000000700", 50.0, 2)]
+
+
+async def test_ownership_refuses_a_cursor_issued_over_other_rows(mcp_client: McpClient) -> None:
+    stale = encode_cursor(
+        contexts.OwnershipQuery(
+            pid="O00000000000000000000000000000100",
+            direction="owners",
+            page_size=1,
+            offset=1,
+            snapshot="0000000000000000",
+        )
+    )
+
+    error = await tool_error(mcp_client, "get_ultimate_beneficial_owners", {"cursor": stale})
+
+    assert error == (
+        "The result changed since the previous page, so this cursor would skip or repeat rows. "
+        "Call the tool again without it."
+    )
