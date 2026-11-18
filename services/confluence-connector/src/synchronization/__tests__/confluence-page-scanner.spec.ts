@@ -287,6 +287,46 @@ describe('ConfluencePageScanner', () => {
     );
   });
 
+  it('excludes folders and keeps the pages inside them', async () => {
+    const parent = makePage('parent', { labels: ['ai-ingest-all'] });
+    const folder = makePage('folder', { type: ContentType.FOLDER });
+    const pageInFolder = makePage('page-in-folder');
+
+    const apiClient = {
+      searchPagesByLabel: vi.fn().mockResolvedValue([parent]),
+      getDescendantPages: vi.fn().mockResolvedValue([folder, pageInFolder]),
+      buildPageWebUrl: vi.fn(
+        (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
+      ),
+      buildAttachmentWebUrl: vi.fn(),
+    };
+
+    const scanner = createScanner(apiClient);
+    const result = await scanner.discoverPages();
+
+    expect(result.pages.map((page) => page.id)).toEqual(['parent', 'page-in-folder']);
+  });
+
+  it('expands descendants of a folder labeled for ingest-all', async () => {
+    const folder = makePage('folder', { type: ContentType.FOLDER, labels: ['ai-ingest-all'] });
+    const pageInFolder = makePage('page-in-folder');
+
+    const apiClient = {
+      searchPagesByLabel: vi.fn().mockResolvedValue([folder]),
+      getDescendantPages: vi.fn().mockResolvedValue([pageInFolder]),
+      buildPageWebUrl: vi.fn(
+        (page: ConfluencePage) => `https://confluence.example.com/wiki/${page.id}`,
+      ),
+      buildAttachmentWebUrl: vi.fn(),
+    };
+
+    const scanner = createScanner(apiClient);
+    const result = await scanner.discoverPages();
+
+    expect(result.pages.map((page) => page.id)).toEqual(['page-in-folder']);
+    expect(apiClient.getDescendantPages).toHaveBeenCalledWith(['folder']);
+  });
+
   it('honors maxItemsToScan limit during descendant expansion', async () => {
     const parent = makePage('parent', { labels: ['ai-ingest-all'] });
     const child = makePage('child', { labels: ['engineering'] });

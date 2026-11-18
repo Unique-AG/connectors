@@ -43,6 +43,7 @@ export class ConfluenceSynchronizationService {
 
     tenant.isScanning = true;
     const startTime = Date.now();
+    this.metrics.recordSyncStart();
     let syncResult: 'success' | 'failure' = 'success';
 
     try {
@@ -145,7 +146,7 @@ export class ConfluenceSynchronizationService {
     } finally {
       tenant.isScanning = false;
       this.metrics.setSyncPhase(SyncPhase.Idle);
-      this.metrics.recordSyncDuration(elapsedSeconds(startTime), syncResult);
+      this.metrics.recordSyncResult(elapsedSeconds(startTime), syncResult);
     }
   }
 

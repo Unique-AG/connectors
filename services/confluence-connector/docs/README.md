@@ -78,7 +78,7 @@ When inlining is enabled, image attachments are not ingested as standalone artif
 
 **Skipped Content Types**
 
-Content types `database`, `whiteboard`, and `embed` are explicitly skipped (no body available via API). Folders are not explicitly skipped but have no body, so they are excluded during ingestion. In both cases, descendants (such as sub-pages under a database or folder) are still discovered and ingested. Live Docs pass through as regular pages. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full breakdown by platform.
+Content types `database`, `whiteboard`, `embed`, and `folder` are skipped during discovery because they have no body to ingest. Their descendants (such as sub-pages under a database or folder) are still discovered and ingested. Live Docs pass through as regular pages. See the [Content Type Ingestion Map](./technical/flows.md#Content-Type-Ingestion-Map) for the full breakdown by platform.
 
 **Scope Management**
 
@@ -235,7 +235,7 @@ See [Technical Reference](./technical/README.md) for detailed architecture and f
 
 - Real-time synchronization (periodic scanning only)
 - Permission synchronization (content sync only)
-- Confluence databases, whiteboards, and embeds (these content types are automatically skipped)
+- Confluence databases, whiteboards, embeds, and folders (these content types are automatically skipped)
 - Hierarchical scope structure (all pages from a space are placed in a single flat scope; sub-scopes mirroring the Confluence page tree are not created)
 
 ### Considerations

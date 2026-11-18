@@ -287,7 +287,7 @@ describe('TenantDeleteService', () => {
   it('records cleanup metrics on success', async () => {
     const client = createMockUniqueApiClient();
     const metrics = createNoopMetrics();
-    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupResult');
     const contentSpy = vi.spyOn(metrics, 'recordCleanupContentDeleted');
     const scopesSpy = vi.spyOn(metrics, 'recordCleanupScopesDeleted');
 
@@ -352,7 +352,7 @@ describe('TenantDeleteService', () => {
   it('records cleanup duration with failure when an API call throws', async () => {
     const client = createMockUniqueApiClient();
     const metrics = createNoopMetrics();
-    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupResult');
 
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockRejectedValue(new Error('API down'));
@@ -369,7 +369,7 @@ describe('TenantDeleteService', () => {
   it('does not record cleanup duration for no-op early returns', async () => {
     const client = createMockUniqueApiClient();
     const metrics = createNoopMetrics();
-    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupResult');
 
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root', externalId: null });
 
@@ -463,7 +463,7 @@ describe('TenantDeleteService', () => {
   it('records cleanup duration as failure when any sub-operation failed', async () => {
     const client = createMockUniqueApiClient();
     const metrics = createNoopMetrics();
-    const durationSpy = vi.spyOn(metrics, 'recordCleanupDuration');
+    const durationSpy = vi.spyOn(metrics, 'recordCleanupResult');
 
     client.scopes.getById.mockResolvedValue({ id: 'scope-1', name: 'root' });
     client.scopes.listChildren.mockResolvedValue([

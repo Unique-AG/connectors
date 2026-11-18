@@ -1,6 +1,8 @@
 import { Readable } from 'node:stream';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import type { ConfluenceConfig } from '../../config';
+import { HttpStatusError } from '../../utils/http-util';
 import type { RateLimitedHttpClient } from '../../utils/rate-limited-http-client';
 import { DataCenterConfluenceApiClient } from '../data-center-api-client';
 import { type ConfluencePage, ContentType } from '../types/confluence-api.types';
@@ -196,39 +198,31 @@ describe('DataCenterConfluenceApiClient', () => {
       expect(result).toEqual(page);
     });
 
-    it('returns null for null response', async () => {
-      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(null);
+    it('returns null when Confluence responds with 404', async () => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockRejectedValueOnce(
+        new HttpStatusError(404, 'Error response from url: 404'),
+      );
 
       const result = await client.getPageById('1');
 
       expect(result).toBeNull();
     });
 
-    it('returns null for undefined response', async () => {
-      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(undefined);
+    it('rethrows other HTTP errors', async () => {
+      const serverError = new HttpStatusError(500, 'Error response from url: 500');
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockRejectedValueOnce(serverError);
 
-      const result = await client.getPageById('1');
-
-      expect(result).toBeNull();
+      await expect(client.getPageById('1')).rejects.toBe(serverError);
     });
 
-    it('returns null for non-object response', async () => {
-      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce('not-an-object');
+    it.each([
+      ['null', null],
+      ['a non-object', 'not-an-object'],
+      ['an object without the page fields', { id: 123, title: 'P' }],
+    ])('throws a ZodError when the response is %s', async (_description, response) => {
+      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce(response);
 
-      const result = await client.getPageById('1');
-
-      expect(result).toBeNull();
-    });
-
-    it('returns null when id is not a string', async () => {
-      vi.mocked(mockHttpClient.rateLimitedRequest).mockResolvedValueOnce({
-        id: 123,
-        title: 'P',
-      });
-
-      const result = await client.getPageById('1');
-
-      expect(result).toBeNull();
+      await expect(client.getPageById('1')).rejects.toBeInstanceOf(ZodError);
     });
   });
 

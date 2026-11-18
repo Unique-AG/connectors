@@ -36,9 +36,7 @@ describe('failure isolation', () => {
     ctx = undefined;
   });
 
-  // One page failing to load from Confluence must not stop the whole sync.
-  // ConfluenceContentFetcher catches the error and returns null, so the page is
-  // skipped and the rest keep going.
+  // One failing page must not stop the sync. It counts as failed.
   it('continues syncing other pages when one page fails to fetch from Confluence', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { confluence } = ctx;
@@ -49,6 +47,7 @@ describe('failure isolation', () => {
       }
       return fetchPage(pageId);
     });
+    const recordPagesProcessed = vi.spyOn(ctx.metrics, 'recordPagesProcessed');
 
     const result = await ctx.runSync();
 
@@ -57,11 +56,14 @@ describe('failure isolation', () => {
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
     expectNotIngested(state, { pages: ['tenant1/space-1_SP/p2'] });
+    expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
+    expect(recordPagesProcessed).not.toHaveBeenCalledWith(1, 'skipped');
   });
 
-  // When Unique rejects registerContent for one page, IngestionService catches
-  // it and moves on. The failure happens before a contentId is assigned, so
-  // there is nothing to clean up and the other pages still ingest.
+  // When Unique rejects registerContent for one page, IngestionService rethrows
+  // and the sync counts that page as failed. The failure happens before a
+  // contentId is assigned, so there is nothing to clean up and the other pages
+  // still ingest.
   it('continues syncing when Unique rejects registerContent for one page', async () => {
     ctx = buildScenarioContext(threePagesOneSpaceScenario);
     const { ingestion } = ctx.unique;
@@ -72,10 +74,16 @@ describe('failure isolation', () => {
       }
       return registerContent(request);
     });
+    const recordPagesProcessed = vi.spyOn(ctx.metrics, 'recordPagesProcessed');
 
     const result = await ctx.runSync();
 
     expect(result).toEqual({ status: 'success' });
+    expect(recordPagesProcessed).toHaveBeenCalledTimes(3);
+    expect(recordPagesProcessed).toHaveBeenCalledWith(1, 'failure');
+    expect(
+      recordPagesProcessed.mock.calls.filter(([, result]) => result === 'success'),
+    ).toHaveLength(2);
 
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1', 'tenant1/space-1_SP/p3'] });
@@ -93,10 +101,12 @@ describe('failure isolation', () => {
     vi.spyOn(ctx.confluence, 'getAttachmentDownloadStream').mockRejectedValue(
       new Error('Network blip during attachment download'),
     );
+    const recordAttachmentsProcessed = vi.spyOn(ctx.metrics, 'recordAttachmentsProcessed');
 
     const result = await ctx.runSync();
 
     expect(result).toEqual({ status: 'success' });
+    expect(recordAttachmentsProcessed).toHaveBeenCalledExactlyOnceWith(1, 'failure');
 
     const state = getUniqueState(ctx.unique);
     expectIngested(state, { pages: ['tenant1/space-1_SP/p1'] });
