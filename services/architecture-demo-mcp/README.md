@@ -31,7 +31,7 @@ Everything else is what the scaffold wrote, owned by this service like any other
 | `UPSTREAM_API_KEY` | The Tiingo API token, sent as `Authorization: Token <key>` |
 | `DATABASE_URL` | Postgres, `postgresql://user:password@host:5432/db`. The chart injects it |
 | `REDIS_URL` | Redis, `redis://host:6379/0`: the price cache and the sign-in state |
-| `ZITADEL_BASE_URL`, `ZITADEL_CLIENT_ID`, `ZITADEL_JWT_SIGNING_KEY` | The Zitadel instance, its PKCE client, and the key that signs the MCP's tokens (32 characters or more) |
+| `ZITADEL_BASE_URL`, `ZITADEL_CLIENT_ID`, `ZITADEL_JWT_SIGNING_KEY` | The Zitadel instance, its PKCE client (with the Refresh Token grant ticked, or the session ends when the access token expires), and the key that signs the MCP's tokens (32 characters or more) |
 | `MCP_AUTH_MODE` | `zitadel` (default) or `none`. Without sign-in the server only binds to loopback and every caller owns the same portfolios |
 
 ## Run it locally
