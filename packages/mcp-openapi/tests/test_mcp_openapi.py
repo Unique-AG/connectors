@@ -166,6 +166,18 @@ def test_call_untyped_builds_the_request_from_the_spec() -> None:
     assert request.headers["authorization"] == "Token k"
 
 
+def test_call_untyped_sends_the_length_of_the_empty_body_it_adds() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, json={})
+
+    asyncio.run(api(handler).call_untyped(Operation("patchThing", OBJECT), name="a"))
+
+    assert (seen[0].content, seen[0].headers["content-length"]) == (b"{}", "2")
+
+
 def test_only_listed_headers_leave_and_fixed_ones_are_set() -> None:
     request = httpx2.Request(
         "GET",
@@ -343,6 +355,42 @@ def test_call_raw_rejects_anything_but_a_path(path: str) -> None:
     client = api(lambda _: httpx2.Response(200, json={"value": 1}))
     with pytest.raises(ValueError, match="is not a path"):
         asyncio.run(client.call_raw("GET", path, TypeAdapter(Row)))
+
+
+def reject_zero(response: object) -> None:
+    """Fails a 200 whose rows hold a 0, the way an upstream with an error body would."""
+    if isinstance(response, list) and Row(value=0) in response:
+        raise UpstreamError("The upstream answered with an error body")
+
+
+class GetThingsRequest(BaseModel):
+    """`getThings` takes no parameters."""
+
+
+GET_THINGS = Operation[list[Row], GetThingsRequest]("getThings", ROWS)
+
+
+def checked_api(body: object) -> OperationClient:
+    http = httpx2.AsyncClient(
+        base_url="https://upstream.example",
+        transport=httpx2.MockTransport(lambda _: httpx2.Response(200, json=body)),
+    )
+    return OperationClient(load_spec(SPEC), http, response_check=reject_zero)
+
+
+def test_the_client_checks_every_response_it_parses() -> None:
+    client = checked_api([{"value": 0}])
+    with pytest.raises(UpstreamError, match="error body"):
+        asyncio.run(client.call(GET_THINGS, GetThingsRequest()))
+    with pytest.raises(UpstreamError, match="error body"):
+        asyncio.run(client.call_untyped(Operation("getThings", ROWS)))
+    with pytest.raises(UpstreamError, match="error body"):
+        asyncio.run(client.call_raw("GET", "/hidden", ROWS))
+
+
+def test_a_response_the_check_accepts_is_returned() -> None:
+    client = checked_api([{"value": 1}])
+    assert asyncio.run(client.call_raw("GET", "/hidden", ROWS)) == [Row(value=1)]
 
 
 RETRY_AFTER = RetryAfterPolicy()
@@ -1329,6 +1377,17 @@ def test_a_timeout_is_an_upstream_error() -> None:
         raise httpx2.ReadTimeout("timed out", request=request)
 
     with pytest.raises(UpstreamError, match="timed out"):
+        asyncio.run(api(handler).call_untyped(Operation("getThings", ROWS)))
+
+
+def test_a_request_without_a_free_connection_says_so() -> None:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        raise httpx2.PoolTimeout("", request=request)
+
+    with pytest.raises(
+        UpstreamError,
+        match=r"^No free connection to the upstream for GET https://upstream\.example/",
+    ):
         asyncio.run(api(handler).call_untyped(Operation("getThings", ROWS)))
 
 

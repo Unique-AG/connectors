@@ -76,7 +76,8 @@ async def get_ogs_updates(
                 new_results=_count(counts=item.watchlist_results, updated=False),
                 updated_results=_count(counts=item.watchlist_results, updated=True),
             )
-            for item in found.results
+            for item in found.results or []
+            if item.case_system_id
         ],
         next_page=next_page(found.pagination),
     )

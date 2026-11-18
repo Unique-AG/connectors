@@ -144,20 +144,22 @@ prometheus:
     ConfluenceConnectorUniqueAPIErrors:
       alert: ConfluenceConnectorUniqueAPIErrors
       annotations:
-        summary: "Confluence Connector Unique REST API errors detected"
-        description: "The Confluence Connector is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        summary: "Confluence Connector Unique API errors detected"
+        description: "More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ humanizePercentage $value }}."
         runbook: |
           1. Inspect application logs for specific error messages
           2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
+      # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
+      # A new error series is missed by increase() until its second error. A failing sync is
+      # caught on the first failure by ConfluenceConnectorSyncFailing.
       expr: |
-        (
-          sum(rate(cfc_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
-          /
-          sum(rate(cfc_unique_rest_api_request_duration_seconds_count[5m]))
-        ) > 0.01
-      for: 30s
+        sum by (namespace) (increase(confluence_connector_unique_api_requests_total{result="error"}[75m]))
+        /
+        sum by (namespace) (increase(confluence_connector_unique_api_requests_total[75m]))
+        > 0.01
+      for: 5m
       labels:
         severity: warning
         alertGroup: confluence-connector

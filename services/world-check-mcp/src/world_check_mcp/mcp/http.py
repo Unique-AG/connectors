@@ -46,7 +46,9 @@ class _HttpOptions(TypedDict):
 def _http_options(mcp: FastMCP, settings: ServerSettings) -> _HttpOptions:
     return {
         "path": "/mcp",
-        "stateless_http": True,
+        # `ctx.elicit()` for 2025-06-18 and 2025-11-25 clients sends its form on the session's GET
+        # stream, which a stateless server does not have.
+        "stateless_http": False,
         # The guard in http_middleware replaces it, so the ops routes can skip it.
         "host_origin_protection": False,
         "middleware": http_middleware(mcp, settings),

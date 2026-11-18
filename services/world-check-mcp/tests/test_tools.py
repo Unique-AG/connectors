@@ -1,4 +1,10 @@
+import asyncio
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from datetime import date
+from datetime import timedelta
 import json
+import socket
 from typing import cast
 
 from fastmcp import Client
@@ -7,13 +13,19 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
 from key_value.aio.stores.memory import MemoryStore
+from mcp.client import session
 from mcp.shared.exceptions import MCPError
+from mcp_configs import ServerSettings
 from mcp_types import ElicitResult
+from pydantic import AnyHttpUrl
 from pydantic import TypeAdapter
 import pytest
+import uvicorn
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.mcp import http_app
+from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
 
 
@@ -104,7 +116,13 @@ def _template(group_id: str, providers: list[str], *, required: bool) -> httpx2.
                                 "fieldValueType": "COUNTRY",
                                 "label": "NATIONALITY",
                                 "fieldRequired": required,
-                            }
+                            },
+                            {
+                                "typeId": "SFCT_3",
+                                "fieldValueType": "DATE",
+                                "label": "DATE_OF_BIRTH",
+                                "fieldRequired": False,
+                            },
                         ]
                     }
                 }
@@ -216,12 +234,35 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         return _json(200, {"id": "g1", "name": "KYC"})
     if "/references/cases/" in path and path.endswith("ext-1"):
         return _json(200, {"caseId": "ext-1", "caseSystemId": _ext_1_maps_to[-1]})
+    if "/references/cases/" in path and path.endswith("ext-nosys"):
+        return _json(200, {"caseId": "ext-nosys", "caseSystemId": "sys-nosys"})
+    if path.endswith("/cases/ext-nosys"):
+        return httpx2.Response(404)
+    if path.endswith("/cases/sys-nosys"):
+        return _json(
+            200,
+            {
+                "caseId": "ext-nosys",
+                "name": "Ada Lovelace",
+                "entityType": "INDIVIDUAL",
+                "groupId": "g1",
+                "providerTypes": [],
+            },
+        )
     if path.endswith("/cases/ext-1"):
         return httpx2.Response(404)
     if path.endswith("/cases/media-1"):
         return _case("media-1", ["MEDIA_CHECK"])
     if path.endswith("/cases/fail-1"):
         return _case("fail-1", ["WATCHLIST"])
+    if path.endswith("/cases/empty-failures-1"):
+        return _case("empty-failures-1", ["WATCHLIST"])
+    if path.endswith("/cases/summary-failed-1"):
+        return _case("summary-failed-1", ["WATCHLIST"])
+    if path.endswith("/cases/no-cases-1"):
+        return _case("no-cases-1", ["WATCHLIST"])
+    if path.endswith("/cases/other-failed-1"):
+        return _case("other-failed-1", ["WATCHLIST"])
     if request.method == "GET" and path.endswith("/cases/sys-pass"):
         return _json(
             200,
@@ -413,7 +454,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             )
         assert providers == ["WATCHLIST"]
         assert body["caseScreeningState"] == {"WATCHLIST": "INITIAL"}
-        assert body["secondaryFields"] == [{"typeId": "SFCT_2", "value": "GBR"}]
+        assert {"typeId": "SFCT_2", "value": "GBR"} in cast(list[object], body["secondaryFields"])
         return _json(
             200,
             _screened(
@@ -456,6 +497,31 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                     ],
                 },
             )
+        if body["caseSystemIds"] == ["empty-failures-1"]:
+            return _json(
+                200,
+                {"summary": {"totalCases": 1, "success": 1, "failed": 0}, "failedCases": []},
+            )
+        if body["caseSystemIds"] == ["summary-failed-1"]:
+            return _json(
+                200,
+                {"summary": {"totalCases": 1, "success": 0, "failed": 1}, "failedCases": []},
+            )
+        if body["caseSystemIds"] == ["no-cases-1"]:
+            return _json(200, {"summary": {"totalCases": 0, "failed": 0}})
+        if body["caseSystemIds"] == ["other-failed-1"]:
+            return _json(
+                200,
+                {
+                    "summary": {"totalCases": 1, "success": 1, "failed": 0},
+                    "failedCases": [
+                        {
+                            "caseSystemId": "someone-else",
+                            "errors": [{"code": "DENIED", "message": "Not this case."}],
+                        }
+                    ],
+                },
+            )
         return httpx2.Response(204)
     if path.endswith("/cases/ongoing-screening-updates"):
         body = _body(request)
@@ -484,13 +550,14 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "sort": [{"columnName": "updateDate", "order": "ASCENDING"}],
                 "totalResultCount": 1,
                 "results": [
+                    {"caseId": "ext-0", "groupId": "g1", "updateDate": "2026-10-22T06:40:00Z"},
                     {
                         "caseSystemId": "sys-1",
                         "caseId": "ext-1",
                         "groupId": "g1",
                         "updateDate": "2026-10-22T06:47:00Z",
                         "watchlistResults": {"numberOfNewResults": 1, "numberOfUpdatedResults": 0},
-                    }
+                    },
                 ],
                 "pagination": {"pageReferences": {"next": "page-2"}},
             },
@@ -506,7 +573,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
 def _server() -> FastMCP:
     return build_server(
         fake_upstream_settings(),
-        Persistence(store=MemoryStore()),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
         httpx2.MockTransport(_world_check),
     )
 
@@ -538,6 +605,15 @@ async def test_get_case_resolves_an_external_id_after_the_internal_lookup_misses
     assert details is not None
     assert details["case_system_id"] == "sys-1"
     assert details["name"] == "Ada Lovelace"
+
+
+async def test_get_case_falls_back_to_the_resolved_system_id_when_upstream_omits_it() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case", {"case": "ext-nosys"})
+
+    details = result.structured_content
+    assert details is not None
+    assert details["case_system_id"] == "sys-nosys"
 
 
 async def test_get_case_reference_returns_the_internal_id() -> None:
@@ -671,6 +747,55 @@ async def test_screen_entity_persists_a_watchlist_case_and_truncates_matches() -
     assert outcome["passport_matches"] == []
 
 
+@pytest.mark.parametrize("days_from_today", [-1, 0])
+async def test_screen_entity_accepts_a_dob_up_to_today(days_from_today: int) -> None:
+    born = (date.today() + timedelta(days=days_from_today)).isoformat()
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+                "dob": born,
+            },
+        )
+
+    assert result.structured_content is not None
+
+
+async def test_screen_entity_refuses_a_future_dob() -> None:
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "nationality": "GBR",
+                    "dob": tomorrow,
+                },
+            )
+
+
+async def test_screen_entity_refuses_a_malformed_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="String should match pattern"):
+            await client.call_tool(
+                "screen_entity",
+                {
+                    "name": "Ada Lovelace",
+                    "entity_type": "INDIVIDUAL",
+                    "group_id": "g-screen",
+                    "case_id": "a//b",
+                    "nationality": "GBR",
+                },
+            )
+
+
 async def test_screen_entity_refuses_an_existing_case_id() -> None:
     async with Client(_server()) as client:
         with pytest.raises(ToolError, match="already exists"):
@@ -736,6 +861,48 @@ async def test_enable_ongoing_screening_treats_an_empty_response_as_enabled() ->
     assert screening["provider_type"] == "WATCHLIST"
 
 
+async def test_enable_ongoing_screening_treats_an_empty_failed_cases_list_as_enabled() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "empty-failures-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is True
+    assert screening["failures"] == []
+
+
+async def test_enable_ongoing_screening_reports_failure_for_a_failure_of_another_case() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "other-failed-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["Not this case."]
+
+
+async def test_enable_ongoing_screening_reports_failure_when_the_summary_counts_no_cases() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "no-cases-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["LSEG did not enable monitoring."]
+
+
+async def test_enable_ongoing_screening_reports_failure_when_the_summary_rules_out_success() -> (
+    None
+):
+    async with Client(_server()) as client:
+        result = await client.call_tool("enable_ongoing_screening", {"case": "summary-failed-1"})
+
+    screening = result.structured_content
+    assert screening is not None
+    assert screening["enabled"] is False
+    assert screening["failures"] == ["LSEG did not enable monitoring."]
+
+
 async def test_enable_ongoing_screening_reports_a_failure_body() -> None:
     async with Client(_server()) as client:
         result = await client.call_tool("enable_ongoing_screening", {"case": "fail-1"})
@@ -759,6 +926,8 @@ async def test_get_ogs_updates_returns_watchlist_counts() -> None:
 
     page = result.structured_content
     assert page is not None
+    updates = cast(list[dict[str, object]], page["updates"])
+    assert [update["case_system_id"] for update in updates] == ["sys-1"]
     assert page["updates"][0]["new_results"] == 1
     assert page["next_page"] == "page-2"
     assert page["window"]["until"] == "2026-10-22T00:00:00Z"
@@ -838,6 +1007,40 @@ async def test_passport_check_refuses_an_existing_case_id() -> None:
             await client.call_tool(
                 "passport_check",
                 {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "ext-1"},
+            )
+
+
+@pytest.mark.parametrize("days_from_today", [-1, 0])
+async def test_passport_check_accepts_a_date_of_birth_up_to_today(days_from_today: int) -> None:
+    born = (date.today() + timedelta(days=days_from_today)).isoformat()
+    async with Client(_server()) as client:
+        result = await client.call_tool(
+            "passport_check",
+            {"passport": {**_PASSPORT, "date_of_birth": born}, "group_id": "g-passport"},
+        )
+
+    assert result.structured_content is not None
+
+
+async def test_passport_check_refuses_a_future_date_of_birth() -> None:
+    tomorrow = (date.today() + timedelta(days=1)).isoformat()
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="Date of birth cannot be in the future"):
+            await client.call_tool(
+                "passport_check",
+                {
+                    "passport": {**_PASSPORT, "date_of_birth": tomorrow},
+                    "group_id": "g-passport",
+                },
+            )
+
+
+async def test_passport_check_refuses_a_malformed_case_id() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="String should match pattern"):
+            await client.call_tool(
+                "passport_check",
+                {"passport": _PASSPORT, "group_id": "g-passport", "case_id": "/a"},
             )
 
 
@@ -943,6 +1146,44 @@ async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_afte
 
     _ext_1_maps_to[:] = ["sys-1"]
     assert _writes == []
+
+
+async def test_resolve_result_refuses_an_overlapping_approved_write_on_one_case() -> None:
+    _writes.clear()
+    first_write_arrived = asyncio.Event()
+    release_first_write = asyncio.Event()
+
+    async def held_first_write(request: httpx2.Request) -> httpx2.Response:
+        if request.method == "PUT":
+            first_write_arrived.set()
+            await release_first_write.wait()
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(held_first_write),
+    )
+    arguments = {"case": "sys-1", "result_id": "r1", "status": "POSITIVE", "risk": "High"}
+
+    async with (
+        asyncio.timeout(10),
+        Client(server, elicitation_handler=_approve) as first,
+        Client(server, elicitation_handler=_approve) as second,
+    ):
+        first_call = asyncio.create_task(first.call_tool("resolve_result", arguments))
+        arrived = asyncio.create_task(first_write_arrived.wait())
+        try:
+            await asyncio.wait({first_call, arrived}, return_when=asyncio.FIRST_COMPLETED)
+            assert first_write_arrived.is_set(), "the first call ended before it wrote"
+            with pytest.raises(ToolError, match="Another decision on this case is being saved"):
+                await second.call_tool("resolve_result", arguments)
+        finally:
+            release_first_write.set()
+            arrived.cancel()
+        await first_call
+
+    assert len(_writes) == 1
 
 
 async def test_resolve_result_decline_does_not_write() -> None:
@@ -1051,3 +1292,56 @@ async def test_get_ogs_updates_rejects_a_future_end() -> None:
                 "get_ogs_updates",
                 {"since": "2026-10-20T00:00:00Z", "until": "2999-01-01T00:00:00Z"},
             )
+
+
+@asynccontextmanager
+async def _serve_over_http(server: FastMCP) -> AsyncGenerator[str]:
+    with socket.socket() as reserved:
+        reserved.bind(("127.0.0.1", 0))
+        port = cast(int, reserved.getsockname()[1])
+        settings = ServerSettings(
+            host="127.0.0.1",
+            port=port,
+            mcp_base_url=AnyHttpUrl(f"http://127.0.0.1:{port}"),
+            mcp_allowed_origins=[],
+        )
+        config = uvicorn.Config(http_app(server, settings), log_config=None)
+        http_server = uvicorn.Server(config)
+
+        async def serve() -> None:
+            try:
+                await http_server.serve(sockets=[reserved])
+            except SystemExit as error:
+                raise RuntimeError("the server exited during startup") from error
+
+        serving = asyncio.create_task(serve())
+        try:
+            async with asyncio.timeout(10):
+                while not http_server.started and not serving.done():
+                    await asyncio.sleep(0.01)
+            assert http_server.started, "the server stopped before it started"
+            yield f"http://127.0.0.1:{port}/mcp"
+        finally:
+            http_server.should_exit = True
+            await asyncio.gather(serving, return_exceptions=True)
+
+
+@pytest.mark.parametrize("protocol_version", ["2025-06-18", "2025-11-25"])
+async def test_verify_passport_check_saves_after_approval_over_http(
+    protocol_version: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _writes.clear()
+    monkeypatch.setattr(session, "LATEST_HANDSHAKE_VERSION", protocol_version)
+    async with (
+        _serve_over_http(_server()) as url,
+        Client(url, mode="legacy", elicitation_handler=_approve) as client,
+    ):
+        assert client.protocol_version == protocol_version
+        result = await client.call_tool(
+            "verify_passport_check", {"case": "sys-pass", "mrz_matched": True}
+        )
+
+    saved = result.structured_content
+    assert saved is not None
+    assert saved["recorded"] is True
+    assert len(_writes) == 1

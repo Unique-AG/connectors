@@ -80,6 +80,11 @@ jobs:
         working-directory: ${{ env.SERVICE_PATH }}
         run: pnpm test
 
+      - name: Run integration tests
+        working-directory: ${{ env.SERVICE_PATH }}
+        if: hashFiles(format('{0}/vitest.integration.config.ts', inputs.service-path)) != ''
+        run: pnpm test:integration
+
   validate-helm:
     permissions:
       contents: read # to let the called workflow read the repository

@@ -6,7 +6,7 @@
 nix develop  # or: direnv allow (.envrc is committed)
 ```
 
-Provides all required tools (Node.js 26, pnpm, terraform, kubectl, helm, etc.) with pinned versions.
+Provides all required tools (Node.js 26, pnpm, terraform, kubectl, helm, etc.) with pinned versions. That includes `secretspec` and the 1Password CLI, which a service with a `secretspec.toml` uses to resolve its credentials (see `services/world-check-mcp/AGENTS.md`).
 
 **Option B: Manual**
 

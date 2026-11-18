@@ -1,0 +1,61 @@
+# Copy to entities.local.yaml and replace each made-up value with a real entity that meets the
+# slot's criteria in cases.yaml. A slot left out skips the cases that use it.
+
+pep_person:
+  name: Elena Varga
+  birth_month: March 1971
+  nationality: Hungarian
+  country: hu
+former_pep:
+  name: Henrik Aalto
+  year_in_office: "2015"
+wealth_client:
+  name: Marco Bellandi
+  sector: logistics
+  exit_year: "2019"
+native_script_person:
+  native_name: Иван Примеров
+common_name_person:
+  name: Mohammed Al-Hassan
+  birth_year: "1984"
+  country: jo
+connected_person:
+  name: Orsolya Kertész
+small_company:
+  name: Kestrel Marine Services Ltd
+  country: Cyprus
+swiss_company:
+  name: Aurelia Trading SA
+  city: Geneva
+  uid: CHE-000.000.000
+foundation:
+  name: Stiftung Alpenrose
+  country: Liechtenstein
+sanction_owned_company:
+  name: Borealis Grain LLC
+sanction_adjacent_company:
+  name: Halvorsen Shipping AS
+sanctioned_org:
+  name: Tarkov Industrial Holding
+payee_company:
+  name: Sahel Petroleum Trading FZE
+state_owned_company:
+  name: Northfield Power Distribution
+pep_linked_company:
+  name: Lindqvist Capital Partners
+exempt_subsidiary:
+  name: Fenwick Industrial Components GmbH
+group_holding:
+  name: Halden Group Holding
+large_shareholder_base:
+  name: Meridian Widely Held AG
+lei_company:
+  lei: "00000000000000000000"
+vessel:
+  imo: "9000000"
+isin_issuer:
+  isin: CH0000000000
+stored_pid:
+  pid: O0123456789abcdef0123456789abcdef
+merged_pid:
+  pid: Ofedcba9876543210fedcba9876543210

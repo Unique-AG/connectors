@@ -13,6 +13,7 @@
     { "path": "services/exp-tiingo-mcp" },
     { "path": "services/kb-mcp" },
     { "path": "services/office-365-mcp" },
+    { "path": "services/polixis-mcp" },
     { "path": "services/with-intelligence-mcp" }
   ],
   "settings": {

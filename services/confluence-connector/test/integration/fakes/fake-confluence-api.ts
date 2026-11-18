@@ -24,8 +24,8 @@ import type {
 const INLINE_ATTACHMENT_LIMIT = 25;
 
 class FakeConfluenceAuth extends ConfluenceAuth {
-  public async acquireToken(): Promise<string> {
-    return 'fake-token';
+  public async getAuthorizationHeader(): Promise<string> {
+    return 'Bearer fake-token';
   }
 }
 

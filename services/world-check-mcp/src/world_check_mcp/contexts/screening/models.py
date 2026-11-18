@@ -1,11 +1,21 @@
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
+from pydantic import AfterValidator
 from pydantic import BaseModel
 from pydantic import Field
 
 EntityType = Literal["INDIVIDUAL", "ORGANISATION"]
 Gender = Literal["MALE", "FEMALE", "UNSPECIFIED"]
+
+
+def _not_in_the_future(value: date) -> date:
+    if value > date.today():
+        raise ValueError("Date of birth cannot be in the future.")
+    return value
+
+
+DateOfBirth = Annotated[date, AfterValidator(_not_in_the_future)]
 
 
 class FieldValue(BaseModel):

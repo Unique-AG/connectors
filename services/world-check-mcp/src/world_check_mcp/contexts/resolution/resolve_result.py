@@ -10,6 +10,8 @@ from world_check_mcp.contexts.resolution.models import ResolutionChoice
 from world_check_mcp.contexts.resolution.models import ResolutionOutcome
 from world_check_mcp.contexts.resolution.models import ResolutionPlan
 from world_check_mcp.contexts.resolution.models import ResolutionRequest
+from world_check_mcp.persistence import CaseLease
+from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
 from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
 from world_check_mcp.upstream import GetResolutionToolkitsForGroupRequest
@@ -97,10 +99,29 @@ async def apply_resolution(
     request: ResolutionRequest,
     plan: ResolutionPlan,
     actor: str,
+    locks: CaseLocks,
 ) -> ResolutionOutcome:
     """Save an already approved match decision, after reading the case once more. A case id that
-    now maps to another case changes the plan, so it is refused too.
+    now maps to another case changes the plan, so it is refused too. The case stays locked from
+    that read to the write, and a second approval on it is refused.
     """
+    refusal = ResolutionError(
+        "Another decision on this case is being saved. Review the case and request fresh approval."
+    )
+    async with locks.hold(plan.case_system_id, refuse=refusal) as lease:
+        return await _apply_resolution(
+            upstream=upstream, request=request, plan=plan, actor=actor, lease=lease
+        )
+
+
+async def _apply_resolution(
+    *,
+    upstream: Upstream,
+    request: ResolutionRequest,
+    plan: ResolutionPlan,
+    actor: str,
+    lease: CaseLease,
+) -> ResolutionOutcome:
     current = await prepare_resolution(upstream=upstream, request=request, actor=actor)
     if current != plan:
         raise ResolutionError(
@@ -115,6 +136,7 @@ async def apply_resolution(
     }
     if plan.reason is not None:
         arguments["reasonId"] = plan.reason.id
+    await lease.ensure_held()
     await upstream.call_untyped(RESOLVE_RESULTS, **arguments)
     return ResolutionOutcome(
         resolved=True,

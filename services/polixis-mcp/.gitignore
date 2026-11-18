@@ -1,0 +1,4 @@
+# Recorded Polixis responses and research dumps: licensed data about real people. Only the
+# folder's README is committed; it says where to download the data.
+.mock-server-data/*
+!.mock-server-data/README.md

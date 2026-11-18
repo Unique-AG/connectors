@@ -1,6 +1,6 @@
 import asyncio
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from typing import ClassVar, Generic, TypeVar, cast
@@ -32,6 +32,11 @@ class LockTimeoutError(UpstreamError):
     """The lock of the `LockConfig` was not acquired within its timeout."""
 
 
+type ResponseCheck = Callable[[object], None]
+"""Looks at a parsed response and raises an `UpstreamError` for one the upstream sent as a
+success but that is a failure, such as a 200 whose body is an error."""
+
+
 class RequestModel(BaseModel):
     """The base of each generated request model. It rejects a field it does not have, so a
     misspelt one fails instead of going unsent."""
@@ -60,6 +65,8 @@ class OperationClient:
 
     `retry_policy` decides which failed responses are sent again. None sends each request once.
     `lock_config` names a lock held around each attempt. None sends without one.
+    `response_check` looks at every parsed response, for an upstream that reports some failures
+    with a success status. None checks nothing.
     """
 
     def __init__(
@@ -69,8 +76,10 @@ class OperationClient:
         *,
         retry_policy: RetryPolicy | None = None,
         lock_config: LockConfig | None = None,
+        response_check: ResponseCheck | None = None,
     ) -> None:
         self._http: httpx2.AsyncClient = http
+        self._response_check: ResponseCheck | None = response_check
         self._retry_policy: RetryPolicy | None = retry_policy
         self._lock_config: LockConfig | None = lock_config
         self._routes: dict[str, HTTPRoute] = {
@@ -85,7 +94,11 @@ class OperationClient:
         return set(self._routes)
 
     async def call[T, R: BaseModel](
-        self, operation: Operation[T, R], request: R, *, headers: Mapping[str, str] | None = None
+        self,
+        operation: Operation[T, R],
+        request: R,
+        *,
+        headers: Mapping[str, str] | None = None,
     ) -> T:
         """Call an operation with its generated `<Operation>Request`, whose `path`, `query` and
         `body` the type check verifies. Use it for every operation the spec gets right.
@@ -115,7 +128,7 @@ class OperationClient:
             json=cast(dict[str, object], body).get("body"),
             headers=headers,
         )
-        return self._parse(operation.adapter, await self._send(built))
+        return self._checked(self._parse(operation.adapter, await self._send(built)))
 
     async def call_untyped[T, R](self, operation: Operation[T, R], **arguments: object) -> T:
         """Call an operation with its arguments as the spec names them, checked against the spec
@@ -140,7 +153,9 @@ class OperationClient:
         body = route.request_body
         if not content and body and body.required and "application/json" in body.content_schema:
             content = b"{}"
-            headers = httpx2.Headers({**headers, "Content-Type": "application/json"})
+            headers = httpx2.Headers(headers)
+            headers.pop("Content-Length", None)
+            headers["Content-Type"] = "application/json"
         # Built again through the client so its default headers are merged in.
         request = self._http.build_request(
             built.method,
@@ -149,7 +164,7 @@ class OperationClient:
             headers=headers,
             content=content,
         )
-        return self._parse(operation.adapter, await self._send(request))
+        return self._checked(self._parse(operation.adapter, await self._send(request)))
 
     async def call_raw[T](
         self,
@@ -171,7 +186,12 @@ class OperationClient:
         if not path.startswith("/") or path.startswith("//"):
             raise ValueError(f"{path} is not a path")
         request = self._http.build_request(method, path, params=params, json=json, headers=headers)
-        return self._parse(adapter, await self._send(request))
+        return self._checked(self._parse(adapter, await self._send(request)))
+
+    def _checked[T](self, response: T) -> T:
+        if self._response_check is not None:
+            self._response_check(response)
+        return response
 
     def _route[T, R](self, operation: Operation[T, R]) -> HTTPRoute:
         route = self._routes.get(operation.operation_id)
@@ -191,6 +211,14 @@ class OperationClient:
             raise UpstreamError(
                 f"{message}: {body}" if body else message, status_code=exc.response.status_code
             ) from exc
+        except httpx2.PoolTimeout as exc:
+            # The client's connection limit caps the requests in flight; this one waited too long.
+            url = request.url.copy_with(query=None)
+            message = (
+                f"No free connection to the upstream for {request.method} {url}: every "
+                "connection the client allows stayed busy past its timeout. Try again shortly."
+            )
+            raise UpstreamError(message) from exc
         except httpx2.HTTPError as exc:
             raise UpstreamError(str(exc) or type(exc).__name__) from exc
 
