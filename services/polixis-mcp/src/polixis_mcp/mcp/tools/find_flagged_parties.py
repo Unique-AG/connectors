@@ -7,13 +7,11 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from polixis_mcp import contexts
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
 from polixis_mcp.mcp.inputs.cursor import PageSize
 from polixis_mcp.mcp.inputs.pid import EntityPid
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -60,7 +58,6 @@ async def find_flagged_parties(
     page_size: PageSize = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.FlaggedPartiesPage:
     """Sanctioned, PEP, state-owned and restricted parties near an organization or person,
     each with its markers and the path to it: who holds what in whom at every step.
@@ -88,6 +85,4 @@ async def find_flagged_parties(
         sanctioned_only=sanctioned_only,
         page_size=page_size,
     )
-    return await contexts.find_flagged_parties(
-        upstream=upstream, persistence=persistence, query=query
-    )
+    return await contexts.find_flagged_parties(upstream=upstream, query=query)

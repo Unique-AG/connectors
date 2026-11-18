@@ -4,13 +4,11 @@ from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 
 from polixis_mcp import contexts
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
 from polixis_mcp.mcp.inputs.cursor import PageSize
 from polixis_mcp.mcp.inputs.pid import EntityPid
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -25,7 +23,6 @@ async def get_sanctions_exposure(
     page_size: PageSize = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.SanctionsExposurePage:
     """An organization's or person's own sanctions listings, and every sanctioned party
     Polixis relates to it at any distance, each with its lists, programmes and the relations
@@ -39,6 +36,4 @@ async def get_sanctions_exposure(
     Polixis does not document this route yet, so its answers may change without notice.
     """
     query = page_query(contexts.SanctionsExposureQuery, cursor, pid=pid, page_size=page_size)
-    return await contexts.get_sanctions_exposure(
-        upstream=upstream, persistence=persistence, query=query
-    )
+    return await contexts.get_sanctions_exposure(upstream=upstream, query=query)

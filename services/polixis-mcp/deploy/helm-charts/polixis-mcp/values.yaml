@@ -53,15 +53,19 @@ mcpConfig:
       # UPSTREAM_RETRY_MAX_WAIT_SECONDS. App default: 30.
       maxWaitSeconds: null
   responseCache:
-    # RESPONSE_CACHE_ENABLED. false sends every request to Polixis. The cull still deletes what
+    # UPSTREAM_CACHE_ENABLED. false sends every request to Polixis. The cull still deletes what
     # was cached before.
     enabled: true
-    # RESPONSE_CACHE_TTL_SECONDS. How long an answer is reused, at most 3600. It stays in Postgres
-    # at most twice as long, until the next cull. App default: 900.
+    # UPSTREAM_CACHE_TTL_SECONDS. How long an answer is reused, at most 3600 here; we advise at
+    # most 900, as Polixis updates its data in real time. It stays in Postgres at most twice as
+    # long, until the next cull. App default: 900.
     ttlSeconds: null
-    # RESPONSE_CACHE_KEY_PREFIX. Change it, e.g. to v2, to stop reading every answer cached so far.
+    # UPSTREAM_CACHE_KEY_PREFIX. Change it, e.g. to v2, to stop reading every answer cached so far.
     # App default: v1.
     keyPrefix: ""
+    # UPSTREAM_CACHE_MAX_MEGABYTES. The size of the cached answers past which each cull deletes
+    # the least recently read. An answer averages about 200 KB. App default: 500.
+    maxMegabytes: null
   rateLimit:
     # MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW. Tool calls one user may make per window, counted in
     # each replica.
@@ -196,7 +200,9 @@ routes:
 
 hooks:
   migration:
-    enabled: false
+    enabled: true
+    command: |
+      alembic upgrade head
 
 # NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
 # Kong ingress allow is generated from internalServices.dependents.ingressGateway.

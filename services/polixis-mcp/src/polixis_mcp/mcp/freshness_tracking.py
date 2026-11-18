@@ -6,7 +6,7 @@ from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import ToolResult
 import mcp_types as mt
 
-from polixis_mcp import contexts
+from polixis_mcp import upstream
 
 
 class FreshnessTracking(Middleware):
@@ -20,5 +20,5 @@ class FreshnessTracking(Middleware):
         context: MiddlewareContext[mt.CallToolRequestParams],
         call_next: CallNext[mt.CallToolRequestParams, ToolResult],
     ) -> ToolResult:
-        with contexts.tracking_freshness():
+        with upstream.tracking_cache_reads():
             return await call_next(context)

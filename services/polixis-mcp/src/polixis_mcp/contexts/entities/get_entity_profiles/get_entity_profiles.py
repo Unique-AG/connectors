@@ -1,7 +1,5 @@
 import asyncio
 
-from polixis_mcp.contexts.cached_calls import cached_call
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.entities.get_entity_profiles.inputs import KEY_SECTIONS
 from polixis_mcp.contexts.entities.get_entity_profiles.inputs import ProfileSection
 from polixis_mcp.contexts.entities.get_entity_profiles.outputs import EntityProfile
@@ -13,9 +11,9 @@ from polixis_mcp.contexts.entities.names import name_record
 from polixis_mcp.contexts.formats import dates_by_kind
 from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.risks import is_hidden_alert
 from polixis_mcp.contexts.risks import polixis_flags
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import CompletionRequestInput
 from polixis_mcp.upstream import GET_PROFILE_FIELDS
 from polixis_mcp.upstream import GetProfileFieldsPath
@@ -29,7 +27,6 @@ from polixis_mcp.upstream import UpstreamError
 async def get_entity_profiles(
     *,
     upstream: Upstream,
-    persistence: Persistence,
     pids: list[str],
     sections: list[ProfileSection] | None,
 ) -> EntityProfiles:
@@ -40,9 +37,7 @@ async def get_entity_profiles(
     try:
         async with asyncio.TaskGroup() as group:
             lookups = [
-                group.create_task(
-                    _profile(upstream=upstream, persistence=persistence, pid=pid, sections=chosen)
-                )
+                group.create_task(_profile(upstream=upstream, pid=pid, sections=chosen))
                 for pid in unique(pids)
             ]
     except* UpstreamError as errors:
@@ -51,14 +46,12 @@ async def get_entity_profiles(
 
 
 async def _profile(
-    *, upstream: Upstream, persistence: Persistence, pid: str, sections: list[ProfileSection]
+    *, upstream: Upstream, pid: str, sections: list[ProfileSection]
 ) -> EntityProfile:
     try:
-        profile = await cached_call(
-            upstream=upstream,
-            persistence=persistence,
-            operation=GET_PROFILE_FIELDS,
-            request=GetProfileFieldsRequest(
+        profile = await upstream.call(
+            GET_PROFILE_FIELDS,
+            GetProfileFieldsRequest(
                 path=GetProfileFieldsPath(id=pid),
                 body=CompletionRequestInput(
                     fields=[_POLIXIS_FIELDS[section] for section in sections]

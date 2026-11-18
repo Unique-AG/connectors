@@ -125,20 +125,41 @@ at once (the ownership trees, the graphs, the sanctions exposure, the court deci
 path between two parties), the next page, or another tool on the same entity, reads the response
 from the cache instead of asking Polixis again.
 
-Every tool of our own reuses Polixis's answers from Postgres (`persistence/response_cache.py`)
-for `RESPONSE_CACHE_TTL_SECONDS`, 15 minutes by default, so the same request within that time
-spares the API key's quota. The answers are licensed data about real people, which Polixis
-updates in real time, so the TTL cannot exceed an hour. The TTL limits reuse, not storage: the
-server deletes the expired entries when it starts and once per TTL after, so an answer normally
-leaves Postgres within twice the TTL, later when a cleanup fails.
-`RESPONSE_CACHE_ENABLED=false` turns the cache off, and a new `RESPONSE_CACHE_KEY_PREFIX` stops
-reading every answer cached so far, which then expires. The cache is shared by every user of the
-deployment, who share the one set of Polixis credentials anyway. `resolve_permanent_id`, served
-straight from the spec, is not cached.
+Every request to Polixis goes through `upstream/cache.py`, a transport on the client that
+reuses Polixis's answers from Postgres for `UPSTREAM_CACHE_TTL_SECONDS`, 15 minutes by default,
+so the same request within that time spares the API key's quota. It sits in front of the limit
+on requests in flight and the quota gate, so a cached answer neither waits nor is refused once
+the quota is spent, and it caches the tools served from the spec too. It caches a 200 whose
+body fits the model of the operation it answers, and not Polixis's 200 with an `error` body; a
+cached answer that no longer fits, as after a deploy that changed the model, is fetched again.
+An answer is cached under its method, Polixis's origin, path, query and body, so a deployment
+pointed at another Polixis reads none of it. Polixis updates its data in real time,
+so we advise a TTL of at most 15 minutes, and the server refuses one past an hour unless
+`UPSTREAM_CACHE_TTL_UNCAPPED=true`, which spares the API key further requests while developing.
+The chart does not set that flag; set it in `envVars` if you need it. The TTL limits reuse, not storage: the server deletes the expired entries when it starts and once per
+TTL after, at least hourly, so an answer normally leaves Postgres within twice the TTL, later
+when a cleanup fails. `UPSTREAM_CACHE_ENABLED=false` turns the cache off, and a new
+`UPSTREAM_CACHE_KEY_PREFIX` stops reading every answer cached so far, which then expires. The
+cache is shared by every user of the deployment, who share the one set of Polixis credentials
+anyway.
+
+The answers sit in their own table, `polixis_response_cache` (`persistence/response_cache.py`,
+modelled in `persistence/models.py`), which an Alembic migration makes: the chart's migration hook
+runs `alembic upgrade head` before each rollout. The migrations make every table, the key-value
+store's `kv_store` for the sign-in state too, and the server makes none.
+Each row holds the body as Polixis sent it, its
+size, when it was cached and when it expires, and when it was last read and how often. Each cull
+also keeps the bodies under `UPSTREAM_CACHE_MAX_MEGABYTES`, 500 by default, by deleting the
+least recently read, so the cache can overshoot the limit by what is cached between two culls.
+The recorded answers average about 200 KB (median 50 KB; a key graph about 600 KB, up to
+1.8 MB), so 500 MB holds about 2,500 of them, each a request paid for once. Postgres compresses
+large bodies, so the table takes less on disk.
 
 Every result of our tools says how fresh it is in `freshness`: `fetched_at`, when the server put
 it together, and `cached_at`, null when all of it came from Polixis on that call, else when the
-oldest cached answer it used was cached. The server instructions tell the agent to give the user
+oldest cached answer it used was cached. A cached answer carries when it was cached in the
+`x-internal-mcp-cache-stored-at` header, which a response hook on the client records for the
+tool call. The server instructions tell the agent to give the user
 that as-of time when the data's age matters, as for sanctions or PEP status.
 
 ## The spec
@@ -162,7 +183,8 @@ those edits add to or correct in their spec and why, and how to take a new spec 
 | `UPSTREAM_QUOTA_COOLDOWN_SECONDS` | Once Polixis answers that the API key's quota is spent (a 429 with `x-amzn-errortype: LimitExceededException`), the process sends it nothing for this long, 900 by default, and every tool fails at once with a message saying so. Each process learns it on its own, so a spent quota costs one request per process per cooldown |
 | `MCP_AUTH_MODE` | `zitadel` in a deployment, `none` locally |
 | `ZITADEL_*` | Zitadel sign-in for the MCP's users |
-| `DATABASE_URL` | Postgres, which holds the encrypted Zitadel sign-in state and the Polixis responses the tools reuse, each for at most an hour, deleted by a cleanup that runs once per cache TTL |
+| `UPSTREAM_CACHE_*` | The cache of Polixis's answers in Postgres: `ENABLED`, `TTL_SECONDS` (900, at most 3600 unless `TTL_UNCAPPED=true`, which the chart does not set), `KEY_PREFIX` and `MAX_MEGABYTES` (500) |
+| `DATABASE_URL` | Postgres, which holds the encrypted Zitadel sign-in state and the cached Polixis answers, deleted by a cleanup that runs once per cache TTL, at least hourly |
 
 Every signed-in user shares the one set of Polixis credentials. A user's Zitadel token never
 reaches Polixis.
@@ -187,27 +209,21 @@ already exists.
 ```bash
 cp .env.example .env    # fill in the UPSTREAM_ credentials
 uv sync
+uv run alembic upgrade head
 uv run polixis-mcp      # http://127.0.0.1:8000/mcp, without sign-in
 ```
 
 It opens Postgres at `DATABASE_URL` even without sign-in, so start one first, for example
 `docker run -e POSTGRES_PASSWORD=dummy-password -e POSTGRES_USER=dummy-user -e POSTGRES_DB=polixis_mcp -p 5432:5432 postgres:17`.
 
-`uv run poe ci` runs every check CI runs.
+`uv run poe ci` runs every check CI runs. After changing `persistence/models.py`, `uv run alembic revision
+--autogenerate -m "<what changed>"` writes the migration, and the Postgres tests check the models
+and migrations agree.
 
-### Record Polixis once, replay it after
+### Spare the quota while developing
 
-The API key's quota is small, so develop against recorded answers. `UPSTREAM_RECORDING_MODE`
-puts `upstream/recording.py` between the client and Polixis:
-
-| Mode | |
-|---|---|
-| `off` | The default, and the only mode a deployment uses |
-| `record` | Answers a request already recorded from its recording, so nothing is paid twice; delete a recording to have it asked again. Sends the others, waiting `UPSTREAM_RECORDING_MIN_INTERVAL_SECONDS` (2 by default) between two, and saves the answer. Needs `UPSTREAM_RECORDING_BUDGET`, the most requests `ledger.jsonl` may hold across every run: past it nothing is sent. The first quota 429 writes `HALT`, and nothing is sent until you delete it |
-| `replay` | Answers from the saved answers and sends nothing, the token request included. A request with no saved answer fails |
-
-The answers go to `UPSTREAM_RECORDING_DIRECTORY`, `.mock-server-data/cassettes/` by default, one
-file per request, and each sent request is a line in its `ledger.jsonl`. `.mock-server-data/` is
-gitignored but for its README: it holds licensed data about real people, so it never leaves your machine or the team's download location, which `.mock-server-data/README.md` names, with what the folder holds and how to replay it. The
-server refuses either mode unless `MCP_AUTH_MODE=none`. The client-credentials token is fetched
-past the recorder, so no secret is ever saved.
+The API key's quota is small. The cache keeps Polixis's answers in your local Postgres like any
+other, so for development set a long `UPSTREAM_CACHE_TTL_SECONDS` with
+`UPSTREAM_CACHE_TTL_UNCAPPED=true` in your `.env`, and each request is paid once. The answers are
+licensed data about real people: they stay in your own database, never in the repository, a
+ticket or a pull request. To start again, change `UPSTREAM_CACHE_KEY_PREFIX`.

@@ -1,21 +1,20 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.court_records.decisions import DecisionSubject
 from polixis_mcp.contexts.court_records.decisions import fetch_decisions
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.pages import text_page
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
 async def get_court_decision(
-    *, upstream: Upstream, persistence: Persistence, query: CourtDecisionTextQuery
+    *, upstream: Upstream, query: CourtDecisionTextQuery
 ) -> CourtDecisionText:
     """Polixis has no route for one decision, so this reads them all, usually from the cache
     `find_court_decisions` filled, and keeps the one.
@@ -23,9 +22,7 @@ async def get_court_decision(
     decision = next(
         (
             decision
-            for decision in await fetch_decisions(
-                upstream=upstream, persistence=persistence, pid=query.pid
-            )
+            for decision in await fetch_decisions(upstream=upstream, pid=query.pid)
             if decision.record.id == query.decision_id
         ),
         None,

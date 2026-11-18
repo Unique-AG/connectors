@@ -3,6 +3,8 @@ from datetime import timedelta
 from datetime import UTC
 
 import httpx2
+from mcp_openapi.upstream import Operation
+from pydantic import AnyHttpUrl
 from pydantic import ValidationError
 import pytest
 
@@ -13,7 +15,10 @@ from polixis_mcp.upstream import SearchRequestInput
 from polixis_mcp.upstream import upstream_http
 from polixis_mcp.upstream import UpstreamError
 from polixis_mcp.upstream import UpstreamSettings
+from polixis_mcp.upstream.answers import _OPERATIONS
+from polixis_mcp.upstream.generated import operations
 from tests.offline_server import fake_upstream_settings
+from tests.offline_server import FakeResponseCache
 
 _WHEN = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
 _TOKEN_PATH = "/token"
@@ -91,6 +96,29 @@ async def test_an_expired_token_is_fetched_again() -> None:
         await http.get("/api/graph/pid/P1")
 
     assert tokens == ["access-1", "access-2"]
+
+
+async def test_a_cached_answer_fetches_no_token_once_the_token_expired() -> None:
+    moments = [_WHEN]
+    sent: list[str] = []
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request.url.path)
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token", expires_in=60)
+        return httpx2.Response(200, json={"status": "active"})
+
+    async with upstream_http(
+        fake_upstream_settings(),
+        httpx2.MockTransport(respond),
+        cache=FakeResponseCache(),
+        now=lambda: moments[-1],
+    ) as http:
+        await http.get("/api/graph/pid/P1")
+        moments.append(_WHEN + timedelta(minutes=5))
+        await http.get("/api/graph/pid/P1")
+
+    assert sent == [_TOKEN_PATH, "/api/graph/pid/P1"]
 
 
 async def test_a_rejected_token_is_refreshed_once() -> None:
@@ -171,3 +199,157 @@ def test_settings_refuse_a_plain_http_endpoint(field: str) -> None:
 
     with pytest.raises(ValidationError, match="URL scheme should be 'https'"):
         UpstreamSettings.model_validate({**secrets, field: "http://api.example.com"})
+
+
+def _polixis(answer: dict[str, object]) -> httpx2.MockTransport:
+    """Answers the token request, and every other one with `answer`."""
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        return httpx2.Response(200, json=answer)
+
+    return httpx2.MockTransport(respond)
+
+
+async def test_an_answer_that_does_not_fit_its_model_is_not_cached() -> None:
+    cache = FakeResponseCache()
+
+    async with upstream_http(
+        fake_upstream_settings(), _polixis({"count": "many"}), cache=cache
+    ) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert cache.answers == {}
+
+
+async def test_an_answer_to_a_route_no_operation_has_is_not_cached() -> None:
+    cache = FakeResponseCache()
+
+    async with upstream_http(fake_upstream_settings(), _polixis({}), cache=cache) as http:
+        await http.get("/api/completion/fields")
+
+    assert cache.answers == {}
+
+
+async def test_a_cached_answer_that_no_longer_fits_is_fetched_again_and_replaced() -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings()
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+    [(key, answer)] = cache.answers.items()
+    cache.answers[key] = answer.model_copy(update={"body": b'{"count": "many"}'})
+
+    async with upstream_http(settings, _polixis({"count": 2}), cache=cache) as http:
+        response = await http.get("/api/graph/pid/P1")
+
+    assert response.json() == {"count": 2}
+    assert cache.answers[key].body == b'{"count":2}'
+
+
+async def test_an_answer_is_not_reused_for_another_polixis_origin() -> None:
+    cache = FakeResponseCache()
+    other = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl("https://other.example.com")}
+    )
+    answered: list[str] = []
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        answered.append(str(request.url.host))
+        return httpx2.Response(200, json={"count": 1})
+
+    async with upstream_http(
+        fake_upstream_settings(), httpx2.MockTransport(respond), cache=cache
+    ) as http:
+        await http.get("/api/graph/pid/P1")
+    cached = len(cache.answers)
+    async with upstream_http(other, httpx2.MockTransport(respond), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert cached == 1
+    assert answered == ["api.example.com", "other.example.com"]
+
+
+def test_the_cache_knows_the_model_of_every_generated_operation() -> None:
+    members: list[object] = list(vars(operations).values())
+    generated = {member.operation_id for member in members if isinstance(member, Operation)}
+
+    assert {operation.operation_id for operation in _OPERATIONS} == generated
+
+
+async def test_a_rejection_is_not_cached_for_a_model_without_an_error_field() -> None:
+    cache = FakeResponseCache()
+    rejection: dict[str, object] = {"count": 1, "error": "unknown id", "code": "NOT_FOUND"}
+
+    async with upstream_http(fake_upstream_settings(), _polixis(rejection), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert cache.answers == {}
+
+
+@pytest.mark.parametrize("api_path", ["/regional%20api", "/v1%2F"])
+async def test_an_answer_under_an_encoded_api_path_is_cached(api_path: str) -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl(f"https://api.example.com{api_path}")}
+    )
+
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert len(cache.answers) == 1
+
+
+async def test_an_encoded_slash_and_a_slash_are_cached_apart() -> None:
+    cache = FakeResponseCache()
+    answered: list[str] = []
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        answered.append(encoded(request))
+        return httpx2.Response(200, json={"count": 1})
+
+    def encoded(request: httpx2.Request) -> str:
+        return request.url.raw_path.decode("ascii")
+
+    for api_path in ("/region%2Fwest", "/region/west"):
+        settings = fake_upstream_settings().model_copy(
+            update={"api_url": AnyHttpUrl(f"https://api.example.com{api_path}")}
+        )
+        async with upstream_http(settings, httpx2.MockTransport(respond), cache=cache) as http:
+            await http.get("/api/graph/pid/P1")
+
+    assert len(cache.answers) == 2
+    assert answered == [
+        "/region%2Fwest/api/graph/pid/P1",
+        "/region/west/api/graph/pid/P1",
+    ]
+
+
+async def test_a_path_that_only_starts_like_the_api_path_is_not_cached() -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl("https://api.example.com/v1")}
+    )
+
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("https://api.example.com/v1api/graph/pid/P1")
+
+    assert cache.answers == {}
+
+
+async def test_the_cache_key_holds_no_credentials_from_the_api_url() -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl("https://user:secret@api.example.com")}
+    )
+
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    [key] = cache.answers
+    assert "secret" not in key
+    assert "user" not in key

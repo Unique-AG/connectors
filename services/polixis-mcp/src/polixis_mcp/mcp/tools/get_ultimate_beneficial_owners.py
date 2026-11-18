@@ -4,13 +4,11 @@ from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 
 from polixis_mcp import contexts
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
 from polixis_mcp.mcp.inputs.cursor import PageSize
 from polixis_mcp.mcp.inputs.pid import EntityPid
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -25,7 +23,6 @@ async def get_ultimate_beneficial_owners(
     page_size: PageSize = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.OwnershipPage:
     """Who owns or controls an organization: one row per owner, however many chains reach it,
     with the share it carries in the organization summed over every chain, the chain carrying
@@ -50,4 +47,4 @@ async def get_ultimate_beneficial_owners(
         pid=pid,
         page_size=page_size,
     )
-    return await contexts.get_ownership(upstream=upstream, persistence=persistence, query=query)
+    return await contexts.get_ownership(upstream=upstream, query=query)

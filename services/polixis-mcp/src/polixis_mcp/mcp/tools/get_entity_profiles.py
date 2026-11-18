@@ -8,9 +8,7 @@ from pydantic import Field
 
 from polixis_mcp import contexts
 from polixis_mcp.contexts import PID_PATTERN
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -47,7 +45,6 @@ async def get_entity_profiles(
         ),
     ] = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.EntityProfiles:
     """Profiles of up to 10 organizations or people at once: names, identifiers, dates,
     countries, sanctions and PEP flags, alerts, sanctions listings and positions held.
@@ -57,6 +54,4 @@ async def get_entity_profiles(
     `sanctions` and `positions` make each profile several times larger, so ask for fewer pids
     with them.
     """
-    return await contexts.get_entity_profiles(
-        upstream=upstream, persistence=persistence, pids=pids, sections=sections
-    )
+    return await contexts.get_entity_profiles(upstream=upstream, pids=pids, sections=sections)

@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.graph.network import fetch_network
 from polixis_mcp.contexts.graph.network import first_shortest_paths
 from polixis_mcp.contexts.graph.network import Party
@@ -18,13 +18,12 @@ from polixis_mcp.contexts.risks import RISK_COUNTS_DESCRIPTION
 from polixis_mcp.contexts.risks import risk_markers
 from polixis_mcp.contexts.risks import RISK_MARKERS_DESCRIPTION
 from polixis_mcp.contexts.risks import risk_severity
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import RadiusFilterInput
 from polixis_mcp.upstream import Upstream
 
 
 async def find_flagged_parties(
-    *, upstream: Upstream, persistence: Persistence, query: FlaggedPartiesQuery
+    *, upstream: Upstream, query: FlaggedPartiesQuery
 ) -> FlaggedPartiesPage:
     """The most severe risk first, so a sanctioned party two hops away comes before the
     state-owned companies of the entity's own group; then the nearest, then by name, unnamed
@@ -32,7 +31,6 @@ async def find_flagged_parties(
     """
     network = await fetch_network(
         upstream=upstream,
-        persistence=persistence,
         pid=query.pid,
         radius=query.radius,
         scope="all",

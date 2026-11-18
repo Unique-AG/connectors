@@ -3,20 +3,18 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import cached_call
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.entities.names import name_record
 from polixis_mcp.contexts.entities.names import NameRecordView
 from polixis_mcp.contexts.formats import dates_by_kind
 from polixis_mcp.contexts.formats import PartialDate
 from polixis_mcp.contexts.formats import polixis_date_number
 from polixis_mcp.contexts.formats import unique
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
 from polixis_mcp.contexts.risks import visible_alert_texts
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import SEARCH_ENTITIES
 from polixis_mcp.upstream import SearchEntitiesRequest
 from polixis_mcp.upstream import SearchHit
@@ -32,9 +30,7 @@ _NAMES_LISTED = 10
 _ADDRESSES_LISTED = 3
 
 
-async def search_entities(
-    *, upstream: Upstream, persistence: Persistence, query: EntitySearchQuery
-) -> EntitySearchResults:
+async def search_entities(*, upstream: Upstream, query: EntitySearchQuery) -> EntitySearchResults:
     filters = {
         "entity_type": query.entity_type,
         "countries": [country.lower() for country in query.countries] or None,
@@ -49,12 +45,7 @@ async def search_entities(
             "size": query.page_size,
         }
     )
-    response = await cached_call(
-        upstream=upstream,
-        persistence=persistence,
-        operation=SEARCH_ENTITIES,
-        request=SearchEntitiesRequest(body=body),
-    )
+    response = await upstream.call(SEARCH_ENTITIES, SearchEntitiesRequest(body=body))
     pagination = response.pagination
     has_next = pagination is not None and bool(pagination.has_next)
     return EntitySearchResults(

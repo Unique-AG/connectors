@@ -1,8 +1,8 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import Freshness
 from polixis_mcp.contexts.entities.names import NameRecordView
+from polixis_mcp.contexts.freshness import Freshness
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 
 

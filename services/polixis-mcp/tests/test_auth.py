@@ -11,11 +11,11 @@ import pytest
 from starlette.applications import Starlette
 
 from polixis_mcp.mcp import create_auth
+from polixis_mcp.mcp import create_server
 from polixis_mcp.mcp import http_app
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.persistence import StoreSettings
 from polixis_mcp.upstream import UpstreamSettings
-from tests.offline_server import build_server
 
 ISSUER = "https://zitadel.example.com"
 OIDC_CONFIGURATION = {
@@ -57,7 +57,7 @@ def signed_in_app(
     signed_in = StaticTokenVerifier(
         tokens={"valid-token": {"client_id": "client", "scopes": [], "sub": "analyst"}}
     )
-    server = build_server(upstream_settings, persistence, upstream_transport, auth=signed_in)
+    server = create_server(upstream_settings, persistence, upstream_transport, auth=signed_in)
     return http_app(server, server_settings)
 
 

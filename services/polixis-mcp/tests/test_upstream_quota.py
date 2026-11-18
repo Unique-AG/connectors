@@ -16,6 +16,7 @@ import httpx2
 from pydantic import AnyHttpUrl
 import pytest
 
+from polixis_mcp.mcp import create_server
 from polixis_mcp.upstream import open_upstream
 from polixis_mcp.upstream import PolixisQuotaSpentError
 from polixis_mcp.upstream import SEARCH_ENTITIES
@@ -24,9 +25,8 @@ from polixis_mcp.upstream import SearchRequestInput
 from polixis_mcp.upstream import Upstream
 from polixis_mcp.upstream import upstream_http
 from polixis_mcp.upstream import UpstreamError
-from tests.offline_server import build_server
+from tests.offline_server import fake_persistence
 from tests.offline_server import fake_upstream_settings
-from tests.offline_server import open_fake_persistence
 from tests.tool_calls import tool_error
 
 _WHEN = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
@@ -120,11 +120,10 @@ async def test_a_spent_quota_tells_the_agent_to_stop_and_send_the_user_to_an_adm
     tool: str, arguments: dict[str, object]
 ) -> None:
     sent: list[httpx2.Request] = []
-    async with open_fake_persistence() as persistence:
-        server = build_server(fake_upstream_settings(), persistence, _quota_spent_polixis(sent))
-        async with Client(server) as client:
-            answered = await tool_error(client, tool, arguments)
-            refused = await tool_error(client, tool, arguments)
+    server = create_server(fake_upstream_settings(), fake_persistence(), _quota_spent_polixis(sent))
+    async with Client(server) as client:
+        answered = await tool_error(client, tool, arguments)
+        refused = await tool_error(client, tool, arguments)
 
     assert len(sent) == 1
     assert answered == refused == _QUOTA_SPENT_ANSWER

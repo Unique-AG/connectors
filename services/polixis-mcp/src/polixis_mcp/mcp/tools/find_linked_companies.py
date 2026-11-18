@@ -7,13 +7,11 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from polixis_mcp import contexts
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
 from polixis_mcp.mcp.inputs.cursor import PageSize
 from polixis_mcp.mcp.inputs.pid import EntityPid
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -51,7 +49,6 @@ async def find_linked_companies(
     page_size: PageSize = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.LinkedCompaniesPage:
     """Companies an organization or person is tied to: directly, as owner, director, signatory
     or subsidiary, or through people in between, such as a PEP's relative or associate, or a
@@ -78,6 +75,4 @@ async def find_linked_companies(
         scope=scope,
         page_size=page_size,
     )
-    return await contexts.find_linked_companies(
-        upstream=upstream, persistence=persistence, query=query
-    )
+    return await contexts.find_linked_companies(upstream=upstream, query=query)
