@@ -289,16 +289,44 @@ async def test_a_rejection_is_not_cached_for_a_model_without_an_error_field() ->
     assert cache.answers == {}
 
 
-async def test_an_answer_under_an_encoded_api_path_is_cached() -> None:
+@pytest.mark.parametrize("api_path", ["/regional%20api", "/v1%2F"])
+async def test_an_answer_under_an_encoded_api_path_is_cached(api_path: str) -> None:
     cache = FakeResponseCache()
     settings = fake_upstream_settings().model_copy(
-        update={"api_url": AnyHttpUrl("https://api.example.com/regional%20api")}
+        update={"api_url": AnyHttpUrl(f"https://api.example.com{api_path}")}
     )
 
     async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
         await http.get("/api/graph/pid/P1")
 
     assert len(cache.answers) == 1
+
+
+async def test_an_encoded_slash_and_a_slash_are_cached_apart() -> None:
+    cache = FakeResponseCache()
+    answered: list[str] = []
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        answered.append(encoded(request))
+        return httpx2.Response(200, json={"count": 1})
+
+    def encoded(request: httpx2.Request) -> str:
+        return request.url.raw_path.decode("ascii")
+
+    for api_path in ("/region%2Fwest", "/region/west"):
+        settings = fake_upstream_settings().model_copy(
+            update={"api_url": AnyHttpUrl(f"https://api.example.com{api_path}")}
+        )
+        async with upstream_http(settings, httpx2.MockTransport(respond), cache=cache) as http:
+            await http.get("/api/graph/pid/P1")
+
+    assert len(cache.answers) == 2
+    assert answered == [
+        "/region%2Fwest/api/graph/pid/P1",
+        "/region/west/api/graph/pid/P1",
+    ]
 
 
 async def test_a_path_that_only_starts_like_the_api_path_is_not_cached() -> None:

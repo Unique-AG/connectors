@@ -13,6 +13,7 @@ from pydantic import ConfigDict
 from pydantic import ValidationError
 
 from polixis_mcp.upstream.cache import AnswerCheck
+from polixis_mcp.upstream.cache import encoded_path
 from polixis_mcp.upstream.generated.operations import FIND_PATHS
 from polixis_mcp.upstream.generated.operations import GET_CORPORATE_PROFILE
 from polixis_mcp.upstream.generated.operations import GET_JUDICIAL_RECORDS
@@ -27,11 +28,11 @@ from polixis_mcp.upstream.generated.operations import SEARCH_ENTITIES
 from polixis_mcp.upstream.rejections import is_rejection_body
 
 
-def answer_check(spec: dict[str, object], *, base_path: str) -> AnswerCheck:
+def answer_check(spec: dict[str, object], *, api_url: httpx2.URL) -> AnswerCheck:
     """A body fits when it validates against the model of the operation whose route the request
-    matches, and is not a rejection. A request no operation matches has no answer to keep.
-    `base_path` is the API URL's path, decoded as a request's is, which the spec's routes leave
-    out.
+    matches, and is not a rejection. A request no operation matches has no answer to keep. The
+    paths are compared as sent, so `api_url`'s path, which the spec's routes leave out, is
+    removed only at a slash, even when it holds an encoded one.
     """
     models = {operation.operation_id: operation.adapter for operation in _OPERATIONS}
     routes = [
@@ -40,12 +41,13 @@ def answer_check(spec: dict[str, object], *, base_path: str) -> AnswerCheck:
         if (model := models.get(route.operation_id or "")) is not None
     ]
 
-    prefix = base_path.rstrip("/")
+    prefix = encoded_path(api_url).rstrip("/")
 
     def usable(request: httpx2.Request, body: bytes) -> bool:
-        if not request.url.path.startswith(f"{prefix}/"):
+        sent = encoded_path(request.url)
+        if not sent.startswith(f"{prefix}/"):
             return False
-        path = request.url.path.removeprefix(prefix)
+        path = sent.removeprefix(prefix)
         route = next(
             (r for r in routes if r.method == request.method and r.path.fullmatch(path)), None
         )

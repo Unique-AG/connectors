@@ -213,7 +213,12 @@ async def _request_key(request: httpx2.Request) -> str:
     canonical = json.dumps([query, body], sort_keys=True, ensure_ascii=False)
     digest = hashlib.sha256(canonical.encode()).hexdigest()
     origin = f"{request.url.scheme}://{request.url.netloc.decode('ascii')}"
-    return f"{request.method} {origin}{request.url.path}:{digest}"
+    return f"{request.method} {origin}{encoded_path(request.url)}:{digest}"
+
+
+def encoded_path(url: httpx2.URL) -> str:
+    """The path as sent, so `/a%2Fb` and `/a/b`, which an upstream may route apart, stay apart."""
+    return url.raw_path.partition(b"?")[0].decode("ascii")
 
 
 _cache_reads: ContextVar[_CacheReads | None] = ContextVar("polixis_cache_reads", default=None)

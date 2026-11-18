@@ -196,11 +196,23 @@ async def test_the_cull_keeps_an_answer_read_while_it_ranked_the_answers(
             .where(ResponseCacheRow.key == "older")
             .values(last_used_at=func.now())
         )
+        reader = await session.scalar(select(func.pg_backend_pid()))
         culling = asyncio.create_task(cache.cull(max_bytes=150))
-        await asyncio.sleep(0.2)
+        await _until_blocked_by(database, reader)
     await culling
 
     assert set(await _keys_and_reads(database)) == {"older", "newer"}
+
+
+async def _until_blocked_by(database: Database, pid: int | None) -> None:
+    """Waits until another backend waits on a lock `pid` holds, as the cull's delete does."""
+    blocked = text("SELECT count(*) FROM pg_stat_activity WHERE :pid = ANY(pg_blocking_pids(pid))")
+    async with asyncio.timeout(5):
+        while True:
+            async with database() as session:
+                if await session.scalar(blocked, {"pid": pid}):
+                    return
+            await asyncio.sleep(0.01)
 
 
 async def test_caching_the_same_key_again_replaces_the_answer(
