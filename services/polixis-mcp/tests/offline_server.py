@@ -9,10 +9,12 @@ from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
 import httpx2
-from key_value.aio.stores.memory import MemoryStore
 from mcp_configs import RetrySettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
+from sqlalchemy.ext.asyncio import async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.pool import StaticPool
 
 from polixis_mcp.mcp import create_server
 from polixis_mcp.persistence import Persistence
@@ -49,18 +51,14 @@ def unanswered_upstream() -> httpx2.MockTransport:
     return httpx2.MockTransport(lambda _request: httpx2.Response(404))
 
 
-class FakeStore(MemoryStore):
-    """`MemoryStore` drops an entry past its TTL when it is read, so a cull only counts, and it
-    holds no connection to close.
-    """
+class FakeSignInState:
+    """Counts the culls of the sign-in state's table."""
 
-    culls: int = 0
+    def __init__(self) -> None:
+        self.culls: int = 0
 
     async def cull(self) -> None:
         self.culls += 1
-
-    async def close(self) -> None:
-        pass
 
 
 class FakeResponseCache:
@@ -73,12 +71,6 @@ class FakeResponseCache:
         self.ttls: dict[str, int] = {}
         self.culls: list[int] = []
 
-    async def setup(self) -> None:
-        pass
-
-    async def close(self) -> None:
-        pass
-
     async def get(self, key: str) -> CachedAnswer | None:
         return self.answers.get(key)
 
@@ -90,9 +82,20 @@ class FakeResponseCache:
         self.culls.append(max_bytes)
 
 
-def fake_persistence(response_cache: FakeResponseCache | None = None) -> Persistence:
-    """In-memory stores in place of Postgres."""
-    return Persistence(store=FakeStore(), response_cache=response_cache or FakeResponseCache())
+def fake_persistence(
+    response_cache: FakeResponseCache | None = None, sign_in_state: FakeSignInState | None = None
+) -> Persistence:
+    """In-memory stores in place of Postgres, which CI does not run outside `test_postgres.py`,
+    over an SQLite database that only the server lifespan connects to.
+    """
+    return Persistence(
+        database=async_sessionmaker(
+            create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool),
+            expire_on_commit=False,
+        ),
+        response_cache=response_cache or FakeResponseCache(),
+        sign_in_state=sign_in_state or FakeSignInState(),
+    )
 
 
 @asynccontextmanager

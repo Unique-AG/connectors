@@ -11,13 +11,14 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-from polixis_mcp.persistence.database import create_engine
+from polixis_mcp.persistence.database import create_database
+from polixis_mcp.persistence.database import Database
 from polixis_mcp.persistence.database import DatabaseSettings
+from polixis_mcp.persistence.database import open_database
 from polixis_mcp.persistence.response_cache import PostgresResponseCache
 from polixis_mcp.persistence.response_cache import ResponseCacheStore
-from polixis_mcp.persistence.store import postgres_store
-from polixis_mcp.persistence.store import Store
-from polixis_mcp.persistence.store import StoreSettings
+from polixis_mcp.persistence.store import PostgresSignInStateTable
+from polixis_mcp.persistence.store import SignInStateTable
 
 _logger = logging.getLogger(__name__)
 
@@ -26,40 +27,35 @@ class PersistenceSettings(BaseModel):
     """Each store reads its own settings from the environment."""
 
     database: DatabaseSettings = Field(default_factory=lambda: from_environment(DatabaseSettings))
-    store: StoreSettings = Field(default_factory=lambda: from_environment(StoreSettings))
 
 
 class Persistence(BaseModel):
-    """Every store the MCP owns. It exists before the server, since the upstream client caches
-    Polixis's answers in `response_cache`; the server lifespan opens and closes it. `store` is
-    the key-value table the sign-in state shares, kept here so its expired rows are culled.
+    """Every store the MCP owns, over one `database`. It exists before the server, since the
+    upstream client caches Polixis's answers in `response_cache`; the server lifespan opens and
+    closes it. `sign_in_state` is the key-value table the auth provider's own store writes, kept
+    here so its expired rows are culled.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(arbitrary_types_allowed=True, frozen=True)
 
-    store: Store
+    database: Database
     response_cache: ResponseCacheStore
+    sign_in_state: SignInStateTable
 
 
 def create_persistence(settings: PersistenceSettings) -> Persistence:
+    database = create_database(settings.database)
     return Persistence(
-        store=postgres_store(settings.store),
-        response_cache=PostgresResponseCache(create_engine(settings.database)),
+        database=database,
+        response_cache=PostgresResponseCache(database),
+        sign_in_state=PostgresSignInStateTable(database),
     )
 
 
 @asynccontextmanager
 async def open_persistence(persistence: Persistence) -> AsyncGenerator[None]:
-    """Connects now, so a database the server cannot reach stops it from starting."""
-    await persistence.store.setup()
-    try:
-        await persistence.response_cache.setup()
-        try:
-            yield
-        finally:
-            await persistence.response_cache.close()
-    finally:
-        await persistence.store.close()
+    async with open_database(persistence.database):
+        yield
 
 
 async def cull_expired_entries_periodically(
@@ -73,7 +69,7 @@ async def cull_expired_entries_periodically(
     """
     while True:
         try:
-            await persistence.store.cull()
+            await persistence.sign_in_state.cull()
             await persistence.response_cache.cull(max_bytes=max_cache_bytes)
         except Exception:
             _logger.warning("Could not delete the expired store entries", exc_info=True)

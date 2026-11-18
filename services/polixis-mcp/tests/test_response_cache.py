@@ -20,7 +20,7 @@ from polixis_mcp.upstream import UpstreamSettings
 from tests.offline_server import fake_cache_settings
 from tests.offline_server import fake_persistence
 from tests.offline_server import FakeResponseCache
-from tests.offline_server import FakeStore
+from tests.offline_server import FakeSignInState
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
 from tests.tool_calls import McpClient
@@ -97,9 +97,9 @@ async def test_the_server_culls_expired_entries_when_it_starts(
         returns=contexts.OwnershipPage,
     )
 
-    assert isinstance(persistence.store, FakeStore)
+    assert isinstance(persistence.sign_in_state, FakeSignInState)
     assert isinstance(persistence.response_cache, FakeResponseCache)
-    assert persistence.store.culls == 1
+    assert persistence.sign_in_state.culls == 1
     assert persistence.response_cache.culls == [500 * 1_000_000]
 
 
@@ -134,7 +134,7 @@ async def test_a_rejected_response_is_not_cached(
     ]
 
 
-class _ClosingPoolStore(FakeStore):
+class _ClosingPoolSignInState(FakeSignInState):
     """Fails every cull with an error that is not a Postgres one, as a closing pool does."""
 
     @override
@@ -147,7 +147,7 @@ async def test_a_failed_cull_is_logged_and_the_culling_goes_on(
 ) -> None:
     culling = asyncio.create_task(
         cull_expired_entries_periodically(
-            Persistence(store=_ClosingPoolStore(), response_cache=FakeResponseCache()),
+            fake_persistence(sign_in_state=_ClosingPoolSignInState()),
             every=600,
             max_cache_bytes=1_000,
         )
@@ -284,14 +284,14 @@ async def test_the_cull_runs_again_after_the_interval_it_is_given(
     monkeypatch.setattr(
         "polixis_mcp.persistence.persistence.asyncio.sleep", stop_after_the_first_wait
     )
-    store, cache = FakeStore(), FakeResponseCache()
+    sign_in_state, cache = FakeSignInState(), FakeResponseCache()
 
     with pytest.raises(asyncio.CancelledError):
         await cull_expired_entries_periodically(
-            Persistence(store=store, response_cache=cache), every=600, max_cache_bytes=1_000
+            fake_persistence(cache, sign_in_state), every=600, max_cache_bytes=1_000
         )
 
-    assert (store.culls, cache.culls, waits) == (1, [1_000], [600])
+    assert (sign_in_state.culls, cache.culls, waits) == (1, [1_000], [600])
 
 
 class _FailingWriteCache(FakeResponseCache):

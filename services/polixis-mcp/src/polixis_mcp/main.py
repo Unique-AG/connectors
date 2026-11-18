@@ -32,7 +32,7 @@ def main() -> None:
     persistence_settings = PersistenceSettings()
     # Read only in zitadel mode, so a server without sign-in starts without its variables.
     zitadel = from_environment(ZitadelSettings) if AuthSettings().mode is AuthMode.ZITADEL else None
-    auth = create_auth(zitadel=zitadel, server=server_settings, store=persistence_settings.store)
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=persistence_settings.database)
     persistence = create_persistence(persistence_settings)
     # Without sign-in there is no user to count tool calls under.
     rate_limit = _RateLimitSettings() if auth is not None else None

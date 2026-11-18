@@ -12,15 +12,15 @@ from polixis_mcp.persistence.persistence import PersistenceSettings
 from polixis_mcp.persistence.response_cache import PostgresResponseCache
 from polixis_mcp.persistence.response_cache import ResponseCacheStore
 from polixis_mcp.persistence.store import postgres_store
-from polixis_mcp.persistence.store import Store
+from polixis_mcp.persistence.store import PostgresSignInStateTable
 from polixis_mcp.persistence.store import StoreSettings
 
 __all__ = [
     "Persistence",
     "PersistenceSettings",
     "PostgresResponseCache",
+    "PostgresSignInStateTable",
     "ResponseCacheStore",
-    "Store",
     "StoreSettings",
     "create_persistence",
     "cull_expired_entries_periodically",

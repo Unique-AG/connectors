@@ -63,8 +63,10 @@ class CachingTransport(httpx2.AsyncBaseTransport):
     cached, which `record_cache_read` reads for the tool's `freshness`.
 
     Only a 200 with a JSON body is cached, and not one whose body is an `error`: Polixis answers
-    some failures, such as an id it does not know, with a 200. The cache is optional: a failed
-    read sends the request, and a failed write still returns Polixis's answer.
+    some failures, such as an id it does not know, with a 200. The body is kept as Polixis sent
+    it, so the client checks a cached answer against the operation's model as it would a fresh
+    one. The cache is optional: a failed read sends the request, and a failed write still
+    returns Polixis's answer.
     """
 
     def __init__(

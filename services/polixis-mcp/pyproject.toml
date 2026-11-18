@@ -34,6 +34,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "aiosqlite==0.22.1",
     "basedpyright==1.40.2",
     "mcp-architecture==0.1.0",
     "mcp-openapi[codegen]==0.1.0",
