@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
 from office_365_mcp.shared.notes import (
     client_url_of,
@@ -21,7 +22,6 @@ from office_365_mcp.shared.notes import (
     onenote_root,
     owner_named,
     web_url_of,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,

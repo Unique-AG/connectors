@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE,

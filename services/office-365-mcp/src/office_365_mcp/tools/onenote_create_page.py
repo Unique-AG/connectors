@@ -20,6 +20,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
     OnenoteSectionHandle,
@@ -34,7 +35,6 @@ from office_365_mcp.shared.notes import (
     onenote_root,
     section_audience,
     web_url_of,
-    write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (

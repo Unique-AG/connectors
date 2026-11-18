@@ -555,4 +555,4 @@ uc-11-36:
   asks_user: false
   chain:
     - tool: outlook_list_focused_overrides
-  note: "shared/focused_inbox.py:46-49: a sender that Microsoft gives with no tab is listed with a null tab, and the address stays."
+  note: "shared/outlook/focused_inbox.py:46-49: a sender that Microsoft gives with no tab is listed with a null tab, and the address stays."

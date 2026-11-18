@@ -35,11 +35,11 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.handles import CHAT_PERMISSION, CallTranscriptHandle
 from office_365_mcp.shared.identity import GRAPH_PERMISSION as USER_PERMISSION
 from office_365_mcp.shared.identity import signed_in_user
-from office_365_mcp.shared.meetings import MAX_ARTIFACT_SCAN, newest_of, user_id_of
-from office_365_mcp.shared.messages import unknown_enum_headers
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.transcripts import CALL_TRANSCRIPT_PERMISSION
+from office_365_mcp.shared.teams.meetings import MAX_ARTIFACT_SCAN, newest_of, user_id_of
+from office_365_mcp.shared.teams.messages import unknown_enum_headers
+from office_365_mcp.shared.teams.transcripts import CALL_TRANSCRIPT_PERMISSION
 from office_365_mcp.shared.window import as_utc, closes_at, opens_at
 
 TOOL_NAME = "teams_list_call_transcripts"

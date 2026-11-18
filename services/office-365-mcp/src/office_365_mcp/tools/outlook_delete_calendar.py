@@ -20,7 +20,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import CalendarSummary, confirmation_id_for
+from office_365_mcp.shared.calendar import CalendarSummary
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, calendar_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (

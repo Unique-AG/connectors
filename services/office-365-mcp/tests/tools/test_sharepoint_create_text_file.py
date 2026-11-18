@@ -30,9 +30,9 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Advised,

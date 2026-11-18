@@ -411,7 +411,7 @@ uc-13-23:
     - tool: teams_create_chat
       args: {chat_type: group}
       uses: {topic: the title that Mia gave, members: user id and name of Anna and Tom from the member rows}
-  note: "The argument rules refuse the title before the tool runs and before any question to Mia. Expected behaviour from src/office_365_mcp/tools/teams_create_chat.py:255-266 and src/office_365_mcp/shared/messages.py:328-330: the topic has at most 250 characters and must not contain a colon. Row 1 breaks the colon rule, and row 2 is one character above the limit."
+  note: "The argument rules refuse the title before the tool runs and before any question to Mia. Expected behaviour from src/office_365_mcp/tools/teams_create_chat.py:255-266 and src/office_365_mcp/shared/teams/messages.py:328-330: the topic has at most 250 characters and must not contain a colon. Row 1 breaks the colon rule, and row 2 is one character above the limit."
 
 uc-13-24:
   status: working
@@ -426,7 +426,7 @@ uc-13-24:
     - tool: teams_create_chat
       args: {chat_type: group}
       uses: {topic: the title of 250 characters, members: user id and name of Anna and Tom from the member rows}
-  note: "Expected behaviour from src/office_365_mcp/shared/messages.py:328 and src/office_365_mcp/tools/teams_create_chat.py:259: the limit is 250 characters, so a title of exactly 250 characters is accepted."
+  note: "Expected behaviour from src/office_365_mcp/shared/teams/messages.py:328 and src/office_365_mcp/tools/teams_create_chat.py:259: the limit is 250 characters, so a title of exactly 250 characters is accepted."
 
 uc-13-25:
   status: working
@@ -456,7 +456,7 @@ uc-13-26:
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
     - any_of: [teams_update_meeting, teams_delete_meeting]
-  note: "The tool refuses before it asks Mia. Row 1 is teams_update_meeting and row 2 is teams_delete_meeting. Expected behaviour from src/office_365_mcp/shared/meetings.py:170-174: Microsoft does not name the signed-in user as the organizer; the tool changes or deletes only a meeting that the signed-in user organizes; nothing changed."
+  note: "The tool refuses before it asks Mia. Row 1 is teams_update_meeting and row 2 is teams_delete_meeting. Expected behaviour from src/office_365_mcp/shared/teams/meetings.py:170-174: Microsoft does not name the signed-in user as the organizer; the tool changes or deletes only a meeting that the signed-in user organizes; nothing changed."
 
 uc-13-27:
   status: working
@@ -471,7 +471,7 @@ uc-13-27:
     - tool: teams_create_meeting
       args: {subject: Design review, starts_at: tomorrow 14:00, ends_at: tomorrow 13:00}
       uses: {attendees: user id and name of Anna from the member rows}
-  note: "The tool refuses before it asks Mia. Expected behaviour from src/office_365_mcp/shared/meetings.py:114-119: a meeting must end after it starts; a meeting that runs past midnight ends on the next day; make sure that the date of the end is correct."
+  note: "The tool refuses before it asks Mia. Expected behaviour from src/office_365_mcp/shared/teams/meetings.py:114-119: a meeting must end after it starts; a meeting that runs past midnight ends on the next day; make sure that the date of the end is correct."
 
 uc-13-28:
   status: working
@@ -485,7 +485,7 @@ uc-13-28:
       args: {chat_type: meeting, topic_contains: Design review}
     - tool: teams_read_meeting
       uses: {meeting_uri: uri of the meeting}
-  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:62 and :260: status not_ready means that no report exists yet; wait, then call again; it does not mean that nobody attended. A meeting counts as not ready for 4 hours after its end (src/office_365_mcp/shared/meetings.py:57)."
+  note: "Expected behaviour from src/office_365_mcp/tools/teams_read_meeting.py:62 and :260: status not_ready means that no report exists yet; wait, then call again; it does not mean that nobody attended. A meeting counts as not ready for 4 hours after its end (src/office_365_mcp/shared/teams/meetings.py:57)."
 
 uc-13-29:
   status: working
@@ -626,7 +626,7 @@ uc-13-42:
   asks_user: false
   chain:
     - any_of: [teams_update_meeting, teams_delete_meeting, teams_read_meeting]
-  note: "The tool refuses before it asks Mia and before it asks Microsoft. Rows 1 to 3 are teams_update_meeting, teams_delete_meeting, and teams_read_meeting. Expected behaviour from src/office_365_mcp/shared/meetings.py:159 and src/office_365_mcp/tools/teams_update_meeting.py:164: a meeting handle has exactly one shape, teams:///meetings/{join_web_url}; copy the meeting_uri of a tool result word for word."
+  note: "The tool refuses before it asks Mia and before it asks Microsoft. Rows 1 to 3 are teams_update_meeting, teams_delete_meeting, and teams_read_meeting. Expected behaviour from src/office_365_mcp/shared/teams/meetings.py:159 and src/office_365_mcp/tools/teams_update_meeting.py:164: a meeting handle has exactly one shape, teams:///meetings/{join_web_url}; copy the meeting_uri of a tool result word for word."
 
 uc-13-43:
   status: working
@@ -638,7 +638,7 @@ uc-13-43:
   chain:
     - tool: teams_update_meeting
       args: {}
-  note: "Rows 1 to 4 are a call with no change, a start with no end, an end with no start, and a start with no offset. Expected behaviour from src/office_365_mcp/tools/teams_update_meeting.py:207, src/office_365_mcp/tools/teams_update_meeting.py:209, and src/office_365_mcp/shared/meetings.py:230: the tool refuses before it asks Mia, and it changes nothing."
+  note: "Rows 1 to 4 are a call with no change, a start with no end, an end with no start, and a start with no offset. Expected behaviour from src/office_365_mcp/tools/teams_update_meeting.py:207, src/office_365_mcp/tools/teams_update_meeting.py:209, and src/office_365_mcp/shared/teams/meetings.py:230: the tool refuses before it asks Mia, and it changes nothing."
 
 uc-13-44:
   status: working
@@ -653,7 +653,7 @@ uc-13-44:
     - tool: teams_create_meeting
       args: {subject: Design review}
       uses: {attendees: user id and name of Anna from the member rows}
-  note: "Row 1 is a start that is no date and time, and row 2 is an end with no offset. Expected behaviour from src/office_365_mcp/shared/meetings.py:220: the value must be an ISO-8601 date and time with an offset; ask the user when the zone is not clear; the tool refuses before it asks Mia."
+  note: "Row 1 is a start that is no date and time, and row 2 is an end with no offset. Expected behaviour from src/office_365_mcp/shared/teams/meetings.py:220: the value must be an ISO-8601 date and time with an offset; ask the user when the zone is not clear; the tool refuses before it asks Mia."
 
 uc-13-45:
   status: working
@@ -706,7 +706,7 @@ uc-13-49:
     - tool: teams_update_meeting
       args: {subject: Design review 2}
       uses: {meeting_uri: uri of the meeting}
-  note: "Expected behaviour from src/office_365_mcp/shared/meetings.py:140: when Microsoft answers with no attendee list, the answer of the tool has no attendee ids."
+  note: "Expected behaviour from src/office_365_mcp/shared/teams/meetings.py:140: when Microsoft answers with no attendee list, the answer of the tool has no attendee ids."
 
 uc-13-50:
   status: working
@@ -720,7 +720,7 @@ uc-13-50:
       args: {chat_type: group}
     - tool: teams_add_chat_member
       uses: {chat_id: id of the chat, member: user id and name of Priya from her chat}
-  note: "Expected behaviour from src/office_365_mcp/shared/messages.py:613: a chat with no topic is named by the display names of its members."
+  note: "Expected behaviour from src/office_365_mcp/shared/teams/messages.py:613: a chat with no topic is named by the display names of its members."
 
 uc-13-47:
   deferred:

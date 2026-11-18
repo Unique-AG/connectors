@@ -21,7 +21,7 @@ from office_365_mcp.graph_client import (
     graph_step,
 )
 from office_365_mcp.shared.handles import MailAttachmentHandle, MailMessageHandle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import FileFromGraph, graph_mailbox
 
 STEP_MESSAGE_ATTACHMENTS = "message_attachments"

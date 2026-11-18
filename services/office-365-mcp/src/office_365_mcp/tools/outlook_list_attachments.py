@@ -8,8 +8,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
-from office_365_mcp.shared.attachments import AttachmentSummary, message_attachments
 from office_365_mcp.shared.handles import mail_message_handle
+from office_365_mcp.shared.outlook.attachments import AttachmentSummary, message_attachments
 from office_365_mcp.shared.seam import MAILBOX_FIELD, READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_attachments"

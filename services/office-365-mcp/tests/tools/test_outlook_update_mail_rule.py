@@ -16,7 +16,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphFailure, GraphNotFound, GraphSettings
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle
-from office_365_mcp.shared.rules import (
+from office_365_mcp.shared.outlook.rules import (
     RULE_FIELDS,
     MailRule,
     RuleActionName,

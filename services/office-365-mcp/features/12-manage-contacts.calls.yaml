@@ -189,7 +189,7 @@ uc-12-13:
     - tool: outlook_create_contact
       args: {given_name: Tom, surname: Berger, email_addresses: tom at acme}
   note: >-
-    Expected behaviour from shared/contacts.py:37-42 (not_one_address), a name is not an address, the
+    Expected behaviour from shared/outlook/contacts.py:37-42 (not_one_address), a name is not an address, the
     entry is not one address, and no contact was created. The text names no next step. Asking Mia is
     the way to get a valid address, because every address must come from the user
     (tools/outlook_create_contact.py:50). The step is the refused call.

@@ -20,6 +20,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.addresses import repeated_address
 from office_365_mcp.shared.calendar import (
     HIDE_ATTENDEES_CHANGE_FIELD,
     IMPORTANCE_CHANGE_FIELD,
@@ -41,7 +42,6 @@ from office_365_mcp.shared.calendar import (
     EventSummary,
     ShowAs,
     calendar_of,
-    confirmation_id_for,
     event_of,
     event_patch_body,
     invited_attendee,
@@ -52,14 +52,15 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.categories import (
+from office_365_mcp.shared.confirmation import confirmation_id_for
+from office_365_mcp.shared.handles import event_handle
+from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
     CategoryName,
     merged_categories,
     named_in_both,
 )
-from office_365_mcp.shared.handles import event_handle
-from office_365_mcp.shared.mail import AddressFault, one_address_each, repeated_address
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,

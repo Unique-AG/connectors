@@ -24,7 +24,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import ZONE_NAME, confirmation_id_for, event_of, wall_clock
+from office_365_mcp.shared.calendar import ZONE_NAME, event_of, wall_clock
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (

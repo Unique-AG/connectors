@@ -16,15 +16,13 @@ from pydantic import BaseModel, Field, StringConstraints
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.identity import (
     Person,
     address_in_question,
     person_in_question,
     user_bind,
 )
-from office_365_mcp.shared.meetings import distinct_people, named_people
-from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -32,6 +30,8 @@ from office_365_mcp.shared.seam import (
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.meetings import distinct_people, named_people
+from office_365_mcp.shared.teams.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT_TOPIC_PATTERN
 
 TOOL_NAME = "teams_create_chat"
 

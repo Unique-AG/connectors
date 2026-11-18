@@ -21,7 +21,7 @@ from office_365_mcp.graph_client import (
     graph_step,
     not_graph,
 )
-from office_365_mcp.shared.categories import CategoryName
+from office_365_mcp.shared.outlook.categories import CategoryName
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,

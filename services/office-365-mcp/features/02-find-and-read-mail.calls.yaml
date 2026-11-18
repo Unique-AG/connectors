@@ -521,7 +521,7 @@ uc-02-25:
     - tool: outlook_read_attachment
       uses: {uri: uri of the PDF}
   note: >-
-    Expected behaviour from shared/attachments.py:29 and :183-184, the cap is 10 * 1024 * 1024 bytes
+    Expected behaviour from shared/outlook/attachments.py:29 and :183-184, the cap is 10 * 1024 * 1024 bytes
     and the tool refuses only a size above it, so a file of exactly the cap is read. The file also
     passes the check on the downloaded bytes at attachments.py:212.
 
@@ -540,7 +540,7 @@ uc-02-26:
   note: >-
     Expected behaviour from tools/outlook_read_attachment.py:148-156 (_too_large), the tool never
     sends part of a file, tell the user to open the message in Outlook, and no other tool returns
-    the file. The size test is shared/attachments.py:183, size above MAX_BYTES. The listing gives the
+    the file. The size test is shared/outlook/attachments.py:183, size above MAX_BYTES. The listing gives the
     size, so the assistant can refuse before it reads.
 
 uc-02-27:
@@ -783,7 +783,7 @@ uc-02-40:
     - tool: outlook_list_attachments
     - tool: outlook_read_attachment
       uses: {uri: uri of the attachment from outlook_list_attachments}
-  note: "shared/attachments.py:217-226: a missing type, a type with no slash, and a text type with bytes that are not UTF-8 all give application/octet-stream."
+  note: "shared/outlook/attachments.py:217-226: a missing type, a type with no slash, and a text type with bytes that are not UTF-8 all give application/octet-stream."
 
 uc-02-41:
   status: working
@@ -797,7 +797,7 @@ uc-02-41:
     - tool: outlook_list_attachments
     - tool: outlook_read_attachment
       uses: {uri: uri of the attachment from outlook_list_attachments}
-  note: "expected behaviour from shared/attachments.py:204-213: the size check after the download uses the bytes that arrived, not the size that Microsoft announced."
+  note: "expected behaviour from shared/outlook/attachments.py:204-213: the size check after the download uses the bytes that arrived, not the size that Microsoft announced."
 
 uc-02-42:
   status: working
@@ -809,7 +809,7 @@ uc-02-42:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_list_attachments
-  note: "shared/attachments.py:115-122: a type of attachment that the tool does not know is listed with the kind unknown."
+  note: "shared/outlook/attachments.py:115-122: a type of attachment that the tool does not know is listed with the kind unknown."
 
 uc-02-43:
   status: working

@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     MailDestination,
     MailFault,
@@ -28,6 +27,7 @@ from office_365_mcp.shared.mail import (
     raise_when_no_message_succeeded,
     resolve_destination,
 )
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,

@@ -11,8 +11,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.shared.handles import ListItemHandle
-from office_365_mcp.shared.lists import ListItemSummary
 from office_365_mcp.shared.seam import Confirm
+from office_365_mcp.shared.sharepoint.lists import ListItemSummary
 from office_365_mcp.tools.sharepoint_update_list_item import a_person_agrees, update_list_item
 from tests.tools.two_call_confirmation import accepted, modern_context
 

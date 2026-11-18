@@ -20,8 +20,8 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import meeting_handle, meeting_uri_for
-from office_365_mcp.shared.meetings import not_a_meeting_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Confirm, Confirmed
+from office_365_mcp.shared.teams.meetings import not_a_meeting_handle
 from office_365_mcp.tools import teams_delete_meeting as deleter
 from office_365_mcp.tools.teams_delete_meeting import (
     DeletedMeeting,

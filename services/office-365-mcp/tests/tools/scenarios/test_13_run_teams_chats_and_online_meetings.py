@@ -12,8 +12,8 @@ from fastmcp import Client
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 
-from office_365_mcp.shared import meetings
 from office_365_mcp.shared.handles import meeting_uri_for
+from office_365_mcp.shared.teams import meetings
 from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.graph_fixtures import recorded_json
 from tests.tools.conftest import (

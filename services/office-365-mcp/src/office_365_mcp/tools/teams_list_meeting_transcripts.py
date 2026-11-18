@@ -33,7 +33,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import MeetingHandle, TranscriptHandle, meeting_handle
-from office_365_mcp.shared.meetings import (
+from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.meetings import (
     MAX_ARTIFACT_SCAN,
     MEETING_PERMISSION,
     TRANSCRIPT_PERMISSION,
@@ -41,15 +43,13 @@ from office_365_mcp.shared.meetings import (
     resolve_meeting,
     settled,
 )
-from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_meeting_transcripts"
 
 STEP_TRANSCRIPTS = "transcripts"
 
 # `tests/test_layering.py` rule 4 forbids importing teams_read_transcript, so the transcript
-# permission lives in `shared/meetings.py`. Entra redeems both under one token or neither.
+# permission lives in `shared/teams/meetings.py`. Entra redeems both under one token or neither.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {

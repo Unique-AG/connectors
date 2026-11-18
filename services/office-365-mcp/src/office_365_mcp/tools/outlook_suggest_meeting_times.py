@@ -25,18 +25,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.addresses import ONE_ADDRESS, repeated_address
 from office_365_mcp.shared.calendar import (
     EventTime,
     event_time,
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.mail import (
-    ONE_ADDRESS,
-    AddressFault,
-    one_address_each,
-    repeated_address,
-)
+from office_365_mcp.shared.mail import AddressFault, one_address_each
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 

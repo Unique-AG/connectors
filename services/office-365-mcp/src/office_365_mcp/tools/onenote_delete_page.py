@@ -11,13 +11,13 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteOwner, OnenoteSectionHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
     NotebookAudience,
     onenote_root,
     page_for_a_question,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,

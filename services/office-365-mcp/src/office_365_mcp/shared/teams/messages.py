@@ -37,7 +37,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
 from office_365_mcp.shared.identity import (

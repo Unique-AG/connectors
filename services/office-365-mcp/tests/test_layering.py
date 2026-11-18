@@ -17,7 +17,9 @@ disagree with it about. `graph_client/` is the transport they borrow.
 
 3. **`tools/` imports `shared/`, `graph_client/` and FastMCP, and nothing else of this package.**
    Not `server/`: a tool that reached into it would have its wiring somewhere other than in itself,
-   which is the shape this layout exists to avoid.
+   which is the shape this layout exists to avoid. Not `config`, `logging` or any other module of
+   the package either: a tool is told what it needs through `shared/`, and `tools/` itself is
+   allowed only because the registry in `tools/__init__.py` names its own modules.
 
 4. **No tool module imports another tool module.** Two tool files sharing a description constant, an
    error text or a helper would re-create the tool-declaration module they exist instead of, one
@@ -72,6 +74,13 @@ disagree with it about. `graph_client/` is the transport they borrow.
    `person_confirms` in the seam is where both eras are handled, and every tool that asks goes
    through it.
 
+10. **A tool imports the shared modules of its own surface and never those of another.** A tool
+    named `outlook_…`, `teams_…`, `sharepoint_…` or `onenote_…` may import the neutral modules
+    directly in `shared/` and its own `shared/<surface>/`, and never `shared/<other surface>/`. A
+    module goes into a surface package because only that surface's tools use it. A second surface
+    that reached into it would make it neutral without a move, and the package name would then
+    tell a reader something false.
+
 Every rule is paired with a guard that fails once the rule has nothing left to check, because a rule
 written down while it forbids nothing gets deleted for the wrong reason later, or worse, kept while
 the thing it covers quietly leaves. None of the rules is conditional: a rule that stops running is a
@@ -100,6 +109,10 @@ _SERVER_PREFIX = "office_365_mcp.server"
 _CONFIG_MODULE = "office_365_mcp.config"
 _GRAPH_CLIENT_PREFIX = "office_365_mcp.graph_client"
 _MCP_FRAMEWORK = "fastmcp"
+
+_TOOL_DEPENDENCIES: tuple[str, ...] = (_SHARED_PREFIX, _GRAPH_CLIENT_PREFIX, _TOOLS_PREFIX)
+
+_SURFACES: tuple[str, ...] = ("outlook", "teams", "sharepoint", "onenote")
 
 # Rule 8. The rule walks `src` only, so tests stay free to reach the pieces a package composes.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
@@ -510,6 +523,58 @@ def _registry_imports() -> set[str]:
     return found
 
 
+def _is_under(module: str, prefix: str) -> bool:
+    return module == prefix or module.startswith(f"{prefix}.")
+
+
+def _reached_modules(source: str, package: str | None = None) -> list[tuple[str, int]]:
+    """`from office_365_mcp import config` names the module `office_365_mcp`, so the member is what
+    tells which part of the package it reaches."""
+    tree = ast.parse(source)
+    return [
+        (module, line) for module, line in _imported_modules(tree, package) if module != _PACKAGE
+    ] + [
+        (member, line)
+        for member, line in _imported_members(tree, package)
+        if member.rsplit(".", 1)[0] == _PACKAGE
+    ]
+
+
+def _undeclared_dependencies(source: str, package: str | None = None) -> list[tuple[str, int]]:
+    return [
+        (module, line)
+        for module, line in _reached_modules(source, package)
+        if _is_under(module, _PACKAGE)
+        and not any(_is_under(module, allowed) for allowed in _TOOL_DEPENDENCIES)
+    ]
+
+
+def _surface_of(tool_name: str) -> str | None:
+    return next((surface for surface in _SURFACES if tool_name.startswith(f"{surface}_")), None)
+
+
+def _other_surface_imports(
+    source: str, surface: str, package: str | None = None
+) -> list[tuple[str, int]]:
+    """`from office_365_mcp.shared import outlook` reaches the package as a member, so members of
+    `shared` are judged as well as the modules imported by name."""
+    tree = ast.parse(source)
+    reached = _imported_modules(tree, package) + [
+        (member, line)
+        for member, line in _imported_members(tree, package)
+        if member.rsplit(".", 1)[0] == _SHARED_PREFIX
+    ]
+    return [
+        (module, line)
+        for module, line in reached
+        if any(
+            _is_under(module, f"{_SHARED_PREFIX}.{other}")
+            for other in _SURFACES
+            if other != surface
+        )
+    ]
+
+
 def _attribute_names(source: str) -> set[str]:
     """Attribute names rather than text so that rule 7 constrains code and leaves prose alone: the
     module it guards has to be able to name the Graph `recordingContentUrl` property it deliberately
@@ -675,6 +740,51 @@ class TestTheDetectionItself:
             + "from fastmcp import FastMCP\n",
             _TOOLS_PREFIX,
         )
+
+    def test_catches_a_tool_reaching_past_its_three_dependencies(self) -> None:
+        assert _undeclared_dependencies(
+            "from office_365_mcp.config import AppConfig\n"
+            + "from office_365_mcp import logging\n"
+            + "from office_365_mcp.server.readiness import ready_response\n"
+        ) == [
+            ("office_365_mcp.config", 1),
+            ("office_365_mcp.server.readiness", 3),
+            ("office_365_mcp.logging", 2),
+        ]
+
+    def test_leaves_the_three_dependencies_of_a_tool_alone(self) -> None:
+        assert not _undeclared_dependencies(
+            "from office_365_mcp.shared.seam import READ_ONLY\n"
+            + "from office_365_mcp.shared import identity\n"
+            + "from office_365_mcp.graph_client import graph_step\n"
+            + "from office_365_mcp.tools import get_me\n"
+            + "from fastmcp import FastMCP\n"
+        )
+
+    def test_catches_a_tool_reaching_into_another_surface(self) -> None:
+        assert _other_surface_imports(
+            "from office_365_mcp.shared.outlook.rules import RuleDraft\n"
+            + "from office_365_mcp.shared import sharepoint\n",
+            "teams",
+        ) == [
+            ("office_365_mcp.shared.outlook.rules", 1),
+            ("office_365_mcp.shared.sharepoint", 2),
+        ]
+
+    def test_leaves_the_own_surface_and_the_neutral_modules_alone(self) -> None:
+        assert not _other_surface_imports(
+            "from office_365_mcp.shared.teams.messages import MessageSummary\n"
+            + "from office_365_mcp.shared.teams import meetings\n"
+            + "from office_365_mcp.shared.calendar import EventDraft\n"
+            + "from office_365_mcp.shared import identity\n",
+            "teams",
+        )
+
+    def test_names_the_surface_by_the_tool_name_prefix(self) -> None:
+        assert [
+            _surface_of(name)
+            for name in ("outlook_list_mail", "teams_list_chats", "sharepointish_tool", "get_me")
+        ] == ["outlook", "teams", None, None]
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
         reached = _internal_imports(
@@ -925,6 +1035,66 @@ class TestAToolLeansOnlyOnSharedAndTheTransport:
             "a tool file must not import server/ — that is the shape it exists instead of, and a "
             + "tool that reaches into it has its wiring somewhere other than in itself. Bring it "
             + "into this file, and put anything a second tool needs into shared/:\n  "
+            + "\n  ".join(violations)
+        )
+
+    @pytest.mark.parametrize("source", _sources(_TOOLS), ids=_source_id)
+    def test_no_tool_module_imports_anything_else_of_ours(self, source: pathlib.Path) -> None:
+        violations = [
+            f"{source.relative_to(_SRC)}:{line} imports {module}"
+            for module, line in _undeclared_dependencies(source.read_text(), _package_of(source))
+        ]
+        assert not violations, (
+            "a tool file imports shared/, graph_client/ and FastMCP, and nothing else of this "
+            + "package. What a tool needs from the rest of the application reaches it through "
+            + "shared/, where every tool says it the same way:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestAToolStaysOnItsOwnSurface:
+    @pytest.mark.parametrize("surface", _SURFACES)
+    def test_every_surface_actually_has_tools(self, surface: str) -> None:
+        assert any(_surface_of(source.stem) == surface for source in _tool_modules()), (
+            f"no tool module is named {surface}_…, so rule 10 checks nothing for it"
+        )
+
+    @pytest.mark.parametrize(
+        "surface", [surface for surface in _SURFACES if (_SHARED / surface).is_dir()]
+    )
+    def test_every_surface_package_is_used_by_its_own_tools(self, surface: str) -> None:
+        prefix = f"{_SHARED_PREFIX}.{surface}"
+        users = [
+            source
+            for source in _tool_modules()
+            if _surface_of(source.stem) == surface
+            and _imports_under(source.read_text(), prefix, _package_of(source))
+        ]
+        assert users, (
+            f"no {surface}_… tool imports shared/{surface}/, so the package holds nothing that "
+            + "surface needs. Move what is left to where it is used"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [source for source in _tool_modules() if _surface_of(source.stem) is not None],
+        ids=_source_id,
+    )
+    def test_no_tool_imports_the_shared_modules_of_another_surface(
+        self, source: pathlib.Path
+    ) -> None:
+        surface = _surface_of(source.stem)
+        assert surface is not None
+        violations = [
+            f"{source.relative_to(_SRC)}:{line} imports {module}"
+            for module, line in _other_surface_imports(
+                source.read_text(), surface, _package_of(source)
+            )
+        ]
+        assert not violations, (
+            f"a {surface}_… tool must not import the shared modules of another surface. A module "
+            + "in shared/<surface>/ is there because only that surface uses it. When a second "
+            + "surface needs it, move it up to shared/ as a neutral module:\n  "
             + "\n  ".join(violations)
         )
 

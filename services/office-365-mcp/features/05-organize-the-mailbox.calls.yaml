@@ -627,7 +627,7 @@ uc-05-40:
     - tool: outlook_create_mail_rule
       args: {display_name: CEO to Anna}
       uses: {actions: forward_to holds the address from outlook_find_recipient, sequence: next free sequence from outlook_get_mailbox_settings}
-  note: "expected behaviour from shared/rules.py:117 (not_one_address): each address in a rule must be one SMTP address and not a display name, use outlook_find_recipient to find the address for a name that the user gave, then call again. The first call creates nothing and asks nothing. The second call asks Mia (uc-05-13)."
+  note: "expected behaviour from shared/outlook/rules.py:117 (not_one_address): each address in a rule must be one SMTP address and not a display name, use outlook_find_recipient to find the address for a name that the user gave, then call again. The first call creates nothing and asks nothing. The second call asks Mia (uc-05-13)."
 
 uc-05-41:
   status: working
@@ -796,7 +796,7 @@ uc-05-52:
       args: {destination: inbox}
       uses: {message_refs: uri of the message Brightway invoice from the listing of Deleted Items}
   must_not: [outlook_delete_folder]
-  note: "a delete only moves mail to Deleted Items, and the message stays recoverable there (tools/outlook_move_mail.py:70-76, and shared/rules.py:895-896: the user can move a message back from there). The way back is the same move tool with `inbox` as the destination (shared/mail.py:91-92, WellKnownFolder). The undo that uc-05-04 promises."
+  note: "a delete only moves mail to Deleted Items, and the message stays recoverable there (tools/outlook_move_mail.py:70-76, and shared/outlook/rules.py:895-896: the user can move a message back from there). The way back is the same move tool with `inbox` as the destination (shared/mail.py:91-92, WellKnownFolder). The undo that uc-05-04 promises."
 
 uc-05-53:
   status: working
@@ -1064,7 +1064,7 @@ uc-05-70:
     - tool: outlook_browse_folders
     - tool: outlook_create_mail_rule
       uses: {actions: move_to_folder with the uri of Finance from outlook_browse_folders}
-  note: "shared/rules.py:1170-1173 turns a size range into the Graph size range, and :1146-1150 turns a folder handle into its id."
+  note: "shared/outlook/rules.py:1170-1173 turns a size range into the Graph size range, and :1146-1150 turns a folder handle into its id."
 
 uc-05-71:
   status: working
@@ -1137,7 +1137,7 @@ uc-05-75:
       args: {actions: {mark_as_read: true}}
       uses: {rule_ref: uri of the rule from outlook_get_mailbox_settings}
     - tool: outlook_disable_mail_rule
-  note: "shared/rules.py:571-573 and :1038: a stored rule with no actions reads as no actions and merges with the given ones."
+  note: "shared/outlook/rules.py:571-573 and :1038: a stored rule with no actions reads as no actions and merges with the given ones."
 
 uc-05-76:
   status: working

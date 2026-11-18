@@ -28,8 +28,8 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.identity import Person
-from office_365_mcp.shared.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirmed
+from office_365_mcp.shared.teams.messages import CHAT_TOPIC_MAX_CHARACTERS
 from office_365_mcp.tools import teams_create_chat as creator
 from office_365_mcp.tools.teams_create_chat import NewChatKind, a_person_agrees, create_chat
 from tests.tools.scenarios.support import Person as Approver

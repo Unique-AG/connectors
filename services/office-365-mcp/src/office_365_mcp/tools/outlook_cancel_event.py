@@ -20,10 +20,10 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.calendar import (
     SERIES_MASTER_FIELD,
     EventAttendee,
-    confirmation_id_for,
     event_of,
     series_reach,
 )
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (

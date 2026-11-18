@@ -26,7 +26,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle
-from office_365_mcp.shared.rules import RULE_FIELDS
+from office_365_mcp.shared.outlook.rules import RULE_FIELDS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import outlook_delete_mail_rule as deleter
 from office_365_mcp.tools.outlook_delete_mail_rule import (

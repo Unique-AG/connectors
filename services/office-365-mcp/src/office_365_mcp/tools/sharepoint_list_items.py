@@ -13,7 +13,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import ListHandle, list_handle
-from office_365_mcp.shared.lists import (
+from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.sharepoint.lists import (
     NOT_A_LIST_HANDLE,
     VALUE_TYPES,
     ListColumn,
@@ -21,8 +23,6 @@ from office_365_mcp.shared.lists import (
     list_columns,
     value_refusal,
 )
-from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_list_items"
 

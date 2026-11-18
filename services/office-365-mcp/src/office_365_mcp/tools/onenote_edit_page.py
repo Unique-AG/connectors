@@ -14,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
@@ -22,7 +23,6 @@ from office_365_mcp.shared.notes import (
     page_for_a_question,
     page_summary,
     patch_page,
-    write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (

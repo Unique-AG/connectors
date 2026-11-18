@@ -11,8 +11,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step, no_retry
-from office_365_mcp.shared.categories import CategoryName
 from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import CategoryName
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_create_category"

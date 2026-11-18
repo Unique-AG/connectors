@@ -15,7 +15,13 @@ from pydantic import Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import MessageHandle
-from office_365_mcp.shared.messages import (
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Confirm,
+    graph_client_for_caller,
+    person_confirms,
+)
+from office_365_mcp.shared.teams.messages import (
     ATTACHMENTS_FIELD,
     CHANNEL_ID_FIELD,
     CHANNEL_IMPORTANCE_FIELD,
@@ -32,12 +38,6 @@ from office_365_mcp.shared.messages import (
     send_binding,
     send_question,
     subject_on_a_reply,
-)
-from office_365_mcp.shared.seam import (
-    WRITE_ADDITIVE,
-    Confirm,
-    graph_client_for_caller,
-    person_confirms,
 )
 
 TOOL_NAME = "teams_send_channel_message_with_files"

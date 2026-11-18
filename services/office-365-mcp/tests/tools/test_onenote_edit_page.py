@@ -28,13 +28,14 @@ from pydantic import ValidationError
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_edit_page as editor
 from office_365_mcp.tools.onenote_edit_page import EditCommand, a_person_agrees, edit_page

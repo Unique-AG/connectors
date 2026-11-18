@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import ListHandle, list_handle
-from office_365_mcp.shared.lists import NOT_A_LIST_HANDLE, ListColumn, list_columns
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.sharepoint.lists import NOT_A_LIST_HANDLE, ListColumn, list_columns
 
 TOOL_NAME = "sharepoint_get_list"
 

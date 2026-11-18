@@ -15,8 +15,8 @@ from office_365_mcp.shared.handles import (
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.messages import TeamsMessage, get_message
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
+from office_365_mcp.shared.teams.messages import TeamsMessage, get_message
 
 TOOL_NAME = "teams_read_message"
 

@@ -22,16 +22,16 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import ZONE_NAME, wall_clock
-from office_365_mcp.shared.categories import (
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.mail import FlagMoment, MailImportance
+from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
     CategoryName,
     merged_categories,
     named_in_both,
 )
-from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import FlagMoment, MailImportance
-from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,

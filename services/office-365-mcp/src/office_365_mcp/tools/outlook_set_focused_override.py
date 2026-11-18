@@ -13,8 +13,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
-from office_365_mcp.shared.focused_inbox import ClassifyAs, FocusedOverride
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.shared.addresses import ONE_ADDRESS
+from office_365_mcp.shared.outlook.focused_inbox import ClassifyAs, FocusedOverride
 from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, graph_client_for_caller
 
 TOOL_NAME = "outlook_set_focused_override"

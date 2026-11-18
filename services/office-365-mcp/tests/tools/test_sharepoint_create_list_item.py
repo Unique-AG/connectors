@@ -10,8 +10,8 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphUnavailable
 from office_365_mcp.shared.handles import ListHandle, ListItemHandle, list_item_handle
-from office_365_mcp.shared.lists import ListItemSummary
 from office_365_mcp.shared.seam import Confirm
+from office_365_mcp.shared.sharepoint.lists import ListItemSummary
 from office_365_mcp.tools.sharepoint_create_list_item import a_person_agrees, create_list_item
 from tests.tools.two_call_confirmation import accepted, modern_context
 

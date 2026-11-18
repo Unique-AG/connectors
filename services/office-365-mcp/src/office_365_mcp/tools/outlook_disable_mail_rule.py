@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import MailRuleHandle, mail_rule_handle
-from office_365_mcp.shared.rules import addresses_of
+from office_365_mcp.shared.outlook.rules import addresses_of
 from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, graph_client_for_caller
 
 TOOL_NAME = "outlook_disable_mail_rule"

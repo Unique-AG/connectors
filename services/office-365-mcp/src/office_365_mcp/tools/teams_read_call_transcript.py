@@ -12,7 +12,7 @@ from pydantic import Field
 from office_365_mcp.graph_client import GraphResponseTooLarge, graph_errors
 from office_365_mcp.shared.handles import CallTranscriptHandle, call_transcript_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.transcripts import (
+from office_365_mcp.shared.teams.transcripts import (
     CALL_TRANSCRIPT_PERMISSION,
     MAX_TRANSCRIPT_BYTES,
     FromSeconds,

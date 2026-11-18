@@ -17,7 +17,7 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.handles import ListHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.sites import not_a_site, site_by_path, site_path_of
+from office_365_mcp.shared.sharepoint.sites import not_a_site, site_by_path, site_path_of
 
 TOOL_NAME = "sharepoint_list_lists"
 

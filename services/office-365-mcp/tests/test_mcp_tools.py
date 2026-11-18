@@ -30,7 +30,7 @@ from office_365_mcp import tools as tool_package
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
-from office_365_mcp.shared import meetings
+from office_365_mcp.shared.teams import meetings
 from office_365_mcp.tools import TOOL_NAMES
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
@@ -1001,7 +1001,7 @@ class TestTheToolsThisServerAdvertises:
         fields = [_properties(taught[name]) for name in _MESSAGE_TOOLS]
         assert all(field == fields[0] for field in fields), (
             "every tool that reports a sender must describe its fields identically — they are one "
-            + "type in shared/messages.py, and a model reads them as one server"
+            + "type in shared/teams/messages.py, and a model reads them as one server"
         )
 
     async def test_teams_read_message_takes_exactly_one_required_handle(

@@ -47,8 +47,8 @@ from office_365_mcp.shared.calendar import (
     RecurrenceRule,
     ShowAs,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import CalendarHandle, event_handle
+from office_365_mcp.shared.outlook.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import outlook_create_event as creator
 from office_365_mcp.tools.outlook_create_event import CreatedEvent, a_person_agrees, create_event

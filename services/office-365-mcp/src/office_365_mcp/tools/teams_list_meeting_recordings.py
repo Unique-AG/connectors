@@ -29,7 +29,8 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
-from office_365_mcp.shared.meetings import (
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.meetings import (
     MAX_ARTIFACT_SCAN,
     MEETING_PERMISSION,
     RECORDING_PERMISSION,
@@ -38,7 +39,6 @@ from office_365_mcp.shared.meetings import (
     settled,
     user_id_of,
 )
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_meeting_recordings"

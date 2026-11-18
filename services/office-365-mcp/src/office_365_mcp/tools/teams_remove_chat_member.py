@@ -14,9 +14,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CHAT_PERMISSION
-from office_365_mcp.shared.messages import EVERYONE_SEES_IT, chat_in_question
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -24,6 +23,7 @@ from office_365_mcp.shared.seam import (
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import EVERYONE_SEES_IT, chat_in_question
 
 TOOL_NAME = "teams_remove_chat_member"
 

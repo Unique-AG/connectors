@@ -213,7 +213,7 @@ uc-03-15:
       uses: {uri: uri of the event from the listing}
     - tool: outlook_read_event_attachment
       uses: {uri: uri of the attachment}
-  note: "expected behaviour from tools/outlook_read_event_attachment.py, one row each. Outlook item, :67-73 _AN_ITEM: tell the user to open the attached item in Outlook. Link, :74-79 _A_LINK: tell the user to open the link from the event in Outlook. No size, :80-87 _NO_SIZE: tell the user to open the event in Outlook. A reported size of 10,485,761 bytes, :143 _too_large with shared/attachments.py:183 (size above MAX_BYTES of 10 * 1024 * 1024, :29): too large, tell the user to open the event in Outlook, and the tool never sends part of a file. The check uses the size that Microsoft reports and not the byte count of the file."
+  note: "expected behaviour from tools/outlook_read_event_attachment.py, one row each. Outlook item, :67-73 _AN_ITEM: tell the user to open the attached item in Outlook. Link, :74-79 _A_LINK: tell the user to open the link from the event in Outlook. No size, :80-87 _NO_SIZE: tell the user to open the event in Outlook. A reported size of 10,485,761 bytes, :143 _too_large with shared/outlook/attachments.py:183 (size above MAX_BYTES of 10 * 1024 * 1024, :29): too large, tell the user to open the event in Outlook, and the tool never sends part of a file. The check uses the size that Microsoft reports and not the byte count of the file."
 
 uc-03-16:
   status: working
@@ -229,7 +229,7 @@ uc-03-16:
       uses: {uri: uri of the event from the listing}
     - tool: outlook_read_event_attachment
       uses: {uri: uri of the attachment}
-  note: "expected behaviour from shared/attachments.py:183 and :29: only a reported size above MAX_BYTES (10 * 1024 * 1024 = 10,485,760 bytes) is refused, so a reported size of exactly the cap is returned."
+  note: "expected behaviour from shared/outlook/attachments.py:183 and :29: only a reported size above MAX_BYTES (10 * 1024 * 1024 = 10,485,760 bytes) is refused, so a reported size of exactly the cap is returned."
 
 uc-03-17:
   status: working

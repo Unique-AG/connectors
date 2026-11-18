@@ -60,10 +60,11 @@ from office_365_mcp.graph_operations import (
     start_tool_outcomes,
 )
 from office_365_mcp.metrics import configure_metrics
-from office_365_mcp.shared import seam, transcripts
+from office_365_mcp.shared import seam
 from office_365_mcp.shared.handles import TranscriptHandle
 from office_365_mcp.shared.seam import GraphToken, TokenExchangeFailed
-from office_365_mcp.shared.transcripts import STEP_ATTRIBUTED
+from office_365_mcp.shared.teams import transcripts
+from office_365_mcp.shared.teams.transcripts import STEP_ATTRIBUTED
 from office_365_mcp.tools import get_me
 from office_365_mcp.tools.get_me import SignedInUser
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
@@ -1276,8 +1277,8 @@ class TestNoStepNameIsTakenFromData:
         }
         assert outside_tools, (
             "every step is declared under tools/, so the modules that own a shared Graph call "
-            + "(shared/identity.py, shared/meetings.py) have stopped naming their own — find where "
-            + "their step went before assuming this rule still covers them"
+            + "(shared/identity.py, shared/teams/meetings.py) have stopped naming their own — find "
+            + "where their step went before assuming this rule still covers them"
         )
 
     @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)

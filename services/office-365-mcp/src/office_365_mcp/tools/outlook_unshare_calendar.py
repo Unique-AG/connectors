@@ -16,7 +16,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, calendar_permission_handle
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question

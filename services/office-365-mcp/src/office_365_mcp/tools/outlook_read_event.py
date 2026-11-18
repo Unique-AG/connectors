@@ -36,7 +36,7 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import event_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_event"

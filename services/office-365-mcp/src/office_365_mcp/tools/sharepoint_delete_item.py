@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     UNNAMED_FOLDER_LABEL,
@@ -24,7 +25,6 @@ from office_365_mcp.shared.files import (
     the_folder,
 )
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_item_handle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,

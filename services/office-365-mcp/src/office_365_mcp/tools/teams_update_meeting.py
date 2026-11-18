@@ -16,10 +16,17 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
 from office_365_mcp.shared.identity import Person
-from office_365_mcp.shared.meetings import (
+from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.seam import (
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Confirm,
+    graph_client_for_caller,
+    person_confirms,
+)
+from office_365_mcp.shared.teams.meetings import (
     attendee_ids,
     distinct_people,
     meeting_participants,
@@ -30,13 +37,6 @@ from office_365_mcp.shared.meetings import (
     organized_by,
     participant_id,
     resolve_meeting,
-)
-from office_365_mcp.shared.prose import cut_for_a_question
-from office_365_mcp.shared.seam import (
-    WRITE_DESTRUCTIVE_IDEMPOTENT,
-    Confirm,
-    graph_client_for_caller,
-    person_confirms,
 )
 
 TOOL_NAME = "teams_update_meeting"
