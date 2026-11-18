@@ -1,39 +1,13 @@
-import hashlib
-import json
-import re
-from collections.abc import Awaitable, Callable, Generator, Iterator, Mapping, Sequence
+from collections.abc import Generator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from types import TracebackType
 from typing import cast, override
 
-import httpx
 from fastmcp import Context
-from fastmcp.dependencies import Dependency, Depends
 from fastmcp.exceptions import ToolError
-from fastmcp.server.auth.providers.azure import EntraOBOToken
-from fastmcp.server.elicitation import (
-    AcceptedElicitation,
-    handle_elicit_accept,
-    parse_elicit_response_type,
-)
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import ToolResult
-from fastmcp.utilities.types import File
-from mcp.shared.exceptions import MCPError
-from mcp.types import (
-    INVALID_REQUEST,
-    METHOD_NOT_FOUND,
-    CallToolRequestParams,
-    ElicitRequest,
-    ElicitRequestFormParams,
-    ElicitResult,
-    InputRequiredResult,
-)
-from mcp.types.version import MODERN_PROTOCOL_VERSIONS
-from msgraph.generated.users.item.user_item_request_builder import UserItemRequestBuilder
-from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel
+from mcp.types import CallToolRequestParams
 
 from office_365_mcp.graph_client import (
     GraphFailure,
@@ -43,270 +17,9 @@ from office_365_mcp.graph_client import (
     GraphResponseTooLarge,
     GraphThrottled,
     GraphUnavailable,
-    current_graph_operation,
-    graph_client_for,
-    record_token_acquisition,
 )
-
-_GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
-
-READ_ONLY: dict[str, bool] = {"readOnlyHint": True, "openWorldHint": True}
-
-WRITE_ADDITIVE: dict[str, bool] = {
-    "readOnlyHint": False,
-    "destructiveHint": False,
-    "idempotentHint": False,
-    "openWorldHint": True,
-}
-WRITE_IDEMPOTENT: dict[str, bool] = {
-    "readOnlyHint": False,
-    "destructiveHint": False,
-    "idempotentHint": True,
-    "openWorldHint": True,
-}
-WRITE_DESTRUCTIVE: dict[str, bool] = {
-    "readOnlyHint": False,
-    "destructiveHint": True,
-    "idempotentHint": False,
-    "openWorldHint": True,
-}
-WRITE_DESTRUCTIVE_IDEMPOTENT: dict[str, bool] = {
-    "readOnlyHint": False,
-    "destructiveHint": True,
-    "idempotentHint": True,
-    "openWorldHint": True,
-}
-
-REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
-    {
-        "User.Read",
-        "Chat.Read",
-        "Team.ReadBasic.All",
-        "Channel.ReadBasic.All",
-        "ChannelMessage.Read.All",
-        "ChatMessage.Send",
-        "ChannelMessage.Send",
-        "OnlineMeetings.Read",
-        "OnlineMeetingTranscript.Read.All",
-        "CallTranscripts.Read.All",
-        "OnlineMeetingRecording.Read.All",
-        "ChannelMessage.ReadWrite",
-        "Chat.ReadWrite",
-        "Chat.Create",
-        "ChatMember.ReadWrite",
-        "OnlineMeetings.ReadWrite",
-        "OnlineMeetingArtifact.Read.All",
-        "Mail.Read",
-        "Mail.Read.Shared",
-        "People.Read",
-        "MailboxSettings.Read",
-        "Mail.ReadWrite",
-        "Mail.ReadWrite.Shared",
-        "Mail.Send",
-        "Mail.Send.Shared",
-        "Mail.ReadBasic",
-        "MailboxSettings.ReadWrite",
-        "Calendars.Read",
-        "Calendars.Read.Shared",
-        "Calendars.ReadBasic",
-        "Calendars.ReadWrite",
-        "Calendars.ReadWrite.Shared",
-        "Files.Read.All",
-        "Files.ReadWrite.All",
-        "Sites.Read.All",
-        "Sites.ReadWrite.All",
-        "Notes.Read",
-        "Notes.Read.All",
-        "Notes.Create",
-        "Notes.ReadWrite",
-        "Place.Read.All",
-        "Group.Read.All",
-        "Contacts.Read",
-        "Contacts.ReadWrite",
-    }
-)
-
-
-def graph_scope(permission: str) -> str:
-    return f"{_GRAPH_SCOPE_PREFIX}{permission}"
-
-
-class TokenExchangeFailed(Exception):
-    def __init__(self, *, permissions: tuple[str, ...], cause: BaseException) -> None:
-        super().__init__(f"Microsoft 365 issued no token for {_named(permissions)}")
-        self.permissions: tuple[str, ...] = permissions
-        self.cause: BaseException = cause
-
-
-class GraphToken(Dependency[str]):
-    def __init__(self, *permissions: str) -> None:
-        assert permissions, "a token is exchanged for at least one permission"
-        self._permissions: tuple[str, ...] = permissions
-        self._exchange: Dependency[str] = cast(
-            "Dependency[str]",
-            cast("object", EntraOBOToken([graph_scope(permission) for permission in permissions])),
-        )
-
-    @override
-    async def __aenter__(self) -> str:
-        try:
-            token = await self._exchange.__aenter__()
-        except Exception as failure:
-            refused = any(_ENTRA_CODE.search(str(cause)) for cause in _causes(failure))
-            record_token_acquisition(
-                current_graph_operation(), result="refused" if refused else "failed"
-            )
-            raise TokenExchangeFailed(permissions=self._permissions, cause=failure) from failure
-        record_token_acquisition(current_graph_operation(), result="ok")
-        return token
-
-    @override
-    async def __aexit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ) -> None:
-        await self._exchange.__aexit__(exc_type, exc_value, traceback)
-
-
-def _graph_token(*permissions: str) -> str:
-    exchange = GraphToken(*permissions)
-    return Depends(lambda: exchange)
-
-
-def graph_client_for_caller(transport: httpx.AsyncClient, *permissions: str) -> GraphServiceClient:
-    token = _graph_token(*permissions)
-
-    def client_for_this_call(access_token: str = token) -> GraphServiceClient:
-        return graph_client_for(transport, access_token)
-
-    return Depends(client_for_this_call)
-
-
-def graph_mailbox(client: GraphServiceClient, mailbox: str | None) -> UserItemRequestBuilder:
-    if mailbox is None:
-        return client.me
-    return client.users.by_user_id(mailbox)
-
-
-MAILBOX_FIELD: str = (
-    "A shared or delegated mailbox to act on, as its user principal name or Entra object id, "
-    + "instead of the signed-in user's own mailbox. Omit for the signed-in user's own mailbox."
-)
-
-
-_ASK_AGAIN = (
-    "Do not call this tool again for the same request unless the user asks for it in a new message."
-)
-
-type Confirmed = str | InputRequiredResult | None
-
-type Confirm = Callable[[str, str], Awaitable[Confirmed]]
-
-type DigestPart = str | int | bool | None | Sequence[DigestPart] | Mapping[str, DigestPart]
-
-_CONFIRMATION = "confirm"
-
-
-def confirmation_digest(*parts: BaseModel | DigestPart) -> str:
-    canonical = [
-        part.model_dump(mode="json", exclude_none=True) if isinstance(part, BaseModel) else part
-        for part in parts
-    ]
-    return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
-
-
-def _modern_protocol(ctx: Context) -> bool:
-    request = ctx.request_context
-    return request is not None and request.protocol_version in MODERN_PROTOCOL_VERSIONS
-
-
-_CANNOT_BE_ASKED = frozenset({METHOD_NOT_FOUND, INVALID_REQUEST})
-
-
-def _nobody_to_ask(nothing_happened: str) -> str:
-    return (
-        f"{nothing_happened} This connector must ask a person to agree to this request. The MCP "
-        + "client or its connection does not support elicitation, so this connector cannot ask a "
-        + "person. If you call this tool again, the call will fail the same way.\n\n"
-        + "Tell the user that their client cannot ask them to agree to this request. Tell them "
-        + "that they can do this task in the Microsoft 365 app. "
-        + _ASK_AGAIN
-    )
-
-
-def _no_answer(nothing_happened: str) -> str:
-    return (
-        f"{nothing_happened} This connector tried to ask a person to agree to this request. "
-        + "The MCP client sent no answer that this connector can use. Tell the user that this "
-        + "connector received no answer, and that they can make the same request again. "
-        + _ASK_AGAIN
-    )
-
-
-def _not_agreed(nothing_happened: str) -> str:
-    return (
-        f"{nothing_happened} The person at the other end of this conversation was asked to "
-        + "confirm it and did not agree. Nothing was changed, so this is not a failure to "
-        + f"report as one: say that the request was not confirmed. {_ASK_AGAIN}"
-    )
-
-
-def _another_request(nothing_happened: str) -> str:
-    return (
-        f"{nothing_happened} The confirmation that came back was given for a different request "
-        + "than this one, so that agreement does not cover this request, and nothing was changed. "
-        + f"Ask the user again and call this tool with exactly what they confirm. {_ASK_AGAIN}"
-    )
-
-
-def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened: str) -> Confirm:
-    answers = parse_elicit_response_type([agree, decline])
-
-    async def elicited(question: str) -> str | None:
-        try:
-            answer = await ctx.elicit(question, response_type=[agree, decline])
-        except Exception as unanswered:
-            if isinstance(unanswered, MCPError) and unanswered.code in _CANNOT_BE_ASKED:
-                return _nobody_to_ask(nothing_happened)
-            return _no_answer(nothing_happened)
-        if not isinstance(answer, AcceptedElicitation) or answer.data != agree:
-            return _not_agreed(nothing_happened)
-        return None
-
-    def asked(question: str, about: str) -> Confirmed:
-        answered = (ctx.input_responses or {}).get(_CONFIRMATION)
-        if answered is None:
-            return InputRequiredResult(
-                input_requests={
-                    _CONFIRMATION: ElicitRequest(
-                        params=ElicitRequestFormParams(
-                            message=question, requested_schema=answers.schema
-                        )
-                    )
-                },
-                request_state=about,
-            )
-        if not isinstance(answered, ElicitResult) or answered.action != "accept":
-            return _not_agreed(nothing_happened)
-        if ctx.request_state != about:
-            return _another_request(nothing_happened)
-        try:
-            accepted = handle_elicit_accept(answers, answered.content)
-        except Exception:
-            return _not_agreed(nothing_happened)
-        chosen = cast("str", accepted.data)
-        return None if chosen == agree else _not_agreed(nothing_happened)
-
-    async def confirm(question: str, about: str) -> Confirmed:
-        return asked(question, about) if _modern_protocol(ctx) else await elicited(question)
-
-    return confirm
-
-
-def answer_pending(ctx: Context) -> bool:
-    return (ctx.input_responses or {}).get(_CONFIRMATION) is not None
+from office_365_mcp.shared.seam.caller import ENTRA_CODE, TokenExchangeFailed, causes
+from office_365_mcp.shared.seam.permissions import named_permissions
 
 
 class Advised(ToolError):
@@ -376,7 +89,7 @@ class GraphAdviceMiddleware(Middleware):
         *,
         repeatable: bool,
     ) -> ToolError | None:
-        for cause in _causes(error):
+        for cause in causes(error):
             if isinstance(cause, Advised):
                 return None
             if isinstance(cause, TokenExchangeFailed):
@@ -403,22 +116,10 @@ async def _repeatable(ctx: Context | None, tool: str) -> bool:
     return hints is not None and bool(hints.read_only_hint or hints.idempotent_hint)
 
 
-def _causes(error: BaseException) -> Iterator[BaseException]:
-    seen: set[int] = set()
-    cause: BaseException | None = error
-    while cause is not None and id(cause) not in seen:
-        seen.add(id(cause))
-        yield cause
-        cause = cause.__cause__
-
-
-_ENTRA_CODE = re.compile(r"AADSTS\d+")
-
-
 def _token_advice(failure: BaseException, permissions: tuple[str, ...]) -> str:
-    code = _ENTRA_CODE.search(str(failure))
+    code = ENTRA_CODE.search(str(failure))
     diagnostics = code.group() if code is not None else type(failure).__name__
-    named = _named(permissions)
+    named = named_permissions(permissions)
     several = len(permissions) > 1
     noun = "permissions" if several else "permission"
     consented = "were never consented to" if several else "was never consented to"
@@ -546,7 +247,7 @@ def _remedy(
             return _NEEDS_A_TEAMS_LICENSE
         if forbidden is not None:
             return forbidden
-        named = _named(permissions)
+        named = named_permissions(permissions)
         noun = "permissions" if len(permissions) > 1 else "permission"
         return (
             f"Microsoft 365 refused this request: the connector may not use {named} on behalf of "
@@ -609,12 +310,6 @@ def _graphs_reason(failure: GraphFailure) -> str:
     return f' Microsoft 365 gave this reason: "{failure.reason}"'
 
 
-def _named(permissions: tuple[str, ...]) -> str:
-    if len(permissions) == 1:
-        return permissions[0]
-    return " and ".join((", ".join(permissions[:-1]), permissions[-1]))
-
-
 def _diagnostics(failure: GraphFailure) -> str:
     parts = [
         f"{label} {value}"
@@ -626,13 +321,3 @@ def _diagnostics(failure: GraphFailure) -> str:
         if value is not None
     ]
     return f" ({', '.join(parts)})" if parts else ""
-
-
-class FileFromGraph(File):
-    def __init__(self, content: bytes, *, name: str | None, mime_type: str) -> None:
-        self.mime_type: str = mime_type
-        super().__init__(data=content, name=name)
-
-    @override
-    def _get_mime_type(self) -> str:
-        return self.mime_type

@@ -101,7 +101,7 @@ uc-04-07:
       bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
       approval: "no"
       expect:
-        tool_error: {shared.seam._not_agreed: [tools.outlook_send_draft._NOTHING_SENT]}
+        tool_error: {shared.seam.elicitation._not_agreed: [tools.outlook_send_draft._NOTHING_SENT]}
         graph_calls: {GET /v1.0/me/messages/*: 1}
   note: Mia declines, so the tool sends nothing
   fixture: uc-04-07
@@ -116,7 +116,7 @@ uc-04-08:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: "the tool sends nothing when the draft changed after the question, and a new call asks Mia about the draft as it is now. On the older elicitation path Mia gets the changed-after-asking text (tools/outlook_send_draft.py:208-212, _refusal_after). On a connection that uses the 2026-07-28 protocol the new change key gives a new digest (seam.py:283), so Mia gets the different-request text of uc-04-34 and not this text."
+  note: "the tool sends nothing when the draft changed after the question, and a new call asks Mia about the draft as it is now. On the older elicitation path Mia gets the changed-after-asking text (tools/outlook_send_draft.py:208-212, _refusal_after). On a connection that uses the 2026-07-28 protocol the new change key gives a new digest (seam/elicitation.py:118), so Mia gets the different-request text of uc-04-34 and not this text."
 
 uc-04-12:
   status: working
@@ -216,7 +216,7 @@ uc-04-15:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: "The tool needs Mia's approval, so no question is shown here, and it sends nothing when the client cannot ask (the client answers METHOD_NOT_FOUND or INVALID_REQUEST, shared/seam.py:216-225 and :261-262) and tells the model to say so. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
+  note: "The tool needs Mia's approval, so no question is shown here, and it sends nothing when the client cannot ask (the client answers METHOD_NOT_FOUND or INVALID_REQUEST, shared/seam/elicitation.py:53-61 and :96-97) and tells the model to say so. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
 
 uc-04-16:
   status: working
@@ -283,7 +283,7 @@ uc-04-20:
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
   must_not: [outlook_draft_mail, outlook_send_draft]
-  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in to this connector again. No access, seam.py:528-537: ask a Microsoft 365 administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-04-37), so the third row means busy through every try."
+  note: "expected behaviour from shared/seam/advice.py, one text for each Examples row. Sign-in expired, seam/advice.py:251-256: ask the user to sign in to this connector again. No access, seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the permissions. Busy with a wait of 30 seconds, seam/advice.py:232-244: retry after 30 seconds, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-04-37), so the third row means busy through every try."
 
 uc-04-21:
   status: working
@@ -298,7 +298,7 @@ uc-04-21:
       args: {query: Anna Meier}
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
-  note: "expected behaviour from shared/seam.py:546-553 for a read: retry once. The search tool is read-only. The row that never ends maps to seam.py:562-570: retry once if the list matters, and if it happens again, stop and report. The row that never ends applies only to the step that scans the mail of Mia, which runs only when the search of people finds nobody (tools/outlook_find_recipient.py:155-159,202-205)."
+  note: "expected behaviour from shared/seam/advice.py:279-286 for a read: retry once. The search tool is read-only. The row that never ends maps to seam/advice.py:295-303: retry once if the list matters, and if it happens again, stop and report. The row that never ends applies only to the step that scans the mail of Mia, which runs only when the search of people finds nobody (tools/outlook_find_recipient.py:155-159,202-205)."
 
 uc-04-22:
   status: working
@@ -312,7 +312,7 @@ uc-04-22:
       args: {query: Anna Meier}
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
-  note: "expected behaviour from shared/seam.py:546-553: retry once, and if it fails again the same way, stop and report it. The assistant calls the search twice and no third time."
+  note: "expected behaviour from shared/seam/advice.py:279-286: retry once, and if it fails again the same way, stop and report it. The assistant calls the search twice and no third time."
 
 uc-04-23:
   status: working
@@ -324,7 +324,7 @@ uc-04-23:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in again. No access, seam.py:528-537: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. The busy row also does not say that the mail was not sent: the write runs with no_retry (graph_client/client.py:220-232) and a 503 with a wait time can arrive after Microsoft did the change (errors.py:293-303, uc-04-36). No row says the mail was sent."
+  note: "expected behaviour from shared/seam/advice.py, one text for each Examples row. Sign-in expired, seam/advice.py:251-256: ask the user to sign in again. No access, seam/advice.py:261-270: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam/advice.py:232-244: retry after 30 seconds, not sooner. The busy row also does not say that the mail was not sent: the write runs with no_retry (graph_client/client.py:220-232) and a 503 with a wait time can arrive after Microsoft did the change (errors.py:293-303, uc-04-36). No row says the mail was sent."
 
 uc-04-24:
   status: working
@@ -352,14 +352,14 @@ uc-04-25:
       bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
       approval: "yes"
       expect:
-        tool_error: {shared.seam._outcome_unknown: [tools.outlook_send_draft.CHANGE_SHOWN_BY]}
+        tool_error: {shared.seam.advice._outcome_unknown: [tools.outlook_send_draft.CHANGE_SHOWN_BY]}
         graph_calls: {GET /v1.0/me/messages/*: 2, POST /v1.0/me/messages/*/send: 1}
     - tool: outlook_list_mail
       args: {folder: sentitems}
       expect:
         result: {messages: []}
         graph_calls: {GET /v1.0/me/mailFolders/sentitems: 1, GET /v1.0/me/mailFolders/sentitems/messages: 1}
-  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail. The send runs with no_retry (graph_client/client.py:220-232), so one failure makes exactly one send call (tests/test_error_mapping.py:654-698 states the same for other writes). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text and not this text (uc-04-36). An unreadable answer is not a row: a send has no answer body, and a 2xx is a success without parsing (kiota send_no_response_content_async). The assistant calls outlook_send_draft again only when the sent items do not show the message, and the read before each send gives not found or not-a-draft for a draft that went out (tools/outlook_send_draft.py:173-183)."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail. The send runs with no_retry (graph_client/client.py:220-232), so one failure makes exactly one send call (tests/test_error_mapping.py:654-698 states the same for other writes). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text and not this text (uc-04-36). An unreadable answer is not a row: a send has no answer body, and a 2xx is a success without parsing (kiota send_no_response_content_async). The assistant calls outlook_send_draft again only when the sent items do not show the message, and the read before each send gives not found or not-a-draft for a draft that went out (tools/outlook_send_draft.py:173-183)."
   variants:
     fails:
       fixture: uc-04-25
@@ -381,14 +381,14 @@ uc-04-26:
     - tool: outlook_draft_mail
       args: {to: [anna.meier@example.com], subject: Contract, body: request for the contract by Friday}
       expect:
-        tool_error: {shared.seam._outcome_unknown: [tools.outlook_draft_mail.CHANGE_SHOWN_BY]}
+        tool_error: {shared.seam.advice._outcome_unknown: [tools.outlook_draft_mail.CHANGE_SHOWN_BY]}
         graph_calls: {POST /v1.0/me/messages: 1}
     - tool: outlook_list_mail
       args: {folder: drafts}
       expect:
         result: {messages: []}
         graph_calls: {GET /v1.0/me/mailFolders/drafts: 1, GET /v1.0/me/mailFolders/drafts/messages: 1}
-  note: "expected behaviour from shared/seam.py:451-470: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:215), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
+  note: "expected behaviour from shared/seam/advice.py:182-201: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:215), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
   variants:
     fails:
       fixture: uc-04-26
@@ -412,7 +412,7 @@ uc-04-27:
       args: {subject: Contract, body: a short note}
       uses: {to: address of Anna}
   must_not: [outlook_send_draft]
-  note: "expected behaviour from shared/seam.py:579-584: bad request, the same call fails the same way, and Microsoft's reason follows (seam.py:586-589). The assistant does not call the tool again with the same arguments."
+  note: "expected behaviour from shared/seam/advice.py:312-317: bad request, the same call fails the same way, and Microsoft's reason follows (seam/advice.py:320-322). The assistant does not call the tool again with the same arguments."
 
 uc-04-28:
   status: working
@@ -486,7 +486,7 @@ uc-04-32:
     - tool: outlook_draft_mail
       args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body: the order is confirmed}
   must_not: [outlook_send_draft]
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again."
+  note: "expected behaviour from shared/seam/elicitation.py:73-78 and 64-70, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again."
 
 uc-04-33:
   status: working
@@ -501,9 +501,9 @@ uc-04-33:
       bind: {message_ref: outlook:///messages/AAMkAGI2RUN-draft-0001%3D}
       approval: unanswered
       expect:
-        tool_error: {shared.seam._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}
+        tool_error: {shared.seam.elicitation._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}
         graph_calls: {GET /v1.0/me/messages/*: 1}
-  note: "expected behaviour from shared/seam.py:227-233 (_no_answer): the client sent no answer that the connector can use, tell the user that the connector received no answer and that they can make the same request again. The same text covers an error or a timeout of the question."
+  note: "expected behaviour from shared/seam/elicitation.py:64-70 (_no_answer): the client sent no answer that the connector can use, tell the user that the connector received no answer and that they can make the same request again. The same text covers an error or a timeout of the question."
   fixture: uc-04-07
 
 uc-04-34:
@@ -516,7 +516,7 @@ uc-04-34:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: "expected behaviour from shared/seam.py:244-249 (_another_request) and 283: the agreement was given for a different request, so it covers nothing and nothing changed. Ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that uses the 2026-07-28 protocol, where the answer carries the state of the question."
+  note: "expected behaviour from shared/seam/elicitation.py:81-86 (_another_request) and 118: the agreement was given for a different request, so it covers nothing and nothing changed. Ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that uses the 2026-07-28 protocol, where the answer carries the state of the question."
 
 uc-04-35:
   status: working
@@ -544,7 +544,7 @@ uc-04-36:
   asks_user: false
   chain:
     - any_of: [outlook_draft_mail, outlook_draft_reply_all]
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam.py:514-518: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_draft_mail and outlook_draft_reply_all (tools/outlook_draft_reply_all.py:453 is no_retry). Neither asks Mia a question. A second call can make a second draft, and nothing in the advice says to look in the drafts first. A send with a wait time is the third row of uc-04-23. An internal error or a timeout is uc-04-26 and uc-04-42."
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_draft_mail and outlook_draft_reply_all (tools/outlook_draft_reply_all.py:453 is no_retry). Neither asks Mia a question. A second call can make a second draft, and nothing in the advice says to look in the drafts first. A send with a wait time is the third row of uc-04-23. An internal error or a timeout is uc-04-26 and uc-04-42."
 
 uc-04-37:
   status: working
@@ -631,7 +631,7 @@ uc-04-42:
       uses: {message_ref: uri of the message}
     - tool: outlook_list_mail
       args: {folder: drafts}
-  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail (CHANGE_SHOWN_BY, tools/outlook_draft_reply_all.py:66). The first write (create reply-all) runs with no_retry (tools/outlook_draft_reply_all.py:453, graph_client/client.py:220-232), so one failure makes exactly one create call. The assistant creates a second reply only when the drafts do not show the first. The rows are an internal error with no wait time and a timeout. A 503 or 504 with a wait time gets the retry-after text and not this text (uc-04-36, now a row there; uc-04-43 is retired). The same check for a new note is uc-04-26."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail (CHANGE_SHOWN_BY, tools/outlook_draft_reply_all.py:66). The first write (create reply-all) runs with no_retry (tools/outlook_draft_reply_all.py:453, graph_client/client.py:220-232), so one failure makes exactly one create call. The assistant creates a second reply only when the drafts do not show the first. The rows are an internal error with no wait time and a timeout. A 503 or 504 with a wait time gets the retry-after text and not this text (uc-04-36, now a row there; uc-04-43 is retired). The same check for a new note is uc-04-26."
 
 uc-04-44:
   status: working
@@ -729,7 +729,7 @@ uc-04-50:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - any_of: [outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft]
-  note: "expected behaviour from shared/seam.py:268-293: a decline gives _not_agreed and no answer gives _no_answer. The write comes after the answer (tools/outlook_draft_reply.py:320-335), so the shared mailbox is not touched."
+  note: "expected behaviour from shared/seam/elicitation.py:103-128: a decline gives _not_agreed and no answer gives _no_answer. The write comes after the answer (tools/outlook_draft_reply.py:320-335), so the shared mailbox is not touched."
 
 uc-04-51:
   status: working
@@ -742,7 +742,7 @@ uc-04-51:
   chain:
     - tool: outlook_draft_mail
       uses: {to: address of Anna}
-  note: "shared/seam.py:208-293: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing (for example tools/outlook_draft_mail.py:197-198)."
+  note: "shared/seam/elicitation.py:45-128: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing (for example tools/outlook_draft_mail.py:197-198)."
 
 uc-04-52:
   status: working
@@ -844,7 +844,7 @@ uc-04-59:
   chain:
     - tool: outlook_send_draft
       uses: {message_ref: uri of the draft}
-  note: "shared/seam.py:208-293: on a connection of the newer protocol the tool returns an input-required result with the question and sends nothing (tools/outlook_send_draft.py:186-187)."
+  note: "shared/seam/elicitation.py:45-128: on a connection of the newer protocol the tool returns an input-required result with the question and sends nothing (tools/outlook_send_draft.py:186-187)."
 
 uc-04-60:
   status: working

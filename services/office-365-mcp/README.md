@@ -74,9 +74,10 @@ disagree about a shared fact. The `shared/` package lists every fact they must n
 - `identity.py` owns who the signed-in user is. The tool `get_me` reports this identity, and every
   other answer is correlated against it. This file stops two tools from giving two different
   answers to "who am I".
-- `seam.py` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
+- `seam/` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
   and the mapping from a Graph failure to advice. A model reads every refusal on this server as one
-  voice, so this mapping must live in one place.
+  voice, so this mapping must live in one place. The package has one module for each concern, and
+  a tool imports the names from the package, not from its modules.
 
 A fact belongs in `shared/` under one condition. Two tools each need their own copy of the fact,
 and a difference between the two copies is a bug a caller can see. Examples are:
@@ -125,7 +126,7 @@ handle before they send a request to Graph.
 
 This layout follows seven layering rules:
 
-1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the
+1. `shared/` imports no tool module. Only `shared/seam/` imports FastMCP. This keeps the
    framework out of the handle grammar and the rest of the shared vocabulary.
 2. `graph_client/` imports nothing from this application. It uses its own frozen `GraphSettings`
    object, instead of reading the configuration.
@@ -168,7 +169,7 @@ The script `scripts/render-terraform-registry.py` generates
 `deploy/terraform/azure/office-365-mcp-entra-application/registry.generated.tf.json`. It imports
 the tool modules, the always-on tool, and the presets from `office_365_mcp.tools`. It also imports
 the admin-consent table from `office_365_mcp.server.manifest`, and the requestable-permission list
-from `office_365_mcp.shared.seam`. Run it with `--check` to find drift between the Python source
+from `office_365_mcp.shared.seam.permissions`. Run it with `--check` to find drift between the Python source
 and the generated Terraform file. CI uses this mode.
 
 The repo-root script `scripts/render-values-schema.sh` generates this chart's
@@ -181,7 +182,7 @@ the real, bounded risk of drift.
 
 - `NEEDS_ADMIN_CONSENT`, in `server/manifest.py`. When the manifest renders, a runtime assertion
   makes sure that every permission has an entry. No build-time check exists for it.
-- `REQUESTABLE_PERMISSIONS`, in `shared/seam.py`. Convention and tests keep it correct, not
+- `REQUESTABLE_PERMISSIONS`, in `shared/seam/permissions.py`. Convention and tests keep it correct, not
   generation.
 
 The function `_stale_promises()`, in `server/manifest.py`, reads every selected tool's description.

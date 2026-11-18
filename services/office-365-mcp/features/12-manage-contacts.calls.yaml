@@ -63,10 +63,10 @@ uc-12-06:
     - tool: outlook_list_contacts
       args: {limit: 200}
   note: >-
-    Expected behaviour per Examples row. Sign-in expired, shared/seam.py:520-525, ask the user to
-    sign in again. Access refused, seam.py:528-537 (the tool has no GRAPH_FORBIDDEN text), an
+    Expected behaviour per Examples row. Sign-in expired, shared/seam/advice.py:251-256, ask the user to
+    sign in again. Access refused, seam/advice.py:261-270 (the tool has no GRAPH_FORBIDDEN text), an
     administrator grants Contacts.Read to the app registration, and retrying will not help. Busy,
-    seam.py:509-513, left alone for 30 seconds, retry after that and not sooner. This text reaches
+    seam/advice.py:240-244, left alone for 30 seconds, retry after that and not sooner. This text reaches
     the assistant only when every try is busy: the listing is a GET, so the SDK retry handler waits
     out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is
     uc-12-19. A failed lookup is never a person who is not in the contacts.
@@ -84,7 +84,7 @@ uc-12-07:
     - tool: outlook_list_contacts
       args: {limit: 200}
   note: >-
-    Expected behaviour from shared/seam.py:549-553, for a read-only tool that Microsoft could not
+    Expected behaviour from shared/seam/advice.py:282-286, for a read-only tool that Microsoft could not
     reach or that failed internally, retry once. All three Examples rows give that one advice. A
     status of 500 or more, graph_client/errors.py:332-335. A timeout or lost connection,
     errors.py:218-227. An answer that cannot be read, errors.py:238-247.
@@ -102,7 +102,7 @@ uc-12-08:
     - tool: outlook_list_contacts
       args: {limit: 200}
   note: >-
-    Expected behaviour from shared/seam.py:549-553, if it fails again the same way, stop and report
+    Expected behaviour from shared/seam/advice.py:282-286, if it fails again the same way, stop and report
     it. The assistant reads twice and no third time.
 
 uc-12-09:
@@ -136,9 +136,9 @@ uc-12-10:
     - tool: outlook_create_contact
       args: {given_name: Tom, surname: Berger, company_name: Acme, email_addresses: tom@acme.example}
   note: >-
-    Expected behaviour per Examples row. Sign-in expired, shared/seam.py:520-525, ask the user to
-    sign in again. Access refused, seam.py:528-537, an administrator grants Contacts.ReadWrite to the
-    app registration. Busy, seam.py:509-513, left alone for 30 seconds, retry after that and not
+    Expected behaviour per Examples row. Sign-in expired, shared/seam/advice.py:251-256, ask the user to
+    sign in again. Access refused, seam/advice.py:261-270, an administrator grants Contacts.ReadWrite to the
+    app registration. Busy, seam/advice.py:240-244, left alone for 30 seconds, retry after that and not
     sooner. Microsoft stores nothing in these three cases.
 
 uc-12-11:
@@ -154,7 +154,7 @@ uc-12-11:
     - tool: outlook_list_contacts
       args: {address: tom@acme.example}
   note: >-
-    Expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN and _outcome_unknown), the
+    Expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN and _outcome_unknown), the
     connector does not know if Microsoft made the change, do not call the tool again first, make sure
     that the change is not already there, and use outlook_list_contacts to see it. The seam gives this
     text because outlook_create_contact is not idempotent (WRITE_ADDITIVE, tools/outlook_create_contact.py:130)
@@ -276,7 +276,7 @@ uc-12-18:
     - tool: outlook_list_contacts
       args: {limit: 200}
   note: >-
-    Expected behaviour from shared/seam.py:562-570 (GraphPagingUnending), Microsoft would not finish
+    Expected behaviour from shared/seam/advice.py:295-303 (GraphPagingUnending), Microsoft would not finish
     sending the list, retry once if the list matters, and if it happens again stop and report it,
     because the list cannot be read while Microsoft answers this way. The walk stops after more than
     10 empty pages in a row (graph_client/pagination.py:74 and :138-144).
@@ -309,7 +309,7 @@ uc-12-20:
       args: {limit: 200}
       optional: true
   note: >-
-    Expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed,
+    Expected behaviour from shared/seam/caller.py:14-44 and shared/seam/advice.py:132-150 (TokenExchangeFailed,
     _token_advice): Microsoft 365 issues no token for Contacts.Read
     (tools/outlook_list_contacts.py:23), so the call never reaches Microsoft Graph. The text tells
     the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for

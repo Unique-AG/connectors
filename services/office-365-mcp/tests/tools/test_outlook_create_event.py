@@ -1217,7 +1217,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
 
 
 def _context(answer: object) -> Context:
-    """A handshake-era connection: no request context at all, which is the era `shared/seam.py`
+    """A handshake-era connection: no request context at all, which is the era `shared/seam/`
     documents as not modern, so every answer here comes back over `elicit`."""
 
     class _Client:
@@ -1234,7 +1234,7 @@ def _context(answer: object) -> Context:
 
 
 class _ModernRequest:
-    """The one thing `shared/seam.py` reads to decide the era. The constant comes from the SDK
+    """The one thing `shared/seam/` reads to decide the era. The constant comes from the SDK
     rather than the date written out, so a future era moves these tests with it."""
 
     protocol_version: str = LATEST_MODERN_VERSION

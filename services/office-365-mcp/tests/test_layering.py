@@ -5,11 +5,12 @@ the prose that teaches a model when to reach for it, its Graph permissions, its 
 answer shape, its request and its refusals. `shared/` is what a second tool will not be free to
 disagree with it about. `graph_client/` is the transport they borrow.
 
-1. **`shared/` imports no tool module, and only `shared/seam.py` imports FastMCP.** `shared/` is
-   what two tools must not disagree about and a tool is what disagrees, so the direction is one-way.
-   FastMCP is not banned outright because the On-Behalf-Of token dependency and the `ToolError` a
-   Graph refusal becomes are types every tool must say identically; allowing them in one named file
-   keeps the framework out of the handle grammar, the message shape and the rest of the vocabulary.
+1. **`shared/` imports no tool module, and only the `shared/seam/` package imports FastMCP.**
+   `shared/` is what two tools must not disagree about and a tool is what disagrees, so the
+   direction is one-way. FastMCP is not banned outright because the On-Behalf-Of token dependency
+   and the `ToolError` a Graph refusal becomes are types every tool must say identically; allowing
+   them in one named package keeps the framework out of the handle grammar, the message shape and
+   the rest of the vocabulary.
 
 2. **`graph_client/` imports nothing of this application.** It takes its own frozen `GraphSettings`
    rather than reading config, because a transport is allowed to be *told* and not to be configured;
@@ -64,15 +65,17 @@ disagree with it about. `graph_client/` is the transport they borrow.
    tool module is named — the list a selection is filtered over and every Graph scope sign-in asks
    for is derived from. `shared/` is deliberately not listed because it publishes no surface: its
    *modules* are the units and every consumer names which of them it depends on at the import line,
-   so an `__init__` re-exporting the lot would hide the one thing the package exists to show. A
-   package joins the list as soon as its `__init__` exports anything.
+   so an `__init__` re-exporting the lot would hide the one thing the package exists to show.
+   `shared/seam/` is listed: it is one unit, split into a module per concern, and every tool names
+   it at the import line as a whole. A package joins the list as soon as its `__init__` exports
+   anything.
 
-9. **Only `shared/seam.py` puts a question to a person.** `Context.elicit` is a capability the
-   protocol era decides: on a 2026-07-28 connection it raises before the wire and the question
-   travels as an `InputRequiredResult` instead, so a tool that called it directly would work on one
-   era and silently refuse on the other, and its unit tests, which stub `Context`, would stay green.
-   `person_confirms` in the seam is where both eras are handled, and every tool that asks goes
-   through it.
+9. **Only `shared/seam/elicitation.py` puts a question to a person.** `Context.elicit` is a
+   capability the protocol era decides: on a 2026-07-28 connection it raises before the wire and
+   the question travels as an `InputRequiredResult` instead, so a tool that called it directly would
+   work on one era and silently refuse on the other, and its unit tests, which stub `Context`, would
+   stay green. `person_confirms` in the seam is where both eras are handled, and every tool that
+   asks goes through it.
 
 10. **A tool imports the shared modules of its own surface and never those of another.** A tool
     named `outlook_…`, `teams_…`, `sharepoint_…` or `onenote_…` may import the neutral modules
@@ -118,10 +121,12 @@ _SURFACES: tuple[str, ...] = ("outlook", "teams", "sharepoint", "onenote")
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "office_365_mcp.graph_client",
     "office_365_mcp.server",
+    "office_365_mcp.shared.seam",
     "office_365_mcp.tools",
 )
 
-_SEAM = _SHARED / "seam.py"
+_SEAM = _SHARED / "seam"
+_ASKER = _SEAM / "elicitation.py"
 
 _HANDLE_OWNER = _SHARED / "handles.py"
 # One scheme per product, and the families each one addresses. Both halves are written out: a
@@ -973,16 +978,19 @@ class TestSharedIsUpstreamOfEveryTool:
 
 class TestOnlyTheSeamSpeaksMcp:
     def test_the_seam_actually_speaks_it(self) -> None:
-        assert _SEAM.is_file(), f"no such file: {_SEAM}"
-        assert _imports_under(_SEAM.read_text(), _MCP_FRAMEWORK, _package_of(_SEAM)), (
-            f"{_SEAM.name} no longer imports FastMCP, so it is no longer the seam"
-        )
+        assert _sources(_SEAM), f"no seam modules found under {_SEAM}"
+        assert any(
+            _imports_under(source.read_text(), _MCP_FRAMEWORK, _package_of(source))
+            for source in _sources(_SEAM)
+        ), f"no module of {_SEAM.name}/ imports FastMCP, so it is no longer the seam"
 
-    @pytest.mark.parametrize("source", [s for s in _sources(_SHARED) if s != _SEAM], ids=_source_id)
+    @pytest.mark.parametrize(
+        "source", [s for s in _sources(_SHARED) if s not in _sources(_SEAM)], ids=_source_id
+    )
     def test_no_other_shared_module_imports_the_mcp_framework(self, source: pathlib.Path) -> None:
         violations = _violations(source, _MCP_FRAMEWORK)
         assert not violations, (
-            "only shared/seam.py may import FastMCP — the rest of the shared vocabulary answers "
+            "only shared/seam/ may import FastMCP — the rest of the shared vocabulary answers "
             + "with its own types and raises Graph failures, and turning either into something an "
             + "MCP client sees is the seam's job or the tool's. Return the fact (or raise) and let "
             + "the tool decide what to say:\n  "
@@ -1261,11 +1269,11 @@ class TestOnlyTheSeamPutsAQuestionToAPerson:
     """Rule 9."""
 
     def test_the_seam_actually_asks(self) -> None:
-        assert _SEAM.is_file(), f"no such file: {_SEAM}"
-        assert _elicitations(_SEAM.read_text()), (
-            "shared/seam.py no longer calls `.elicit(` anywhere, so this rule guards nothing; "
-            "either the confirmation moved, and the rule should follow it, or asking a person "
-            "left this service"
+        assert _ASKER.is_file(), f"no such file: {_ASKER}"
+        assert _elicitations(_ASKER.read_text()), (
+            "shared/seam/elicitation.py no longer calls `.elicit(` anywhere, so this rule guards "
+            "nothing; either the confirmation moved, and the rule should follow it, or asking a "
+            "person left this service"
         )
 
     def test_catches_the_call_the_rule_exists_for(self) -> None:
@@ -1278,12 +1286,12 @@ class TestOnlyTheSeamPutsAQuestionToAPerson:
         violations = [
             f"{_source_id(source)}:{line}"
             for source in _sources(_SRC)
-            if source != _SEAM
+            if source != _ASKER
             for line in _elicitations(source.read_text())
         ]
         assert not violations, (
-            "only shared/seam.py may call `.elicit(`: a direct call works on a handshake-era "
-            + "connection and refuses on a 2026-07-28 one, and the tests that stub Context never "
-            + "notice. Ask through `person_confirms` from shared/seam.py instead:\n  "
+            "only shared/seam/elicitation.py may call `.elicit(`: a direct call works on a "
+            + "handshake-era connection and refuses on a 2026-07-28 one, and the tests that stub "
+            + "Context never notice. Ask through `person_confirms` from shared/seam/ instead:\n  "
             + "\n  ".join(violations)
         )

@@ -159,7 +159,7 @@ uc-10-11:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour per row. Both rows fail at the read of the folder (item_for_a_question, tools/sharepoint_create_text_file.py:169), before the question to Mia, so asks_user is false. Sign-in expired, from shared/seam.py:520-525: ask the user to sign in to this connector again. Folder gone, from tools/sharepoint_create_text_file.py:122-129 (GRAPH_NOT_FOUND): the folder was most probably deleted or moved, find it again with sharepoint_search_files or sharepoint_browse_folder, and do not retry the same handle. A refusal at the save itself, after the question, is uc-10-35."
+  note: "expected behaviour per row. Both rows fail at the read of the folder (item_for_a_question, tools/sharepoint_create_text_file.py:169), before the question to Mia, so asks_user is false. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again. Folder gone, from tools/sharepoint_create_text_file.py:122-129 (GRAPH_NOT_FOUND): the folder was most probably deleted or moved, find it again with sharepoint_search_files or sharepoint_browse_folder, and do not retry the same handle. A refusal at the save itself, after the question, is uc-10-35."
 
 uc-10-12:
   status: working
@@ -171,7 +171,7 @@ uc-10-12:
   chain:
     - any_of: [sharepoint_search_files, sharepoint_browse_folder]
     - any_of: [sharepoint_create_text_file, sharepoint_create_folder]
-  note: "expected behaviour for both rows from shared/seam.py:571-578 (status 409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that shows a list of items. Both tools set FAIL_ON_CONFLICT (shared/files.py:51, tools/sharepoint_create_text_file.py:207, tools/sharepoint_create_folder.py:164), and their descriptions say Microsoft refuses and creates nothing (tools/sharepoint_create_text_file.py:90, tools/sharepoint_create_folder.py:67). The row for a folder uses the ask Create a folder 2026 Signed in my Notes folder."
+  note: "expected behaviour for both rows from shared/seam/advice.py:304-311 (status 409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that shows a list of items. Both tools set FAIL_ON_CONFLICT (shared/files.py:51, tools/sharepoint_create_text_file.py:207, tools/sharepoint_create_folder.py:164), and their descriptions say Microsoft refuses and creates nothing (tools/sharepoint_create_text_file.py:90, tools/sharepoint_create_folder.py:67). The row for a folder uses the ask Create a folder 2026 Signed in my Notes folder."
 
 uc-10-13:
   status: working
@@ -185,7 +185,7 @@ uc-10-13:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner"
+  note: "expected behaviour from shared/seam/advice.py:240-244: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner"
 
 uc-10-14:
   status: working
@@ -201,7 +201,7 @@ uc-10-14:
       uses: {folder: handle of the folder Notes}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_text_file.py:50) and tools/sharepoint_create_text_file.py:82-92: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a file named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_text_file.py:211), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_text_file.py:50) and tools/sharepoint_create_text_file.py:82-92: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a file named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_text_file.py:211), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
 
 uc-10-15:
   status: working
@@ -231,7 +231,7 @@ uc-10-16:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from shared/seam.py:579-584 and 587-590: Microsoft 365 rejected this request because it is a bad request, the same call fails the same way, and Microsoft 365 gave this reason (the reason text)"
+  note: "expected behaviour from shared/seam/advice.py:312-317 and 320-323: Microsoft 365 rejected this request because it is a bad request, the same call fails the same way, and Microsoft 365 gave this reason (the reason text)"
 
 uc-10-17:
   status: working
@@ -395,7 +395,7 @@ uc-10-27:
     - tool: sharepoint_invite
       args: {role: write}
       uses: {item: handle of the file, recipients: address of Anna that Mia chooses from outlook_find_recipient}
-  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN and _NO_TOOL_SHOWS_IT, tools/sharepoint_invite.py:48 sets CHANGE_SHOWN_BY to nothing): Microsoft 365 can make a change and then give an error, do not call this tool again first, no tool of this deployment can show the change, ask the user if the Microsoft 365 app shows the change. The description says an invitation can already be out (tools/sharepoint_invite.py:76-88). The chain holds exactly one invite step."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN and _NO_TOOL_SHOWS_IT, tools/sharepoint_invite.py:48 sets CHANGE_SHOWN_BY to nothing): Microsoft 365 can make a change and then give an error, do not call this tool again first, no tool of this deployment can show the change, ask the user if the Microsoft 365 app shows the change. The description says an invitation can already be out (tools/sharepoint_invite.py:76-88). The chain holds exactly one invite step."
 
 uc-10-28:
   status: working
@@ -421,7 +421,7 @@ uc-10-30:
   chain:
     - any_of: [sharepoint_search_files, sharepoint_browse_folder]
     - any_of: [sharepoint_move_item, sharepoint_delete_item, sharepoint_rename_item, sharepoint_invite, sharepoint_create_text_file]
-  note: "expected behaviour for every row from shared/seam.py:236-241 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam.py:187-189). The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the delete uses Delete Old draft.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
+  note: "expected behaviour for every row from shared/seam/elicitation.py:73-78 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam/elicitation.py:24-26). The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the delete uses Delete Old draft.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
 
 uc-10-31:
   status: working
@@ -433,7 +433,7 @@ uc-10-31:
   chain:
     - any_of: [sharepoint_search_files, sharepoint_browse_folder]
     - any_of: [sharepoint_move_item, sharepoint_delete_item, sharepoint_rename_item, sharepoint_invite, sharepoint_create_text_file]
-  note: "The one cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (shared/seam.py:227-233 and :255-263). A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). Expected behaviour for every row from shared/seam.py:227-233 (_no_answer; the answer path is shared/seam.py:263): nothing was changed, this connector received no answer, tell the user that they can make the same request again, do not call this tool again for the same request unless the user asks for it in a new message. The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the rename uses Rename Plan v1.docx to Plan v2.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
+  note: "The one cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (shared/seam/elicitation.py:64-70 and :92-98). A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128). Expected behaviour for every row from shared/seam/elicitation.py:64-70 (_no_answer; the answer path is shared/seam/elicitation.py:98): nothing was changed, this connector received no answer, tell the user that they can make the same request again, do not call this tool again for the same request unless the user asks for it in a new message. The row for the move uses the ask Move Contract A.pdf into 2026 Signed, the row for the rename uses Rename Plan v1.docx to Plan v2.docx, the row for the invite uses Give Anna edit access to Q3 Plan.pptx, and the row for the save uses Save these meeting notes as Sync 14 June.txt in Notes."
 
 uc-10-32:
   status: working
@@ -447,7 +447,7 @@ uc-10-32:
     - tool: sharepoint_rename_item
       args: {name: Plan v2.docx}
       uses: {item: handle of the file Plan v1.docx}
-  note: "expected behaviour from shared/seam.py:244-250 and 283-284 (_another_request, a check of request_state against the digest in write_state_for at tools/sharepoint_rename_item.py:122): the confirmation was given for a different request, so that agreement does not cover this request, nothing was changed, ask the user again and call this tool with exactly what they confirm. This check runs only on the newer protocol path, where the question comes back with the answer."
+  note: "expected behaviour from shared/seam/elicitation.py:81-86 and 118-119 (_another_request, a check of request_state against the digest in write_state_for at tools/sharepoint_rename_item.py:122): the confirmation was given for a different request, so that agreement does not cover this request, nothing was changed, ask the user again and call this tool with exactly what they confirm. This check runs only on the newer protocol path, where the question comes back with the answer."
 
 uc-10-29:
   status: working
@@ -462,7 +462,7 @@ uc-10-29:
       uses: {item: handle of the file Q3 Plan.pptx, to_folder: handle of the folder Archive}
     - tool: sharepoint_move_item
       uses: {item: same handle as the first move, to_folder: same handle as the first move}
-  note: "expected behaviour from shared/seam.py:546-553 (sharepoint_move_item is WRITE_DESTRUCTIVE_IDEMPOTENT at tools/sharepoint_move_item.py:265, and shared/seam.py:392-395 treats an idempotent tool as safe to repeat): retry once, and if it fails again stop and report it. The description says this call is safe to repeat after a timeout (tools/sharepoint_move_item.py:62-71). The tool asks the user to agree every time, so the second try asks again. sharepoint_delete_item (tools/sharepoint_delete_item.py:59), sharepoint_rename_item (tools/sharepoint_rename_item.py:59), and sharepoint_create_share_link (tools/sharepoint_create_share_link.py:72) carry the same sentence."
+  note: "expected behaviour from shared/seam/advice.py:279-286 (sharepoint_move_item is WRITE_DESTRUCTIVE_IDEMPOTENT at tools/sharepoint_move_item.py:265, and shared/seam/advice.py:114-117 treats an idempotent tool as safe to repeat): retry once, and if it fails again stop and report it. The description says this call is safe to repeat after a timeout (tools/sharepoint_move_item.py:62-71). The tool asks the user to agree every time, so the second try asks again. sharepoint_delete_item (tools/sharepoint_delete_item.py:59), sharepoint_rename_item (tools/sharepoint_rename_item.py:59), and sharepoint_create_share_link (tools/sharepoint_create_share_link.py:72) carry the same sentence."
 
 uc-10-33:
   status: working
@@ -522,7 +522,7 @@ uc-10-36:
     - tool: sharepoint_move_item
       optional: true
       uses: {item: handle of the file Plan.docx, to_folder: handle of the folder Archive}
-  note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for Files.ReadWrite.All (tools/sharepoint_move_item.py:45), so the call never reaches Microsoft Graph and never reaches the question to Mia. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The move step is optional because the failing call is not a required step. The Then holds the same for every write tool of this feature."
+  note: "expected behaviour from shared/seam/caller.py:14-44 and shared/seam/advice.py:132-150 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for Files.ReadWrite.All (tools/sharepoint_move_item.py:45), so the call never reaches Microsoft Graph and never reaches the question to Mia. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The move step is optional because the failing call is not a required step. The Then holds the same for every write tool of this feature."
 
 uc-10-37:
   status: working
@@ -539,7 +539,7 @@ uc-10-37:
       uses: {item: handle of the folder Template, to_folder: handle of the folder Archive}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Archive}
-  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:57) and tools/sharepoint_copy_item.py:86-87: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:263), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:76), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:82-85), and no text says who tells Mia."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:57) and tools/sharepoint_copy_item.py:86-87: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:263), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:76), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:82-85), and no text says who tells Mia."
 
 uc-10-38:
   status: working
@@ -555,7 +555,7 @@ uc-10-38:
       uses: {parent: handle of the folder Contracts}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Contracts}
-  note: "expected behaviour for both rows from shared/seam.py:451-470 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:48) and tools/sharepoint_create_folder.py:68-69: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:168), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:66), and the failure comes after the question."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:48) and tools/sharepoint_create_folder.py:68-69: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:168), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:66), and the failure comes after the question."
 
 uc-10-39:
   status: working

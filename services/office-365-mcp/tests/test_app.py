@@ -336,7 +336,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
     that cannot be obtained after sign-in. The tuple is asserted, not the set: two tools name the
     same permission all over this registry, so a reorder leaves the set identical, and production
     is keyed by the list as a string. A derivation compared with the files it came from agrees with
-    a typo, so the names are also checked against `shared/seam.py`'s hand-written
+    a typo, so the names are also checked against `shared/seam/permissions.py`'s hand-written
     `REQUESTABLE_PERMISSIONS`. Every assertion is written against `TOOLS_PRESET=teams`.
     """
 
@@ -400,8 +400,9 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
         assert not unknown, (
             "a permission a tool declares has to be one Microsoft defines and one this connector "
             + "is willing to ask every user to consent to — check the spelling against "
-            + "`REQUESTABLE_PERMISSIONS` in shared/seam.py, and if the permission is genuinely "
-            + f"new, add it there deliberately and to the README's table: {sorted(unknown)}"
+            + "`REQUESTABLE_PERMISSIONS` in shared/seam/permissions.py, and if the permission is "
+            + "genuinely new, add it there deliberately and to the README's table: "
+            + f"{sorted(unknown)}"
         )
 
     def test_no_tool_declares_an_empty_permission_tuple(self) -> None:

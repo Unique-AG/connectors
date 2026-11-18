@@ -235,14 +235,14 @@ uc-02-17:
     - tool: outlook_search_mail
       args: {sender: Anna}
   note: >-
-    Expected behaviour per Examples row. Sign-in expired, shared/seam.py:520-525, ask the user to
-    sign in again, because retrying unchanged fails the same way. Access refused, seam.py:528-537
+    Expected behaviour per Examples row. Sign-in expired, shared/seam/advice.py:251-256, ask the user to
+    sign in again, because retrying unchanged fails the same way. Access refused, seam/advice.py:261-270
     (outlook_search_mail has no GRAPH_FORBIDDEN text), an administrator grants Mail.Read, User.Read
     and Mail.Read.Shared to the app registration, and retrying will not help. Search words not
-    valid, seam.py:579-584, a bad request that fails the same way, with the reason that Microsoft
-    gives. Busy, seam.py:509-513, left alone for 30 seconds, retry after that and not sooner. Cannot
-    answer now with a wait of 90 seconds, seam.py:514-518, retry after that and not sooner, and not
-    in a loop. No wait time, seam.py:503-508, wait before retrying and not in a loop; the SDK
+    valid, seam/advice.py:312-317, a bad request that fails the same way, with the reason that Microsoft
+    gives. Busy, seam/advice.py:240-244, left alone for 30 seconds, retry after that and not sooner. Cannot
+    answer now with a wait of 90 seconds, seam/advice.py:245-249, retry after that and not sooner, and not
+    in a loop. No wait time, seam/advice.py:234-239, wait before retrying and not in a loop; the SDK
     waits a random time of about 4 seconds between tries then, so the run checks the 4 tries and not the
     waits. The waiting rows reach the assistant only when every try is busy: the search is
     a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342,
@@ -256,7 +256,7 @@ uc-02-17:
         fault: {graph: {status: 429, headers: {Retry-After: "30"}, body: error.TooManyRequests.json}, times: 4}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphThrottled: {message: "", status: 429, code: null, request_id: null, retry_after_seconds: 30}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -271,7 +271,7 @@ uc-02-17:
         fault: {graph: {status: 429, body: error.TooManyRequests.json}, times: 4}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphThrottled: {message: "", status: 429, code: null, request_id: null, retry_after_seconds: null}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -295,7 +295,7 @@ uc-02-18:
     - tool: outlook_search_mail
       args: {sender: Anna}
   note: >-
-    Expected behaviour from shared/seam.py:549-553, for a read-only tool that Microsoft could not
+    Expected behaviour from shared/seam/advice.py:282-286, for a read-only tool that Microsoft could not
     reach or that failed internally, retry once. All three Examples rows give that one advice. A
     status of 500 or more, graph_client/errors.py:332-335. A timeout or lost connection,
     errors.py:218-227. An answer that cannot be read, errors.py:238-247.
@@ -306,7 +306,7 @@ uc-02-18:
         fault: {graph: {status: 500, body: error.generalException.json}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -324,7 +324,7 @@ uc-02-18:
         fault: {transport: timeout}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: null, code: null, request_id: null}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -342,7 +342,7 @@ uc-02-18:
         fault: {graph: {status: 502, headers: {Content-Type: text/html}, body: page.badGateway.html}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: 502, code: null, request_id: null}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -368,7 +368,7 @@ uc-02-19:
     - tool: outlook_search_mail
       args: {sender: Anna}
   note: >-
-    Expected behaviour from shared/seam.py:549-553, if it fails again the same way, stop and
+    Expected behaviour from shared/seam/advice.py:282-286, if it fails again the same way, stop and
     report it. The assistant calls the search twice and no third time.
   variants:
     fails-twice:
@@ -377,7 +377,7 @@ uc-02-19:
         fault: {graph: {status: 500, body: error.generalException.json}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -389,7 +389,7 @@ uc-02-19:
         fault: {graph: {status: 500, body: error.generalException.json}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
               permissions: tools.outlook_search_mail.GRAPH_PERMISSIONS
               not_found: null
@@ -431,7 +431,7 @@ uc-02-31:
     - tool: outlook_list_mail
       args: {unread_only: true, received_after: yesterday}
   note: >-
-    Expected behaviour from shared/seam.py:562-570 (GraphPagingUnending), Microsoft would not finish
+    Expected behaviour from shared/seam/advice.py:295-303 (GraphPagingUnending), Microsoft would not finish
     sending the list, retry once if the list matters, and if it happens again stop and report it,
     because the list cannot be read while Microsoft answers this way. The walk stops after more than
     10 empty pages in a row (graph_client/pagination.py:74 and :138-144). outlook_search_mail reads
@@ -644,7 +644,7 @@ uc-02-33:
       args: {sender: Anna}
       optional: true
   note: >-
-    Expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed,
+    Expected behaviour from shared/seam/caller.py:14-44 and shared/seam/advice.py:132-150 (TokenExchangeFailed,
     _token_advice): Microsoft 365 issues no token for Mail.Read, User.Read and Mail.Read.Shared
     (tools/outlook_search_mail.py:42), so the call never reaches Microsoft Graph. The text tells the
     assistant to ask a Microsoft 365 administrator to grant the permissions and to consent for the

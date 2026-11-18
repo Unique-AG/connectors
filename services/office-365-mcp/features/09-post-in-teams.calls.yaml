@@ -194,7 +194,7 @@ uc-09-13:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam.py:520-525: ask the user to sign in to this connector again; retrying the call unchanged fails the same way."
+  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:251-256: ask the user to sign in to this connector again; retrying the call unchanged fails the same way."
 
 uc-09-14:
   status: working
@@ -208,7 +208,7 @@ uc-09-14:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permissions ChatMessage.Send and Chat.Read; retrying will not help."
+  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the delegated permissions ChatMessage.Send and Chat.Read; retrying will not help."
 
 uc-09-15:
   status: working
@@ -222,7 +222,7 @@ uc-09-15:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, after Mia agrees. The tool has no text of its own for a missing chat, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam.py:538-545: Microsoft reports a missing chat and a chat that the user may not know about in the same way, so the assistant says that it could not find the chat and does not say that it was deleted."
+  note: "The failing step is teams_send_chat_message, after Mia agrees. The tool has no text of its own for a missing chat, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:271-278: Microsoft reports a missing chat and a chat that the user may not know about in the same way, so the assistant says that it could not find the chat and does not say that it was deleted."
 
 uc-09-16:
   status: working
@@ -236,7 +236,7 @@ uc-09-16:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. A 503 with a wait time is not a row here: the write may have taken effect before the 503 (src/office_365_mcp/graph_client/client.py:226-229), and the advice still says to retry after the stated seconds (seam.py:514-518)."
+  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:240-244: retry after the stated seconds, not sooner. A 503 with a wait time is not a row here: the write may have taken effect before the 503 (src/office_365_mcp/graph_client/client.py:226-229), and the advice still says to retry after the stated seconds (seam/advice.py:245-249)."
 
 uc-09-17:
   status: working
@@ -252,7 +252,7 @@ uc-09-17:
       uses: {chat_id: id of the chat}
     - tool: teams_list_chat_messages
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, which is called once. A second call is allowed only after teams_list_chat_messages shows that the message is not there. Expected behaviour from src/office_365_mcp/shared/seam.py:451-470: this connector does not know if Microsoft made the change; do not call the tool again first; use teams_list_chat_messages to see if the message is there. The tool sends the post with no retry (src/office_365_mcp/tools/teams_send_chat_message.py:114). Row 1 is a Microsoft error above 499 (src/office_365_mcp/graph_client/errors.py:332-337), row 2 is a timeout or lost connection (errors.py:218-227), row 3 is an answer that cannot be read (errors.py:238-247)."
+  note: "The failing step is teams_send_chat_message, which is called once. A second call is allowed only after teams_list_chat_messages shows that the message is not there. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:182-201: this connector does not know if Microsoft made the change; do not call the tool again first; use teams_list_chat_messages to see if the message is there. The tool sends the post with no retry (src/office_365_mcp/tools/teams_send_chat_message.py:114). Row 1 is a Microsoft error above 499 (src/office_365_mcp/graph_client/errors.py:332-337), row 2 is a timeout or lost connection (errors.py:218-227), row 3 is an answer that cannot be read (errors.py:238-247)."
 
 uc-09-18:
   status: working
@@ -266,7 +266,7 @@ uc-09-18:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam.py:579-584: the request is bad, not an outage or a permission problem; the same call fails the same way; Microsoft's reason is passed on."
+  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:312-317: the request is bad, not an outage or a permission problem; the same call fails the same way; Microsoft's reason is passed on."
 
 uc-09-19:
   status: working
@@ -282,7 +282,7 @@ uc-09-19:
     - tool: teams_send_channel_message
       args: {message: v2 ships on Friday}
       uses: {team_id: id of the team, channel_id: id of the channel}
-  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam.py:236-241: nothing was changed, and the assistant says that the request was not confirmed. The tool words it as Nothing was posted (src/office_365_mcp/shared/teams/messages.py:445-447)."
+  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:73-78: nothing was changed, and the assistant says that the request was not confirmed. The tool words it as Nothing was posted (src/office_365_mcp/shared/teams/messages.py:445-447)."
 
 uc-09-20:
   status: working
@@ -298,7 +298,7 @@ uc-09-20:
       args: {query: Q3 Plan}
     - tool: teams_send_chat_message_with_files
       uses: {chat_id: id of the chat, attachments: uri of the file from the search}
-  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam.py:236-241: nothing was changed, and the assistant says that the request was not confirmed. The tool words it as Nothing was sent (src/office_365_mcp/shared/teams/messages.py:439)."
+  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:73-78: nothing was changed, and the assistant says that the request was not confirmed. The tool words it as Nothing was sent (src/office_365_mcp/shared/teams/messages.py:439)."
 
 uc-09-21:
   status: working
@@ -311,7 +311,7 @@ uc-09-21:
     - tool: teams_list_chat_messages
       uses: {chat_id: id of the chat}
     - any_of: [teams_edit_message, teams_delete_message, teams_react_to_message]
-  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam.py:236-241: nothing was changed, and the assistant says that the request was not confirmed. Row 1 is teams_edit_message (No message was changed, src/office_365_mcp/tools/teams_edit_message.py:75), row 2 is teams_delete_message (No message was deleted, src/office_365_mcp/tools/teams_delete_message.py:75), row 3 is teams_react_to_message (No reaction was changed, src/office_365_mcp/tools/teams_react_to_message.py:96)."
+  note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:73-78: nothing was changed, and the assistant says that the request was not confirmed. Row 1 is teams_edit_message (No message was changed, src/office_365_mcp/tools/teams_edit_message.py:75), row 2 is teams_delete_message (No message was deleted, src/office_365_mcp/tools/teams_delete_message.py:75), row 3 is teams_react_to_message (No reaction was changed, src/office_365_mcp/tools/teams_react_to_message.py:96)."
 
 uc-09-22:
   status: working
@@ -322,7 +322,7 @@ uc-09-22:
   asks_user: true
   chain:
     - any_of: [teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message]
-  note: "Each row names its own tool by its action: rows 1 to 7 are teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message. The one cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST, so every row ends in the same text. Expected behaviour from src/office_365_mcp/shared/seam.py:227-233 and :255-263: nothing happened; this connector tried to ask; it received no answer that it can use; tell the user that it received no answer, and that they can make the same request again. A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. The same holds for uc-10-31, uc-05-42 row 2 and uc-05-46 row 2. Two other causes end differently: a client that cannot ask ends in the text of uc-09-29 (seam.py:216-225 and :261-262), and an answer of no ends in the text of uc-09-19 to uc-09-21 (seam.py:236-241 and :264-265). This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
+  note: "Each row names its own tool by its action: rows 1 to 7 are teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message. The one cause is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST, so every row ends in the same text. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:64-70 and :92-98: nothing happened; this connector tried to ask; it received no answer that it can use; tell the user that it received no answer, and that they can make the same request again. A question that never gets an answer is not a cause of this text: the server sets no time limit on the question (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. The same holds for uc-10-31, uc-05-42 row 2 and uc-05-46 row 2. Two other causes end differently: a client that cannot ask ends in the text of uc-09-29 (seam/elicitation.py:53-61 and :96-97), and an answer of no ends in the text of uc-09-19 to uc-09-21 (seam/elicitation.py:73-78 and :99-100). This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
 
 uc-09-29:
   status: working
@@ -336,7 +336,7 @@ uc-09-29:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The question cannot be shown, so asks_user is false, as in uc-04-15. Expected behaviour from src/office_365_mcp/shared/seam.py:216-225 and :261-262: the client answers METHOD_NOT_FOUND or INVALID_REQUEST to the question; nothing was sent; tell the user that their client cannot ask them to agree, and that they can do this task in the Microsoft 365 app; a second call fails the same way. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :292-293); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
+  note: "The question cannot be shown, so asks_user is false, as in uc-04-15. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:53-61 and :96-97: the client answers METHOD_NOT_FOUND or INVALID_REQUEST to the question; nothing was sent; tell the user that their client cannot ask them to agree, and that they can do this task in the Microsoft 365 app; a second call fails the same way. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :127-128); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
 
 uc-09-23:
   status: working
@@ -350,7 +350,7 @@ uc-09-23:
   asks_user: true
   chain:
     - any_of: [teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message]
-  note: "Each row names its own tool by its action, in the order of uc-09-22. Every tool binds the answer to its arguments: the chat or channel, the text, the mentions, the files, the subject and the importance of a post (src/office_365_mcp/shared/teams/messages.py:552-566), the message handle, the new text and the mentions of a correction (src/office_365_mcp/tools/teams_edit_message.py), the message handle of a deletion, and the handle, the emoji and the removal flag of a reaction (src/office_365_mcp/tools/teams_react_to_message.py:168). Expected behaviour from src/office_365_mcp/shared/seam.py:244-249 and :283: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (seam.py:208-211)."
+  note: "Each row names its own tool by its action, in the order of uc-09-22. Every tool binds the answer to its arguments: the chat or channel, the text, the mentions, the files, the subject and the importance of a post (src/office_365_mcp/shared/teams/messages.py:552-566), the message handle, the new text and the mentions of a correction (src/office_365_mcp/tools/teams_edit_message.py), the message handle of a deletion, and the handle, the emoji and the removal flag of a reaction (src/office_365_mcp/tools/teams_react_to_message.py:168). Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:81-86 and :118: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (seam/elicitation.py:45-47)."
 
 uc-09-24:
   status: working
@@ -444,7 +444,7 @@ uc-09-30:
   asks_user: true
   chain:
     - any_of: [teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message]
-  note: "Rows 1 to 7 name the tools in the order of uc-09-22: teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message. A client of the 2026-07-28 protocol has no back-channel, so the tool returns the question in its result, the client asks the person, and the client calls the tool again with the answer. Expected behaviour from src/office_365_mcp/shared/seam.py:266 to src/office_365_mcp/shared/seam.py:288: the tool changes Teams after the person gives the word for yes, and only then."
+  note: "Rows 1 to 7 name the tools in the order of uc-09-22: teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message. A client of the 2026-07-28 protocol has no back-channel, so the tool returns the question in its result, the client asks the person, and the client calls the tool again with the answer. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:101 to src/office_365_mcp/shared/seam/elicitation.py:123: the tool changes Teams after the person gives the word for yes, and only then."
 
 uc-09-31:
   status: working
@@ -455,7 +455,7 @@ uc-09-31:
   asks_user: true
   chain:
     - any_of: [teams_send_chat_message, teams_send_channel_message, teams_send_chat_message_with_files, teams_send_channel_message_with_files, teams_edit_message, teams_delete_message, teams_react_to_message]
-  note: "Rows 1 to 7 name the tools in the order of uc-09-30. The three answers are a refusal, the word for no, and a word that is no choice. Expected behaviour from src/office_365_mcp/shared/seam.py:279, src/office_365_mcp/shared/seam.py:285, and src/office_365_mcp/shared/seam.py:288: nothing was changed, and the assistant says that the request was not confirmed."
+  note: "Rows 1 to 7 name the tools in the order of uc-09-30. The three answers are a refusal, the word for no, and a word that is no choice. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:114, src/office_365_mcp/shared/seam/elicitation.py:120, and src/office_365_mcp/shared/seam/elicitation.py:123: nothing was changed, and the assistant says that the request was not confirmed."
 
 uc-09-32:
   status: working
@@ -575,4 +575,4 @@ uc-09-40:
     - tool: teams_send_chat_message
       args: {message: the build is green}
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam.py:583: the request is bad, not an outage or a permission problem; the same call fails the same way; the answer has no reason when Microsoft gave none."
+  note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:316: the request is bad, not an outage or a permission problem; the same call fails the same way; the answer has no reason when Microsoft gave none."

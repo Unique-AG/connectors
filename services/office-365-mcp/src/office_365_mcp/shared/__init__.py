@@ -17,6 +17,6 @@ A module that the tools of only one surface use goes in that surface's package: 
 here. A tool imports the modules of its own surface and the modules directly here, and never the
 modules of another surface. See rule 10 in `tests/test_layering.py`.
 
-Layering rule: nothing here imports `tools/`, and only `seam.py` imports FastMCP. See
+Layering rule: nothing here imports `tools/`, and only the `seam/` package imports FastMCP. See
 `tests/test_layering.py` for its first rule, which states exactly that.
 """

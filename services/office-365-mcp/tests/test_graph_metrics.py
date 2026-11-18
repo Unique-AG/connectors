@@ -60,9 +60,8 @@ from office_365_mcp.graph_operations import (
     start_tool_outcomes,
 )
 from office_365_mcp.metrics import configure_metrics
-from office_365_mcp.shared import seam
 from office_365_mcp.shared.handles import TranscriptHandle
-from office_365_mcp.shared.seam import GraphToken, TokenExchangeFailed
+from office_365_mcp.shared.seam import GraphToken, TokenExchangeFailed, caller
 from office_365_mcp.shared.teams import transcripts
 from office_365_mcp.shared.teams.transcripts import STEP_ATTRIBUTED
 from office_365_mcp.tools import get_me
@@ -667,7 +666,7 @@ class TestATokenAcquisitionIsCountedUnderTheTool:
         def exchange_for(_scopes: list[str]) -> _Exchange:
             return _Exchange()
 
-        monkeypatch.setattr(seam, "EntraOBOToken", exchange_for)
+        monkeypatch.setattr(caller, "EntraOBOToken", exchange_for)
         return GraphToken("Mail.Read")
 
     @staticmethod
@@ -975,7 +974,7 @@ class TestEachToolCallIsCountedUnderHowItEnded:
         def exchange_for(_scopes: list[str]) -> _Refused:
             return _Refused()
 
-        monkeypatch.setattr(seam, "EntraOBOToken", exchange_for)
+        monkeypatch.setattr(caller, "EntraOBOToken", exchange_for)
         me = graph.get("/me")
         server: FastMCP[None] = FastMCP(
             "probe", middleware=[BoundedNameMiddleware(), GraphOperationMiddleware()]

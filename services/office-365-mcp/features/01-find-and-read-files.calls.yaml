@@ -251,7 +251,7 @@ uc-01-17:
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
       bind: {file: "$prev.files[0].uri"}
-  note: "expected behaviour per row. Sign-in expired, from shared/seam.py:520-525: ask the user to sign in to this connector again, because retrying unchanged fails the same way. No access, from shared/seam.py:528-537 (sharepoint_read_file has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Files.Read.All, and retrying will not help. File gone, from tools/sharepoint_read_file.py:110-117 (GRAPH_NOT_FOUND): most probably deleted or moved, search again with sharepoint_search_files and take the uri from the new result, and do not retry the same handle."
+  note: "expected behaviour per row. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again, because retrying unchanged fails the same way. No access, from shared/seam/advice.py:261-270 (sharepoint_read_file has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Files.Read.All, and retrying will not help. File gone, from tools/sharepoint_read_file.py:110-117 (GRAPH_NOT_FOUND): most probably deleted or moved, search again with sharepoint_search_files and take the uri from the new result, and do not retry the same handle."
   variants:
     sign-in-expired:
       fixture: uc-01-17
@@ -259,7 +259,7 @@ uc-01-17:
         fault: {graph: {status: 401, body: error.InvalidAuthenticationToken.json}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphForbidden: {message: "", status: 401, code: null, request_id: null}}
               permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
               not_found: null
@@ -273,7 +273,7 @@ uc-01-17:
         fault: {graph: {status: 403, body: error.accessDenied.json}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphForbidden: {message: "", status: 403, code: null, request_id: null}}
               permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
               not_found: null
@@ -302,7 +302,7 @@ uc-01-18:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/seam.py:509-513: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is uc-01-30."
+  note: "expected behaviour from shared/seam/advice.py:240-244: Microsoft 365 is rate-limiting this connector and asked to be left alone for 30 seconds, retry after that, not sooner. This text reaches the assistant only when Microsoft stays busy through every try: the read is a GET, so the SDK retry handler waits out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is uc-01-30."
 
 uc-01-19:
   status: working
@@ -322,7 +322,7 @@ uc-01-19:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: same handle as the first read}
-  note: "expected behaviour for every row from shared/seam.py:546-553 (sharepoint_read_file is read only): retry once. Internal error and no answer in time come from graph_client/errors.py:218-227 and 238-247 and map to the same advice. An incomplete file comes from graph_client/download.py:121-131 (GraphUnavailable) and maps to the same advice."
+  note: "expected behaviour for every row from shared/seam/advice.py:279-286 (sharepoint_read_file is read only): retry once. Internal error and no answer in time come from graph_client/errors.py:218-227 and 238-247 and map to the same advice. An incomplete file comes from graph_client/download.py:121-131 (GraphUnavailable) and maps to the same advice."
   variants:
     fails-with-an-internal-error:
       fixture: uc-01-19
@@ -334,7 +334,7 @@ uc-01-19:
         fault: {at: GET */content, graph: {status: 500, body: error.generalException.json}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: 500, code: null, request_id: null}}
               permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
               not_found: null
@@ -357,7 +357,7 @@ uc-01-19:
         fault: {at: GET */content, transport: timeout}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: null, code: null, request_id: null}}
               permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
               not_found: null
@@ -381,7 +381,7 @@ uc-01-19:
         fault: {at: GET */download.aspx, graph: {status: 200, headers: {content-length: "24576"}, body: agreement.docx}}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphUnavailable: {message: "", status: null, code: null, request_id: null}}
               permissions: tools.sharepoint_read_file.GRAPH_PERMISSIONS
               not_found: null
@@ -412,7 +412,7 @@ uc-01-20:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: same handle as the first read}
-  note: "expected behaviour from shared/seam.py:549-553: Retry once; if it fails again the same way, stop and report it, because some Graph 500s are permanent for particular content"
+  note: "expected behaviour from shared/seam/advice.py:282-286: Retry once; if it fails again the same way, stop and report it, because some Graph 500s are permanent for particular content"
 
 uc-01-21:
   status: working
@@ -427,7 +427,7 @@ uc-01-21:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/seam.py:579-584 and 587-590: Microsoft 365 rejected this request because it is a bad request, the same call fails the same way, and Microsoft 365 gave this reason (the reason text)"
+  note: "expected behaviour from shared/seam/advice.py:312-317 and 320-323: Microsoft 365 rejected this request because it is a bad request, the same call fails the same way, and Microsoft 365 gave this reason (the reason text)"
 
 uc-01-22:
   status: working
@@ -533,7 +533,7 @@ uc-01-28:
       uses: {folder: handle of the folder Archive from the search}
     - tool: sharepoint_browse_folder
       uses: {folder: same handle as the first listing}
-  note: "expected behaviour from shared/seam.py:562-570 (GraphPagingUnending, graph_client/pagination.py:74,138-144): Microsoft would not finish sending this list, retry once if the list matters, if it happens again stop and report that the list cannot be read. Both listings get empty pages, as in uc-02-31."
+  note: "expected behaviour from shared/seam/advice.py:295-303 (GraphPagingUnending, graph_client/pagination.py:74,138-144): Microsoft would not finish sending this list, retry once if the list matters, if it happens again stop and report that the list cannot be read. Both listings get empty pages, as in uc-02-31."
 
 uc-01-29:
   status: working
@@ -579,7 +579,7 @@ uc-01-31:
       optional: true
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/seam.py:128-158 and 410-428 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for the delegated permission of the first call that needs it (sharepoint_read_file asks for Files.Read.All), so the call never reaches Microsoft Graph. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The failing call is the first call that needs the permission, so both steps are optional."
+  note: "expected behaviour from shared/seam/caller.py:14-44 and shared/seam/advice.py:132-150 (TokenExchangeFailed, _token_advice): Microsoft 365 issues no token for the delegated permission of the first call that needs it (sharepoint_read_file asks for Files.Read.All), so the call never reaches Microsoft Graph. The text tells the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for the organization, then to have the user sign in again, and that retrying will not help. The failing call is the first call that needs the permission, so both steps are optional."
 
 uc-01-32:
   status: working

@@ -445,7 +445,7 @@ uc-05-29:
   asks_user: false
   chain:
     - tool: outlook_browse_folders
-  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in again. No access, seam.py:528-537: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-05-51), so the third row means busy through every try."
+  note: "expected behaviour from shared/seam/advice.py, one text for each Examples row. Sign-in expired, seam/advice.py:251-256: ask the user to sign in again. No access, seam/advice.py:261-270: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam/advice.py:232-244: retry after 30 seconds, not sooner. The retry handler of the SDK waits out a single busy answer on a read (graph_client/client.py:339-342, config.py:127; uc-05-51), so the third row means busy through every try."
 
 uc-05-30:
   status: working
@@ -457,7 +457,7 @@ uc-05-30:
   chain:
     - tool: outlook_browse_folders
     - tool: outlook_browse_folders
-  note: "expected behaviour from shared/seam.py:546-553 for a read: retry once. The folder list is read-only. The row that never ends maps to seam.py:562-570: retry once if the list matters, and if it happens again, stop and report."
+  note: "expected behaviour from shared/seam/advice.py:279-286 for a read: retry once. The folder list is read-only. The row that never ends maps to seam/advice.py:295-303: retry once if the list matters, and if it happens again, stop and report."
 
 uc-05-31:
   status: working
@@ -471,7 +471,7 @@ uc-05-31:
     - tool: outlook_move_mail
       args: {destination: archive}
       uses: {message_refs: uri values from the previous listing}
-  note: "expected behaviour from shared/seam.py, one text for each Examples row. Sign-in expired, seam.py:520-525: ask the user to sign in again. No access, seam.py:528-537: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam.py:501-513: retry after 30 seconds, not sooner. When every message fails, the first failure is the answer (shared/mail.py:434-439). The move runs with no_retry (tools/outlook_move_mail.py:275), and a 503 with a wait time can arrive after Microsoft did the move (errors.py:293-303, uc-05-50), so the busy row does not say that the messages did not move."
+  note: "expected behaviour from shared/seam/advice.py, one text for each Examples row. Sign-in expired, seam/advice.py:251-256: ask the user to sign in again. No access, seam/advice.py:261-270: ask an administrator to grant the permissions. Busy with a wait of 30 seconds, seam/advice.py:232-244: retry after 30 seconds, not sooner. When every message fails, the first failure is the answer (shared/mail.py:434-439). The move runs with no_retry (tools/outlook_move_mail.py:275), and a 503 with a wait time can arrive after Microsoft did the move (errors.py:293-303, uc-05-50), so the busy row does not say that the messages did not move."
 
 uc-05-32:
   status: working
@@ -520,7 +520,7 @@ uc-05-34:
       args: {destination: archive}
       uses: {message_refs: uri values from the previous listing}
     - any_of: [outlook_read_mail, outlook_list_mail]
-  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft 365 made the change, do not call the tool again first, check with outlook_read_mail or outlook_list_mail. Each move runs with no_retry (tools/outlook_move_mail.py:274 _move_request, graph_client/client.py:220-232), so a failure makes one move call for each message. The unreadable answer maps to the same text (graph_client/errors.py:238-247). The assistant calls outlook_move_mail again only when the messages are not in Archive."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft 365 made the change, do not call the tool again first, check with outlook_read_mail or outlook_list_mail. Each move runs with no_retry (tools/outlook_move_mail.py:274 _move_request, graph_client/client.py:220-232), so a failure makes one move call for each message. The unreadable answer maps to the same text (graph_client/errors.py:238-247). The assistant calls outlook_move_mail again only when the messages are not in Archive."
 
 uc-05-35:
   status: working
@@ -537,7 +537,7 @@ uc-05-35:
     - tool: outlook_mark_mail
       args: {is_read: true}
       uses: {message_refs: all uri values from the previous listing}
-  note: "expected behaviour from shared/seam.py:546-553: the tool is annotated idempotent (tools/outlook_mark_mail.py:524), so a failure with no outcome gets the read advice: retry once, and if it fails again the same way, stop and report it. The chain has two marking calls, and the scenario states that the second failure ends the tries. A marking twice gives the same result. This is the contrast to uc-05-34. When every message fails, the first failure is the answer (tools/outlook_mark_mail.py:470, _raise_when_nothing_changed)."
+  note: "expected behaviour from shared/seam/advice.py:279-286: the tool is annotated idempotent (tools/outlook_mark_mail.py:524), so a failure with no outcome gets the read advice: retry once, and if it fails again the same way, stop and report it. The chain has two marking calls, and the scenario states that the second failure ends the tries. A marking twice gives the same result. This is the contrast to uc-05-34. When every message fails, the first failure is the answer (tools/outlook_mark_mail.py:470, _raise_when_nothing_changed)."
 
 uc-05-36:
   status: working
@@ -551,7 +551,7 @@ uc-05-36:
     - tool: outlook_browse_folders
     - any_of: [outlook_create_folder, outlook_rename_folder]
   must_not: [outlook_delete_folder]
-  note: "expected behaviour from shared/seam.py:571-578 (409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that lists items. The Examples rows are the create and the rename tool. The assistant asks Mia for another name."
+  note: "expected behaviour from shared/seam/advice.py:304-311 (409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that lists items. The Examples rows are the create and the rename tool. The assistant asks Mia for another name."
 
 uc-05-37:
   status: working
@@ -565,7 +565,7 @@ uc-05-37:
       args: {name: Follow-up Q4}
     - tool: outlook_list_categories
       optional: true
-  note: "expected behaviour from shared/seam.py:571-578 (409) and tools/outlook_create_category.py:64: each category name is unique, Microsoft refuses a name that the list already has, the same call fails the same way, change the name or list the categories to find that one."
+  note: "expected behaviour from shared/seam/advice.py:304-311 (409) and tools/outlook_create_category.py:64: each category name is unique, Microsoft refuses a name that the list already has, the same call fails the same way, change the name or list the categories to find that one."
 
 uc-05-81:
   status: working
@@ -592,7 +592,7 @@ uc-05-38:
     - tool: outlook_create_mail_rule
       args: {display_name: Billing to Finance, conditions: sender billing}
       uses: {sequence: next free sequence from outlook_get_mailbox_settings, actions: move_to_folder is the uri of Finance from outlook_browse_folders}
-  note: "expected behaviour from shared/seam.py:579-584 (400 bad request) and 587-589: the same call fails the same way, and Microsoft's reason follows. The assistant tells Mia that reason and does not create the same rule again."
+  note: "expected behaviour from shared/seam/advice.py:312-317 (400 bad request) and 320-322: the same call fails the same way, and Microsoft's reason follows. The assistant tells Mia that reason and does not create the same rule again."
 
 uc-05-39:
   status: working
@@ -660,7 +660,7 @@ uc-05-42:
     - tool: outlook_move_mail
       args: {mailbox: support@example.com}
       uses: {message_refs: uri values from the previous listing, folder_ref: uri of Handled from outlook_browse_folders}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). uc-05-05 states the question."
+  note: "expected behaviour from shared/seam/elicitation.py:73-78 and 64-70, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam/elicitation.py:92-98). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128). uc-05-05 states the question."
 
 uc-05-43:
   status: working
@@ -673,7 +673,7 @@ uc-05-43:
     - tool: outlook_browse_folders
     - tool: outlook_delete_folder
       uses: {folder_ref: folder handle of Temp}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): The folder was not deleted, say that the request was not confirmed. No answer (_no_answer): no answer reached the connector and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The folder tool asks every time, also for the own mailbox (tools/outlook_delete_folder.py:80)."
+  note: "expected behaviour from shared/seam/elicitation.py:73-78 and 64-70, one text for each Examples row. Declines (_not_agreed): The folder was not deleted, say that the request was not confirmed. No answer (_no_answer): no answer reached the connector and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam/elicitation.py:92-98). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128). The folder tool asks every time, also for the own mailbox (tools/outlook_delete_folder.py:80)."
 
 uc-05-44:
   status: working
@@ -686,7 +686,7 @@ uc-05-44:
   chain:
     - tool: outlook_delete_folder
       uses: {folder_ref: folder handle of Temp}
-  note: "expected behaviour from shared/seam.py:244-249 (_another_request) and 283: the agreement was given for a different request, so it covers nothing and nothing changed. The assistant asks the user again and calls the tool with exactly what they confirm. The check runs only on a connection that uses the 2026-07-28 protocol, where the answer carries the state of the question. The state of the question holds the handle and the folder name (tools/outlook_delete_folder.py:161)."
+  note: "expected behaviour from shared/seam/elicitation.py:81-86 (_another_request) and 118: the agreement was given for a different request, so it covers nothing and nothing changed. The assistant asks the user again and calls the tool with exactly what they confirm. The check runs only on a connection that uses the 2026-07-28 protocol, where the answer carries the state of the question. The state of the question holds the handle and the folder name (tools/outlook_delete_folder.py:161)."
 
 uc-05-45:
   status: working
@@ -698,7 +698,7 @@ uc-05-45:
   chain:
     - tool: outlook_create_mail_rule
       uses: {actions: forward_to holds the address from the request}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): No rule was created, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The rule tools ask only before a rule that forwards or redirects mail (tools/outlook_create_mail_rule.py:71)."
+  note: "expected behaviour from shared/seam/elicitation.py:73-78 and 64-70, one text for each Examples row. Declines (_not_agreed): No rule was created, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam/elicitation.py:92-98). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128). The rule tools ask only before a rule that forwards or redirects mail (tools/outlook_create_mail_rule.py:71)."
 
 uc-05-46:
   status: working
@@ -711,7 +711,7 @@ uc-05-46:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_delete_mail_rule
       uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
-  note: "expected behaviour from shared/seam.py:236-241 and 227-233, one text for each Examples row. Declines (_not_agreed): The rule was not deleted, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam.py:255-263). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam.py:208-211 and :293). The rule delete asks every time (tools/outlook_delete_mail_rule.py:62)."
+  note: "expected behaviour from shared/seam/elicitation.py:73-78 and 64-70, one text for each Examples row. Declines (_not_agreed): The rule was not deleted, say that the request was not confirmed. No answer (_no_answer): the connector received no answer and Mia can make the same request again. The one cause of that row is that the chat program answers the question with an error that is not METHOD_NOT_FOUND or INVALID_REQUEST (seam/elicitation.py:92-98). A question that never gets an answer is not a cause: the server sets no time limit (fastmcp/server/context.py:1091-1095, mcp/server/session.py:97 and :113-114), so the call waits until the client cancels it, and a cancelled call returns no text. This text exists only on a connection that uses the older protocol (seam/elicitation.py:45-47 and :128). The rule delete asks every time (tools/outlook_delete_mail_rule.py:62)."
 
 uc-05-47:
   status: working
@@ -724,7 +724,7 @@ uc-05-47:
     - tool: outlook_get_mailbox_settings
     - tool: outlook_delete_mail_rule
       uses: {rule_ref: uri of the rule Receipts from outlook_get_mailbox_settings}
-  note: "expected behaviour from shared/seam.py:244-249 (_another_request): the answer does not match the question, so nothing changed, and the assistant asks again and calls the tool with exactly what the user confirms. The state of the question holds the rule as it was read (tools/outlook_delete_mail_rule.py:130), so a changed rule gives a different state. The check runs only on a connection that uses the 2026-07-28 protocol. On the older elicitation path the tool reads the rule once, asks, and deletes with no second read (tools/outlook_delete_mail_rule.py:125-137), so a rule that changed while Mia decided is erased there."
+  note: "expected behaviour from shared/seam/elicitation.py:81-86 (_another_request): the answer does not match the question, so nothing changed, and the assistant asks again and calls the tool with exactly what the user confirms. The state of the question holds the rule as it was read (tools/outlook_delete_mail_rule.py:130), so a changed rule gives a different state. The check runs only on a connection that uses the 2026-07-28 protocol. On the older elicitation path the tool reads the rule once, asks, and deletes with no second read (tools/outlook_delete_mail_rule.py:125-137), so a rule that changed while Mia decided is erased there."
 
 uc-05-48:
   status: working
@@ -769,7 +769,7 @@ uc-05-50:
   asks_user: true
   chain:
     - any_of: [outlook_create_mail_rule, outlook_create_folder]
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam.py:514-518: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. These two writes run with no_retry (tools/outlook_create_mail_rule.py:131, tools/outlook_create_folder.py:158), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the change happened. The asks of the rows: make a rule that forwards mail from ceo@example.com to anna@example.com; create the folder Alpha inside Projects. A move with a wait time is the third row of uc-05-31. Only the forwarding rule asks Mia, so asks_user is true for that row only. A second forwarding rule can follow a repeat, and nothing in the advice says to look at the rules first. A repeated create of a folder is refused because the name is used (uc-05-36)."
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. These two writes run with no_retry (tools/outlook_create_mail_rule.py:131, tools/outlook_create_folder.py:158), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the change happened. The asks of the rows: make a rule that forwards mail from ceo@example.com to anna@example.com; create the folder Alpha inside Projects. A move with a wait time is the third row of uc-05-31. Only the forwarding rule asks Mia, so asks_user is true for that row only. A second forwarding rule can follow a repeat, and nothing in the advice says to look at the rules first. A repeated create of a folder is refused because the name is used (uc-05-36)."
 
 uc-05-51:
   status: working
@@ -814,7 +814,7 @@ uc-05-53:
     - tool: outlook_list_mail
       uses: {folder_ref: uri of Contracts from outlook_browse_folders}
   must_not: [outlook_move_mail]
-  note: "expected behaviour from shared/seam.py:451-470 (_OUTCOME_UNKNOWN) and tools/outlook_copy_mail.py:80-82 and 172-175: the connector does not know if Microsoft made the copy, do not call the tool again first, and make sure that outlook_list_mail does not show the copy in the destination folder (CHANGE_SHOWN_BY: outlook_read_mail or outlook_list_mail, :48). A copy is a new message, so a second call can make a second copy. The copy runs with no_retry (tools/outlook_copy_mail.py:291), so one failure makes one copy call. When the only message fails, the answer is an error (shared/mail.py:434-439). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text (uc-05-50)."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN) and tools/outlook_copy_mail.py:80-82 and 172-175: the connector does not know if Microsoft made the copy, do not call the tool again first, and make sure that outlook_list_mail does not show the copy in the destination folder (CHANGE_SHOWN_BY: outlook_read_mail or outlook_list_mail, :48). A copy is a new message, so a second call can make a second copy. The copy runs with no_retry (tools/outlook_copy_mail.py:291), so one failure makes one copy call. When the only message fails, the answer is an error (shared/mail.py:434-439). The rows are an internal error with no wait time and a timeout. A 503 or a 504 with a wait time gets the retry-after text (uc-05-50)."
 
 uc-05-54:
   status: working
@@ -985,7 +985,7 @@ uc-05-64:
   asks_user: true
   chain:
     - tool: outlook_create_folder
-  note: "expected behaviour from shared/seam.py:268-293: a decline gives _not_agreed and no answer gives _no_answer. The write comes after the answer (tools/outlook_create_folder.py:109-121), so the mailbox is not touched."
+  note: "expected behaviour from shared/seam/elicitation.py:103-128: a decline gives _not_agreed and no answer gives _no_answer. The write comes after the answer (tools/outlook_create_folder.py:109-121), so the mailbox is not touched."
 
 uc-05-65:
   status: working
@@ -996,7 +996,7 @@ uc-05-65:
   asks_user: true
   chain:
     - tool: outlook_create_folder
-  note: "shared/seam.py:208-293: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing. Each tool returns that result before it writes (for example tools/outlook_create_folder.py:118-119)."
+  note: "shared/seam/elicitation.py:45-128: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing. Each tool returns that result before it writes (for example tools/outlook_create_folder.py:118-119)."
 
 uc-05-66:
   status: working
@@ -1122,7 +1122,7 @@ uc-05-74:
     - tool: outlook_update_mail_rule
       args: {sequence: 4}
       uses: {rule_ref: uri of the rule Forward to Anna from outlook_get_mailbox_settings}
-  note: "tools/outlook_update_mail_rule.py:183-197 asks before a change of a rule that runs and forwards. A decline gives _not_agreed (shared/seam.py:268-293)."
+  note: "tools/outlook_update_mail_rule.py:183-197 asks before a change of a rule that runs and forwards. A decline gives _not_agreed (shared/seam/elicitation.py:103-128)."
 
 uc-05-75:
   status: working
@@ -1197,7 +1197,7 @@ uc-05-79:
     - tool: outlook_copy_mail
       args: {mailbox: support@example.com, destination: archive}
       uses: {message_refs: uri values from the previous listing}
-  note: "expected behaviour from tools/outlook_copy_mail.py:245-248 and shared/seam.py:227-241: a decline and a missing answer both stop the copy before the first message. uc-05-42 states the same rule for a move."
+  note: "expected behaviour from tools/outlook_copy_mail.py:245-248 and shared/seam/elicitation.py:64-78: a decline and a missing answer both stop the copy before the first message. uc-05-42 states the same rule for a move."
 
 uc-05-80:
   status: working

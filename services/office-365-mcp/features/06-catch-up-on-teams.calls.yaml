@@ -254,7 +254,7 @@ uc-06-16:
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
-  note: "The failing step is teams_list_chats. Expected behaviour from src/office_365_mcp/shared/seam.py:520-525: ask the user to sign in to this connector again; retrying the call unchanged fails the same way."
+  note: "The failing step is teams_list_chats. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:251-256: ask the user to sign in to this connector again; retrying the call unchanged fails the same way."
 
 uc-06-17:
   status: working
@@ -266,7 +266,7 @@ uc-06-17:
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
-  note: "The failing step is teams_list_chats. Expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
+  note: "The failing step is teams_list_chats. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
 
 uc-06-18:
   status: working
@@ -279,7 +279,7 @@ uc-06-18:
   chain:
     - tool: teams_list_chats
       args: {limit: 50}
-  note: "The failing step is teams_list_chats. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:127: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. Row 1, expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam.py:514-518: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
+  note: "The failing step is teams_list_chats. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:127: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. Row 1, expected behaviour from src/office_365_mcp/shared/seam/advice.py:240-244: retry after the stated seconds, not sooner. Row 2, from src/office_365_mcp/shared/seam/advice.py:245-249: Microsoft is rate-limiting or too busy to answer; retry after the stated seconds, not sooner, and not in a loop."
   variants:
     limited:
       fixture: uc-06-01
@@ -287,7 +287,7 @@ uc-06-18:
         fault: {graph: {status: 429, headers: {Retry-After: "30"}, body: error.TooManyRequests.json}, times: 4}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphThrottled: {message: "", status: 429, code: null, request_id: null, retry_after_seconds: 30}}
               permissions: tools.teams_list_chats.GRAPH_PERMISSIONS
               not_found: null
@@ -302,7 +302,7 @@ uc-06-18:
         fault: {graph: {status: 503, headers: {Retry-After: "120"}}, times: 4}
         expect:
           tool_error:
-            shared.seam._remedy:
+            shared.seam.advice._remedy:
               failure: {graph_client.GraphThrottled: {message: "", status: 503, code: null, request_id: null, retry_after_seconds: 120}}
               permissions: tools.teams_list_chats.GRAPH_PERMISSIONS
               not_found: null
@@ -325,7 +325,7 @@ uc-06-19:
       args: {limit: 50}
     - tool: teams_list_chats
       args: {limit: 50}
-  note: "The first step fails, and the second step is the single retry. The tool is read-only, so the advice is to retry once. Expected behaviour from src/office_365_mcp/shared/seam.py:546-553: retry once; if it fails again the same way, stop and report it. Row 1 is a Microsoft error above 499 (src/office_365_mcp/graph_client/errors.py:332-337), row 2 is a timeout or lost connection (errors.py:218-227), row 3 is an answer that cannot be read (errors.py:238-247). Row 4 is a list that never ends (src/office_365_mcp/shared/seam.py:562-570: retry once if the list matters; if it happens again, stop and report it)."
+  note: "The first step fails, and the second step is the single retry. The tool is read-only, so the advice is to retry once. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:279-286: retry once; if it fails again the same way, stop and report it. Row 1 is a Microsoft error above 499 (src/office_365_mcp/graph_client/errors.py:332-337), row 2 is a timeout or lost connection (errors.py:218-227), row 3 is an answer that cannot be read (errors.py:238-247). Row 4 is a list that never ends (src/office_365_mcp/shared/seam/advice.py:295-303: retry once if the list matters; if it happens again, stop and report it)."
 
 uc-06-20:
   status: working
@@ -337,7 +337,7 @@ uc-06-20:
   chain:
     - tool: teams_search_messages
       args: {query: pricing change}
-  note: "The failing step is teams_search_messages. Expected behaviour from src/office_365_mcp/shared/seam.py:579-584: the request is bad, not an outage or a permission problem; the same call fails the same way; Microsoft's reason is passed on."
+  note: "The failing step is teams_search_messages. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:312-317: the request is bad, not an outage or a permission problem; the same call fails the same way; Microsoft's reason is passed on."
 
 uc-06-31:
   status: working
@@ -353,7 +353,7 @@ uc-06-31:
     - tool: teams_browse_channel
       args: {include_window_completeness: true}
       uses: {team_id: id of the team, channel_id: id of the channel}
-  note: "The failing step is teams_browse_channel. Expected behaviour from src/office_365_mcp/shared/seam.py:528-537: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help. The two listings before it work, so a refusal on the posts is not an empty channel."
+  note: "The failing step is teams_browse_channel. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help. The two listings before it work, so a refusal on the posts is not an empty channel."
 
 uc-06-32:
   status: working
@@ -367,7 +367,7 @@ uc-06-32:
       args: {chat_type: group, topic_contains: Launch}
     - tool: teams_list_chat_messages
       uses: {chat_id: id of the chat}
-  note: "The failing step is teams_list_chat_messages. The tool has no text of its own for a missing chat, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam.py:538-545: Microsoft reports a missing chat and a chat that the user may not know about in the same way, so the assistant says that it could not find the chat and does not say that it was deleted."
+  note: "The failing step is teams_list_chat_messages. The tool has no text of its own for a missing chat, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:271-278: Microsoft reports a missing chat and a chat that the user may not know about in the same way, so the assistant says that it could not find the chat and does not say that it was deleted."
 
 uc-06-21:
   status: working
@@ -438,7 +438,7 @@ uc-06-24:
       uses: {uri: uri of the transcript}
     - tool: teams_read_transcript
       uses: {uri: uri of the transcript}
-  note: "The first teams_read_transcript step fails, and the second is the single retry. Expected behaviour from src/office_365_mcp/graph_client/download.py:121-131: a body that stops before its declared length is treated as unavailable, and from src/office_365_mcp/shared/seam.py:546-553: retry once; if it fails again the same way, stop and report it. The advice says only that Microsoft 365 could not be reached or failed internally (seam.py:546-553), so the assistant does not learn that a part of the transcript arrived and tells Mia only that it could not read the transcript."
+  note: "The first teams_read_transcript step fails, and the second is the single retry. Expected behaviour from src/office_365_mcp/graph_client/download.py:121-131: a body that stops before its declared length is treated as unavailable, and from src/office_365_mcp/shared/seam/advice.py:279-286: retry once; if it fails again the same way, stop and report it. The advice says only that Microsoft 365 could not be reached or failed internally (seam/advice.py:279-286), so the assistant does not learn that a part of the transcript arrived and tells Mia only that it could not read the transcript."
 
 uc-06-25:
   status: working
@@ -483,7 +483,7 @@ uc-06-33:
     - tool: teams_list_meeting_transcripts
       uses: {meeting_uri: uri of the meeting}
   must_not: [teams_read_transcript]
-  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:148-149: a refusal reflects this user, not the meeting, and the tool can refuse a participant even when the organizer succeeds. This is the generic refusal and not the switch of uc-06-14, so the text of src/office_365_mcp/shared/seam.py:528-537 applies: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
+  note: "The failing step is teams_list_meeting_transcripts. Expected behaviour from src/office_365_mcp/tools/teams_list_meeting_transcripts.py:148-149: a refusal reflects this user, not the meeting, and the tool can refuse a participant even when the organizer succeeds. This is the generic refusal and not the switch of uc-06-14, so the text of src/office_365_mcp/shared/seam/advice.py:261-270 applies: ask a Microsoft 365 administrator to grant the delegated permission; retrying will not help."
 
 uc-06-27:
   status: working
@@ -608,7 +608,7 @@ uc-06-37:
     - tool: teams_get_channel_files_folder
       uses: {team_id: id of the team Platform, channel_id: id of the channel Launch}
   must_not: [sharepoint_browse_folder]
-  note: "The failing step is teams_get_channel_files_folder. The tool has no text of its own for a missing folder, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam.py:538-545: Microsoft reports a missing item and an item that the user may not know about in the same way, so the assistant says that it could not find the folder and does not say that the channel holds no files. No folder means that no listing of its content follows."
+  note: "The failing step is teams_get_channel_files_folder. The tool has no text of its own for a missing folder, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:271-278: Microsoft reports a missing item and an item that the user may not know about in the same way, so the assistant says that it could not find the folder and does not say that the channel holds no files. No folder means that no listing of its content follows."
 
 uc-06-40:
   status: working
@@ -624,7 +624,7 @@ uc-06-40:
     - tool: teams_browse_channel
       args: {include_window_completeness: true}
       uses: {team_id: id of the team, channel_id: id of the channel}
-  note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:127: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam.py:509-513: retry after the stated seconds, not sooner."
+  note: "The failing step is teams_browse_channel. A read waits out one busy answer before the assistant sees anything (src/office_365_mcp/graph_client/client.py:339-342 and src/office_365_mcp/config.py:127: up to 3 retries, each after the time that Microsoft states), so the advice reaches the assistant only when every try gets the busy answer; the code does not ask again before the stated time. A channel allows this connector only about one request a second (src/office_365_mcp/tools/teams_list_message_replies.py:46-47), so this limit is separate from the chat list of uc-06-18. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:240-244: retry after the stated seconds, not sooner."
 
 uc-06-42:
   status: working

@@ -471,7 +471,7 @@ class TestTheBoundIsNotAnAssertion:
     async def test_the_refusal_names_the_run_and_what_graph_was_still_advertising(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`shared/seam.py` maps `GraphFailure` and nothing else onto tool advice, so the type is
+        """`shared/seam/` maps `GraphFailure` and nothing else onto tool advice, so the type is
         what makes this reach the caller as something it can act on rather than as a crash."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(

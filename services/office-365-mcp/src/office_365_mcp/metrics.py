@@ -21,18 +21,15 @@ _provider: MeterProvider | None = None
 # `graph_client/observability.py`, which imports nothing of this application. The provider installed
 # below is what gives those instruments somewhere to record.
 #
-# The layout `app.py` hands `setup_ops` for the inbound histogram: `prometheus_client`'s own
-# defaults, whose top finite boundary is 10 s, plus 30/60/120/300. A dashboard that puts inbound MCP
-# latency beside outbound Graph latency can then read one against the other without correcting for
+# One layout serves the inbound histogram `app.py` hands `setup_ops` and both Graph latency
+# histograms: `prometheus_client`'s own defaults, whose top finite boundary is 10 s, plus
+# 30/60/120/300. A dashboard that puts inbound MCP latency beside outbound Graph latency, or an
+# operation beside the steps inside it, can then read one against the other without correcting for
 # the boundaries. The layout must reach minutes because these instruments time the SDK's Retry-After
 # waits too: `GraphSettings` documents four attempts at its 30 s request timeout, and each wait
 # between them is capped at kiota's `RetryHandlerOption.MAX_DELAY` of 180 s. 300 s does not cover
 # that worst case, but it tells a throttled call apart from a slow one, which a 10 s ceiling cannot.
-#
-# One tuple serves both Graph latency histograms, so an operation and the steps inside it read on
-# the same scale. Two separate literals can drift out of sync, and a step quantile on a scale that
-# does not match the operation quantile above it answers only half a question.
-_GRAPH_LATENCY_BUCKETS = (
+LATENCY_BUCKETS = (
     0.005,
     0.01,
     0.025,
@@ -64,11 +61,11 @@ _GRAPH_LATENCY_BUCKETS = (
 _VIEWS = (
     View(
         instrument_name=GRAPH_OPERATION_DURATION_SECONDS,
-        aggregation=ExplicitBucketHistogramAggregation(_GRAPH_LATENCY_BUCKETS),
+        aggregation=ExplicitBucketHistogramAggregation(LATENCY_BUCKETS),
     ),
     View(
         instrument_name=GRAPH_STEP_DURATION_SECONDS,
-        aggregation=ExplicitBucketHistogramAggregation(_GRAPH_LATENCY_BUCKETS),
+        aggregation=ExplicitBucketHistogramAggregation(LATENCY_BUCKETS),
     ),
     View(
         instrument_name=GRAPH_PAGES_SCANNED,
