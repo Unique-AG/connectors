@@ -12,4 +12,7 @@ Each is empty until two layers need it: what one layer uses stays in that layer.
 imports fastmcp, MCP or a layer above. Expose each name here, never the module it lives in.
 """
 
-__all__: list[str] = []
+from polixis_mcp.shared.contracts import CachedAnswer
+from polixis_mcp.shared.contracts import ResponseCache
+
+__all__ = ["CachedAnswer", "ResponseCache"]

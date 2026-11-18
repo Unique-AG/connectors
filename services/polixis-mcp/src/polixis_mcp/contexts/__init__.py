@@ -1,7 +1,5 @@
 # mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import tracking_freshness
 from polixis_mcp.contexts.court_records import CourtDecisionNotFoundError
 from polixis_mcp.contexts.court_records import CourtDecisionsPage
 from polixis_mcp.contexts.court_records import CourtDecisionsQuery
@@ -17,6 +15,7 @@ from polixis_mcp.contexts.entities import get_entity_profiles
 from polixis_mcp.contexts.entities import ProfileSection
 from polixis_mcp.contexts.entities import search_entities
 from polixis_mcp.contexts.formats import PartialDate
+from polixis_mcp.contexts.freshness import Freshness
 from polixis_mcp.contexts.graph import Connections
 from polixis_mcp.contexts.graph import find_connections
 from polixis_mcp.contexts.graph import find_flagged_parties
@@ -85,5 +84,4 @@ __all__ = [
     "get_related_parties",
     "get_sanctions_exposure",
     "search_entities",
-    "tracking_freshness",
 ]

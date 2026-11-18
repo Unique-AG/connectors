@@ -4,13 +4,11 @@ from mcp_observability import trace_arguments
 from mcp_types import ToolAnnotations
 
 from polixis_mcp import contexts
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
 from polixis_mcp.mcp.inputs.cursor import PageSize
 from polixis_mcp.mcp.inputs.pid import EntityPid
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -25,7 +23,6 @@ async def get_top_down_ownership(
     page_size: PageSize = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.OwnershipPage:
     """What an organization or person owns: one row per holding, however many chains of
     shareholdings reach it, with the share the entity carries in it summed over every chain,
@@ -48,4 +45,4 @@ async def get_top_down_ownership(
         pid=pid,
         page_size=page_size,
     )
-    return await contexts.get_ownership(upstream=upstream, persistence=persistence, query=query)
+    return await contexts.get_ownership(upstream=upstream, query=query)

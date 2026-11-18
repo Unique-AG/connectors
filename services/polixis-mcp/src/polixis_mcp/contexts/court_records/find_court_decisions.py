@@ -1,22 +1,21 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.court_records.decisions import DecisionSubject
 from polixis_mcp.contexts.court_records.decisions import fetch_decisions
 from polixis_mcp.contexts.court_records.decisions import without_highlights
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.contexts.pages import snapshot_for
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
 async def find_court_decisions(
-    *, upstream: Upstream, persistence: Persistence, query: CourtDecisionsQuery
+    *, upstream: Upstream, query: CourtDecisionsQuery
 ) -> CourtDecisionsPage:
     """The decisions naming the entity itself first, then the most recent."""
     decisions = [
@@ -30,7 +29,7 @@ async def find_court_decisions(
             text_characters=len(decision.record.content or ""),
         )
         for decision in sorted(
-            await fetch_decisions(upstream=upstream, persistence=persistence, pid=query.pid),
+            await fetch_decisions(upstream=upstream, pid=query.pid),
             key=lambda decision: (decision.subject != "entity", -_year(decision.record.year)),
         )
     ]

@@ -1,9 +1,8 @@
 from collections.abc import Iterator
 
-from polixis_mcp.contexts.cached_calls import cached_call
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import node_name
 from polixis_mcp.contexts.formats import unique
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.ownership.get_ownership.inputs import OwnershipQuery
 from polixis_mcp.contexts.ownership.get_ownership.outputs import ChainLink
 from polixis_mcp.contexts.ownership.get_ownership.outputs import FLAGGED_SHOWN
@@ -16,7 +15,6 @@ from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.risks import is_hidden_alert
 from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import risk_markers
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import GET_TOP_DOWN_OWNERSHIP
 from polixis_mcp.upstream import GET_ULTIMATE_BENEFICIAL_OWNERS
 from polixis_mcp.upstream import GetTopDownOwnershipPath
@@ -31,15 +29,13 @@ from polixis_mcp.upstream import Upstream
 type _Chain = tuple[UboNode, ...]
 
 
-async def get_ownership(
-    *, upstream: Upstream, persistence: Persistence, query: OwnershipQuery
-) -> OwnershipPage:
+async def get_ownership(*, upstream: Upstream, query: OwnershipQuery) -> OwnershipPage:
     """One row per entity, however many chains reach it, the largest effective share first, so
     a threshold question is answered once the shares drop below it. The flagged entities come
     sanctioned first, then in the order of the rows. Polixis returns the whole tree at once, so
     the next page reads it from the cache.
     """
-    tree = await _tree(upstream=upstream, persistence=persistence, query=query)
+    tree = await _tree(upstream=upstream, query=query)
     meta = tree.meta or {}
     chains_by_pid: dict[str, list[_Chain]] = {}
     for chain in _chains(tree.roots or [], above=()):
@@ -90,23 +86,15 @@ async def get_ownership(
     )
 
 
-async def _tree(
-    *, upstream: Upstream, persistence: Persistence, query: OwnershipQuery
-) -> UboResult:
+async def _tree(*, upstream: Upstream, query: OwnershipQuery) -> UboResult:
     if query.direction == "owners":
-        return await cached_call(
-            upstream=upstream,
-            persistence=persistence,
-            operation=GET_ULTIMATE_BENEFICIAL_OWNERS,
-            request=GetUltimateBeneficialOwnersRequest(
-                path=GetUltimateBeneficialOwnersPath(id=query.pid)
-            ),
+        return await upstream.call(
+            GET_ULTIMATE_BENEFICIAL_OWNERS,
+            GetUltimateBeneficialOwnersRequest(path=GetUltimateBeneficialOwnersPath(id=query.pid)),
         )
-    return await cached_call(
-        upstream=upstream,
-        persistence=persistence,
-        operation=GET_TOP_DOWN_OWNERSHIP,
-        request=GetTopDownOwnershipRequest(path=GetTopDownOwnershipPath(id=query.pid)),
+    return await upstream.call(
+        GET_TOP_DOWN_OWNERSHIP,
+        GetTopDownOwnershipRequest(path=GetTopDownOwnershipPath(id=query.pid)),
     )
 
 

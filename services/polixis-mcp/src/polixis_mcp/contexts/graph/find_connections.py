@@ -1,17 +1,15 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import cached_call
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import node_name
 from polixis_mcp.contexts.formats import unique
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.graph.network import Link
 from polixis_mcp.contexts.graph.network import link_of
 from polixis_mcp.contexts.graph.network import Party
 from polixis_mcp.contexts.graph.network import party_of
 from polixis_mcp.contexts.graph.network import PathStep
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import FIND_PATHS
 from polixis_mcp.upstream import FindPathsRequest
 from polixis_mcp.upstream import GraphPath
@@ -20,17 +18,12 @@ from polixis_mcp.upstream import PathRequestInput
 from polixis_mcp.upstream import Upstream
 
 
-async def find_connections(
-    *, upstream: Upstream, persistence: Persistence, from_pid: str, to_pid: str
-) -> Connections:
+async def find_connections(*, upstream: Upstream, from_pid: str, to_pid: str) -> Connections:
     """Polixis searches its whole graph for the path and takes no options: every request field
     besides the two ids was ignored when tried.
     """
-    response = await cached_call(
-        upstream=upstream,
-        persistence=persistence,
-        operation=FIND_PATHS,
-        request=FindPathsRequest(body=PathRequestInput(source_id=from_pid, target_id=to_pid)),
+    response = await upstream.call(
+        FIND_PATHS, FindPathsRequest(body=PathRequestInput(source_id=from_pid, target_id=to_pid))
     )
     meta = response.meta or {}
     paths = [

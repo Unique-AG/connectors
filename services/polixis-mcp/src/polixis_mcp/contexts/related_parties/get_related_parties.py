@@ -4,11 +4,10 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import cached_call
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import partial_date
 from polixis_mcp.contexts.formats import unique
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
@@ -17,7 +16,6 @@ from polixis_mcp.contexts.pages import snapshot_for
 from polixis_mcp.contexts.risks import ALERT_TEXTS_DESCRIPTION
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 from polixis_mcp.contexts.risks import visible_alert_texts
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import CorporateNodeData
 from polixis_mcp.upstream import CorporateRequestInput
 from polixis_mcp.upstream import GET_CORPORATE_PROFILE
@@ -40,7 +38,7 @@ RelationCategory = Literal[
 
 
 async def get_related_parties(
-    *, upstream: Upstream, persistence: Persistence, query: RelatedPartiesQuery
+    *, upstream: Upstream, query: RelatedPartiesQuery
 ) -> RelatedPartiesPage:
     """Polixis groups the parties by publisher even when paged, and pages each group on its
     own: its page `n` holds up to `_PER_PUBLISHER` parties of every publisher, so a party
@@ -49,11 +47,9 @@ async def get_related_parties(
     A party can come again on a later Polixis page, when a publisher with more lists it there.
     Parties with a current relation come first, then those most sources report.
     """
-    response = await cached_call(
-        upstream=upstream,
-        persistence=persistence,
-        operation=GET_CORPORATE_PROFILE,
-        request=GetCorporateProfileRequest(
+    response = await upstream.call(
+        GET_CORPORATE_PROFILE,
+        GetCorporateProfileRequest(
             query=GetCorporateProfileQuery(page=query.polixis_page, size=_PER_PUBLISHER),
             body=CorporateRequestInput(id=query.pid, category=list(query.categories)),
         ),

@@ -6,6 +6,7 @@ description = "Looks up organizations and people in Polixis corporate data: sear
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
 dependencies = [
+    "alembic==1.20.1",
     "asyncpg==0.32.0",
     "fastmcp==4.1.6",
     "httpx2==2.16.0",
@@ -17,6 +18,7 @@ dependencies = [
     "pydantic-settings==2.16.3",
     "pydantic==2.14.3",
     "pyyaml==6.0.3",
+    "sqlalchemy[asyncio]==2.1.8",
     "starlette==1.10.0",
     "tenacity==9.2.1",
     "unique-mcp==2026.46.4",
@@ -39,6 +41,7 @@ dev = [
     "pytest-asyncio==1.5.0",
     "pytest==9.2.0",
     "ruff==0.17.5",
+    "testcontainers[postgres]==4.15.0",
 ]
 
 [tool.pytest.ini_options]

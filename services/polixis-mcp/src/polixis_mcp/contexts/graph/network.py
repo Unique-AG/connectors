@@ -4,14 +4,12 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import cached_call
 from polixis_mcp.contexts.formats import node_name
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.formats import unix_date
 from polixis_mcp.contexts.risks import ALERT_CATEGORIES_DESCRIPTION
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 from polixis_mcp.contexts.risks import is_hidden_alert
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import GET_SMART_GRAPH
 from polixis_mcp.upstream import GET_SUBGRAPH
 from polixis_mcp.upstream import GetSmartGraphRequest
@@ -33,7 +31,6 @@ GraphScope = Literal["key", "all"]
 async def fetch_network(
     *,
     upstream: Upstream,
-    persistence: Persistence,
     pid: str,
     radius: int,
     scope: GraphScope,
@@ -56,30 +53,13 @@ async def fetch_network(
         )
     )
     if scope == "key":
-        key = await cached_call(
-            upstream=upstream,
-            persistence=persistence,
-            operation=GET_SMART_GRAPH,
-            request=GetSmartGraphRequest(body=request),
-        )
+        key = await upstream.call(GET_SMART_GRAPH, GetSmartGraphRequest(body=request))
         return _network(root_pid=pid, graph=key, meta=key.meta or {}, truncated=bool(key.truncated))
     try:
         async with asyncio.TaskGroup() as group:
-            full = group.create_task(
-                cached_call(
-                    upstream=upstream,
-                    persistence=persistence,
-                    operation=GET_SUBGRAPH,
-                    request=GetSubgraphRequest(body=request),
-                )
-            )
+            full = group.create_task(upstream.call(GET_SUBGRAPH, GetSubgraphRequest(body=request)))
             key = group.create_task(
-                cached_call(
-                    upstream=upstream,
-                    persistence=persistence,
-                    operation=GET_SMART_GRAPH,
-                    request=GetSmartGraphRequest(body=request),
-                )
+                upstream.call(GET_SMART_GRAPH, GetSmartGraphRequest(body=request))
             )
     except* UpstreamError as errors:
         raise errors.exceptions[0] from None

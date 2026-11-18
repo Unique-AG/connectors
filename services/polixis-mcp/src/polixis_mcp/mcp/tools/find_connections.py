@@ -8,9 +8,7 @@ from pydantic import Field
 
 from polixis_mcp import contexts
 from polixis_mcp.contexts import PID_PATTERN
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -29,7 +27,6 @@ async def find_connections(
         Field(pattern=PID_PATTERN, description="The pid to look for, such as a sanctioned party."),
     ],
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.Connections:
     """How two organizations or people are connected: the shortest path Polixis finds between
     them across its whole graph, with no hop limit, and the role, share and dates of each link
@@ -38,6 +35,4 @@ async def find_connections(
 
     Polixis does not document this route yet, so its answers may change without notice.
     """
-    return await contexts.find_connections(
-        upstream=upstream, persistence=persistence, from_pid=from_pid, to_pid=to_pid
-    )
+    return await contexts.find_connections(upstream=upstream, from_pid=from_pid, to_pid=to_pid)

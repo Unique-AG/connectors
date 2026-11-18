@@ -1,8 +1,7 @@
 # mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 
 import asyncio
-from collections.abc import AsyncGenerator, Callable
-from contextlib import AbstractAsyncContextManager
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from importlib.metadata import version
 from pathlib import Path
@@ -20,6 +19,7 @@ from mcp_observability import validate_trace_declarations
 from polixis_mcp.mcp.freshness_tracking import FreshnessTracking
 from polixis_mcp.mcp.spec_tool_errors import SpecToolErrors
 from polixis_mcp.persistence import cull_expired_entries_periodically
+from polixis_mcp.persistence import open_persistence
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import open_upstream
 from polixis_mcp.upstream import upstream_http
@@ -47,27 +47,34 @@ INSTRUCTIONS = (
 
 def create_server(
     upstream: UpstreamSettings,
-    open_persistence: Callable[[], AbstractAsyncContextManager[Persistence]],
+    persistence: Persistence,
     transport: httpx2.AsyncBaseTransport | None = None,
     *,
     auth: AuthProvider | None = None,
     rate_limit: RateLimitSettings | None = None,
 ) -> FastMCP:
-    """Build the server. `open_persistence` opens every store, so the tests can open their own."""
-    http = upstream_http(upstream, transport)
+    """Build the server. The tests pass their own `persistence` and `transport`."""
+    http = upstream_http(upstream, transport, cache=persistence.response_cache)
+    # Once per TTL, so an answer normally leaves Postgres within twice the TTL, but at least
+    # hourly, so a long TTL does not hold back the deletion of the sign-in state's expired rows.
+    cull_every = min(upstream.cache.ttl_seconds, 60 * 60)
 
     @asynccontextmanager
     async def lifespan(_: FastMCP) -> AsyncGenerator[dict[str, object]]:
         async with (
             open_upstream(http, upstream) as upstream_resource,
-            open_persistence() as persistence_resource,
+            open_persistence(persistence),
             asyncio.TaskGroup() as background,
         ):
             culling = background.create_task(
-                cull_expired_entries_periodically(persistence_resource)
+                cull_expired_entries_periodically(
+                    persistence,
+                    every=cull_every,
+                    max_cache_bytes=upstream.cache.max_megabytes * 1_000_000,
+                )
             )
             try:
-                yield {"upstream": upstream_resource, "persistence": persistence_resource}
+                yield {"upstream": upstream_resource}
             finally:
                 culling.cancel()
 

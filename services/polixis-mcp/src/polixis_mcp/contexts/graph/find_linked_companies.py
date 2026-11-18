@@ -3,8 +3,8 @@ from itertools import pairwise
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.graph.network import fetch_network
 from polixis_mcp.contexts.graph.network import GraphScope
 from polixis_mcp.contexts.graph.network import Link
@@ -19,14 +19,13 @@ from polixis_mcp.contexts.risks import risk_counts
 from polixis_mcp.contexts.risks import RISK_COUNTS_DESCRIPTION
 from polixis_mcp.contexts.risks import risk_markers
 from polixis_mcp.contexts.risks import RISK_MARKERS_DESCRIPTION
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 _THROUGH_SHOWN = 5
 
 
 async def find_linked_companies(
-    *, upstream: Upstream, persistence: Persistence, query: LinkedCompaniesQuery
+    *, upstream: Upstream, query: LinkedCompaniesQuery
 ) -> LinkedCompaniesPage:
     """Companies tied to the entity directly, or through people in a row, at most `radius`
     links away: a relative or associate of a person, a director or owner of a company. The
@@ -34,7 +33,6 @@ async def find_linked_companies(
     """
     network = await fetch_network(
         upstream=upstream,
-        persistence=persistence,
         pid=query.pid,
         radius=query.radius,
         scope=query.scope,

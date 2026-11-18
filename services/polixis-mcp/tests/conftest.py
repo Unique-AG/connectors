@@ -10,12 +10,12 @@ from pydantic import AnyHttpUrl
 from pydantic import TypeAdapter
 import pytest
 
+from polixis_mcp.mcp import create_server
 from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import UpstreamSettings
 from tests import polixis_responses
-from tests.offline_server import build_server
+from tests.offline_server import fake_persistence
 from tests.offline_server import fake_upstream_settings
-from tests.offline_server import open_fake_persistence
 from tests.tool_calls import McpClient
 
 _COMPLETION_FIELDS = TypeAdapter(dict[str, list[str]])
@@ -104,9 +104,9 @@ def upstream_transport(upstream_requests: list[httpx2.Request]) -> httpx2.MockTr
 
 
 @pytest.fixture
-async def persistence() -> AsyncGenerator[Persistence]:
-    async with open_fake_persistence() as fake:
-        yield fake
+def persistence() -> Persistence:
+    """Every client of the server shares it, as the server's clients share the real store."""
+    return fake_persistence()
 
 
 @pytest.fixture
@@ -115,7 +115,7 @@ def server(
     persistence: Persistence,
     upstream_transport: httpx2.MockTransport,
 ) -> FastMCP:
-    return build_server(upstream_settings, persistence, upstream_transport)
+    return create_server(upstream_settings, persistence, upstream_transport)
 
 
 @pytest.fixture

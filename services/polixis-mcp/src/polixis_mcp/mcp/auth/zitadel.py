@@ -6,7 +6,7 @@ from unique_mcp.auth.zitadel.oidc_proxy import create_zitadel_oidc_proxy
 from unique_mcp.auth.zitadel.oidc_proxy import ZitadelOIDCProxySettings
 from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 
-from polixis_mcp.persistence import sign_in_store
+from polixis_mcp.persistence import postgres_store
 from polixis_mcp.persistence import StoreSettings
 
 _OFFLINE_ACCESS = "offline_access"
@@ -44,7 +44,7 @@ def create_auth(
         # Tokens at rest in Postgres are encrypted with a key derived from the signing key, so
         # rotating it signs everyone out, as it would anyway.
         client_storage=FernetEncryptionWrapper(
-            key_value=sign_in_store(store),
+            key_value=postgres_store(store),
             source_material=signing_key,
             salt="polixis-mcp-sign-in",
             raise_on_decryption_error=False,

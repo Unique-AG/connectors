@@ -1,7 +1,5 @@
 # mcp-scaffold-commit: 36a912c54836, timestamp: 2026-10-29T08:37:43+00:00
 
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from typing import override, Protocol
 
 import asyncpg
@@ -15,7 +13,13 @@ StoreSettings = PostgresSettings
 
 
 class Store(AsyncKeyValue, AsyncCullProtocol, Protocol):
-    """A key-value store whose `cull` deletes the entries past their TTL."""
+    """A key-value store whose `cull` deletes the entries past their TTL. It connects on first
+    use, or on `setup`.
+    """
+
+    async def setup(self) -> None: ...
+
+    async def close(self) -> None: ...
 
 
 # PostgreSQLStore's default table, named here so the cull does not read its private name.
@@ -71,12 +75,8 @@ class _PostgresStore(PostgreSQLStore):
         await self._cull_pool.execute(_DELETE_EXPIRED)  # pyright: ignore[reportUnknownMemberType] - asyncpg's Pool.execute is untyped
 
 
-@asynccontextmanager
-async def open_store(settings: StoreSettings) -> AsyncGenerator[Store]:
-    async with _PostgresStore(settings) as store:
-        yield store
-
-
-def sign_in_store(settings: StoreSettings) -> Store:
-    """The auth provider's own store: it exists before the lifespan opens `Persistence`."""
+def postgres_store(settings: StoreSettings) -> Store:
+    """Not connected yet: it connects on first use, or on `setup`. The auth provider builds its
+    own, with its own pool.
+    """
     return _PostgresStore(settings)

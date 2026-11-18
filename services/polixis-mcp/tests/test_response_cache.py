@@ -7,23 +7,26 @@ from typing import override
 from fastmcp import Client
 from fastmcp import FastMCP
 import httpx2
-from key_value.aio.stores.memory import MemoryStore
 from pydantic import ValidationError
 import pytest
 
 from polixis_mcp import contexts
-from polixis_mcp.persistence import CachedResponse
+from polixis_mcp.mcp import create_server
 from polixis_mcp.persistence import cull_expired_entries_periodically
 from polixis_mcp.persistence import Persistence
-from polixis_mcp.persistence import ResponseCacheSettings
+from polixis_mcp.shared import CachedAnswer
+from polixis_mcp.upstream import CacheSettings
 from polixis_mcp.upstream import UpstreamSettings
-from tests.offline_server import build_server
-from tests.offline_server import fake_response_cache
+from tests.offline_server import fake_cache_settings
+from tests.offline_server import fake_persistence
+from tests.offline_server import FakeResponseCache
 from tests.offline_server import FakeStore
 from tests.polixis_responses import UNKNOWN_PID
 from tests.tool_calls import call_tool
 from tests.tool_calls import McpClient
 from tests.tool_calls import tool_error
+
+_OWNER = "O00000000000000000000000000000100"
 
 
 async def test_the_next_page_reads_the_tree_from_the_cache(
@@ -95,36 +98,28 @@ async def test_the_server_culls_expired_entries_when_it_starts(
     )
 
     assert isinstance(persistence.store, FakeStore)
+    assert isinstance(persistence.response_cache, FakeResponseCache)
     assert persistence.store.culls == 1
+    assert persistence.response_cache.culls == [500 * 1_000_000]
 
 
-async def test_a_cached_response_that_no_longer_fits_is_fetched_again(
-    mcp_client: McpClient, persistence: Persistence, upstream_requests: list[httpx2.Request]
+async def test_a_tool_served_from_the_spec_is_answered_from_the_cache_too(
+    upstream_settings: UpstreamSettings,
 ) -> None:
-    owners: dict[str, object] = {"pid": "O00000000000000000000000000000100"}
-    await call_tool(
-        mcp_client, "get_ultimate_beneficial_owners", owners, returns=contexts.OwnershipPage
-    )
-    store = persistence.store
-    assert isinstance(store, FakeStore)
-    [collection] = await store.collections()
-    [key] = await store.keys(collection)
-    entry = await store.get(key, collection=collection)
-    assert entry is not None
-    await store.put(key, {**entry, "response": {"roots": "not a list"}}, collection=collection)
+    sent: list[str] = []
 
-    refetched = await call_tool(
-        mcp_client, "get_ultimate_beneficial_owners", owners, returns=contexts.OwnershipPage
-    )
-    await call_tool(
-        mcp_client, "get_ultimate_beneficial_owners", owners, returns=contexts.OwnershipPage
-    )
+    def polixis(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request.url.path)
+        if request.url.host == "auth.example.com":
+            return httpx2.Response(200, json={"access_token": "fake-token", "expires_in": 300})
+        return httpx2.Response(200, json={"status": "active"})
 
-    assert refetched.total_entities == 3
-    assert [request.url.path for request in upstream_requests if "/api/" in request.url.path] == [
-        "/api/graph/ubo/O00000000000000000000000000000100",
-        "/api/graph/ubo/O00000000000000000000000000000100",
-    ]
+    server = _server(upstream_settings, FakeResponseCache(), httpx2.MockTransport(polixis))
+    async with Client(server) as client:
+        for _ in range(2):
+            await client.call_tool("resolve_permanent_id", {"pid": _OWNER})
+
+    assert sent == ["/token", f"/api/graph/pid/{_OWNER}"]
 
 
 async def test_a_rejected_response_is_not_cached(
@@ -139,9 +134,10 @@ async def test_a_rejected_response_is_not_cached(
     ]
 
 
-class _ClosingPoolStore(MemoryStore):
+class _ClosingPoolStore(FakeStore):
     """Fails every cull with an error that is not a Postgres one, as a closing pool does."""
 
+    @override
     async def cull(self) -> None:
         raise RuntimeError("The pool is closing")
 
@@ -151,7 +147,9 @@ async def test_a_failed_cull_is_logged_and_the_culling_goes_on(
 ) -> None:
     culling = asyncio.create_task(
         cull_expired_entries_periodically(
-            Persistence(store=_ClosingPoolStore(), response_cache=fake_response_cache())
+            Persistence(store=_ClosingPoolStore(), response_cache=FakeResponseCache()),
+            every=600,
+            max_cache_bytes=1_000,
         )
     )
     await asyncio.sleep(0.01)
@@ -206,15 +204,22 @@ async def test_a_cached_answer_expires_after_the_configured_ttl(
         {"pid": "O00000000000000000000000000000100"},
         returns=contexts.OwnershipPage,
     )
-    store = persistence.store
-    assert isinstance(store, FakeStore)
-    [collection] = await store.collections()
-    [key] = await store.keys(collection)
-    _, ttl = await store.ttl(key, collection=collection)
+    cache = persistence.response_cache
+    assert isinstance(cache, FakeResponseCache)
+    [(key, ttl)] = cache.ttls.items()
 
-    assert key.startswith("v1:getTopDownOwnership:")
-    assert ttl is not None
-    assert 15 * 60 - 5 < ttl <= 15 * 60
+    assert key.startswith("v1:GET /api/graph/topdown/O00000000000000000000000000000100:")
+    assert ttl == 15 * 60
+
+
+def _server(
+    upstream_settings: UpstreamSettings,
+    response_cache: FakeResponseCache,
+    upstream_transport: httpx2.AsyncBaseTransport,
+    **cache: object,
+) -> FastMCP:
+    settings = upstream_settings.model_copy(update={"cache": fake_cache_settings(**cache)})
+    return create_server(settings, fake_persistence(response_cache), upstream_transport)
 
 
 async def _top_down_twice(server: FastMCP) -> None:
@@ -233,13 +238,12 @@ async def test_nothing_is_cached_with_the_cache_off(
     upstream_transport: httpx2.MockTransport,
     upstream_requests: list[httpx2.Request],
 ) -> None:
-    store = FakeStore()
-    persistence = Persistence(store=store, response_cache=fake_response_cache(enabled=False))
+    cache = FakeResponseCache()
 
-    await _top_down_twice(build_server(upstream_settings, persistence, upstream_transport))
+    await _top_down_twice(_server(upstream_settings, cache, upstream_transport, enabled=False))
 
     assert len(_polixis_paths(upstream_requests)) == 2
-    assert await store.collections() == []
+    assert cache.answers == {}
 
 
 async def test_a_new_key_prefix_leaves_the_answers_cached_before_unread(
@@ -247,22 +251,31 @@ async def test_a_new_key_prefix_leaves_the_answers_cached_before_unread(
     upstream_transport: httpx2.MockTransport,
     upstream_requests: list[httpx2.Request],
 ) -> None:
-    store = FakeStore()
+    cache = FakeResponseCache()
     for prefix in ("v1", "v2"):
-        persistence = Persistence(
-            store=store, response_cache=fake_response_cache(key_prefix=prefix)
+        await _top_down_twice(
+            _server(upstream_settings, cache, upstream_transport, key_prefix=prefix)
         )
-        await _top_down_twice(build_server(upstream_settings, persistence, upstream_transport))
 
     assert len(_polixis_paths(upstream_requests)) == 2
 
 
 def test_the_cache_keeps_an_answer_at_most_an_hour() -> None:
     with pytest.raises(ValidationError):
-        ResponseCacheSettings.model_validate({"ttl_seconds": 60 * 60 + 1})
+        CacheSettings.model_validate({"ttl_seconds": 60 * 60 + 1, "ttl_uncapped": False})
 
 
-async def test_the_cull_runs_again_once_per_ttl(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_uncapped_cache_keeps_an_answer_longer_than_an_hour() -> None:
+    ten_years = 10 * 365 * 24 * 60 * 60
+
+    settings = CacheSettings.model_validate({"ttl_seconds": ten_years, "ttl_uncapped": True})
+
+    assert settings.ttl_seconds == ten_years
+
+
+async def test_the_cull_runs_again_after_the_interval_it_is_given(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     waits: list[float] = []
 
     async def stop_after_the_first_wait(seconds: float) -> None:
@@ -270,22 +283,23 @@ async def test_the_cull_runs_again_once_per_ttl(monkeypatch: pytest.MonkeyPatch)
         raise asyncio.CancelledError
 
     monkeypatch.setattr(
-        "polixis_mcp.persistence.response_cache.asyncio.sleep", stop_after_the_first_wait
+        "polixis_mcp.persistence.persistence.asyncio.sleep", stop_after_the_first_wait
     )
-    store = FakeStore()
-    persistence = Persistence(store=store, response_cache=fake_response_cache(ttl_seconds=600))
+    store, cache = FakeStore(), FakeResponseCache()
 
     with pytest.raises(asyncio.CancelledError):
-        await cull_expired_entries_periodically(persistence)
+        await cull_expired_entries_periodically(
+            Persistence(store=store, response_cache=cache), every=600, max_cache_bytes=1_000
+        )
 
-    assert (store.culls, waits) == (1, [600])
+    assert (store.culls, cache.culls, waits) == (1, [1_000], [600])
 
 
-class _FailingWriteStore(FakeStore):
+class _FailingWriteCache(FakeResponseCache):
     """Fails every write, as a Postgres that went away does."""
 
     @override
-    async def put(self, *args: object, **kwargs: object) -> None:
+    async def put(self, key: str, answer: CachedAnswer, *, ttl_seconds: int) -> None:
         raise RuntimeError("The connection is closed")
 
 
@@ -294,8 +308,9 @@ async def test_a_failed_cache_write_still_returns_polixis_answer(
     upstream_transport: httpx2.MockTransport,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    persistence = Persistence(store=_FailingWriteStore(), response_cache=fake_response_cache())
-    async with Client(build_server(upstream_settings, persistence, upstream_transport)) as client:
+    async with Client(
+        _server(upstream_settings, _FailingWriteCache(), upstream_transport)
+    ) as client:
         owners = await call_tool(
             client,
             "get_ultimate_beneficial_owners",
@@ -307,11 +322,11 @@ async def test_a_failed_cache_write_still_returns_polixis_answer(
     assert "Could not cache a Polixis response" in caplog.messages
 
 
-class _FailingReadStore(FakeStore):
+class _FailingReadCache(FakeResponseCache):
     """Fails every read, as a Postgres that went away does."""
 
     @override
-    async def get(self, *args: object, **kwargs: object) -> None:
+    async def get(self, key: str) -> CachedAnswer | None:
         raise RuntimeError("The connection is closed")
 
 
@@ -320,8 +335,9 @@ async def test_a_failed_cache_read_asks_polixis(
     upstream_transport: httpx2.MockTransport,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    persistence = Persistence(store=_FailingReadStore(), response_cache=fake_response_cache())
-    async with Client(build_server(upstream_settings, persistence, upstream_transport)) as client:
+    async with Client(
+        _server(upstream_settings, _FailingReadCache(), upstream_transport)
+    ) as client:
         owners = await call_tool(
             client,
             "get_ultimate_beneficial_owners",
@@ -331,9 +347,6 @@ async def test_a_failed_cache_read_asks_polixis(
 
     assert owners.entities
     assert "Could not read the Polixis response cache, asking Polixis" in caplog.messages
-
-
-_OWNER = "O00000000000000000000000000000100"
 
 
 async def _owners(client: McpClient) -> contexts.OwnershipPage:
@@ -381,29 +394,11 @@ async def test_profiles_report_the_cached_one_among_fresh_ones(mcp_client: McpCl
 async def test_with_the_cache_off_no_result_has_a_cached_at(
     upstream_settings: UpstreamSettings, upstream_transport: httpx2.MockTransport
 ) -> None:
-    persistence = Persistence(store=FakeStore(), response_cache=fake_response_cache(enabled=False))
-    async with Client(build_server(upstream_settings, persistence, upstream_transport)) as client:
+    server = _server(upstream_settings, FakeResponseCache(), upstream_transport, enabled=False)
+    async with Client(server) as client:
         results = [await _owners(client) for _ in range(2)]
 
     assert [result.freshness.cached_at for result in results] == [None, None]
-
-
-async def test_an_entry_cached_in_an_older_form_is_fetched_again(
-    mcp_client: McpClient, persistence: Persistence, upstream_requests: list[httpx2.Request]
-) -> None:
-    await _owners(mcp_client)
-    store = persistence.store
-    assert isinstance(store, FakeStore)
-    [collection] = await store.collections()
-    [key] = await store.keys(collection)
-    entry = await store.get(key, collection=collection)
-    assert entry is not None
-    await store.put(key, CachedResponse.model_validate(entry).response, collection=collection)
-
-    refetched = await _owners(mcp_client)
-
-    assert refetched.freshness.cached_at is None
-    assert len(_polixis_paths(upstream_requests)) == 2
 
 
 async def test_an_entry_cached_longer_ago_than_a_shortened_ttl_is_fetched_again(
@@ -411,26 +406,44 @@ async def test_an_entry_cached_longer_ago_than_a_shortened_ttl_is_fetched_again(
     upstream_transport: httpx2.MockTransport,
     upstream_requests: list[httpx2.Request],
 ) -> None:
-    store = FakeStore()
-    async with Client(
-        build_server(
-            upstream_settings,
-            Persistence(store=store, response_cache=fake_response_cache()),
-            upstream_transport,
-        )
-    ) as client:
+    cache = FakeResponseCache()
+    async with Client(_server(upstream_settings, cache, upstream_transport)) as client:
         await _owners(client)
-    [collection] = await store.collections()
-    [key] = await store.keys(collection)
-    entry = await store.get(key, collection=collection)
-    assert entry is not None
+    [(key, answer)] = cache.answers.items()
     ten_minutes_ago = datetime.now(UTC) - timedelta(minutes=10)
-    aged = CachedResponse.model_validate(entry).model_copy(update={"cached_at": ten_minutes_ago})
-    await store.put(key, aged.model_dump(mode="json"), collection=collection, ttl=15 * 60)
+    cache.answers[key] = answer.model_copy(update={"cached_at": ten_minutes_ago})
 
-    shortened = Persistence(store=store, response_cache=fake_response_cache(ttl_seconds=5 * 60))
-    async with Client(build_server(upstream_settings, shortened, upstream_transport)) as client:
+    shortened = _server(upstream_settings, cache, upstream_transport, ttl_seconds=5 * 60)
+    async with Client(shortened) as client:
         refetched = await _owners(client)
 
     assert refetched.freshness.cached_at is None
     assert len(_polixis_paths(upstream_requests)) == 2
+
+
+async def test_a_cached_answer_is_served_while_the_quota_is_spent(
+    upstream_settings: UpstreamSettings, upstream_transport: httpx2.MockTransport
+) -> None:
+    answered: list[str] = []
+
+    async def polixis_until_one_answer(request: httpx2.Request) -> httpx2.Response:
+        if request.url.host == "api.example.com":
+            if answered:
+                return httpx2.Response(
+                    429, headers={"x-amzn-errortype": "LimitExceededException"}, json={}
+                )
+            answered.append(request.url.path)
+        return await upstream_transport.handle_async_request(request)
+
+    server = _server(
+        upstream_settings, FakeResponseCache(), httpx2.MockTransport(polixis_until_one_answer)
+    )
+    async with Client(server) as client:
+        fresh = await _owners(client)
+        await tool_error(
+            client, "get_ultimate_beneficial_owners", {"pid": "O00000000000000000000000000000101"}
+        )
+        cached = await _owners(client)
+
+    assert cached.entities == fresh.entities
+    assert cached.freshness.cached_at is not None

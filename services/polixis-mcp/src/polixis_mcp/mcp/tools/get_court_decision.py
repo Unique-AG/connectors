@@ -8,12 +8,10 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from polixis_mcp import contexts
-from polixis_mcp.mcp.dependencies import get_persistence
 from polixis_mcp.mcp.dependencies import get_upstream
 from polixis_mcp.mcp.inputs.cursor import Cursor
 from polixis_mcp.mcp.inputs.cursor import page_query
 from polixis_mcp.mcp.inputs.pid import EntityPid
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import Upstream
 
 
@@ -35,7 +33,6 @@ async def get_court_decision(
     ] = None,
     cursor: Cursor = None,
     upstream: Upstream = Depends(get_upstream),
-    persistence: Persistence = Depends(get_persistence),
 ) -> contexts.CourtDecisionText:
     """The full text of one court decision, in its own language, one part of about 8,000
     tokens at a time. A decision runs to about 60,000 characters at most.
@@ -51,8 +48,6 @@ async def get_court_decision(
         decision_id=decision_id,
     )
     try:
-        return await contexts.get_court_decision(
-            upstream=upstream, persistence=persistence, query=query
-        )
+        return await contexts.get_court_decision(upstream=upstream, query=query)
     except contexts.CourtDecisionNotFoundError as error:
         raise ToolError(str(error)) from error

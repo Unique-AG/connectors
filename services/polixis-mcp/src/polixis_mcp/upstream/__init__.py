@@ -3,6 +3,9 @@
 from mcp_openapi.upstream import Operation
 from mcp_openapi.upstream import UpstreamError
 
+from polixis_mcp.upstream.cache import CacheSettings
+from polixis_mcp.upstream.cache import oldest_cache_read
+from polixis_mcp.upstream.cache import tracking_cache_reads
 from polixis_mcp.upstream.client import open_upstream
 from polixis_mcp.upstream.client import Upstream
 from polixis_mcp.upstream.client import upstream_http
@@ -61,14 +64,14 @@ from polixis_mcp.upstream.generated.vendor_responses import VirtualEdge
 from polixis_mcp.upstream.generated.vendor_responses import VirtualNode
 from polixis_mcp.upstream.generated.vendor_responses import VirtualSubgraph
 from polixis_mcp.upstream.quota import PolixisQuotaSpentError
-from polixis_mcp.upstream.recording import ledger_count
-from polixis_mcp.upstream.recording import RecordingMode
-from polixis_mcp.upstream.recording import RecordingSettings
 from polixis_mcp.upstream.rejections import PolixisRejectedError
 from polixis_mcp.upstream.settings import UpstreamSettings
 
 __all__ = [
     "Operation",
+    "CacheSettings",
+    "oldest_cache_read",
+    "tracking_cache_reads",
     "FIND_PATHS",
     "GET_JUDICIAL_RECORDS",
     "GET_SANCTION_EXPOSURE",
@@ -116,9 +119,6 @@ __all__ = [
     "UboResult",
     "PolixisQuotaSpentError",
     "PolixisRejectedError",
-    "RecordingMode",
-    "RecordingSettings",
-    "ledger_count",
     "Profile",
     "CorporateNodeData",
     "RelationProperty",

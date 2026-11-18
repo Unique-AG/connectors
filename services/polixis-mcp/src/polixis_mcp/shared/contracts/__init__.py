@@ -2,4 +2,7 @@
 
 """The types two layers agree on. See `shared/__init__.py`."""
 
-__all__: list[str] = []
+from polixis_mcp.shared.contracts.response_cache import CachedAnswer
+from polixis_mcp.shared.contracts.response_cache import ResponseCache
+
+__all__ = ["CachedAnswer", "ResponseCache"]

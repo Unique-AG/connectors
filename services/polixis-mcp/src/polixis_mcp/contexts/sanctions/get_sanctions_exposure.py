@@ -1,18 +1,16 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import cached_call
-from polixis_mcp.contexts.cached_calls import Freshness
-from polixis_mcp.contexts.cached_calls import freshness
 from polixis_mcp.contexts.formats import record_date
 from polixis_mcp.contexts.formats import unique
 from polixis_mcp.contexts.formats import unix_date
+from polixis_mcp.contexts.freshness import Freshness
+from polixis_mcp.contexts.freshness import freshness
 from polixis_mcp.contexts.pages import encode_cursor
 from polixis_mcp.contexts.pages import page_of
 from polixis_mcp.contexts.pages import PageQuery
 from polixis_mcp.contexts.pages import QueryPid
 from polixis_mcp.contexts.pages import snapshot_for
-from polixis_mcp.persistence import Persistence
 from polixis_mcp.upstream import GET_SANCTION_EXPOSURE
 from polixis_mcp.upstream import GetSanctionExposurePath
 from polixis_mcp.upstream import GetSanctionExposureRequest
@@ -26,17 +24,15 @@ _LISTING_DATE_KEYS = ("Listing Date", "Listed Date", "#UK_DESIGNATED_DATE")
 
 
 async def get_sanctions_exposure(
-    *, upstream: Upstream, persistence: Persistence, query: SanctionsExposureQuery
+    *, upstream: Upstream, query: SanctionsExposureQuery
 ) -> SanctionsExposurePage:
     """Polixis walks its graph itself, with no hop limit we can set, and returns the whole
     result at once, so the next page reads it from the cache. The nearest come first, the ones
     with an active listing before the others at the same distance.
     """
-    exposure = await cached_call(
-        upstream=upstream,
-        persistence=persistence,
-        operation=GET_SANCTION_EXPOSURE,
-        request=GetSanctionExposureRequest(path=GetSanctionExposurePath(id=query.pid)),
+    exposure = await upstream.call(
+        GET_SANCTION_EXPOSURE,
+        GetSanctionExposureRequest(path=GetSanctionExposurePath(id=query.pid)),
     )
     related = sorted(
         (_related(party) for party in exposure.related_sanctions or []),

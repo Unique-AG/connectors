@@ -1,7 +1,7 @@
 from pydantic import BaseModel
 from pydantic import Field
 
-from polixis_mcp.contexts.cached_calls import Freshness
+from polixis_mcp.contexts.freshness import Freshness
 from polixis_mcp.contexts.risks import ALERT_CATEGORIES_DESCRIPTION
 from polixis_mcp.contexts.risks import FLAGS_DESCRIPTION
 from polixis_mcp.contexts.risks import RISK_COUNTS_DESCRIPTION
