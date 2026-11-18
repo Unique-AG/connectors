@@ -1400,7 +1400,8 @@ The dashboard has these rows:
   below, with the alert threshold as the red color.
 - **Totals for the selected time range**: tool calls, tool errors, Graph operations, Graph
   failures, HTTP 5xx answers, and pod restarts.
-- **MCP tool calls**: calls and errors for each tool, and the call duration.
+- **MCP tool calls**: calls and errors for each tool, the call duration, and the Graph tokens
+  that each tool asked for, by result.
 - **Microsoft Graph**: operations by status, failures for each operation and step, the duration,
   the operations over 30 and 60 seconds, throttling, and pages read.
 - **HTTP transport**: MCP and OAuth requests by path and status, the duration, and the open
@@ -1418,17 +1419,30 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `Office365McpToolErrors` | More than 20% of the tool calls in the last hour failed, and at least 10 failed | `15m` | `warning` |
 | `Office365McpGraphFailing` | More than 20% of the Graph operations in the last hour got status `unavailable`, `failed`, `error` or `paging_unending`, and at least 10 did | `15m` | `warning` |
 | `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
+| `Office365McpTokenRefused` | Entra refused at least 5 Graph token requests in the last hour | `15m` | `warning` |
 | `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour were throttled, and the callers got an error | `15m` | `warning` |
 | `Office365McpGraphSlow` | At least 3 Graph operations in the last hour took more than 60 seconds. Kong and the chat close the request at 60 seconds | `0m` | `warning` |
 | `Office365McpHttp5xx` | More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, and at least 5 did | `5m` | `warning` |
 | `Office365McpMemoryHigh` | A pod uses more than 80% of its memory limit | `30m` | `warning` |
 
 `Office365McpToolErrors` does not count the caller errors `ValidationError`, `NotFoundError` and
-`Advised`. The status `ToolError` also includes Graph errors, so `Office365McpToolErrors` stays
-silent while `Office365McpGraphFailing` or `Office365McpGraphForbidden` is pending or firing. The
-tool and Graph alerts need a minimum number of failures, so one failed call at a time of low
-traffic does not fire an alert. Each alert has a `runbook` annotation with the steps to find the
-cause.
+`Advised`. The status `ToolError` also includes Graph errors and refused tokens, so
+`Office365McpToolErrors` can fire together with `Office365McpGraphFailing`,
+`Office365McpGraphForbidden` or `Office365McpTokenRefused`. Follow the runbook of the more
+specific alert first. The tool, Graph and token alerts need a minimum number of failures, so one
+failed call at a time of low traffic does not fire an alert. Each alert has a `runbook` annotation
+with the steps to find the cause.
+
+`Office365McpTokenRefused` counts refusals and not a ratio. A token that the SDK serves from its
+cache counts as a success, so a ratio would hide an Entra outage while cached tokens last.
+
+When the pod starts, it creates `graph_operations_total` for every status,
+`graph_throttled_total` for both `retried` values, and `graph_token_acquisitions_total` for every
+result, at zero, for every registered tool. `increase()` then counts their first failure, except a
+failure that happens before the first scrape of the pod. The other
+series appear on their first use: `mcp_calls_total`, `python_http_requests_total` and the duration
+histograms. `increase()` does not count the first sample of a new series, so the first observation
+of a new status or tool on a pod is not counted.
 
 The alerts select the series with `job="office-365-mcp"` and `deployment="office-365-mcp"`. These
 names come from `fullnameOverride`. Helm does not apply templates to alert values, so a deployment

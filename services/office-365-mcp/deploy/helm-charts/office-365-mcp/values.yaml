@@ -174,19 +174,17 @@ prometheus:
         description: "More than 20% of the tool calls in the last hour failed, with at least 10 failures. Current failure ratio: {{ humanizePercentage $value }}."
         runbook: |
           1. Open the Office 365 MCP dashboard and find the tool in "Tool errors by tool and cause"
-          2. ToolError also counts Graph errors. While Office365McpGraphFailing or Office365McpGraphForbidden is pending or firing, this alert stays silent. Follow those runbooks for Graph faults
-          3. Search the logs for "Microsoft 365 issued no token". This is an Entra On-Behalf-Of failure. Check the AADSTS code, the client secret and the admin consent
+          2. ToolError also counts Graph errors and refused tokens. If Office365McpGraphFailing, Office365McpGraphForbidden or Office365McpTokenRefused fires at the same time, follow that runbook first
+          3. Search the logs for "Microsoft 365 issued no token" and read the chained cause in the traceback. An AADSTS code means that Entra refused the token: follow the Office365McpTokenRefused runbook. A connection error (DNS, timeout, refused connection) means that the pod did not reach Entra: check DNS and the NetworkPolicy egress to login.microsoftonline.com. For any other error, read the exception type and the HTTP status in the traceback
           4. Search the logs for "graph call failed" with the graph_operation of the tool
       expr: |
         (
-          sum by (namespace) ((increase(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) and present_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[24h] offset 1h)) or (last_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) unless present_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[24h] offset 1h)))
+          sum by (namespace) (increase(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]))
           /
-          sum by (namespace) ((increase(mcp_calls_total{job="office-365-mcp", kind="tool"}[1h]) and present_over_time(mcp_calls_total{job="office-365-mcp", kind="tool"}[24h] offset 1h)) or (last_over_time(mcp_calls_total{job="office-365-mcp", kind="tool"}[1h]) unless present_over_time(mcp_calls_total{job="office-365-mcp", kind="tool"}[24h] offset 1h)))
+          sum by (namespace) (increase(mcp_calls_total{job="office-365-mcp", kind="tool"}[1h]))
         ) > 0.2
         and on (namespace)
-        sum by (namespace) ((increase(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) and present_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[24h] offset 1h)) or (last_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h]) unless present_over_time(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[24h] offset 1h))) >= 10
-        unless on (namespace)
-        ALERTS{alertname=~"Office365McpGraphFailing|Office365McpGraphForbidden"}
+        sum by (namespace) (increase(mcp_calls_total{job="office-365-mcp", kind="tool", status!~"ok|ValidationError|NotFoundError|Advised"}[1h])) >= 10
       for: 15m
       labels:
         severity: warning
@@ -204,12 +202,12 @@ prometheus:
           5. graph_remedy failed or error: the request or the code has a defect. Open a ticket with the log lines
       expr: |
         (
-          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) and present_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[24h] offset 1h)) or (last_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) unless present_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[24h] offset 1h)))
+          sum by (namespace) (increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]))
           /
-          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp"}[1h]) and present_over_time(graph_operations_total{job="office-365-mcp"}[24h] offset 1h)) or (last_over_time(graph_operations_total{job="office-365-mcp"}[1h]) unless present_over_time(graph_operations_total{job="office-365-mcp"}[24h] offset 1h)))
+          sum by (namespace) (increase(graph_operations_total{job="office-365-mcp"}[1h]))
         ) > 0.2
         and on (namespace)
-        sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) and present_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[24h] offset 1h)) or (last_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]) unless present_over_time(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[24h] offset 1h))) >= 10
+        sum by (namespace) (increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h])) >= 10
       for: 15m
       labels:
         severity: warning
@@ -225,12 +223,30 @@ prometheus:
           3. 403 on one tool: the app registration does not have that delegated permission, or the admin consent is missing. Grant it in Entra
       expr: |
         (
-          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) and present_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[24h] offset 1h)) or (last_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) unless present_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[24h] offset 1h)))
+          sum by (namespace) (increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]))
           /
-          sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp"}[1h]) and present_over_time(graph_operations_total{job="office-365-mcp"}[24h] offset 1h)) or (last_over_time(graph_operations_total{job="office-365-mcp"}[1h]) unless present_over_time(graph_operations_total{job="office-365-mcp"}[24h] offset 1h)))
+          sum by (namespace) (increase(graph_operations_total{job="office-365-mcp"}[1h]))
         ) > 0.2
         and on (namespace)
-        sum by (namespace) ((increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) and present_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[24h] offset 1h)) or (last_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]) unless present_over_time(graph_operations_total{job="office-365-mcp", status="forbidden"}[24h] offset 1h))) >= 10
+        sum by (namespace) (increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h])) >= 10
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: office-365-mcp
+    Office365McpTokenRefused:
+      alert: Office365McpTokenRefused
+      annotations:
+        summary: "Entra refuses Office 365 MCP tokens in {{ $labels.namespace }}"
+        description: '{{ $value | printf "%.0f" }} Graph token requests in the last hour were refused by Entra. These tool calls never reached Microsoft Graph.'
+        runbook: |
+          1. Open the Office 365 MCP dashboard and find the tool in "Token acquisitions by tool and result"
+          2. Search the logs for "Microsoft 365 issued no token". That line has no AADSTS code. The code is in the traceback of the failed tool call, in the chained cause
+          3. AADSTS65001: nobody consented to the delegated permission. A Microsoft 365 administrator grants it through /admin/consent. Then ask an affected user to call the tool again. If it still fails, the user must sign in to the connector again
+          4. AADSTS7000215: the pod sends a client secret that Entra does not accept. Check the end date of the client secret on the Entra app registration. If the secret is still valid, the pod reads a wrong value: make sure that the Key Vault secret holds the value of the valid secret, without printing it, then restart the pod. Do not create a new secret
+          5. AADSTS7000222, or AADSTS7000215 with an expired or revoked secret: create a new client secret on the Entra app registration (the office-365-mcp-entra-application Terraform module manages it). Put the new value in the Key Vault secret that the pod reads, then restart the pod. Every user must then sign in to the connector again, because the stored sign-ins are encrypted with a key made from the old secret
+          6. Other AADSTS codes: look up the code in the Microsoft Entra error code reference
+      expr: |
+        sum by (namespace) (increase(graph_token_acquisitions_total{job="office-365-mcp", result="refused"}[1h])) >= 5
       for: 15m
       labels:
         severity: warning
@@ -245,7 +261,7 @@ prometheus:
           2. retried=true: the SDK retried and Graph still refused. Too many calls go to one mailbox or one tenant. Find the agent or the user that sends them
           3. retried=false: the SDK did not retry. Graph asked for a wait of 180 seconds or more, or the call does not allow a retry (send, move, copy). A wait of 180 seconds or more means that the tenant is over its Graph quota
       expr: |
-        sum by (namespace) ((increase(graph_throttled_total{job="office-365-mcp"}[1h]) and present_over_time(graph_throttled_total{job="office-365-mcp"}[24h] offset 1h)) or (last_over_time(graph_throttled_total{job="office-365-mcp"}[1h]) unless present_over_time(graph_throttled_total{job="office-365-mcp"}[24h] offset 1h))) > 5
+        sum by (namespace) (increase(graph_throttled_total{job="office-365-mcp"}[1h])) > 5
       for: 15m
       labels:
         severity: warning
@@ -261,9 +277,9 @@ prometheus:
           3. A high "Pages scanned per walk" value means that the tool reads too many pages. Make the query of the tool narrower
           4. Retry-After waits also add time. Look at Office365McpGraphThrottled
       expr: |
-        sum by (namespace) ((increase(graph_operation_duration_seconds_count{job="office-365-mcp"}[1h]) and present_over_time(graph_operation_duration_seconds_count{job="office-365-mcp"}[24h] offset 1h)) or (last_over_time(graph_operation_duration_seconds_count{job="office-365-mcp"}[1h]) unless present_over_time(graph_operation_duration_seconds_count{job="office-365-mcp"}[24h] offset 1h)))
+        sum by (namespace) (increase(graph_operation_duration_seconds_count{job="office-365-mcp"}[1h]))
         -
-        sum by (namespace) ((increase(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[1h]) and present_over_time(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[24h] offset 1h)) or (last_over_time(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[1h]) unless present_over_time(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[24h] offset 1h)))
+        sum by (namespace) (increase(graph_operation_duration_seconds_bucket{job="office-365-mcp", le="60.0"}[1h]))
         >= 3
       for: 0m
       labels:
@@ -280,12 +296,12 @@ prometheus:
           3. 5xx on /token, /authorize or /auth/callback: the OAuth store in Postgres or the Entra sign-in fails
       expr: |
         (
-          sum by (namespace) ((increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) and present_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[24h] offset 15m)) or (last_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) unless present_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[24h] offset 15m)))
+          sum by (namespace) (increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]))
           /
-          sum by (namespace) ((increase(python_http_requests_total{job="office-365-mcp"}[15m]) and present_over_time(python_http_requests_total{job="office-365-mcp"}[24h] offset 15m)) or (last_over_time(python_http_requests_total{job="office-365-mcp"}[15m]) unless present_over_time(python_http_requests_total{job="office-365-mcp"}[24h] offset 15m)))
+          sum by (namespace) (increase(python_http_requests_total{job="office-365-mcp"}[15m]))
         ) > 0.05
         and on (namespace)
-        sum by (namespace) ((increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) and present_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[24h] offset 15m)) or (last_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]) unless present_over_time(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[24h] offset 15m))) >= 5
+        sum by (namespace) (increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m])) >= 5
       for: 5m
       labels:
         severity: warning

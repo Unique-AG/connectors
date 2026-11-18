@@ -30,6 +30,7 @@ from office_365_mcp.graph_client import (
     GRAPH_STEP_DURATION_SECONDS,
     GRAPH_STEPS_TOTAL,
     GRAPH_THROTTLED_TOTAL,
+    GRAPH_TOKEN_ACQUISITIONS_TOTAL,
     GraphForbidden,
     GraphSettings,
     GraphThrottled,
@@ -40,11 +41,13 @@ from office_365_mcp.graph_client import (
     graph_step,
     measured_graph_operation,
     no_retry,
+    start_operation_series,
 )
 from office_365_mcp.graph_operations import TOOL_REFUSALS, GraphOperationMiddleware
 from office_365_mcp.metrics import configure_metrics
-from office_365_mcp.shared import transcripts
+from office_365_mcp.shared import seam, transcripts
 from office_365_mcp.shared.handles import TranscriptHandle
+from office_365_mcp.shared.seam import GraphToken, TokenExchangeFailed
 from office_365_mcp.shared.transcripts import STEP_ATTRIBUTED
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
 from office_365_mcp.tools.teams_list_call_transcripts import (
@@ -621,6 +624,89 @@ def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
     return isinstance(called, ast.Attribute) and called.attr == name
 
 
+class TestATokenAcquisitionIsCountedUnderTheTool:
+    @staticmethod
+    def _token(monkeypatch: pytest.MonkeyPatch, failure: Exception | None) -> GraphToken:
+        class _Exchange:
+            async def __aenter__(self) -> str:
+                if failure is not None:
+                    raise failure
+                return "token"
+
+            async def __aexit__(self, *_: object) -> None:
+                return None
+
+        def exchange_for(_scopes: list[str]) -> _Exchange:
+            return _Exchange()
+
+        monkeypatch.setattr(seam, "EntraOBOToken", exchange_for)
+        return GraphToken("Mail.Read")
+
+    @staticmethod
+    def _counts() -> dict[frozenset[tuple[str, str]], float]:
+        return _samples(GRAPH_TOKEN_ACQUISITIONS_TOTAL)
+
+    @staticmethod
+    def _moved(
+        before: dict[frozenset[tuple[str, str]], float],
+        after: dict[frozenset[tuple[str, str]], float],
+    ) -> dict[tuple[str, str], float]:
+        return {
+            (dict(labels)["operation"], dict(labels)["result"]): value - before.get(labels, 0.0)
+            for labels, value in after.items()
+            if value != before.get(labels, 0.0)
+        }
+
+    async def test_a_token_counts_once_as_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        token = self._token(monkeypatch, None)
+        before = self._counts()
+
+        with measured_graph_operation("zz_mail_tool"):
+            async with token as issued:
+                assert issued == "token"
+
+        assert self._moved(before, self._counts()) == {("zz_mail_tool", "ok"): 1}
+
+    @pytest.mark.parametrize(
+        ("failure", "result"),
+        [
+            (RuntimeError("AADSTS65001: The user or administrator has not consented"), "refused"),
+            (ConnectionError("Name or service not known"), "failed"),
+        ],
+        ids=["entra-refused", "network-failed"],
+    )
+    async def test_a_failure_counts_once_under_its_result(
+        self, monkeypatch: pytest.MonkeyPatch, failure: Exception, result: str
+    ) -> None:
+        token = self._token(monkeypatch, failure)
+        before = self._counts()
+
+        with pytest.raises(TokenExchangeFailed), measured_graph_operation("zz_mail_tool"):
+            _ = await token.__aenter__()
+
+        assert self._moved(before, self._counts()) == {("zz_mail_tool", result): 1}
+
+
+class TestEverySeriesAnAlertCountsStartsAtZero:
+    def test_a_registered_tool_has_every_series_before_its_first_call(self) -> None:
+        start_operation_series(["zz_never_called_tool"], statuses=GRAPH_STATUSES)
+
+        def started(metric: str, label: str) -> dict[str, float]:
+            return {
+                dict(labels)[label]: value
+                for labels, value in _samples(metric).items()
+                if dict(labels).get("operation") == "zz_never_called_tool"
+            }
+
+        assert started(GRAPH_OPERATIONS_TOTAL, "status") == dict.fromkeys(GRAPH_STATUSES, 0.0)
+        assert started(GRAPH_THROTTLED_TOTAL, "retried") == {"true": 0.0, "false": 0.0}
+        assert started(GRAPH_TOKEN_ACQUISITIONS_TOTAL, "result") == {
+            "ok": 0.0,
+            "refused": 0.0,
+            "failed": 0.0,
+        }
+
+
 class TestTheServerCountsEachToolCallUnderItsRegisteredName:
     @staticmethod
     def _server(client: GraphServiceClient) -> FastMCP[None]:
@@ -1077,6 +1163,7 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
             GRAPH_PAGES_SCANNED,
             GRAPH_STEPS_TOTAL,
             GRAPH_STEP_DURATION_SECONDS,
+            GRAPH_TOKEN_ACQUISITIONS_TOTAL,
         }
         queried = _queried_graph_metrics()
         assert queried <= exported, (
@@ -1095,6 +1182,7 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
             GRAPH_PAGES_SCANNED,
             GRAPH_STEPS_TOTAL,
             GRAPH_STEP_DURATION_SECONDS,
+            GRAPH_TOKEN_ACQUISITIONS_TOTAL,
         } - queried
         assert not unplotted, (
             f"{sorted(unplotted)} is recorded on every call and shown to nobody. Either add the "
@@ -1102,9 +1190,14 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
         )
 
 
+_HISTOGRAMS = frozenset(
+    {GRAPH_OPERATION_DURATION_SECONDS, GRAPH_STEP_DURATION_SECONDS, GRAPH_PAGES_SCANNED}
+)
+
+
 def _instrument(sample: str) -> str:
     for suffix in _PROMETHEUS_SUFFIXES:
-        if sample.endswith(suffix):
+        if sample.endswith(suffix) and sample[: -len(suffix)] in _HISTOGRAMS:
             return sample[: -len(suffix)]
     return sample
 

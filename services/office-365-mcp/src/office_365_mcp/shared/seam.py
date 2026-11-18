@@ -43,7 +43,9 @@ from office_365_mcp.graph_client import (
     GraphResponseTooLarge,
     GraphThrottled,
     GraphUnavailable,
+    current_graph_operation,
     graph_client_for,
+    record_token_acquisition,
 )
 
 _GRAPH_SCOPE_PREFIX = "https://graph.microsoft.com/"
@@ -148,9 +150,15 @@ class GraphToken(Dependency[str]):
     @override
     async def __aenter__(self) -> str:
         try:
-            return await self._exchange.__aenter__()
+            token = await self._exchange.__aenter__()
         except Exception as failure:
+            refused = any(_ENTRA_CODE.search(str(cause)) for cause in _causes(failure))
+            record_token_acquisition(
+                current_graph_operation(), result="refused" if refused else "failed"
+            )
             raise TokenExchangeFailed(permissions=self._permissions, cause=failure) from failure
+        record_token_acquisition(current_graph_operation(), result="ok")
+        return token
 
     @override
     async def __aexit__(
