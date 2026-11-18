@@ -35,6 +35,8 @@ from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, graph_clien
 
 TOOL_NAME = "outlook_update_contact"
 
+PRESETS: tuple[str, ...] = ("outlook-contacts-write",)
+
 STEP_READ_CONTACT = "contact"
 STEP_UPDATE = "update_contact"
 

@@ -35,6 +35,8 @@ from office_365_mcp.shared.sharepoint.lists import (
 
 TOOL_NAME = "sharepoint_create_list_item"
 
+PRESETS: tuple[str, ...] = ("sharepoint-lists-write", "sharepoint-lists-delete")
+
 STEP_COLUMNS = "list_columns"
 STEP_LIST = "read_list"
 STEP_CREATE = "create_list_item"

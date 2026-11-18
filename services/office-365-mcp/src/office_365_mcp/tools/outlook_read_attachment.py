@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_read_attachment"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP_ATTACHMENT = "message_attachment"
 STEP_CONTENT = "attachment_content"
 

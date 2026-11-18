@@ -16,6 +16,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_find_rooms"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-rooms",)
+
 STEP = "rooms"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Place.Read.All",)

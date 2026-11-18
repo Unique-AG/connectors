@@ -41,6 +41,8 @@ from office_365_mcp.shared.teams.meetings import (
 
 TOOL_NAME = "teams_update_meeting"
 
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
+
 STEP_UPDATE = "update_meeting"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("OnlineMeetings.ReadWrite", identity.GRAPH_PERMISSION)

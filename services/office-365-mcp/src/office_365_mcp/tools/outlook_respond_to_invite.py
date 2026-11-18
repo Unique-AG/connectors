@@ -37,6 +37,13 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_respond_to_invite"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP_RESPOND = "respond_to_invite"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)

@@ -40,6 +40,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_move_item"
 
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
+
 STEP_MOVE = "move_item"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

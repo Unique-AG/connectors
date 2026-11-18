@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_send_draft"
 
+PRESETS: tuple[str, ...] = ("outlook-send",)
+
 STEP_READ_DRAFT = "read_draft"
 STEP_SEND_DRAFT = "send_draft"
 

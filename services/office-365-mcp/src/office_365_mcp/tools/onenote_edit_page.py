@@ -37,6 +37,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_edit_page"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_EDIT_CONTENT = "edit_content"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)

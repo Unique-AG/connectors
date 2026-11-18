@@ -41,6 +41,14 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_event"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP = "calendar_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read", "Calendars.Read.Shared")

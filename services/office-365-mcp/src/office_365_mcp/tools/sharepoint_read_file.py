@@ -38,6 +38,14 @@ logger = logging.getLogger(__name__)
 
 TOOL_NAME = "sharepoint_read_file"
 
+PRESETS: tuple[str, ...] = (
+    "teams-files",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
+
 STEP_ITEM = "drive_item"
 STEP_CONTENT = "drive_content"
 

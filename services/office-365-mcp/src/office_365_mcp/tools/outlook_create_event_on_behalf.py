@@ -91,6 +91,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_create_event_on_behalf"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-delegate",)
+
 STEP_CREATE = "create_event"
 
 # The read is declared twice: `calendar-get` names `Calendars.Read` for `GET /me/calendars/{id}`

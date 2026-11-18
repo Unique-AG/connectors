@@ -28,6 +28,8 @@ from office_365_mcp.shared.sharepoint.lists import list_label
 
 TOOL_NAME = "sharepoint_delete_list_item"
 
+PRESETS: tuple[str, ...] = ("sharepoint-lists-delete",)
+
 STEP_LIST = "read_list"
 STEP_READ_ITEM = "list_item"
 STEP_DELETE = "delete_list_item"

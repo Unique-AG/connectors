@@ -44,6 +44,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_copy_notebook"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_COPY_NOTEBOOK = "copy_notebook"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)

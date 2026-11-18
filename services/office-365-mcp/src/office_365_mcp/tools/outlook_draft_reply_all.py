@@ -56,6 +56,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_draft_reply_all"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_READ_MESSAGE = "mail_message"
 STEP_CREATE_REPLY_ALL = "create_reply_all"
 STEP_FILL_REPLY_ALL = "fill_reply_all"

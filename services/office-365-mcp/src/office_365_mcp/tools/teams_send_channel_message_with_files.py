@@ -42,6 +42,8 @@ from office_365_mcp.shared.teams.messages import (
 
 TOOL_NAME = "teams_send_channel_message_with_files"
 
+PRESETS: tuple[str, ...] = ("teams-write-files",)
+
 STEP_SEND = "send_channel_message"
 STEP_REPLY = "reply_channel_message"
 

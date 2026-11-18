@@ -21,6 +21,16 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_browse_folder"
 
+PRESETS: tuple[str, ...] = (
+    "teams-write-files",
+    "teams-files",
+    "sharepoint-search",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
+
 STEP_MY_DRIVE = "my_drive"
 STEP_CHILDREN = "folder_children"
 

@@ -29,6 +29,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_delete_page"
 
+PRESETS: tuple[str, ...] = ("onenote-delete",)
+
 STEP_DELETE_PAGE = "delete_page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)

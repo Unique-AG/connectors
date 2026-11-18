@@ -21,6 +21,8 @@ from office_365_mcp.shared.teams.messages import TeamsMessage, event_of, unknown
 
 TOOL_NAME = "teams_list_message_replies"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-messages", "teams-channels", "teams-edit")
+
 STEP = "channel_replies"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)

@@ -45,6 +45,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_update_draft"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_READ_DRAFT = "read_draft"
 STEP_UPDATE_DRAFT = "update_draft"
 

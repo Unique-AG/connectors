@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_read_mail"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP_MESSAGE = "mail_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")

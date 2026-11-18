@@ -17,6 +17,8 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_create_category"
 
+PRESETS: tuple[str, ...] = ("outlook-automate", "outlook-rules")
+
 STEP_CREATE_CATEGORY = "create_category"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite",)

@@ -36,6 +36,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_append_to_page"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_APPEND_CONTENT = "append_content"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)

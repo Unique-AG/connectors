@@ -61,6 +61,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_copy_section"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_SECTION = "section"
 STEP_COPY_SECTION = "copy_section"
 

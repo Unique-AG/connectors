@@ -38,6 +38,8 @@ from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_search_mail"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP_SEARCH = "mail_search"
 STEP_IDS = "mail_ids"
 

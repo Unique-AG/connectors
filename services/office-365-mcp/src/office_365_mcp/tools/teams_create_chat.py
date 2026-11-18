@@ -35,6 +35,8 @@ from office_365_mcp.shared.teams.messages import CHAT_TOPIC_MAX_CHARACTERS, CHAT
 
 TOOL_NAME = "teams_create_chat"
 
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
+
 STEP_CREATE = "create_chat"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Chat.Create", identity.GRAPH_PERMISSION)

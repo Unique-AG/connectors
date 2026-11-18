@@ -18,6 +18,14 @@ from office_365_mcp.shared.window import closes_at, opens_at
 
 TOOL_NAME = "teams_list_chat_messages"
 
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-messages",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+)
+
 STEP = "chat_messages"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)

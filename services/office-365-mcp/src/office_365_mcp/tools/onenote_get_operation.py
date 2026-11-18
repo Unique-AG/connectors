@@ -19,6 +19,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner
 
 TOOL_NAME = "onenote_get_operation"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_OPERATION = "operation"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)

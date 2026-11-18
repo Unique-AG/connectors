@@ -21,6 +21,8 @@ from office_365_mcp.shared.teams.messages import TeamsMessage, event_of
 
 TOOL_NAME = "teams_browse_channel"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-channels", "teams-edit")
+
 STEP = "channel_messages"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHANNEL_PERMISSION,)

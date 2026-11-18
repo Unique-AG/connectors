@@ -50,6 +50,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_copy_item"
 
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
+
 STEP_COPY = "copy_item"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

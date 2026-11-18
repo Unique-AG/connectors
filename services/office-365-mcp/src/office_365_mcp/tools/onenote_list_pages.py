@@ -35,6 +35,8 @@ from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "onenote_list_pages"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_PAGES = "pages"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)

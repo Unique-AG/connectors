@@ -48,6 +48,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_create_page"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_CREATE = "create_page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Create",)

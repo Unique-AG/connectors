@@ -21,6 +21,8 @@ from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, graph_client_for_caller
 
 TOOL_NAME = "outlook_disable_mail_rule"
 
+PRESETS: tuple[str, ...] = ("outlook-automate", "outlook-rules")
+
 STEP_READ = "read_mail_rule"
 STEP_DISABLE = "disable_mail_rule"
 

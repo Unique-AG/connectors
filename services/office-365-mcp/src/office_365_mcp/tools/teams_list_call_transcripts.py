@@ -44,6 +44,8 @@ from office_365_mcp.shared.window import as_utc, closes_at, opens_at
 
 TOOL_NAME = "teams_list_call_transcripts"
 
+PRESETS: tuple[str, ...] = ("teams-call-transcripts",)
+
 STEP_TRANSCRIPTS = "call_transcripts"
 STEP_TENANT = "home_tenant"
 STEP_CHAT = "chat_call_events"

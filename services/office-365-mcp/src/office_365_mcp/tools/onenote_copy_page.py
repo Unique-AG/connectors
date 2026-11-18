@@ -56,6 +56,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_copy_page"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_COPY_PAGE = "copy_page"
 STEP_PAGE = "page"
 

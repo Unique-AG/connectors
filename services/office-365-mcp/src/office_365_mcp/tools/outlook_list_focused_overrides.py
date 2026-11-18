@@ -11,6 +11,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_focused_overrides"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP = "focused_overrides"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read",)

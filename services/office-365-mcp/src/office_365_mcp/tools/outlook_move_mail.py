@@ -41,6 +41,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_move_mail"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_MOVE = "move_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")

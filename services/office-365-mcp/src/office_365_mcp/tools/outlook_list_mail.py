@@ -41,6 +41,8 @@ from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_mail"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP_FOLDER = "mail_folder"
 STEP_MESSAGES = "folder_messages"
 

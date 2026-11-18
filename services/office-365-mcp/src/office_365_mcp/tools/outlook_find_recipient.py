@@ -27,6 +27,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_find_recipient"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP_PEOPLE = "people_search"
 STEP_PARTICIPANTS = "mail_participants"
 

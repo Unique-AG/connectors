@@ -34,6 +34,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_delete_item"
 
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
+
 STEP_DELETE = "delete_item"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

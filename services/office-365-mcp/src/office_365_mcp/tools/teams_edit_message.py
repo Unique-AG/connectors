@@ -45,6 +45,8 @@ from office_365_mcp.shared.teams.messages import (
 
 TOOL_NAME = "teams_edit_message"
 
+PRESETS: tuple[str, ...] = ("teams-edit",)
+
 STEP_EDIT = "edit_message"
 
 _CHAT_READ_WRITE = "Chat.ReadWrite"

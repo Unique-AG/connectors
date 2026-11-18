@@ -21,6 +21,8 @@ from office_365_mcp.shared.sharepoint.sites import not_a_site, site_by_path, sit
 
 TOOL_NAME = "sharepoint_list_lists"
 
+PRESETS: tuple[str, ...] = ("sharepoint-lists", "sharepoint-lists-write", "sharepoint-lists-delete")
+
 STEP_SITE = "site_by_url"
 STEP_LISTS = "site_lists"
 

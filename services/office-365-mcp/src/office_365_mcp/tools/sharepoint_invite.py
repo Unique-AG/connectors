@@ -41,6 +41,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_invite"
 
+PRESETS: tuple[str, ...] = ("sharepoint-share",)
+
 STEP_INVITE = "invite"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

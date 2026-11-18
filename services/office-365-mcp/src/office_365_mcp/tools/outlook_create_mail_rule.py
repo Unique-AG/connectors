@@ -38,6 +38,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_create_mail_rule"
 
+PRESETS: tuple[str, ...] = ("outlook-rules",)
+
 STEP_CREATE = "create_mail_rule"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite", "Mail.ReadBasic")

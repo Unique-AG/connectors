@@ -46,6 +46,8 @@ from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_search_messages"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-messages")
+
 STEP_SEARCH = "search_query"
 STEP_CHAT_MESSAGE = "chat_message"
 STEP_CHANNEL_MESSAGE = "channel_message"

@@ -33,6 +33,21 @@ from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_chats"
 
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-chat",
+    "teams-messages",
+    "teams-transcripts",
+    "teams-call-transcripts",
+    "teams-recordings",
+    "teams-meetings",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-meetings-write",
+    "teams-chat-admin",
+)
+
 STEP = "chats"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION,)

@@ -36,6 +36,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner
 
 TOOL_NAME = "onenote_find_notebook_from_url"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_NOTEBOOK_FROM_URL = "notebook_from_url"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)

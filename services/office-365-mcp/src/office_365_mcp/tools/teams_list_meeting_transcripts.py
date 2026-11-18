@@ -46,6 +46,8 @@ from office_365_mcp.shared.teams.meetings import (
 
 TOOL_NAME = "teams_list_meeting_transcripts"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-transcripts", "teams-meetings")
+
 STEP_TRANSCRIPTS = "transcripts"
 
 # `tests/test_layering.py` rule 4 forbids importing teams_read_transcript, so the transcript

@@ -30,6 +30,8 @@ from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_create_contact"
 
+PRESETS: tuple[str, ...] = ("outlook-contacts-write",)
+
 STEP_CREATE = "create_contact"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Contacts.ReadWrite",)

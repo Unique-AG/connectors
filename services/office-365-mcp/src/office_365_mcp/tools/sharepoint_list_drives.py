@@ -30,6 +30,16 @@ from office_365_mcp.shared.sharepoint.sites import not_a_site, site_path_of
 
 TOOL_NAME = "sharepoint_list_drives"
 
+PRESETS: tuple[str, ...] = (
+    "teams-write-files",
+    "teams-files",
+    "sharepoint-search",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
+
 STEP = "my_drives"
 
 STEP_SITE_DRIVES = "site_drives"

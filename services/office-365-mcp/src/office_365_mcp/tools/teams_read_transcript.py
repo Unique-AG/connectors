@@ -28,6 +28,8 @@ from office_365_mcp.shared.teams.transcripts import (
 
 TOOL_NAME = "teams_read_transcript"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-transcripts", "teams-meetings")
+
 GRAPH_PERMISSIONS: tuple[str, ...] = (TRANSCRIPT_PERMISSION,)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {

@@ -14,6 +14,8 @@ from office_365_mcp.shared.sharepoint.lists import NOT_A_LIST_HANDLE, ListColumn
 
 TOOL_NAME = "sharepoint_get_list"
 
+PRESETS: tuple[str, ...] = ("sharepoint-lists", "sharepoint-lists-write", "sharepoint-lists-delete")
+
 STEP = "list_columns"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Sites.Read.All",)

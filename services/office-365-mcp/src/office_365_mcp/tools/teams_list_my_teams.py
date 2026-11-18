@@ -20,6 +20,16 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_my_teams"
 
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-channels",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-files",
+    "outlook-group-calendar",
+)
+
 STEP = "joined_teams"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Team.ReadBasic.All",)

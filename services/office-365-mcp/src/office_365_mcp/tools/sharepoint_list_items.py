@@ -26,6 +26,8 @@ from office_365_mcp.shared.sharepoint.lists import (
 
 TOOL_NAME = "sharepoint_list_items"
 
+PRESETS: tuple[str, ...] = ("sharepoint-lists", "sharepoint-lists-write", "sharepoint-lists-delete")
+
 STEP_COLUMNS = "list_columns"
 STEP_ITEMS = "list_items"
 

@@ -38,6 +38,8 @@ from office_365_mcp.shared.teams.messages import (
 
 TOOL_NAME = "teams_send_chat_message"
 
+PRESETS: tuple[str, ...] = ("teams-write", "teams-write-files", "teams-edit")
+
 STEP_SEND = "send_chat_message"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMessage.Send", CHAT_PERMISSION)

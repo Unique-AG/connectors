@@ -43,6 +43,8 @@ from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_meeting_recordings"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-recordings", "teams-meetings")
+
 STEP_RECORDINGS = "recordings"
 
 # Entra redeems all three under one token or none.

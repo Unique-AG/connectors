@@ -70,6 +70,13 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_update_event"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP_UPDATE = "update_event"
 
 STORED_BODY_QUOTE_LIMIT = 16000

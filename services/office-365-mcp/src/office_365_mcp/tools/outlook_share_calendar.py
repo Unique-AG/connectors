@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_share_calendar"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
+
 STEP_CALENDAR = "calendar"
 STEP_SHARE = "share_calendar"
 

@@ -19,6 +19,13 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_search_sites"
 
+PRESETS: tuple[str, ...] = (
+    "sharepoint-sites",
+    "sharepoint-lists",
+    "sharepoint-lists-write",
+    "sharepoint-lists-delete",
+)
+
 STEP = "site_search"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Sites.Read.All",)

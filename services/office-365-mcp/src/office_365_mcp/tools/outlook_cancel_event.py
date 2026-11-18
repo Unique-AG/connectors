@@ -35,6 +35,13 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_cancel_event"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP_CANCEL = "cancel_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)

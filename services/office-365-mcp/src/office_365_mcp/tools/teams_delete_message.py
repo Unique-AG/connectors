@@ -38,6 +38,8 @@ from office_365_mcp.shared.teams.messages import (
 
 TOOL_NAME = "teams_delete_message"
 
+PRESETS: tuple[str, ...] = ("teams-edit",)
+
 STEP_DELETE = "delete_message"
 
 _CHAT_WRITE = "Chat.ReadWrite"

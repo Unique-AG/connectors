@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_read_resource"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_RESOURCE_CONTENT = "resource_content"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)

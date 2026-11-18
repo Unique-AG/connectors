@@ -34,6 +34,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_delete_event"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
+
 STEP_DELETE = "delete_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadWrite",)

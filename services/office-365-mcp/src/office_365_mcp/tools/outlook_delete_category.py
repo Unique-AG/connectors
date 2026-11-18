@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_delete_category"
 
+PRESETS: tuple[str, ...] = ("outlook-rules",)
+
 STEP_FIND = "categories"
 
 STEP_DELETE = "delete_category"

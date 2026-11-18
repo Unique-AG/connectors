@@ -38,6 +38,8 @@ from office_365_mcp.shared.teams.meetings import (
 
 TOOL_NAME = "teams_create_meeting"
 
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
+
 STEP = "create_meeting"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("OnlineMeetings.ReadWrite",)

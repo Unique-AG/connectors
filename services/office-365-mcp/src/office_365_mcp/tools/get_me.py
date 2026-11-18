@@ -15,6 +15,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "get_me"
 
+PRESETS: tuple[str, ...] = ()
+
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}

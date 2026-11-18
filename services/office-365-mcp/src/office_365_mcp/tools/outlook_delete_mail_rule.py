@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_delete_mail_rule"
 
+PRESETS: tuple[str, ...] = ("outlook-rules",)
+
 STEP_DELETE = "delete_mail_rule"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.ReadWrite",)

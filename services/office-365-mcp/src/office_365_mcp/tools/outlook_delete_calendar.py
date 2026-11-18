@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_delete_calendar"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
+
 STEP_CALENDAR = "calendar"
 STEP_EVENTS = "calendar_events"
 STEP_DELETE = "delete_calendar"

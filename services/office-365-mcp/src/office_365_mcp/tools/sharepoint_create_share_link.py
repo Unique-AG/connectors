@@ -34,6 +34,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_create_share_link"
 
+PRESETS: tuple[str, ...] = ("sharepoint-share",)
+
 STEP_CREATE_LINK = "create_link"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

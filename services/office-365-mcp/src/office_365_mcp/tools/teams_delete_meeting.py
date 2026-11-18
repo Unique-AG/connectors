@@ -32,6 +32,8 @@ from office_365_mcp.shared.teams.meetings import (
 
 TOOL_NAME = "teams_delete_meeting"
 
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
+
 STEP_DELETE = "delete_meeting"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("OnlineMeetings.ReadWrite", identity.GRAPH_PERMISSION)

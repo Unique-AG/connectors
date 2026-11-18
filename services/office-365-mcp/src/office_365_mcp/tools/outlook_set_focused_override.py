@@ -19,6 +19,8 @@ from office_365_mcp.shared.seam import WRITE_IDEMPOTENT, graph_client_for_caller
 
 TOOL_NAME = "outlook_set_focused_override"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_READ = "focused_overrides"
 STEP_WRITE = "write_focused_override"
 

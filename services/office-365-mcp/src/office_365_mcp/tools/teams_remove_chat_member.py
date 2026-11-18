@@ -27,6 +27,8 @@ from office_365_mcp.shared.teams.messages import EVERYONE_SEES_IT, chat_in_quest
 
 TOOL_NAME = "teams_remove_chat_member"
 
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
+
 STEP_READ = "chat_member"
 STEP = "remove_chat_member"
 

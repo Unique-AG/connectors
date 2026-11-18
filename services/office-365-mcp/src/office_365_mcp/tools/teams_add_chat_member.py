@@ -25,6 +25,8 @@ from office_365_mcp.shared.teams.messages import EVERYONE_SEES_IT, chat_in_quest
 
 TOOL_NAME = "teams_add_chat_member"
 
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
+
 STEP = "add_chat_member"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("ChatMember.ReadWrite", CHAT_PERMISSION)

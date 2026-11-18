@@ -43,6 +43,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_create_text_file"
 
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
+
 STEP_CREATE_FILE = "create_text_file"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

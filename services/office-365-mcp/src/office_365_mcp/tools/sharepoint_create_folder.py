@@ -41,6 +41,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "sharepoint_create_folder"
 
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
+
 STEP_CREATE_FOLDER = "create_folder"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.ReadWrite.All",)

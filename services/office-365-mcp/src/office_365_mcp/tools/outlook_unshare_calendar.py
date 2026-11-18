@@ -29,6 +29,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_unshare_calendar"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
+
 STEP_PERMISSION = "calendar_permission"
 STEP_CALENDAR = "calendar"
 STEP_UNSHARE = "unshare_calendar"

@@ -35,6 +35,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "onenote_rename_page"
 
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
+
 STEP_RENAME_PAGE = "rename_page"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.ReadWrite",)

@@ -31,6 +31,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_forward_event"
 
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
+
 STEP_FORWARD = "forward_event"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read",)

@@ -46,6 +46,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_mark_mail"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_READ_MESSAGE = "mail_message"
 STEP_MARK = "mark_message"
 

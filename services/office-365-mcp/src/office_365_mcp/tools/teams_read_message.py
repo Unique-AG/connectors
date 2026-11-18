@@ -20,6 +20,8 @@ from office_365_mcp.shared.teams.messages import TeamsMessage, get_message
 
 TOOL_NAME = "teams_read_message"
 
+PRESETS: tuple[str, ...] = ("teams", "teams-messages")
+
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {

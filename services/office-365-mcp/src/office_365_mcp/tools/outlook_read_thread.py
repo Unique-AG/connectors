@@ -27,6 +27,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_read_thread"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP_ANCHOR = "thread_anchor"
 STEP_THREAD = "thread_messages"
 

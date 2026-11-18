@@ -14,6 +14,8 @@ from office_365_mcp.shared.seam import MAILBOX_FIELD, READ_ONLY, graph_client_fo
 
 TOOL_NAME = "outlook_list_attachments"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {

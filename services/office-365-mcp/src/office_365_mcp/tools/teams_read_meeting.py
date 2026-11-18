@@ -30,6 +30,8 @@ from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_read_meeting"
 
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
+
 STEP_REPORTS = "attendance_reports"
 STEP_RECORDS = "attendance_records"
 

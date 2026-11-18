@@ -18,6 +18,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_contacts"
 
+PRESETS: tuple[str, ...] = ("outlook-contacts", "outlook-contacts-write")
+
 STEP = "contacts"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Contacts.Read",)

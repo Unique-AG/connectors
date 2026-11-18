@@ -25,6 +25,8 @@ from office_365_mcp.shared.teams.messages import (
 
 TOOL_NAME = "teams_rename_chat"
 
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
+
 STEP = "rename_chat"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Chat.ReadWrite",)

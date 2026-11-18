@@ -38,6 +38,14 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_suggest_meeting_times"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP_SUGGEST = "find_meeting_times"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read.Shared",)
