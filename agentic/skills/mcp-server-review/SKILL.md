@@ -12,6 +12,7 @@ metadata:
   internal: true
   rubric-as-of: "2026-11-13"
   latest-stable-mcp-spec: "2026-07-28"
+  unique-client-as-of: "2026-11-18"
 ---
 
 # MCP server review
@@ -80,6 +81,10 @@ a sample of 3-5 tools (the riskiest and the vaguest). Judge by reading, not by c
   candidates even when names differ.
 - **Source check** (if code is available): auth middleware, token audience validation,
   token passthrough, object-level authorization, input validation, logging.
+- **Host fit**: when the server will be used from Unique AI, also apply
+  [references/unique-client.md](references/unique-client.md). It records what that client
+  does with names, annotations, `_meta`, auth errors and timeouts, so a finding can say
+  what breaks for a Unique user instead of citing a generic guideline.
 
 Script flags are leads, not verdicts. `missing_outputSchema` is P2 at most;
 `generic_names` may be fine if the host prefixes server names.
@@ -128,6 +133,8 @@ For tool-description problems, include a rewritten example.
 - Internal code structure is already enforced by `packages/mcp-architecture` (ruff,
   basedpyright, import-linter). Do not repeat those checks; review what a client sees.
 - Review a QA or local instance with a test account. Never put a prod token in a snapshot.
+- Every service here is consumed by the Unique client, so the checklist at the end of
+  [references/unique-client.md](references/unique-client.md) is part of the review.
 
 ## Gotchas
 
@@ -144,3 +151,5 @@ For tool-description problems, include a rewritten example.
   overlap as a risk and recommend the eval in the rubric, do not claim measured results.
 - The rubric is dated. If the date is stale (>6 months) or the server targets a newer
   revision, verify the cited spec pages before asserting an N-class finding.
+- The Unique client notes are dated too. Re-check the behaviour in `Unique-AG/monorepo`
+  (`node-chat`) before asserting a finding on them.
