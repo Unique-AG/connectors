@@ -86,7 +86,7 @@ def upstream_http(
                 admission,
                 cache=cache,
                 settings=settings.cache,
-                usable=answer_check(SPEC, base_path=(settings.api_url.path or "").rstrip("/")),
+                usable=answer_check(SPEC, base_path=httpx2.URL(str(settings.api_url)).path),
                 now=clock,
             )
             if cache is not None and settings.cache.enabled

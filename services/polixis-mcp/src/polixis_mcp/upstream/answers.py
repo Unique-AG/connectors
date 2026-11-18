@@ -24,13 +24,14 @@ from polixis_mcp.upstream.generated.operations import GET_TOP_DOWN_OWNERSHIP
 from polixis_mcp.upstream.generated.operations import GET_ULTIMATE_BENEFICIAL_OWNERS
 from polixis_mcp.upstream.generated.operations import RESOLVE_PERMANENT_ID
 from polixis_mcp.upstream.generated.operations import SEARCH_ENTITIES
-from polixis_mcp.upstream.rejections import is_rejection
+from polixis_mcp.upstream.rejections import is_rejection_body
 
 
 def answer_check(spec: dict[str, object], *, base_path: str) -> AnswerCheck:
     """A body fits when it validates against the model of the operation whose route the request
     matches, and is not a rejection. A request no operation matches has no answer to keep.
-    `base_path` is the API URL's path, which the spec's routes leave out.
+    `base_path` is the API URL's path, decoded as a request's is, which the spec's routes leave
+    out.
     """
     models = {operation.operation_id: operation.adapter for operation in _OPERATIONS}
     routes = [
@@ -39,8 +40,12 @@ def answer_check(spec: dict[str, object], *, base_path: str) -> AnswerCheck:
         if (model := models.get(route.operation_id or "")) is not None
     ]
 
+    prefix = base_path.rstrip("/")
+
     def usable(request: httpx2.Request, body: bytes) -> bool:
-        path = request.url.path.removeprefix(base_path)
+        if not request.url.path.startswith(f"{prefix}/"):
+            return False
+        path = request.url.path.removeprefix(prefix)
         route = next(
             (r for r in routes if r.method == request.method and r.path.fullmatch(path)), None
         )
@@ -62,12 +67,14 @@ class _Route(BaseModel):
 
 
 def _accepts(model: _Parses) -> Callable[[bytes], bool]:
+    """Reads the rejection from the body itself, since a model without `error` drops it."""
+
     def accepts(body: bytes) -> bool:
         try:
-            answer = model.validate_json(body)
+            _ = model.validate_json(body)
         except ValidationError:
             return False
-        return not is_rejection(answer)
+        return not is_rejection_body(body)
 
     return accepts
 

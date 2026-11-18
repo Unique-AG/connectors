@@ -15,9 +15,11 @@ from key_value.aio.errors import StoreSetupError
 from key_value.aio.stores.postgresql import PostgreSQLStore
 from pydantic import SecretStr
 import pytest
+from sqlalchemy import func
 from sqlalchemy import insert
 from sqlalchemy import select
 from sqlalchemy import text
+from sqlalchemy import update
 from sqlalchemy.ext.asyncio import AsyncEngine
 from sqlalchemy.ext.asyncio import create_async_engine
 from testcontainers.community.postgres import PostgresContainer
@@ -75,7 +77,9 @@ def server_url() -> Generator[str]:
 def _new_database(server_url: str) -> Generator[str]:
     """An empty database of the test run's own, dropped on exit."""
     name = f"polixis_mcp_test_{uuid.uuid4().hex[:12]}"
-    asyncio.run(_run_outside_a_transaction(server_url, f'CREATE DATABASE "{name}"'))
+    asyncio.run(
+        _run_outside_a_transaction(server_url, f'CREATE DATABASE "{name}" TEMPLATE template0')
+    )
     try:
         yield str(httpx2.URL(server_url).copy_with(path=f"/{name}"))
     finally:
@@ -84,9 +88,11 @@ def _new_database(server_url: str) -> Generator[str]:
 
 async def _run_outside_a_transaction(server_url: str, statement: str) -> None:
     engine = _engine(server_url).execution_options(isolation_level="AUTOCOMMIT")
-    async with engine.connect() as connection:
-        await connection.exec_driver_sql(statement)
-    await engine.dispose()
+    try:
+        async with engine.connect() as connection:
+            await connection.exec_driver_sql(statement)
+    finally:
+        await engine.dispose()
 
 
 @pytest.fixture(scope="session")
@@ -177,6 +183,26 @@ async def test_the_cull_takes_a_size_past_what_an_integer_holds(
     assert await _keys_and_reads(database) == {"graph": 0}
 
 
+async def test_the_cull_keeps_an_answer_read_while_it_ranked_the_answers(
+    cache: PostgresResponseCache, database: Database
+) -> None:
+    for key in ("older", "newer"):
+        await cache.put(key, _answer(100), ttl_seconds=60)
+        await asyncio.sleep(0.01)
+
+    async with database.begin() as session:
+        _ = await session.execute(
+            update(ResponseCacheRow)
+            .where(ResponseCacheRow.key == "older")
+            .values(last_used_at=func.now())
+        )
+        culling = asyncio.create_task(cache.cull(max_bytes=150))
+        await asyncio.sleep(0.2)
+    await culling
+
+    assert set(await _keys_and_reads(database)) == {"older", "newer"}
+
+
 async def test_caching_the_same_key_again_replaces_the_answer(
     cache: PostgresResponseCache, database: Database
 ) -> None:
@@ -251,13 +277,14 @@ def test_a_downgrade_keeps_the_sign_in_state(server_url: str) -> None:
 
 async def _tables(database_url: str) -> list[str]:
     engine = _engine(database_url)
-    async with engine.connect() as connection:
-        names = await connection.scalars(
-            text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")
-        )
-        tables = list(names)
-    await engine.dispose()
-    return tables
+    try:
+        async with engine.connect() as connection:
+            names = await connection.scalars(
+                text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")
+            )
+            return list(names)
+    finally:
+        await engine.dispose()
 
 
 async def _sign_in_state(database_url: str) -> dict[str, object] | None:

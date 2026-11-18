@@ -202,7 +202,7 @@ class _CacheReads:
 
 async def _request_key(request: httpx2.Request) -> str:
     """The method, origin and path, readable, and a digest of the query and the body: the
-    headers, the token among them, play no part.
+    headers, the token among them, and any credentials in the URL play no part.
     """
     content = await request.aread()
     try:
@@ -212,7 +212,8 @@ async def _request_key(request: httpx2.Request) -> str:
     query = sorted(request.url.params.multi_items())
     canonical = json.dumps([query, body], sort_keys=True, ensure_ascii=False)
     digest = hashlib.sha256(canonical.encode()).hexdigest()
-    return f"{request.method} {request.url.copy_with(query=None)}:{digest}"
+    origin = f"{request.url.scheme}://{request.url.netloc.decode('ascii')}"
+    return f"{request.method} {origin}{request.url.path}:{digest}"
 
 
 _cache_reads: ContextVar[_CacheReads | None] = ContextVar("polixis_cache_reads", default=None)

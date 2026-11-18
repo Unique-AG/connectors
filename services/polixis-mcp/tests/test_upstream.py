@@ -260,10 +260,15 @@ async def test_an_answer_is_not_reused_for_another_polixis_origin() -> None:
         answered.append(str(request.url.host))
         return httpx2.Response(200, json={"count": 1})
 
-    for settings in (fake_upstream_settings(), other):
-        async with upstream_http(settings, httpx2.MockTransport(respond), cache=cache) as http:
-            await http.get("/api/graph/pid/P1")
+    async with upstream_http(
+        fake_upstream_settings(), httpx2.MockTransport(respond), cache=cache
+    ) as http:
+        await http.get("/api/graph/pid/P1")
+    cached = len(cache.answers)
+    async with upstream_http(other, httpx2.MockTransport(respond), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
 
+    assert cached == 1
     assert answered == ["api.example.com", "other.example.com"]
 
 
@@ -272,3 +277,51 @@ def test_the_cache_knows_the_model_of_every_generated_operation() -> None:
     generated = {member.operation_id for member in members if isinstance(member, Operation)}
 
     assert {operation.operation_id for operation in _OPERATIONS} == generated
+
+
+async def test_a_rejection_is_not_cached_for_a_model_without_an_error_field() -> None:
+    cache = FakeResponseCache()
+    rejection: dict[str, object] = {"count": 1, "error": "unknown id", "code": "NOT_FOUND"}
+
+    async with upstream_http(fake_upstream_settings(), _polixis(rejection), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert cache.answers == {}
+
+
+async def test_an_answer_under_an_encoded_api_path_is_cached() -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl("https://api.example.com/regional%20api")}
+    )
+
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert len(cache.answers) == 1
+
+
+async def test_a_path_that_only_starts_like_the_api_path_is_not_cached() -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl("https://api.example.com/v1")}
+    )
+
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("https://api.example.com/v1api/graph/pid/P1")
+
+    assert cache.answers == {}
+
+
+async def test_the_cache_key_holds_no_credentials_from_the_api_url() -> None:
+    cache = FakeResponseCache()
+    settings = fake_upstream_settings().model_copy(
+        update={"api_url": AnyHttpUrl("https://user:secret@api.example.com")}
+    )
+
+    async with upstream_http(settings, _polixis({"count": 1}), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    [key] = cache.answers
+    assert "secret" not in key
+    assert "user" not in key

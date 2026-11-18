@@ -11,6 +11,7 @@ from sqlalchemy import BigInteger
 from sqlalchemy import delete
 from sqlalchemy import func
 from sqlalchemy import select
+from sqlalchemy import tuple_
 from sqlalchemy import type_coerce
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
@@ -74,9 +75,11 @@ class PostgresResponseCache:
 
     async def cull(self, *, max_bytes: int) -> None:
         # Keeps the most recently used answers whose sizes add up to at most `max_bytes`. The sum
-        # is a BIGINT, so `max_bytes` binds as one past the 2 GB an INTEGER holds.
+        # is a BIGINT, so `max_bytes` binds as one past the 2 GB an INTEGER holds. A row is
+        # deleted only as it was ranked: one read meanwhile has a newer `last_used_at` and stays.
         ranked = select(
             ResponseCacheRow.key,
+            ResponseCacheRow.last_used_at,
             type_coerce(
                 func.sum(ResponseCacheRow.size_bytes).over(
                     order_by=(ResponseCacheRow.last_used_at.desc(), ResponseCacheRow.key),
@@ -88,8 +91,10 @@ class PostgresResponseCache:
         evict = (
             delete(ResponseCacheRow)
             .where(
-                ResponseCacheRow.key.in_(
-                    select(ranked.c.key).where(ranked.c.kept_bytes > max_bytes)
+                tuple_(ResponseCacheRow.key, ResponseCacheRow.last_used_at).in_(
+                    select(ranked.c.key, ranked.c.last_used_at).where(
+                        ranked.c.kept_bytes > max_bytes
+                    )
                 )
             )
             .returning(ResponseCacheRow.key)
