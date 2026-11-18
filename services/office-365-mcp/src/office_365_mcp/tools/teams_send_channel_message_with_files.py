@@ -12,7 +12,7 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.seam import (
@@ -35,6 +35,7 @@ from office_365_mcp.shared.teams.messages import (
     Mention,
     TeamsMessage,
     outgoing_message,
+    post_once_agreed,
     send_binding,
     send_question,
     subject_on_a_reply,
@@ -104,29 +105,14 @@ async def send_channel_message_with_files(
         importance=importance,
         files=handles,
     )
-    sent: ChatMessage | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
+    outcome: ChatMessage | InputRequiredResult | str
     with graph_errors():
         files = await attachable_files(client, handles)
         if isinstance(files, str):
-            refused = f"{CHANNEL_POST.nothing_sent} {files}"
+            outcome = f"{CHANNEL_POST.nothing_sent} {files}"
         else:
-            where = "to" if reply_to_id is None else f"as a reply to post {reply_to_id!r} in"
-            question = send_question(
-                CHANNEL_POST,
-                message,
-                f"{where} channel {channel_id!r} in team {team_id!r}",
-                mentions,
-                subject=subject,
-                importance=importance,
-                files=files,
-            )
-            with not_graph():
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-            if refused is None and asked is None:
+
+            async def post() -> ChatMessage | None:
                 outgoing = outgoing_message(
                     message,
                     mentions=mentions,
@@ -140,23 +126,37 @@ async def send_channel_message_with_files(
                 configuration = RequestConfiguration[QueryParameters](options=no_retry())
                 if reply_to_id is None:
                     with graph_step(STEP_SEND):
-                        sent = await messages.post(outgoing, request_configuration=configuration)
-                else:
-                    with graph_step(STEP_REPLY):
-                        sent = await messages.by_chat_message_id(reply_to_id).replies.post(
-                            outgoing, request_configuration=configuration
-                        )
+                        return await messages.post(outgoing, request_configuration=configuration)
+                with graph_step(STEP_REPLY):
+                    return await messages.by_chat_message_id(reply_to_id).replies.post(
+                        outgoing, request_configuration=configuration
+                    )
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert sent is not None, "a post that nothing refused answered with no message"
-    assert sent.id is not None, "Graph accepted a channel message post but returned no id"
+            where = "to" if reply_to_id is None else f"as a reply to post {reply_to_id!r} in"
+            outcome = await post_once_agreed(
+                confirm,
+                send_question(
+                    CHANNEL_POST,
+                    message,
+                    f"{where} channel {channel_id!r} in team {team_id!r}",
+                    mentions,
+                    subject=subject,
+                    importance=importance,
+                    files=files,
+                ),
+                about,
+                post,
+            )
+
+    if isinstance(outcome, InputRequiredResult):
+        return outcome
+    if isinstance(outcome, str):
+        raise ToolError(outcome)
+    assert outcome.id is not None, "Graph accepted a channel message post but returned no id"
     return TeamsMessage.from_message(
-        sent,
+        outcome,
         handle=MessageHandle(
-            sent.id, team_id=team_id, channel_id=channel_id, reply_to_id=reply_to_id
+            outcome.id, team_id=team_id, channel_id=channel_id, reply_to_id=reply_to_id
         ),
     )
 

@@ -1,12 +1,13 @@
 import html
 import re
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Self, cast
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
+from mcp.types import InputRequiredResult
 from msgraph.generated.chats.item.messages.item.chat_message_item_request_builder import (
     ChatMessageItemRequestBuilder as ChatMessageRequestBuilder,
 )
@@ -36,7 +37,7 @@ from msgraph.generated.teams.item.channels.item.messages.item.replies.item impor
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step, not_graph
 from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
@@ -47,6 +48,7 @@ from office_365_mcp.shared.identity import (
 )
 from office_365_mcp.shared.markdown import link_targets, markdown_to_html
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
+from office_365_mcp.shared.seam import Confirm
 
 
 class MessageSender(BaseModel):
@@ -554,6 +556,21 @@ def send_question(
         f"{words.verb} {cut_for_a_question(message)!r}{marked} {destination} now?"
         + f"{mentioned}{attached}{links_in_question(message)} {words.cannot_be_recalled}"
     )
+
+
+async def post_once_agreed(
+    confirm: Confirm,
+    question: str,
+    about: str,
+    post: Callable[[], Awaitable[ChatMessage | None]],
+) -> ChatMessage | InputRequiredResult | str:
+    with not_graph():
+        answer = await confirm(question, about)
+    if answer is not None:
+        return answer
+    sent = await post()
+    assert sent is not None, "a post that nothing refused answered with no message"
+    return sent
 
 
 def mention_in_question(mention: OutgoingMention) -> str:

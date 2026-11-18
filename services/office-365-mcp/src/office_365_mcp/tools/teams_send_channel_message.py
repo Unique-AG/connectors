@@ -12,7 +12,7 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -33,6 +33,7 @@ from office_365_mcp.shared.teams.messages import (
     Mention,
     TeamsMessage,
     outgoing_message,
+    post_once_agreed,
     send_binding,
     send_question,
     subject_on_a_reply,
@@ -102,41 +103,37 @@ async def send_channel_message(
         subject=subject,
         importance=importance,
     )
-    sent: ChatMessage | None = None
-    asked: InputRequiredResult | None = None
+
+    async def post() -> ChatMessage | None:
+        outgoing = outgoing_message(
+            message,
+            mentions=mentions,
+            importance=None if importance is None else ChatMessageImportance(importance),
+            subject=subject,
+        )
+        messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
+        configuration = RequestConfiguration[QueryParameters](options=no_retry())
+        return await (
+            messages.post(outgoing, request_configuration=configuration)
+            if reply_to_id is None
+            else messages.by_chat_message_id(reply_to_id).replies.post(
+                outgoing, request_configuration=configuration
+            )
+        )
+
     measured = graph_step(STEP_SEND) if reply_to_id is None else graph_step(STEP_REPLY)
     with measured:
-        with not_graph():
-            answer = await confirm(question, about)
-        asked = answer if isinstance(answer, InputRequiredResult) else None
-        refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            outgoing = outgoing_message(
-                message,
-                mentions=mentions,
-                importance=None if importance is None else ChatMessageImportance(importance),
-                subject=subject,
-            )
-            messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
-            configuration = RequestConfiguration[QueryParameters](options=no_retry())
-            sent = await (
-                messages.post(outgoing, request_configuration=configuration)
-                if reply_to_id is None
-                else messages.by_chat_message_id(reply_to_id).replies.post(
-                    outgoing, request_configuration=configuration
-                )
-            )
+        outcome = await post_once_agreed(confirm, question, about, post)
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert sent is not None, "a post that nothing refused answered with no message"
-    assert sent.id is not None, "Graph accepted a channel message post but returned no id"
+    if isinstance(outcome, InputRequiredResult):
+        return outcome
+    if isinstance(outcome, str):
+        raise ToolError(outcome)
+    assert outcome.id is not None, "Graph accepted a channel message post but returned no id"
     return TeamsMessage.from_message(
-        sent,
+        outcome,
         handle=MessageHandle(
-            sent.id, team_id=team_id, channel_id=channel_id, reply_to_id=reply_to_id
+            outcome.id, team_id=team_id, channel_id=channel_id, reply_to_id=reply_to_id
         ),
     )
 

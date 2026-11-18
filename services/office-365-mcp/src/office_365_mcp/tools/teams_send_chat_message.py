@@ -12,7 +12,7 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -32,6 +32,7 @@ from office_365_mcp.shared.teams.messages import (
     TeamsMessage,
     mentioned_members,
     outgoing_message,
+    post_once_agreed,
     send_binding,
     send_question,
 )
@@ -78,32 +79,16 @@ async def send_chat_message(
     importance: ChatImportance | None = None,
     subject: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    sent: ChatMessage | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
+    outcome: ChatMessage | InputRequiredResult | str
     with graph_errors():
         members = await mentioned_members(client, chat_id, mentions)
         if isinstance(members, str):
-            refused = members
+            outcome = members
         else:
-            question = send_question(
-                CHAT_SEND,
-                message,
-                f"to chat {chat_id!r}",
-                members,
-                subject=subject,
-                importance=importance,
-            )
-            about = send_binding(
-                (chat_id,), message, members, subject=subject, importance=importance
-            )
-            with not_graph():
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-            if refused is None and asked is None:
+
+            async def post() -> ChatMessage | None:
                 with graph_step(STEP_SEND):
-                    sent = await client.chats.by_chat_id(chat_id).messages.post(
+                    return await client.chats.by_chat_id(chat_id).messages.post(
                         outgoing_message(
                             message,
                             mentions=members,
@@ -117,13 +102,26 @@ async def send_chat_message(
                         ),
                     )
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert sent is not None, "a send that nothing refused answered with no message"
-    assert sent.id is not None, "Graph accepted a chat message post but returned no id"
-    return TeamsMessage.from_message(sent, handle=MessageHandle(sent.id, chat_id=chat_id))
+            outcome = await post_once_agreed(
+                confirm,
+                send_question(
+                    CHAT_SEND,
+                    message,
+                    f"to chat {chat_id!r}",
+                    members,
+                    subject=subject,
+                    importance=importance,
+                ),
+                send_binding((chat_id,), message, members, subject=subject, importance=importance),
+                post,
+            )
+
+    if isinstance(outcome, InputRequiredResult):
+        return outcome
+    if isinstance(outcome, str):
+        raise ToolError(outcome)
+    assert outcome.id is not None, "Graph accepted a chat message post but returned no id"
+    return TeamsMessage.from_message(outcome, handle=MessageHandle(outcome.id, chat_id=chat_id))
 
 
 def a_person_agrees(ctx: Context) -> Confirm:
