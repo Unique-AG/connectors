@@ -10,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphResponseTooLarge, graph_errors
+from office_365_mcp.shared.files import MEGABYTE
 from office_365_mcp.shared.handles import TranscriptHandle, transcript_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.teams.meetings import TRANSCRIPT_PERMISSION
@@ -50,7 +51,7 @@ Notes:
 nothing.
 - `from_seconds` must not be later than `to_seconds`. If `from_seconds` is later than \
 `to_seconds`, this tool refuses the call.
-- If a transcript is larger than {MAX_TRANSCRIPT_BYTES // (1024 * 1024)} MB, this tool refuses \
+- If a transcript is larger than {MAX_TRANSCRIPT_BYTES // MEGABYTE} MB, this tool refuses \
 it. No argument makes the call smaller.
 """
 

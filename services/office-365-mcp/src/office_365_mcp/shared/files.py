@@ -22,6 +22,10 @@ from office_365_mcp.shared.seam import Advised
 
 STEP_DRIVE_ITEM = "drive_item"
 
+MEGABYTE = 1024 * 1024
+
+MAX_BYTES = 10 * MEGABYTE
+
 ATTACHMENT_FIELDS: tuple[str, ...] = (
     "id",
     "name",
@@ -453,3 +457,11 @@ def _reserved(found: list[str]) -> str:
 
 def _name_refusal(*problems: str) -> str:
     return " ".join((_NAME_NOT_ALLOWED, *problems, _SAME_NAME_FAILS))
+
+
+def is_utf8(body: bytes) -> bool:
+    try:
+        _ = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True

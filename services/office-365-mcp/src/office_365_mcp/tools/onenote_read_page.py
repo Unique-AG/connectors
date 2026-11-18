@@ -18,6 +18,7 @@ from office_365_mcp.graph_client import (
     graph_step,
     request_with_query,
 )
+from office_365_mcp.shared.files import MEGABYTE
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary, onenote_root, page_summary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
@@ -34,9 +35,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "page": "onenote:///pages/1-SYNTHETICPAGE00000000000000000000%21ABCDEF"
 }
 
-MAX_CONTENT_BYTES = 1 * 1024 * 1024
-
-_MEGABYTE = 1024 * 1024
+MAX_CONTENT_BYTES = 1 * MEGABYTE
 
 _DESCRIPTION = f"""\
 Reads the HTML of one page exactly as Microsoft stores it. This tool converts nothing: the answer \
@@ -48,7 +47,7 @@ Notes:
 connector's own sign-in token. Pass that address to onenote_read_resource.
 - `include_ids` true makes Microsoft add an `id` to nearly every element, which onenote_edit_page \
 takes as `target`.
-- This tool refuses a page larger than {MAX_CONTENT_BYTES // _MEGABYTE} MB.
+- This tool refuses a page larger than {MAX_CONTENT_BYTES // MEGABYTE} MB.
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -171,7 +170,7 @@ def _too_large(*, size: int, web_url: str | None) -> str:
     )
     return (
         f"This page's HTML is {size:,} bytes, and onenote_read_page returns a page of "
-        + f"{MAX_CONTENT_BYTES:,} bytes ({MAX_CONTENT_BYTES // _MEGABYTE} MB) or less. The whole "
+        + f"{MAX_CONTENT_BYTES:,} bytes ({MAX_CONTENT_BYTES // MEGABYTE} MB) or less. The whole "
         + "page would have to arrive in one message, so a page this large is refused rather than "
         + f"sent to you. {where} No other tool here returns this page's content, and "
         + "a second call fails the same way."
