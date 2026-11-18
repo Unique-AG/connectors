@@ -323,17 +323,26 @@ def _is_inside(directory: pathlib.Path, package: str) -> bool:
     )
 
 
+def _is_module(name: str) -> bool:
+    path = _SRC.parent.joinpath(*name.split("."))
+    return path.with_suffix(".py").is_file() or path.is_dir()
+
+
 def _internal_imports(
     source: str, directory: pathlib.Path, package: str | None = None
 ) -> list[tuple[str, int]]:
     """A file inside a package may import its own package's modules freely — that is the package
     composing itself, `tools/__init__.py` naming every tool module being the clearest case — so the
     directory the file lives in, not its name, decides."""
+    tree = ast.parse(source)
+    submodules = [
+        (member, line) for member, line in _imported_members(tree, package) if _is_module(member)
+    ]
     return [
         (module, line)
         for surface in _PUBLIC_SURFACE_PACKAGES
         if not _is_inside(directory, surface)
-        for module, line in _imported_modules(ast.parse(source), package)
+        for module, line in [*_imported_modules(tree, package), *submodules]
         if module.startswith(f"{surface}.")
     ]
 
@@ -801,6 +810,11 @@ class TestTheDetectionItself:
     def test_catches_reaching_past_the_registry_for_a_tool_file(self) -> None:
         assert _internal_imports("from office_365_mcp.tools.get_me import register", _SRC) == [
             ("office_365_mcp.tools.get_me", 1)
+        ]
+
+    def test_catches_a_submodule_named_in_the_import_list(self) -> None:
+        assert _internal_imports("from office_365_mcp.shared.seam import elicitation", _SRC) == [
+            ("office_365_mcp.shared.seam.elicitation", 1)
         ]
 
     def test_the_same_import_is_fine_inside_the_package(self) -> None:

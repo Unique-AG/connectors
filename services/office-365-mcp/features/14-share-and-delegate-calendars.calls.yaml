@@ -219,7 +219,7 @@ uc-14-15:
     - tool: outlook_list_calendars
       optional: true
     - any_of: [outlook_share_calendar, outlook_unshare_calendar, outlook_create_event_on_behalf, outlook_delete_calendar]
-  note: "expected behaviour from shared/seam/elicitation.py:64-70 _no_answer, reached from :95-98 when the client sends no answer or the question fails: the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:26-28). The asks of the rows are the asks of uc-14-14."
+  note: "expected behaviour from shared/seam/elicitation.py:64-70 _no_answer, reached from :95-98 when the question fails with an error (a client that never answers leaves the call waiting until it is cancelled, and a cancelled call returns no text): the connector received no answer, tell the user that, and that they can make the same request again, and do not call the tool again unless the user asks in a new message (:26-28). The asks of the rows are the asks of uc-14-14."
 
 uc-14-16:
   status: working

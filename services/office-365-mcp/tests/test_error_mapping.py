@@ -482,7 +482,11 @@ class TestWhereTheMappingSits:
         ):
             _ = await mcp_client.call_tool("teams_list_chats", {})
 
-        logged = [record for record in caplog.records if record.exc_info is not None]
+        logged = [
+            record
+            for record in caplog.records
+            if record.name == "mcp_observability.tool_calls" and record.exc_info is not None
+        ]
         assert logged, "the tool-call line logged nothing about a failed call"
         raised = logged[-1].exc_info
         assert raised is not None and raised[1] is not None

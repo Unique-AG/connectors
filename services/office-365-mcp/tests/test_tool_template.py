@@ -207,15 +207,13 @@ class TestEveryToolFollowsOneTemplate:
             for tool in await every_tool.list_tools()
             if (bounds := _limit_bounds(tool)) is not None
         }
-        violators = {
-            name
-            for name, bounds in limits.items()
-            if "minimum" not in bounds or "maximum" not in bounds
-        }
+        without_minimum = {name for name, bounds in limits.items() if "minimum" not in bounds}
+        without_maximum = {name for name, bounds in limits.items() if "maximum" not in bounds}
 
         assert len(limits) > len(_LIMIT_WITHOUT_MAXIMUM), "the survey found too few limits"
-        assert violators == _LIMIT_WITHOUT_MAXIMUM, _breaks(
-            violators, _LIMIT_WITHOUT_MAXIMUM, "a `limit` parameter has `minimum` and `maximum`"
+        assert not without_minimum, f"a `limit` has a `minimum`: {sorted(without_minimum)}"
+        assert without_maximum == _LIMIT_WITHOUT_MAXIMUM, _breaks(
+            without_maximum, _LIMIT_WITHOUT_MAXIMUM, "a `limit` parameter has a `maximum`"
         )
 
     async def test_a_write_tool_asks_a_person_before_it_writes(

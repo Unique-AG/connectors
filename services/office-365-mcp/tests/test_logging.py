@@ -201,6 +201,11 @@ class TestNothingSecretReachesTheLog:
         assert line["entra_client_secret"] == CENSORED
         assert line["graph_access_token"] == CENSORED
 
+    def test_a_decoded_sign_in_hint_is_censored(self, sink: _Sink) -> None:
+        _log("authorize", query={"login_hint": "jane.doe@corp.com", "state": "x"})
+
+        assert sink.one()["query"] == {"login_hint": CENSORED, "state": "x"}
+
     def test_a_bearer_token_in_a_value_is_censored_under_an_innocent_name(
         self, sink: _Sink
     ) -> None:
@@ -271,11 +276,12 @@ class TestNothingSecretReachesTheLog:
         assert f"code={CENSORED}&state=x" in message, message
         assert "1.AXcAlive-auth-code" not in sink.stream.getvalue()
 
-    def test_a_sign_in_hint_in_a_query_string_is_censored(self, sink: _Sink) -> None:
-        _log('127.0.0.1:1 - "GET /authorize?login_hint=jane.doe%40corp.com&state=x HTTP/1.1" 302')
+    @pytest.mark.parametrize("name", ["login_hint", "login%5Fhint", "login%5fhint"], ids=repr)
+    def test_a_sign_in_hint_in_a_query_string_is_censored(self, sink: _Sink, name: str) -> None:
+        _log(f'127.0.0.1:1 - "GET /authorize?{name}=jane.doe%40corp.com&state=x HTTP/1.1" 302')
 
         message = cast("str", sink.one()["msg"])
-        assert f"login_hint={CENSORED}&state=x" in message, message
+        assert f"{name}={CENSORED}&state=x" in message, message
         assert "jane.doe" not in sink.stream.getvalue()
 
     @pytest.mark.parametrize("parameter", ["postcode", "encoding", "areacode"], ids=repr)
@@ -857,6 +863,9 @@ def _wait_until_up(server: subprocess.Popen[str], probe: str, timeout: float = 3
     raise AssertionError(f"{probe} never answered")
 
 
+_PINO_WARN = 40
+
+
 class TestOneLinePerToolFailure:
     async def test_a_failed_tool_call_is_logged_once(self, sink: _Sink) -> None:
         server = FastMCP("one-line", middleware=[ToolCallObservabilityMiddleware()])
@@ -869,5 +878,5 @@ class TestOneLinePerToolFailure:
         async with Client(server) as client:
             _ = await client.call_tool("refuse", {}, raise_on_error=False)
 
-        failures = [line for line in sink.lines() if "fail" in str(line["msg"])]
+        failures = [line for line in sink.lines() if cast("int", line["level"]) >= _PINO_WARN]
         assert [line["msg"] for line in failures] == ["Tool call failed"], failures
