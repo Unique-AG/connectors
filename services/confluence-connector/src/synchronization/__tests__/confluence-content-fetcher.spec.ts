@@ -1,4 +1,5 @@
 import { Smeared } from '@unique-ag/utils';
+import { errors } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ZodError } from 'zod';
 import type { ConfluenceConfig } from '../../config';
@@ -218,6 +219,23 @@ describe('ConfluenceContentFetcher', () => {
       title: new Smeared('Page reset', false),
       errorName: 'Error',
       errorCode: 'ECONNRESET',
+      msg: 'Failed to fetch page',
+    });
+  });
+
+  it('logs the status code when undici gives up retrying a 503', async () => {
+    const retryError = new errors.RequestRetryError('Request failed: secret detail', 503, {});
+    const apiClient = { getPageById: vi.fn().mockRejectedValue(retryError) };
+    const fetcher = createFetcher(apiClient);
+
+    await expect(fetcher.fetchPageContent(makeDiscoveredPage('busy'))).rejects.toBe(retryError);
+
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      pageId: 'busy',
+      title: new Smeared('Page busy', false),
+      errorName: 'RequestRetryError',
+      statusCode: 503,
+      errorCode: 'UND_ERR_REQ_RETRY',
       msg: 'Failed to fetch page',
     });
   });

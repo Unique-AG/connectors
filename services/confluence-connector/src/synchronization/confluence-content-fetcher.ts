@@ -2,7 +2,6 @@ import { Logger } from '@nestjs/common';
 import { ZodError } from 'zod';
 import type { ConfluenceConfig } from '../config';
 import type { ConfluenceApiClient, ConfluencePage } from '../confluence-api';
-import { HttpStatusError } from '../utils/http-util';
 import type { DiscoveredPage, FetchedPage } from './sync.types';
 
 export class ConfluenceContentFetcher {
@@ -85,10 +84,8 @@ export class ConfluenceContentFetcher {
 }
 
 // Error messages can carry Confluence response bodies, so only their shape is logged.
+// Both HttpStatusError and undici's RequestRetryError (retries exhausted on 5xx or 429) carry statusCode.
 function describeFetchError(err: unknown): Record<string, unknown> {
-  if (err instanceof HttpStatusError) {
-    return { errorName: err.name, statusCode: err.statusCode };
-  }
   if (err instanceof ZodError) {
     return {
       errorName: err.name,
@@ -96,8 +93,10 @@ function describeFetchError(err: unknown): Record<string, unknown> {
     };
   }
   if (err instanceof Error) {
+    const statusCode =
+      'statusCode' in err && typeof err.statusCode === 'number' ? err.statusCode : undefined;
     const errorCode = 'code' in err && typeof err.code === 'string' ? err.code : undefined;
-    return errorCode ? { errorName: err.name, errorCode } : { errorName: err.name };
+    return { errorName: err.name, statusCode, errorCode };
   }
   return { errorName: typeof err };
 }
