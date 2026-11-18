@@ -1,7 +1,7 @@
 # mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 [project]
 name = "polixis-mcp"
-version = "0.0.0"
+version = "0.1.0"
 description = "Looks up organizations and people in Polixis corporate data: search, corporate profiles with their related parties, relationship graphs, top-down ownership and ultimate beneficial owners, and sanctions and PEP flags."
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"

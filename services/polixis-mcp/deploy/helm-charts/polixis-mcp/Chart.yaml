@@ -1,10 +1,12 @@
-# mcp-scaffold-commit: f07e25a209f4, timestamp: 2026-11-09T11:34:03+00:00
 apiVersion: v2
 name: polixis-mcp
-description: "Looks up organizations and people in Polixis corporate data: search, corporate profiles with their related parties, relationship graphs, top-down ownership and ultimate beneficial owners, and sanctions and PEP flags."
+description: >-
+  Looks up organizations and people in Polixis corporate data: search, corporate
+  profiles with their related parties, relationship graphs, top-down ownership
+  and ultimate beneficial owners, and sanctions and PEP flags.
 type: application
-version: 0.0.0
-appVersion: 0.0.0
+version: 0.1.0
+appVersion: 0.1.0
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
