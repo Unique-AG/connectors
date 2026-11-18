@@ -470,16 +470,20 @@ class TestWhereTheMappingSits:
         assert self._chain_of(app_as_main_composes_it) == _CHAIN
 
     @pytest.mark.usefixtures("obo", "graph")
-    async def test_the_operations_layer_logs_the_failure_untranslated(
+    async def test_the_logged_failure_keeps_the_graph_error_in_its_cause_chain(
         self, mcp_client: Client[FastMCPTransport], caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The `GraphForbidden` under the logged exception has to survive: it carries the status
-        and request id that make a production 403 traceable."""
-        with caplog.at_level(logging.ERROR, logger="unique_mcp"), pytest.raises(ToolError):
+        """The tool-call line logs the translated `ToolError`. The `GraphForbidden` in its cause
+        chain has to survive: it carries the status and request id that make a production 403
+        traceable."""
+        with (
+            caplog.at_level(logging.WARNING, logger="mcp_observability.tool_calls"),
+            pytest.raises(ToolError),
+        ):
             _ = await mcp_client.call_tool("teams_list_chats", {})
 
         logged = [record for record in caplog.records if record.exc_info is not None]
-        assert logged, "the operations layer logged nothing about a failed call"
+        assert logged, "the tool-call line logged nothing about a failed call"
         raised = logged[-1].exc_info
         assert raised is not None and raised[1] is not None
         causes = _chain(raised[1])

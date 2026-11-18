@@ -28,13 +28,17 @@ from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
 from azure.core.pipeline.transport import AsyncHttpTransport, HttpRequest
 from azure.core.rest import AsyncHttpResponse
 from azure.identity.aio import OnBehalfOfCredential
+from fastmcp import Client, FastMCP
+from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
+from mcp_observability import ToolCallObservabilityMiddleware
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 from unique_mcp.logging import _PinoJson  # pyright: ignore[reportPrivateUsage]
+from unique_mcp.monitoring import setup_ops
 
 from office_365_mcp.app import create_app
 from office_365_mcp.config import (
@@ -622,9 +626,7 @@ class TestOneLinePerMessageInTheRightTrace:
 
     def test_the_tool_call_really_ran(self, lines: Sequence[Mapping[str, object]]) -> None:
         """Guards every assertion above: a session that never called the tool would pass them."""
-        assert any(line.get("operation") == "get_me" for line in lines), (
-            "the operations layer logged no get_me call"
-        )
+        assert any(line.get("tool") == "get_me" for line in lines), "no line logged the get_me call"
 
 
 class TestABootedServerHonoursTheLogContract:
@@ -853,3 +855,19 @@ def _wait_until_up(server: subprocess.Popen[str], probe: str, timeout: float = 3
         except httpx.HTTPError:
             time.sleep(0.2)
     raise AssertionError(f"{probe} never answered")
+
+
+class TestOneLinePerToolFailure:
+    async def test_a_failed_tool_call_is_logged_once(self, sink: _Sink) -> None:
+        server = FastMCP("one-line", middleware=[ToolCallObservabilityMiddleware()])
+        _ = setup_ops(server)
+
+        @server.tool
+        async def refuse() -> str:
+            raise ToolError("no such folder")
+
+        async with Client(server) as client:
+            _ = await client.call_tool("refuse", {}, raise_on_error=False)
+
+        failures = [line for line in sink.lines() if "fail" in str(line["msg"])]
+        assert [line["msg"] for line in failures] == ["Tool call failed"], failures

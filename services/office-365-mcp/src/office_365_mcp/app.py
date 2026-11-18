@@ -140,8 +140,8 @@ def create_app(
         #
         # The name one first, because `setup_ops`' metrics middleware labels a Prometheus counter
         # with the name the *client* sent, before anything has resolved it. See `cardinality.py`.
-        # Then the advice one, outside the operations layer, so a client reads the polished refusal
-        # while that layer still logs the untranslated failure.
+        # Then the advice one, so a client reads the polished refusal. The tool-call line logs that
+        # refusal, and the Graph error stays in its cause chain.
         middleware=[
             # Outermost FastMCP middleware: logs one line per tool call (start, complete/fail).
             ToolCallObservabilityMiddleware(),
