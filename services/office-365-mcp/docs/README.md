@@ -1380,6 +1380,8 @@ Two things can go wrong:
 - If the Terraform output names more permissions than the pod uses, the tenant carries standing
   access that no tool spends.
 
+After a deployment runs, complete the steps in [Setup after a deployment](after-deployment.md).
+
 ## Reference: every tool
 
 This reference lists all 129 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
