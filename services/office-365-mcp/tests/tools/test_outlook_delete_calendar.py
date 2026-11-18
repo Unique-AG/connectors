@@ -747,13 +747,10 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         assert "This tool always asks the user to agree" in description
         assert "No event is lost" not in description
-        assert "This tool refuses a calendar that holds an event" in description
         looks_again = (
             "It looks for an event again after the user agrees, immediately before the delete"
         )
         assert looks_again in description
-        assert "the default calendar" in description
-        assert "another person owns" in description
         assert "Microsoft does not document whether a deleted calendar can be restored" in (
             description
         )

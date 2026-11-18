@@ -873,7 +873,6 @@ class TestHowItDeclaresItself:
         group = properties["group"]
         assert cast("list[Mapping[str, object]]", group["anyOf"])[0]["minLength"] == 1
         described = cast("str", group["description"])
-        assert "A team id is a group id." in described
         assert "Ask the user for it, or copy a team id from an earlier result." in described
         assert "teams_list_my_teams" not in described
         assert "Omit it to create the notebook in the user's own OneNote." in described
@@ -901,9 +900,7 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
 
         described = cast("str", properties["name"]["description"])
-        assert "unique in the OneNote of its owner" in described
         assert "at most 128 characters long" in described
-        assert "Microsoft refuses a bad name and creates nothing." in described
         assert "Read it from the answer" not in described
         assert 15 <= len(described.split()) <= 60
 

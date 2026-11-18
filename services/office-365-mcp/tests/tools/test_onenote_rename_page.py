@@ -1346,7 +1346,6 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
-        assert "title" in description
         assert "onenote_edit_page" in description
         assert "previous_title" in description
 

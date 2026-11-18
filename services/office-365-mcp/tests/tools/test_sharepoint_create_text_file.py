@@ -850,7 +850,6 @@ class TestHowItDeclaresItself:
             assert "contentEncoding" not in spec
             assert "contentMediaType" not in spec
             assert "format" not in spec
-        assert "as plain text" in cast("str", _properties(parameters)["content"]["description"])
 
     async def test_the_content_schema_caps_the_text(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)

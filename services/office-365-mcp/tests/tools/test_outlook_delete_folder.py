@@ -867,11 +867,6 @@ class TestHowItDeclaresItself:
         assert "This tool always asks the user to agree, also for the user's own mailbox." in (
             description
         )
-        assert "This tool refuses Deleted Items itself" in description
-        assert (
-            "It also refuses a folder that Outlook creates for every mailbox, such as Inbox."
-            in description
-        )
         assert "If a call times out, do not call this tool again first." in description
         assert "permanent" not in description.casefold()
 

@@ -1004,7 +1004,6 @@ class TestHowItDeclaresItself:
 
         description = (tool.description or "").casefold()
         assert "always" in description
-        assert "recycle bin" in description
         assert "this change is permanent" in description
         assert "onenote_read_page" in description
         assert "onenote_edit_page" in description

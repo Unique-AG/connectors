@@ -688,7 +688,8 @@ class TestHowItDeclaresItself:
             + "person and the role."
         ) in description
         assert "This tool refuses the `My Organization` row" in description
-        assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
         assert "outlook_list_calendar_shares lists the shares of a calendar" in description
         assert "outlook_share_calendar" in description
 

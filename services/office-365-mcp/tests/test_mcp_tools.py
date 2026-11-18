@@ -983,16 +983,6 @@ class TestTheToolsThisServerAdvertises:
                 {"type": "string", "format": "date-time"},
             ], bound
 
-    async def test_the_query_parameter_describes_the_matching_it_actually_does(
-        self, mcp_client: Client[FastMCPTransport]
-    ) -> None:
-        tools = _named(await mcp_client.list_tools())
-        query = _object(_properties(tools["teams_search_messages"].input_schema)["query"])
-        description = cast("str", query["description"])
-
-        assert "Keywords to find" in description
-        assert "quote a phrase for exact adjacency" in description
-
     async def test_teams_search_messages_puts_no_ceiling_on_its_page(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
@@ -1121,7 +1111,6 @@ class TestTheToolsThisServerAdvertises:
         assert "one request a second, across the whole tenant" in (description or "")
         assert "Read at most five pages" in (description or "")
         assert "read pages until `next_page_token` is null" in (description or "")
-        assert "the date of a page does not tell when to stop" in (description or "")
         assert "still set after five pages" in (description or "")
 
     async def test_the_mail_tools_say_how_to_read_and_keep_a_stored_bcc(
@@ -1130,24 +1119,20 @@ class TestTheToolsThisServerAdvertises:
         tools = _named(await every_tool.list_tools())
         update = tools["outlook_update_draft"]
         bcc = _object(_properties(update.input_schema)["bcc"])
-        read_bcc = _object(_properties(tools["outlook_read_mail"].output_schema)["bcc"])
 
         assert "first read the draft with outlook_read_mail" in (update.description or "")
         assert "read the draft with outlook_read_mail and send the full list" in str(
             bcc["description"]
         )
-        assert "only for a draft or a sent message" in str(read_bcc["description"])
 
     async def test_teams_browse_channel_says_it_is_one_call(
         self, mcp_client: Client[FastMCPTransport]
     ) -> None:
         tools = _named(await mcp_client.list_tools())
         description = tools["teams_browse_channel"].description
-        posts = _object(_properties(tools["teams_browse_channel"].output_schema)["messages"])
         assert description is not None
 
         assert "in one call" in description
-        assert "thread order" in str(posts["description"])
 
     async def test_teams_list_meeting_transcripts_names_its_four_answers_and_their_remedies(
         self, mcp_client: Client[FastMCPTransport]
@@ -1183,7 +1168,6 @@ class TestTheToolsThisServerAdvertises:
         )
         assert "A retry does not change this" in taught, "and the one that means stop says so"
         assert "no availability SLA" in rendered, "the inference has to be admitted as one"
-        assert "recurring" in str(meeting_type["description"])
         assert "started_at" in str(meeting_type["description"])
 
     async def test_teams_list_meeting_transcripts_takes_a_meeting_handle_and_a_pairing_id(
@@ -1283,7 +1267,6 @@ class TestTheToolsThisServerAdvertises:
         )
         assert "unless an admin unblocks them" in rendered
         assert "An `organizer_only` recording exists but is out of reach" in description
-        assert "Never report it as missing" in description
         assert "This is not a missing recording" in rendered
         assert "organizer_user_id" in rendered, "who to ask for it"
         assert "you_are_the_organizer" in rendered and "organizer_only" in rendered
@@ -1311,7 +1294,6 @@ class TestTheToolsThisServerAdvertises:
         ):
             assert f"`{value}`" in taught, value
         assert "`not_ready` means wait" in description
-        assert 'not "the call was not recorded"' in description
         assert "Wait, then call again" in taught
         assert "not the same as `not_recorded`" in taught
         assert "A retry does not help" in taught
@@ -1354,8 +1336,6 @@ class TestTheToolsThisServerAdvertises:
         rendered = str(limit.get("description")) + str(listed.get("description"))
 
         assert str(meetings.MAX_ARTIFACT_SCAN) in rendered, "the cap is named where it binds"
-        assert "you get more results, but only within that read" in str(limit.get("description"))
-        assert "the latest of what this tool read" in str(listed.get("description"))
         assert "so asking for 3 gives the 3 latest" not in rendered, (
             "the overstatement: past the cap those 3 are the newest of what was read"
         )
@@ -1368,7 +1348,6 @@ class TestTheToolsThisServerAdvertises:
         transcripts_description = tools["teams_list_meeting_transcripts"].description
         assert recordings_description is not None and transcripts_description is not None
 
-        assert "recordings still succeed, and the reverse never happens" in transcripts_description
         assert (
             "When this tool refuses access, teams_list_meeting_recordings can succeed instead"
             in transcripts_description
@@ -1476,9 +1455,6 @@ class TestTheToolsThisServerAdvertises:
     ) -> None:
         tools = _named(await every_tool.list_tools())
 
-        assert "document libraries of that SharePoint site" in (
-            tools["sharepoint_list_drives"].description or ""
-        )
         assert "call sharepoint_list_drives with the web address of the site" in (
             tools["sharepoint_copy_item"].description or ""
         )

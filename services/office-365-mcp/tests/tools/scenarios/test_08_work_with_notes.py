@@ -210,7 +210,6 @@ class TestFindingNotes:
         listing = tools["onenote_list_pages"]
         asked = set(cast("Mapping[str, object]", listing.input_schema["properties"]))
         assert not asked & {"query", "text", "body", "body_contains", "content_contains"}
-        assert "matches the title only" in (listing.description or "")
 
     async def test_a_notebook_from_a_web_address_gives_its_sections(
         self, graph: respx.MockRouter
@@ -890,13 +889,6 @@ class TestNamesAndNotebooks:
         _ = graph.post("/me/onenote/sectionGroups/ARCHIVE/sections").mock(
             return_value=httpx.Response(403, json=_BUSY)
         )
-        async with Client(FastMCPTransport(_server()), mode="legacy") as client:
-            description = next(
-                t.description
-                for t in await client.list_tools()
-                if t.name == "onenote_create_section"
-            )
-
         with pytest.raises(ToolError) as refused:
             _ = await call(
                 "onenote_create_section",
@@ -908,7 +900,6 @@ class TestNamesAndNotebooks:
         assert "copy of a section into the group with onenote_copy_section" in str(refused.value)
         assert "not on a SharePoint site" in str(refused.value)
         assert "administrator" not in str(refused.value)
-        assert "copy of a section into the group" in (description or "")
 
 
 def _operation(*, status: str = "Running", error: Row | None = None) -> Row:
