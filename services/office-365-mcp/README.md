@@ -30,9 +30,12 @@ only table, `oauth_kv`.
 - the error messages
 
 A new tool needs one file and two lines in the registry: its import and its place in
-`_TOOL_MODULES`. A tool needs no base class and no decorator. A tool module publishes four names:
-`TOOL_NAME`, `PRESETS`, `GRAPH_PERMISSIONS`, and `register`. `PRESETS` names the presets that hold
+`_TOOL_MODULES`. A tool needs no base class and no decorator. A tool module publishes the names
+that the `ToolModule` protocol in `tools/__init__.py` requires: `TOOL_NAME`, `PRESETS`,
+`GRAPH_PERMISSIONS`, `GRAPH_CALL_EXAMPLE`, and `register`. `PRESETS` names the presets that hold
 the tool. The registry builds the map from each preset to its tools from these names.
+`GRAPH_CALL_EXAMPLE` gives the arguments for one example call, which the tests use to call each
+tool against a stub of Microsoft Graph.
 
 The file `tools/__init__.py` is the central registry. Its function `resolve()` reads an operator's
 selection and returns two things:

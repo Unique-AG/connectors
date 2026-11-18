@@ -634,6 +634,24 @@ def _record_text(record: logging.LogRecord) -> str:
     return f"{record.getMessage()} {record.__dict__!r}"
 
 
+_RETURNS_A_FILE: frozenset[str] = frozenset(
+    {
+        "outlook_read_attachment",
+        "outlook_read_event_attachment",
+        "sharepoint_read_file",
+        "onenote_read_resource",
+    }
+)
+
+
+def _with_a_result_shape(tools: Mapping[str, Tool]) -> dict[str, Tool]:
+    shapeless = {name for name, tool in tools.items() if tool.output_schema is None}
+    assert shapeless == _RETURNS_A_FILE, (
+        f"only a tool that returns a file publishes no result shape, but {sorted(shapeless)} do"
+    )
+    return {name: tool for name, tool in tools.items() if tool.output_schema is not None}
+
+
 WRITE_TOOLS: frozenset[str] = frozenset(
     {
         "outlook_mark_mail",
@@ -914,9 +932,9 @@ class TestTheToolsThisServerAdvertises:
         }
 
     async def test_every_tool_response_field_is_described(
-        self, mcp_client: Client[FastMCPTransport]
+        self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        tools = _named(await mcp_client.list_tools())
+        tools = _with_a_result_shape(_named(await every_tool.list_tools()))
         published = {
             path: field
             for name, tool in tools.items()
@@ -931,16 +949,15 @@ class TestTheToolsThisServerAdvertises:
         assert undescribed == [], "a model is handed these values with nothing to say what they are"
 
     async def test_the_whole_surface_speaks_one_language(
-        self, mcp_client: Client[FastMCPTransport]
+        self, every_tool: Client[FastMCPTransport]
     ) -> None:
-        tools = _named(await mcp_client.list_tools())
+        tools = _named(await every_tool.list_tools())
 
         for name in tools:
             assert re.fullmatch(r"[a-z]+(_[a-z]+)+", name), f"{name} is not verb_noun"
-        for tool in tools.values():
+        for name, tool in _with_a_result_shape(tools).items():
             for field in _properties(tool.output_schema):
                 assert re.fullmatch(r"[a-z][a-z0-9]*(_[a-z0-9]+)*", field), f"{field} is not snake"
-        for name, tool in tools.items():
             assert "truncated" not in _properties(tool.output_schema), name
         for name in ("teams_search_messages", "teams_read_transcript"):
             assert "next_offset" in _properties(tools[name].output_schema), name
