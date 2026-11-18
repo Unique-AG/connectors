@@ -952,6 +952,11 @@ class EventDraft:
     recurrence: RecurrenceRule | None = None
 
 
+def placed_location(location: str | None) -> str | None:
+    stripped = None if location is None else location.strip()
+    return stripped or None
+
+
 def with_default_online_meeting(draft: EventDraft, calendar: Calendar) -> EventDraft:
     if draft.online_meeting is not None:
         return draft

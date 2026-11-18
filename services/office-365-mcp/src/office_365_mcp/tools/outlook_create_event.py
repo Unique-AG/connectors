@@ -12,6 +12,7 @@
 """
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -68,6 +69,7 @@ from office_365_mcp.shared.calendar import (
     event_body,
     event_time,
     is_midnight,
+    placed_location,
     providers_without_teams,
     recurrence_refusal,
     transaction_id_for,
@@ -399,27 +401,29 @@ async def create_event(
     """
     assert len(subject) >= 1, f"the subject is bounded by the schema, got {len(subject)} characters"
     draft = _drafted(
-        subject=subject,
-        starts_at=starts_at,
-        ends_at=ends_at,
-        time_zone=time_zone,
-        attendees=attendees,
-        optional_attendees=optional_attendees,
-        body_html=body_html,
-        location=location,
-        all_day=all_day,
-        online_meeting=online_meeting,
-        room_addresses=room_addresses,
-        categories=categories,
-        show_as=show_as,
-        importance=importance,
-        sensitivity=sensitivity,
-        is_reminder_on=is_reminder_on,
-        reminder_minutes_before_start=reminder_minutes_before_start,
-        hide_attendees=hide_attendees,
-        response_requested=response_requested,
-        allow_new_time_proposals=allow_new_time_proposals,
-        recurrence=recurrence,
+        EventDraft(
+            subject=subject,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            time_zone=time_zone,
+            attendees=tuple(attendees),
+            optional_attendees=tuple(optional_attendees),
+            body_html=body_html,
+            location=location,
+            all_day=all_day,
+            online_meeting=online_meeting,
+            room_addresses=tuple(room_addresses),
+            categories=tuple(categories),
+            show_as=show_as,
+            importance=importance,
+            sensitivity=sensitivity,
+            is_reminder_on=is_reminder_on,
+            reminder_minutes_before_start=reminder_minutes_before_start,
+            hide_attendees=hide_attendees,
+            response_requested=response_requested,
+            allow_new_time_proposals=allow_new_time_proposals,
+            recurrence=recurrence,
+        )
     )
 
     created: Event | None = None
@@ -456,76 +460,33 @@ async def create_event(
     )
 
 
-def _drafted(
-    *,
-    subject: str,
-    starts_at: str,
-    ends_at: str,
-    time_zone: str,
-    attendees: Sequence[str],
-    optional_attendees: Sequence[str],
-    body_html: str | None,
-    location: str | None,
-    all_day: bool,
-    online_meeting: bool | None,
-    room_addresses: Sequence[str],
-    categories: Sequence[str],
-    show_as: ShowAs | None,
-    importance: EventImportance | None,
-    sensitivity: EventSensitivity | None,
-    is_reminder_on: bool | None,
-    reminder_minutes_before_start: int | None,
-    hide_attendees: bool | None,
-    response_requested: bool | None,
-    allow_new_time_proposals: bool | None,
-    recurrence: RecurrenceRule | None,
-) -> EventDraft:
-    opens = _moment("starts_at", starts_at)
-    closes = _moment("ends_at", ends_at)
+def _drafted(asked: EventDraft) -> EventDraft:
+    opens = _moment("starts_at", asked.starts_at)
+    closes = _moment("ends_at", asked.ends_at)
     if closes <= opens:
         raise ToolError(_ENDS_BEFORE_IT_STARTS)
-    if all_day and not (is_midnight(opens) and is_midnight(closes)):
-        raise ToolError(_not_midnight(starts_at, ends_at))
-    refusal = recurrence_refusal(TOOL_NAME, recurrence, starts_on=opens.date())
+    if asked.all_day and not (is_midnight(opens) and is_midnight(closes)):
+        raise ToolError(_not_midnight(asked.starts_at, asked.ends_at))
+    refusal = recurrence_refusal(TOOL_NAME, asked.recurrence, starts_on=opens.date())
     if refusal is not None:
         raise ToolError(refusal)
-    required = _addresses(attendees, argument="attendees")
-    optional = _addresses(optional_attendees, argument="optional_attendees")
-    rooms = _addresses(room_addresses, argument="room_addresses")
+    required = _addresses(asked.attendees, argument="attendees")
+    optional = _addresses(asked.optional_attendees, argument="optional_attendees")
+    rooms = _addresses(asked.room_addresses, argument="room_addresses")
     twice = repeated_address([*required, *optional])
     if twice is not None:
         raise ToolError(_invited_twice(twice))
     again = repeated_address([*required, *optional, *rooms])
     if again is not None:
         raise ToolError(_room_also_invited(again))
-    return EventDraft(
-        subject=subject,
-        starts_at=starts_at,
-        ends_at=ends_at,
-        time_zone=time_zone,
+    return replace(
+        asked,
         attendees=required,
         optional_attendees=optional,
-        body_html=body_html,
-        location=_place(location),
-        all_day=all_day,
-        online_meeting=online_meeting,
         room_addresses=rooms,
-        categories=tuple(merged_categories((), add=categories, remove=())),
-        show_as=show_as,
-        importance=importance,
-        sensitivity=sensitivity,
-        is_reminder_on=is_reminder_on,
-        reminder_minutes_before_start=reminder_minutes_before_start,
-        hide_attendees=hide_attendees,
-        response_requested=response_requested,
-        allow_new_time_proposals=allow_new_time_proposals,
-        recurrence=recurrence,
+        location=placed_location(asked.location),
+        categories=tuple(merged_categories((), add=asked.categories, remove=())),
     )
-
-
-def _place(location: str | None) -> str | None:
-    stripped = None if location is None else location.strip()
-    return stripped or None
 
 
 def _moment(argument: str, value: str) -> datetime:
