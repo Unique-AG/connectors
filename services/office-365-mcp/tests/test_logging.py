@@ -267,6 +267,13 @@ class TestNothingSecretReachesTheLog:
         assert f"code={CENSORED}&state=x" in message, message
         assert "1.AXcAlive-auth-code" not in sink.stream.getvalue()
 
+    def test_a_sign_in_hint_in_a_query_string_is_censored(self, sink: _Sink) -> None:
+        _log('127.0.0.1:1 - "GET /authorize?login_hint=jane.doe%40corp.com&state=x HTTP/1.1" 302')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"login_hint={CENSORED}&state=x" in message, message
+        assert "jane.doe" not in sink.stream.getvalue()
+
     @pytest.mark.parametrize("parameter", ["postcode", "encoding", "areacode"], ids=repr)
     def test_a_parameter_that_merely_contains_code_is_kept(
         self, sink: _Sink, parameter: str

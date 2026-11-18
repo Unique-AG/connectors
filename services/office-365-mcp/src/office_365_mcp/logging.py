@@ -85,7 +85,7 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
             r"(?i)([?&](?:[A-Za-z0-9_.%\[\]-]*(?:token|key|secret|password|auth)"
-            + r"[A-Za-z0-9_.%\[\]-]*|code)=)[^&\s\"']+"
+            + r"[A-Za-z0-9_.%\[\]-]*|code|login_hint)=)[^&\s\"']+"
         ),
         r"\1" + CENSORED,
     ),
