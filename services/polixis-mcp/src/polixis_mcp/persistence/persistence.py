@@ -63,14 +63,17 @@ async def cull_expired_entries_periodically(
 ) -> None:
     """Deletes the expired entries now and once per `every` seconds after, until cancelled, and
     the least recently used cached answers past `max_cache_bytes`. It runs with the cache off
-    too, to delete what was cached before. A failed run is logged and the next one tries again:
-    it runs in the server lifespan's task group, where an error that escapes would stop the
-    server over rows that only stay longer.
+    too, to delete what was cached before. A failed cull is logged, the other still runs, and
+    the next run tries again: it runs in the server lifespan's task group, where an error that
+    escapes would stop the server over rows that only stay longer.
     """
     while True:
         try:
             await persistence.sign_in_state.cull()
+        except Exception:
+            _logger.warning("Could not delete the expired sign-in state", exc_info=True)
+        try:
             await persistence.response_cache.cull(max_bytes=max_cache_bytes)
         except Exception:
-            _logger.warning("Could not delete the expired store entries", exc_info=True)
+            _logger.warning("Could not cull the Polixis response cache", exc_info=True)
         await asyncio.sleep(every)

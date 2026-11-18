@@ -145,18 +145,18 @@ class _ClosingPoolSignInState(FakeSignInState):
 async def test_a_failed_cull_is_logged_and_the_culling_goes_on(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    cache = FakeResponseCache()
     culling = asyncio.create_task(
         cull_expired_entries_periodically(
-            fake_persistence(sign_in_state=_ClosingPoolSignInState()),
-            every=600,
-            max_cache_bytes=1_000,
+            fake_persistence(cache, _ClosingPoolSignInState()), every=600, max_cache_bytes=1_000
         )
     )
     await asyncio.sleep(0.01)
 
     try:
         assert not culling.done()
-        assert caplog.messages == ["Could not delete the expired store entries"]
+        assert caplog.messages == ["Could not delete the expired sign-in state"]
+        assert cache.culls == [1_000]
     finally:
         culling.cancel()
 

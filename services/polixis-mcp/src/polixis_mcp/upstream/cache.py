@@ -30,6 +30,10 @@ _logger = logging.getLogger(__name__)
 
 CACHE_STORED_AT_HEADER = "x-internal-mcp-cache-stored-at"
 
+# Whether a 200's body is an answer to the request worth reusing: one that fits the model of the
+# operation it answers, and is not a rejection.
+type AnswerCheck = Callable[[httpx2.Request, bytes], bool]
+
 
 class CacheSettings(BaseSettings):
     """A changed `key_prefix` leaves every answer cached under the old one unread, until it expires
@@ -62,11 +66,16 @@ class CachingTransport(httpx2.AsyncBaseTransport):
     it and caches the answer. A cached answer carries `CACHE_STORED_AT_HEADER`, when it was
     cached, which `record_cache_read` reads for the tool's `freshness`.
 
-    Only a 200 with a JSON body is cached, and not one whose body is an `error`: Polixis answers
-    some failures, such as an id it does not know, with a 200. The body is kept as Polixis sent
-    it, so the client checks a cached answer against the operation's model as it would a fresh
-    one. The cache is optional: a failed read sends the request, and a failed write still
-    returns Polixis's answer.
+    The body is kept as Polixis sent it, and only one `usable` accepts is cached or reused: a 200
+    whose body does not fit the operation's model is not cached, and neither is a rejection,
+    which Polixis sends with a 200 for an id it does not know. A cached answer that no longer
+    fits, as after a deploy that changed the model, is fetched again, and the fresh answer, if
+    it fits, replaces it. The cache is optional: a failed read sends the request, and a failed
+    write still returns Polixis's answer.
+
+    The key binds an answer to the upstream's origin, so a deployment pointed at another Polixis
+    reads none of the first one's answers. It does not bind it to the credentials: every account
+    gets the same data.
     """
 
     def __init__(
@@ -75,11 +84,13 @@ class CachingTransport(httpx2.AsyncBaseTransport):
         *,
         cache: ResponseCache,
         settings: CacheSettings,
+        usable: AnswerCheck,
         now: Callable[[], datetime],
     ) -> None:
         self._inner: httpx2.AsyncBaseTransport = inner
         self._cache: ResponseCache = cache
         self._settings: CacheSettings = settings
+        self._usable: AnswerCheck = usable
         self._now: Callable[[], datetime] = now
 
     @override
@@ -108,7 +119,7 @@ class CachingTransport(httpx2.AsyncBaseTransport):
 
     async def _read(self, key: str, request: httpx2.Request) -> CachedAnswer | None:
         """None for an answer cached longer ago than the TTL now set, as after a restart with a
-        shorter one, which is then fetched again.
+        shorter one, or that no longer fits its model, which is then fetched again.
         """
         try:
             cached = await self._cache.get(key)
@@ -123,14 +134,16 @@ class CachingTransport(httpx2.AsyncBaseTransport):
             return None
         if self._now() - cached.cached_at > timedelta(seconds=self._settings.ttl_seconds):
             return None
+        if not self._usable(request, cached.body):
+            _logger.warning(
+                "Fetching a cached Polixis answer again: it no longer fits its model",
+                extra={"path": request.url.path},
+            )
+            return None
         return cached
 
     async def _write(self, key: str, request: httpx2.Request, response: httpx2.Response) -> None:
-        try:
-            body = _JSON.validate_json(response.content)
-        except ValueError:
-            return
-        if isinstance(body, dict) and body.get("error") is not None:
+        if not self._usable(request, response.content):
             return
         answer = CachedAnswer(cached_at=self._now(), body=response.content)
         try:
@@ -188,8 +201,8 @@ class _CacheReads:
 
 
 async def _request_key(request: httpx2.Request) -> str:
-    """The method and path, readable, and a digest of the query and the body: the headers, the
-    token among them, play no part.
+    """The method, origin and path, readable, and a digest of the query and the body: the
+    headers, the token among them, play no part.
     """
     content = await request.aread()
     try:
@@ -199,7 +212,7 @@ async def _request_key(request: httpx2.Request) -> str:
     query = sorted(request.url.params.multi_items())
     canonical = json.dumps([query, body], sort_keys=True, ensure_ascii=False)
     digest = hashlib.sha256(canonical.encode()).hexdigest()
-    return f"{request.method} {request.url.path}:{digest}"
+    return f"{request.method} {request.url.copy_with(query=None)}:{digest}"
 
 
 _cache_reads: ContextVar[_CacheReads | None] = ContextVar("polixis_cache_reads", default=None)

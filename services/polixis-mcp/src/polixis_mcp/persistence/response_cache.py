@@ -7,9 +7,11 @@ from datetime import timedelta
 import logging
 from typing import Protocol, runtime_checkable
 
+from sqlalchemy import BigInteger
 from sqlalchemy import delete
 from sqlalchemy import func
 from sqlalchemy import select
+from sqlalchemy import type_coerce
 from sqlalchemy import update
 from sqlalchemy.dialects.postgresql import insert
 
@@ -71,15 +73,17 @@ class PostgresResponseCache:
             await session.execute(upsert)
 
     async def cull(self, *, max_bytes: int) -> None:
-        # Keeps the most recently used answers whose sizes add up to at most `max_bytes`.
+        # Keeps the most recently used answers whose sizes add up to at most `max_bytes`. The sum
+        # is a BIGINT, so `max_bytes` binds as one past the 2 GB an INTEGER holds.
         ranked = select(
             ResponseCacheRow.key,
-            func.sum(ResponseCacheRow.size_bytes)
-            .over(
-                order_by=(ResponseCacheRow.last_used_at.desc(), ResponseCacheRow.key),
-                rows=(None, 0),
-            )
-            .label("kept_bytes"),
+            type_coerce(
+                func.sum(ResponseCacheRow.size_bytes).over(
+                    order_by=(ResponseCacheRow.last_used_at.desc(), ResponseCacheRow.key),
+                    rows=(None, 0),
+                ),
+                BigInteger,
+            ).label("kept_bytes"),
         ).subquery()
         evict = (
             delete(ResponseCacheRow)

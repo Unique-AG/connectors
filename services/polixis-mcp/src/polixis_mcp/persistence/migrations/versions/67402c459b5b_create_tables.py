@@ -5,7 +5,8 @@ Revises: none, the first revision
 Create Date: 2026-11-18 16:20:00.000000
 
 The key-value store made `kv_store` itself on first use before, so a database from then already
-has it, with the same columns and index, and keeps its rows.
+has it, with the same columns and index, and keeps its rows. A downgrade keeps it too: the sign-in
+state in it is what the server before this one reads.
 """
 
 from collections.abc import Sequence
@@ -60,9 +61,3 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_table("polixis_response_cache")
-    op.drop_index(
-        "idx_kv_store_expires_at",
-        table_name="kv_store",
-        postgresql_where=sa.text("expires_at IS NOT NULL"),
-    )
-    op.drop_table("kv_store")

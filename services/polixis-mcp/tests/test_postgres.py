@@ -6,6 +6,7 @@ from datetime import timedelta
 from datetime import UTC
 import os
 from pathlib import Path
+import uuid
 
 from alembic import command
 from alembic.config import Config
@@ -56,17 +57,42 @@ def _migrate(url: str) -> None:
 
 
 @pytest.fixture(scope="session")
-def database_url() -> Generator[str]:
-    """`TEST_DB_URL` points the tests at a Postgres that is already running, for a machine
-    without Docker; otherwise a container is started, as in CI.
+def server_url() -> Generator[str]:
+    """The Postgres server the tests make their own databases on. `TEST_DB_URL` names one that
+    is already running, for a machine without Docker: the tests never touch the database it
+    names, only the ones they create and drop beside it, which needs `CREATEDB`. Otherwise a
+    container is started, as in CI.
     """
     provided = os.environ.get("TEST_DB_URL")
     if provided:
-        _migrate(provided)
         yield provided
         return
     with PostgresContainer("postgres:17-alpine", driver=None) as postgres:
-        url = postgres.get_connection_url()
+        yield postgres.get_connection_url()
+
+
+@contextmanager
+def _new_database(server_url: str) -> Generator[str]:
+    """An empty database of the test run's own, dropped on exit."""
+    name = f"polixis_mcp_test_{uuid.uuid4().hex[:12]}"
+    asyncio.run(_run_outside_a_transaction(server_url, f'CREATE DATABASE "{name}"'))
+    try:
+        yield str(httpx2.URL(server_url).copy_with(path=f"/{name}"))
+    finally:
+        asyncio.run(_run_outside_a_transaction(server_url, f'DROP DATABASE "{name}" WITH (FORCE)'))
+
+
+async def _run_outside_a_transaction(server_url: str, statement: str) -> None:
+    engine = _engine(server_url).execution_options(isolation_level="AUTOCOMMIT")
+    async with engine.connect() as connection:
+        await connection.exec_driver_sql(statement)
+    await engine.dispose()
+
+
+@pytest.fixture(scope="session")
+def database_url(server_url: str) -> Generator[str]:
+    """The migrated database the tests share."""
+    with _new_database(server_url) as url:
         _migrate(url)
         yield url
 
@@ -141,6 +167,16 @@ async def test_the_cull_keeps_the_most_recently_read_answers_within_the_size(
     assert await _keys_and_reads(database) == {"read-first": 1, "read-last": 1}
 
 
+async def test_the_cull_takes_a_size_past_what_an_integer_holds(
+    cache: PostgresResponseCache, database: Database
+) -> None:
+    await cache.put("graph", _answer(10), ttl_seconds=60)
+
+    await cache.cull(max_bytes=3_000_000_000)
+
+    assert await _keys_and_reads(database) == {"graph": 0}
+
+
 async def test_caching_the_same_key_again_replaces_the_answer(
     cache: PostgresResponseCache, database: Database
 ) -> None:
@@ -176,35 +212,52 @@ async def test_the_key_value_store_keeps_its_entries_in_the_migrated_table(
         await store.close()
 
 
-async def _let_the_store_make_its_table(database_url: str) -> None:
+async def _save_sign_in_state(database_url: str) -> None:
+    """As the server did before the migrations: its store makes `kv_store` when there is none."""
     async with PostgreSQLStore(url=database_url, table_name="kv_store") as store:
         await store.setup()
         await store.put("state", {"step": 1}, collection="sign-in", ttl=60)
 
 
-async def _forget_every_migration(database_url: str) -> None:
-    """As a deployment that ran the server before it ran any migration: no `alembic_version`."""
-    engine = _engine(database_url)
-    async with engine.begin() as connection:
-        await connection.exec_driver_sql("DROP TABLE alembic_version")
-    await engine.dispose()
-
-
 def test_the_migration_keeps_the_table_and_rows_the_store_made_before_it(
-    database_url: str,
+    server_url: str,
 ) -> None:
     """The server made `kv_store` itself on first use before, so a deployment that never ran a
     migration holds it, with sign-in state in it, before the migration that makes it runs.
     """
-    with _alembic(database_url) as config:
-        command.downgrade(config, "base")
-        asyncio.run(_forget_every_migration(database_url))
-        asyncio.run(_let_the_store_make_its_table(database_url))
+    with _new_database(server_url) as url, _alembic(url) as config:
+        asyncio.run(_save_sign_in_state(url))
 
         command.upgrade(config, "head")
         command.check(config)
+        kept = asyncio.run(_sign_in_state(url))
 
-    assert asyncio.run(_sign_in_state(database_url)) == {"step": 1}
+    assert kept == {"step": 1}
+
+
+def test_a_downgrade_keeps_the_sign_in_state(server_url: str) -> None:
+    """The server before the migrations reads the sign-in state from `kv_store`."""
+    with _new_database(server_url) as url, _alembic(url) as config:
+        command.upgrade(config, "head")
+        asyncio.run(_save_sign_in_state(url))
+
+        command.downgrade(config, "base")
+        kept = asyncio.run(_sign_in_state(url))
+        tables = asyncio.run(_tables(url))
+
+    assert kept == {"step": 1}
+    assert tables == ["alembic_version", "kv_store"]
+
+
+async def _tables(database_url: str) -> list[str]:
+    engine = _engine(database_url)
+    async with engine.connect() as connection:
+        names = await connection.scalars(
+            text("SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY 1")
+        )
+        tables = list(names)
+    await engine.dispose()
+    return tables
 
 
 async def _sign_in_state(database_url: str) -> dict[str, object] | None:
@@ -215,18 +268,12 @@ async def _sign_in_state(database_url: str) -> dict[str, object] | None:
         await store.close()
 
 
-async def test_the_key_value_store_does_not_make_its_table(database_url: str) -> None:
-    unmigrated = str(httpx2.URL(database_url).copy_with(path="/unmigrated"))
-    admin = _engine(database_url).execution_options(isolation_level="AUTOCOMMIT")
-    async with admin.connect() as connection:
-        await connection.exec_driver_sql("CREATE DATABASE unmigrated")
-    try:
-        with pytest.raises(StoreSetupError, match="does not exist"):
-            await _store(unmigrated).setup()
-    finally:
-        async with admin.connect() as connection:
-            await connection.exec_driver_sql("DROP DATABASE unmigrated WITH (FORCE)")
-        await admin.dispose()
+def test_the_key_value_store_does_not_make_its_table(server_url: str) -> None:
+    with (
+        _new_database(server_url) as unmigrated,
+        pytest.raises(StoreSetupError, match="does not exist"),
+    ):
+        asyncio.run(_store(unmigrated).setup())
 
 
 async def test_the_cull_deletes_the_expired_sign_in_state(database: Database) -> None:

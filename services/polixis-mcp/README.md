@@ -129,8 +129,11 @@ Every request to Polixis goes through `upstream/cache.py`, a transport on the cl
 reuses Polixis's answers from Postgres for `UPSTREAM_CACHE_TTL_SECONDS`, 15 minutes by default,
 so the same request within that time spares the API key's quota. It sits in front of the limit
 on requests in flight and the quota gate, so a cached answer neither waits nor is refused once
-the quota is spent, and it caches the tools served from the spec too. It caches a 200 with a
-JSON body, and not Polixis's 200 with an `error` body. Polixis updates its data in real time,
+the quota is spent, and it caches the tools served from the spec too. It caches a 200 whose
+body fits the model of the operation it answers, and not Polixis's 200 with an `error` body; a
+cached answer that no longer fits, as after a deploy that changed the model, is fetched again.
+An answer is cached under its method, Polixis's origin, path, query and body, so a deployment
+pointed at another Polixis reads none of it. Polixis updates its data in real time,
 so we advise a TTL of at most 15 minutes, and the server refuses one past an hour unless
 `UPSTREAM_CACHE_TTL_UNCAPPED=true`, which spares the API key further requests while developing.
 The chart does not set that flag; set it in `envVars` if you need it. The TTL limits reuse, not storage: the server deletes the expired entries when it starts and once per

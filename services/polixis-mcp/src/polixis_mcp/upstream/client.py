@@ -23,6 +23,7 @@ from mcp_types import ToolAnnotations
 import yaml
 
 from polixis_mcp.shared import ResponseCache
+from polixis_mcp.upstream.answers import answer_check
 from polixis_mcp.upstream.cache import CachingTransport
 from polixis_mcp.upstream.cache import record_cache_read
 from polixis_mcp.upstream.quota import AdmissionTransport
@@ -81,7 +82,13 @@ def upstream_http(
         timeout=settings.timeout_seconds,
         event_hooks={"response": [quota.record, record_cache_read]},
         transport=(
-            CachingTransport(admission, cache=cache, settings=settings.cache, now=clock)
+            CachingTransport(
+                admission,
+                cache=cache,
+                settings=settings.cache,
+                usable=answer_check(SPEC, base_path=(settings.api_url.path or "").rstrip("/")),
+                now=clock,
+            )
             if cache is not None and settings.cache.enabled
             else admission
         ),
