@@ -53,13 +53,14 @@ jq -n \
     generic_names: ($t | map(.name) | map(select(test("^(search|get|list|create|update|delete|run|execute|query|fetch|send)(_[a-z]+)?$")))),
     missing_description: ($t | map(select((.description // "") == "") | .name)),
     short_description_lt_40: ($t | map(select((.description // "") | length | . > 0 and . < 40) | .name)),
-    long_description_gt_1200: ($t | map(select((.description // "") | length > 1200) | .name)),
+    longest_descriptions: ($t | map({tool: .name, chars: ((.description // "") | length)}) | sort_by(-.chars) | .[:3]),
     missing_annotations: ($t | map(select(.annotations == null) | .name)),
     no_readOnlyHint_or_destructiveHint: ($t | map(select(.annotations != null and (.annotations.readOnlyHint == null and .annotations.destructiveHint == null)) | .name)),
     missing_outputSchema: ($t | map(select(.outputSchema == null) | .name)),
     params_without_description: ($t | map({tool: .name, params: [(.inputSchema.properties // {}) | to_entries[] | select((.value | type) == "object" and (.value.description // "") == "" and (.value.title // "") == "") | .key]} | select(.params | length > 0))),
     deep_schemas_gt_4: ($t | map({tool: .name, depth: (.inputSchema | depth)} | select(.depth > 4))),
-    uses_anyOf_oneOf: ($t | map(select(.inputSchema | tojson | test("\"(anyOf|oneOf)\"")) | .name)),
+    uses_anyOf_oneOf: ($t | map(select(.inputSchema | [.. | objects | select(has("oneOf") or (has("anyOf") and ([.anyOf[] | select(.type != "null")] | length > 1)))] | length > 0) | .name)),
+    paginated: ($tools[0].result.nextCursor != null),
     strict_exit: $strict_exit,
     strict_findings: ($tools[0].schemaFindings // {})
   }' >"$OUT/summary.json"
@@ -70,5 +71,8 @@ for entry in "resources/list:$RESOURCES_EXIT" "resources/templates/list:$TEMPLAT
   echo "$m exit=${entry##*:} count=$(jq '[.result[]? | arrays | length] | add // 0' "$f" 2>/dev/null)" >>"$OUT/summary.txt"
 done
 cat "$OUT/summary.json"
+if jq -e '.paginated' "$OUT/summary.json" >/dev/null; then
+  echo "WARNING: tools/list returned nextCursor; tool_count covers the first page only" >&2
+fi
 cat "$OUT/summary.txt" >&2
 echo "raw outputs: $OUT/*.json" >&2

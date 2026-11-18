@@ -1,6 +1,8 @@
 # Inspector CLI cheat sheet (v2)
 
-Invoke with `pnpm --silent dlx @modelcontextprotocol/inspector@2.15.0 --cli ...`.
+Invoke with `pnpm --silent dlx "$INSPECTOR" --cli ...`, where `INSPECTOR` is
+`MCP_INSPECTOR_PKG` if set, else the pinned default on the `INSPECTOR=` line of
+`scripts/mcp-snapshot.sh`. The pin lives only there.
 One invocation = one request. Flags first, stdio command last. Add `--format json`
 for parsing; stdout is the result, stderr is diagnostics (last stderr line on failure
 is a JSON error envelope).
@@ -49,7 +51,7 @@ piping to `jq`.
 Error semantics (expect exit 5 and an actionable message, not a stack trace):
 
 ```bash
-pnpm --silent dlx @modelcontextprotocol/inspector@2.15.0 --cli --method tools/call \
+pnpm --silent dlx "$INSPECTOR" --cli --method tools/call \
   --tool-name <tool> --tool-args-json '{}' --format json <target flags> || echo "exit=$?"
 ```
 

@@ -87,7 +87,10 @@ a sample of 3-5 tools (the riskiest and the vaguest). Judge by reading, not by c
   what breaks for a Unique user instead of citing a generic guideline.
 
 Script flags are leads, not verdicts. `missing_outputSchema` is P2 at most;
-`generic_names` may be fine if the host prefixes server names.
+`generic_names` may be fine if the host prefixes server names. `longest_descriptions`
+is not a flag: read those descriptions and check they carry only what the model needs
+to pick and call the tool (TOOL-003 wants constraints and id sources, so long can be right).
+`uses_anyOf_oneOf` ignores the `anyOf: [X, null]` Pydantic emits for optional fields.
 
 ### 4. Active probes (ask first)
 
@@ -133,6 +136,12 @@ For tool-description problems, include a rewritten example.
 - Internal code structure is already enforced by `packages/mcp-architecture` (ruff,
   basedpyright, import-linter). Do not repeat those checks; review what a client sees.
 - Review a QA or local instance with a test account. Never put a prod token in a snapshot.
+- A deployed instance sits behind OAuth, so the snapshot cannot run non-interactively
+  until a token is stored (exit 3). Fallback: a small stdio wrapper around the service's
+  tool modules, which lists the same catalog without auth.
+- Step 4 probes through such a wrapper, or without a real identity, exercise argument
+  validation only. A valid call that answers with a bare `Not Found` is a lead for
+  ERR-001, but confirm it against the deployed service before reporting it.
 - Every service here is consumed by the Unique client, so the checklist at the end of
   [references/unique-client.md](references/unique-client.md) is part of the review.
 
