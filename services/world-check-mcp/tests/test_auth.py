@@ -59,3 +59,47 @@ def test_create_auth_signs_in_through_the_zitadel_it_is_given(
     assert isinstance(auth, OIDCProxy)
     assert zitadel_discovery == [f"{ISSUER}/.well-known/openid-configuration"]
     assert auth.required_scopes == zitadel.required_scopes
+
+
+@pytest.mark.usefixtures("zitadel_discovery")
+def test_create_auth_lets_a_client_register_with_the_organisation_scope(
+    server_settings: ServerSettings,
+) -> None:
+    zitadel = ZitadelSettings(
+        base_url=AnyHttpUrl(ISSUER),
+        client_id="world-check",
+        jwt_signing_key=SecretStr("k" * 32),
+        org_id="123456789",
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=STORE)
+
+    assert isinstance(auth, OIDCProxy)
+    registration = auth.client_registration_options
+    assert registration is not None
+    assert registration.valid_scopes is not None
+    assert set(zitadel.required_scopes) <= set(registration.valid_scopes)
+    assert "urn:zitadel:iam:org:id:123456789" in registration.valid_scopes
+
+
+@pytest.mark.usefixtures("zitadel_discovery")
+def test_create_auth_asks_zitadel_for_a_refresh_token_without_requiring_one(
+    server_settings: ServerSettings,
+) -> None:
+    zitadel = ZitadelSettings(
+        base_url=AnyHttpUrl(ISSUER),
+        client_id="world-check",
+        jwt_signing_key=SecretStr("k" * 32),
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=STORE)
+
+    assert isinstance(auth, OIDCProxy)
+    registration = auth.client_registration_options
+    assert registration is not None
+    assert registration.valid_scopes is not None
+    assert "offline_access" in auth._extra_authorize_params["scope"].split()
+    assert "offline_access" in registration.valid_scopes
+    assert "offline_access" not in auth.required_scopes

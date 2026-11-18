@@ -20,7 +20,8 @@ def create_auth(settings: Settings) -> OIDCProxy | None:
     assert settings.zitadel_client_id
     assert settings.mcp_jwt_signing_key
     required = list(_REQUIRED_SCOPES)
-    authorize_scopes = list(ZITADEL_DEFAULT_MCP_SCOPES)
+    # offline_access makes Zitadel send a refresh token; asked for, never required.
+    authorize_scopes = [*ZITADEL_DEFAULT_MCP_SCOPES, "offline_access"]
     if settings.zitadel_org_id:
         org_scope = f"urn:zitadel:iam:org:id:{settings.zitadel_org_id}"
         required.append(org_scope)
@@ -38,5 +39,6 @@ def create_auth(settings: Settings) -> OIDCProxy | None:
         client_storage=MemoryStore(),
         verify_id_token=True,
         required_scopes=required,
+        valid_scopes=authorize_scopes,
         extra_authorize_params={"scope": " ".join(authorize_scopes)},
     )

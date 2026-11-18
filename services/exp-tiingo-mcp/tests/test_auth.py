@@ -86,3 +86,14 @@ def test_org_restriction_is_required_and_requested(proxy_kwargs: dict[str, Any])
     org_scope = "urn:zitadel:iam:org:id:42"
     assert org_scope in auth.required_scopes
     assert org_scope in proxy_kwargs["extra_authorize_params"]["scope"].split()
+
+
+def test_refresh_token_is_requested_but_not_required(proxy_kwargs: dict[str, Any]) -> None:
+    auth = create_auth(zitadel_settings())
+    assert auth is not None
+    registration = auth.client_registration_options
+    assert registration is not None
+    assert registration.valid_scopes is not None
+    assert "offline_access" in proxy_kwargs["extra_authorize_params"]["scope"].split()
+    assert "offline_access" in registration.valid_scopes
+    assert "offline_access" not in auth.required_scopes
