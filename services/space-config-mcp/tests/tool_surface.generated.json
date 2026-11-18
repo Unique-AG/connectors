@@ -746,6 +746,19 @@
           "default": null,
           "description": "Enable bash/write/read tools in the agent (setup.enableCodeExecution)."
         },
+        "max_history_interactions": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of past chat messages included as history context (setup.maxHistoryInteractions). Set to 0 to disable history."
+        },
         "max_turns": {
           "anyOf": [
             {

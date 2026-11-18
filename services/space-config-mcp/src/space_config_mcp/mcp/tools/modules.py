@@ -253,6 +253,16 @@ async def update_conduct_config(  # noqa: PLR0913
             )
         ),
     ] = None,
+    max_history_interactions: Annotated[
+        int | None,
+        Field(
+            description=(
+                "Maximum number of past chat messages included as history context "
+                "(setup.maxHistoryInteractions). Set to 0 to disable history."
+            ),
+            ge=0,
+        ),
+    ] = None,
     show_thinking_in_chat: Annotated[
         bool | None,
         Field(description="Show agent thinking steps in the chat UI (setup.showThinkingInChat)."),
@@ -326,6 +336,7 @@ async def update_conduct_config(  # noqa: PLR0913
             enable_code_execution,
             enable_browser_control,
             mcp_integration_mode,
+            max_history_interactions,
             show_thinking_in_chat,
             show_tool_calls_in_chat,
             progress_update_abort_s,
@@ -338,6 +349,7 @@ async def update_conduct_config(  # noqa: PLR0913
             enable_code_execution=enable_code_execution,
             enable_browser_control=enable_browser_control,
             mcp_integration_mode=mcp_integration_mode,
+            max_history_interactions=max_history_interactions,
             show_thinking_in_chat=show_thinking_in_chat,
             show_tool_calls_in_chat=show_tool_calls_in_chat,
             progress_update_abort_s=progress_update_abort_s,
