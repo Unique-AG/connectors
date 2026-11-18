@@ -38,18 +38,28 @@ class PostgresResponseCache:
         self._database: Database = database
 
     async def get(self, key: str) -> CachedAnswer | None:
-        # A read is a use: it moves the answer to the back of the eviction order.
-        touch = (
-            update(ResponseCacheRow)
-            .where(ResponseCacheRow.key == key, ResponseCacheRow.expires_at > func.now())
-            .values(last_used_at=func.now(), reads=ResponseCacheRow.reads + 1)
-            .returning(ResponseCacheRow.body, ResponseCacheRow.cached_at)
-        )
+        # A read is a use: it moves the answer to the back of the eviction order. Only one older
+        # than `_TOUCH_AFTER` is moved, so that reads of the same answer, such as the pages of
+        # one graph, neither wait on each other's row lock nor leave a dead tuple each.
+        hit = select(
+            ResponseCacheRow.body,
+            ResponseCacheRow.cached_at,
+            ResponseCacheRow.last_used_at < func.now() - _TOUCH_AFTER,
+        ).where(ResponseCacheRow.key == key, ResponseCacheRow.expires_at > func.now())
         async with self._database.begin() as session:
-            row = (await session.execute(touch)).one_or_none()
-        if row is None:
-            return None
-        body, cached_at = row
+            row = (await session.execute(hit)).one_or_none()
+            if row is None:
+                return None
+            body, cached_at, stale = row
+            if stale:
+                _ = await session.execute(
+                    update(ResponseCacheRow)
+                    .where(
+                        ResponseCacheRow.key == key,
+                        ResponseCacheRow.last_used_at < func.now() - _TOUCH_AFTER,
+                    )
+                    .values(last_used_at=func.now())
+                )
         return CachedAnswer(cached_at=cached_at, body=body)
 
     async def put(self, key: str, answer: CachedAnswer, *, ttl_seconds: int) -> None:
@@ -67,7 +77,6 @@ class PostgresResponseCache:
                 "cached_at": row.excluded.cached_at,
                 "expires_at": row.excluded.expires_at,
                 "last_used_at": row.excluded.last_used_at,
-                "reads": 0,
             },
         )
         async with self._database.begin() as session:
@@ -76,7 +85,8 @@ class PostgresResponseCache:
     async def cull(self, *, max_bytes: int) -> None:
         # Keeps the most recently used answers whose sizes add up to at most `max_bytes`. The sum
         # is a BIGINT, so `max_bytes` binds as one past the 2 GB an INTEGER holds. A row is
-        # deleted only as it was ranked: one read meanwhile has a newer `last_used_at` and stays.
+        # deleted only as it was ranked: one whose read moved it meanwhile has a newer
+        # `last_used_at` and stays.
         ranked = select(
             ResponseCacheRow.key,
             ResponseCacheRow.last_used_at,
@@ -109,3 +119,6 @@ class PostgresResponseCache:
                 "Deleted the least recently used Polixis answers to keep the cache under its size",
                 extra={"evicted": evicted, "max_bytes": max_bytes},
             )
+
+
+_TOUCH_AFTER = timedelta(minutes=1)

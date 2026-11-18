@@ -4,7 +4,9 @@ page through it, so the next page, or another tool on the same entity, reads it 
 as does the same search or profile asked again.
 """
 
-from collections.abc import Callable, Generator
+import asyncio
+from collections.abc import AsyncGenerator, Callable, Generator
+from contextlib import asynccontextmanager
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
@@ -76,6 +78,11 @@ class CachingTransport(httpx2.AsyncBaseTransport):
     The key binds an answer to the upstream's origin, so a deployment pointed at another Polixis
     reads none of the first one's answers. It does not bind it to the credentials: every account
     gets the same data.
+
+    Requests that miss under the same key at once, such as parallel tool calls on one entity,
+    send one request: the others wait for it and read its answer from the cache. That holds
+    within one replica, and for an answer the cache keeps: after one it does not, such as a
+    rejection, each waiting request sends its own in turn.
     """
 
     def __init__(
@@ -92,30 +99,50 @@ class CachingTransport(httpx2.AsyncBaseTransport):
         self._settings: CacheSettings = settings
         self._usable: AnswerCheck = usable
         self._now: Callable[[], datetime] = now
+        self._fetches: dict[str, _Fetch] = {}
 
     @override
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         key = f"{self._settings.key_prefix}:{await _request_key(request)}"
         cached = await self._read(key, request)
-        if cached is not None:
-            return httpx2.Response(
-                _OK,
-                content=cached.body,
-                headers={
-                    "content-type": "application/json",
-                    CACHE_STORED_AT_HEADER: cached.cached_at.isoformat(),
-                },
-                request=request,
-            )
+        if cached is None:
+            async with self._one_fetch_at_a_time(key):
+                cached = await self._read(key, request)
+                if cached is None:
+                    return await self._fetch(key, request)
+        return httpx2.Response(
+            _OK,
+            content=cached.body,
+            headers={
+                "content-type": "application/json",
+                CACHE_STORED_AT_HEADER: cached.cached_at.isoformat(),
+            },
+            request=request,
+        )
+
+    @override
+    async def aclose(self) -> None:
+        await self._inner.aclose()
+
+    @asynccontextmanager
+    async def _one_fetch_at_a_time(self, key: str) -> AsyncGenerator[None]:
+        """Holds `key`'s lock, which is dropped once no request waits on it."""
+        fetch = self._fetches.setdefault(key, _Fetch())
+        fetch.waiting += 1
+        try:
+            async with fetch.lock:
+                yield
+        finally:
+            fetch.waiting -= 1
+            if fetch.waiting == 0:
+                del self._fetches[key]
+
+    async def _fetch(self, key: str, request: httpx2.Request) -> httpx2.Response:
         response = await self._inner.handle_async_request(request)
         if response.status_code == _OK:
             await response.aread()
             await self._write(key, request, response)
         return response
-
-    @override
-    async def aclose(self) -> None:
-        await self._inner.aclose()
 
     async def _read(self, key: str, request: httpx2.Request) -> CachedAnswer | None:
         """None for an answer cached longer ago than the TTL now set, as after a restart with a
@@ -186,6 +213,14 @@ async def record_cache_read(response: httpx2.Response) -> None:
     reads = _cache_reads.get()
     if stored_at is not None and reads is not None:
         reads.record(datetime.fromisoformat(stored_at))
+
+
+class _Fetch:
+    """The lock on one key, and how many requests hold it or wait for it."""
+
+    def __init__(self) -> None:
+        self.lock: asyncio.Lock = asyncio.Lock()
+        self.waiting: int = 0
 
 
 class _CacheReads:

@@ -53,4 +53,3 @@ class ResponseCacheRow(Base):
     cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    reads: Mapped[int] = mapped_column(Integer, server_default="0")

@@ -1,10 +1,17 @@
+import asyncio
+from collections.abc import Callable
 from datetime import datetime
 from datetime import timedelta
 from datetime import UTC
+from functools import partial
+import json
+from typing import Protocol
 
 import httpx2
 from mcp_openapi.upstream import Operation
 from pydantic import AnyHttpUrl
+from pydantic import JsonValue
+from pydantic import TypeAdapter
 from pydantic import ValidationError
 import pytest
 
@@ -17,6 +24,7 @@ from polixis_mcp.upstream import UpstreamError
 from polixis_mcp.upstream import UpstreamSettings
 from polixis_mcp.upstream.answers import _OPERATIONS
 from polixis_mcp.upstream.generated import operations
+from tests import polixis_responses
 from tests.offline_server import fake_upstream_settings
 from tests.offline_server import FakeResponseCache
 
@@ -353,3 +361,89 @@ async def test_the_cache_key_holds_no_credentials_from_the_api_url() -> None:
     [key] = cache.answers
     assert "secret" not in key
     assert "user" not in key
+
+
+async def _three_at_once(answer: dict[str, object]) -> tuple[list[str], list[httpx2.Response]]:
+    """Sends the same request three times at once, while Polixis holds the first answer back
+    until the others have reached the cache. Returns the paths Polixis answered and the responses.
+    """
+    answered: list[str] = []
+    first_arrived = asyncio.Event()
+
+    async def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        answered.append(request.url.path)
+        first_arrived.set()
+        await asyncio.sleep(0.05)
+        return httpx2.Response(200, json=answer)
+
+    async with upstream_http(
+        fake_upstream_settings(), httpx2.MockTransport(respond), cache=FakeResponseCache()
+    ) as http:
+        sent = [asyncio.create_task(http.get("/api/graph/pid/P1")) for _ in range(3)]
+        await first_arrived.wait()
+        responses = await asyncio.gather(*sent)
+    return answered, responses
+
+
+async def test_the_same_request_missing_at_once_asks_polixis_once() -> None:
+    answered, responses = await _three_at_once({"count": 1})
+
+    assert answered == ["/api/graph/pid/P1"]
+    assert [response.json() for response in responses] == [{"count": 1}] * 3
+
+
+async def test_after_an_answer_the_cache_does_not_keep_each_waiting_request_asks_again() -> None:
+    rejection: dict[str, object] = {"count": 1, "error": "unknown id", "code": "NOT_FOUND"}
+
+    answered, responses = await _three_at_once(rejection)
+
+    assert answered == ["/api/graph/pid/P1"] * 3
+    assert [response.json() for response in responses] == [rejection] * 3
+
+
+class _Validates(Protocol):
+    def validate_json(self, data: bytes, /) -> object: ...
+
+    def validate_python(self, data: JsonValue, /) -> object: ...
+
+
+_MODELS: dict[str, _Validates] = {
+    operation.operation_id: operation.adapter for operation in _OPERATIONS
+}
+
+
+def _fixture_bodies() -> list[bytes]:
+    members = dict[str, object](vars(polixis_responses))
+    return [
+        json.dumps(members[name]).encode()
+        for name, value in members.items()
+        if name.isupper() and isinstance(value, dict)
+    ]
+
+
+def _fits(validate: Callable[[], object]) -> bool:
+    try:
+        _ = validate()
+    except ValidationError:
+        return False
+    return True
+
+
+@pytest.mark.parametrize("operation_id", sorted(_MODELS))
+def test_a_model_accepts_the_parsed_json_as_it_accepts_the_body(operation_id: str) -> None:
+    """The cache parses a body once and validates the parsed JSON, in pydantic's lax Python
+    mode, which must agree with validating the body as JSON.
+    """
+    model = _MODELS[operation_id]
+    bodies = _fixture_bodies()
+
+    from_json = [_fits(partial(model.validate_json, body)) for body in bodies]
+    from_python = [
+        _fits(partial(model.validate_python, TypeAdapter(JsonValue).validate_json(body)))
+        for body in bodies
+    ]
+
+    assert from_python == from_json
+    assert any(from_json)
