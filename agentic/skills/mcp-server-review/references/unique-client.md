@@ -33,18 +33,22 @@ stateful one.**
 - If the server returns no `Mcp-Session-Id`, the client carries on without one. A stateless
   server therefore works, provided it accepts `tools/call` on a fresh HTTP request with no
   session header and no `initialize` in front of it, which is what stateless means.
-- A stateful server must keep a session alive across at least 30 min of idle time and
-  across many chats, and when it drops one it must answer with `404` and a body that says
-  `Session not found` (or `Session expired`, `Invalid session`, `terminated`). Only those
-  messages make the client reconnect and retry; any other error reaches the user as a tool
-  failure.
+- When a stateful server drops a session it must answer with `404` and a body that says
+  `Session not found` (or `Session expired`, `Invalid session`, `terminated`). The client
+  then marks the connection dead and the **next** call reconnects; the in-flight call
+  still fails and reaches the user as a tool error. Any other status or wording leaves the
+  client on a dead connection. A session that outlives the client's own 30 min idle
+  timeout never costs a user a failed call; a shorter one costs one failed call per lapse,
+  which is a P2 usability finding, not an incompatibility.
 - The `2026-07-28` stateless model (`server/discover`, no sessions) is not implemented by
   the client's SDK generation. Such a server works only through its backwards-compatible
   `initialize` path.
 
-Review consequences: a server that stores per-session state (cursors, elicitation results,
-caches) and evicts it after a few minutes fails OUT-001 and REL-001 for this client. A server
-that answers a lost session with 400 or 500 instead of `404 Session not found` fails REL-001.
+Review consequences: a server that answers a lost session with 400 or 500 instead of
+`404 Session not found` fails REL-001. A server whose continuation tokens (cursors, handles
+returned for a follow-up call) die with the session fails OUT-001, because the model's next
+call cannot complete after a reconnect. A recomputable cache that is evicted with the session
+is not a finding on its own; note the extra latency if it matters.
 A stateless server has no session findings; check instead that it does not depend on
 `initialize` having happened on the same request stream.
 
@@ -145,8 +149,8 @@ Report that under the verdict, not as a server defect.
 ## Checklist to add for a Unique-facing server
 
 1. Streamable HTTP on `https://`, path only, no query string.
-2. Either stateless, or a session that survives 30 min idle and is reported lost with
-   `404 Session not found`.
+2. Either stateless, or a session that is reported lost with `404 Session not found` and
+   ideally outlives 30 min idle.
 3. OAuth with RFC 9728 + RFC 8414 discovery, PKCE S256, public client (`none`), DCR or a
    documented client id. Audience-check the bearer (AUTH-001).
 4. Expired or invalid token: 401 with `invalid_token` wording. Permission denied: 403.
