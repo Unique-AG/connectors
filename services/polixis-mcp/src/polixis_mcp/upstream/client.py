@@ -30,7 +30,7 @@ from polixis_mcp.upstream.quota import QuotaGate
 from polixis_mcp.upstream.rejections import reject_error_body
 from polixis_mcp.upstream.routes import EXPOSED
 from polixis_mcp.upstream.settings import UpstreamSettings
-from polixis_mcp.upstream.token import ClientCredentialsAuth
+from polixis_mcp.upstream.token import ClientCredentialsTransport
 
 # The name the contexts and tools import the client by, kept the same in every MCP whatever
 # the client is. It is an alias, not an abstraction: its API is the client's own.
@@ -54,8 +54,8 @@ def upstream_http(
     says the quota is spent, the ones waiting for a slot included.
 
     With `cache` given and on in `settings`, the same request is answered from it within its
-    TTL. The cache sits outside the admission, so a cached answer neither waits for a slot
-    nor is refused while the quota is spent.
+    TTL. The cache sits outside the admission and the client credentials, so a cached answer
+    neither waits for a slot, nor is refused while the quota is spent, nor fetches a token.
 
     `now` is the clock the client-credentials token's expiry, the quota cooldown and the cache's
     TTL are read against.
@@ -64,8 +64,18 @@ def upstream_http(
     network = transport or httpx2.AsyncHTTPTransport(
         limits=httpx2.Limits(max_connections=settings.max_concurrent_requests)
     )
+    signed = ClientCredentialsTransport(
+        network,
+        client_id=settings.client_id,
+        client_secret=settings.client_secret,
+        api_key=settings.api_key,
+        token_url=str(settings.token_url),
+        timeout=settings.timeout_seconds,
+        token_transport=transport,
+        now=clock,
+    )
     quota = QuotaGate(cooldown=timedelta(seconds=settings.quota_cooldown_seconds), now=clock)
-    admission = AdmissionTransport(network, slots=settings.max_concurrent_requests, quota=quota)
+    admission = AdmissionTransport(signed, slots=settings.max_concurrent_requests, quota=quota)
     return httpx2.AsyncClient(
         base_url=str(settings.api_url).rstrip("/"),
         timeout=settings.timeout_seconds,
@@ -74,15 +84,6 @@ def upstream_http(
             CachingTransport(admission, cache=cache, settings=settings.cache, now=clock)
             if cache is not None and settings.cache.enabled
             else admission
-        ),
-        auth=ClientCredentialsAuth(
-            client_id=settings.client_id,
-            client_secret=settings.client_secret,
-            api_key=settings.api_key,
-            token_url=str(settings.token_url),
-            timeout=settings.timeout_seconds,
-            transport=transport,
-            now=clock,
         ),
         headers={"Accept": "application/json"},
     )

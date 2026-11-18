@@ -195,21 +195,20 @@ async def test_the_same_profile_asked_again_is_answered_from_the_cache(
     ]
 
 
-async def test_a_cached_answer_expires_after_the_configured_ttl(
-    mcp_client: McpClient, persistence: Persistence
-) -> None:
-    await call_tool(
-        mcp_client,
-        "get_top_down_ownership",
-        {"pid": "O00000000000000000000000000000100"},
-        returns=contexts.OwnershipPage,
-    )
-    cache = persistence.response_cache
-    assert isinstance(cache, FakeResponseCache)
-    [(key, ttl)] = cache.ttls.items()
+_TTL_SECONDS = 60
 
-    assert key.startswith("v1:GET /api/graph/topdown/O00000000000000000000000000000100:")
-    assert ttl == 15 * 60
+
+async def test_an_answer_is_stored_for_the_configured_ttl(
+    upstream_settings: UpstreamSettings, upstream_transport: httpx2.MockTransport
+) -> None:
+    cache = FakeResponseCache()
+
+    async with Client(
+        _server(upstream_settings, cache, upstream_transport, ttl_seconds=_TTL_SECONDS)
+    ) as client:
+        await _owners(client)
+
+    assert list(cache.ttls.values()) == [_TTL_SECONDS]
 
 
 def _server(

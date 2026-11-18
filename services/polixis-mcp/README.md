@@ -142,7 +142,8 @@ anyway.
 
 The answers sit in their own table, `polixis_response_cache` (`persistence/response_cache.py`,
 modelled in `persistence/models.py`), which an Alembic migration makes: the chart's migration hook
-runs `alembic upgrade head` before each rollout, so the server itself changes no schema for it.
+runs `alembic upgrade head` before each rollout. The migrations make every table, the key-value
+store's `kv_store` for the sign-in state too, and the server makes none.
 Each row holds the body as Polixis sent it, its
 size, when it was cached and when it expires, and when it was last read and how often. Each cull
 also keeps the bodies under `UPSTREAM_CACHE_MAX_MEGABYTES`, 500 by default, by deleting the

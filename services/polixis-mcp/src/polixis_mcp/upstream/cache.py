@@ -164,8 +164,8 @@ def oldest_cache_read() -> datetime | None:
 
 
 async def record_cache_read(response: httpx2.Response) -> None:
-    """An httpx response hook. Outside a tool call, as for a tool served from the spec, which
-    reports no freshness, nothing records it.
+    """An httpx response hook. Outside a tool call nothing records it. A tool served from the
+    spec records it too, but reports no freshness.
     """
     stored_at = response.headers.get(CACHE_STORED_AT_HEADER)
     reads = _cache_reads.get()

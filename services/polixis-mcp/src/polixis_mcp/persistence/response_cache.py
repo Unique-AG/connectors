@@ -76,6 +76,7 @@ class PostgresResponseCache:
                 "cached_at": row.excluded.cached_at,
                 "expires_at": row.excluded.expires_at,
                 "last_used_at": row.excluded.last_used_at,
+                "reads": 0,
             },
         )
         async with self._engine.begin() as connection:

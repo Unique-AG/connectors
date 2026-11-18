@@ -14,6 +14,7 @@ from polixis_mcp.upstream import upstream_http
 from polixis_mcp.upstream import UpstreamError
 from polixis_mcp.upstream import UpstreamSettings
 from tests.offline_server import fake_upstream_settings
+from tests.offline_server import FakeResponseCache
 
 _WHEN = datetime(2026, 11, 9, 12, 0, tzinfo=UTC)
 _TOKEN_PATH = "/token"
@@ -91,6 +92,29 @@ async def test_an_expired_token_is_fetched_again() -> None:
         await http.get("/api/graph/pid/P1")
 
     assert tokens == ["access-1", "access-2"]
+
+
+async def test_a_cached_answer_fetches_no_token_once_the_token_expired() -> None:
+    moments = [_WHEN]
+    sent: list[str] = []
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request.url.path)
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token", expires_in=60)
+        return httpx2.Response(200, json={"status": "active"})
+
+    async with upstream_http(
+        fake_upstream_settings(),
+        httpx2.MockTransport(respond),
+        cache=FakeResponseCache(),
+        now=lambda: moments[-1],
+    ) as http:
+        await http.get("/api/graph/pid/P1")
+        moments.append(_WHEN + timedelta(minutes=5))
+        await http.get("/api/graph/pid/P1")
+
+    assert sent == [_TOKEN_PATH, "/api/graph/pid/P1"]
 
 
 async def test_a_rejected_token_is_refreshed_once() -> None:

@@ -9,6 +9,8 @@ from key_value.aio.protocols.key_value import AsyncCullProtocol
 from key_value.aio.stores.postgresql import PostgreSQLStore
 from mcp_configs import PostgresSettings
 
+from polixis_mcp.persistence.models import KeyValueRow
+
 StoreSettings = PostgresSettings
 
 
@@ -22,8 +24,7 @@ class Store(AsyncKeyValue, AsyncCullProtocol, Protocol):
     async def close(self) -> None: ...
 
 
-# PostgreSQLStore's default table, named here so the cull does not read its private name.
-_TABLE = "kv_store"
+_TABLE = KeyValueRow.__tablename__
 _DELETE_EXPIRED = f"DELETE FROM {_TABLE} WHERE expires_at <= now()"
 _SQLALCHEMY_ONLY = "prepared_statement_cache_size"
 _ASYNCPG_DEFAULT_CACHE = 100
@@ -39,7 +40,8 @@ def _asyncpg_dsn(url: str) -> tuple[str, int]:
 
 class _PostgresStore(PostgreSQLStore):
     """A `PostgreSQLStore` that connects as `PostgresSettings` says: with its TLS settings and a
-    small pool.
+    small pool. It does not make its table, which a migration makes, and fails to set up without
+    it.
     """
 
     _settings: StoreSettings
@@ -49,7 +51,7 @@ class _PostgresStore(PostgreSQLStore):
 
     def __init__(self, settings: StoreSettings) -> None:
         dsn, statement_cache_size = _asyncpg_dsn(settings.connection_url)
-        super().__init__(url=dsn, table_name=_TABLE)
+        super().__init__(url=dsn, table_name=_TABLE, auto_create=False)
         self._settings = settings
         self._dsn = dsn
         self._statement_cache_size = statement_cache_size
