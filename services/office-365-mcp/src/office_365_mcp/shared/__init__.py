@@ -14,8 +14,9 @@ depends on at the import line. That import line is the one thing this package ex
 
 A module that the tools of only one surface use goes in that surface's package: `outlook/`,
 `teams/` or `sharepoint/`. A module that the tools of two or more surfaces use stays directly
-here. A tool imports the modules of its own surface and the modules directly here, and never the
-modules of another surface. See rule 10 in `tests/test_layering.py`.
+here. A tool imports the modules of its own surface, the modules directly here, and the `seam`
+package through its `__init__`, and never the modules of another surface. See rule 10 in
+`tests/test_layering.py`.
 
 Layering rule: nothing here imports `tools/`, and only the `seam/` package imports FastMCP. See
 `tests/test_layering.py` for its first rule, which states exactly that.
