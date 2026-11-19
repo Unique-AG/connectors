@@ -10,7 +10,6 @@ from world_check_mcp.contexts.monitoring.errors import MonitoringError
 from world_check_mcp.contexts.monitoring.models import OgsPage
 from world_check_mcp.contexts.monitoring.models import OgsUpdate
 from world_check_mcp.contexts.monitoring.models import OgsWindow
-from world_check_mcp.contexts.monitoring.models import UpdateMode
 from world_check_mcp.upstream import GET_ONGOING_SCREENING_UPDATES
 from world_check_mcp.upstream import GetOngoingScreeningUpdatesRequest
 from world_check_mcp.upstream import next_page
@@ -25,7 +24,7 @@ _EMPTY = "NO_OGS_CASE_UPDATES_FOUND_WITHIN_DATE_RANGE"
 
 
 @traced(
-    arguments=("group_id", "case", "mode", "limit", "page_reference"),
+    arguments=("group_id", "case", "limit", "page_reference"),
     result=lambda r: {"updates": len(r.updates)},
 )
 async def get_ogs_updates(
@@ -35,9 +34,8 @@ async def get_ogs_updates(
     until: datetime | None = None,
     group_id: str | None = None,
     case: str | None = None,
-    limit: int = 100,
+    limit: int = 25,
     page_reference: str | None = None,
-    mode: UpdateMode = "FULL",
 ) -> OgsPage:
     """WATCHLIST monitoring updates. Defaults to the last 24 hours inside a 30-day window."""
     if page_reference is not None and (since is None or until is None):
@@ -57,7 +55,7 @@ async def get_ogs_updates(
                     pagination=PaginationReferenceRequestInput(
                         items_per_page=limit, page_reference=page_reference
                     ),
-                    mode=mode,
+                    mode="FULL",
                 )
             ),
         )

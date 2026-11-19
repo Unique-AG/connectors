@@ -8,6 +8,7 @@ from fastmcp.server.context import Context
 from fastmcp.server.dependencies import get_access_token
 
 from world_check_mcp.mcp.approval import ApprovalGate
+from world_check_mcp.persistence import Cache
 from world_check_mcp.persistence import CaseLocks
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import Upstream
@@ -15,6 +16,10 @@ from world_check_mcp.upstream import Upstream
 
 def get_persistence(ctx: Context = CurrentContext()) -> Persistence:
     return cast(Persistence, ctx.lifespan_context["persistence"])
+
+
+def get_cache(ctx: Context = CurrentContext()) -> Cache:
+    return get_persistence(ctx).cache
 
 
 def get_upstream(ctx: Context = CurrentContext()) -> Upstream:

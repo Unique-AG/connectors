@@ -29,8 +29,8 @@ PageReference = Annotated[
         'primaryName=="John Smith".\n'
         "\n"
         "Use get_reference_data kind search_filters for the fields. Quote values that "
-        "contain reserved characters. EXACT is the mode for an exact caseId. The group "
-        "filter is always added."
+        "contain reserved characters. To look up one case by its caseId, use "
+        "get_case_reference instead. The group filter is always added."
     ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )

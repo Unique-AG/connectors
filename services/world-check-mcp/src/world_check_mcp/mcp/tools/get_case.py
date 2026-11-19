@@ -15,8 +15,8 @@ from world_check_mcp.upstream import Upstream
     description=(
         "Get a saved case by its internal caseSystemId or its exact external caseId.\n"
         "\n"
-        "An internal id is tried first. Use the returned case_system_id with the other case "
-        "tools."
+        "An internal id is tried first, and matched_by says which id matched. Use the returned "
+        "case_system_id with the other case tools."
     ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )

@@ -4,6 +4,8 @@ from mcp_observability import traced
 
 from world_check_mcp.contexts.cases import CaseNotFoundError
 from world_check_mcp.contexts.cases import get_case_reference
+from world_check_mcp.contexts.screening.case_id import derived_case_id
+from world_check_mcp.contexts.screening.case_id import field_parts
 from world_check_mcp.contexts.screening.errors import ScreeningError
 from world_check_mcp.contexts.screening.fields import check_entity
 from world_check_mcp.contexts.screening.fields import screening_arguments
@@ -55,7 +57,23 @@ async def screen_entity(
         gender=gender,
         case_id=case_id,
     )
-    await refuse_existing_case(upstream=upstream, case_id=case_id)
+    effective_case_id = case_id or derived_case_id(
+        "WATCHLIST",
+        group_id,
+        entity_type,
+        name,
+        dob,
+        nationality,
+        country_of_residence,
+        place_of_birth,
+        registered_country,
+        gender,
+        *field_parts(fields=secondary_fields),
+        *field_parts(fields=custom_fields),
+    )
+    await refuse_existing_case(
+        upstream=upstream, case_id=effective_case_id, chosen=case_id is not None
+    )
     template = await upstream.call(
         GET_CASE_TEMPLATE_FOR_GROUP,
         GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
@@ -71,7 +89,7 @@ async def screen_entity(
             template=template,
             countries=countries.root,
             nationalities=nationalities.root,
-            case_id=case_id,
+            case_id=effective_case_id,
             dob=dob,
             nationality=nationality,
             country_of_residence=country_of_residence,
@@ -85,14 +103,22 @@ async def screen_entity(
     return outcome(screened=saved, limit=limit)
 
 
-async def refuse_existing_case(*, upstream: Upstream, case_id: str | None) -> None:
+async def refuse_existing_case(
+    *, upstream: Upstream, case_id: str | None, chosen: bool = True
+) -> None:
     if case_id is None:
         return
     try:
         existing = await get_case_reference(upstream=upstream, case_id=case_id)
     except CaseNotFoundError:
         return
+    if chosen:
+        raise ScreeningError(
+            f"case_id already exists (case_system_id={existing.case_system_id}). "
+            "Use get_case or rescreen_case."
+        )
     raise ScreeningError(
-        f"case_id already exists (case_system_id={existing.case_system_id}). "
-        "Use get_case or rescreen_case."
+        f"These details were already screened (case_system_id={existing.case_system_id}). "
+        "Use rescreen_case to screen it again, or pass your own case_id to screen a "
+        "different entity with the same details."
     )

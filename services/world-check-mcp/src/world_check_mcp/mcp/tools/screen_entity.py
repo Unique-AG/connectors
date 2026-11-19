@@ -23,9 +23,10 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="Matches to return.")]
     description=(
         "Create a persistent WATCHLIST case and screen it synchronously.\n"
         "\n"
-        "This writes a case. Repeated calls without case_id create new cases. An existing "
-        "case_id is refused, not rescreened. Matches are candidates, not confirmed "
-        "identities."
+        "This writes a case. Without case_id one is derived from the details, so a retry after "
+        "the first call saved its case is refused as already screened. Two calls at the same "
+        "time are not guarded. Use rescreen_case to screen it again. An existing case_id is "
+        "refused, not rescreened. Matches are candidates, not confirmed identities."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=False, open_world_hint=True
@@ -37,7 +38,8 @@ async def screen_entity(
     entity_type: Annotated[contexts.EntityType, Field(description="INDIVIDUAL or ORGANISATION.")],
     group_id: GroupId,
     case_id: Annotated[
-        ExternalId | None, Field(description="External caseId. Existing ids are refused.")
+        ExternalId | None,
+        Field(description="External caseId. Defaults to one derived from the details."),
     ] = None,
     dob: Annotated[
         contexts.DateOfBirth | None, Field(description="Date of birth. Individuals only.")

@@ -19,6 +19,7 @@ from mcp_observability import validate_trace_declarations
 
 from world_check_mcp.mcp.approval import ApprovalGate
 from world_check_mcp.mcp.approval import request_state_security
+from world_check_mcp.mcp.deadline import ToolDeadlineMiddleware
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import open_upstream
 from world_check_mcp.upstream import upstream_http
@@ -27,7 +28,16 @@ from world_check_mcp.upstream import UpstreamSettings
 
 INSTRUCTIONS = (
     "Screens people and organizations in LSEG World-Check One and returns sanctions, PEP, "
-    "and adverse-media results for KYC and third-party due diligence."
+    "and adverse-media results for KYC and third-party due diligence.\n"
+    "\n"
+    "Matches are candidates, not confirmed identities. Start with list_groups for a group id. "
+    "A case argument takes an internal caseSystemId or an external caseId, and get_case says "
+    "which one matched. screen_entity and passport_check derive a case_id from their details, "
+    "so a retry after the first call saved its case is refused as already screened, and "
+    "rescreen_case screens it again. Two calls at the same time are not guarded. "
+    "resolve_result and verify_passport_check save a regulatory record only after the user "
+    "approves it in the client. Every limit has a default and a maximum, and next_page "
+    "continues a list."
 )
 
 
@@ -78,7 +88,7 @@ def create_server(
         request_state_security=request_state_security(elicitation),
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
+        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting, ToolDeadlineMiddleware()],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")

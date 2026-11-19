@@ -2,13 +2,16 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import date
+from datetime import datetime
 from datetime import timedelta
+from datetime import UTC
 import json
 import socket
-from typing import cast
+from typing import cast, Self
 
 from fastmcp import Client
 from fastmcp import FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
@@ -24,6 +27,9 @@ import uvicorn
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.contexts.groups.models import GroupEntry
+from world_check_mcp.contexts.groups.search import find_groups
+from world_check_mcp.contexts.screening import derived_case_id
 from world_check_mcp.mcp import http_app
 from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
@@ -48,6 +54,9 @@ _screen_modes: list[str] = []
 _writes: list[tuple[str, dict[str, object]]] = []
 # The last entry is the case LSEG maps the external caseId "ext-1" to.
 _ext_1_maps_to: list[str] = ["sys-1"]
+_SCREENED_CASE_ID = derived_case_id(
+    "WATCHLIST", "g-retry", "INDIVIDUAL", "Grace Hopper", None, None, None, None, None, None
+)
 
 
 def _passport_template() -> httpx2.Response:
@@ -232,6 +241,10 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         )
     if path.endswith("/groups/g1"):
         return _json(200, {"id": "g1", "name": "KYC"})
+    if "/references/cases/" in path and path.endswith(
+        (_SCREENED_CASE_ID, _SCREENED_PASSPORT_CASE_ID)
+    ):
+        return _json(200, {"caseId": "derived", "caseSystemId": "sys-screened"})
     if "/references/cases/" in path and path.endswith("ext-1"):
         return _json(200, {"caseId": "ext-1", "caseSystemId": _ext_1_maps_to[-1]})
     if "/references/cases/" in path and path.endswith("ext-nosys"):
@@ -578,13 +591,141 @@ def _server() -> FastMCP:
     )
 
 
-async def test_list_groups_returns_descendant_groups() -> None:
-    async with Client(_server()) as client:
+_GROUP_TREE: list[dict[str, object]] = [
+    {
+        "id": "g1",
+        "name": "KYC",
+        "childGroups": [
+            {"id": "g2", "name": "EU Onboarding"},
+            {"id": "g3", "name": "EU Monitoring"},
+        ],
+    },
+    {"id": "g4", "name": "Third Party Due Diligence"},
+]
+
+
+def _counting_server() -> tuple[FastMCP, list[str]]:
+    """The server over a larger group tree, with the LSEG paths each request asked for."""
+    paths: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("/groups") and request.url.params.get("showAllChildGroups"):
+            return _json(200, _GROUP_TREE)
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(handler),
+    )
+    return server, paths
+
+
+class _StoreThatCountsExits(MemoryStore):
+    """Postgres closes its pool when the store is exited, and FastMCP exits what a dependency
+    returns if it is a context manager.
+    """
+
+    exits: int = 0
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        self.exits += 1
+
+
+async def test_a_tool_that_reads_the_cache_never_exits_the_store() -> None:
+    store = _StoreThatCountsExits()
+    paths: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("/groups") and request.url.params.get("showAllChildGroups"):
+            return _json(200, _GROUP_TREE)
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=store, case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(handler),
+    )
+    async with Client(server) as client:
+        await client.call_tool("list_groups", {})
+        await client.call_tool("list_groups", {})
+
+    assert store.exits == 0
+    assert [path for path in paths if path.endswith("/groups")] == ["/groups"]
+
+
+async def _group_ids(client: Client[FastMCPTransport], **arguments: object) -> list[str]:
+    result = await client.call_tool("list_groups", arguments)
+    page = result.structured_content
+    assert page is not None
+    return [group["id"] for group in cast(list[dict[str, str]], page["groups"])]
+
+
+async def test_list_groups_returns_a_flat_page_with_parents_and_child_counts() -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
         result = await client.call_tool("list_groups", {})
 
-    groups = result.structured_content
-    assert groups is not None
-    assert groups["result"][0]["child_groups"][0]["name"] == "EU"
+    page = result.structured_content
+    assert page is not None
+    groups = cast(list[dict[str, object]], page["groups"])
+    assert [(group["id"], group["parent_id"], group["child_group_count"]) for group in groups] == [
+        ("g1", None, 2),
+        ("g2", "g1", 0),
+        ("g3", "g1", 0),
+        ("g4", None, 0),
+    ]
+    assert page["total"] == 4
+    assert page["next_page"] is None
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        ({"query": "eu"}, ["g3", "g2"]),
+        ({"query": "Onbording"}, ["g2"]),
+        ({"query": "due diligence third"}, ["g4"]),
+        ({"query": "zzz"}, []),
+        ({"parent_id": "g1"}, ["g2", "g3"]),
+        ({"parent_id": "g1", "query": "monitoring"}, ["g3"]),
+    ],
+)
+async def test_list_groups_finds_groups_by_words_typos_and_parent(
+    arguments: dict[str, str], expected: list[str]
+) -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
+        assert await _group_ids(client, **arguments) == expected
+
+
+async def test_list_groups_pages_through_the_matches() -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
+        first = (await client.call_tool("list_groups", {"limit": 3})).structured_content
+        assert first is not None
+        assert first["next_page"] == "3"
+        assert await _group_ids(client, limit=3, page_reference=first["next_page"]) == ["g4"]
+
+
+async def test_list_groups_refuses_a_page_reference_it_did_not_hand_out() -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
+        with pytest.raises(ToolError, match="next_page"):
+            await client.call_tool("list_groups", {"page_reference": "abc"})
+
+
+async def test_list_groups_asks_lseg_once_while_the_cache_holds() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        await client.call_tool("list_groups", {})
+        await client.call_tool("list_groups", {"query": "eu"})
+
+    assert [path for path in paths if path.endswith("/groups")] == ["/groups"]
 
 
 async def test_get_group_settings_joins_the_template_and_toolkit() -> None:
@@ -597,6 +738,60 @@ async def test_get_group_settings_joins_the_template_and_toolkit() -> None:
     assert settings["toolkits"][0]["statuses"][0]["status_type"] == "POSITIVE"
 
 
+async def test_get_group_settings_returns_only_the_section_asked_for() -> None:
+    async with Client(_server()) as client:
+        fields = (
+            await client.call_tool("get_group_settings", {"group_id": "g1", "section": "fields"})
+        ).structured_content
+        toolkits = (
+            await client.call_tool("get_group_settings", {"group_id": "g1", "section": "toolkits"})
+        ).structured_content
+
+    assert fields is not None
+    assert toolkits is not None
+    assert fields["secondary_fields"] and fields["toolkits"] is None
+    assert toolkits["toolkits"] and toolkits["secondary_fields"] is None
+
+
+async def test_get_group_settings_narrows_the_fields_by_entity_type_and_requirement() -> None:
+    async with Client(_server()) as client:
+        everything = (
+            await client.call_tool("get_group_settings", {"group_id": "g1"})
+        ).structured_content
+        required = (
+            await client.call_tool("get_group_settings", {"group_id": "g1", "required_only": True})
+        ).structured_content
+        organisations = (
+            await client.call_tool(
+                "get_group_settings", {"group_id": "g1", "entity_type": "ORGANISATION"}
+            )
+        ).structured_content
+
+    assert everything is not None
+    assert required is not None
+    assert organisations is not None
+    all_fields = cast(list[dict[str, object]], everything["secondary_fields"])
+    assert all(
+        field["required"] for field in cast(list[dict[str, object]], required["secondary_fields"])
+    )
+    assert {
+        str(field["entity_type"]).casefold()
+        for field in cast(list[dict[str, object]], organisations["secondary_fields"])
+    } <= {"organisation"}
+    assert len(cast(list[object], organisations["secondary_fields"])) < len(all_fields)
+
+
+async def test_get_group_settings_asks_lseg_once_while_the_cache_holds() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        await client.call_tool("get_group_settings", {"group_id": "g1"})
+        await client.call_tool("get_group_settings", {"group_id": "g1", "section": "toolkits"})
+
+    assert [path for path in paths if path.endswith("/groups/g1/case-template")] == [
+        "/groups/g1/case-template"
+    ]
+
+
 async def test_get_case_resolves_an_external_id_after_the_internal_lookup_misses() -> None:
     async with Client(_server()) as client:
         result = await client.call_tool("get_case", {"case": "ext-1"})
@@ -605,6 +800,17 @@ async def test_get_case_resolves_an_external_id_after_the_internal_lookup_misses
     assert details is not None
     assert details["case_system_id"] == "sys-1"
     assert details["name"] == "Ada Lovelace"
+    assert details["matched_by"] == "case_id"
+
+
+async def test_get_case_reports_an_internal_id_match() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case", {"case": "sys-1"})
+
+    details = result.structured_content
+    assert details is not None
+    assert details["case_system_id"] == "sys-1"
+    assert details["matched_by"] == "case_system_id"
 
 
 async def test_get_case_falls_back_to_the_resolved_system_id_when_upstream_omits_it() -> None:
@@ -811,6 +1017,112 @@ async def test_screen_entity_refuses_an_existing_case_id() -> None:
             )
 
 
+def _recording_server() -> tuple[FastMCP, list[dict[str, object]]]:
+    """The server, with the body of each case LSEG was asked to save."""
+    saved: list[dict[str, object]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.method == "POST" and request.url.path.endswith("/cases"):
+            saved.append(_body(request))
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(handler),
+    )
+    return server, saved
+
+
+async def test_screen_entity_saves_the_case_under_the_derived_id() -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+            },
+        )
+
+    expected = derived_case_id(
+        "WATCHLIST", "g-screen", "INDIVIDUAL", "Ada Lovelace", None, "GBR", None, None, None, None
+    )
+    assert [body["caseId"] for body in saved] == [expected]
+
+
+async def test_screen_entity_saves_the_case_under_the_id_the_caller_chose() -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+                "case_id": "chosen-1",
+            },
+        )
+
+    assert [body["caseId"] for body in saved] == ["chosen-1"]
+
+
+async def test_passport_check_saves_the_case_under_the_derived_id() -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        await client.call_tool("passport_check", {"passport": _PASSPORT, "group_id": "g-passport"})
+
+    assert [body["caseId"] for body in saved] == [_passport_case_id("g-passport")]
+
+
+@pytest.mark.parametrize("change", [{"gender": "MALE"}, {"last_name": "King"}])
+async def test_passport_check_derives_another_id_when_a_screened_field_differs(
+    change: dict[str, str],
+) -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        for passport in (_PASSPORT, {**_PASSPORT, **change}):
+            await client.call_tool(
+                "passport_check",
+                {"passport": passport, "group_id": "g-passport", "name": "Ada Lovelace"},
+            )
+
+    assert len({body["caseId"] for body in saved}) == 2
+
+
+def test_a_group_without_a_name_does_not_break_a_search() -> None:
+    groups = [
+        GroupEntry(id="g1", name="", parent_id=None, child_group_count=0),
+        GroupEntry(id="g2", name="   ", parent_id=None, child_group_count=0),
+        GroupEntry(id="g3", name="EU Onboarding", parent_id=None, child_group_count=0),
+    ]
+
+    found = find_groups(groups, query="eu", parent_id=None)
+
+    assert [group.id for group in found] == ["g3"]
+
+
+def test_derived_case_id_ignores_case_and_spacing_and_tells_entities_apart() -> None:
+    assert derived_case_id("a", " Grace   HOPPER ") == derived_case_id("A", "grace hopper")
+    assert derived_case_id("a", "Grace Hopper") != derived_case_id(
+        "a", "Grace Hopper", date(1906, 12, 9)
+    )
+    assert derived_case_id("a", "b", "c") != derived_case_id("a", "bc")
+
+
+@pytest.mark.parametrize("name", ["Grace Hopper", "  grace   HOPPER "])
+async def test_screen_entity_refuses_a_retry_of_the_same_details(name: str) -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match=r"already screened.*sys-screened.*rescreen_case"):
+            await client.call_tool(
+                "screen_entity",
+                {"name": name, "entity_type": "INDIVIDUAL", "group_id": "g-retry"},
+            )
+
+
 async def test_screen_entity_requires_the_group_nationality() -> None:
     async with Client(_server()) as client:
         with pytest.raises(ToolError, match="NATIONALITY"):
@@ -913,13 +1225,21 @@ async def test_enable_ongoing_screening_reports_a_failure_body() -> None:
     assert screening["failures"] == ["Case cannot be monitored."]
 
 
+# LSEG keeps 30 days of updates and the tool refuses a window outside them, so the window the
+# tests ask for moves with the clock.
+_OGS_UNTIL = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+_OGS_SINCE = _OGS_UNTIL - timedelta(days=2)
+_OGS_SINCE_STAMP = _OGS_SINCE.strftime("%Y-%m-%dT%H:%M:%SZ")
+_OGS_UNTIL_STAMP = _OGS_UNTIL.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 async def test_get_ogs_updates_returns_watchlist_counts() -> None:
     async with Client(_server()) as client:
         result = await client.call_tool(
             "get_ogs_updates",
             {
-                "since": "2026-10-20T00:00:00Z",
-                "until": "2026-10-22T00:00:00Z",
+                "since": _OGS_SINCE_STAMP,
+                "until": _OGS_UNTIL_STAMP,
                 "group_id": "g1",
             },
         )
@@ -930,7 +1250,7 @@ async def test_get_ogs_updates_returns_watchlist_counts() -> None:
     assert [update["case_system_id"] for update in updates] == ["sys-1"]
     assert page["updates"][0]["new_results"] == 1
     assert page["next_page"] == "page-2"
-    assert page["window"]["until"] == "2026-10-22T00:00:00Z"
+    assert page["window"]["until"] == _OGS_UNTIL_STAMP
 
 
 async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
@@ -938,8 +1258,8 @@ async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
         result = await client.call_tool(
             "get_ogs_updates",
             {
-                "since": "2026-10-20T00:00:00Z",
-                "until": "2026-10-22T00:00:00Z",
+                "since": _OGS_SINCE_STAMP,
+                "until": _OGS_UNTIL_STAMP,
                 "page_reference": "none",
             },
         )
@@ -948,6 +1268,12 @@ async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
     assert page is not None
     assert page["updates"] == []
     assert page["next_page"] is None
+
+
+async def test_get_ogs_updates_refuses_a_page_larger_than_100() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="100"):
+            await client.call_tool("get_ogs_updates", {"limit": 101})
 
 
 async def test_get_ogs_updates_requires_the_original_window_on_the_next_page() -> None:
@@ -966,6 +1292,28 @@ _PASSPORT = {
     "identification_number": "123456789",
     "date_of_expiry": "2030-01-01",
 }
+
+
+def _passport_case_id(group_id: str) -> str:
+    """The id of the passport check of `_PASSPORT`: one part for each field it screens."""
+    return derived_case_id(
+        "PASSPORT_CHECK",
+        group_id,
+        "PASSPORT",
+        "123456789",
+        "GBR",
+        "GBR",
+        date(1815, 12, 10),
+        date(2030, 1, 1),
+        "FEMALE",
+        "Ada",
+        "Lovelace",
+        "Ada Lovelace",
+        "True",
+    )
+
+
+_SCREENED_PASSPORT_CASE_ID = _passport_case_id("g-retry")
 
 
 async def test_generate_passport_mrz_uses_nationality_codes() -> None:
@@ -999,6 +1347,12 @@ async def test_passport_check_screens_without_media_check() -> None:
     assert check["passport_matches"][0]["mrz_line_1"] == "P<GBR"
     assert check["watchlist_truncated"] is True
     assert check["watchlist_matches"][1:] == []
+
+
+async def test_passport_check_refuses_a_retry_of_the_same_document() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match=r"already screened.*sys-screened"):
+            await client.call_tool("passport_check", {"passport": _PASSPORT, "group_id": "g-retry"})
 
 
 async def test_passport_check_refuses_an_existing_case_id() -> None:
@@ -1290,7 +1644,7 @@ async def test_get_ogs_updates_rejects_a_future_end() -> None:
         with pytest.raises(ToolError, match="last 30 days"):
             await client.call_tool(
                 "get_ogs_updates",
-                {"since": "2026-10-20T00:00:00Z", "until": "2999-01-01T00:00:00Z"},
+                {"since": _OGS_SINCE_STAMP, "until": "2999-01-01T00:00:00Z"},
             )
 
 

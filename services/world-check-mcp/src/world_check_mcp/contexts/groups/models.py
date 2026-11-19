@@ -1,13 +1,23 @@
+from typing import Literal
+
 from pydantic import BaseModel
 from pydantic import Field
 
+SettingsSection = Literal["fields", "toolkits", "all"]
 
-class Group(BaseModel):
+
+class GroupEntry(BaseModel):
     id: str = Field(description="Group ID.")
     name: str = Field(description="Group name.")
     parent_id: str | None = Field(default=None, description="Parent group ID, or null for a root.")
-    child_groups: list[Group] = Field(
-        default_factory=list, description="Direct child groups, nested."
+    child_group_count: int = Field(description="Number of groups directly under this one.")
+
+
+class GroupPage(BaseModel):
+    groups: list[GroupEntry] = Field(description="Groups on this page, best match first.")
+    total: int = Field(description="Groups that match, before paging.")
+    next_page: str | None = Field(
+        description="Cursor for the next page, or null when there is none."
     )
 
 
@@ -36,14 +46,14 @@ class ResolutionToolkit(BaseModel):
 
 
 class GroupSettings(BaseModel):
-    group: Group = Field(description="The group.")
+    group: GroupEntry = Field(description="The group.")
     screening_type: str = Field(description="Group screening type, e.g. CASE_MANAGEMENT_AUDIT.")
     mandatory_provider_types: list[str] = Field(
         description="Providers that must be screened, e.g. WATCHLIST."
     )
-    secondary_fields: list[SecondaryField] = Field(
-        description="Secondary fields the group's cases accept."
+    secondary_fields: list[SecondaryField] | None = Field(
+        description="Secondary fields the group's cases accept, or null when not asked for."
     )
-    toolkits: list[ResolutionToolkit] = Field(
-        description="Resolution toolkits available for the group."
+    toolkits: list[ResolutionToolkit] | None = Field(
+        description="Resolution toolkits available for the group, or null when not asked for."
     )
