@@ -82,7 +82,8 @@ class CachingTransport(httpx2.AsyncBaseTransport):
     Requests that miss under the same key at once, such as parallel tool calls on one entity,
     send one request: the others wait for it and read its answer from the cache. That holds
     within one replica, and for an answer the cache keeps: after one it does not, such as a
-    rejection, each waiting request sends its own in turn.
+    rejection, each waiting request sends its own in turn. A request waits at most `wait_seconds`
+    for the one ahead of it, then sends its own.
     """
 
     def __init__(
@@ -92,24 +93,30 @@ class CachingTransport(httpx2.AsyncBaseTransport):
         cache: ResponseCache,
         settings: CacheSettings,
         usable: AnswerCheck,
+        wait_seconds: float,
         now: Callable[[], datetime],
     ) -> None:
         self._inner: httpx2.AsyncBaseTransport = inner
         self._cache: ResponseCache = cache
         self._settings: CacheSettings = settings
         self._usable: AnswerCheck = usable
+        self._wait_seconds: float = wait_seconds
         self._now: Callable[[], datetime] = now
         self._fetches: dict[str, _Fetch] = {}
 
     @override
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         key = f"{self._settings.key_prefix}:{await _request_key(request)}"
-        cached = await self._read(key, request)
-        if cached is None:
-            async with self._one_fetch_at_a_time(key):
-                cached = await self._read(key, request)
-                if cached is None:
-                    return await self._fetch(key, request)
+        async with self._joined(key) as fetch:
+            # Read before the lookup, so an answer cached while it ran is read again below.
+            published = fetch.published
+            cached = await self._read(key, request)
+            if cached is None:
+                async with self._turn(fetch) as turn:
+                    if turn and fetch.published != published:
+                        cached = await self._read(key, request)
+                    if cached is None:
+                        return await self._fetch(key, request, fetch)
         return httpx2.Response(
             _OK,
             content=cached.body,
@@ -125,23 +132,41 @@ class CachingTransport(httpx2.AsyncBaseTransport):
         await self._inner.aclose()
 
     @asynccontextmanager
-    async def _one_fetch_at_a_time(self, key: str) -> AsyncGenerator[None]:
-        """Holds `key`'s lock, which is dropped once no request waits on it."""
+    async def _joined(self, key: str) -> AsyncGenerator[_Fetch]:
+        """`key`'s fetch, which is dropped once no request for the key is in flight."""
         fetch = self._fetches.setdefault(key, _Fetch())
-        fetch.waiting += 1
+        fetch.requests += 1
         try:
-            async with fetch.lock:
-                yield
+            yield fetch
         finally:
-            fetch.waiting -= 1
-            if fetch.waiting == 0:
+            fetch.requests -= 1
+            if fetch.requests == 0:
                 del self._fetches[key]
 
-    async def _fetch(self, key: str, request: httpx2.Request) -> httpx2.Response:
+    @asynccontextmanager
+    async def _turn(self, fetch: _Fetch) -> AsyncGenerator[bool]:
+        """Holds the fetch's lock, or after `wait_seconds` without it goes on regardless. Yields
+        whether it holds it.
+        """
+        try:
+            async with asyncio.timeout(self._wait_seconds):
+                _ = await fetch.lock.acquire()
+        except TimeoutError:
+            turn = False
+        else:
+            turn = True
+        try:
+            yield turn
+        finally:
+            if turn:
+                fetch.lock.release()
+
+    async def _fetch(self, key: str, request: httpx2.Request, fetch: _Fetch) -> httpx2.Response:
         response = await self._inner.handle_async_request(request)
         if response.status_code == _OK:
             await response.aread()
-            await self._write(key, request, response)
+            if await self._write(key, request, response):
+                fetch.published += 1
         return response
 
     async def _read(self, key: str, request: httpx2.Request) -> CachedAnswer | None:
@@ -169,9 +194,10 @@ class CachingTransport(httpx2.AsyncBaseTransport):
             return None
         return cached
 
-    async def _write(self, key: str, request: httpx2.Request, response: httpx2.Response) -> None:
+    async def _write(self, key: str, request: httpx2.Request, response: httpx2.Response) -> bool:
+        """Whether the answer was cached."""
         if not self._usable(request, response.content):
-            return
+            return False
         answer = CachedAnswer(cached_at=self._now(), body=response.content)
         try:
             await self._cache.put(key, answer, ttl_seconds=self._settings.ttl_seconds)
@@ -182,6 +208,8 @@ class CachingTransport(httpx2.AsyncBaseTransport):
                 extra={"path": request.url.path},
                 exc_info=True,
             )
+            return False
+        return True
 
 
 @contextmanager
@@ -216,11 +244,14 @@ async def record_cache_read(response: httpx2.Response) -> None:
 
 
 class _Fetch:
-    """The lock on one key, and how many requests hold it or wait for it."""
+    """The requests in flight for one key: how many there are, the lock the one that sends it
+    holds, and how many answers they have cached.
+    """
 
     def __init__(self) -> None:
         self.lock: asyncio.Lock = asyncio.Lock()
-        self.waiting: int = 0
+        self.requests: int = 0
+        self.published: int = 0
 
 
 class _CacheReads:

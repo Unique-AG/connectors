@@ -87,6 +87,7 @@ def upstream_http(
                 cache=cache,
                 settings=settings.cache,
                 usable=answer_check(SPEC, api_url=httpx2.URL(str(settings.api_url))),
+                wait_seconds=settings.timeout_seconds,
                 now=clock,
             )
             if cache is not None and settings.cache.enabled

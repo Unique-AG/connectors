@@ -39,8 +39,9 @@ class PostgresResponseCache:
 
     async def get(self, key: str) -> CachedAnswer | None:
         # A read is a use: it moves the answer to the back of the eviction order. Only one older
-        # than `_TOUCH_AFTER` is moved, so that reads of the same answer, such as the pages of
-        # one graph, neither wait on each other's row lock nor leave a dead tuple each.
+        # than `_TOUCH_AFTER` is moved, and only while no other transaction holds its row, so
+        # that reads of the same answer, such as the pages of one graph, neither wait on each
+        # other's row lock nor leave a dead tuple each.
         hit = select(
             ResponseCacheRow.body,
             ResponseCacheRow.cached_at,
@@ -52,12 +53,17 @@ class PostgresResponseCache:
                 return None
             body, cached_at, stale = row
             if stale:
-                _ = await session.execute(
-                    update(ResponseCacheRow)
+                unlocked = (
+                    select(ResponseCacheRow.key)
                     .where(
                         ResponseCacheRow.key == key,
                         ResponseCacheRow.last_used_at < func.now() - _TOUCH_AFTER,
                     )
+                    .with_for_update(skip_locked=True)
+                )
+                _ = await session.execute(
+                    update(ResponseCacheRow)
+                    .where(ResponseCacheRow.key.in_(unlocked))
                     .values(last_used_at=func.now())
                 )
         return CachedAnswer(cached_at=cached_at, body=body)

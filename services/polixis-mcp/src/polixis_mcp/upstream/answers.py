@@ -58,8 +58,8 @@ def answer_check(spec: dict[str, object], *, api_url: httpx2.URL) -> AnswerCheck
     return usable
 
 
-class _Validates(Protocol):
-    def validate_python(self, data: JsonValue, /) -> object: ...
+class _Parses(Protocol):
+    def validate_json(self, data: bytes, /) -> object: ...
 
 
 class _Route(BaseModel):
@@ -70,19 +70,18 @@ class _Route(BaseModel):
     accepts: Callable[[bytes], bool]
 
 
-def _accepts(model: _Validates) -> Callable[[bytes], bool]:
-    """Parses the body once, then reads the rejection from the JSON itself, since a model without
-    `error` drops it. `test_upstream` checks that the model accepts the parsed JSON just as it
-    accepts the body.
+def _accepts(model: _Parses) -> Callable[[bytes], bool]:
+    """Validates the bytes themselves, as the caller parses them: parsed into a dict first, a key
+    the body repeats would keep only its last value. The rejection is read from the JSON itself,
+    since a model without `error` drops it.
     """
 
     def accepts(body: bytes) -> bool:
         try:
-            data = _JSON.validate_json(body)
-            _ = model.validate_python(data)
+            _ = model.validate_json(body)
         except ValidationError:
             return False
-        return not is_rejection(data)
+        return not is_rejection(_JSON.validate_json(body))
 
     return accepts
 

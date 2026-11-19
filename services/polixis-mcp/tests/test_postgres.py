@@ -182,6 +182,26 @@ async def test_a_read_over_a_minute_after_the_last_use_moves_the_answer(
     assert moved > used + timedelta(minutes=1)
 
 
+@pytest.mark.parametrize("last_used", [timedelta(0), timedelta(minutes=2)], ids=["fresh", "stale"])
+async def test_a_read_does_not_wait_on_a_row_another_transaction_holds(
+    cache: PostgresResponseCache, database: Database, last_used: timedelta
+) -> None:
+    answer = _answer(10)
+    await cache.put("graph", answer, ttl_seconds=600)
+    await _last_used_ago(database, "graph", last_used)
+    used = await _last_used(database, "graph")
+
+    async with database.begin() as holder:
+        _ = await holder.execute(
+            select(ResponseCacheRow.key).where(ResponseCacheRow.key == "graph").with_for_update()
+        )
+        async with asyncio.timeout(5):
+            read = await cache.get("graph")
+
+    assert read == answer
+    assert await _last_used(database, "graph") == used
+
+
 async def test_an_expired_answer_is_not_returned_and_the_cull_deletes_it(
     cache: PostgresResponseCache, database: Database
 ) -> None:
