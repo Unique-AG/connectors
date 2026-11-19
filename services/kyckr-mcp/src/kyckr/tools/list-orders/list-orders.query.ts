@@ -5,9 +5,12 @@ import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
 import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import {
   KyckrBaseResponseShape,
+  KyckrOrderDetailsSchema,
   KyckrOrdersPageSchema,
   McpEnvelopeShape,
+  OrderTitleSchema,
 } from '../../schemas/kyckr-response.schemas';
+import { orderTitle } from '../_shared/titles';
 
 export const ListOrdersInputSchema = z.object({
   startDate: z
@@ -47,9 +50,16 @@ const ListOrdersEnvelopeSchema = z
 export const ListOrdersOutputSchema = z
   .object({
     ...McpEnvelopeShape,
-    data: KyckrOrdersPageSchema.optional().describe(
-      'Paginated orders page. The orders themselves are at `data.orders`. Pagination is at `data.pageNumber` / `data.pageSize` / `data.totalCount`.',
-    ),
+    data: KyckrOrdersPageSchema.extend({
+      orders: z
+        .array(KyckrOrderDetailsSchema.extend({ title: OrderTitleSchema }))
+        .optional()
+        .describe('Orders on this page.'),
+    })
+      .optional()
+      .describe(
+        'Paginated orders page. The orders themselves are at `data.orders`. Pagination is at `data.pageNumber` / `data.pageSize` / `data.totalCount`.',
+      ),
   })
   .loose();
 
@@ -91,7 +101,14 @@ export class ListOrdersQuery {
         },
         'list_orders: succeeded',
       );
-      return { success: true, ...response };
+      return {
+        success: true,
+        ...response,
+        data: response.data && {
+          ...response.data,
+          orders: response.data.orders?.map((order) => ({ ...order, title: orderTitle(order) })),
+        },
+      };
     } catch (err) {
       result = 'error';
       if (err instanceof KyckrApiError) {
