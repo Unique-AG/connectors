@@ -8,11 +8,7 @@ export const OAUTH_ENDPOINTS = {
   introspect: '/auth/introspect',
 };
 
-/**
- * The paths an MCP client falls back to when it cannot read the authorization server metadata,
- * per the 2025-03-26 MCP authorization spec. Served as aliases so a client that lost discovery
- * still completes the flow instead of hitting a 404.
- */
+/** MCP 2025-03-26 fallback paths. Clients use these when they cannot read the metadata. */
 export const OAUTH_FALLBACK_ENDPOINTS = {
   authorize: '/authorize',
   token: '/token',

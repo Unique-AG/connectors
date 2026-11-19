@@ -21,10 +21,7 @@ import { PerIpCeiling } from '../guards/per-ip-ceiling.decorator';
 import { McpOAuthService } from '../services/mcp-oauth.service';
 import { tokenCredentialTracker } from '../utils/token-credential-tracker';
 
-/**
- * Caps what one address can send to the token endpoint while its main bucket is per credential.
- * High enough for every user of a tenant refreshing through one backend egress IP.
- */
+/** Per-IP cap beside the per-credential bucket. Sized for a tenant refreshing through one IP. */
 export const TOKEN_ENDPOINT_PER_IP_CEILING = { limit: 600, ttl: seconds(60) };
 
 @Controller()

@@ -11,10 +11,7 @@ const CODE_VERIFIER = 'dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk';
 const CODE_CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';
 const REDIRECT_URI = 'http://localhost:4000/callback';
 
-/**
- * A client that could not read the authorization server metadata uses /register, /authorize
- * and /token on the server origin and sends no `resource`. The flow has to work end to end.
- */
+/** A client without metadata uses /register, /authorize and /token and sends no `resource`. */
 describe('OAuth default endpoint paths (E2E)', () => {
   let app: INestApplication;
 

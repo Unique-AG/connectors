@@ -8,9 +8,6 @@ export interface PerIpCeilingOptions {
   ttl: number;
 }
 
-/**
- * A second cap, counted per IP, for a route whose main bucket is keyed per credential. It keeps
- * a single address from escaping every limit by varying the credential on each request.
- */
+/** Per-IP cap for a route keyed per credential, so one address cannot escape by varying it. */
 export const PerIpCeiling = (options: PerIpCeilingOptions) =>
   SetMetadata(PER_IP_CEILING_KEY, options);

@@ -18,10 +18,8 @@ import {
 } from './per-ip-ceiling.decorator';
 
 /**
- * The throttler guard for every OAuth route, with two additions. `disableRateLimiting` lets an
- * operator rule rate limiting in or out of an incident with a config change instead of a
- * release. A route decorated with `PerIpCeiling` gets a second, per-IP cap on top of its own
- * bucket.
+ * The throttler guard for every OAuth route. `disableRateLimiting` skips it all without a
+ * release, and `PerIpCeiling` adds a per-IP cap to a route whose bucket is per credential.
  */
 @Injectable()
 export class McpOAuthThrottlerGuard extends ThrottlerGuard {

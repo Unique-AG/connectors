@@ -40,10 +40,7 @@ import { CONSENT_PAGE_HEADERS, renderConsentPage } from '../utils/consent-page';
 import { normalizeError } from '../utils/normalize-error';
 import { decodeProviderState } from '../utils/provider-state';
 
-/**
- * Every user behind one corporate NAT shares a per-IP bucket, so these routes allow a whole
- * office to sign in within a minute rather than three or five people.
- */
+/** Users behind one NAT share the per-IP bucket. */
 const BROWSER_FLOW_THROTTLE = { default: { limit: 30, ttl: seconds(60) } };
 
 @Controller()

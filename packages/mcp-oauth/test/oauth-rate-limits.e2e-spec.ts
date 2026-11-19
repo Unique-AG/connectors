@@ -16,11 +16,7 @@ const DISCOVERY_PATHS = [
   '/.well-known/oauth-authorization-server',
 ];
 
-/**
- * Runs against the module's real throttler. Every user of a tenant reaches the server from one
- * backend egress IP, and every user in an office from one NAT, so these limits must hold for
- * many users sharing an address, not just for one.
- */
+/** Runs the real throttler: many users share one IP, so the limits must hold per address. */
 describe('OAuth rate limits (E2E)', () => {
   let app: INestApplication;
   let clientId: string;
