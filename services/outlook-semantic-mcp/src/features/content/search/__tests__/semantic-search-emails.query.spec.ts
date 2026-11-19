@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { WebLinks } from '~/features/graph-utils/build-web-links.command';
+import { BuildWebLinksCommand, WebLinks } from '~/features/graph-utils/build-web-links.command';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { SearchConditionSchema, SearchEmailsInputSchema } from '../search-conditions.dto';
 import { SearchBackend, SearchPageStatus } from '../search-results.types';
@@ -118,6 +118,7 @@ function createMockQuery(
     }[];
     searchResults?: ReturnType<typeof makeSearchItem>[][];
     searchErrors?: (Error | null)[];
+    buildWebLinksCommand?: BuildWebLinksCommand;
   } = {},
 ) {
   const { delegatedAccesses = [], searchResults = [[]], searchErrors = [] } = opts;
@@ -168,8 +169,10 @@ function createMockQuery(
   const profileMock = getUserProfileQuery as any;
   // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
   const sanitizeMock = sanitize as any;
-  // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
-  const buildWebLinksMock = { run: vi.fn().mockResolvedValue(new WebLinks()) } as any;
+  const buildWebLinksMock =
+    opts.buildWebLinksCommand ??
+    // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
+    ({ run: vi.fn().mockResolvedValue(new WebLinks()) } as any);
   const instance = new SemanticSearchEmailsQuery(
     getDelegatedAccessQuery,
     apiMock,
@@ -443,6 +446,86 @@ describe('SemanticSearchEmailsQuery', () => {
       const { results } = await instance.run(testUserId, [baseInput]);
 
       expect(results.map((result) => result.uniqueContentId)).toEqual(['mail-2']);
+    });
+
+    it('titles a match with the email subject, not the ingested file name', async () => {
+      const { instance } = createMockQuery({
+        searchResults: [
+          [
+            {
+              ...makeSearchItem('mail-1'),
+              title: 'Budget Q3.eml',
+              metadata: { id: 'graph-1', subject: 'Budget Q3' },
+            },
+          ],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.title).toBe('Budget Q3');
+    });
+
+    it('titles a match without a stored subject with the file name minus .eml', async () => {
+      const { instance } = createMockQuery({
+        searchResults: [
+          [{ ...makeSearchItem('mail-1'), title: 'Offsite plan.eml', metadata: { id: 'graph-1' } }],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.title).toBe('Offsite plan');
+    });
+
+    it('links a match from no known mailbox to its stored Outlook web link', async () => {
+      const storedWebLink = 'https://outlook.office365.com/owa/?ItemID=graph-1&exvsurl=1';
+      const { instance } = createMockQuery({
+        buildWebLinksCommand: new BuildWebLinksCommand({ run: vi.fn() } as never),
+        searchResults: [
+          [
+            {
+              ...makeSearchItem('mail-1'),
+              metadata: { id: 'graph-1', webLink: storedWebLink },
+            },
+          ],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.sourceMailbox).toBeNull();
+      expect(results[0]?.outlookWebLink).toBe(storedWebLink);
+    });
+
+    it('builds the Outlook web link of a delegated match from its RestId', async () => {
+      const folderIdPath =
+        'uniquepathid://scope:/__Outlook MCP/scope:Outlook_delegated-provider-id_uncategoried/inbox';
+      const translateImmutableIdsToRestIds = {
+        run: vi.fn().mockResolvedValue(new Map([['graph-1', 'AAMk/rest=']])),
+      };
+      const { instance } = createMockQuery({
+        delegatedAccesses: [delegatedAccess],
+        buildWebLinksCommand: new BuildWebLinksCommand(translateImmutableIdsToRestIds as never),
+        searchResults: [
+          [
+            {
+              ...makeSearchItem('mail-1'),
+              metadata: {
+                id: 'graph-1',
+                webLink: 'https://outlook.cloud.microsoft/mail/deeplink/read/graph-1',
+                folderIdPath,
+              },
+            },
+          ],
+        ],
+      });
+
+      const { results } = await instance.run(testUserId, [baseInput]);
+
+      expect(results[0]?.outlookWebLink).toBe(
+        'https://outlook.office365.com/owa/?ItemID=AAMk%2Frest%3D&exvsurl=1&viewmodel=ReadMessageItem',
+      );
     });
 
     it('returns every email of every search without a count cap', async () => {

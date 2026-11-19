@@ -3,11 +3,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import { filter, isNonNullish, map, pipe } from 'remeda';
 import * as z from 'zod';
+import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
+import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { graphMessagePath } from '~/msgraph/graph-message-path';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
+import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 
 const recipientSchema = z.object({
@@ -42,12 +45,12 @@ const graphMessageSchema = z.object({
 export interface OpenEmailResult {
   id: string;
   title: string | null;
+  webLink: string | null;
   metadata: {
     from: Nullish<string>;
     toRecipients: Nullish<string[]>;
     ccRecipients: Nullish<string[]>;
     receivedDateTime: Nullish<string>;
-    webLink: Nullish<string>;
     hasAttachments: boolean;
     isDraft: boolean;
     attachments?: { name: string; size?: number; isInline: boolean }[];
@@ -64,6 +67,8 @@ export class OpenEmailQuery {
   public constructor(
     private readonly graphClientFactory: GraphClientFactory,
     @InjectUniqueApi() private readonly uniqueApi: UniqueApiClient,
+    private readonly getUserProfileQuery: GetUserProfileQuery,
+    private readonly buildWebLinksCommand: BuildWebLinksCommand,
   ) {}
 
   @Span()
@@ -78,7 +83,7 @@ export class OpenEmailQuery {
     chunkIds,
     outputTimeZone,
   }: {
-    userProfileId: string;
+    userProfileId: UserProfileTypeID;
     id: string;
     mailbox?: string;
     folderId?: string;
@@ -114,7 +119,7 @@ export class OpenEmailQuery {
   }
 
   private async readMessageFromMsGraph(
-    userProfileId: string,
+    userProfileId: UserProfileTypeID,
     messageId: string,
     mailbox?: string,
     folderId?: string,
@@ -122,7 +127,7 @@ export class OpenEmailQuery {
     bodyContentType: 'text' | 'html' = 'text',
     outputTimeZone?: string,
   ): Promise<OpenEmailResult> {
-    const client = this.graphClientFactory.createClientForUser(userProfileId);
+    const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
     const messagePath = graphMessagePath({ messageId, mailbox, folderId });
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
     const raw = await client
@@ -138,13 +143,20 @@ export class OpenEmailQuery {
     if (message['attachments@odata.nextLink'] !== undefined) {
       this.logger.warn({
         msg: 'Microsoft Graph returned only part of the attachments of the message',
-        userProfileId,
+        userProfileId: userProfileId.toString(),
       });
     }
 
     return {
       id: message.id,
       title: message.subject ?? null,
+      webLink: await this.buildWebLink({
+        userProfileId,
+        messageId: message.id,
+        mailbox,
+        isImmutable: idIsImmutable === true,
+        graphWebLink: message.webLink,
+      }),
       metadata: {
         from: message.from?.emailAddress?.address,
         toRecipients: pipe(
@@ -158,7 +170,6 @@ export class OpenEmailQuery {
           filter(isNonNullish),
         ),
         receivedDateTime: convertDateTimeToTimezone(message.receivedDateTime, outputTimeZone),
-        webLink: message.webLink,
         hasAttachments: message.hasAttachments === true,
         isDraft: message.isDraft === true,
         attachments: message.attachments.flatMap(({ name, size, isInline }) =>
@@ -168,6 +179,30 @@ export class OpenEmailQuery {
       text: message.body?.content ?? '',
       bodyContentType,
     };
+  }
+
+  // See BuildWebLinksCommand for why the Graph webLink cannot be used directly for delegated mailboxes.
+  private async buildWebLink({
+    userProfileId,
+    messageId,
+    mailbox,
+    isImmutable,
+    graphWebLink,
+  }: {
+    userProfileId: UserProfileTypeID;
+    messageId: string;
+    mailbox: string | undefined;
+    isImmutable: boolean;
+    graphWebLink: string | undefined;
+  }): Promise<string | null> {
+    const userProfile = await this.getUserProfileQuery.run(userProfileId);
+    const messageMailbox = mailbox ?? userProfile.email;
+    const webLinks = await this.buildWebLinksCommand.run({
+      userProfileId: userProfile.id,
+      userProfileEmail: userProfile.email,
+      ids: [{ id: messageId, isImmutable, mailbox: messageMailbox, webLink: graphWebLink ?? '' }],
+    });
+    return webLinks.get(messageMailbox, messageId) || null;
   }
 
   private async readRelevantChunks(

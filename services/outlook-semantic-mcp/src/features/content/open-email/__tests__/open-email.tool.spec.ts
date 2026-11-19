@@ -36,6 +36,33 @@ describe('OpenEmailTool', () => {
     });
   });
 
+  it('puts the subject and the Outlook web link at the top of the result', async () => {
+    const webLink = 'https://outlook.office365.com/owa/?ItemID=AAMk&exvsurl=1';
+    openEmailQuery.run.mockResolvedValue({
+      id: 'msg-1',
+      title: 'Budget Q3',
+      webLink,
+      metadata: { from: 'alex@example.com', isDraft: false },
+      text: 'Numbers for the quarter.',
+      bodyContentType: 'text',
+    });
+
+    const result = await tool.openEmailById({ id: 'msg-1' }, context, request);
+
+    expect(result).toEqual({
+      success: true,
+      title: 'Budget Q3',
+      webLink,
+      emailData: {
+        id: 'msg-1',
+        title: 'Budget Q3',
+        metadata: { from: 'alex@example.com', isDraft: false },
+        text: 'Numbers for the quarter.',
+        bodyContentType: 'text',
+      },
+    });
+  });
+
   it('rethrows any other Graph failure', async () => {
     const error = new GraphError(503, 'Unavailable');
     openEmailQuery.run.mockRejectedValue(error);
