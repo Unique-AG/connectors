@@ -44,7 +44,7 @@ async def test_get_entity_profiles_leaves_out_the_alerts_polixis_marks_hidden(
         returns=contexts.EntityProfiles,
     )
 
-    [profile] = result.profiles
+    [profile] = result.results
     assert [alert.model_dump() for alert in profile.alerts or []] == [
         {"category": "PEP", "message": "Member of an example parliament"}
     ]
@@ -60,7 +60,7 @@ async def test_get_entity_profiles_gives_the_original_script_of_a_name_only_when
         returns=contexts.EntityProfiles,
     )
 
-    [profile] = profiles.profiles
+    [profile] = profiles.results
     assert [record.model_dump() for record in profile.name_records or []] == [
         {
             "name": "Anna Example",
@@ -81,7 +81,7 @@ async def test_get_entity_profiles_returns_only_the_sections_asked_for(
         returns=contexts.EntityProfiles,
     )
 
-    [profile] = profiles.profiles
+    [profile] = profiles.results
     assert [listing.model_dump() for listing in profile.sanctions or []] == [
         {
             "list_name": "Example Sanctions List",
@@ -120,7 +120,7 @@ async def test_get_entity_profiles_looks_up_every_pid_and_marks_an_unknown_one(
         returns=contexts.EntityProfiles,
     )
 
-    known, unknown = profiles.profiles
+    known, unknown = profiles.results
     assert (known.pid, known.rejected, known.flags) == (
         "P00000000000000000000000000000200",
         None,
@@ -177,7 +177,7 @@ async def test_get_entity_profiles_lists_the_names_under_every_key(
         returns=contexts.EntityProfiles,
     )
 
-    assert result.profiles[0].names == ["Anna Example", "Anna Beispiel", "Anna B."]
+    assert result.results[0].names == ["Anna Example", "Anna Beispiel", "Anna B."]
 
 
 async def test_get_entity_profiles_returns_the_image_urls_when_asked(
@@ -195,5 +195,31 @@ async def test_get_entity_profiles_returns_the_image_urls_when_asked(
         returns=contexts.EntityProfiles,
     )
 
-    assert json.loads(upstream_requests[-1].content) == {"fields": ["images"]}
-    assert result.profiles[0].images == [image]
+    assert json.loads(upstream_requests[-1].content) == {"fields": ["nameRecords", "images"]}
+    assert result.results[0].images == [image]
+
+
+async def test_get_entity_profiles_names_a_profile_whichever_sections_are_asked_for(
+    mcp_client: McpClient, upstream_requests: list[httpx2.Request]
+) -> None:
+    profiles = await call_tool(
+        mcp_client,
+        "get_entity_profiles",
+        {"pids": ["P00000000000000000000000000000200"], "sections": ["flags"]},
+        returns=contexts.EntityProfiles,
+    )
+
+    [profile] = profiles.results
+    assert (profile.name, profile.name_records) == ("Anna Example", None)
+    assert json.loads(upstream_requests[-1].content) == {"fields": ["nameRecords", "flags"]}
+
+
+async def test_get_entity_profiles_leaves_a_rejected_pid_unnamed(mcp_client: McpClient) -> None:
+    profiles = await call_tool(
+        mcp_client,
+        "get_entity_profiles",
+        {"pids": [UNKNOWN_PID]},
+        returns=contexts.EntityProfiles,
+    )
+
+    assert profiles.results[0].name is None

@@ -20,7 +20,7 @@ async def test_find_court_decisions_lists_those_naming_the_entity_first_without_
 
     assert upstream_requests[-1].url.path == "/api/judicial/O00000000000000000000000000000100"
     assert (found.total_decisions, found.total_naming_entity) == (2, 1)
-    assert [decision.model_dump() for decision in found.decisions] == [
+    assert [decision.model_dump() for decision in found.results] == [
         {
             "decision_id": "ch_2019_1",
             "subject": "entity",
@@ -29,6 +29,7 @@ async def test_find_court_decisions_lists_those_naming_the_entity_first_without_
             "year": "2019",
             "snippets": ["the appeal of Example Holdings AG is dismissed"],
             "text_characters": 40_000,
+            "title": "Federal Court, CH, 2019 (ch_2019_1)",
         },
         {
             "decision_id": "de_2023_7",
@@ -38,6 +39,7 @@ async def test_find_court_decisions_lists_those_naming_the_entity_first_without_
             "year": "2023",
             "snippets": ["Anna Example as witness"],
             "text_characters": 100,
+            "title": "Regional Court, DE, 2023 (de_2023_7)",
         },
     ]
 
@@ -105,4 +107,4 @@ async def test_find_court_decisions_lists_a_decision_whose_year_is_not_a_number(
         returns=contexts.CourtDecisionsPage,
     )
 
-    assert [decision.decision_id for decision in found.decisions] == ["ch_x"]
+    assert [decision.decision_id for decision in found.results] == ["ch_x"]

@@ -1,6 +1,8 @@
 from pydantic import BaseModel
+from pydantic import computed_field
 from pydantic import Field
 
+from polixis_mcp.contexts.court_records.decisions import decision_title
 from polixis_mcp.contexts.court_records.decisions import DecisionSubject
 from polixis_mcp.contexts.court_records.decisions import fetch_decisions
 from polixis_mcp.contexts.court_records.decisions import without_highlights
@@ -39,7 +41,7 @@ async def find_court_decisions(
         pid=query.pid,
         total_decisions=len(decisions),
         total_naming_entity=sum(1 for decision in decisions if decision.subject == "entity"),
-        decisions=page,
+        results=page,
         next_cursor=(
             encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
@@ -79,6 +81,19 @@ class CourtDecisionSummary(BaseModel):
         description="Computed by this MCP: the length of its full text, in characters."
     )
 
+    @computed_field(
+        description="Computed by this MCP, since Polixis gives none: its court, country, year "
+        "and id."
+    )
+    @property
+    def title(self) -> str:
+        return decision_title(
+            decision_id=self.decision_id,
+            court_type=self.court_type,
+            country=self.country,
+            year=self.year,
+        )
+
 
 class CourtDecisionsPage(BaseModel):
     """Court decisions naming an entity or its related parties, one page of them."""
@@ -89,7 +104,7 @@ class CourtDecisionsPage(BaseModel):
         "one without decisions, so 0 also follows a wrong pid."
     )
     total_naming_entity: int = Field(description="Decisions naming the entity itself.")
-    decisions: list[CourtDecisionSummary] = Field(
+    results: list[CourtDecisionSummary] = Field(
         description="The decisions of this page: those naming the entity first, then the newest."
     )
     next_cursor: str | None = Field(

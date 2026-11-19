@@ -54,7 +54,7 @@ async def get_sanctions_exposure(
             for record in exposure.direct_sanctions or []
         ],
         total_related=len(related),
-        related=page,
+        results=page,
         next_cursor=(
             encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
@@ -196,7 +196,7 @@ class SanctionsExposurePage(BaseModel):
         "Polixis has returned "
         "different counts for the same entity on two calls, so say when a count matters."
     )
-    related: list[SanctionedRelatedParty] = Field(
+    results: list[SanctionedRelatedParty] = Field(
         description="The sanctioned related parties of this page, the nearest first."
     )
     next_cursor: str | None = Field(
