@@ -291,6 +291,13 @@ class TestNothingSecretReachesTheLog:
         assert message.endswith(f'?x=?token={CENSORED} HTTP/1.1"'), message[-80:]
         assert "opaque-value" not in sink.stream.getvalue()
 
+    def test_many_benign_parameters_are_scanned_in_linear_time(self, sink: _Sink) -> None:
+        started = time.monotonic()
+        _log('"GET /mcp' + "?x=" * 100_000 + '"')
+
+        assert time.monotonic() - started < 5.0
+        assert sink.one()["msg"]
+
     def test_an_apostrophe_in_a_credential_does_not_end_its_redaction(self, sink: _Sink) -> None:
         _log('127.0.0.1:1 - "GET /mcp?token=opaque\'value&page=2 HTTP/1.1" 200')
 

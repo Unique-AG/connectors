@@ -88,13 +88,12 @@ def _censor_query_values(text: str) -> str:
     copied_up_to = 0
     scan_from = 0
     while (found := _QUERY_NAME.search(text, scan_from)) is not None:
-        value_start = found.end()
+        value_start = scan_from = found.end()
+        if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(1))) is None:
+            continue
         value_end = _QUERY_VALUE_END.search(text, value_start)
         assert value_end is not None, "the end of the text always ends a value"
-        scan_from = value_start
         if value_end.start() == value_start:
-            continue
-        if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(1))) is None:
             continue
         kept.extend((text[copied_up_to:value_start], CENSORED))
         copied_up_to = scan_from = value_end.start()
