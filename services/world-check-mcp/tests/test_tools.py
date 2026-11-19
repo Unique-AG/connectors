@@ -1075,20 +1075,7 @@ async def test_passport_check_saves_the_case_under_the_derived_id() -> None:
     async with Client(server) as client:
         await client.call_tool("passport_check", {"passport": _PASSPORT, "group_id": "g-passport"})
 
-    assert [body["caseId"] for body in saved] == [
-        derived_case_id(
-            "PASSPORT_CHECK",
-            "g-passport",
-            "PASSPORT",
-            "123456789",
-            "GBR",
-            "GBR",
-            date(1815, 12, 10),
-            date(2030, 1, 1),
-            "Ada Lovelace",
-            "True",
-        )
-    ]
+    assert [body["caseId"] for body in saved] == [_passport_case_id("g-passport")]
 
 
 @pytest.mark.parametrize("change", [{"gender": "MALE"}, {"last_name": "King"}])
@@ -1305,18 +1292,28 @@ _PASSPORT = {
     "identification_number": "123456789",
     "date_of_expiry": "2030-01-01",
 }
-_SCREENED_PASSPORT_CASE_ID = derived_case_id(
-    "PASSPORT_CHECK",
-    "g-retry",
-    "PASSPORT",
-    "123456789",
-    "GBR",
-    "GBR",
-    date(1815, 12, 10),
-    date(2030, 1, 1),
-    "Ada Lovelace",
-    "True",
-)
+
+
+def _passport_case_id(group_id: str) -> str:
+    """The id of the passport check of `_PASSPORT`: one part for each field it screens."""
+    return derived_case_id(
+        "PASSPORT_CHECK",
+        group_id,
+        "PASSPORT",
+        "123456789",
+        "GBR",
+        "GBR",
+        date(1815, 12, 10),
+        date(2030, 1, 1),
+        "FEMALE",
+        "Ada",
+        "Lovelace",
+        "Ada Lovelace",
+        "True",
+    )
+
+
+_SCREENED_PASSPORT_CASE_ID = _passport_case_id("g-retry")
 
 
 async def test_generate_passport_mrz_uses_nationality_codes() -> None:
