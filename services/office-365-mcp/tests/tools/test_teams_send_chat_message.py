@@ -28,9 +28,9 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
     graph_step,
 )
-from office_365_mcp.shared import messages
-from office_365_mcp.shared.messages import ChatImportance, Mention
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
+from office_365_mcp.shared.teams import messages
+from office_365_mcp.shared.teams.messages import ChatImportance, Mention
 from office_365_mcp.tools import teams_send_chat_message as sender
 from office_365_mcp.tools.teams_send_chat_message import a_person_agrees, send_chat_message
 from tests.tools.scenarios.support import Person, call, serve

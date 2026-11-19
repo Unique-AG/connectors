@@ -29,6 +29,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -48,7 +49,6 @@ from office_365_mcp.shared.notes import (
     group_id_of,
     in_a_site,
     onenote_root,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -60,6 +60,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_copy_section"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_SECTION = "section"
 STEP_COPY_SECTION = "copy_section"

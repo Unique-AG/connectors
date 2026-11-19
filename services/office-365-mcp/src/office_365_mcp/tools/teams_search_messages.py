@@ -35,16 +35,18 @@ from office_365_mcp.shared.handles import (
     message_handle,
 )
 from office_365_mcp.shared.kql import flag, free_text, quoted
-from office_365_mcp.shared.messages import (
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.messages import (
     BODY_IS_PLAIN_TEXT_FIELD,
     MessageReaction,
     MessageSender,
     TeamsMessage,
 )
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_search_messages"
+
+PRESETS: tuple[str, ...] = ("teams", "teams-messages")
 
 STEP_SEARCH = "search_query"
 STEP_CHAT_MESSAGE = "chat_message"

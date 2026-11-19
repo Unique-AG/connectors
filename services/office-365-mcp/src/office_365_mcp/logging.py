@@ -55,6 +55,7 @@ _SENSITIVE_MARKERS: tuple[str, ...] = (
     "authorization",
     "cookie",
     "credential",
+    "loginhint",
     "passwd",
     "password",
     "privatekey",
@@ -85,7 +86,7 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
     (
         re.compile(
             r"(?i)([?&](?:[A-Za-z0-9_.%\[\]-]*(?:token|key|secret|password|auth)"
-            + r"[A-Za-z0-9_.%\[\]-]*|code)=)[^&\s\"']+"
+            + r"[A-Za-z0-9_.%\[\]-]*|code|login(?:[_-]|%5[Ff])?hint)=)[^&\s\"']+"
         ),
         r"\1" + CENSORED,
     ),
@@ -471,6 +472,16 @@ _REQUEST_URL_LOGGERS: tuple[str, ...] = (
 )
 
 
+class _UniqueMcpToolCallLines(logging.Filter):
+    """`unique_mcp`'s ops middleware logs every tool call again, a refusal at ERROR with a
+    traceback. `ToolCallObservabilityMiddleware` already logs each call once, at the right level."""
+
+    @override
+    def filter(self, record: logging.LogRecord) -> bool:
+        kind: object = getattr(record, "kind", None)
+        return kind != "tool"
+
+
 _FILTERS: tuple[type[logging.Filter], ...] = (
     ColorMessageFilter,
     CorrelationFilter,
@@ -494,6 +505,9 @@ def configure_logging(config: AppConfig) -> None:
         _reclaim(name)
     for name in _REQUEST_URL_LOGGERS:
         logging.getLogger(name).setLevel(logging.WARNING)
+    unique_mcp = logging.getLogger("unique_mcp")
+    if not any(isinstance(existing, _UniqueMcpToolCallLines) for existing in unique_mcp.filters):
+        unique_mcp.addFilter(_UniqueMcpToolCallLines())
     # Every root handler: a second handler is a second way out, and partial redaction does not hold.
     for handler in logging.getLogger().handlers:
         _install_filters(handler)

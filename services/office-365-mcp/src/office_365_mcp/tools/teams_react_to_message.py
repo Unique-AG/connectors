@@ -35,18 +35,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CHAT_PERMISSION,
     MessageHandle,
     message_handle,
     not_a_message_handle,
-)
-from office_365_mcp.shared.messages import (
-    EVERYONE_SEES_IT,
-    TeamsMessage,
-    get_message,
-    message_in_question,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -56,8 +50,16 @@ from office_365_mcp.shared.seam import (
     narrowed_to,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import (
+    EVERYONE_SEES_IT,
+    TeamsMessage,
+    get_message,
+    message_in_question,
+)
 
 TOOL_NAME = "teams_react_to_message"
+
+PRESETS: tuple[str, ...] = ("teams-write", "teams-write-files", "teams-edit")
 
 STEP_CHANNEL = "channel"
 STEP_TEAM = "team"

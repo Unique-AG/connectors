@@ -1,7 +1,7 @@
 """Two callers, one registration: every Graph request carries the token of the caller who asked.
 
 A tool is registered once, at startup, but the Graph client it calls with is a FastMCP *dependency*
-resolved per call: `graph_client_for_caller` in `shared/seam.py`. Building the client once inside
+resolved per call: `graph_client_for_caller` in `shared/seam/`. Building the client once inside
 `register`, or memoising it in the dependency, looks like an obvious saving and sends every later
 caller's Graph requests under the *first* caller's token. Both callers get a `200`. One of them is
 reading the other's Teams data.

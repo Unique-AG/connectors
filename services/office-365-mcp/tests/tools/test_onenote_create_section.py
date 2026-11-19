@@ -15,6 +15,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
@@ -22,7 +23,7 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import OWNED_REFUSED, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED
 from office_365_mcp.shared.seam import Advised, Confirm
 from office_365_mcp.tools import onenote_create_section as creator
 from office_365_mcp.tools.onenote_create_section import a_person_agrees, create_section

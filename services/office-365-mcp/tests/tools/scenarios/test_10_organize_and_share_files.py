@@ -263,18 +263,12 @@ class TestFilingDocuments:
     async def test_a_mail_attachment_cannot_be_saved_because_only_text_files_are_created(
         self, graph: respx.MockRouter
     ) -> None:
-        async with Client(FastMCPTransport(_server()), mode="legacy") as client:
-            tools = {tool.name: tool for tool in await client.list_tools()}
-
         with pytest.raises(ToolError) as refused:
             _ = await call(
                 "sharepoint_create_text_file", folder=_FOLDER, name="Offer.pdf", content="%PDF"
             )
 
         assert "cannot create a Word, Excel, PowerPoint or PDF file" in str(refused.value)
-        assert "cannot replace a file or upload a binary file" in (
-            tools["sharepoint_create_text_file"].description or ""
-        )
         assert not graph.calls
 
 

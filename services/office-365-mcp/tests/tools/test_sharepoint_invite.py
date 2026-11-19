@@ -37,9 +37,9 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, resolve

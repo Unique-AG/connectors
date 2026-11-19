@@ -21,18 +21,17 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD, CategoryName, merged_categories
+from office_365_mcp.shared.addresses import repeated_address
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import (
-    AddressFault,
-    MailAddress,
-    MailImportance,
-    one_address_each,
-    repeated_address,
-)
+from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
 from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import (
+    LIST_CATEGORIES_GUARD,
+    CategoryName,
+    merged_categories,
+)
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -45,6 +44,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_update_draft"
+
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
 
 STEP_READ_DRAFT = "read_draft"
 STEP_UPDATE_DRAFT = "update_draft"

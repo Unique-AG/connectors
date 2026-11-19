@@ -12,8 +12,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import MailRuleHandle, mail_rule_handle
-from office_365_mcp.shared.prose import cut_for_a_question
-from office_365_mcp.shared.rules import (
+from office_365_mcp.shared.outlook.rules import (
     READ_ONLY_RULE,
     MailRule,
     RuleActions,
@@ -23,6 +22,7 @@ from office_365_mcp.shared.rules import (
     read_rule,
     rule_of,
 )
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_delete_mail_rule"
+
+PRESETS: tuple[str, ...] = ("outlook-rules",)
 
 STEP_DELETE = "delete_mail_rule"
 

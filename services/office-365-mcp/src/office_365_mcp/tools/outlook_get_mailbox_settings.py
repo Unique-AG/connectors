@@ -33,10 +33,12 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.calendar import WorkingHoursSummary
 from office_365_mcp.shared.handles import MailFolderHandle
-from office_365_mcp.shared.rules import MailRule
+from office_365_mcp.shared.outlook.rules import MailRule
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mailbox_settings"
+
+PRESETS: tuple[str, ...] = ("outlook-mailbox", "outlook-automate", "outlook-rules")
 
 STEP_SETTINGS = "mailbox_settings"
 STEP_RULES = "mail_rules"

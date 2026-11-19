@@ -176,7 +176,7 @@ In `expect`:
 - `result` maps a selector to a value.
 - `tool_error` names a text constant, for example `tools.outlook_move_mail._NOT_A_MESSAGE_HANDLE`.
   It can also call a function of the server, for example
-  `{shared.seam._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}`. A list gives the arguments
+  `{shared.seam.elicitation._no_answer: [tools.outlook_send_draft._NOTHING_SENT]}`. A list gives the arguments
   in order. A mapping gives them by name. A name that does not exist fails the run.
 - `graph_calls` maps `METHOD /path` to a count. A `*` matches any text. The count is exact.
 - `retry_sleeps` lists the waits of the retry handler, in seconds.

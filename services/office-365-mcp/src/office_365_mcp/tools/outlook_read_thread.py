@@ -15,9 +15,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import PREVIEW_CHARACTERS, SUMMARY_FIELDS, MailSummary
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -26,6 +26,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_read_thread"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP_ANCHOR = "thread_anchor"
 STEP_THREAD = "thread_messages"

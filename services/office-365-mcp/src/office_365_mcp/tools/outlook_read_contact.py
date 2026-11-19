@@ -14,12 +14,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
-from office_365_mcp.shared.contacts import ContactSummary
 from office_365_mcp.shared.handles import contact_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.contacts import ContactSummary
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_contact"
+
+PRESETS: tuple[str, ...] = ("outlook-contacts", "outlook-contacts-write")
 
 STEP = "contact"
 

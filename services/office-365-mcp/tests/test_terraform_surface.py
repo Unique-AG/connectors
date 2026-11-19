@@ -1,7 +1,7 @@
 """The Terraform module's registry, and the three things generating it cannot check.
 
 `deploy/terraform/azure/office-365-mcp-entra-application/registry.generated.tf.json` states, in
-Terraform's JSON configuration syntax, what `tools/__init__.py`, `shared/seam.py` and
+Terraform's JSON configuration syntax, what `tools/__init__.py`, `shared/seam/` and
 `server/manifest.py` state in Python: which tools exist, which delegated Graph permissions each
 declares, what every preset means, which permissions this connector may ever ask for, and which of
 them need an Entra administrator. `scripts/render-terraform-registry.py` writes it from those

@@ -1,11 +1,11 @@
-"""`shared/transcripts.py`: reading a page of turns, independent of either reader."""
+"""`shared/teams/transcripts.py`: reading a page of turns, independent of either reader."""
 
 import httpx
 import pytest
 import respx
 from msgraph.graph_service_client import GraphServiceClient
 
-from office_365_mcp.shared import transcripts
+from office_365_mcp.shared.teams import transcripts
 
 _PATH = "/me/onlineMeetings/meeting-1/transcripts/transcript-1/content"
 

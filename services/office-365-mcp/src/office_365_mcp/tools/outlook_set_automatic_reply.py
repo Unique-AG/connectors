@@ -31,6 +31,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_set_automatic_reply"
 
+PRESETS: tuple[str, ...] = ("outlook-automate", "outlook-rules")
+
 STEP_READ = "read_mailbox_settings"
 STEP_WRITE = "write_automatic_reply"
 

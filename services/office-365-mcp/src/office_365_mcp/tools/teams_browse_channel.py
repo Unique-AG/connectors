@@ -16,10 +16,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle
-from office_365_mcp.shared.messages import TeamsMessage, event_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.messages import TeamsMessage, event_of
 
 TOOL_NAME = "teams_browse_channel"
+
+PRESETS: tuple[str, ...] = ("teams", "teams-channels", "teams-edit")
 
 STEP = "channel_messages"
 

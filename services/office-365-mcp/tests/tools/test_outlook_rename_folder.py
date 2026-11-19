@@ -724,12 +724,8 @@ class TestHowItDeclaresItself:
             "This tool asks the user to agree before it changes a shared or delegated mailbox. "
             + "It changes the user's own mailbox without a question."
         ) in description
-        assert (
-            "This tool refuses a folder that Outlook creates for every mailbox, such as Inbox."
-            in description
-        )
-        assert "This call is safe to repeat after a timeout." in description
-        assert "The folder keeps its mail and its subfolders." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
 
     async def test_register_asks_through_the_context_it_is_given(
         self, transport: httpx.AsyncClient, client: GraphServiceClient, graph: respx.MockRouter

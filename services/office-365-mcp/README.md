@@ -29,8 +29,16 @@ only table, `oauth_kv`.
 - the Graph request
 - the error messages
 
-A new tool needs one file and one line in the registry. A tool needs no base class and no
-decorator. A tool module publishes three names: `TOOL_NAME`, `GRAPH_PERMISSIONS`, and `register`.
+A new tool needs one file and two lines in the registry: its import and its place in
+`_TOOL_MODULES`. A tool needs no base class and no decorator. A tool module publishes the names
+that the `ToolModule` protocol in `tools/__init__.py` requires: `TOOL_NAME`, `PRESETS`,
+`GRAPH_PERMISSIONS`, `GRAPH_CALL_EXAMPLE`, and `register`. `PRESETS` names the presets that hold
+the tool. The registry builds the map from each preset to its tools from these names.
+`GRAPH_CALL_EXAMPLE` gives the arguments for one example call, which the tests use to call each
+tool against a stub of Microsoft Graph.
+
+A new tool also changes the generated Terraform registry. From the service directory, run
+`uv run python scripts/render-terraform-registry.py` and commit the generated file with the tool.
 
 The file `tools/__init__.py` is the central registry. Its function `resolve()` reads an operator's
 selection and returns two things:
@@ -60,23 +68,24 @@ disagree about a shared fact. The `shared/` package lists every fact they must n
   - the parser for each shape
   - the writer for each shape
   - the permission that each Teams surface reads under
-- `messages.py` owns what a Teams message is:
+- `teams/messages.py` owns what a Teams message is:
   - the shape a message is answered in
   - the sender, normalized out of every identity shape Graph answers with
   - the test for "did a person write this"
 
   One function normalizes this type. So the same message, found by one tool and read by another
   tool, is one type, not two types that must separately agree.
-- `meetings.py` owns how a meeting is reached:
+- `teams/meetings.py` owns how a meeting is reached:
   - a join URL, resolved to the meeting it identifies
   - which occurrence of a series a time window means
   - how far "newest first" holds
 - `identity.py` owns who the signed-in user is. The tool `get_me` reports this identity, and every
   other answer is correlated against it. This file stops two tools from giving two different
   answers to "who am I".
-- `seam.py` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
+- `seam/` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
   and the mapping from a Graph failure to advice. A model reads every refusal on this server as one
-  voice, so this mapping must live in one place.
+  voice, so this mapping must live in one place. The package has one module for each concern, and
+  a tool imports the names from the package, not from its modules.
 
 A fact belongs in `shared/` under one condition. Two tools each need their own copy of the fact,
 and a difference between the two copies is a bug a caller can see. Examples are:
@@ -123,9 +132,9 @@ A OneNote handle starts with `onenote:///sites/{site}/` when Graph addresses its
 documents no copy from or into a site notebook. As a result, the three copy tools refuse a site
 handle before they send a request to Graph.
 
-This layout follows seven layering rules:
+This layout follows eight layering rules:
 
-1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the
+1. `shared/` imports no tool module. Only `shared/seam/` imports FastMCP. This keeps the
    framework out of the handle grammar and the rest of the shared vocabulary.
 2. `graph_client/` imports nothing from this application. It uses its own frozen `GraphSettings`
    object, instead of reading the configuration.
@@ -138,10 +147,13 @@ This layout follows seven layering rules:
 6. `shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`,
    `sharepoint:///`, or `onenote:///` URI. Showing the shape of a URI to a model, in a description,
    an `examples=` field, or a refusal message, is prose. It is not building or parsing a URI.
-7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`, and
-   `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
+7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`,
+   `shared/seam/`, and `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
    grouping whose modules are the real units. Each consumer states which module it depends on, at
    the import line.
+8. A tool imports the neutral modules directly under `shared/` and the package of its own surface,
+   such as `shared/teams/` for a Teams tool. It never imports another surface's package, such as
+   `shared/outlook/`. The tool's `TOOL_NAME` prefix names its surface.
 
 The test file `tests/test_layering.py` enforces every rule above, and each rule has its own guard.
 When a rule has nothing real behind it, the rule has gone vacuous, and its guard fails. Examples of
@@ -168,7 +180,7 @@ The script `scripts/render-terraform-registry.py` generates
 `deploy/terraform/azure/office-365-mcp-entra-application/registry.generated.tf.json`. It imports
 the tool modules, the always-on tool, and the presets from `office_365_mcp.tools`. It also imports
 the admin-consent table from `office_365_mcp.server.manifest`, and the requestable-permission list
-from `office_365_mcp.shared.seam`. Run it with `--check` to find drift between the Python source
+from `office_365_mcp.shared.seam.permissions`. Run it with `--check` to find drift between the Python source
 and the generated Terraform file. CI uses this mode.
 
 The repo-root script `scripts/render-values-schema.sh` generates this chart's
@@ -181,7 +193,7 @@ the real, bounded risk of drift.
 
 - `NEEDS_ADMIN_CONSENT`, in `server/manifest.py`. When the manifest renders, a runtime assertion
   makes sure that every permission has an entry. No build-time check exists for it.
-- `REQUESTABLE_PERMISSIONS`, in `shared/seam.py`. Convention and tests keep it correct, not
+- `REQUESTABLE_PERMISSIONS`, in `shared/seam/permissions.py`. Convention and tests keep it correct, not
   generation.
 
 The function `_stale_promises()`, in `server/manifest.py`, reads every selected tool's description.

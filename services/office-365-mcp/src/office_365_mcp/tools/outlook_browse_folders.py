@@ -28,6 +28,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_browse_folders"
 
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
+
 STEP = "mail_folders"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")

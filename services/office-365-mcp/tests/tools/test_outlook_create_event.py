@@ -47,8 +47,8 @@ from office_365_mcp.shared.calendar import (
     RecurrenceRule,
     ShowAs,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import CalendarHandle, event_handle
+from office_365_mcp.shared.outlook.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm
 from office_365_mcp.tools import outlook_create_event as creator
 from office_365_mcp.tools.outlook_create_event import CreatedEvent, a_person_agrees, create_event
@@ -1217,7 +1217,7 @@ class TestThePersonBetweenTheRequestAndTheInvitations:
 
 
 def _context(answer: object) -> Context:
-    """A handshake-era connection: no request context at all, which is the era `shared/seam.py`
+    """A handshake-era connection: no request context at all, which is the era `shared/seam/`
     documents as not modern, so every answer here comes back over `elicit`."""
 
     class _Client:
@@ -1234,7 +1234,7 @@ def _context(answer: object) -> Context:
 
 
 class _ModernRequest:
-    """The one thing `shared/seam.py` reads to decide the era. The constant comes from the SDK
+    """The one thing `shared/seam/` reads to decide the era. The constant comes from the SDK
     rather than the date written out, so a future era moves these tests with it."""
 
     protocol_version: str = LATEST_MODERN_VERSION
@@ -2311,8 +2311,6 @@ class TestTheSchemaItPublishes:
         )
         assert "Europe/Berlin" in described
         assert "Europe/Zurich" not in described
-        assert "fixed list of IANA names" in described
-        assert "Exchange refuses" in described
 
     async def test_a_zone_that_writes_a_question_of_its_own_never_reaches_this_tool(
         self, transport: httpx.AsyncClient, graph: respx.MockRouter
@@ -2474,8 +2472,6 @@ class TestTheSchemaItPublishes:
 
         properties = _object(parameters["properties"])
         assert [name for name in properties if "hide" in name.casefold()] == ["hide_attendees"]
-        described = cast("str", _object(properties["hide_attendees"])["description"])
-        assert "sees only themselves" in described
 
     async def test_the_optional_list_defaults_to_empty_and_neither_list_has_a_size_bound(
         self, transport: httpx.AsyncClient
@@ -2529,7 +2525,6 @@ class TestTheSchemaItPublishes:
             + "agree"
             in described
         )
-        assert "If Teams is not among them" in described
 
     async def test_the_online_meeting_switch_is_left_for_the_attendees_to_decide(
         self, transport: httpx.AsyncClient

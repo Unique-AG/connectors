@@ -20,6 +20,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     FOLDER_HANDLE_SOURCES,
@@ -32,7 +33,6 @@ from office_365_mcp.shared.files import (
     unusable_name,
 )
 from office_365_mcp.shared.handles import drive_folder_handle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -42,6 +42,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_create_text_file"
+
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
 
 STEP_CREATE_FILE = "create_text_file"
 

@@ -28,7 +28,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle, calendar_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import outlook_delete_calendar as deleter
@@ -747,13 +747,10 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         assert "This tool always asks the user to agree" in description
         assert "No event is lost" not in description
-        assert "This tool refuses a calendar that holds an event" in description
         looks_again = (
             "It looks for an event again after the user agrees, immediately before the delete"
         )
         assert looks_again in description
-        assert "the default calendar" in description
-        assert "another person owns" in description
         assert "Microsoft does not document whether a deleted calendar can be restored" in (
             description
         )

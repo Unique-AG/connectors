@@ -1,5 +1,4 @@
 import re
-import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date, datetime, time, timedelta
@@ -41,11 +40,12 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from office_365_mcp.graph_client import graph_step
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, EventHandle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import LIST_CATEGORIES_GUARD
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import body_opening as body_opening
 from office_365_mcp.shared.prose import cut_for_a_question as cut_for_a_question
 from office_365_mcp.shared.window import closes_at, opens_at
@@ -257,8 +257,6 @@ ZONE_NAME = r"^[A-Za-z0-9][A-Za-z0-9 _./+-]*$"
 _DefaultCalendarQuery = CalendarRequestBuilder.CalendarRequestBuilderGetQueryParameters
 _NamedCalendarQuery = CalendarItemRequestBuilder.CalendarItemRequestBuilderGetQueryParameters
 _EventItemQuery = EventItemRequestBuilder.EventItemRequestBuilderGetQueryParameters
-
-_TRANSACTION_NAMESPACE = uuid.UUID("eb6f3437-0196-4593-b4d7-a6044db0acdf")
 
 _UNANSWERED_YEAR = 1
 
@@ -954,6 +952,11 @@ class EventDraft:
     recurrence: RecurrenceRule | None = None
 
 
+def placed_location(location: str | None) -> str | None:
+    stripped = None if location is None else location.strip()
+    return stripped or None
+
+
 def with_default_online_meeting(draft: EventDraft, calendar: Calendar) -> EventDraft:
     if draft.online_meeting is not None:
         return draft
@@ -1338,10 +1341,6 @@ def event_patch_body(patch: EventPatch) -> Event:
     )
 
 
-def confirmation_id_for(target: str, *fields: str) -> str:
-    return str(uuid.uuid5(_TRANSACTION_NAMESPACE, _canonical(target, *fields)))
-
-
 def transaction_id_for(target: str, draft: EventDraft) -> str:
     return confirmation_id_for(
         target,
@@ -1393,10 +1392,6 @@ def series_reach(event: Event, *, what: str) -> str:
             + "as they are."
         )
     return ""
-
-
-def _canonical(*fields: str) -> str:
-    return "".join(f"{len(field)}:{field}" for field in fields)
 
 
 def _listed(addresses: tuple[str, ...]) -> list[str]:

@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_delete_folder"
 
+PRESETS: tuple[str, ...] = ("outlook-delete",)
+
 STEP_READ_FOLDER = "mail_folder"
 STEP_READ_DELETED_ITEMS = "destination_folder"
 STEP_MOVE = "move_folder"

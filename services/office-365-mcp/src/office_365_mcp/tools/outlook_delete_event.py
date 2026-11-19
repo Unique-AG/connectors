@@ -18,11 +18,11 @@ from office_365_mcp.shared.calendar import (
     SERIES_MASTER_FIELD,
     EventAttendee,
     EventTime,
-    confirmation_id_for,
     event_of,
     event_time,
     series_reach,
 )
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_delete_event"
+
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
 
 STEP_DELETE = "delete_event"
 

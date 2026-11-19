@@ -30,13 +30,28 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
-from office_365_mcp.shared.files import ITEM_FIELDS, UNNAMED_ITEM_LABEL, browser_url
+from office_365_mcp.shared.files import (
+    ITEM_FIELDS,
+    MAX_BYTES,
+    MEGABYTE,
+    UNNAMED_ITEM_LABEL,
+    browser_url,
+    is_utf8,
+)
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
 logger = logging.getLogger(__name__)
 
 TOOL_NAME = "sharepoint_read_file"
+
+PRESETS: tuple[str, ...] = (
+    "teams-files",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
 
 STEP_ITEM = "drive_item"
 STEP_CONTENT = "drive_content"
@@ -46,10 +61,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "file": "sharepoint:///files/b%21SYNTHETICDRIVE0000/01SYNTHETICFILE0000"
 }
-
-MAX_BYTES = 10 * 1024 * 1024
-
-_MEGABYTE = 1024 * 1024
 
 _DEFAULT_MEDIA_TYPE = "application/octet-stream"
 
@@ -68,7 +79,7 @@ form. A PDF may be readable, but that is not sure. If you cannot read the conten
 so, and give the web address of the file. Never guess what the file says.
 - Next to the file, this tool returns a link that opens it in a browser. Cite the file with that \
 link, and copy it exactly: never decode its `%` escapes.
-- This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
+- This tool refuses a file above {MAX_BYTES // MEGABYTE} MB. The whole file travels in one \
 message.
 """
 
@@ -252,17 +263,9 @@ def _media_type(item: DriveItem, body: bytes) -> str:
     reported = item.file.mime_type if item.file is not None else None
     if reported is None:
         return _DEFAULT_MEDIA_TYPE
-    if reported.startswith("text/") and not _is_utf8(body):
+    if reported.startswith("text/") and not is_utf8(body):
         return _DEFAULT_MEDIA_TYPE
     return reported
-
-
-def _is_utf8(body: bytes) -> bool:
-    try:
-        _ = body.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    return True
 
 
 def _is_a_folder(handle: DriveFileHandle) -> str:
@@ -296,7 +299,7 @@ def _too_large(*, size: int | None, web_url: str | None) -> str:
 
 
 def _megabytes(size: int) -> str:
-    return f"{size / _MEGABYTE:.1f}"
+    return f"{size / MEGABYTE:.1f}"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

@@ -2,7 +2,6 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import datetime
-from hashlib import sha256
 from typing import Literal, Protocol, Self, cast
 from urllib.parse import unquote, urlsplit
 
@@ -765,7 +764,3 @@ def accepted_operation(
     if operation_id is None:
         return None
     return OperationSummary.accepted(operation_id, owner=owner)
-
-
-def write_state_for(*parts: str) -> str:
-    return sha256("\x1f".join(parts).encode()).hexdigest()

@@ -23,11 +23,19 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle, event_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_event_instances"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_EVENTS = "calendar_events"
 

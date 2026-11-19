@@ -23,6 +23,17 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_time_zones"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-mailbox",
+    "outlook-automate",
+    "outlook-rules",
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP = "time_zones"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)

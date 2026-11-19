@@ -17,6 +17,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_categories"
 
+PRESETS: tuple[str, ...] = ("outlook-mailbox", "outlook-automate", "outlook-rules")
+
 STEP = "categories"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("MailboxSettings.Read",)

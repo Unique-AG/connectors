@@ -1,6 +1,5 @@
 import asyncio
 import hashlib
-import re
 from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -27,6 +26,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, GraphNotFound, graph_step
 from office_365_mcp.shared import kql
+from office_365_mcp.shared.addresses import ONE_ADDRESS, repeated_address
 from office_365_mcp.shared.handles import (
     MailFolderHandle,
     MailMessageHandle,
@@ -85,8 +85,6 @@ _CHILD_NAMES: tuple[str, ...] = (
 OUTLOOK_FOLDER_NAMES: tuple[str, ...] = (*_PARENT_NAMES, *_CHILD_NAMES)
 
 _FolderQuery = MailFolderItemRequestBuilder.MailFolderItemRequestBuilderGetQueryParameters
-
-ONE_ADDRESS = re.compile(r"\A[^\s<>,;:\"@]+@[^\s<>,;:\"@]+\Z")
 
 
 def participants_term(value: str) -> str:
@@ -311,15 +309,6 @@ def copied_and_marked(
         + ("" if importance is None else f" It has {importance} importance.")
         + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
     )
-
-
-def repeated_address(addresses: Sequence[str]) -> str | None:
-    named: set[str] = set()
-    for address in addresses:
-        if address.casefold() in named:
-            return address
-        named.add(address.casefold())
-    return None
 
 
 @dataclass(frozen=True, slots=True)

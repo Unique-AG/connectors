@@ -20,7 +20,7 @@ from collections.abc import Sequence
 
 from office_365_mcp.auth import _CALLBACK_PATH, _REQUIRED_SCOPES
 from office_365_mcp.server.manifest import NEEDS_ADMIN_CONSENT
-from office_365_mcp.shared.seam import _GRAPH_SCOPE_PREFIX, REQUESTABLE_PERMISSIONS
+from office_365_mcp.shared.seam.permissions import _GRAPH_SCOPE_PREFIX, REQUESTABLE_PERMISSIONS
 from office_365_mcp.tools import _TOOL_MODULES, ALWAYS_ON, PRESETS
 
 _INVOCATION = "scripts/render-terraform-registry.py"

@@ -51,6 +51,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner
 
 TOOL_NAME = "onenote_list_notebooks"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_NOTEBOOKS = "notebooks"
 STEP_SECTIONS = "sections"
 STEP_SECTION_GROUPS = "section_groups"

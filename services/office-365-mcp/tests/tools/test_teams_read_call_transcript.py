@@ -11,8 +11,8 @@ from fastmcp.tools import FunctionTool
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared import transcripts
 from office_365_mcp.shared.handles import CallTranscriptHandle
+from office_365_mcp.shared.teams import transcripts
 from office_365_mcp.tools import teams_read_call_transcript as reader
 
 CALL_ID = "SYNTHETIC-CALL-0001"

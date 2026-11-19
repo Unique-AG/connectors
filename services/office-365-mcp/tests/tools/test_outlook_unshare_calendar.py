@@ -27,7 +27,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CalendarHandle,
     CalendarPermissionHandle,
@@ -688,7 +688,8 @@ class TestHowItDeclaresItself:
             + "person and the role."
         ) in description
         assert "This tool refuses the `My Organization` row" in description
-        assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
         assert "outlook_list_calendar_shares lists the shares of a calendar" in description
         assert "outlook_share_calendar" in description
 

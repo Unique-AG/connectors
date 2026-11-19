@@ -17,6 +17,14 @@ from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_reminders"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP = "reminder_view"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.ReadBasic",)
