@@ -276,7 +276,7 @@ prometheus:
         runbook: |
           1. Open the Office 365 MCP dashboard and find the operation in "Throttling rate by operation"
           2. If retried is true, the SDK retried and Graph still refused. Too many calls go to one mailbox or one tenant. Find the agent or the user that sends them
-          3. If retried is false, the SDK did not retry. Graph asked for a wait of 180 seconds or more, or the call does not allow a retry (send, move, copy). A wait of 180 seconds or more means that the tenant is over its Graph quota
+          3. If retried is false, the SDK did not retry. Graph asked for a wait of 180 seconds or more, or the call does not allow a retry (send, move, copy). The wait does not show which limit Graph applied. Find the operation in "Throttling rate by operation", then check the Microsoft Graph service limits for its service
       expr: |
         sum by (namespace) (increase(graph_throttled_total{job="office-365-mcp"}[1h])) > 5
       for: 15m
