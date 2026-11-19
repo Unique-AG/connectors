@@ -42,8 +42,9 @@ _outcomes = metrics.get_meter("office_365_mcp").create_counter(
     description=(
         "MCP tool calls by how they ended. `asked` returned a question for a person to confirm. "
         "`refused` is a refusal the tool raised on purpose, such as a malformed handle. `graph` "
-        "is a refusal or failure with a Graph failure in its cause chain, and `token` one with a "
-        "token that Entra did not issue. `error` is any other exception, which FastMCP masks. "
+        "is a refusal or failure with a Graph failure in its cause chain. `token` is a call that "
+        "got no Graph token. `error` is any other exception, or a result that the tool returned "
+        "as an error. "
         "`cancelled` is a call that the client or the server cancelled."
     ),
 )

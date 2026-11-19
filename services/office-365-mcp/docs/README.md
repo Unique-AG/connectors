@@ -1396,13 +1396,9 @@ grafana:
 
 The dashboard has these rows:
 
-- **End of the selected range: state now, counts for the last hour**: the firing alerts, the ready
-  pods and the memory use at the end of the range, and one panel for each alert below with its
-  count over the hour before that end. The HTTP 5xx panel uses the 15 minutes before that end, as
-  its alert does. Red marks the ratio or count that the alert
-  compares, as a visual threshold. It does not prove that every condition of the alert holds, for
-  example its minimum count or its `for` time. With a range in the past, these panels show that
-  hour, not the present.
+- **End of the selected range: state now, counts for the last hour**: firing alerts, ready pods
+  and memory show the state at the end of the range. The alert panels count the hour before that
+  end (HTTP 5xx: 15 minutes). Red is a visual threshold, not proof the alert fires.
 - **Totals for the selected time range**: tool calls, tool failures, Graph operations, Graph
   failures, HTTP 5xx answers, and pod restarts.
 - **MCP tool calls**: calls and errors for each tool, the call duration, and the Graph tokens
@@ -1420,7 +1416,7 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 
 | Alert | Fires when | `for` | Severity |
 |---|---|---|---|
-| `Office365McpDown` | The deployment has no available replica. All tool calls and sign-ins fail | `10m` | `critical` |
+| `Office365McpDown` | The deployment has no available pod. All tool calls and sign-ins fail | `10m` | `critical` |
 | `Office365McpToolErrors` | Unexpected exceptions or returned error results were more than 10% of all recorded tool outcomes in the last hour, and at least 5 happened | `15m` | `warning` |
 | `Office365McpGraphFailing` | More than 20% of the Graph operations in the last hour got status `unavailable`, `failed`, `error` or `paging_unending`, and at least 10 did | `15m` | `warning` |
 | `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
@@ -1434,10 +1430,10 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 `tool_outcomes_total` sorts the tool calls that `GraphOperationMiddleware` sees by what ended
 them: `ok`, `asked` (a question for a person to confirm), `refused` (a refusal the tool raised on
 purpose, such as a malformed handle), `graph` (a refusal or failure with a Graph failure in its
-cause chain), `token` (Entra issued no token), `error` (any other exception, or a result that the tool returned
+cause chain), `token` (the call got no Graph token), `error` (any other exception, or a result that the tool returned
 as an error) or `cancelled`. A
 refusal counts as `refused` when neither its cause chain nor its context chain holds a Graph
-failure, for example a transcript refusal that a tool raises after it left the `except` block. Each alert selects these labels:
+failure, for example a transcript refusal that a tool raises after it left the `except` block. The failure alerts select these labels:
 
 - `Office365McpToolErrors`: `tool_outcomes_total` with `outcome="error"`.
 - `Office365McpGraphFailing`: `graph_operations_total` with status `unavailable`, `failed`,
@@ -1491,7 +1487,7 @@ The base chart also ships these alerts for the pods of this deployment, in the a
 The container has no CPU limit, so `KubernetesPodHighCPUUsage` and `KubernetesPodThrottled` do not
 fire for this service.
 
-#### Alert Configuration
+#### Change an alert
 
 ```yaml
 prometheus:

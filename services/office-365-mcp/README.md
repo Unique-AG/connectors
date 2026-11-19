@@ -269,7 +269,7 @@ Once the service runs, it exposes these endpoints:
 - **Admin consent**, `GET /admin/consent`. Redirects to the Microsoft admin-consent page for this
   deployment. It needs no authentication. See "Admin consent" in `docs/README.md`.
 - **Metrics**, `GET /metrics`. Prometheus, through `setup_ops`. Beside `unique_toolkit`'s own HTTP
-  series, eight metrics report what this connector asked Microsoft Graph for:
+  series, eight metrics report what this connector asked Microsoft Graph and Entra for:
   - `graph_operations_total{operation,status}`
   - `graph_operation_duration_seconds{operation}`
   - `graph_steps_total{operation,step,status}`

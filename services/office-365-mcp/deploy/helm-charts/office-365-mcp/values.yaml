@@ -153,12 +153,12 @@ prometheus:
     Office365McpDown:
       alert: Office365McpDown
       annotations:
-        summary: "Office 365 MCP has no ready pod in {{ $labels.namespace }}"
-        description: "The office-365-mcp deployment has no available replica. Every tool call and every sign-in fails."
+        summary: "Office 365 MCP has no available pod in {{ $labels.namespace }}"
+        description: "The office-365-mcp deployment has no available pod. Every tool call and every sign-in fails."
         runbook: |
           1. Run kubectl get pods and kubectl describe pod for office-365-mcp
-          2. Pods Running but not Ready: search the logs for "ready.database_timeout" or "ready.database_unreachable". Make sure that Postgres is reachable, that DB_URL is correct and that the database user has CREATE on its schema
-          3. Pods not Running: look at the pod events for image pull, scheduling or OOMKilled errors
+          2. If the pods are Running but not Ready, search the logs for "ready.database_timeout" or "ready.database_unreachable". Check that Postgres is reachable, DB_URL is correct, and the database user has CREATE on its schema
+          3. If the pods are not Running, look at the pod events for image pull, scheduling or OOMKilled errors
       expr: |
         sum by (namespace) (kube_deployment_status_replicas_available{deployment="office-365-mcp"}) == 0
         and on (namespace)
@@ -175,7 +175,7 @@ prometheus:
         runbook: |
           1. Open the Office 365 MCP dashboard and find the tool in "Tool failures by tool and outcome", outcome error
           2. Search the logs for "Error calling tool" with the tool name. The traceback shows the exception that FastMCP masked
-          3. No such log line: the tool returned an error result instead of raising. Read the answer text of that tool call in the chat log, and search the connector logs for the tool name at that time
+          3. If there is no such log line, the tool returned an error result instead of raising. Read the answer text of that tool call in the chat log, and search the connector logs for the tool name at that time
           4. An unexpected exception or error result is a defect in the connector. Open a ticket with the traceback or the answer text, and the tool name
           5. Graph failures and refused tokens have their own alerts: Office365McpGraphFailing, Office365McpGraphForbidden and Office365McpTokenRefused
       expr: |
@@ -193,14 +193,14 @@ prometheus:
     Office365McpGraphFailing:
       alert: Office365McpGraphFailing
       annotations:
-        summary: "Microsoft Graph calls from Office 365 MCP fail in {{ $labels.namespace }}"
+        summary: "Microsoft Graph operations from Office 365 MCP fail in {{ $labels.namespace }}"
         description: "More than 20% of the Graph operations in the last hour failed, with at least 10 failures. Current failure ratio: {{ humanizePercentage $value }}."
         runbook: |
           1. Open the Office 365 MCP dashboard and find the operation in "Graph failures by operation and status"
           2. Search the logs for "graph call failed". The fields graph_operation, graph_status, graph_code and graph_request_id identify the call
-          3. graph_remedy unavailable with graph_status 5xx: Microsoft Graph has a fault. Check the Microsoft 365 service health. Give the graph_request_id to Microsoft support
-          4. graph_remedy unavailable with no graph_status: the pod cannot reach Graph. Check the NetworkPolicy egress, DNS and the proxy
-          5. graph_remedy failed or error: the request or the code has a defect. Open a ticket with the log lines
+          3. If graph_remedy is unavailable and graph_status is 5xx, Microsoft Graph has a fault. Check the Microsoft 365 service health. Give the graph_request_id to Microsoft support
+          4. If graph_remedy is unavailable and there is no graph_status, the pod cannot reach Graph. Check the NetworkPolicy egress, DNS and the proxy
+          5. If graph_remedy is failed or error, the request or the code has a defect. Open a ticket with the log lines
       expr: |
         (
           sum by (namespace) (increase(graph_operations_total{job="office-365-mcp", status=~"unavailable|failed|error|paging_unending"}[1h]))
@@ -220,8 +220,8 @@ prometheus:
         description: "More than 20% of the Graph operations in the last hour got 401 or 403, with at least 10 refusals. Current ratio: {{ humanizePercentage $value }}."
         runbook: |
           1. Search the logs for "graph call failed" with graph_remedy forbidden. Find the graph_operation and graph_code
-          2. 401 on all operations: the delegated token is not accepted. Check the Entra app registration and the client secret
-          3. 403 on one tool: the app registration does not have that delegated permission, or the admin consent is missing. Grant it in Entra
+          2. If every operation gets 401, Entra rejects the delegated token. Check the Entra app registration and the client secret
+          3. If one tool gets 403, the app registration lacks that delegated permission, or the admin consent is missing. Grant it in Entra
       expr: |
         (
           sum by (namespace) (increase(graph_operations_total{job="office-365-mcp", status="forbidden"}[1h]))
@@ -238,14 +238,14 @@ prometheus:
       alert: Office365McpTokenRefused
       annotations:
         summary: "Entra refuses Office 365 MCP tokens in {{ $labels.namespace }}"
-        description: '{{ $value | printf "%.0f" }} Graph token requests in the last hour were refused by Entra. These tool calls never reached Microsoft Graph.'
+        description: 'Entra refused {{ $value | printf "%.0f" }} Graph token requests in the last hour. These tool calls never reached Microsoft Graph.'
         runbook: |
           1. Open the Office 365 MCP dashboard and find the tool in "Token acquisitions by tool and result"
           2. Search the logs for "Microsoft 365 issued no token". That line has no AADSTS code. The code is in the traceback of the failed tool call, in the chained cause
-          3. AADSTS65001: nobody consented to the delegated permission. A Microsoft 365 administrator grants it through /admin/consent. Then ask an affected user to call the tool again. If it still fails, the user must sign in to the connector again
-          4. AADSTS7000215: the pod sends a client secret that Entra does not accept. Check the end date of the client secret on the Entra app registration. If the secret is still valid, the pod reads a wrong value: make sure that the Key Vault secret holds the value of the valid secret, without printing it, then restart the pod. Do not create a new secret
-          5. AADSTS7000222, or AADSTS7000215 with an expired or revoked secret: create a new client secret on the Entra app registration (the office-365-mcp-entra-application Terraform module manages it). Put the new value in the Key Vault secret that the pod reads, then restart the pod. Every user must then sign in to the connector again, because the stored sign-ins are encrypted with a key made from the old secret
-          6. Other AADSTS codes: look up the code in the Microsoft Entra error code reference
+          3. If the code is AADSTS65001, nobody consented to the delegated permission. A Microsoft 365 administrator grants it through /admin/consent. Then ask an affected user to call the tool again. If it still fails, the user must sign in to the connector again
+          4. If the code is AADSTS7000215, Entra does not accept the client secret that the pod sends. Check the end date of the secret on the Entra app registration. If the secret is still valid, the pod reads a wrong value: check that the Key Vault secret holds the valid value, without printing it, then restart the pod. Do not create a new secret
+          5. If the code is AADSTS7000222, or the secret is expired or revoked, create a new client secret on the Entra app registration (the office-365-mcp-entra-application Terraform module manages it), store it in the Key Vault secret the pod reads, and restart the pod. Users must then sign in again, because the stored sign-ins are encrypted with the old secret
+          6. For any other AADSTS code, look up the code in the Microsoft Entra error code reference
       expr: |
         sum by (namespace) (increase(graph_token_acquisitions_total{job="office-365-mcp", result="refused"}[1h])) >= 5
       for: 15m
@@ -260,8 +260,8 @@ prometheus:
         runbook: |
           1. Open the Office 365 MCP dashboard and find the tool in "Token acquisitions by tool and result", result failed
           2. Search the logs for "Microsoft 365 issued no token" and read the chained cause in the traceback
-          3. A connection error (DNS, timeout, refused connection): the pod does not reach Entra. Check DNS and the NetworkPolicy egress to login.microsoftonline.com. An HTTP answer from Entra is not a connectivity fault, so skip this step for it
-          4. Any other error: read the exception type and the HTTP status in the traceback. An answer with an AADSTS code is counted by Office365McpTokenRefused instead
+          3. If it is a connection error (DNS, timeout, refused connection), the pod does not reach Entra. Check DNS and the NetworkPolicy egress to login.microsoftonline.com. An HTTP answer from Entra is not a connectivity fault, so skip this step for it
+          4. For any other error, read the exception type and the HTTP status in the traceback. Answers with an AADSTS code go to Office365McpTokenRefused instead
       expr: |
         sum by (namespace) (increase(graph_token_acquisitions_total{job="office-365-mcp", result="failed"}[1h])) >= 5
       for: 15m
@@ -272,11 +272,11 @@ prometheus:
       alert: Office365McpGraphThrottled
       annotations:
         summary: "Microsoft Graph throttles Office 365 MCP in {{ $labels.namespace }}"
-        description: '{{ $value | printf "%.0f" }} Graph operations in the last hour were throttled, and the callers got an error.'
+        description: 'Graph throttled {{ $value | printf "%.0f" }} operations in the last hour, and the callers got an error.'
         runbook: |
           1. Open the Office 365 MCP dashboard and find the operation in "Throttling rate by operation"
-          2. retried=true: the SDK retried and Graph still refused. Too many calls go to one mailbox or one tenant. Find the agent or the user that sends them
-          3. retried=false: the SDK did not retry. Graph asked for a wait of 180 seconds or more, or the call does not allow a retry (send, move, copy). A wait of 180 seconds or more means that the tenant is over its Graph quota
+          2. If retried is true, the SDK retried and Graph still refused. Too many calls go to one mailbox or one tenant. Find the agent or the user that sends them
+          3. If retried is false, the SDK did not retry. Graph asked for a wait of 180 seconds or more, or the call does not allow a retry (send, move, copy). A wait of 180 seconds or more means that the tenant is over its Graph quota
       expr: |
         sum by (namespace) (increase(graph_throttled_total{job="office-365-mcp"}[1h])) > 5
       for: 15m
@@ -286,7 +286,7 @@ prometheus:
     Office365McpGraphSlow:
       alert: Office365McpGraphSlow
       annotations:
-        summary: "Office 365 MCP Graph operations take more than 60 seconds in {{ $labels.namespace }}"
+        summary: "Office 365 MCP tool calls take more than 60 seconds in {{ $labels.namespace }}"
         description: '{{ $value | printf "%.0f" }} tool calls that attempted Graph took more than 60 seconds in the last hour. Kong and the chat close the request at 60 seconds, so the user gets no answer.'
         runbook: |
           1. Open the Office 365 MCP dashboard and find the tool in "Graph operations over 60 seconds by tool". It is the counter of this alert, shown for each time bucket instead of for one hour
@@ -303,12 +303,11 @@ prometheus:
       alert: Office365McpHttp5xx
       annotations:
         summary: "Office 365 MCP answers HTTP 5xx in {{ $labels.namespace }}"
-        description: "More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, with at least 5 of them. Current ratio: {{ humanizePercentage $value }}."
+        description: "More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, with at least 5 of them. Current ratio: {{ humanizePercentage $value }}. The 5xx answers at the first scrape of a new status code on a pod are not counted."
         runbook: |
           1. Open the Office 365 MCP dashboard and find the path in "HTTP request rate by path and status"
           2. Search the logs for "Traceback" and for "ready.database_unreachable"
           3. 5xx on /token, /authorize or /auth/callback: the OAuth store in Postgres or the Entra sign-in fails
-          4. This alert does not count the 5xx answers already present at the first scrape of a new status-code series on a pod. Later increases count, including the rest of the same burst. The alert fires when, over 15 minutes, more than 5% of the requests got a 5xx answer and at least 5 did, for 5 minutes
       expr: |
         (
           sum by (namespace) (increase(python_http_requests_total{job="office-365-mcp", status_code=~"5.."}[15m]))
@@ -328,8 +327,8 @@ prometheus:
         description: "Pod {{ $labels.pod }} uses {{ humanizePercentage $value }} of its memory limit. At the limit, the pod is OOM-killed and all open calls fail."
         runbook: |
           1. Open the Office 365 MCP dashboard and look at "Memory usage vs limit"
-          2. A steady climb over days: the process keeps memory. A rollout or a restart of the pod sets it back
-          3. A fast jump: look for large file reads in "Tool call rate by tool", for example sharepoint_read_file
+          2. A steady climb over days means memory is not released. A restart or rollout resets it
+          3. If memory jumps fast, look for large file reads in "Tool call rate by tool", for example sharepoint_read_file
           4. If the pod is near the limit with normal load, increase resources.limits.memory and resources.requests.memory
       expr: |
         max by (namespace, pod) (container_memory_working_set_bytes{container="office-365-mcp"})

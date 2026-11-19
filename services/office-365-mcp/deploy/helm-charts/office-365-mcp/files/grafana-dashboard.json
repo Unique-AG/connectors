@@ -1478,7 +1478,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "tool_outcomes_total with every outcome except ok and asked, the same set as the \"Tool failures\" total. graph: a refusal or failure with a Graph failure in its cause chain (see the Microsoft Graph row). token: Entra issued no token. refused: the tool refused the request on purpose, for example a malformed handle. error: an unexpected exception, which Office365McpToolErrors alerts on. cancelled: the client or the server cancelled the call. Pairs that did not fail in the selected range are hidden.",
+      "description": "tool_outcomes_total with every outcome except ok and asked, the same set as the \"Tool failures\" total. graph: a refusal or failure with a Graph failure in its cause chain (see the Microsoft Graph row). token: Entra issued no token. refused: the tool refused the request on purpose, for example a malformed handle. error: an unexpected exception or a returned error result, which Office365McpToolErrors alerts on. cancelled: the client or the server cancelled the call. Pairs that did not fail in the selected range are hidden.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1680,7 +1680,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Graph tokens that tool calls asked for in each interval, counted with increase() like the \"Token refusals, last hour\" stat. ok includes tokens the SDK serves from its cache. refused is an Entra answer with an AADSTS code; failed is any other failure, such as a network error. A tool call without a token never reaches Graph.",
+      "description": "Graph tokens that tool calls asked for in each interval, counted with increase() like the \"Token refusals and failures, last hour\" stat. ok includes tokens the SDK serves from its cache. refused is an Entra answer with an AADSTS code; failed is any other failure, such as a network error. A tool call without a token never reaches Graph.",
       "fieldConfig": {
         "defaults": {
           "color": {
