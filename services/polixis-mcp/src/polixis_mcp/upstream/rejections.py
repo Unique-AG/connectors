@@ -1,9 +1,7 @@
 from typing import Protocol, runtime_checkable
 
 from mcp_openapi.upstream import UpstreamError
-from pydantic import BaseModel
 from pydantic import JsonValue
-from pydantic import ValidationError
 
 
 def reject_error_body(response: object) -> None:
@@ -16,14 +14,11 @@ def reject_error_body(response: object) -> None:
         )
 
 
-def is_rejection_body(body: bytes) -> bool:
-    """Whether a 200's body is such a rejection, read from the JSON itself, so a response
+def is_rejection(body: JsonValue) -> bool:
+    """Whether a 200's parsed body is such a rejection, read from the JSON itself, so a response
     model without `error` does not hide it.
     """
-    try:
-        return _RejectionBody.model_validate_json(body).error is not None
-    except ValidationError:
-        return False
+    return isinstance(body, dict) and body.get("error") is not None
 
 
 class PolixisRejectedError(UpstreamError):
@@ -37,7 +32,3 @@ class _MayBeRejected(Protocol):
 
     @property
     def code(self) -> str | None: ...
-
-
-class _RejectionBody(BaseModel):
-    error: JsonValue = None

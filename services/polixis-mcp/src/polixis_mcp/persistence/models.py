@@ -53,4 +53,5 @@ class ResponseCacheRow(Base):
     cached_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Unused; kept until no release that can still run during a rollout writes it.
     reads: Mapped[int] = mapped_column(Integer, server_default="0")

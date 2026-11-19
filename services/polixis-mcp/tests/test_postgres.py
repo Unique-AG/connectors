@@ -122,26 +122,84 @@ def cache(database: Database) -> PostgresResponseCache:
     return PostgresResponseCache(database)
 
 
-async def _keys_and_reads(database: Database) -> dict[str, int]:
+async def _keys(database: Database) -> set[str]:
     async with database() as session:
-        rows = await session.execute(select(ResponseCacheRow.key, ResponseCacheRow.reads))
-    return {key: reads for key, reads in rows}
+        return set(await session.scalars(select(ResponseCacheRow.key)))
+
+
+async def _last_used(database: Database, key: str) -> datetime | None:
+    async with database() as session:
+        return await session.scalar(
+            select(ResponseCacheRow.last_used_at).where(ResponseCacheRow.key == key)
+        )
+
+
+async def _last_used_ago(database: Database, key: str, ago: timedelta) -> None:
+    async with database.begin() as session:
+        _ = await session.execute(
+            update(ResponseCacheRow)
+            .where(ResponseCacheRow.key == key)
+            .values(last_used_at=func.now() - ago)
+        )
 
 
 def _answer(size: int, *, cached_at: datetime | None = None) -> CachedAnswer:
     return CachedAnswer(cached_at=cached_at or datetime.now(UTC), body=b"x" * size)
 
 
-async def test_returns_what_it_cached_and_counts_the_reads(
-    cache: PostgresResponseCache, database: Database
-) -> None:
+async def test_returns_what_it_cached(cache: PostgresResponseCache) -> None:
     answer = _answer(10)
     await cache.put("graph", answer, ttl_seconds=60)
 
     read = [await cache.get("graph") for _ in range(2)]
 
     assert read == [answer, answer]
-    assert await _keys_and_reads(database) == {"graph": 2}
+
+
+async def test_a_read_within_a_minute_of_the_last_use_leaves_the_row_alone(
+    cache: PostgresResponseCache, database: Database
+) -> None:
+    await cache.put("graph", _answer(10), ttl_seconds=60)
+    used = await _last_used(database, "graph")
+
+    await cache.get("graph")
+
+    assert await _last_used(database, "graph") == used
+
+
+async def test_a_read_over_a_minute_after_the_last_use_moves_the_answer(
+    cache: PostgresResponseCache, database: Database
+) -> None:
+    await cache.put("graph", _answer(10), ttl_seconds=600)
+    await _last_used_ago(database, "graph", timedelta(minutes=2))
+    used = await _last_used(database, "graph")
+
+    await cache.get("graph")
+
+    moved = await _last_used(database, "graph")
+    assert used is not None
+    assert moved is not None
+    assert moved > used + timedelta(minutes=1)
+
+
+@pytest.mark.parametrize("last_used", [timedelta(0), timedelta(minutes=2)], ids=["fresh", "stale"])
+async def test_a_read_does_not_wait_on_a_row_another_transaction_holds(
+    cache: PostgresResponseCache, database: Database, last_used: timedelta
+) -> None:
+    answer = _answer(10)
+    await cache.put("graph", answer, ttl_seconds=600)
+    await _last_used_ago(database, "graph", last_used)
+    used = await _last_used(database, "graph")
+
+    async with database.begin() as holder:
+        _ = await holder.execute(
+            select(ResponseCacheRow.key).where(ResponseCacheRow.key == "graph").with_for_update()
+        )
+        async with asyncio.timeout(5):
+            read = await cache.get("graph")
+
+    assert read == answer
+    assert await _last_used(database, "graph") == used
 
 
 async def test_an_expired_answer_is_not_returned_and_the_cull_deletes_it(
@@ -155,22 +213,22 @@ async def test_an_expired_answer_is_not_returned_and_the_cull_deletes_it(
     await cache.cull(max_bytes=1_000)
 
     assert missed is None
-    assert await _keys_and_reads(database) == {"fresh": 0}
+    assert await _keys(database) == {"fresh"}
 
 
 async def test_the_cull_keeps_the_most_recently_read_answers_within_the_size(
     cache: PostgresResponseCache, database: Database
 ) -> None:
-    for key in ("read-first", "never-read", "read-last"):
-        await cache.put(key, _answer(100), ttl_seconds=60)
-        await asyncio.sleep(0.01)
+    for key, minutes_ago in (("read-first", 4), ("never-read", 3), ("read-last", 2)):
+        await cache.put(key, _answer(100), ttl_seconds=600)
+        await _last_used_ago(database, key, timedelta(minutes=minutes_ago))
     await cache.get("read-first")
     await asyncio.sleep(0.01)
     await cache.get("read-last")
 
     await cache.cull(max_bytes=250)
 
-    assert await _keys_and_reads(database) == {"read-first": 1, "read-last": 1}
+    assert await _keys(database) == {"read-first", "read-last"}
 
 
 async def test_the_cull_takes_a_size_past_what_an_integer_holds(
@@ -180,7 +238,7 @@ async def test_the_cull_takes_a_size_past_what_an_integer_holds(
 
     await cache.cull(max_bytes=3_000_000_000)
 
-    assert await _keys_and_reads(database) == {"graph": 0}
+    assert await _keys(database) == {"graph"}
 
 
 async def test_the_cull_keeps_an_answer_read_while_it_ranked_the_answers(
@@ -201,7 +259,7 @@ async def test_the_cull_keeps_an_answer_read_while_it_ranked_the_answers(
         await _until_blocked_by(database, reader)
     await culling
 
-    assert set(await _keys_and_reads(database)) == {"older", "newer"}
+    assert await _keys(database) == {"older", "newer"}
 
 
 async def _until_blocked_by(database: Database, pid: int | None) -> None:
@@ -219,13 +277,12 @@ async def test_caching_the_same_key_again_replaces_the_answer(
     cache: PostgresResponseCache, database: Database
 ) -> None:
     await cache.put("search", _answer(10), ttl_seconds=60)
-    await cache.get("search")
     newer = _answer(20)
 
     await cache.put("search", newer, ttl_seconds=60)
 
     assert await cache.get("search") == newer
-    assert await _keys_and_reads(database) == {"search": 1}
+    assert await _keys(database) == {"search"}
 
 
 def _store(database_url: str) -> PostgreSQLStore:
