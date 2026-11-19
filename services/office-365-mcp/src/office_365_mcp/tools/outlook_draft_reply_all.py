@@ -271,8 +271,12 @@ async def draft_reply_all(
             original = await _read_original(reached, handle)
             addressed = _addressed(original)
             original_cc = _spelled(original.cc_recipients)
-            copied = [*original_cc, *_not_yet_on(added, [*addressed, *original_cc])]
-            blind = _not_yet_on(blind_added, [*addressed, *original_cc])
+            recorded = _recorded(
+                [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
+                original.cc_recipients,
+            )
+            copied = [*original_cc, *_not_yet_on(added, recorded)]
+            blind = _not_yet_on(blind_added, recorded)
             with not_graph():
                 answer = await confirm(
                     _question(
@@ -344,9 +348,21 @@ async def _read_original(reached: UserItemRequestBuilder, handle: MailMessageHan
     return original
 
 
+def _sender(original: Message) -> list[Recipient]:
+    return [] if original.from_ is None else [original.from_]
+
+
 def _addressed(original: Message) -> list[str]:
-    sender = [] if original.from_ is None else [original.from_]
-    return _spelled([*(original.reply_to or sender), *(original.to_recipients or [])])
+    return _spelled([*(original.reply_to or _sender(original)), *(original.to_recipients or [])])
+
+
+def _recorded(*lists: list[Recipient] | None) -> list[str]:
+    return [
+        one.address
+        for recipients in lists
+        for one in MailAddress.each_of(recipients)
+        if one.address
+    ]
 
 
 def _spelled(recipients: list[Recipient] | None) -> list[str]:
@@ -419,13 +435,7 @@ def _fill_body(
     importance: MailImportance | None,
     categories: Sequence[str],
 ) -> Message:
-    on_the_draft = [
-        one.address
-        for one in MailAddress.each_of(
-            [*(created.to_recipients or []), *(created.cc_recipients or [])]
-        )
-        if one.address
-    ]
+    on_the_draft = _recorded(created.to_recipients, created.cc_recipients)
     new = _not_yet_on(added, on_the_draft)
     blind = _not_yet_on(blind_added, on_the_draft)
     return Message(
