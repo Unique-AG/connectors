@@ -12,14 +12,23 @@ podLabels:
   logging.unique.app/format: pino-json
 
 env:
-  HOST: "0.0.0.0"
-  PORT: "8000"
+  # Bind address inside the pod. Leave this alone in Argo overlays.
+  UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
   LOG_LEVEL: info
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
 
-# Set per deployment in the overlay. The app refuses to start without them.
-# - MCP_BASE_URL: the public https origin, matching routes.hostname
-# - every secret in .env.example, e.g. UPSTREAM_API_KEY, from a secret through envVars
+mcpConfig:
+  enabled: true
+  app:
+    publicBaseUrl: "" # e.g. https://space-config-mcp.mcp.qa.unique.app. Must match routes.hostname
+  zitadel:
+    baseUrl: "" # e.g. https://id.qa.unique.app
+    clientId: ""
+
+# Required secrets (via envVars in overlay):
+#   - ZITADEL_JWT_SIGNING_KEY (openssl rand -hex 32, local to FastMCP, never sent to Zitadel)
+# For QA with ephemeral OAuth storage, set ALLOW_EPHEMERAL_OAUTH_STORAGE=true in envVars.
+# For prod, set DATABASE_URL and ENCRYPTION_KEY (openssl rand -hex 32) for durable storage.
 envVars: []
 
 image:
@@ -119,8 +128,24 @@ networkPolicy:
   enableDefaultDeny:
     ingress: true
     egress: true
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
   baseline:
     prometheus:
       enabled: false
     ephemeralPorts:
       enabled: false
+    # *.unique.app covers single-label hosts; templates/_ext.tpl adds the
+    # Zitadel host explicitly since multi-label hosts don't match the pattern.
+    egress:
+      unique:
+        toFQDNs:
+          - matchPattern: "*.unique.app"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

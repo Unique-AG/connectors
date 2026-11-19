@@ -506,19 +506,35 @@ async def update_translator_config(
 )
 async def get_magic_table_config(
     *,
+    target_space_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "ID of the Magic Table space to read. Defaults to the current space. "
+                "Set this when calling from a Conduct or command space to read a "
+                "Magic Table space that has no chat interface of its own."
+            )
+        ),
+    ] = None,
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> dict[str, object]:
-    """Return the RfpAgent (Magic Table) module ID and its raw configuration for the current space.
+    """Return the RfpAgent (Magic Table) module ID and its raw configuration.
 
+    Reads the current space by default. Pass target_space_id to read a Magic Table
+    space from a Conduct or command space that acts as its configuration interface.
     Use this before calling update_magic_table_config to inspect the current state,
     including the full column list.
     """
     user_id, company_id = caller
+    effective_space_id = target_space_id or space_id
     try:
         return await contexts.get_magic_table_config(
-            upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
+            upstream=upstream,
+            user_id=user_id,
+            company_id=company_id,
+            space_id=effective_space_id,
         )
     except SpaceConfigError as exc:
         raise ToolError(str(exc)) from exc
@@ -531,6 +547,16 @@ async def get_magic_table_config(
 )
 async def update_magic_table_config(  # noqa: PLR0913
     *,
+    target_space_id: Annotated[
+        str | None,
+        Field(
+            description=(
+                "ID of the Magic Table space to update. Defaults to the current space. "
+                "Set this when calling from a Conduct or command space to configure a "
+                "Magic Table space that has no chat interface of its own."
+            )
+        ),
+    ] = None,
     language_model: Annotated[
         str | None,
         Field(description="Default language model for all columns that don't override it."),
@@ -608,14 +634,17 @@ async def update_magic_table_config(  # noqa: PLR0913
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Module:
-    """Update the current space's RfpAgent (Magic Table) module and/or space-level settings.
+    """Update a Magic Table space's RfpAgent module and/or space-level settings.
 
+    Updates the current space by default. Pass target_space_id to configure a Magic Table
+    space from a Conduct or command space that acts as its configuration interface.
     Module-level parameters (language_model, columns, etc.) patch the RfpAgent module config.
     Space-level parameters (answer_library, hide_sheet_status, etc.) patch
     space.settings.magicTableConfig. Only provided (non-None) parameters are written.
     Use get_magic_table_config first to inspect the current state.
     """
     user_id, company_id = caller
+    effective_space_id = target_space_id or space_id
 
     module_patch: RfpModuleConfig | None = None
     if any(
@@ -665,7 +694,7 @@ async def update_magic_table_config(  # noqa: PLR0913
             persistence=persistence,
             user_id=user_id,
             company_id=company_id,
-            space_id=space_id,
+            space_id=effective_space_id,
             module_patch=module_patch,
             space_settings_patch=space_settings_patch,
         )

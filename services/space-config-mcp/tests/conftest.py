@@ -6,6 +6,7 @@ import pytest
 from space_config_mcp.persistence import PersistenceSettings
 from space_config_mcp.upstream import UpstreamSettings
 from tests.offline_server import build_server
+from tests.offline_server import fake_auth_settings
 from tests.offline_server import fake_persistence_settings
 from tests.offline_server import fake_upstream_settings
 
@@ -36,4 +37,4 @@ def server(
     upstream_settings: UpstreamSettings,
     persistence_settings: PersistenceSettings,
 ) -> FastMCP:
-    return build_server(upstream_settings, persistence_settings)
+    return build_server(upstream_settings, persistence_settings, fake_auth_settings())

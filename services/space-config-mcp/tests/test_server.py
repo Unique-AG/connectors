@@ -48,7 +48,8 @@ def test_ops_routes_answer_a_pod_ip_host(client: TestClient, path: str) -> None:
 def test_mcp_route_answers_a_local_host(client: TestClient) -> None:
     headers = {**MCP_HEADERS, "Host": LOCAL_HOST}
 
-    assert client.post("/mcp", json=PING, headers=headers).status_code == 200
+    # 401 means the route accepted the host and the auth guard responded (auth required).
+    assert client.post("/mcp", json=PING, headers=headers).status_code == 401
 
 
 def test_mcp_route_rejects_an_unknown_host(client: TestClient) -> None:
@@ -71,11 +72,10 @@ def test_cors_lets_a_browser_client_read_the_auth_and_session_headers(client: Te
     assert response.headers["access-control-expose-headers"] == "WWW-Authenticate, Mcp-Session-Id"
 
 
-def test_a_server_without_auth_refuses_to_serve_beyond_loopback(
-    server: FastMCP, served: list[str]
-) -> None:
+def test_a_server_without_auth_refuses_to_serve_beyond_loopback(served: list[str]) -> None:
+    no_auth_server = FastMCP(name="NoAuth")
     with pytest.raises(RuntimeError, match="has no auth provider"):
-        run_server(server, DEPLOYED)
+        run_server(no_auth_server, DEPLOYED)
 
     assert served == []
 

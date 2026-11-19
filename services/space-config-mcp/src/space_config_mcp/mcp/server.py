@@ -4,8 +4,11 @@ from importlib.metadata import version
 from pathlib import Path
 
 from fastmcp import FastMCP
+from fastmcp.server.auth.oidc_proxy import OIDCProxy
 from fastmcp.server.providers import FileSystemProvider
 
+from space_config_mcp.mcp.auth import build_auth
+from space_config_mcp.mcp.auth.settings import AuthSettings
 from space_config_mcp.persistence import open_persistence
 from space_config_mcp.persistence import PersistenceSettings
 from space_config_mcp.upstream import open_upstream
@@ -17,7 +20,10 @@ INSTRUCTIONS = "Read and update Unique AI space and module configuration"
 def create_server(
     upstream: UpstreamSettings,
     persistence: PersistenceSettings,
+    auth_settings: AuthSettings,
 ) -> FastMCP:
+    oidc_proxy: OIDCProxy = build_auth(auth_settings)
+
     @asynccontextmanager
     async def lifespan(_: FastMCP) -> AsyncGenerator[dict[str, object]]:
         async with (
@@ -30,6 +36,7 @@ def create_server(
         name="Space Config MCP",
         version=version("space-config-mcp"),
         instructions=INSTRUCTIONS,
+        auth=oidc_proxy,
         mask_error_details=True,
         lifespan=lifespan,
     )

@@ -6,6 +6,7 @@ description = "Read and update Unique AI space and module configuration"
 classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
 dependencies = [
+    "cryptography==50.0.2",
     "fastmcp==4.1.4",
     "httpx==0.28.1",
     "httpx2==2.16.0",
@@ -13,6 +14,8 @@ dependencies = [
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
     "mcp-types==2.3.0",
+    # fastmcp already depends on py-key-value-aio[filetree,memory];
+    "py-key-value-aio[postgresql]==0.4.6",
     "pydantic-settings==2.16.1",
     "pydantic==2.14.1",
     "python-dotenv==1.2.4",

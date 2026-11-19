@@ -2182,6 +2182,44 @@
           }
         }
       ]
+    },
+    "mcpConfig": {
+      "type": "object",
+      "description": "Non-secret configuration for the space-config-mcp server, mapped to environment variables. Secrets (ZITADEL_JWT_SIGNING_KEY, ENCRYPTION_KEY) go in envVars/secretKeyRef. Zitadel uses a public PKCE client (no client secret).",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "If disabled, none of the fields below are mapped to environment variables.",
+          "default": true
+        },
+        "app": {
+          "type": "object",
+          "description": "Application URLs",
+          "properties": {
+            "publicBaseUrl": {
+              "type": "string",
+              "description": "Public URL of this MCP service (the Gateway/Kong host clients hit). Used for the OAuth redirect base and must match routes.hostname, e.g. https://space-config-mcp.mcp.qa.unique.app."
+            }
+          },
+          "additionalProperties": false
+        },
+        "zitadel": {
+          "type": "object",
+          "description": "Zitadel OIDC issuer (non-secret). Deliver ZITADEL_JWT_SIGNING_KEY via envVars/secretKeyRef.",
+          "properties": {
+            "baseUrl": {
+              "type": "string",
+              "description": "Zitadel issuer base URL, e.g. https://id.qa.unique.app."
+            },
+            "clientId": {
+              "type": "string",
+              "description": "Public PKCE client ID for this MCP's Zitadel application."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
     }
   },
   "$defs": {
