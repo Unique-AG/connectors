@@ -51,7 +51,7 @@ def build_storage(settings: AuthSettings) -> AsyncKeyValue:
             "or ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev."
         )
 
-    dev_dir = Path(tempfile.gettempdir()) / "space-config-mcp-oauth-dev"
+    dev_dir = Path(tempfile.mkdtemp(prefix="space-config-mcp-oauth-"))
     return FernetEncryptionWrapper(
         key_value=FileTreeStore(data_directory=dev_dir),
         source_material="space-config-mcp-local-dev-oauth-storage",

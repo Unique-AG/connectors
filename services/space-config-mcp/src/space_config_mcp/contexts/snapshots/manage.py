@@ -2,7 +2,7 @@ from datetime import datetime
 from datetime import UTC
 import json
 import logging
-from typing import cast
+from typing import cast, Literal
 import uuid
 
 import unique_sdk
@@ -21,13 +21,14 @@ async def snapshot_space(
     company_id: str,
     space_id: str,
     label: str = "",
-) -> dict[str, str]:
+) -> dict[str, str | bool]:
     """Capture full space config as a named snapshot stored in the knowledge base.
 
     Snapshots are point-in-time captures. Config changes made through
     the portal between MCP calls are not reflected until the next call.
     The knowledge-base write is best-effort: the snapshot ID and config
-    are always returned, even when persistence fails.
+    are always returned, even when persistence fails. `persisted` is False
+    when the KB write failed — such a snapshot_id cannot be restored.
     """
     space = await upstream.get_space(user_id, company_id, space_id)
     metadata_id = str(uuid.uuid4())
@@ -52,9 +53,13 @@ async def snapshot_space(
             exc_info=True,
         )
     # Return the KB contentVersionId so callers can pass it to get_snapshot / revert_space.
-    # Fall back to the metadata UUID only when persistence failed.
+    # Fall back to the metadata UUID only when persistence failed; persisted=False signals this.
     returned_id = kb_version_id if kb_version_id is not None else metadata_id
-    return {"snapshot_id": returned_id, "label": effective_label}
+    return {
+        "snapshot_id": returned_id,
+        "label": effective_label,
+        "persisted": kb_version_id is not None,
+    }
 
 
 async def list_snapshots(
@@ -127,6 +132,25 @@ async def revert_space(
     is_pinned_val = snap.get("isPinned")
     if isinstance(is_pinned_val, bool):
         patch["isPinned"] = is_pinned_val
+    settings_val = snap.get("settings")
+    if isinstance(settings_val, dict):
+        patch["settings"] = cast(dict[str, object], settings_val)
+    switchable_val = snap.get("switchableLanguageModels")
+    if isinstance(switchable_val, list):
+        patch["switchableLanguageModels"] = cast(
+            list[unique_sdk.Space.SwitchableLanguageModel], switchable_val
+        )
+    chat_upload_val = snap.get("chatUpload")
+    if chat_upload_val in {"ENABLED", "DISABLED"}:
+        patch["chatUpload"] = cast(Literal["ENABLED", "DISABLED"], chat_upload_val)
+    assistant_prompts_val = snap.get("assistantPrompts")
+    if isinstance(assistant_prompts_val, list):
+        patch["assistantPrompts"] = cast(
+            list[unique_sdk.Space.AssistantPromptParams], assistant_prompts_val
+        )
+    mcp_servers_val = snap.get("mcpServers")
+    if isinstance(mcp_servers_val, list):
+        patch["mcpServers"] = cast(list[unique_sdk.Space.McpServerParams], mcp_servers_val)
 
     await upstream.update_space(user_id, company_id, space_id, patch=patch)
 
@@ -211,23 +235,53 @@ async def import_space_config(
     language_model_val = config.get("languageModel")
     if isinstance(language_model_val, str):
         patch["languageModel"] = language_model_val
+    allow_model_val = config.get("allowModelSwitching")
+    if isinstance(allow_model_val, bool):
+        patch["allowModelSwitching"] = allow_model_val
+    is_pinned_val = config.get("isPinned")
+    if isinstance(is_pinned_val, bool):
+        patch["isPinned"] = is_pinned_val
+    settings_val = config.get("settings")
+    if isinstance(settings_val, dict):
+        patch["settings"] = cast(dict[str, object], settings_val)
+    switchable_val = config.get("switchableLanguageModels")
+    if isinstance(switchable_val, list):
+        patch["switchableLanguageModels"] = cast(
+            list[unique_sdk.Space.SwitchableLanguageModel], switchable_val
+        )
+    chat_upload_val = config.get("chatUpload")
+    if chat_upload_val in {"ENABLED", "DISABLED"}:
+        patch["chatUpload"] = cast(Literal["ENABLED", "DISABLED"], chat_upload_val)
+    assistant_prompts_val = config.get("assistantPrompts")
+    if isinstance(assistant_prompts_val, list):
+        patch["assistantPrompts"] = cast(
+            list[unique_sdk.Space.AssistantPromptParams], assistant_prompts_val
+        )
+    mcp_servers_val = config.get("mcpServers")
+    if isinstance(mcp_servers_val, list):
+        patch["mcpServers"] = cast(list[unique_sdk.Space.McpServerParams], mcp_servers_val)
 
     await upstream.update_space(user_id, company_id, space_id, patch=patch)
 
     modules_val = config.get("modules")
     if isinstance(modules_val, list):
+        # Match by module name so the import works across spaces with different module IDs.
+        target_modules = await upstream.list_modules(user_id, company_id, space_id)
+        target_by_name = {m.name: m.id for m in target_modules}
         for mod_raw in cast(list[object], modules_val):
             if not isinstance(mod_raw, dict):
                 continue
             mod_obj = cast(dict[str, object], mod_raw)
-            mod_id = mod_obj.get("id")
+            mod_name = mod_obj.get("name")
             mod_config = mod_obj.get("configuration")
-            if isinstance(mod_id, str) and isinstance(mod_config, dict):
-                await upstream.modify_module(
-                    user_id,
-                    company_id,
-                    mod_id,
-                    configuration=cast(dict[str, object], mod_config),
-                )
+            if isinstance(mod_name, str) and isinstance(mod_config, dict):
+                target_id = target_by_name.get(mod_name)
+                if target_id:
+                    await upstream.modify_module(
+                        user_id,
+                        company_id,
+                        target_id,
+                        configuration=cast(dict[str, object], mod_config),
+                    )
 
     return {"imported": True, "pre_import_snapshot": pre["snapshot_id"]}

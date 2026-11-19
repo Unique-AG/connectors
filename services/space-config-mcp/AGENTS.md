@@ -16,4 +16,4 @@ Read and update Unique AI space and module configuration
 
 - Upstream: A client of our own in `upstream/client.py`, started from the scaffold's HTTP client: one `request` for any method and path, retried by `RetrySettings`, parsing every body into a pydantic model. The `new-mcp` skill's rules for coding a client apply.
 - Persistence: None.
-- Auth: Not implemented. `run_server` refuses to serve beyond loopback until the server has an auth provider, `FastMCP(auth=...)`. The `new-mcp` skill's rules for coding auth say how to add one.
+- Auth: Zitadel OIDC via `unique_mcp.auth.zitadel.create_zitadel_oidc_proxy`. Settings live in `mcp/auth/settings.py` (`AuthSettings`). For ephemeral OAuth storage (QA/dev) set `ALLOW_EPHEMERAL_OAUTH_STORAGE=true`; for durable storage (prod) set `DATABASE_URL` + `ENCRYPTION_KEY`.

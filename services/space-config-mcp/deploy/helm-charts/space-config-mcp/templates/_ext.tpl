@@ -12,12 +12,14 @@ networkPolicy does not silently drop the Zitadel calls this chart requires.
 */}}
 {{- define "base.externalService.networkPolicy.cilium.egress.rules.ext" -}}
 {{- if and .Values.mcpConfig.enabled .Values.mcpConfig.zitadel.baseUrl -}}
-{{- $zitadelHost := (tpl .Values.mcpConfig.zitadel.baseUrl . | urlParse).hostname -}}
+{{- $zitadelParsed := tpl .Values.mcpConfig.zitadel.baseUrl . | urlParse -}}
+{{- $zitadelHost := $zitadelParsed.hostname -}}
+{{- $zitadelPort := $zitadelParsed.port | default "443" -}}
 - toFQDNs:
   - matchName: {{ $zitadelHost | quote }}
   toPorts:
   - ports:
-    - port: "443"
+    - port: {{ $zitadelPort | quote }}
       protocol: TCP
 {{- end -}}
 {{- end -}}

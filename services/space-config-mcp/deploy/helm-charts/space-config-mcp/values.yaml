@@ -12,8 +12,10 @@ podLabels:
   logging.unique.app/format: pino-json
 
 env:
-  # Bind address inside the pod. Leave this alone in Argo overlays.
-  UNIQUE_MCP_LOCAL_BASE_URL: http://0.0.0.0:8000
+  # Bind address — 0.0.0.0 so the pod is reachable from the mesh.
+  # ServerSettings reads HOST (not UNIQUE_MCP_LOCAL_BASE_URL); MCP_BASE_URL is set via
+  # chart.config.mcpEnv below when mcpConfig.enabled is true.
+  HOST: "0.0.0.0"
   LOG_LEVEL: info
   LOGS_DIAGNOSTICS_DATA_POLICY: conceal
 
@@ -26,7 +28,9 @@ mcpConfig:
     clientId: ""
 
 # Required secrets (via envVars in overlay):
-#   - ZITADEL_JWT_SIGNING_KEY (openssl rand -hex 32, local to FastMCP, never sent to Zitadel)
+#   - SPACE_CONFIG_MCP_UNIQUE_API_KEY  Unique platform API key
+#   - SPACE_CONFIG_MCP_UNIQUE_APP_ID   Unique platform app ID
+#   - ZITADEL_JWT_SIGNING_KEY          openssl rand -hex 32 (local to FastMCP, never sent to Zitadel)
 # For QA with ephemeral OAuth storage, set ALLOW_EPHEMERAL_OAUTH_STORAGE=true in envVars.
 # For prod, set DATABASE_URL and ENCRYPTION_KEY (openssl rand -hex 32) for durable storage.
 envVars: []

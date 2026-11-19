@@ -19,9 +19,14 @@ Every tool operates exclusively on the space the calling assistant belongs to. T
 is derived from the platform-injected request context (`unique.app/chat/assistant-id`), not from
 any parameter the caller supplies. An agent cannot read or modify a different space.
 
+**Exception — Magic Table cross-space reads.**
+`get_magic_table_config` and `update_magic_table_config` accept an optional `target_space_id`
+parameter. This lets a Conduct or command space configure a Magic Table space that has no chat
+interface of its own. The parameter is validated: the target module must exist in the named space.
+
 **Out of scope.**
 - Creating or deleting spaces
-- Cross-space operations
+- Arbitrary cross-space operations (beyond the Magic Table exception above)
 - Company-level or platform-level configuration
 
 ---
@@ -42,6 +47,17 @@ any parameter the caller supplies. An agent cannot read or modify a different sp
 > configuration as a snapshot before applying any change. The snapshot is stored in the
 > knowledge base and can be used to revert if the change produces unintended effects.
 > The write proceeds even when the snapshot storage fails (best-effort).
+
+> **Known limitation — snapshots do not include access entries.**
+> A snapshot captures space metadata and module configuration. It does **not** capture the
+> access list (users and groups). `revert_space` therefore cannot restore access after an
+> `add_space_access` or `delete_space_access` call. Use `get_space_access` to record
+> the access list before making access changes if restoration might be needed.
+
+> **Known limitation — concurrent updates.**
+> Two concurrent calls to `update_magic_table_config` (or `update_module_config`) may each
+> read the same current config and then write, with the first write lost. This is a
+> last-write-wins race. Avoid issuing parallel writes to the same module.
 
 ---
 
@@ -216,7 +232,8 @@ Feature: Export and import space configuration
 
 | Action | Why it is excluded |
 |---|---|
-| Read or modify other spaces | Space ID is locked to the calling assistant; no cross-space access |
+| Read or modify other spaces | Space ID is locked to the calling assistant; Magic Table cross-space is the sole exception |
+| Restore access entries via revert | Snapshots capture config and modules, not the access list |
 | Create or delete spaces | Out of scope; requires platform-level admin, not tool-level calls |
 | Manage company-level settings | No company-scoped write tools |
 | Delete individual snapshot versions | The KB API does not support per-version deletion; only full history deletion is exposed |

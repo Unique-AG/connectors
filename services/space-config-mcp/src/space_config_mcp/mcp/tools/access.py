@@ -80,7 +80,7 @@ async def add_space_access(
 @tool(
     title="Delete Space Access",
     meta=_META,
-    annotations=ToolAnnotations(idempotent_hint=True),
+    annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def delete_space_access(
     *,

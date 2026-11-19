@@ -39,10 +39,11 @@ async def snapshot_space(
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> dict[str, str]:
+) -> dict[str, str | bool]:
     """Capture the full configuration of the current space as a versioned JSON snapshot.
 
     Stores the snapshot in the knowledge base. Returns snapshot_id for later revert.
+    `persisted` is False when the KB write failed — such a snapshot_id cannot be restored.
     Each call creates a new version of the space's snapshot file.
     """
     user_id, company_id = caller

@@ -84,7 +84,7 @@
   },
   {
     "annotations": {
-      "idempotentHint": true
+      "idempotentHint": false
     },
     "description": "Revoke access entries from the current space.",
     "inputSchema": {
@@ -647,7 +647,7 @@
     "annotations": {
       "idempotentHint": false
     },
-    "description": "Capture the full configuration of the current space as a versioned JSON snapshot.\n\nStores the snapshot in the knowledge base. Returns snapshot_id for later revert.\nEach call creates a new version of the space's snapshot file.",
+    "description": "Capture the full configuration of the current space as a versioned JSON snapshot.\n\nStores the snapshot in the knowledge base. Returns snapshot_id for later revert.\n`persisted` is False when the KB write failed \u2014 such a snapshot_id cannot be restored.\nEach call creates a new version of the space's snapshot file.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -662,7 +662,14 @@
     "name": "snapshot_space",
     "outputSchema": {
       "additionalProperties": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
       },
       "type": "object"
     },

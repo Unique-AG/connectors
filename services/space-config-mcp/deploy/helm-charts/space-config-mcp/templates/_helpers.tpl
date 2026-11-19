@@ -11,6 +11,8 @@ Secrets (ZITADEL_JWT_SIGNING_KEY, ENCRYPTION_KEY) stay in envVars or secret refs
 {{- if .Values.mcpConfig.app.publicBaseUrl }}
 - name: UNIQUE_MCP_PUBLIC_BASE_URL
   value: {{ tpl .Values.mcpConfig.app.publicBaseUrl . | quote }}
+- name: MCP_BASE_URL
+  value: {{ tpl .Values.mcpConfig.app.publicBaseUrl . | quote }}
 {{- end }}
 {{- if .Values.mcpConfig.zitadel.baseUrl }}
 - name: ZITADEL_BASE_URL

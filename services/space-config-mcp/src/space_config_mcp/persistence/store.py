@@ -167,7 +167,7 @@ class Persistence:
         try:
             content_id = await self._resolve_content_id(user_id, company_id, space_id)
         except Exception as exc:  # noqa: BLE001
-            _LOGGER.debug("list_snapshots: content not found: %s", exc)
+            _LOGGER.debug("list_snapshots: content not found", exc_info=exc)
             return []
 
         if content_id is None:
