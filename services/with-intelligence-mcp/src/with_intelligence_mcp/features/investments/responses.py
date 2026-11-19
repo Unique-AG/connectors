@@ -4,6 +4,7 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.investments.api_responses import (
     InvestmentExtendedAttributes,
+    InvestmentListItemAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
 from with_intelligence_mcp.utils import names
@@ -25,6 +26,10 @@ class PositionResponse(OmitNoneModel):
     """One position: a fund this investor holds, or held."""
 
     id: int = Field(description="With Intelligence position identifier.")
+    title: str = Field(
+        description="Short label: the fund, or the manager when the fund is unidentified.",
+        examples=["Example Macro Fund"],
+    )
     fund: str | None = Field(default=None, description="Fund receiving the allocation.")
     fund_id: int | None = Field(
         default=None, description="With Intelligence identifier of the fund."
@@ -65,11 +70,14 @@ class PositionResponse(OmitNoneModel):
         strategy_available = bool(
             {"fund_primary_strategies", "fund_secondary_strategies"} & attributes.model_fields_set
         )
+        fund = attributes.fund.name if attributes.fund else None
+        manager = attributes.manager_firm.name if attributes.manager_firm else None
         return cls(
             id=attributes.id,
-            fund=attributes.fund.name if attributes.fund else None,
+            title=_title(attributes.id, fund, manager),
+            fund=fund,
             fund_id=attributes.fund.id if attributes.fund else None,
-            manager=attributes.manager_firm.name if attributes.manager_firm else None,
+            manager=manager,
             manager_id=attributes.manager_firm.id if attributes.manager_firm else None,
             amount=_amount(attributes),
             asset_classes=(
@@ -94,13 +102,17 @@ class PositionResponse(OmitNoneModel):
             fund_unidentified=attributes.fund.unknown if attributes.fund else None,
         )
 
+    @classmethod
+    def from_listing(cls, attributes: InvestmentListItemAttributes) -> Self:
+        return cls(id=attributes.id, title=_title(attributes.id, None, None))
+
 
 class InvestorPositionsResponse(OmitNoneModel):
     """An investor's fund roster — who they allocate to, and at what size."""
 
     investor_id: int = Field(description="With Intelligence investor identifier.")
     investor_name: str | None = Field(default=None, description="Resolved investor name.")
-    positions: list[PositionResponse] = Field(
+    results: list[PositionResponse] = Field(
         default_factory=list, description="Positions on the requested page, newest first."
     )
     total: int = Field(
@@ -111,6 +123,14 @@ class InvestorPositionsResponse(OmitNoneModel):
     has_more: bool = Field(
         default=False, description="True when another page of positions is available."
     )
+
+
+def _title(position_id: int, fund: str | None, manager: str | None) -> str:
+    if fund:
+        return fund
+    if manager:
+        return f"Unidentified fund at {manager}"
+    return f"Position {position_id}"
 
 
 def _amount(attributes: InvestmentExtendedAttributes) -> PositionAmountResponse | None:

@@ -1,11 +1,13 @@
 """A client wired to a fake session, for tests that drive HTTP through respx."""
 
+import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import cast
 
 import httpx
 import respx
+from pydantic import BaseModel
 
 from with_intelligence_mcp.with_intelligence_client import (
     RetryPolicy,
@@ -109,3 +111,11 @@ def wi_factory(base_url: str = BASE_URL, *, max_attempts: int = 1) -> WithIntell
 
 def sign_in_ok(access: str = "access-1", refresh: str = "refresh-1") -> httpx.Response:
     return httpx.Response(200, json={"accessToken": access, "refreshToken": refresh})
+
+
+def sent_records(response: BaseModel) -> list[dict[str, object]]:
+    """The `results` records as the tool sends them, which is what the chat cites."""
+    payload = cast("dict[str, object]", json.loads(response.model_dump_json()))
+    records = payload["results"]
+    assert isinstance(records, list)
+    return cast("list[dict[str, object]]", records)

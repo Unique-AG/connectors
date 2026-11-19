@@ -36,6 +36,10 @@ class IntentionResponse(OmitNoneModel):
     """One forward-looking allocation intention."""
 
     id: int = Field(description="With Intelligence intention identifier.", examples=[7])
+    title: str = Field(
+        description="Short label: the asset class and strategies. Intentions have no name.",
+        examples=["Intention: Hedge Funds, Global Macro, Discretionary"],
+    )
     date: str | None = Field(
         default=None, description="Date of the intention.", examples=["2026-06-01"]
     )
@@ -86,16 +90,21 @@ class IntentionResponse(OmitNoneModel):
         status = attributes.status
         segments = attributes.classification_segments
         strategies = segments.strategies if segments else None
+        asset_class = attributes.asset_class.name if attributes.asset_class else None
+        strategy_names = (
+            _strategy_names(strategies.primary_strategy, strategies.secondary_strategies)
+            if strategies
+            else None
+        )
         return cls(
             id=attributes.id,
+            title=_title(attributes.id, asset_class, strategy_names),
             date=attributes.date,
             updated_at=attributes.updated_at,
             status=status.name if status else None,
             sub_status=status.sub_status.name if status and status.sub_status else None,
-            asset_class=attributes.asset_class.name if attributes.asset_class else None,
-            strategies=_strategy_names(strategies.primary_strategy, strategies.secondary_strategies)
-            if strategies
-            else None,
+            asset_class=asset_class,
+            strategies=strategy_names,
             structures=when_present(attributes, "structures", names(attributes.structures)),
             themes=when_present(attributes, "themes", names(attributes.themes)),
             allocation_amount=_amount(attributes.allocation_amount),
@@ -112,7 +121,12 @@ class IntentionResponse(OmitNoneModel):
 
     @classmethod
     def from_listing(cls, attributes: IntentionListItemAttributes) -> Self:
-        return cls(id=attributes.id, date=attributes.date, updated_at=attributes.updated_at)
+        return cls(
+            id=attributes.id,
+            title=_title(attributes.id, None, None),
+            date=attributes.date,
+            updated_at=attributes.updated_at,
+        )
 
 
 class InvestorIntentionsResponse(OmitNoneModel):
@@ -124,7 +138,7 @@ class InvestorIntentionsResponse(OmitNoneModel):
 
     investor_id: int = Field(description="With Intelligence investor identifier.")
     investor_name: str | None = Field(default=None, description="Resolved investor name.")
-    intentions: list[IntentionResponse] = Field(
+    results: list[IntentionResponse] = Field(
         default_factory=list,
         description="Intentions on this page, most recently updated first.",
     )
@@ -137,6 +151,11 @@ class InvestorIntentionsResponse(OmitNoneModel):
         default=False,
         description="True when another page is available. Call again with page + 1.",
     )
+
+
+def _title(intention_id: int, asset_class: str | None, strategies: list[str] | None) -> str:
+    targets = ([asset_class] if asset_class else []) + (strategies or [])
+    return f"Intention: {', '.join(targets)}" if targets else f"Intention {intention_id}"
 
 
 def _strategy_names(

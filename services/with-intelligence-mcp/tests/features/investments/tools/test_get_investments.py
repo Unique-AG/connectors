@@ -3,7 +3,7 @@
 import httpx
 import respx
 
-from tests.helpers import BASE_URL, build_client, page_body, sent_query
+from tests.helpers import BASE_URL, build_client, page_body, sent_query, sent_records
 from with_intelligence_mcp.features.investments import InvestorPositionsResponse
 from with_intelligence_mcp.features.investments.queries import GetInvestmentsQuery
 from with_intelligence_mcp.features.investments.tools.get_investments import (
@@ -88,7 +88,7 @@ class TestTheRoster:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        position = result.positions[0]
+        position = result.results[0]
         assert position.fund == "Example Macro Fund"
         assert position.manager == "Manager One"
         assert position.strategies == ["Macro", "Global Macro"]
@@ -101,7 +101,7 @@ class TestTheRoster:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        assert result.positions[0].manager_id == 500
+        assert result.results[0].manager_id == 500
 
     @respx.mock
     async def test_reports_the_total_alongside_what_it_returned(self) -> None:
@@ -119,7 +119,7 @@ class TestAmounts:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        amount = result.positions[0].amount
+        amount = result.results[0].amount
         assert amount is not None
         assert amount.value_millions == 250.0
         assert amount.currency == "USD"
@@ -131,7 +131,7 @@ class TestAmounts:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        assert result.positions[0].amount is None
+        assert result.results[0].amount is None
 
 
 class TestExits:
@@ -141,7 +141,7 @@ class TestExits:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        position = result.positions[0]
+        position = result.results[0]
         assert position.is_current is None
         assert position.asset_classes is None
         assert position.strategies is None
@@ -162,10 +162,10 @@ class TestExits:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        assert result.positions[0].is_current is None
-        assert result.positions[0].asset_classes is None
-        assert result.positions[0].strategies is None
-        assert result.positions[0].structures is None
+        assert result.results[0].is_current is None
+        assert result.results[0].asset_classes is None
+        assert result.results[0].strategies is None
+        assert result.results[0].structures is None
 
     @respx.mock
     async def test_an_exited_position_is_flagged_not_dropped(self) -> None:
@@ -174,7 +174,7 @@ class TestExits:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        by_id = {p.id: p for p in result.positions}
+        by_id = {p.id: p for p in result.results}
         assert by_id[11].is_current is True
         assert by_id[12].is_current is False
         assert by_id[12].exited_on == "2025-03-31"
@@ -188,8 +188,8 @@ class TestUnidentifiedFund:
         client, _ = build_client()
         result = await get_investments(investor_id=2504, client=client)
         assert isinstance(result, InvestorPositionsResponse)
-        assert result.positions[0].fund_unidentified is True
-        assert result.positions[0].fund is None
+        assert result.results[0].fund_unidentified is True
+        assert result.results[0].fund is None
 
 
 class TestScoping:
@@ -276,3 +276,22 @@ class TestScoping:
         result = await get_investments(investor_id=1, client=client)
         assert isinstance(result, InvestorNotFoundResponse)
         assert listing.call_count == 0
+
+
+class TestCitation:
+    @respx.mock
+    async def test_titles_each_position_by_its_fund_under_results(self) -> None:
+        manager_only: dict[str, object] = {
+            "id": 14,
+            "manager_firm": {"id": 502, "name": "Manager Three"},
+        }
+        _mock([HELD, EXITED, UNIDENTIFIED, manager_only])
+        client, _ = build_client()
+        result = await get_investments(investor_id=2504, client=client)
+        assert isinstance(result, InvestorPositionsResponse)
+        assert [position["title"] for position in sent_records(result)] == [
+            "Example Macro Fund",
+            "Example Credit Fund",
+            "Position 13",
+            "Unidentified fund at Manager Three",
+        ]
