@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
-import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
+import { OAUTH_ENDPOINTS, OAUTH_FALLBACK_ENDPOINTS } from '../constants/oauth.constants';
 import { type IntrospectionResponse, IntrospectRequestDto } from '../dtos/introspect-request.dto';
 import { RevokeRequestDto } from '../dtos/revoke-request.dto';
 import { TokenRequestDto } from '../dtos/token-request.dto';
@@ -27,7 +27,7 @@ export class TokenController {
 
   public constructor(private readonly authService: McpOAuthService) {}
 
-  @Post(OAUTH_ENDPOINTS.token)
+  @Post([OAUTH_ENDPOINTS.token, OAUTH_FALLBACK_ENDPOINTS.token])
   @Throttle({ default: { getTracker: tokenCredentialTracker } })
   @Header('Cache-Control', 'no-store')
   @Header('Pragma', 'no-cache')

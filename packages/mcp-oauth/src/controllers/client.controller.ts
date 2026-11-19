@@ -1,7 +1,7 @@
 import { Body, Controller, Post, UseGuards, UsePipes } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
-import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
+import { OAUTH_ENDPOINTS, OAUTH_FALLBACK_ENDPOINTS } from '../constants/oauth.constants';
 import { RegisterClientDto } from '../dtos/register-client.dto';
 import { ClientService } from '../services/client.service';
 import { MetricService } from '../services/metric.service';
@@ -14,7 +14,7 @@ export class ClientController {
     private readonly metricService: MetricService,
   ) {}
 
-  @Post(OAUTH_ENDPOINTS.register)
+  @Post([OAUTH_ENDPOINTS.register, OAUTH_FALLBACK_ENDPOINTS.register])
   @UsePipes(ZodValidationPipe)
   public async registerClient(@Body() registerClientDto: RegisterClientDto) {
     this.metricService.incrementClientsRegistered();

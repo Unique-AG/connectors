@@ -22,7 +22,7 @@ import { type NextFunction, type Request, type Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 import passport from 'passport';
 import { serializeError } from 'serialize-error-cjs';
-import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
+import { OAUTH_ENDPOINTS, OAUTH_FALLBACK_ENDPOINTS } from '../constants/oauth.constants';
 import { ConsentDecisionDto } from '../dtos/consent-decision.dto';
 import type { IOAuthStore } from '../interfaces/io-auth-store.interface';
 import {
@@ -60,7 +60,7 @@ export class OAuthController {
     private readonly flowBinding: FlowBindingService,
   ) {}
 
-  @Get(OAUTH_ENDPOINTS.authorize)
+  @Get([OAUTH_ENDPOINTS.authorize, OAUTH_FALLBACK_ENDPOINTS.authorize])
   @Throttle(BROWSER_FLOW_THROTTLE)
   public async authorize(
     @Query('response_type') responseType: string,
