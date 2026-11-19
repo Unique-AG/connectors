@@ -9,7 +9,7 @@ from msgraph.generated.models.chat import Chat
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, not_graph
+from office_365_mcp.graph_client import graph_step, not_graph
 from office_365_mcp.shared.calendar import confirmation_id_for
 from office_365_mcp.shared.messages import (
     CHAT_TOPIC_MAX_CHARACTERS,
@@ -70,7 +70,7 @@ async def rename_chat(
     client: GraphServiceClient, *, chat_id: str, topic: str, confirm: Confirm
 ) -> RenamedChat | InputRequiredResult:
     renamed: Chat | None = None
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         with not_graph():
             answer = await confirm(_question(chat_id, topic), _about(chat_id, topic))
         asked = answer if isinstance(answer, InputRequiredResult) else None

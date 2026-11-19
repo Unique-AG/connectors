@@ -117,7 +117,7 @@ async def create_folder(
     created: DriveItemSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, handle.drive_id, handle.item_id)
         assert found.id is not None, "Graph answered a drive item read with no id"
         if found.folder is None:

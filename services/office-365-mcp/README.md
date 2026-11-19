@@ -269,17 +269,37 @@ Once the service runs, it exposes these endpoints:
 - **Admin consent**, `GET /admin/consent`. Redirects to the Microsoft admin-consent page for this
   deployment. It needs no authentication. See "Admin consent" in `docs/README.md`.
 - **Metrics**, `GET /metrics`. Prometheus, through `setup_ops`. Beside `unique_toolkit`'s own HTTP
-  series, four metrics report what this connector asked Microsoft Graph for:
-  - `graph_requests_total{operation,status}`
-  - `graph_request_duration_seconds{operation}`
+  series, eight metrics report what this connector asked Microsoft Graph and Entra for:
+  - `graph_operations_total{operation,status}`
+  - `graph_operation_duration_seconds{operation}`
+  - `graph_steps_total{operation,step,status}`
+  - `graph_step_duration_seconds{operation,step}`
   - `graph_throttled_total{operation,retried}`
   - `graph_pages_scanned{operation}`
+  - `graph_token_acquisitions_total{operation,result}`
+  - `graph_slow_operations_total{operation}`
 
-  The label `operation` is always the tool's own name, never a URL. A label taken from a Graph URL
+  `tool_outcomes_total{operation,outcome}` counts the MCP tool calls that reach
+  `GraphOperationMiddleware` by what ended them. Calls that the rate limiter rejects, and calls to a
+  tool name that the server does not register, are not counted.
+
+  `GraphOperationMiddleware` wraps each MCP tool call. It counts the call under
+  `tool_outcomes_total`, and under `graph_operations_total` when the call attempted at least one
+  Graph request. `GraphCallObserver` is the first handler in the
+  Graph SDK pipeline. It sees each Graph answer after the SDK's retries, and counts throttling under
+  `graph_throttled_total`. `GraphToken` asks Entra for the Graph token before the first Graph
+  request, and counts the result under `graph_token_acquisitions_total`. A tool can mark a
+  block of Graph calls as one named step with `graph_step`. One step can send several requests,
+  for example the pages of a list. A call outside a step has no step name and is not in
+  `graph_steps_total`. `graph_step` and `graph_errors` turn SDK errors into the `GraphFailure`
+  types.
+
+  The label `operation` is always the registered tool name, never a URL. The label `step` names one
+  Graph call inside the tool. A label taken from a Graph URL
   creates one time series for each chat, so this service does not use one. The label `status` names
   the remedy a failure needs, for example `forbidden`, `not_found`, `throttled`, or `unavailable`,
-  rather than the HTTP status code. The label `retried` states whether the SDK spent its retries on
-  the throttling, or refused the wait that Graph asked for.
+  rather than the HTTP status code. The label `retried` states whether the SDK retried the request
+  before the last throttling answer.
 - **Traces**. Off, unless an `OTEL_*` variable states where to send them.
   - `OTEL_TRACES_EXPORTER=console` prints spans to stderr.
   - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends spans to a collector, and needs no other

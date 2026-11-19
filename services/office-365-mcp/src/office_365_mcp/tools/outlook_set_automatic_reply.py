@@ -155,7 +155,7 @@ async def set_automatic_reply(
     stored: AutomaticRepliesSetting | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         current = await _read_setting(client)
         whole = _whole_setting(current, change)
         if change.status == "scheduled":

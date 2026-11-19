@@ -6,7 +6,7 @@ from fastmcp import FastMCP
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.files import DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -36,7 +36,7 @@ error.\
 async def teams_get_channel_files_folder(
     client: GraphServiceClient, *, team_id: str, channel_id: str
 ) -> DriveItemSummary:
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         item = await (
             client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).files_folder.get()
         )

@@ -107,7 +107,7 @@ async def delete_list_item(
         .lists.by_list_id(handle.list_id)
         .items.by_list_item_id(handle.item_id)
     )
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ_ITEM):
             current = await item.get(
                 request_configuration=RequestConfiguration[_ItemQuery](

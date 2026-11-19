@@ -19,6 +19,8 @@ from office_365_mcp.graph_client import (
     GraphThrottled,
     GraphUnavailable,
     graph_errors,
+    graph_step,
+    measured_graph_operation,
 )
 from tests.conftest import RecordedSleeps
 
@@ -69,7 +71,7 @@ async def test_the_status_decides_the_error(
         )
     )
 
-    with pytest.raises(expected) as raised, graph_errors("a_test"):
+    with pytest.raises(expected) as raised, measured_graph_operation("a_test"), graph_errors():
         _ = await client.me.get()
 
     assert type(raised.value) is expected
@@ -105,7 +107,7 @@ async def test_a_5xx_is_throttling_when_it_named_a_delay_and_an_outage_when_it_d
         side_effect=always(status, headers, error_body("serviceError", "synthesised failure"))
     )
 
-    with pytest.raises(expected) as raised, graph_errors("a_test"):
+    with pytest.raises(expected) as raised, measured_graph_operation("a_test"), graph_errors():
         _ = await client.me.get()
 
     assert type(raised.value) is expected
@@ -131,7 +133,11 @@ async def test_a_429_that_outlasts_the_retries_carries_graphs_own_retry_after(
         )
     )
 
-    with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphThrottled) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.retry_after_seconds == 10.0
@@ -148,7 +154,11 @@ async def test_a_throttle_without_a_retry_after_says_so_rather_than_guessing(
         side_effect=always(429, {}, error_body("TooManyRequests", "Please retry again later."))
     )
 
-    with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphThrottled) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.retry_after_seconds is None
@@ -174,7 +184,11 @@ async def test_the_inner_code_is_carried_because_it_is_the_only_thing_that_diffe
         )
     )
 
-    with pytest.raises(GraphForbidden) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphForbidden) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.code == "Forbidden", "the outer code says nothing actionable"
@@ -188,7 +202,11 @@ async def test_an_error_without_an_inner_code_reports_none_rather_than_the_outer
         return_value=httpx.Response(403, json={"error": {"code": "accessDenied", "message": "no"}})
     )
 
-    with pytest.raises(GraphForbidden) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphForbidden) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.inner_code is None
@@ -200,7 +218,11 @@ async def test_never_reaching_graph_is_reported_as_upstream_not_as_a_bad_request
     """A connection failure never becomes an `APIError`: there is no response to build one from."""
     graph.get("/me").mock(side_effect=httpx.ConnectError("name resolution failed"))
 
-    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphUnavailable) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.status is None
@@ -216,7 +238,11 @@ async def test_a_redirect_the_sdk_gave_up_on_is_worded_rather_than_escaping_unwo
     `ToolError` counted under the `error` sentinel."""
     graph.get("/me").mock(return_value=httpx.Response(302, headers={"location": f"{GRAPH_V1}/me"}))
 
-    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphUnavailable) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.status is None
@@ -227,7 +253,7 @@ def test_a_cancelled_call_stays_cancelled_and_is_not_reported_as_a_graph_failure
     """Re-raised untranslated: the task group that cancelled this has to learn it was obeyed, and a
     `CancelledError` swallowed into a `GraphUnavailable` reports success to a cancellation. Raised
     in the block and not off the wire, because respx stands in only for an `Exception`."""
-    with pytest.raises(CancelledError), graph_errors("a_test"):
+    with pytest.raises(CancelledError), measured_graph_operation("a_test"), graph_errors():
         raise CancelledError("the client hung up")
 
 
@@ -240,7 +266,11 @@ async def test_a_body_the_sdk_cannot_read_keeps_the_status_it_arrived_with(
         )
     )
 
-    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphUnavailable) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         _ = await client.me.get()
 
     assert raised.value.status == 500
@@ -249,7 +279,11 @@ async def test_a_body_the_sdk_cannot_read_keeps_the_status_it_arrived_with(
 
 
 def test_a_bare_exception_is_reported_as_an_answer_that_could_not_be_read() -> None:
-    with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+    with (
+        pytest.raises(GraphUnavailable) as raised,
+        measured_graph_operation("a_test"),
+        graph_errors(),
+    ):
         raise Exception("no parser for this content type")
 
     assert raised.value.status is None
@@ -260,7 +294,7 @@ def test_a_bug_of_our_own_is_not_reported_as_graph_being_unavailable() -> None:
     """An `Exception` subclass raised inside the block is this connector's fault; translated to
     `GraphUnavailable` it would tell an operator to retry and blame Microsoft for our defect."""
     for ours in (AssertionError("an invariant of ours"), TypeError("a bug of ours")):
-        with pytest.raises(type(ours)), graph_errors("a_test"):
+        with pytest.raises(type(ours)), measured_graph_operation("a_test"), graph_errors():
             raise ours
 
 
@@ -280,7 +314,7 @@ async def test_graph_failures_keep_graphs_reason_out_of_their_logged_message(
         return_value=httpx.Response(status, json=error_body("aCode", "Invalid filter clause."))
     )
 
-    with pytest.raises(GraphFailure) as raised, graph_errors("a_test"):
+    with pytest.raises(GraphFailure) as raised, measured_graph_operation("a_test"), graph_errors():
         _ = await client.me.get()
 
     assert raised.value.reason == reason
@@ -302,7 +336,11 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
             )
         )
 
-        with pytest.raises(GraphUnavailable) as raised, graph_errors("a_test"):
+        with (
+            pytest.raises(GraphUnavailable) as raised,
+            measured_graph_operation("a_test"),
+            graph_errors(),
+        ):
             _ = await client.me.get()
 
         assert raised.value.reason == _OR_FILTER
@@ -315,7 +353,11 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
             side_effect=always(503, {"Retry-After": "10"}, error_body("serviceError", _OR_FILTER))
         )
 
-        with pytest.raises(GraphThrottled) as raised, graph_errors("a_test"):
+        with (
+            pytest.raises(GraphThrottled) as raised,
+            measured_graph_operation("a_test"),
+            graph_errors(),
+        ):
             _ = await client.me.get()
 
         assert raised.value.reason == _OR_FILTER
@@ -341,7 +383,8 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
             caplog.at_level(logging.INFO, logger="office_365_mcp.graph_client.errors"),
             provider.get_tracer("test").start_as_current_span("tool"),
             pytest.raises(GraphUnavailable),
-            graph_errors("a_test", step="a_step"),
+            measured_graph_operation("a_test"),
+            graph_step("a_step"),
         ):
             _ = await client.me.get()
 
@@ -376,7 +419,8 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
         with (
             caplog.at_level(logging.INFO, logger="office_365_mcp.graph_client.errors"),
             pytest.raises(GraphNotFound),
-            graph_errors("a_test"),
+            measured_graph_operation("a_test"),
+            graph_errors(),
         ):
             _ = await client.me.get()
 
@@ -394,7 +438,8 @@ class TestAFailedGraphCallLeavesFieldsAnOperatorCanSearch:
         with (
             caplog.at_level(logging.INFO, logger="office_365_mcp.graph_client.errors"),
             pytest.raises(GraphUnavailable),
-            graph_errors("a_test"),
+            measured_graph_operation("a_test"),
+            graph_errors(),
         ):
             _ = await client.me.get()
 

@@ -418,7 +418,7 @@ async def create_event(
     asked: InputRequiredResult | None = None
     # Derived from the draft rather than minted: the round that answers the question composes the
     # same id, which is both the `request_state` an answer is bound to and Graph's dedup key.
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         calendar = await calendar_of(client, calendar_id=None)
         draft = with_default_online_meeting(draft, calendar)
         transaction = transaction_id_for(_ME, draft)
@@ -439,8 +439,6 @@ async def create_event(
                     ),
                 )
 
-    # Raised outside the block on purpose: `graph_errors` records an escaping `ToolError` as a Graph
-    # operation that failed for a reason it cannot describe, and a refusal is not one.
     if asked is not None:
         return asked
     if refused is not None:

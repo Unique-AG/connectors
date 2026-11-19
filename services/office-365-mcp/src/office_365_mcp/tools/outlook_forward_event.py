@@ -165,7 +165,7 @@ async def forward_event(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     about = confirmation_id_for(handle.uri, *sorted(recipients), repr(comment))
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
         with not_graph():
             answer = await confirm(_question(event, recipients, comment), about)

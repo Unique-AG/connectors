@@ -92,7 +92,7 @@ async def add_chat_member(
     share_history: bool,
     confirm: Confirm,
 ) -> AddedChatMember | InputRequiredResult:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         chat = await chat_in_question(client, chat_id)
         with not_graph():
             answer = await confirm(

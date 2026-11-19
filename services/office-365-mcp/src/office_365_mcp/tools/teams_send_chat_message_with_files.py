@@ -89,7 +89,7 @@ async def send_chat_message_with_files(
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         members = await mentioned_members(client, chat_id, mentions)
         files = () if isinstance(members, str) else await attachable_files(client, handles)
         if isinstance(members, str):

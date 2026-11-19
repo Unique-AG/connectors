@@ -18,7 +18,7 @@ from msgraph.generated.users.item.online_meetings.create_or_get import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import meeting_uri_for
 from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.meetings import (
@@ -140,7 +140,7 @@ async def create_meeting(
     created: OnlineMeeting | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         with not_graph():
             answer = await confirm(_question(draft), external_id)
         asked = answer if isinstance(answer, InputRequiredResult) else None

@@ -106,7 +106,7 @@ async def create_mail_rule(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     created: MessageRule | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         folders = await rule_folders(client, actions)
         if folders.hidden:
             refused = f"{_NOTHING_CREATED} {HIDDEN_RULE_FOLDER}"

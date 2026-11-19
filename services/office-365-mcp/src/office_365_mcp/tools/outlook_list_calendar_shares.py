@@ -9,7 +9,7 @@ from msgraph.generated.models.calendar_role_type import CalendarRoleType
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.handles import CalendarPermissionHandle, calendar_handle
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -144,7 +144,7 @@ async def list_calendar_shares(client: GraphServiceClient, *, calendar_ref: str)
     if handle is None:
         raise ToolError(_NOT_A_CALENDAR_HANDLE)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         permissions = client.me.calendars.by_calendar_id(handle.calendar_id).calendar_permissions
         first_page = await permissions.get()
         assert first_page is not None, "Graph answered a calendar permission listing with nothing"

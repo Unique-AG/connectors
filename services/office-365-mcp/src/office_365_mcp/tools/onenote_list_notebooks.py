@@ -274,7 +274,7 @@ async def list_notebooks(
     root = onenote_root(client, owner)
     with (
         owner_refused(owner is not None, named_owner_refused("Notes.Read")),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
     ):
         with graph_step(STEP_NOTEBOOKS):
             first_notebooks = await get_with_query(

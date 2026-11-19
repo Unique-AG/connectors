@@ -179,7 +179,7 @@ async def copy_page(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned = handle.owner is not None or section_handle.owner is not None
-    with owner_refused(owned, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned, OWNED_REFUSED), graph_errors():
         container = await section_container(
             client, section_handle.section_id, owner=section_handle.owner
         )

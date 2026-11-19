@@ -29,8 +29,8 @@ def chat(number: int, topic: str) -> dict[str, object]:
 
 class RecordedPages:
     """The histogram itself is asserted on in `tests/test_graph_metrics.py`, from inside a
-    `graph_errors` block: `observability` drops a count taken outside one, as every walk here
-    is."""
+    `measured_graph_operation` block: `observability` drops a count taken outside one, as every
+    walk here is."""
 
     def __init__(self) -> None:
         self.counts: list[int] = []

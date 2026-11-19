@@ -10,7 +10,7 @@ from msgraph.generated.models.outlook_category import OutlookCategory
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry
+from office_365_mcp.graph_client import graph_step, no_retry
 from office_365_mcp.shared.categories import CategoryName
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
@@ -89,7 +89,7 @@ class CreatedCategory(BaseModel):
 async def create_category(
     client: GraphServiceClient, *, name: str, color: CategoryColorName
 ) -> CreatedCategory:
-    with graph_errors(TOOL_NAME, step=STEP_CREATE_CATEGORY):
+    with graph_step(STEP_CREATE_CATEGORY):
         created = await client.me.outlook.master_categories.post(
             OutlookCategory(display_name=name, color=CategoryColor(color)),
             request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),

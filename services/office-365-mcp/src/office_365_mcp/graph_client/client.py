@@ -39,6 +39,7 @@ from opentelemetry.semconv.attributes.url_attributes import URL_FULL
 from opentelemetry.trace import Span, SpanContext, Status, StatusCode
 from opentelemetry.util.types import AttributeValue
 
+from office_365_mcp.graph_client.errors import GraphCallObserver
 from office_365_mcp.graph_client.settings import GraphSettings
 
 type GraphErrorMap = dict[str, type[ParsableFactory[Parsable]]]
@@ -213,7 +214,7 @@ def _graph_middleware(options: dict[str, RequestOption]) -> list[BaseMiddleware]
         else handler
         for handler in KiotaClientFactory.get_default_middleware(options)
     ]
-    return [*quietened, GraphTelemetryHandler(options=telemetry_option)]
+    return [GraphCallObserver(), *quietened, GraphTelemetryHandler(options=telemetry_option)]
 
 
 def no_retry() -> list[RequestOption]:

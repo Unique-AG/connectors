@@ -24,7 +24,7 @@ from msgraph.generated.users.item.find_meeting_times.find_meeting_times_post_req
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import (
     EventTime,
     event_time,
@@ -290,7 +290,7 @@ async def suggest_meeting_times(
     zone = zone_named(time_zone) or _FALLBACK_ZONE
     constraint = _graph_constraint(location_constraint)
 
-    with graph_errors(TOOL_NAME, step=STEP_SUGGEST):
+    with graph_step(STEP_SUGGEST):
         answered = await client.me.find_meeting_times.post(
             FindMeetingTimesPostRequestBody(
                 attendees=[

@@ -225,7 +225,7 @@ async def copy_mail(
 
     answer: Confirmed = None
     attempts: list[MessageAttempt[CopiedMessage]] = []
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         target = await resolve_destination(reached, wanted)
         if not isinstance(target, MailFault):
             if mailbox is not None:

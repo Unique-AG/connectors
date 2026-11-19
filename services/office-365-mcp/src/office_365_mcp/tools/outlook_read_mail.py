@@ -170,7 +170,7 @@ _NO_BODY = _Body(text=None, is_the_new_part=False, is_plain_text=False)
 async def read_mail(
     client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
 ) -> MailMessage:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_MESSAGE):
             message = await (
                 graph_mailbox(client, mailbox)

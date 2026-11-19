@@ -121,7 +121,7 @@ async def delete_mail_rule(
 
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         rule = await read_rule(client, handle)
         if rule.is_read_only:
             refused = f"{_NOTHING_DELETED} {READ_ONLY_RULE}"

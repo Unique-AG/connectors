@@ -21,7 +21,13 @@ from unique_toolkit.monitoring import configure_tracing
 from office_365_mcp.auth import build_auth, build_oauth_storage
 from office_365_mcp.cardinality import BoundedNameMiddleware, BoundedRequestMiddleware
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
-from office_365_mcp.graph_client import GraphSettings, create_graph_transport
+from office_365_mcp.graph_client import (
+    GRAPH_STATUSES,
+    GraphSettings,
+    create_graph_transport,
+    start_operation_series,
+)
+from office_365_mcp.graph_operations import GraphOperationMiddleware, start_tool_outcomes
 from office_365_mcp.logging import (
     HttpRequestIdMiddleware,
     MessageLogMiddleware,
@@ -149,10 +155,13 @@ def create_app(
                 if rate_limit is not None
                 else []
             ),
+            GraphOperationMiddleware(),
         ],
         lifespan=lifespan,
     )
     register_tools(mcp, graph_transport, selection)
+    start_operation_series(selection.tools, statuses=GRAPH_STATUSES)
+    start_tool_outcomes(selection.tools)
 
     ops_middleware = setup_ops(mcp, duration_buckets=_HTTP_DURATION_BUCKETS)
 

@@ -118,7 +118,7 @@ async def update_list_item(
     if handle is None:
         raise ToolError(_NOT_AN_ITEM_HANDLE)
     try:
-        with graph_errors(TOOL_NAME):
+        with graph_errors():
             outcome = await _update(client, handle, fields, confirm)
     except GraphFailure as failure:
         if failure.status != _PRECONDITION_FAILED:

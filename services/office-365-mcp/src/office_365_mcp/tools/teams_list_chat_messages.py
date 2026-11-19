@@ -10,7 +10,7 @@ from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.messages import TeamsMessage, unknown_enum_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -81,7 +81,7 @@ async def list_chat_messages(
         ),
         headers=unknown_enum_headers(),
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         page = await client.chats.by_chat_id(chat_id).messages.get(
             request_configuration=configuration
         )

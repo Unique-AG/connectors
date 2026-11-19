@@ -14,7 +14,7 @@ from msgraph.generated.teams.item.channels.item.messages.messages_request_builde
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle
 from office_365_mcp.shared.messages import TeamsMessage, event_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -107,7 +107,7 @@ async def teams_browse_channel(
         channel_messages = channel_messages.with_url(
             _own_continuation(page_token, base_url=base_url, team_id=team_id, channel_id=channel_id)
         )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         page = await channel_messages.get(request_configuration=configuration)
         assert page is not None, "Graph answered a channel message listing with no collection"
 

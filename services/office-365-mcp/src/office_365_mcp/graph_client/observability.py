@@ -15,7 +15,7 @@ import order. `metrics.py` still owns the aggregation: the histogram buckets are
 matched by instrument name.
 """
 
-from collections.abc import Generator
+from collections.abc import Generator, Iterable
 from contextlib import contextmanager
 from contextvars import ContextVar
 
@@ -27,13 +27,19 @@ __all__ = [
     "GRAPH_PAGES_SCANNED",
     "GRAPH_STEPS_TOTAL",
     "GRAPH_STEP_DURATION_SECONDS",
+    "GRAPH_SLOW_OPERATIONS_TOTAL",
     "GRAPH_THROTTLED_TOTAL",
+    "SLOW_OPERATION_SECONDS",
+    "GRAPH_TOKEN_ACQUISITIONS_TOTAL",
     "current_graph_operation",
     "graph_operation",
     "record_graph_call",
     "record_graph_step",
     "record_graph_throttled",
     "record_pages_scanned",
+    "TOKEN_RESULTS",
+    "record_token_acquisition",
+    "start_operation_series",
 ]
 
 # Constants because the instruments below and the test that scrapes for them must agree: restating
@@ -41,9 +47,12 @@ __all__ = [
 GRAPH_OPERATIONS_TOTAL = "graph_operations_total"
 GRAPH_OPERATION_DURATION_SECONDS = "graph_operation_duration_seconds"
 GRAPH_THROTTLED_TOTAL = "graph_throttled_total"
+GRAPH_SLOW_OPERATIONS_TOTAL = "graph_slow_operations_total"
+SLOW_OPERATION_SECONDS = 60.0
 GRAPH_PAGES_SCANNED = "graph_pages_scanned"
 GRAPH_STEPS_TOTAL = "graph_steps_total"
 GRAPH_STEP_DURATION_SECONDS = "graph_step_duration_seconds"
+GRAPH_TOKEN_ACQUISITIONS_TOTAL = "graph_token_acquisitions_total"
 
 # Deliberately the whole service's name, not this package's own. The Prometheus exporter puts the
 # meter name on every sample as `otel_scope_name`, so any instrument this service adds later under
@@ -66,10 +75,10 @@ _operation_duration = _meter.create_histogram(
     GRAPH_OPERATION_DURATION_SECONDS,
     unit="s",
     description=(
-        "Wall-clock time one Graph operation took. This includes the SDK's Retry-After waits and "
-        "every page a paged walk read. It leaves out any wait a tool marked as not Microsoft's, "
-        "such as `outlook_send_draft` asking a person to confirm. For the whole wait an MCP "
-        "client saw, person included, read `mcp_call_duration_seconds`."
+        "Wall-clock time of one tool call that attempted Graph. This includes the SDK's "
+        "Retry-After waits and every page a paged walk read. It leaves out any wait a tool marked "
+        "as not Microsoft's, such as `outlook_send_draft` asking a person to confirm. For the "
+        "whole wait an MCP client saw, person included, read `mcp_call_duration_seconds`."
     ),
 )
 _steps = _meter.create_counter(
@@ -89,12 +98,28 @@ _step_duration = _meter.create_histogram(
         "slow."
     ),
 )
+_slow_operations = _meter.create_counter(
+    GRAPH_SLOW_OPERATIONS_TOTAL,
+    description=(
+        "Tool calls that attempted Graph and took more than 60 seconds, the time after which Kong "
+        "and the chat close the request. Measured like graph_operation_duration_seconds."
+    ),
+)
 _throttled = _meter.create_counter(
     GRAPH_THROTTLED_TOTAL,
     description=(
-        "429s that outlived the SDK's retrying. `retried` says which of the two ways it survived: "
-        "true when the retries were spent, false when Graph asked for a wait past the SDK's "
-        "ceiling and none was attempted."
+        "Throttling answers that outlived the SDK's retrying. `retried` is true when the SDK "
+        "retried the request, and false when it did not: Graph asked for a wait past the SDK's "
+        "ceiling, or the call allows no retry."
+    ),
+)
+_token_acquisitions = _meter.create_counter(
+    GRAPH_TOKEN_ACQUISITIONS_TOTAL,
+    description=(
+        "Graph tokens a tool call asked for on the caller's behalf, by tool and by result. A token "
+        "the SDK serves from its cache counts as ok. `refused` is an answer from Entra with an "
+        "AADSTS code, and is never cached. `failed` is any other failure, such as a network "
+        "error. A tool call without a token never reaches Graph."
     ),
 )
 _pages_scanned = _meter.create_histogram(
@@ -106,8 +131,8 @@ _pages_scanned = _meter.create_histogram(
     ),
 )
 
-# How `collect_pages` learns which operation it is walking for, set by `graph_errors` around the
-# block that makes the call.
+# How `collect_pages` learns which operation it is walking for, set by `measured_graph_operation`
+# around the tool call.
 _OPERATION: ContextVar[str | None] = ContextVar("office_365_mcp_graph_operation", default=None)
 
 
@@ -144,6 +169,8 @@ def record_graph_call(operation: str | None, *, status: str, seconds: float) -> 
         return
     _operations.add(1, {"operation": operation, "status": status})
     _operation_duration.record(seconds, {"operation": operation})
+    if seconds > SLOW_OPERATION_SECONDS:
+        _slow_operations.add(1, {"operation": operation})
 
 
 def record_graph_step(
@@ -169,3 +196,25 @@ def record_pages_scanned(operation: str | None, pages: int) -> None:
     if operation is None:
         return
     _pages_scanned.record(pages, {"operation": operation})
+
+
+TOKEN_RESULTS: tuple[str, ...] = ("ok", "refused", "failed")
+
+
+def record_token_acquisition(operation: str | None, *, result: str) -> None:
+    assert result in TOKEN_RESULTS, f"unknown token result {result!r}"
+    if operation is None:
+        return
+    _token_acquisitions.add(1, {"operation": operation, "result": result})
+
+
+def start_operation_series(operations: Iterable[str], *, statuses: Iterable[str]) -> None:
+    status_values = tuple(statuses)
+    for operation in operations:
+        for status in status_values:
+            _operations.add(0, {"operation": operation, "status": status})
+        _slow_operations.add(0, {"operation": operation})
+        for retried in ("true", "false"):
+            _throttled.add(0, {"operation": operation, "retried": retried})
+        for result in TOKEN_RESULTS:
+            _token_acquisitions.add(0, {"operation": operation, "result": result})

@@ -167,7 +167,7 @@ async def list_mail(
     address = _folder_address(folder, folder_ref)
     reached = graph_mailbox(client, mailbox)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_FOLDER):
             found = await reached.mail_folders.by_mail_folder_id(address).get(
                 request_configuration=RequestConfiguration[_FolderQuery](

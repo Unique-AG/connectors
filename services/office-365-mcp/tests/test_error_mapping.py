@@ -142,7 +142,7 @@ _PAGE = {
 }
 _NOTEBOOK = {"id": "NB1", "displayName": "Work", "isShared": False, "userRole": "Owner"}
 
-# The MCP middleware chain the composed app ends up with, outside-in. Two of the six belong to
+# The MCP middleware chain the composed app ends up with, outside-in. Two of them belong to
 # other packages, so the assertion is on names rather than on the types: `_McpMetrics` is
 # `unique_mcp`'s own private class, and importing it here to compare types would be reaching past
 # its front door for the sake of a name it already answers to.
@@ -157,14 +157,15 @@ _CHAIN = (
     "TraceContextRestoreMiddleware",
     "MessageLogMiddleware",
     "RateLimitMiddleware",
+    "GraphOperationMiddleware",
     "DereferenceRefsMiddleware",
     "_McpMetrics",
 )
 
-# The two members of that chain that record what happened to a call — one log line, one set of
-# counters — and so the two the advice has to stay outside of. This, rather than the whole tuple
+# The members of that chain that record what happened to a call — one log line, two sets of
+# counters — and so the ones the advice has to stay outside of. This, rather than the whole tuple
 # above, is the ordering the class below is named for.
-_RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "_McpMetrics")
+_RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "GraphOperationMiddleware", "_McpMetrics")
 
 _ORACLE = "worded_alone"
 
@@ -461,7 +462,7 @@ class TestWhereTheMappingSits:
     ) -> None:
         """Not an ordering rule: a tripwire, so a middleware that appears or disappears underneath
         this service is read here rather than inferred later from a metric that stopped being
-        emitted. Two of the six are not this repository's — `DereferenceRefsMiddleware` is
+        emitted. Two of them are not this repository's — `DereferenceRefsMiddleware` is
         FastMCP's, appended at construction, and `_McpMetrics` is `unique_mcp`'s, appended by
         `setup_ops`. Update this tuple deliberately when a bump moves it; the ordering above is the
         part that may not move quietly.

@@ -167,7 +167,7 @@ async def update_meeting(
     updated: OnlineMeeting | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             refused = _NO_SUCH_MEETING

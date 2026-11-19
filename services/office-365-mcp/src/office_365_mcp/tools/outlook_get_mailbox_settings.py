@@ -241,7 +241,7 @@ async def get_mailbox_settings(
     wants_settings = wants_replies or wants_preferences
     settings_select = None if wants_preferences else _REPLY_FIELDS
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         rules = await _inbox_rules(client) if wants_rules else None
         settings = await _mailbox_settings(client, settings_select) if wants_settings else None
         categories = await _categories(client) if wants_categories else None

@@ -17,7 +17,7 @@ from msgraph.generated.users.item.user_item_request_builder import UserItemReque
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.handles import MailFolderHandle, mail_folder_handle
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -122,7 +122,7 @@ async def browse_folders(
     handle = _parent_folder(parent)
     reached = graph_mailbox(client, mailbox)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(
             reached, parent=handle, include_hidden=include_hidden, limit=limit
         )

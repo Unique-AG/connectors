@@ -236,7 +236,7 @@ async def copy_section(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned = handle.owner is not None or destination.owner is not None
-    with owner_refused(owned, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned, OWNED_REFUSED), graph_errors():
         container = await container_audience(client, destination)
         audience = container.notebook
         if answer_pending or audience.reaches_others:

@@ -282,7 +282,7 @@ async def mark_mail(
 
     answer: Confirmed = None
     attempts: list[_Attempt] = []
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if mailbox is not None:
             with not_graph():
                 answer = await confirm(

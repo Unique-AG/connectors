@@ -165,7 +165,7 @@ async def copy_notebook(
             to_group is not None,
             _OWNER_REFUSED if handle.owner is None else _BOTH_GROUPS_REFUSED,
         ),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
     ):
         if answer_pending or to_group is not None:
             source = await notebook_audience(client, handle.notebook_id, owner=handle.owner)

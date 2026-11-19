@@ -14,7 +14,7 @@ from msgraph.generated.teams.item.channels.item.messages.item.replies import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHANNEL_PERMISSION, MessageHandle, message_handle
 from office_365_mcp.shared.messages import TeamsMessage, event_of, unknown_enum_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -92,7 +92,7 @@ async def teams_list_message_replies(
         headers=unknown_enum_headers(),
         query_parameters=_RepliesQuery(top=limit),
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         page = await (
             client.teams.by_team_id(post.team_id)
             .channels.by_channel_id(post.channel_id)

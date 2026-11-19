@@ -137,7 +137,7 @@ async def delete_calendar(
         raise ToolError(_NOT_A_CALENDAR_HANDLE)
 
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         calendar = await _calendar(client, handle.calendar_id)
         refused = _refusal(calendar, await identity.signed_in_user(client))
         if refused is None and await _holds_an_event(client, handle.calendar_id):

@@ -176,7 +176,7 @@ async def create_section(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
-    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors():
         container = await container_audience(client, handle)
         if answer_pending or container.notebook.reaches_others:
             with not_graph():

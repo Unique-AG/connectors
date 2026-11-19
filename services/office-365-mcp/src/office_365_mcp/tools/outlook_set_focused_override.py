@@ -61,7 +61,7 @@ async def set_focused_override(
 
     overrides = client.me.inference_classification.overrides
     tab = InferenceClassificationType(classify_as)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ):
             first_page = await overrides.get()
             assert first_page is not None, "Graph answered an override listing with no collection"

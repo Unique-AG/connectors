@@ -266,7 +266,7 @@ async def draft_reply_all(
     answer: Confirmed = None
     created: Message | None = None
     fill: _Fill | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if mailbox is not None:
             original = await _read_original(reached, handle)
             addressed = _addressed(original)

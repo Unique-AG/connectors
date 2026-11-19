@@ -110,7 +110,7 @@ async def rename_folder(
 
     answer: Confirmed = None
     renamed: MailFolder | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ_FOLDER):
             read = await folder.get(
                 request_configuration=RequestConfiguration[_FolderQuery](

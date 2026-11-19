@@ -208,7 +208,7 @@ async def respond_to_invite(
         else (proposed_new_time.starts_at, proposed_new_time.ends_at, proposed_new_time.time_zone)
     )
     about = confirmation_id_for(handle.uri, response, repr(comment), repr(send_response), *proposed)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(
             client,
             calendar_id=handle.calendar_id,

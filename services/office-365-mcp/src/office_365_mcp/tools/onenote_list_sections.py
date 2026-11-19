@@ -254,7 +254,7 @@ async def list_sections(
     max_scanned = limit if created_by is None else MAX_SCANNED_ITEMS
 
     owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
-    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors():
         with graph_step(STEP_SECTIONS):
             first_sections = await _first_sections(
                 client, handle, top=top, query_filter=query_filter, orderby=orderby

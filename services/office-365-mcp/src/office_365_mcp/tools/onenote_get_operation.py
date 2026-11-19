@@ -7,7 +7,7 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import fetch_response, graph_errors, native_response
+from office_365_mcp.graph_client import fetch_response, graph_step, native_response
 from office_365_mcp.shared.handles import onenote_operation_handle
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
@@ -70,7 +70,7 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
 
     with (
         owner_refused(handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME, step=STEP_OPERATION),
+        graph_step(STEP_OPERATION),
     ):
         builder = onenote_root(client, handle.owner).operations.by_onenote_operation_id(
             handle.operation_id

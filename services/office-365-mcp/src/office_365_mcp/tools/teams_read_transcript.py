@@ -91,7 +91,7 @@ async def teams_read_transcript(
         .content
     )
     try:
-        with graph_errors(TOOL_NAME):
+        with graph_errors():
             page = await read_page(
                 client,
                 transport,

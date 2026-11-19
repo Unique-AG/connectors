@@ -95,7 +95,7 @@ async def remove_chat_member(
     found: ConversationMember | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with suppress(GraphNotFound), graph_step(STEP_READ):
             found = await member.get()
         if found is None:

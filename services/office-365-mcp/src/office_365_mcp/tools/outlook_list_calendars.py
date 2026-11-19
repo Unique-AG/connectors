@@ -81,7 +81,7 @@ class Calendars(BaseModel):
 
 
 async def list_calendars(client: GraphServiceClient) -> Calendars:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         user = await identity.signed_in_user(client)
         with graph_step(STEP):
             # Container types such as `calendar` support no immutable id, so no `Prefer` header

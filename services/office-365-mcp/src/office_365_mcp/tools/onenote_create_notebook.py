@@ -12,7 +12,7 @@ from msgraph.generated.models.notebook import Notebook
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
 from office_365_mcp.shared.notes import (
     client_url_of,
@@ -158,7 +158,7 @@ async def create_notebook(
     refused: str | None = None
     with (
         owner_refused(owner is not None, named_owner_refused("Notes.Create")),
-        graph_errors(TOOL_NAME, step=STEP_CREATE_NOTEBOOK),
+        graph_step(STEP_CREATE_NOTEBOOK),
     ):
         if answer_pending or owner is not None:
             with not_graph():

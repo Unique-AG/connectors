@@ -142,7 +142,7 @@ async def read_attachment(
                 )
             )
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         fetched = await fetch_file_or_refusal(
             describe, download, uri=handle.uri, refusals=_REFUSALS
         )

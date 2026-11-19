@@ -14,7 +14,7 @@ from msgraph.generated.users.item.onenote.notebooks.get_notebook_from_web_url im
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, send_parsed
+from office_365_mcp.graph_client import graph_step, send_parsed
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
@@ -170,7 +170,7 @@ async def find_notebook_from_url(
     named = owner_named(group=group, site=site)
     with (
         owner_refused(named is not None, named_owner_refused("Notes.Read")),
-        graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL),
+        graph_step(STEP_NOTEBOOK_FROM_URL),
     ):
         found = await _resolve(client, web_url, named)
     assert found is not None, "Graph answered getNotebookFromWebUrl with nothing"

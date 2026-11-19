@@ -48,6 +48,7 @@ from office_365_mcp.cardinality import (
 )
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
+from office_365_mcp.graph_operations import GraphOperationMiddleware
 from office_365_mcp.server import readiness
 from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
@@ -861,6 +862,17 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
         assert ours[0] < metrics[0], (
             "BoundedNameMiddleware has to run outside unique_mcp's metrics middleware, which reads "
             + "the tool name the client sent as a Prometheus label before anything resolves it"
+        )
+
+    def test_it_is_mounted_outside_the_graph_operation_middleware(self) -> None:
+        installed = _server_of(_app()).middleware
+        ours = [i for i, mw in enumerate(installed) if isinstance(mw, BoundedNameMiddleware)]
+        graph = [i for i, mw in enumerate(installed) if isinstance(mw, GraphOperationMiddleware)]
+
+        assert len(ours) == 1 and len(graph) == 1, f"expected one of each: {installed}"
+        assert ours[0] < graph[0], (
+            "GraphOperationMiddleware labels graph_operations_total with the tool name, so the "
+            + "name has to be bounded before it gets there"
         )
 
 

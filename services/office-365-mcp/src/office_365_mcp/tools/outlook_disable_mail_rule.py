@@ -135,7 +135,7 @@ async def disable_mail_rule(client: GraphServiceClient, *, rule_ref: str) -> Dis
     if handle is None:
         raise ToolError(_NOT_A_RULE_HANDLE)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         before = await _read_rule(client, handle)
         after = None if before.is_read_only else await _disable_rule(client, handle)
 

@@ -13,7 +13,7 @@ from msgraph.generated.shares.item.drive_item.drive_item_request_builder import 
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.files import ITEM_FIELDS, DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -75,7 +75,7 @@ async def resolve_url(client: GraphServiceClient, *, url: str) -> DriveItemSumma
     if not _is_web_address(address):
         raise ToolError(_NOT_A_WEB_ADDRESS)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         item = await client.shares.by_shared_drive_item_id(_sharing_token(address)).drive_item.get(
             request_configuration=RequestConfiguration[_ItemQuery](
                 query_parameters=_ItemQuery(select=list(ITEM_FIELDS))

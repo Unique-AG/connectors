@@ -192,7 +192,7 @@ async def list_pages(
     with (
         owner_refused(group is not None or site is not None, named_owner_refused("Notes.Read")),
         owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
         graph_step(STEP_PAGES),
     ):
         first_page = await _first_page(

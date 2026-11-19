@@ -232,7 +232,7 @@ async def teams_list_meeting_recordings(
     """
     assert limit >= 1, f"limit must be at least 1, got {limit}"
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingRecordings(

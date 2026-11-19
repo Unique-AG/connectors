@@ -9,7 +9,7 @@ from msgraph.generated.models.room_collection_response import RoomCollectionResp
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.mail import ONE_ADDRESS
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -195,7 +195,7 @@ async def find_rooms(
     if wanted_list is not None and ONE_ADDRESS.match(wanted_list) is None:
         raise ToolError(_NOT_ONE_ADDRESS)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(client, wanted_list)
         assert first_page is not None, "Graph answered a room listing with no collection"
         collected = await collect_pages(

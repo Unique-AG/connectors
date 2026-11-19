@@ -126,7 +126,7 @@ async def cancel_event(
 
     asked: InputRequiredResult | None = None
     about = confirmation_id_for(handle.uri, repr(comment))
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
         refused = _NOT_THE_ORGANIZER if event.is_organizer is False else None
         if refused is None and event.attendees:

@@ -164,7 +164,7 @@ async def move_item(
     moved: MovedItem | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, moving.drive_id, moving.item_id)
         folder = await item_for_a_question(client, into.drive_id, into.item_id)
         refused = _unmovable(found, folder)

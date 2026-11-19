@@ -74,7 +74,7 @@ async def list_attachments(
     if handle is None:
         raise ToolError(_BAD_HANDLE)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await message_attachments(client, handle=handle, mailbox=mailbox)
 
     return MessageAttachments(attachments=found.items, capped=found.capped)

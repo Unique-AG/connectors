@@ -147,7 +147,7 @@ async def edit_message(
     mentions: Sequence[Mention] = (),
 ) -> EditedMessage | InputRequiredResult:
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await get_message(client, handle)
         assert found is not None, "Graph answered a message read with no message"
         current = TeamsMessage.from_message(found, handle=handle)

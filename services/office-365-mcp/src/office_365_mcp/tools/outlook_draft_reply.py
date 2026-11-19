@@ -285,7 +285,7 @@ async def draft_reply(
     answer: Confirmed = None
     created: Message | None = None
     fill: _Fill | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if mailbox is not None or (mode == "reply" and (copied or blind)):
             original = await _read_original(reached, handle)
             addressed = forwarded_to or _reply_addresses(original)

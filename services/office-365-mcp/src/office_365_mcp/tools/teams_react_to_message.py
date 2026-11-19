@@ -158,7 +158,7 @@ async def react_to_message(
     confirm: Confirm,
 ) -> ChangedReaction | InputRequiredResult:
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         target = await _target(client, handle)
         refused = _ALREADY_DELETED if target is None else None
         if target is not None:

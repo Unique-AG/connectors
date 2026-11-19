@@ -201,7 +201,7 @@ async def draft_mail(
         if answer is not None:
             raise ToolError(answer)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_CREATE_DRAFT):
             draft = await reached.messages.post(
                 Message(

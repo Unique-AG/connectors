@@ -210,7 +210,7 @@ async def list_events(
     opens, closes = window_bounds(starts_on, ends_on, zone=zone)
     narrowed = _filter_for(subject_contains=subject_contains, cancelled=cancelled)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         calendar = await calendar_of(client, calendar_id=named)
         calendar_id = calendar.id
         assert calendar_id is not None, "Graph answered a calendar read with a calendar with no id"
