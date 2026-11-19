@@ -6,6 +6,8 @@ import type { ThrottlerGetTrackerFunction } from '@nestjs/throttler';
  * user of a tenant reaches the server through the same backend egress IP, so a per-IP bucket
  * is shared by all of them, while a legitimate client presents each code or refresh token once.
  * Requests without a credential still share the per-IP bucket.
+ * The token route also carries a `PerIpCeiling`, so varying the credential does not escape
+ * every limit.
  */
 export const tokenCredentialTracker: ThrottlerGetTrackerFunction = (req) => {
   const credential = credentialOf(req.body);

@@ -15,6 +15,7 @@ export {
 export * from './filters/oauth-exception.filter';
 export * from './guards/mcp-auth-jwt.guard';
 export * from './guards/mcp-oauth-throttler.guard';
+export * from './guards/per-ip-ceiling.decorator';
 export type { IEncryptionService } from './interfaces/encryption-service.interface';
 export type {
   AccessTokenMetadata,

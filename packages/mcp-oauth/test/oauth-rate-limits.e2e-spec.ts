@@ -4,6 +4,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OAUTH_ENDPOINTS } from '../src';
 import { createMockModuleConfig } from '../src/__mocks__';
+import { TOKEN_ENDPOINT_PER_IP_CEILING } from '../src/controllers/token.controller';
 import { McpOAuthModule } from '../src/mcp-oauth.module';
 import { openConsentPage } from './consent.helpers';
 
@@ -140,5 +141,56 @@ describe('OAuth rate limits with the emergency switch on (E2E)', () => {
       });
       expect(response.status, `attempt ${attempt + 1}`).not.toBe(429);
     }
+  });
+});
+
+describe('OAuth token endpoint per-IP ceiling (E2E)', () => {
+  let app: INestApplication;
+  let clientId: string;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [McpOAuthModule.forRootAsync({ useFactory: () => createMockModuleConfig() })],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    const registration = await request(app.getHttpServer())
+      .post(OAUTH_ENDPOINTS.register)
+      .send({
+        client_name: 'Credential-cycling client',
+        redirect_uris: [REDIRECT_URI],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      });
+    clientId = registration.body.client_id;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('caps one IP that varies the credential on every request', async () => {
+    const { limit } = TOKEN_ENDPOINT_PER_IP_CEILING;
+    for (let attempt = 0; attempt < limit; attempt++) {
+      const response = await request(app.getHttpServer())
+        .post(OAUTH_ENDPOINTS.token)
+        .send({
+          grant_type: 'refresh_token',
+          refresh_token: `random-token-${attempt}`,
+          client_id: clientId,
+        });
+      expect(response.status, `attempt ${attempt + 1}`).not.toBe(429);
+    }
+
+    const overTheCeiling = await request(app.getHttpServer()).post(OAUTH_ENDPOINTS.token).send({
+      grant_type: 'refresh_token',
+      refresh_token: 'random-token-over-the-ceiling',
+      client_id: clientId,
+    });
+    expect(overTheCeiling.status).toBe(429);
+    expect(overTheCeiling.headers['retry-after']).toBeDefined();
   });
 });

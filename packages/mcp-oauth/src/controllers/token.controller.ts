@@ -10,15 +10,22 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
+import { seconds, Throttle } from '@nestjs/throttler';
 import { ZodValidationPipe } from 'nestjs-zod';
 import { OAUTH_ENDPOINTS, OAUTH_FALLBACK_ENDPOINTS } from '../constants/oauth.constants';
 import { type IntrospectionResponse, IntrospectRequestDto } from '../dtos/introspect-request.dto';
 import { RevokeRequestDto } from '../dtos/revoke-request.dto';
 import { TokenRequestDto } from '../dtos/token-request.dto';
 import { McpOAuthThrottlerGuard } from '../guards/mcp-oauth-throttler.guard';
+import { PerIpCeiling } from '../guards/per-ip-ceiling.decorator';
 import { McpOAuthService } from '../services/mcp-oauth.service';
 import { tokenCredentialTracker } from '../utils/token-credential-tracker';
+
+/**
+ * Caps what one address can send to the token endpoint while its main bucket is per credential.
+ * High enough for every user of a tenant refreshing through one backend egress IP.
+ */
+export const TOKEN_ENDPOINT_PER_IP_CEILING = { limit: 600, ttl: seconds(60) };
 
 @Controller()
 @UseGuards(McpOAuthThrottlerGuard)
@@ -30,6 +37,7 @@ export class TokenController {
 
   @Post([OAUTH_ENDPOINTS.token, OAUTH_FALLBACK_ENDPOINTS.token])
   @Throttle({ default: { getTracker: tokenCredentialTracker } })
+  @PerIpCeiling(TOKEN_ENDPOINT_PER_IP_CEILING)
   @Header('Cache-Control', 'no-store')
   @Header('Pragma', 'no-cache')
   @Header('X-Content-Type-Options', 'nosniff')
