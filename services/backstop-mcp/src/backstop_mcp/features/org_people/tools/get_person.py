@@ -207,11 +207,13 @@ async def get_person(
         ),
     )
     person = person_query_result.person
+    resolved = ResolvedPartyResponse.from_party(
+        party, attributes=person.model_dump(by_alias=True, exclude_none=True)
+    )
     return PersonResolvedResponse(
+        name=resolved.name,
         person=person,
-        resolved=ResolvedPartyResponse.from_party(
-            party, attributes=person.model_dump(by_alias=True, exclude_none=True)
-        ),
+        resolved=resolved,
         as_of=AsOfResponse.from_attributes(person),
         employments=person_query_result.employments,
         included=person_query_result.included,
