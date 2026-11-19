@@ -582,19 +582,17 @@ def _surface_of(tool_name: str | None) -> str | None:
 
 
 def _declared_tool_name(source: pathlib.Path) -> str | None:
-    return next(
-        (
-            node.value.value
-            for node in ast.parse(source.read_text()).body
-            if isinstance(node, ast.Assign)
-            and any(
-                isinstance(target, ast.Name) and target.id == "TOOL_NAME" for target in node.targets
-            )
-            and isinstance(node.value, ast.Constant)
-            and isinstance(node.value.value, str)
-        ),
-        None,
-    )
+    for node in ast.parse(source.read_text()).body:
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        else:
+            continue
+        named = any(isinstance(target, ast.Name) and target.id == "TOOL_NAME" for target in targets)
+        if named and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return node.value.value
+    return None
 
 
 def _tool_surface(source: pathlib.Path) -> str | None:
@@ -848,6 +846,12 @@ class TestTheDetectionItself:
         _ = module.write_text('TOOL_NAME = "outlook_list_mail"\n')
 
         assert _tool_surface(module) == "outlook"
+
+    def test_names_the_surface_of_an_annotated_tool_name(self, tmp_path: pathlib.Path) -> None:
+        module = tmp_path / "list_chats.py"
+        _ = module.write_text('TOOL_NAME: str = "teams_list_chats"\n')
+
+        assert _tool_surface(module) == "teams"
 
     def test_names_no_surface_for_a_module_that_declares_no_tool_name(
         self, tmp_path: pathlib.Path

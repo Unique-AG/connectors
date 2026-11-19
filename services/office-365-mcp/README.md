@@ -37,6 +37,9 @@ the tool. The registry builds the map from each preset to its tools from these n
 `GRAPH_CALL_EXAMPLE` gives the arguments for one example call, which the tests use to call each
 tool against a stub of Microsoft Graph.
 
+A new tool also changes the generated Terraform registry. From the service directory, run
+`uv run python scripts/render-terraform-registry.py` and commit the generated file with the tool.
+
 The file `tools/__init__.py` is the central registry. Its function `resolve()` reads an operator's
 selection and returns two things:
 
@@ -129,7 +132,7 @@ A OneNote handle starts with `onenote:///sites/{site}/` when Graph addresses its
 documents no copy from or into a site notebook. As a result, the three copy tools refuse a site
 handle before they send a request to Graph.
 
-This layout follows seven layering rules:
+This layout follows eight layering rules:
 
 1. `shared/` imports no tool module. Only `shared/seam/` imports FastMCP. This keeps the
    framework out of the handle grammar and the rest of the shared vocabulary.
@@ -144,10 +147,13 @@ This layout follows seven layering rules:
 6. `shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`,
    `sharepoint:///`, or `onenote:///` URI. Showing the shape of a URI to a model, in a description,
    an `examples=` field, or a refusal message, is prose. It is not building or parsing a URI.
-7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`, and
-   `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
+7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`,
+   `shared/seam/`, and `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
    grouping whose modules are the real units. Each consumer states which module it depends on, at
    the import line.
+8. A tool imports the neutral modules directly under `shared/` and the package of its own surface,
+   such as `shared/teams/` for a Teams tool. It never imports another surface's package, such as
+   `shared/outlook/`. The tool's `TOOL_NAME` prefix names its surface.
 
 The test file `tests/test_layering.py` enforces every rule above, and each rule has its own guard.
 When a rule has nothing real behind it, the rule has gone vacuous, and its guard fails. Examples of
