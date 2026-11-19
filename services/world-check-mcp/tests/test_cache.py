@@ -61,3 +61,31 @@ async def test_a_store_that_cannot_be_read_still_gives_the_loaded_value() -> Non
     )
 
     assert value == ["a", "b"]
+
+
+_MAP = TypeAdapter(dict[str, str])
+
+
+async def test_a_cached_value_is_stored_as_a_json_string_that_postgres_cannot_reorder() -> None:
+    store = MemoryStore()
+
+    async def load() -> dict[str, str]:
+        return {"ZZ": "last", "B": "first", "AAA": "middle"}
+
+    await Cache(store).read_through(key="k", adapter=_MAP, ttl_seconds=60, load=load)
+
+    stored = await store.get("k", collection="cache")
+    assert stored is not None
+    assert isinstance(stored["value"], str)
+
+
+async def test_a_cached_map_keeps_the_order_lseg_sent_it_in() -> None:
+    cache = Cache(MemoryStore())
+
+    async def load() -> dict[str, str]:
+        return {"ZZ": "last", "B": "first", "AAA": "middle"}
+
+    await cache.read_through(key="k", adapter=_MAP, ttl_seconds=60, load=load)
+    cached = await cache.read_through(key="k", adapter=_MAP, ttl_seconds=60, load=load)
+
+    assert list(cached) == ["ZZ", "B", "AAA"]

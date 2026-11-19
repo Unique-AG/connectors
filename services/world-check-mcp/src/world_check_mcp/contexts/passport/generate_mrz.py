@@ -1,18 +1,18 @@
 from mcp_observability import traced
 
+from world_check_mcp.contexts.lookups import nationalities as reference_nationalities
 from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Mrz
 from world_check_mcp.contexts.passport.models import Passport
+from world_check_mcp.persistence import Cache
 from world_check_mcp.upstream import GET_MRZ_DATA
-from world_check_mcp.upstream import GET_NATIONALITIES
-from world_check_mcp.upstream import GetNationalitiesRequest
 from world_check_mcp.upstream import Upstream
 
 
 @traced(arguments=("passport.document_type",))
-async def generate_passport_mrz(*, upstream: Upstream, passport: Passport) -> Mrz:
+async def generate_passport_mrz(*, upstream: Upstream, cache: Cache, passport: Passport) -> Mrz:
     """MRZ lines for a document. This does not create a case or record a verification."""
-    nationalities = (await upstream.call(GET_NATIONALITIES, GetNationalitiesRequest())).root
+    nationalities = await reference_nationalities(upstream=upstream, cache=cache)
     issuing_state = passport.issuing_state.upper()
     nationality = passport.nationality.upper()
     if issuing_state not in nationalities or nationality not in nationalities:

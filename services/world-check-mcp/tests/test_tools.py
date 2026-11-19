@@ -604,12 +604,22 @@ _GROUP_TREE: list[dict[str, object]] = [
 ]
 
 
-def _counting_server() -> tuple[FastMCP, list[str]]:
-    """The server over a larger group tree, with the LSEG paths each request asked for."""
+def _counting_server(*, reject_save_for: str | None = None) -> tuple[FastMCP, list[str]]:
+    """The server over a larger group tree, with the LSEG paths each request asked for.
+
+    LSEG refuses to save the case named `reject_save_for`.
+    """
     paths: list[str] = []
 
     def handler(request: httpx2.Request) -> httpx2.Response:
         paths.append(request.url.path)
+        if (
+            reject_save_for is not None
+            and request.method == "POST"
+            and request.url.path.endswith("/cases")
+            and _body(request).get("name") == reject_save_for
+        ):
+            return _json(400, {"error": "bad request"})
         if request.url.path.endswith("/groups") and request.url.params.get("showAllChildGroups"):
             return _json(200, _GROUP_TREE)
         return _world_check(request)
@@ -620,6 +630,86 @@ def _counting_server() -> tuple[FastMCP, list[str]]:
         httpx2.MockTransport(handler),
     )
     return server, paths
+
+
+def _paths_to(paths: list[str], suffix: str) -> list[str]:
+    return [path for path in paths if path.endswith(suffix)]
+
+
+async def _screen(client: Client[FastMCPTransport], name: str) -> None:
+    await client.call_tool(
+        "screen_entity",
+        {
+            "name": name,
+            "entity_type": "INDIVIDUAL",
+            "group_id": "g-screen",
+            "nationality": "GBR",
+        },
+    )
+
+
+async def test_two_screenings_read_the_template_and_the_reference_lists_once() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        await _screen(client, "Ada Lovelace")
+        await _screen(client, "Grace Hopper")
+
+    assert len(_paths_to(paths, "/groups/g-screen/case-template")) == 1
+    assert len(_paths_to(paths, "/references/countries")) == 1
+    assert len(_paths_to(paths, "/references/nationalities")) == 1
+
+
+async def test_two_passport_checks_read_the_template_and_the_nationalities_once() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        for passport in (_PASSPORT, {**_PASSPORT, "identification_number": "987654321"}):
+            await client.call_tool(
+                "passport_check", {"passport": passport, "group_id": "g-passport"}
+            )
+
+    assert len(_paths_to(paths, "/groups/g-passport/case-template")) == 1
+    assert len(_paths_to(paths, "/references/nationalities")) == 1
+
+
+async def test_reference_data_is_the_same_from_the_cache_and_api_info_is_never_cached() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        for kind in ("countries", "nationalities", "providers", "search_filters"):
+            first = (
+                await client.call_tool("get_reference_data", {"kind": kind})
+            ).structured_content
+            second = (
+                await client.call_tool("get_reference_data", {"kind": kind})
+            ).structured_content
+            assert first is not None
+            assert first == second
+        await client.call_tool("get_reference_data", {"kind": "api_info"})
+        await client.call_tool("get_reference_data", {"kind": "api_info"})
+
+    assert len(_paths_to(paths, "/references/countries")) == 1
+    assert len(_paths_to(paths, "/references/nationalities")) == 1
+    assert len(_paths_to(paths, "/references/providers")) == 1
+    assert len(_paths_to(paths, "/references/search-filters")) == 1
+    assert len(_paths_to(paths, "/apiInfo")) == 2
+
+
+async def test_screening_reuses_the_countries_the_reference_tool_read() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        await client.call_tool("get_reference_data", {"kind": "countries"})
+        await _screen(client, "Ada Lovelace")
+
+    assert len(_paths_to(paths, "/references/countries")) == 1
+
+
+async def test_a_rejected_save_makes_the_next_screening_read_the_template_again() -> None:
+    server, paths = _counting_server(reject_save_for="Reject Me")
+    async with Client(server) as client:
+        with pytest.raises(ToolError):
+            await _screen(client, "Reject Me")
+        await _screen(client, "Ada Lovelace")
+
+    assert len(_paths_to(paths, "/groups/g-screen/case-template")) == 2
 
 
 class _StoreThatCountsExits(MemoryStore):

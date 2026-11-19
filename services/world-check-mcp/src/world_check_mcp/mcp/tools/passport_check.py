@@ -8,9 +8,11 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from world_check_mcp import contexts
+from world_check_mcp.mcp.dependencies import get_cache
 from world_check_mcp.mcp.dependencies import get_upstream
 from world_check_mcp.mcp.inputs.identifiers import ExternalId
 from world_check_mcp.mcp.inputs.identifiers import GroupId
+from world_check_mcp.persistence import Cache
 from world_check_mcp.upstream import Upstream
 
 PageSize = Annotated[int, Field(ge=1, le=100, description="WATCHLIST matches to return.")]
@@ -55,10 +57,12 @@ async def passport_check(
     ] = None,
     limit: PageSize = 20,
     upstream: Upstream = Depends(get_upstream),
+    cache: Cache = Depends(get_cache),
 ) -> contexts.PassportCheck:
     try:
         return await contexts.passport_check(
             upstream=upstream,
+            cache=cache,
             passport=passport,
             group_id=group_id,
             case_id=case_id,

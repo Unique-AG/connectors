@@ -1,5 +1,7 @@
 from mcp_observability import traced
 
+from world_check_mcp.contexts.lookups import forget_template_if_rejected
+from world_check_mcp.contexts.lookups import screening_lookups
 from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Passport
 from world_check_mcp.contexts.passport.models import PassportCheck
@@ -11,15 +13,10 @@ from world_check_mcp.contexts.screening import match_from_result
 from world_check_mcp.contexts.screening import refuse_existing_case
 from world_check_mcp.contexts.screening import ScreeningError
 from world_check_mcp.contexts.screening import watchlist_results
-from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
-from world_check_mcp.upstream import GET_COUNTRIES
-from world_check_mcp.upstream import GET_NATIONALITIES
-from world_check_mcp.upstream import GetCaseTemplateForGroupPath
-from world_check_mcp.upstream import GetCaseTemplateForGroupRequest
-from world_check_mcp.upstream import GetCountriesRequest
-from world_check_mcp.upstream import GetNationalitiesRequest
+from world_check_mcp.persistence import Cache
 from world_check_mcp.upstream import SAVE_AND_SCREEN
 from world_check_mcp.upstream import Upstream
+from world_check_mcp.upstream import UpstreamError
 
 
 @traced(
@@ -32,6 +29,7 @@ from world_check_mcp.upstream import Upstream
 async def passport_check(
     *,
     upstream: Upstream,
+    cache: Cache,
     passport: Passport,
     group_id: str,
     case_id: str | None = None,
@@ -65,20 +63,15 @@ async def passport_check(
         )
     except ScreeningError as error:
         raise PassportError(str(error)) from error
-    template = await upstream.call(
-        GET_CASE_TEMPLATE_FOR_GROUP,
-        GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
-    )
-    countries = await upstream.call(GET_COUNTRIES, GetCountriesRequest())
-    nationalities = await upstream.call(GET_NATIONALITIES, GetNationalitiesRequest())
+    lookups = await screening_lookups(upstream=upstream, cache=cache, group_id=group_id)
     try:
         arguments = passport_arguments(
             passport=passport,
             name=name or f"{passport.given_name} {passport.last_name}",
             group_id=group_id,
-            template=template,
-            countries=countries.root,
-            nationalities=nationalities.root,
+            template=lookups.template,
+            countries=lookups.countries,
+            nationalities=lookups.nationalities,
             case_id=effective_case_id,
             include_watchlist=include_watchlist,
             secondary_fields=list(secondary_fields or []),
@@ -86,7 +79,11 @@ async def passport_check(
         )
     except ScreeningError as error:
         raise PassportError(str(error)) from error
-    saved = await upstream.call_untyped(SAVE_AND_SCREEN, **arguments)
+    try:
+        saved = await upstream.call_untyped(SAVE_AND_SCREEN, **arguments)
+    except UpstreamError as error:
+        await forget_template_if_rejected(cache=cache, group_id=group_id, error=error)
+        raise
     if not saved.case_system_id:
         raise PassportError(
             "LSEG completed the passport check but returned no caseSystemId. "
