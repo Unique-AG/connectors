@@ -1,6 +1,8 @@
+import asyncio
 from datetime import datetime
 from datetime import timedelta
 from datetime import UTC
+from typing import override
 
 import httpx2
 from mcp_openapi.upstream import Operation
@@ -8,6 +10,7 @@ from pydantic import AnyHttpUrl
 from pydantic import ValidationError
 import pytest
 
+from polixis_mcp.shared import CachedAnswer
 from polixis_mcp.upstream import open_upstream
 from polixis_mcp.upstream import SEARCH_ENTITIES
 from polixis_mcp.upstream import SearchEntitiesRequest
@@ -353,3 +356,117 @@ async def test_the_cache_key_holds_no_credentials_from_the_api_url() -> None:
     [key] = cache.answers
     assert "secret" not in key
     assert "user" not in key
+
+
+class _MissCountingCache(FakeResponseCache):
+    """Sets `all_missed` once `expected` reads have missed."""
+
+    def __init__(self, *, expected: int) -> None:
+        super().__init__()
+        self._expected: int = expected
+        self.misses: int = 0
+        self.all_missed: asyncio.Event = asyncio.Event()
+
+    @override
+    async def get(self, key: str) -> CachedAnswer | None:
+        answer = await super().get(key)
+        if answer is None:
+            self.misses += 1
+            if self.misses >= self._expected:
+                self.all_missed.set()
+        return answer
+
+
+async def _three_at_once(answer: dict[str, object]) -> tuple[list[str], list[httpx2.Response]]:
+    """Sends the same request three times at once, while Polixis holds the first answer back
+    until all three have missed the cache. Returns the paths Polixis answered and the responses.
+    """
+    answered: list[str] = []
+    cache = _MissCountingCache(expected=3)
+
+    async def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        answered.append(request.url.path)
+        await cache.all_missed.wait()
+        return httpx2.Response(200, json=answer)
+
+    async with (
+        upstream_http(fake_upstream_settings(), httpx2.MockTransport(respond), cache=cache) as http,
+        asyncio.timeout(5),
+        asyncio.TaskGroup() as requests,
+    ):
+        sent = [requests.create_task(http.get("/api/graph/pid/P1")) for _ in range(3)]
+    return answered, [request.result() for request in sent]
+
+
+async def test_the_same_request_missing_at_once_asks_polixis_once() -> None:
+    answered, responses = await _three_at_once({"count": 1})
+
+    assert answered == ["/api/graph/pid/P1"]
+    assert [response.json() for response in responses] == [{"count": 1}] * 3
+
+
+async def test_after_an_answer_the_cache_does_not_keep_each_waiting_request_asks_again() -> None:
+    rejection: dict[str, object] = {"count": 1, "error": "unknown id", "code": "NOT_FOUND"}
+
+    answered, responses = await _three_at_once(rejection)
+
+    assert answered == ["/api/graph/pid/P1"] * 3
+    assert [response.json() for response in responses] == [rejection] * 3
+
+
+async def test_a_miss_no_other_request_shares_reads_the_cache_once() -> None:
+    cache = _MissCountingCache(expected=1)
+
+    async with upstream_http(fake_upstream_settings(), _polixis({"count": 1}), cache=cache) as http:
+        await http.get("/api/graph/pid/P1")
+
+    assert cache.misses == 1
+
+
+async def test_a_request_waits_at_most_the_timeout_for_the_same_one_ahead_of_it() -> None:
+    answered: list[str] = []
+    first_arrived = asyncio.Event()
+    release_first = asyncio.Event()
+
+    async def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        answered.append(request.url.path)
+        count = len(answered)
+        if count == 1:
+            first_arrived.set()
+            await release_first.wait()
+        return httpx2.Response(200, json={"count": count})
+
+    settings = fake_upstream_settings().model_copy(update={"timeout_seconds": 0.05})
+    async with (
+        upstream_http(settings, httpx2.MockTransport(respond), cache=FakeResponseCache()) as http,
+        asyncio.timeout(5),
+        asyncio.TaskGroup() as requests,
+    ):
+        first = requests.create_task(http.get("/api/graph/pid/P1"))
+        await first_arrived.wait()
+        second = await http.get("/api/graph/pid/P1")
+        release_first.set()
+
+    assert answered == ["/api/graph/pid/P1"] * 2
+    assert (first.result().json(), second.json()) == ({"count": 1}, {"count": 2})
+
+
+async def test_an_answer_that_repeats_a_key_with_a_value_that_does_not_fit_is_not_cached() -> None:
+    cache = FakeResponseCache()
+    body = b'{"nodes": {"N1": false, "N1": {"id": "N1"}}}'
+
+    def respond(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path == _TOKEN_PATH:
+            return _token("access-token")
+        return httpx2.Response(200, content=body, headers={"content-type": "application/json"})
+
+    async with upstream_http(
+        fake_upstream_settings(), httpx2.MockTransport(respond), cache=cache
+    ) as http:
+        await http.post("/api/graph/subgraph", json={"pids": ["P1"]})
+
+    assert cache.answers == {}

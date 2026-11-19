@@ -12,6 +12,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_get_channel_files_folder"
 
+PRESETS: tuple[str, ...] = ("teams-files",)
+
 STEP = "channel_files_folder"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)

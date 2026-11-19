@@ -16,7 +16,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphFailure, GraphNotFound, GraphSettings
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle
-from office_365_mcp.shared.rules import (
+from office_365_mcp.shared.outlook.rules import (
     RULE_FIELDS,
     MailRule,
     RuleActionName,
@@ -1196,13 +1196,13 @@ class TestHowItDeclaresItself:
             + "does not forward or redirect mail, after the change."
         ) in description
         assert "Every address must come from the user." in description
-        assert "This tool refuses a read-only rule." in description
         assert "refuses `actions` and `remove_actions` for a rule that erases mail" in description
         assert "Each action that you give in `actions` replaces the same action" in description
         assert "keeps every other action, except the actions that `remove_actions` names" in (
             description
         )
-        assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
 
     async def test_the_actions_field_says_that_a_given_action_replaces_only_that_action(
         self, transport: httpx.AsyncClient

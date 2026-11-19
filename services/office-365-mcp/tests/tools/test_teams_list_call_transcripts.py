@@ -12,7 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, GraphNotFound
 from office_365_mcp.shared.handles import CallTranscriptHandle
-from office_365_mcp.shared.meetings import MAX_ARTIFACT_SCAN
+from office_365_mcp.shared.teams.meetings import MAX_ARTIFACT_SCAN
 from office_365_mcp.tools import teams_list_call_transcripts as lister
 
 from .conftest import GRAPH_V1, ME, OTHER_USER_ID, SIGNED_IN_USER_ID

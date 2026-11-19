@@ -22,10 +22,11 @@ from office_365_mcp.graph_client import (
     download_to_file,
     graph_step,
 )
+from office_365_mcp.shared.files import MEGABYTE
 
 CALL_TRANSCRIPT_PERMISSION = "CallTranscripts.Read.All"
 
-MAX_TRANSCRIPT_BYTES = 100 * 1024 * 1024
+MAX_TRANSCRIPT_BYTES = 100 * MEGABYTE
 
 INVERTED_TIME_WINDOW = (
     "from_seconds is later than to_seconds. No turn matches both bounds. Swap the two values, "

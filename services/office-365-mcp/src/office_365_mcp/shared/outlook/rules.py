@@ -26,10 +26,11 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, ConfigDict, Field
 
 from office_365_mcp.graph_client import graph_step
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
+from office_365_mcp.shared.addresses import ONE_ADDRESS
 from office_365_mcp.shared.handles import MailRuleHandle, mail_folder_handle
-from office_365_mcp.shared.mail import ONE_ADDRESS, WellKnownFolder
+from office_365_mcp.shared.mail import WellKnownFolder
 from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.prose import cut_for_a_question
 
 STEP_READ_RULE = "read_mail_rule"

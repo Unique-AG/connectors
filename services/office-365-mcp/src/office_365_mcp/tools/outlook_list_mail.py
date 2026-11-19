@@ -19,10 +19,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.addresses import ONE_ADDRESS
 from office_365_mcp.shared.handles import mail_folder_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
-    ONE_ADDRESS,
     SUMMARY_FIELDS,
     MailImportance,
     MailSummary,
@@ -31,6 +30,7 @@ from office_365_mcp.shared.mail import (
     has_flag_state,
 )
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -40,6 +40,8 @@ from office_365_mcp.shared.seam import (
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_mail"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP_FOLDER = "mail_folder"
 STEP_MESSAGES = "folder_messages"

@@ -27,6 +27,7 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOperationHandle,
@@ -35,7 +36,7 @@ from office_365_mcp.shared.handles import (
     OnenoteSectionGroupHandle,
     OnenoteSectionHandle,
 )
-from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_copy_section as copier

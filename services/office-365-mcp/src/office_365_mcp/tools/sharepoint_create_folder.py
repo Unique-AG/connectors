@@ -19,6 +19,7 @@ from office_365_mcp.graph_client import (
     request_with_json_body,
     send_parsed,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     FOLDER_HANDLE_SOURCES,
@@ -31,7 +32,6 @@ from office_365_mcp.shared.files import (
     unusable_name,
 )
 from office_365_mcp.shared.handles import drive_folder_handle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -40,6 +40,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_create_folder"
+
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
 
 STEP_CREATE_FOLDER = "create_folder"
 

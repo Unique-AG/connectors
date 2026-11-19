@@ -22,6 +22,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, onenote_notebook_handle
 from office_365_mcp.shared.notes import (
     COPY_HANDLE_OWNERS,
@@ -31,7 +32,6 @@ from office_365_mcp.shared.notes import (
     in_a_site,
     notebook_audience,
     onenote_root,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -43,6 +43,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_copy_notebook"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_COPY_NOTEBOOK = "copy_notebook"
 

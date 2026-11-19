@@ -9,9 +9,9 @@ import pytest
 import respx
 from fastmcp.exceptions import ToolError
 
-from office_365_mcp.shared import meetings, transcripts
 from office_365_mcp.shared.handles import meeting_uri_for
-from office_365_mcp.shared.transcripts import MAX_TRANSCRIPT_BYTES
+from office_365_mcp.shared.teams import meetings, transcripts
+from office_365_mcp.shared.teams.transcripts import MAX_TRANSCRIPT_BYTES
 from tests.tools.conftest import (
     JOIN_WEB_URL,
     ME,

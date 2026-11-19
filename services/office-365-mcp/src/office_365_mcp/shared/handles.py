@@ -12,7 +12,7 @@ This is the only module that spells or parses these URIs. tests/test_layering.py
 A second speller does not look like a disagreement. It looks like a handle that one tool produced
 and another answers 404 to.
 
-Three of the five shapes are Graph's three ways to address a Teams message
+The three `MessageHandle` shapes are Graph's three ways to address a Teams message
 (https://learn.microsoft.com/en-us/graph/api/chatmessage-get). The reply shape is the one a
 search cannot mint. Graph addresses a reply *under* its parent post, and the search projection
 carries no `replyToId`. So a channel hit that is really a reply becomes the plain channel shape

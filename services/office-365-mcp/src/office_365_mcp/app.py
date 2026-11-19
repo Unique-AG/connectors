@@ -33,7 +33,7 @@ from office_365_mcp.logging import (
     MessageLogMiddleware,
     configure_logging,
 )
-from office_365_mcp.metrics import configure_metrics
+from office_365_mcp.metrics import LATENCY_BUCKETS, configure_metrics
 from office_365_mcp.server import (
     admin_consent_url,
     ready_response,
@@ -48,34 +48,6 @@ from office_365_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRe
 __all__ = ["create_app"]
 
 logger = logging.getLogger(__name__)
-
-# `prometheus_client`'s default layout plus four boundaries above it. One inbound MCP request holds
-# a tool call and every Graph call that tool made: 30 s per request times four attempts is 120 s
-# before any Retry-After wait, and a paged walk is several requests. The default's top finite bucket
-# is 10 s, so every one of those lands in `+Inf` and p95 and p99 both read 10.
-#
-# Trap: the histogram is registered once per process and the first middleware to declare it wins its
-# buckets, so this has to travel on the `setup_ops` call and cannot be corrected later.
-_HTTP_DURATION_BUCKETS = (
-    0.005,
-    0.01,
-    0.025,
-    0.05,
-    0.075,
-    0.1,
-    0.25,
-    0.5,
-    0.75,
-    1.0,
-    2.5,
-    5.0,
-    7.5,
-    10.0,
-    30.0,
-    60.0,
-    120.0,
-    300.0,
-)
 
 
 def create_app(
@@ -146,8 +118,8 @@ def create_app(
         #
         # The name one first, because `setup_ops`' metrics middleware labels a Prometheus counter
         # with the name the *client* sent, before anything has resolved it. See `cardinality.py`.
-        # Then the advice one, outside the operations layer, so a client reads the polished refusal
-        # while that layer still logs the untranslated failure.
+        # Then the advice one, so a client reads the polished refusal. The tool-call line logs that
+        # refusal, and the Graph error stays in its cause chain.
         middleware=[
             # Outermost FastMCP middleware: logs one line per tool call (start, complete/fail).
             ToolCallObservabilityMiddleware(),
@@ -169,7 +141,9 @@ def create_app(
     start_operation_series(selection.tools, statuses=GRAPH_STATUSES)
     start_tool_outcomes(selection.tools)
 
-    ops_middleware = setup_ops(mcp, duration_buckets=_HTTP_DURATION_BUCKETS)
+    # Trap: the histogram is registered once per process and the first middleware to declare it wins
+    # its buckets, so this has to travel on the `setup_ops` call and cannot be corrected later.
+    ops_middleware = setup_ops(mcp, duration_buckets=LATENCY_BUCKETS)
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:

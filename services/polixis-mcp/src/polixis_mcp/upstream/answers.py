@@ -10,6 +10,8 @@ from fastmcp.utilities.openapi import parse_openapi_to_http_routes
 import httpx2
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import JsonValue
+from pydantic import TypeAdapter
 from pydantic import ValidationError
 
 from polixis_mcp.upstream.cache import AnswerCheck
@@ -25,7 +27,7 @@ from polixis_mcp.upstream.generated.operations import GET_TOP_DOWN_OWNERSHIP
 from polixis_mcp.upstream.generated.operations import GET_ULTIMATE_BENEFICIAL_OWNERS
 from polixis_mcp.upstream.generated.operations import RESOLVE_PERMANENT_ID
 from polixis_mcp.upstream.generated.operations import SEARCH_ENTITIES
-from polixis_mcp.upstream.rejections import is_rejection_body
+from polixis_mcp.upstream.rejections import is_rejection
 
 
 def answer_check(spec: dict[str, object], *, api_url: httpx2.URL) -> AnswerCheck:
@@ -69,14 +71,16 @@ class _Route(BaseModel):
 
 
 def _accepts(model: _Parses) -> Callable[[bytes], bool]:
-    """Reads the rejection from the body itself, since a model without `error` drops it."""
+    """Validates the bytes as the caller parses them, since a dict keeps only a repeated key's
+    last value, and reads the rejection from the JSON, since a model without `error` drops it.
+    """
 
     def accepts(body: bytes) -> bool:
         try:
             _ = model.validate_json(body)
         except ValidationError:
             return False
-        return not is_rejection_body(body)
+        return not is_rejection(_JSON.validate_json(body))
 
     return accepts
 
@@ -85,6 +89,8 @@ def _path_pattern(template: str) -> re.Pattern[str]:
     """`/api/graph/pid/{pid}` matches `/api/graph/pid/` and one segment."""
     return re.compile("[^/]+".join(re.escape(part) for part in re.split(r"\{[^}]+\}", template)))
 
+
+_JSON: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 # Every operation the generated code holds, which `test_upstream` checks against it.
 _OPERATIONS = (

@@ -20,15 +20,12 @@ from office_365_mcp.graph_client import (
     collect_pages,
     graph_step,
 )
+from office_365_mcp.shared.files import MAX_BYTES, is_utf8
 from office_365_mcp.shared.handles import MailAttachmentHandle, MailMessageHandle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import FileFromGraph, graph_mailbox
 
 STEP_MESSAGE_ATTACHMENTS = "message_attachments"
-
-MAX_BYTES = 10 * 1024 * 1024
-
-MEGABYTE = 1024 * 1024
 
 _DEFAULT_MEDIA_TYPE = "application/octet-stream"
 
@@ -221,14 +218,6 @@ def media_type(content_type: str | None, body: bytes) -> str:
     top, _, sub = reported.partition("/")
     if not top or not sub:
         return _DEFAULT_MEDIA_TYPE
-    if top == "text" and not _is_utf8(body):
+    if top == "text" and not is_utf8(body):
         return _DEFAULT_MEDIA_TYPE
     return reported
-
-
-def _is_utf8(body: bytes) -> bool:
-    try:
-        _ = body.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    return True

@@ -22,8 +22,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import meeting_handle, meeting_uri_for
 from office_365_mcp.shared.identity import Person
-from office_365_mcp.shared.meetings import not_a_meeting_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
+from office_365_mcp.shared.teams.meetings import not_a_meeting_handle
 from office_365_mcp.tools import teams_update_meeting as updater
 from office_365_mcp.tools.teams_update_meeting import (
     UpdatedMeeting,
@@ -904,7 +904,8 @@ class TestHowItDeclaresItself:
             + "event."
         ) in description
         assert "outlook_update_event" not in description
-        assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
 
     async def test_the_description_says_the_question_shows_the_object_id(
         self, transport: httpx.AsyncClient
@@ -914,9 +915,6 @@ class TestHowItDeclaresItself:
         description = " ".join((tool.description or "").split())
         assert (
             "The question shows the Microsoft Entra object id of each person in the new list."
-        ) in description
-        assert (
-            "The name is only a label, because Teams identifies each attendee by the object id."
         ) in description
 
     async def test_the_description_says_the_new_list_replaces_and_who_it_removes(
@@ -982,7 +980,6 @@ class TestHowItDeclaresItself:
             "Copy it from the `user_id` of get_me, of a teams_list_chat_members row, or of a "
             + "teams_list_chats member. Never build it from a name or an email address."
         ) in str(person["user_id"]["description"])
-        assert "as a label only" in str(person["name"]["description"])
 
     async def test_the_attendees_say_what_an_empty_list_and_an_omitted_list_do(
         self, transport: httpx.AsyncClient

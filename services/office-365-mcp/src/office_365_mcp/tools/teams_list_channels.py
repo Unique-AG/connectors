@@ -26,6 +26,15 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_channels"
 
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-channels",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-files",
+)
+
 STEP = "channels"
 
 # Not `ChannelMessage.Read.All`, which teams_browse_channel declares: a tenant commonly grants one

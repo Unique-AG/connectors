@@ -14,18 +14,25 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
-from office_365_mcp.shared.attachments import (
+from office_365_mcp.shared.files import MAX_BYTES, MEGABYTE
+from office_365_mcp.shared.handles import EventAttachmentHandle, event_attachment_handle
+from office_365_mcp.shared.outlook.attachments import (
     ATTACHMENT_FIELDS,
-    MAX_BYTES,
-    MEGABYTE,
     AttachmentRefusals,
     fetch_file_or_refusal,
 )
-from office_365_mcp.shared.handles import EventAttachmentHandle, event_attachment_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_event_attachment"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_ATTACHMENT = "event_attachment"
 STEP_CONTENT = "event_attachment_content"

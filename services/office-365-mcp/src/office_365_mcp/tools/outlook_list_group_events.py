@@ -23,6 +23,8 @@ from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_group_events"
 
+PRESETS: tuple[str, ...] = ("outlook-group-calendar",)
+
 STEP = "calendar_events"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Group.Read.All",)

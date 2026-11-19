@@ -12,16 +12,24 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
-from office_365_mcp.shared.attachments import (
+from office_365_mcp.shared.handles import EventAttachmentHandle, event_handle
+from office_365_mcp.shared.outlook.attachments import (
     ATTACHMENT_FIELDS,
     AttachmentSummary,
     collect_attachments,
 )
-from office_365_mcp.shared.handles import EventAttachmentHandle, event_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_event_attachments"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_ATTACHMENTS = "event_attachments"
 

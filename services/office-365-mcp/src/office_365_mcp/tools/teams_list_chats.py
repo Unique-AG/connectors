@@ -27,11 +27,26 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
-from office_365_mcp.shared.messages import MessageSender
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.messages import MessageSender
 from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_chats"
+
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-chat",
+    "teams-messages",
+    "teams-transcripts",
+    "teams-call-transcripts",
+    "teams-recordings",
+    "teams-meetings",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-meetings-write",
+    "teams-chat-admin",
+)
 
 STEP = "chats"
 

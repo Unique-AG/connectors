@@ -28,13 +28,17 @@ from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
 from azure.core.pipeline.transport import AsyncHttpTransport, HttpRequest
 from azure.core.rest import AsyncHttpResponse
 from azure.identity.aio import OnBehalfOfCredential
+from fastmcp import Client, FastMCP
+from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
+from mcp_observability import ToolCallObservabilityMiddleware
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from starlette.applications import Starlette
 from starlette.testclient import TestClient
 from unique_mcp.logging import _PinoJson  # pyright: ignore[reportPrivateUsage]
+from unique_mcp.monitoring import setup_ops
 
 from office_365_mcp.app import create_app
 from office_365_mcp.config import (
@@ -197,6 +201,11 @@ class TestNothingSecretReachesTheLog:
         assert line["entra_client_secret"] == CENSORED
         assert line["graph_access_token"] == CENSORED
 
+    def test_a_decoded_sign_in_hint_is_censored(self, sink: _Sink) -> None:
+        _log("authorize", query={"login_hint": "jane.doe@corp.com", "state": "x"})
+
+        assert sink.one()["query"] == {"login_hint": CENSORED, "state": "x"}
+
     def test_a_bearer_token_in_a_value_is_censored_under_an_innocent_name(
         self, sink: _Sink
     ) -> None:
@@ -304,6 +313,16 @@ class TestNothingSecretReachesTheLog:
         message = cast("str", sink.one()["msg"])
         assert f"token={CENSORED}&page=2" in message, message
         assert "value" not in sink.stream.getvalue()
+
+    @pytest.mark.parametrize(
+        "name", ["login_hint", "login%5Fhint", "login%5fhint", "loginhint", "login-hint"], ids=repr
+    )
+    def test_a_sign_in_hint_in_a_query_string_is_censored(self, sink: _Sink, name: str) -> None:
+        _log(f'127.0.0.1:1 - "GET /authorize?{name}=jane.doe%40corp.com&state=x HTTP/1.1" 302')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"{name}={CENSORED}&state=x" in message, message
+        assert "jane.doe" not in sink.stream.getvalue()
 
     @pytest.mark.parametrize("parameter", ["postcode", "encoding", "areacode"], ids=repr)
     def test_a_parameter_that_merely_contains_code_is_kept(
@@ -644,7 +663,7 @@ class TestOneLinePerMessageInTheRightTrace:
         during_the_call = [
             line
             for line in lines
-            if line.get("mcp_method") == "tools/call" or line.get("operation") == "get_me"
+            if line.get("mcp_method") == "tools/call" or line.get("tool") == "get_me"
         ]
         assert during_the_call, "the tool call logged nothing"
         assert all(line.get("trace_id") == _TOOL_CALL_TRACE for line in during_the_call), [
@@ -653,9 +672,7 @@ class TestOneLinePerMessageInTheRightTrace:
 
     def test_the_tool_call_really_ran(self, lines: Sequence[Mapping[str, object]]) -> None:
         """Guards every assertion above: a session that never called the tool would pass them."""
-        assert any(line.get("operation") == "get_me" for line in lines), (
-            "the operations layer logged no get_me call"
-        )
+        assert any(line.get("tool") == "get_me" for line in lines), "no line logged the get_me call"
 
 
 class TestABootedServerHonoursTheLogContract:
@@ -884,3 +901,27 @@ def _wait_until_up(server: subprocess.Popen[str], probe: str, timeout: float = 3
         except httpx.HTTPError:
             time.sleep(0.2)
     raise AssertionError(f"{probe} never answered")
+
+
+_PINO_WARN = 40
+
+
+class TestOneLinePerToolFailure:
+    async def test_a_failed_tool_call_is_logged_once(self, sink: _Sink) -> None:
+        server = FastMCP("one-line", middleware=[ToolCallObservabilityMiddleware()])
+        _ = setup_ops(server)
+
+        @server.tool
+        async def refuse() -> str:
+            raise ToolError("no such folder")
+
+        async with Client(server) as client:
+            _ = await client.call_tool("refuse", {}, raise_on_error=False)
+
+        failures = [line for line in sink.lines() if cast("int", line["level"]) >= _PINO_WARN]
+        assert [line["msg"] for line in failures] == ["Tool call failed"], failures
+        assert not [
+            line
+            for line in sink.lines()
+            if str(line.get("msg", "")).startswith("Error calling tool")
+        ], sink.lines()

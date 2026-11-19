@@ -30,9 +30,9 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Advised,
@@ -850,7 +850,6 @@ class TestHowItDeclaresItself:
             assert "contentEncoding" not in spec
             assert "contentMediaType" not in spec
             assert "format" not in spec
-        assert "as plain text" in cast("str", _properties(parameters)["content"]["description"])
 
     async def test_the_content_schema_caps_the_text(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)

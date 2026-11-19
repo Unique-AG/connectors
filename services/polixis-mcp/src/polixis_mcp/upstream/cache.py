@@ -4,7 +4,9 @@ page through it, so the next page, or another tool on the same entity, reads it 
 as does the same search or profile asked again.
 """
 
-from collections.abc import Callable, Generator
+import asyncio
+from collections.abc import AsyncGenerator, Callable, Generator
+from contextlib import asynccontextmanager
 from contextlib import contextmanager
 from contextvars import ContextVar
 from datetime import datetime
@@ -76,6 +78,9 @@ class CachingTransport(httpx2.AsyncBaseTransport):
     The key binds an answer to the upstream's origin, so a deployment pointed at another Polixis
     reads none of the first one's answers. It does not bind it to the credentials: every account
     gets the same data.
+
+    Requests in one replica that miss under the same key at once send one request: the others
+    wait for it, at most `wait_seconds`, and read its answer from the cache if it kept one.
     """
 
     def __init__(
@@ -85,37 +90,81 @@ class CachingTransport(httpx2.AsyncBaseTransport):
         cache: ResponseCache,
         settings: CacheSettings,
         usable: AnswerCheck,
+        wait_seconds: float,
         now: Callable[[], datetime],
     ) -> None:
         self._inner: httpx2.AsyncBaseTransport = inner
         self._cache: ResponseCache = cache
         self._settings: CacheSettings = settings
         self._usable: AnswerCheck = usable
+        self._wait_seconds: float = wait_seconds
         self._now: Callable[[], datetime] = now
+        self._fetches: dict[str, _Fetch] = {}
 
     @override
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
         key = f"{self._settings.key_prefix}:{await _request_key(request)}"
-        cached = await self._read(key, request)
-        if cached is not None:
-            return httpx2.Response(
-                _OK,
-                content=cached.body,
-                headers={
-                    "content-type": "application/json",
-                    CACHE_STORED_AT_HEADER: cached.cached_at.isoformat(),
-                },
-                request=request,
-            )
-        response = await self._inner.handle_async_request(request)
-        if response.status_code == _OK:
-            await response.aread()
-            await self._write(key, request, response)
-        return response
+        async with self._joined(key) as fetch:
+            # Read before the lookup, so an answer cached while it ran is read again below.
+            published = fetch.published
+            cached = await self._read(key, request)
+            if cached is None:
+                async with self._turn(fetch) as turn:
+                    if turn and fetch.published != published:
+                        cached = await self._read(key, request)
+                    if cached is None:
+                        return await self._fetch(key, request, fetch)
+        return httpx2.Response(
+            _OK,
+            content=cached.body,
+            headers={
+                "content-type": "application/json",
+                CACHE_STORED_AT_HEADER: cached.cached_at.isoformat(),
+            },
+            request=request,
+        )
 
     @override
     async def aclose(self) -> None:
         await self._inner.aclose()
+
+    @asynccontextmanager
+    async def _joined(self, key: str) -> AsyncGenerator[_Fetch]:
+        """`key`'s fetch, which is dropped once no request for the key is in flight."""
+        fetch = self._fetches.setdefault(key, _Fetch())
+        fetch.requests += 1
+        try:
+            yield fetch
+        finally:
+            fetch.requests -= 1
+            if fetch.requests == 0:
+                del self._fetches[key]
+
+    @asynccontextmanager
+    async def _turn(self, fetch: _Fetch) -> AsyncGenerator[bool]:
+        """Holds the fetch's lock, or after `wait_seconds` without it goes on regardless. Yields
+        whether it holds it.
+        """
+        try:
+            async with asyncio.timeout(self._wait_seconds):
+                _ = await fetch.lock.acquire()
+        except TimeoutError:
+            turn = False
+        else:
+            turn = True
+        try:
+            yield turn
+        finally:
+            if turn:
+                fetch.lock.release()
+
+    async def _fetch(self, key: str, request: httpx2.Request, fetch: _Fetch) -> httpx2.Response:
+        response = await self._inner.handle_async_request(request)
+        if response.status_code == _OK:
+            await response.aread()
+            if await self._write(key, request, response):
+                fetch.published += 1
+        return response
 
     async def _read(self, key: str, request: httpx2.Request) -> CachedAnswer | None:
         """None for an answer cached longer ago than the TTL now set, as after a restart with a
@@ -142,9 +191,10 @@ class CachingTransport(httpx2.AsyncBaseTransport):
             return None
         return cached
 
-    async def _write(self, key: str, request: httpx2.Request, response: httpx2.Response) -> None:
+    async def _write(self, key: str, request: httpx2.Request, response: httpx2.Response) -> bool:
+        """Whether the answer was cached."""
         if not self._usable(request, response.content):
-            return
+            return False
         answer = CachedAnswer(cached_at=self._now(), body=response.content)
         try:
             await self._cache.put(key, answer, ttl_seconds=self._settings.ttl_seconds)
@@ -155,6 +205,8 @@ class CachingTransport(httpx2.AsyncBaseTransport):
                 extra={"path": request.url.path},
                 exc_info=True,
             )
+            return False
+        return True
 
 
 @contextmanager
@@ -186,6 +238,17 @@ async def record_cache_read(response: httpx2.Response) -> None:
     reads = _cache_reads.get()
     if stored_at is not None and reads is not None:
         reads.record(datetime.fromisoformat(stored_at))
+
+
+class _Fetch:
+    """The requests in flight for one key: how many there are, the lock the one that sends it
+    holds, and how many answers they have cached.
+    """
+
+    def __init__(self) -> None:
+        self.lock: asyncio.Lock = asyncio.Lock()
+        self.requests: int = 0
+        self.published: int = 0
 
 
 class _CacheReads:

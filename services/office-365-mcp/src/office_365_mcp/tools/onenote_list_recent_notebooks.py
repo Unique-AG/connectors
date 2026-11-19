@@ -24,6 +24,8 @@ _SOURCE_SERVICE_TEXT: Mapping[OnenoteSourceService, _SourceService] = {
 
 TOOL_NAME = "onenote_list_recent_notebooks"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_RECENT_NOTEBOOKS = "recent_notebooks"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)

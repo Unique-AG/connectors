@@ -29,6 +29,16 @@ from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "sharepoint_search_files"
 
+PRESETS: tuple[str, ...] = (
+    "teams-write-files",
+    "teams-files",
+    "sharepoint-search",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
+
 STEP = "file_search"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)

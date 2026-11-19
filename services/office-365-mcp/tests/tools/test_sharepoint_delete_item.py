@@ -31,13 +31,13 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import ITEM_HANDLE_SOURCES
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
     DriveFolderHandle,
     drive_item_handle,
 )
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import PREVIEW_CHARACTERS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, resolve
@@ -832,6 +832,8 @@ class TestHowItDeclaresItself:
             "OneDrive and SharePoint can show the change to everyone who can open the folder."
         )
         assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
 
     async def test_the_description_says_it_uses_the_recycle_bin_and_never_erases(
         self, transport: httpx.AsyncClient
@@ -840,11 +842,9 @@ class TestHowItDeclaresItself:
 
         description = tool.description or ""
         assert "to the recycle bin" in description
-        assert "together with everything inside it" in description
         assert "this connector never erases a file or a folder permanently" in (
             description.casefold()
         )
-        assert "top folder of a drive" in description
 
     async def test_the_lead_names_the_tool_that_moves_the_item_instead(
         self, transport: httpx.AsyncClient

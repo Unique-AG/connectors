@@ -12,6 +12,12 @@ module, which is exactly what the separate tool files exist to prevent.
 This package has no `__all__`. The modules are the units, and each consumer names the one it
 depends on at the import line. That import line is the one thing this package exists to show.
 
-Layering rule: nothing here imports `tools/`, and only `seam.py` imports FastMCP. See
+A module that the tools of only one surface use goes in that surface's package: `outlook/`,
+`teams/` or `sharepoint/`. A module that the tools of two or more surfaces use stays directly
+here. A tool imports the modules of its own surface, the modules directly here, and the `seam`
+package through its `__init__`, and never the modules of another surface. See rule 10 in
+`tests/test_layering.py`.
+
+Layering rule: nothing here imports `tools/`, and only the `seam/` package imports FastMCP. See
 `tests/test_layering.py` for its first rule, which states exactly that.
 """

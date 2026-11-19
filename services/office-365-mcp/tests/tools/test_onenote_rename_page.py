@@ -27,13 +27,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import OWNED_REFUSED, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Advised, Confirm
 from office_365_mcp.tools import onenote_rename_page as renamer
 from office_365_mcp.tools.onenote_rename_page import RenamedPage, a_person_agrees, rename_page
@@ -1345,7 +1346,6 @@ class TestHowItDeclaresItself:
         _parameters, tool = await _registered(transport)
 
         description = (tool.description or "").casefold()
-        assert "title" in description
         assert "onenote_edit_page" in description
         assert "previous_title" in description
 

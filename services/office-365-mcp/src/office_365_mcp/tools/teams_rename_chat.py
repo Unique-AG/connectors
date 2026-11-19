@@ -10,20 +10,22 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.messages import (
-    CHAT_TOPIC_MAX_CHARACTERS,
-    CHAT_TOPIC_PATTERN,
-    EVERYONE_SEES_IT,
-)
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import (
+    CHAT_TOPIC_MAX_CHARACTERS,
+    CHAT_TOPIC_PATTERN,
+    EVERYONE_SEES_IT,
+)
 
 TOOL_NAME = "teams_rename_chat"
+
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
 
 STEP = "rename_chat"
 

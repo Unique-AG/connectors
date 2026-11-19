@@ -31,6 +31,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_rename_folder"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_READ_FOLDER = "mail_folder"
 STEP_RENAME = "rename_folder"
 

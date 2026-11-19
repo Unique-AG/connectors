@@ -14,15 +14,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
-from office_365_mcp.shared.attachments import (
+from office_365_mcp.shared.files import MAX_BYTES, MEGABYTE
+from office_365_mcp.shared.handles import MailAttachmentHandle, mail_attachment_handle
+from office_365_mcp.shared.outlook.attachments import (
     ATTACHMENT_FIELDS,
-    MAX_BYTES,
-    MEGABYTE,
     AttachmentRefusals,
     fetch_file_or_refusal,
 )
-from office_365_mcp.shared.handles import MailAttachmentHandle, mail_attachment_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -31,6 +30,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_read_attachment"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP_ATTACHMENT = "message_attachment"
 STEP_CONTENT = "attachment_content"

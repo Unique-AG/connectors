@@ -12,7 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.rules import (
+from office_365_mcp.shared.outlook.rules import (
     HIDDEN_RULE_FOLDER,
     NO_RULE_ACTION,
     NOT_A_RULE_FOLDER,
@@ -37,6 +37,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_create_mail_rule"
+
+PRESETS: tuple[str, ...] = ("outlook-rules",)
 
 STEP_CREATE = "create_mail_rule"
 

@@ -27,10 +27,11 @@ from office_365_mcp.graph_client import (
     GraphUnavailable,
     graph_step,
 )
-from office_365_mcp.shared import files, messages
+from office_365_mcp.shared import files
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
-from office_365_mcp.shared.messages import Mention
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
+from office_365_mcp.shared.teams import messages
+from office_365_mcp.shared.teams.messages import Mention
 from office_365_mcp.tools import teams_send_channel_message_with_files as channel_sender
 from office_365_mcp.tools import teams_send_chat_message as plain_sender
 from office_365_mcp.tools import teams_send_chat_message_with_files as sender

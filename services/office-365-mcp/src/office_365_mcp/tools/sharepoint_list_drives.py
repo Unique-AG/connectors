@@ -26,9 +26,19 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.sites import not_a_site, site_path_of
+from office_365_mcp.shared.sharepoint.sites import not_a_site, site_path_of
 
 TOOL_NAME = "sharepoint_list_drives"
+
+PRESETS: tuple[str, ...] = (
+    "teams-write-files",
+    "teams-files",
+    "sharepoint-search",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
 
 STEP = "my_drives"
 

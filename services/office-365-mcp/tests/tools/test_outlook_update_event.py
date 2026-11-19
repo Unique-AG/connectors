@@ -24,8 +24,8 @@ from office_365_mcp.shared.calendar import (
     EventSummary,
     ShowAs,
 )
-from office_365_mcp.shared.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.handles import EventHandle
+from office_365_mcp.shared.outlook.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools.outlook_create_event import CreatedEvent, create_event
 from office_365_mcp.tools.outlook_update_event import (

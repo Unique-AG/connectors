@@ -13,20 +13,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     MessageHandle,
     message_handle,
     not_a_message_handle,
-)
-from office_365_mcp.shared.messages import (
-    EVERYONE_SEES_IT,
-    TeamsMessage,
-    get_message,
-    message_in_question,
-    not_the_sender,
-    sent_by,
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -35,8 +27,18 @@ from office_365_mcp.shared.seam import (
     narrowed_to,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import (
+    EVERYONE_SEES_IT,
+    TeamsMessage,
+    get_message,
+    message_in_question,
+    not_the_sender,
+    sent_by,
+)
 
 TOOL_NAME = "teams_delete_message"
+
+PRESETS: tuple[str, ...] = ("teams-edit",)
 
 STEP_DELETE = "delete_message"
 

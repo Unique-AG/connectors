@@ -38,18 +38,32 @@ class PostgresResponseCache:
         self._database: Database = database
 
     async def get(self, key: str) -> CachedAnswer | None:
-        # A read is a use: it moves the answer to the back of the eviction order.
-        touch = (
-            update(ResponseCacheRow)
-            .where(ResponseCacheRow.key == key, ResponseCacheRow.expires_at > func.now())
-            .values(last_used_at=func.now(), reads=ResponseCacheRow.reads + 1)
-            .returning(ResponseCacheRow.body, ResponseCacheRow.cached_at)
-        )
+        # A read moves the answer in the eviction order only once `_TOUCH_AFTER` has passed, and
+        # skips a row another transaction holds, so a hit rarely writes and never waits.
+        hit = select(
+            ResponseCacheRow.body,
+            ResponseCacheRow.cached_at,
+            ResponseCacheRow.last_used_at < func.now() - _TOUCH_AFTER,
+        ).where(ResponseCacheRow.key == key, ResponseCacheRow.expires_at > func.now())
         async with self._database.begin() as session:
-            row = (await session.execute(touch)).one_or_none()
-        if row is None:
-            return None
-        body, cached_at = row
+            row = (await session.execute(hit)).one_or_none()
+            if row is None:
+                return None
+            body, cached_at, stale = row
+            if stale:
+                unlocked = (
+                    select(ResponseCacheRow.key)
+                    .where(
+                        ResponseCacheRow.key == key,
+                        ResponseCacheRow.last_used_at < func.now() - _TOUCH_AFTER,
+                    )
+                    .with_for_update(skip_locked=True)
+                )
+                _ = await session.execute(
+                    update(ResponseCacheRow)
+                    .where(ResponseCacheRow.key.in_(unlocked))
+                    .values(last_used_at=func.now())
+                )
         return CachedAnswer(cached_at=cached_at, body=body)
 
     async def put(self, key: str, answer: CachedAnswer, *, ttl_seconds: int) -> None:
@@ -67,7 +81,6 @@ class PostgresResponseCache:
                 "cached_at": row.excluded.cached_at,
                 "expires_at": row.excluded.expires_at,
                 "last_used_at": row.excluded.last_used_at,
-                "reads": 0,
             },
         )
         async with self._database.begin() as session:
@@ -109,3 +122,6 @@ class PostgresResponseCache:
                 "Deleted the least recently used Polixis answers to keep the cache under its size",
                 extra={"evicted": evicted, "max_bytes": max_bytes},
             )
+
+
+_TOUCH_AFTER = timedelta(minutes=1)

@@ -12,11 +12,19 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
-from office_365_mcp.shared.messages import TeamsMessage, unknown_enum_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.messages import TeamsMessage, unknown_enum_headers
 from office_365_mcp.shared.window import closes_at, opens_at
 
 TOOL_NAME = "teams_list_chat_messages"
+
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-messages",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+)
 
 STEP = "chat_messages"
 

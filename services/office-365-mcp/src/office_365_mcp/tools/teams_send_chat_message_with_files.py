@@ -12,10 +12,16 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
-from office_365_mcp.shared.messages import (
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Confirm,
+    graph_client_for_caller,
+    person_confirms,
+)
+from office_365_mcp.shared.teams.messages import (
     ATTACHMENTS_FIELD,
     CHAT_ID_FIELD,
     CHAT_IMPORTANCE_FIELD,
@@ -28,17 +34,14 @@ from office_365_mcp.shared.messages import (
     TeamsMessage,
     mentioned_members,
     outgoing_message,
+    post_once_agreed,
     send_binding,
     send_question,
 )
-from office_365_mcp.shared.seam import (
-    WRITE_ADDITIVE,
-    Confirm,
-    graph_client_for_caller,
-    person_confirms,
-)
 
 TOOL_NAME = "teams_send_chat_message_with_files"
+
+PRESETS: tuple[str, ...] = ("teams-write-files",)
 
 STEP_SEND = "send_chat_message"
 
@@ -86,42 +89,19 @@ async def send_chat_message_with_files(
     handles = attachment_handles(attachments)
     if isinstance(handles, str):
         raise ToolError(f"{CHAT_SEND.nothing_sent} {handles}")
-    sent: ChatMessage | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
+    outcome: ChatMessage | InputRequiredResult | str | None
     with graph_errors():
         members = await mentioned_members(client, chat_id, mentions)
         files = () if isinstance(members, str) else await attachable_files(client, handles)
         if isinstance(members, str):
-            refused = members
+            outcome = members
         elif isinstance(files, str):
-            refused = f"{CHAT_SEND.nothing_sent} {files}"
+            outcome = f"{CHAT_SEND.nothing_sent} {files}"
         else:
-            question = send_question(
-                CHAT_SEND,
-                message,
-                f"to chat {chat_id!r}",
-                members,
-                subject=subject,
-                importance=importance,
-                files=files,
-            )
-            about = send_binding(
-                (chat_id,),
-                message,
-                members,
-                subject=subject,
-                importance=importance,
-                files=handles,
-                attached=files,
-            )
-            with not_graph():
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-            if refused is None and asked is None:
+
+            async def post() -> ChatMessage | None:
                 with graph_step(STEP_SEND):
-                    sent = await client.chats.by_chat_id(chat_id).messages.post(
+                    return await client.chats.by_chat_id(chat_id).messages.post(
                         outgoing_message(
                             message,
                             mentions=members,
@@ -136,13 +116,36 @@ async def send_chat_message_with_files(
                         ),
                     )
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert sent is not None, "a send that nothing refused answered with no message"
-    assert sent.id is not None, "Graph accepted a chat message post but returned no id"
-    return TeamsMessage.from_message(sent, handle=MessageHandle(sent.id, chat_id=chat_id))
+            outcome = await post_once_agreed(
+                confirm,
+                send_question(
+                    CHAT_SEND,
+                    message,
+                    f"to chat {chat_id!r}",
+                    members,
+                    subject=subject,
+                    importance=importance,
+                    files=files,
+                ),
+                send_binding(
+                    (chat_id,),
+                    message,
+                    members,
+                    subject=subject,
+                    importance=importance,
+                    files=handles,
+                    attached=files,
+                ),
+                post,
+            )
+
+    if isinstance(outcome, InputRequiredResult):
+        return outcome
+    if isinstance(outcome, str):
+        raise ToolError(outcome)
+    assert outcome is not None, "a send that nothing refused answered with no message"
+    assert outcome.id is not None, "Graph accepted a chat message post but returned no id"
+    return TeamsMessage.from_message(outcome, handle=MessageHandle(outcome.id, chat_id=chat_id))
 
 
 def a_person_agrees(ctx: Context) -> Confirm:

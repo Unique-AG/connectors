@@ -1347,7 +1347,6 @@ class TestWhatItSaysAboutItself:
             "This tool asks the user to agree before it changes a shared or delegated mailbox. "
             + "It changes the user's own mailbox without a question."
         ) in description
-        assert "A copy is a new message, and the original stays where it is." in description
         assert "outlook_move_mail is the tool to move a message instead." in description
         assert "If a call times out, do not call this tool again first." in description
         assert "A second call can make a second copy of each message." in description

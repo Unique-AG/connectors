@@ -60,10 +60,10 @@ from office_365_mcp.graph_operations import (
     start_tool_outcomes,
 )
 from office_365_mcp.metrics import configure_metrics
-from office_365_mcp.shared import seam, transcripts
 from office_365_mcp.shared.handles import TranscriptHandle
-from office_365_mcp.shared.seam import GraphToken, TokenExchangeFailed
-from office_365_mcp.shared.transcripts import STEP_ATTRIBUTED
+from office_365_mcp.shared.seam import Confirmed, GraphToken, TokenExchangeFailed, caller
+from office_365_mcp.shared.teams import transcripts
+from office_365_mcp.shared.teams.transcripts import STEP_ATTRIBUTED
 from office_365_mcp.tools import get_me
 from office_365_mcp.tools.get_me import SignedInUser
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
@@ -74,6 +74,12 @@ from office_365_mcp.tools.teams_list_call_transcripts import TOOL_NAME as CALL_T
 from office_365_mcp.tools.teams_list_call_transcripts import teams_list_call_transcripts
 from office_365_mcp.tools.teams_read_transcript import TOOL_NAME as TRANSCRIPT_TOOL
 from office_365_mcp.tools.teams_read_transcript import teams_read_transcript
+from office_365_mcp.tools.teams_send_channel_message import STEP_SEND as STEP_CHANNEL_SEND
+from office_365_mcp.tools.teams_send_channel_message import TOOL_NAME as CHANNEL_SEND_TOOL
+from office_365_mcp.tools.teams_send_channel_message import send_channel_message
+from office_365_mcp.tools.teams_send_chat_message import STEP_SEND as STEP_CHAT_SEND
+from office_365_mcp.tools.teams_send_chat_message import TOOL_NAME as CHAT_SEND_TOOL
+from office_365_mcp.tools.teams_send_chat_message import send_chat_message
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -606,6 +612,125 @@ class TestAPagedWalkReportsWhatItRead:
         )
 
 
+_TEAM_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+_CHANNEL_ID = "19:general@thread.tacv2"
+_CHAT_ID = "19:release@thread.v2"
+
+_UNANSWERED = InputRequiredResult(input_requests={}, request_state="state")
+
+
+async def _send_to_chat(client: GraphServiceClient, answer: Confirmed) -> object:
+    async def confirm(question: str, about: str) -> Confirmed:
+        assert question and about
+        return answer
+
+    with measured_graph_operation(CHAT_SEND_TOOL, not_failures=TOOL_REFUSALS):
+        return await send_chat_message(
+            client, chat_id=_CHAT_ID, message="Ship it.", confirm=confirm
+        )
+
+
+async def _send_to_channel(client: GraphServiceClient, answer: Confirmed) -> object:
+    async def confirm(question: str, about: str) -> Confirmed:
+        assert question and about
+        return answer
+
+    with measured_graph_operation(CHANNEL_SEND_TOOL, not_failures=TOOL_REFUSALS):
+        return await send_channel_message(
+            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, message="Ship it.", confirm=confirm
+        )
+
+
+class TestATeamsSendIsMeasuredOnlyWhereItPosts:
+    @pytest.mark.parametrize("answer", ["Nothing was sent.", _UNANSWERED])
+    async def test_a_chat_message_nobody_agreed_to_records_no_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter, answer: Confirmed
+    ) -> None:
+        posted = graph.post(url__regex=r"/chats/.+/messages$").mock(
+            return_value=httpx.Response(201, json={"id": "1700000000001"})
+        )
+        steps = _value(
+            f"{GRAPH_STEP_DURATION_SECONDS}_count", operation=CHAT_SEND_TOOL, step=STEP_CHAT_SEND
+        )
+
+        if isinstance(answer, str):
+            with pytest.raises(ToolError):
+                _ = await _send_to_chat(client, answer)
+        else:
+            assert await _send_to_chat(client, answer) is answer
+
+        assert posted.call_count == 0
+        assert (
+            _value(
+                f"{GRAPH_STEP_DURATION_SECONDS}_count",
+                operation=CHAT_SEND_TOOL,
+                step=STEP_CHAT_SEND,
+            )
+            == steps
+        ), "a send that never reached Microsoft Graph was recorded as a send step"
+
+    @pytest.mark.parametrize("answer", ["Nothing was posted.", _UNANSWERED])
+    async def test_a_channel_message_nobody_agreed_to_records_no_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter, answer: Confirmed
+    ) -> None:
+        posted = graph.post(url__regex=r"/channels/.+/messages$").mock(
+            return_value=httpx.Response(201, json={"id": "1700000000002"})
+        )
+        steps = _value(
+            f"{GRAPH_STEP_DURATION_SECONDS}_count",
+            operation=CHANNEL_SEND_TOOL,
+            step=STEP_CHANNEL_SEND,
+        )
+
+        if isinstance(answer, str):
+            with pytest.raises(ToolError):
+                _ = await _send_to_channel(client, answer)
+        else:
+            assert await _send_to_channel(client, answer) is answer
+
+        assert posted.call_count == 0
+        assert (
+            _value(
+                f"{GRAPH_STEP_DURATION_SECONDS}_count",
+                operation=CHANNEL_SEND_TOOL,
+                step=STEP_CHANNEL_SEND,
+            )
+            == steps
+        ), "a post that never reached Microsoft Graph was recorded as a send step"
+
+    async def test_a_chat_post_answered_with_no_message_is_an_answered_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(url__regex=r"/chats/.+/messages$").mock(return_value=httpx.Response(204))
+        sent = _value(GRAPH_STEPS_TOTAL, operation=CHAT_SEND_TOOL, step=STEP_CHAT_SEND, status="ok")
+
+        with pytest.raises(AssertionError, match="answered with no message"):
+            _ = await _send_to_chat(client, None)
+
+        assert (
+            _value(GRAPH_STEPS_TOTAL, operation=CHAT_SEND_TOOL, step=STEP_CHAT_SEND, status="ok")
+            == sent + 1
+        )
+
+    async def test_a_channel_post_answered_with_no_message_is_an_answered_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(url__regex=r"/channels/.+/messages$").mock(return_value=httpx.Response(204))
+        sent = _value(
+            GRAPH_STEPS_TOTAL, operation=CHANNEL_SEND_TOOL, step=STEP_CHANNEL_SEND, status="ok"
+        )
+
+        with pytest.raises(AssertionError, match="answered with no message"):
+            _ = await _send_to_channel(client, None)
+
+        assert (
+            _value(
+                GRAPH_STEPS_TOTAL, operation=CHANNEL_SEND_TOOL, step=STEP_CHANNEL_SEND, status="ok"
+            )
+            == sent + 1
+        )
+
+
 _SOURCE_ROOT = pathlib.Path(__file__).resolve().parents[1] / "src" / "office_365_mcp"
 _TOOLS = _SOURCE_ROOT / "tools"
 
@@ -666,7 +791,7 @@ class TestATokenAcquisitionIsCountedUnderTheTool:
         def exchange_for(_scopes: list[str]) -> _Exchange:
             return _Exchange()
 
-        monkeypatch.setattr(seam, "EntraOBOToken", exchange_for)
+        monkeypatch.setattr(caller, "EntraOBOToken", exchange_for)
         return GraphToken("Mail.Read")
 
     @staticmethod
@@ -974,7 +1099,7 @@ class TestEachToolCallIsCountedUnderHowItEnded:
         def exchange_for(_scopes: list[str]) -> _Refused:
             return _Refused()
 
-        monkeypatch.setattr(seam, "EntraOBOToken", exchange_for)
+        monkeypatch.setattr(caller, "EntraOBOToken", exchange_for)
         me = graph.get("/me")
         server: FastMCP[None] = FastMCP(
             "probe", middleware=[BoundedNameMiddleware(), GraphOperationMiddleware()]
@@ -1276,8 +1401,8 @@ class TestNoStepNameIsTakenFromData:
         }
         assert outside_tools, (
             "every step is declared under tools/, so the modules that own a shared Graph call "
-            + "(shared/identity.py, shared/meetings.py) have stopped naming their own — find where "
-            + "their step went before assuming this rule still covers them"
+            + "(shared/identity.py, shared/teams/meetings.py) have stopped naming their own — find "
+            + "where their step went before assuming this rule still covers them"
         )
 
     @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)

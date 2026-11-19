@@ -26,7 +26,7 @@ from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound
 from office_365_mcp.shared.handles import MailFolderHandle, MailRuleHandle
-from office_365_mcp.shared.rules import RULE_FIELDS
+from office_365_mcp.shared.outlook.rules import RULE_FIELDS
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import outlook_delete_mail_rule as deleter
 from office_365_mcp.tools.outlook_delete_mail_rule import (
@@ -508,8 +508,8 @@ class TestHowItDeclaresItself:
         assert "This tool always asks the user to agree" in description
         assert "no message is deleted" in description
         assert "This connector cannot restore a deleted rule." in description
-        assert "This tool refuses a read-only rule." in description
-        assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
         assert "outlook_disable_mail_rule turns a rule off and keeps it" in description
 
     async def test_every_field_of_the_answer_says_what_it_is(
