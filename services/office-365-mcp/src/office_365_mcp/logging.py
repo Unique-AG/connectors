@@ -92,7 +92,7 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str | Callable[[re.Match[str]],
     # `scheme://user:password@host`: `server/readiness.py` logs a store failure with
     # `exc_info=True`, and asyncpg quotes the DSN it failed to reach.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@]+:[^\s/@]+@"), r"\1" + CENSORED + "@"),
-    (re.compile(r"([?&]([A-Za-z0-9_.%\[\]+-]+)=)[^&\s\"']+"), _censored_query_value),
+    (re.compile(r"([?&]([A-Za-z0-9_.%\[\]+-]+)=)[^&\s\"]+"), _censored_query_value),
 )
 
 # Trap: at the cap the container must be replaced, not passed through. An ASGI scope can contain
