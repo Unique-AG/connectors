@@ -57,11 +57,6 @@ class Persistence:
                 content_id = item.get("id")
                 if isinstance(content_id, str):  # pyright: ignore[reportUnnecessaryIsInstance]
                     return content_id
-        # Fallback: accept any match when scopeId field is absent from the response.
-        infos = result.get("contentInfos") or []
-        if infos:
-            content_id = infos[0].get("id")
-            return content_id if isinstance(content_id, str) else None  # pyright: ignore[reportUnnecessaryIsInstance]
         return None
 
     async def save_snapshot(

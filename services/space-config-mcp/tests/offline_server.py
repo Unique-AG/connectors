@@ -35,6 +35,8 @@ def fake_auth_settings() -> AuthSettings:
         zitadel_base_url="https://id.qa.unique.app",
         zitadel_client_id="dummy-client-id",
         zitadel_jwt_signing_key=SecretStr("a" * 64),
+        database_url=None,
+        encryption_key=None,
         allow_ephemeral_oauth_storage=True,
     )
 

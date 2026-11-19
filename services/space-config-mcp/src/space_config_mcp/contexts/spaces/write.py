@@ -58,7 +58,9 @@ async def update_space(
     if chat_upload is not None:
         patch["chatUpload"] = chat_upload
     if settings is not None:
-        patch["settings"] = settings
+        space = await upstream.get_space(user_id, company_id, space_id)
+        existing: dict[str, object] = cast(dict[str, object], space.settings or {})
+        patch["settings"] = {**existing, **settings}
     if assistant_prompts is not None:
         patch["assistantPrompts"] = cast(
             list[unique_sdk.Space.AssistantPromptParams],

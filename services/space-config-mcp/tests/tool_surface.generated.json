@@ -1060,6 +1060,18 @@
                     "default": null,
                     "description": "Whether users can edit cell values in this column."
                   },
+                  "language_model": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Language model for this column. Overrides the module-level default."
+                  },
                   "name": {
                     "description": "Column identifier. Built-in names: Section, Question, Answers, References, HallucinationScore.",
                     "type": "string"

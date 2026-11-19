@@ -45,7 +45,11 @@ def build_storage(settings: AuthSettings) -> AsyncKeyValue:
         )
 
     # Only reachable because the settings validator allowed it (dev opt-in).
-    assert settings.allow_ephemeral_oauth_storage
+    if not settings.allow_ephemeral_oauth_storage:
+        raise RuntimeError(
+            "OAuth storage is not configured: set DATABASE_URL + ENCRYPTION_KEY, "
+            "or ALLOW_EPHEMERAL_OAUTH_STORAGE=true for local dev."
+        )
 
     dev_dir = Path(tempfile.gettempdir()) / "space-config-mcp-oauth-dev"
     return FernetEncryptionWrapper(

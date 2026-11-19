@@ -77,6 +77,10 @@ class RfpColumn(BaseModel):
         default=None,
         description="Whether users can edit cell values in this column.",
     )
+    language_model: str | None = Field(
+        default=None,
+        description="Language model for this column. Overrides the module-level default.",
+    )
 
 
 class RfpModuleConfig(BaseModel):
