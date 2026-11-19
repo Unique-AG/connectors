@@ -31,6 +31,7 @@ from office_365_mcp.shared import files, messages
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
 from office_365_mcp.shared.messages import Mention
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Confirm, Confirmed
+from office_365_mcp.tools import teams_send_channel_message_with_files as channel_sender
 from office_365_mcp.tools import teams_send_chat_message as plain_sender
 from office_365_mcp.tools import teams_send_chat_message_with_files as sender
 from office_365_mcp.tools.teams_send_chat_message_with_files import (
@@ -43,6 +44,11 @@ from .conftest import TEAMS_SENDER, message_payload
 _CHAT_ID = "19:release@thread.v2"
 _SEND_PATH = "/chats/19%3Arelease%40thread.v2/messages"
 _MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
+_TEAM_ID = "00000000-0000-4000-8000-0000000000a1"
+_CHANNEL_ID = "19:general@thread.tacv2"
+_CHANNEL_SEND_PATH = (
+    "/teams/00000000-0000-4000-8000-0000000000a1/channels/19%3Ageneral%40thread.tacv2/messages"
+)
 
 _MESSAGE = "Here is the plan."
 _SUBJECT = "Release plan"
@@ -482,6 +488,76 @@ class TestTheEraWithNoBackChannel:
             )
 
         assert post.call_count == 0, "the plan went out on an accept given for the budget alone"
+
+    async def test_an_accept_for_one_file_name_cannot_send_the_file_under_another_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        budget, _plan = _files(graph)
+        post = _posts(graph)
+        key, state, agrees_with = _the_question(
+            await send_chat_message_with_files(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=a_person_agrees(_modern_context()),
+            )
+        )
+        budget.mock(
+            return_value=httpx.Response(
+                200, json=_drive_item(name="Salaries.docx", guid=_BUDGET_ID)
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await send_chat_message_with_files(
+                client,
+                chat_id=_CHAT_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=_answered(key, state, agrees_with),
+            )
+
+        assert post.call_count == 0, "a file went out under a name nobody agreed to"
+
+    async def test_a_channel_accept_for_one_file_name_cannot_send_it_under_another_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        budget, _plan = _files(graph)
+        post = graph.post(_CHANNEL_SEND_PATH).mock(return_value=httpx.Response(201, json={}))
+        asked = await channel_sender.send_channel_message_with_files(
+            client,
+            team_id=_TEAM_ID,
+            channel_id=_CHANNEL_ID,
+            message=_MESSAGE,
+            attachments=[_BUDGET.uri],
+            confirm=channel_sender.a_person_agrees(_modern_context()),
+        )
+        key, state, agrees_with = _the_question(asked)
+        budget.mock(
+            return_value=httpx.Response(
+                200, json=_drive_item(name="Salaries.docx", guid=_BUDGET_ID)
+            )
+        )
+
+        with pytest.raises(ToolError, match="given for a different request"):
+            _ = await channel_sender.send_channel_message_with_files(
+                client,
+                team_id=_TEAM_ID,
+                channel_id=_CHANNEL_ID,
+                message=_MESSAGE,
+                attachments=[_BUDGET.uri],
+                confirm=channel_sender.a_person_agrees(
+                    _modern_context(
+                        answers={
+                            key: ElicitResult(action="accept", content={"value": agrees_with})
+                        },
+                        state=state,
+                    )
+                ),
+            )
+
+        assert post.call_count == 0, "a file went out under a name nobody agreed to"
 
     async def test_an_accept_for_one_mention_cannot_send_the_same_label_for_another_id(
         self, client: GraphServiceClient, graph: respx.MockRouter

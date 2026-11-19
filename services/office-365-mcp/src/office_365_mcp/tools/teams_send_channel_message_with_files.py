@@ -94,14 +94,6 @@ async def send_channel_message_with_files(
     handles = attachment_handles(attachments)
     if isinstance(handles, str):
         raise ToolError(f"{CHANNEL_POST.nothing_sent} {handles}")
-    about = send_binding(
-        (team_id, channel_id, repr(reply_to_id)),
-        message,
-        mentions,
-        subject=subject,
-        importance=importance,
-        files=handles,
-    )
     sent: ChatMessage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
@@ -119,6 +111,15 @@ async def send_channel_message_with_files(
                 subject=subject,
                 importance=importance,
                 files=files,
+            )
+            about = send_binding(
+                (team_id, channel_id, repr(reply_to_id)),
+                message,
+                mentions,
+                subject=subject,
+                importance=importance,
+                files=handles,
+                attached=files,
             )
             with not_graph():
                 answer = await confirm(question, about)

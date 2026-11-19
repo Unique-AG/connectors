@@ -107,7 +107,13 @@ async def send_chat_message_with_files(
                 files=files,
             )
             about = send_binding(
-                (chat_id,), message, members, subject=subject, importance=importance, files=handles
+                (chat_id,),
+                message,
+                members,
+                subject=subject,
+                importance=importance,
+                files=handles,
+                attached=files,
             )
             with not_graph():
                 answer = await confirm(question, about)
