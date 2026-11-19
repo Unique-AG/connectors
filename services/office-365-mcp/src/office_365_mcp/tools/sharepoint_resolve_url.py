@@ -14,7 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_step
-from office_365_mcp.shared.files import ITEM_FIELDS, DriveItemSummary
+from office_365_mcp.shared.files import ITEM_FIELDS, VIEWER_QUERY, DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_resolve_url"
@@ -78,7 +78,10 @@ async def resolve_url(client: GraphServiceClient, *, url: str) -> DriveItemSumma
         raise ToolError(_NOT_A_WEB_ADDRESS)
 
     with graph_step(STEP):
-        item = await client.shares.by_shared_drive_item_id(_sharing_token(address)).drive_item.get(
+        # The `web_url` of this connector's own results adds the viewer query to a file's path,
+        # and the path alone is what names the file.
+        shared = _sharing_token(address.removesuffix(VIEWER_QUERY))
+        item = await client.shares.by_shared_drive_item_id(shared).drive_item.get(
             request_configuration=RequestConfiguration[_ItemQuery](
                 query_parameters=_ItemQuery(select=list(ITEM_FIELDS))
             )

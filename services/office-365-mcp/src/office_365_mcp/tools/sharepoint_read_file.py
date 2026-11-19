@@ -35,8 +35,8 @@ from office_365_mcp.shared.files import (
     MAX_BYTES,
     MEGABYTE,
     UNNAMED_ITEM_LABEL,
-    browser_url,
     is_utf8,
+    view_url,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
@@ -181,7 +181,7 @@ async def _fetched(
         if item.size is None:
             return _NO_SIZE
         if item.size > MAX_BYTES:
-            return _too_large(size=item.size, web_url=item.web_url)
+            return _too_large(size=item.size, web_url=view_url(item))
 
         try:
             with graph_step(STEP_CONTENT):
@@ -198,7 +198,7 @@ async def _fetched(
                         extra={"item_bytes": item.size, "downloaded_bytes": downloaded.size},
                     )
         except GraphResponseTooLarge:
-            return _too_large(size=None, web_url=item.web_url)
+            return _too_large(size=None, web_url=view_url(item))
         except GraphFailure as failure:
             if convert_to is not None and failure.status == HTTPStatus.NOT_ACCEPTABLE:
                 return _NOT_CONVERTIBLE
@@ -215,11 +215,12 @@ async def _fetched(
 
 
 def _browser_link(item: DriveItem) -> ResourceLink | None:
-    if item.web_url is None:
+    address = view_url(item)
+    if address is None:
         return None
     return ResourceLink(
         name=item.name or UNNAMED_ITEM_LABEL,
-        uri=browser_url(item.web_url),
+        uri=address,
         description="Opens this file in a browser. Cite the file with this address.",
         mime_type=item.file.mime_type if item.file is not None else None,
     )
@@ -283,7 +284,7 @@ def _too_large(*, size: int | None, web_url: str | None) -> str:
         f"{_megabytes(size)} MB" if size is not None else f"more than {_megabytes(MAX_BYTES)} MB"
     )
     where = (
-        "Tell the user to open the file in a browser instead, at " + browser_url(web_url) + "."
+        "Tell the user to open the file in a browser instead, at " + web_url + "."
         if web_url is not None
         else "Microsoft gave no web address for this file. Tell the user to open the file from "
         + "the site itself."

@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Self, cast
+from urllib.parse import quote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -146,6 +147,13 @@ BODY_IS_PLAIN_TEXT_FIELD: str = (
 
 class TeamsMessage(BaseModel):
     uri: str = Field(description="The handle this message was read from.")
+    title: str | None = Field(
+        description=(
+            "A short label for this message, to name it when you cite it: its subject, or else "
+            + "who sent it and how its text opens. This connector builds it, so read `body` for "
+            + "what the message says. Null when the message has no subject, sender or text."
+        )
+    )
     message_id: str = Field(description="The message's Graph id.")
     chat_id: str | None = Field(description="The chat this message is in, or null for channels.")
     team_id: str | None = Field(description="The team, for channel messages, or null for chats.")
@@ -181,7 +189,12 @@ class TeamsMessage(BaseModel):
         description="`normal`, `high` or `urgent`, as the sender marked it."
     )
     web_url: str | None = Field(
-        description="A link to open the message in Microsoft Teams, or null for chats."
+        description=(
+            "A link that opens the message in Microsoft Teams. Give it to the user when you "
+            + "answer from this message. Graph often sends none for a chat message, and this "
+            + "connector then gives Teams' deep link to the message in its chat. Null when "
+            + "neither exists."
+        )
     )
     mentions: list[MessageMention] = Field(
         description="Everyone and everything this message @-mentions."
@@ -196,25 +209,29 @@ class TeamsMessage(BaseModel):
         mentions = message.mentions or []
         attachments = message.attachments or []
         body = None if message.deleted_date_time is not None else message.body
+        text = body.content if body is not None else None
+        sender = MessageSender.from_identity(message.from_)
+        event = event_of(message)
         return cls(
             uri=handle.uri,
+            title=_message_title(message.subject, sender, text, event),
             message_id=message.id or handle.message_id,
             chat_id=handle.chat_id,
             team_id=handle.team_id,
             channel_id=handle.channel_id,
-            sender=MessageSender.from_identity(message.from_),
-            body=body.content if body is not None else None,
+            sender=sender,
+            body=text,
             body_is_plain_text=body is not None
             and body.content is not None
             and body.content_type == BodyType.Text,
-            event=event_of(message),
+            event=event,
             created_at=message.created_date_time,
             last_edited_at=message.last_edited_date_time,
             deleted_at=message.deleted_date_time,
             reply_to_id=message.reply_to_id or handle.reply_to_id,
             subject=message.subject,
             importance=message.importance,
-            web_url=message.web_url,
+            web_url=message.web_url or _chat_message_link(handle),
             mentions=[MessageMention.from_mention(mention) for mention in mentions],
             attachments=[
                 MessageAttachment.from_attachment(attachment) for attachment in attachments
@@ -223,6 +240,32 @@ class TeamsMessage(BaseModel):
                 MessageReaction.from_reaction(reaction) for reaction in (message.reactions or [])
             ],
         )
+
+
+def _message_title(
+    subject: str | None, sender: MessageSender | None, body: str | None, event: str | None
+) -> str | None:
+    if subject is not None and subject.strip():
+        return subject.strip()
+    who = sender.display_name if sender is not None else None
+    what = (body_opening(body) if body is not None else None) or event
+    if who and what:
+        return f"{who}: {what}"
+    return who or what or None
+
+
+# The documented deep link to a chat message:
+# https://learn.microsoft.com/en-us/microsoftteams/platform/concepts/build-and-test/deep-link-teams
+_CHAT_CONTEXT = quote('{"contextType":"chat"}', safe="")
+
+
+def _chat_message_link(handle: MessageHandle) -> str | None:
+    if handle.chat_id is None:
+        return None
+    return (
+        f"https://teams.microsoft.com/l/message/{quote(handle.chat_id, safe=':@')}/"
+        + f"{quote(handle.message_id, safe='')}?context={_CHAT_CONTEXT}"
+    )
 
 
 STEP_CHAT_MESSAGE = "chat_message"

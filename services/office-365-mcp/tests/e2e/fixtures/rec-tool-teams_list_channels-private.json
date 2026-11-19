@@ -39,7 +39,7 @@
     },
     "query": {
       "$filter": "membershipType eq 'private'",
-      "$select": "id,displayName,description,createdDateTime,membershipType"
+      "$select": "id,displayName,description,createdDateTime,membershipType,webUrl"
     },
     "status": 200,
     "response_headers": {

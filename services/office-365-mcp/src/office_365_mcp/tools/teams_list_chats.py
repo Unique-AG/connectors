@@ -27,6 +27,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.teams.messages import MessageSender
 from office_365_mcp.shared.window import as_utc
@@ -128,6 +129,18 @@ class ChatSummary(BaseModel):
             "Chat name. Null for oneOnOne chats and unnamed group chats (use `members` for those)."
         )
     )
+    title: str | None = Field(
+        description=(
+            "A short label for this chat, to name it when you cite it: its `topic`, or else the "
+            + "names of its members. Null when the chat has neither."
+        )
+    )
+    web_url: str | None = Field(
+        description=(
+            "The link that opens this chat in Microsoft Teams, as Graph reports it. Give it to the "
+            + "user when you answer about this chat. Null when Graph sent none."
+        )
+    )
     meeting_uri: str | None = Field(
         description=(
             "A handle for the Teams meeting behind this chat. It is the only route from a "
@@ -196,6 +209,7 @@ class ChatSummary(BaseModel):
         # Graph documents `topic` as absent when unnamed. A blank one survives the SDK as `""`.
         topic = chat.topic if chat.topic is not None and chat.topic.strip() else None
         members = _members(chat, include_member_emails) if topic is None else None
+        names = ", ".join(member.display_name for member in members or [] if member.display_name)
         meeting = chat.online_meeting_info
         return cls(
             chat_id=chat.id,
@@ -203,6 +217,8 @@ class ChatSummary(BaseModel):
             # comma, so `.value` is typed as a one-tuple.
             chat_type=chat.chat_type if chat.chat_type is not None else "unknown",
             topic=topic,
+            title=topic or cut_for_a_question(names) or None,
+            web_url=chat.web_url,
             meeting_uri=meeting_uri_for(meeting.join_web_url) if meeting is not None else None,
             last_message_at=preview.created_date_time if preview is not None else None,
             last_message_body=last_body.content if last_body is not None else None,

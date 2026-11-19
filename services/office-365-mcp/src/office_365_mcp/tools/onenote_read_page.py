@@ -1,4 +1,6 @@
+import re
 from collections.abc import Mapping
+from html import unescape
 from pathlib import Path
 from tempfile import gettempdir
 from typing import Annotated
@@ -36,6 +38,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 MAX_CONTENT_BYTES = 1 * MEGABYTE
+
+_TITLE_ELEMENT = re.compile(r"<title\b[^>]*>(.*?)</title\s*>", re.DOTALL | re.IGNORECASE)
 
 _DESCRIPTION = f"""\
 Reads the HTML of one page exactly as Microsoft stores it. This tool converts nothing: the answer \
@@ -77,6 +81,19 @@ _NOTHING_CAME_BACK = (
 
 
 class PageContent(BaseModel):
+    title: str | None = Field(
+        description=(
+            "The page title from the page's own `<title>`, or `page.title` when the HTML holds "
+            + "none. Name the page by it when you cite it. The page index behind `page.title` can "
+            + "lag an edit, and this field does not."
+        )
+    )
+    web_url: str | None = Field(
+        description=(
+            "The address that opens the page in OneNote for the web, as `page.web_url` holds it. "
+            + "Give it to the user when you answer from this page."
+        )
+    )
     page: PageSummary = Field(
         description=(
             "The page this HTML belongs to: its title, when it changed, and the handles that "
@@ -124,7 +141,16 @@ async def onenote_read_page(
     except UnicodeDecodeError as error:
         raise ToolError(_cannot_decode(summary.web_url)) from error
 
-    return PageContent(page=summary, html=html)
+    return PageContent(
+        title=_html_title(html) or summary.title, web_url=summary.web_url, page=summary, html=html
+    )
+
+
+def _html_title(page_html: str) -> str | None:
+    found = _TITLE_ELEMENT.search(page_html)
+    if found is None:
+        return None
+    return " ".join(unescape(found.group(1)).split()) or None
 
 
 async def _content(
