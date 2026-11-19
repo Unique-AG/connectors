@@ -21,9 +21,10 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="WATCHLIST matches to 
     description=(
         "Create a Passport Check case and screen it synchronously, returning its MRZ.\n"
         "\n"
-        "This writes a case. Without case_id one is derived from the document, so a retry is "
-        "refused as already screened instead of creating a second case. It does not record a "
-        "human document comparison. limit truncates WATCHLIST matches only."
+        "This writes a case. Without case_id one is derived from the document, so a retry after "
+        "the first call saved its case is refused as already screened. Two calls at the same "
+        "time are not guarded. It does not record a human document comparison. limit "
+        "truncates WATCHLIST matches only."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=False, open_world_hint=True

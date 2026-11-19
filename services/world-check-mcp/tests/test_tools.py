@@ -27,6 +27,8 @@ import uvicorn
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.contexts.groups.models import GroupEntry
+from world_check_mcp.contexts.groups.search import find_groups
 from world_check_mcp.contexts.screening import derived_case_id
 from world_check_mcp.mcp import http_app
 from world_check_mcp.persistence import InMemoryCaseLocks
@@ -1013,6 +1015,92 @@ async def test_screen_entity_refuses_an_existing_case_id() -> None:
                     "nationality": "GBR",
                 },
             )
+
+
+def _recording_server() -> tuple[FastMCP, list[dict[str, object]]]:
+    """The server, with the body of each case LSEG was asked to save."""
+    saved: list[dict[str, object]] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.method == "POST" and request.url.path.endswith("/cases"):
+            saved.append(_body(request))
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(handler),
+    )
+    return server, saved
+
+
+async def test_screen_entity_saves_the_case_under_the_derived_id() -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+            },
+        )
+
+    expected = derived_case_id(
+        "WATCHLIST", "g-screen", "INDIVIDUAL", "Ada Lovelace", None, "GBR", None, None, None, None
+    )
+    assert [body["caseId"] for body in saved] == [expected]
+
+
+async def test_screen_entity_saves_the_case_under_the_id_the_caller_chose() -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        await client.call_tool(
+            "screen_entity",
+            {
+                "name": "Ada Lovelace",
+                "entity_type": "INDIVIDUAL",
+                "group_id": "g-screen",
+                "nationality": "GBR",
+                "case_id": "chosen-1",
+            },
+        )
+
+    assert [body["caseId"] for body in saved] == ["chosen-1"]
+
+
+async def test_passport_check_saves_the_case_under_the_derived_id() -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        await client.call_tool("passport_check", {"passport": _PASSPORT, "group_id": "g-passport"})
+
+    assert [body["caseId"] for body in saved] == [
+        derived_case_id(
+            "PASSPORT_CHECK",
+            "g-passport",
+            "PASSPORT",
+            "123456789",
+            "GBR",
+            "GBR",
+            date(1815, 12, 10),
+            date(2030, 1, 1),
+            "Ada Lovelace",
+            "True",
+        )
+    ]
+
+
+def test_a_group_without_a_name_does_not_break_a_search() -> None:
+    groups = [
+        GroupEntry(id="g1", name="", parent_id=None, child_group_count=0),
+        GroupEntry(id="g2", name="   ", parent_id=None, child_group_count=0),
+        GroupEntry(id="g3", name="EU Onboarding", parent_id=None, child_group_count=0),
+    ]
+
+    found = find_groups(groups, query="eu", parent_id=None)
+
+    assert [group.id for group in found] == ["g3"]
 
 
 def test_derived_case_id_ignores_case_and_spacing_and_tells_entities_apart() -> None:

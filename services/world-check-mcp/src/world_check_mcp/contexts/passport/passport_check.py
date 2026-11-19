@@ -42,25 +42,23 @@ async def passport_check(
     limit: int = 20,
 ) -> PassportCheck:
     """Create a Passport Check case and screen it. This does not record a verification decision."""
+    effective_case_id = case_id or derived_case_id(
+        "PASSPORT_CHECK",
+        group_id,
+        passport.document_type,
+        passport.identification_number,
+        passport.issuing_state,
+        passport.nationality,
+        passport.date_of_birth,
+        passport.date_of_expiry,
+        name or f"{passport.given_name} {passport.last_name}",
+        str(include_watchlist),
+        *field_parts(fields=secondary_fields),
+        *field_parts(fields=custom_fields),
+    )
     try:
         await refuse_existing_case(
-            upstream=upstream,
-            case_id=case_id
-            or derived_case_id(
-                "PASSPORT_CHECK",
-                group_id,
-                passport.document_type,
-                passport.identification_number,
-                passport.issuing_state,
-                passport.nationality,
-                passport.date_of_birth,
-                passport.date_of_expiry,
-                name or f"{passport.given_name} {passport.last_name}",
-                str(include_watchlist),
-                *field_parts(fields=secondary_fields),
-                *field_parts(fields=custom_fields),
-            ),
-            chosen=case_id is not None,
+            upstream=upstream, case_id=effective_case_id, chosen=case_id is not None
         )
     except ScreeningError as error:
         raise PassportError(str(error)) from error
@@ -78,7 +76,7 @@ async def passport_check(
             template=template,
             countries=countries.root,
             nationalities=nationalities.root,
-            case_id=case_id,
+            case_id=effective_case_id,
             include_watchlist=include_watchlist,
             secondary_fields=list(secondary_fields or []),
             custom_fields=list(custom_fields or []),

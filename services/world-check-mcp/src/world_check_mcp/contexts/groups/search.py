@@ -34,10 +34,11 @@ def _score(*, needle: str, group: GroupEntry) -> float:
         return 0.9
     if all(word in name for word in needle.split()):
         return 0.85
-    words = name.split()
     return max(
-        SequenceMatcher(None, needle, name).ratio(),
-        *(SequenceMatcher(None, needle, word).ratio() for word in words),
+        [
+            SequenceMatcher(None, needle, name).ratio(),
+            *(SequenceMatcher(None, needle, word).ratio() for word in name.split()),
+        ]
     )
 
 

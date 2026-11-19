@@ -1730,7 +1730,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. Without case_id one is derived from the document, so a retry is refused as already screened instead of creating a second case. It does not record a human document comparison. limit truncates WATCHLIST matches only.",
+    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. Without case_id one is derived from the document, so a retry after the first call saved its case is refused as already screened. Two calls at the same time are not guarded. It does not record a human document comparison. limit truncates WATCHLIST matches only.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2707,7 +2707,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Without case_id one is derived from the details, so a retry is refused as already screened instead of creating a second case. Use rescreen_case to screen it again. An existing case_id is refused, not rescreened. Matches are candidates, not confirmed identities.",
+    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Without case_id one is derived from the details, so a retry after the first call saved its case is refused as already screened. Two calls at the same time are not guarded. Use rescreen_case to screen it again. An existing case_id is refused, not rescreened. Matches are candidates, not confirmed identities.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

@@ -57,24 +57,22 @@ async def screen_entity(
         gender=gender,
         case_id=case_id,
     )
+    effective_case_id = case_id or derived_case_id(
+        "WATCHLIST",
+        group_id,
+        entity_type,
+        name,
+        dob,
+        nationality,
+        country_of_residence,
+        place_of_birth,
+        registered_country,
+        gender,
+        *field_parts(fields=secondary_fields),
+        *field_parts(fields=custom_fields),
+    )
     await refuse_existing_case(
-        upstream=upstream,
-        case_id=case_id
-        or derived_case_id(
-            "WATCHLIST",
-            group_id,
-            entity_type,
-            name,
-            dob,
-            nationality,
-            country_of_residence,
-            place_of_birth,
-            registered_country,
-            gender,
-            *field_parts(fields=secondary_fields),
-            *field_parts(fields=custom_fields),
-        ),
-        chosen=case_id is not None,
+        upstream=upstream, case_id=effective_case_id, chosen=case_id is not None
     )
     template = await upstream.call(
         GET_CASE_TEMPLATE_FOR_GROUP,
@@ -91,7 +89,7 @@ async def screen_entity(
             template=template,
             countries=countries.root,
             nationalities=nationalities.root,
-            case_id=case_id,
+            case_id=effective_case_id,
             dob=dob,
             nationality=nationality,
             country_of_residence=country_of_residence,
