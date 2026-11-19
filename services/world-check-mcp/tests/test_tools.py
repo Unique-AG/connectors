@@ -1091,6 +1091,21 @@ async def test_passport_check_saves_the_case_under_the_derived_id() -> None:
     ]
 
 
+@pytest.mark.parametrize("change", [{"gender": "MALE"}, {"last_name": "King"}])
+async def test_passport_check_derives_another_id_when_a_screened_field_differs(
+    change: dict[str, str],
+) -> None:
+    server, saved = _recording_server()
+    async with Client(server) as client:
+        for passport in (_PASSPORT, {**_PASSPORT, **change}):
+            await client.call_tool(
+                "passport_check",
+                {"passport": passport, "group_id": "g-passport", "name": "Ada Lovelace"},
+            )
+
+    assert len({body["caseId"] for body in saved}) == 2
+
+
 def test_a_group_without_a_name_does_not_break_a_search() -> None:
     groups = [
         GroupEntry(id="g1", name="", parent_id=None, child_group_count=0),
