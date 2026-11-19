@@ -79,9 +79,12 @@ _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
 _SENSITIVE_QUERY_NAME = re.compile(r"(?is).*(?:token|key|secret|password|auth).*|code")
 
 
+_QUERY_PARAMETER = re.compile(r"([?&]([A-Za-z0-9_.%\[\]+-]+)=)([^&\s\"]+)")
+
+
 def _censored_query_value(found: re.Match[str]) -> str:
     if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(2))) is None:
-        return found.group(0)
+        return found.group(1) + _QUERY_PARAMETER.sub(_censored_query_value, found.group(3))
     return found.group(1) + CENSORED
 
 
@@ -92,7 +95,7 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str | Callable[[re.Match[str]],
     # `scheme://user:password@host`: `server/readiness.py` logs a store failure with
     # `exc_info=True`, and asyncpg quotes the DSN it failed to reach.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@]+:[^\s/@]+@"), r"\1" + CENSORED + "@"),
-    (re.compile(r"([?&]([A-Za-z0-9_.%\[\]+-]+)=)[^&\s\"]+"), _censored_query_value),
+    (_QUERY_PARAMETER, _censored_query_value),
 )
 
 # Trap: at the cap the container must be replaced, not passed through. An ASGI scope can contain
