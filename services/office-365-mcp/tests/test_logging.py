@@ -267,6 +267,16 @@ class TestNothingSecretReachesTheLog:
         assert f"code={CENSORED}&state=x" in message, message
         assert "1.AXcAlive-auth-code" not in sink.stream.getvalue()
 
+    @pytest.mark.parametrize("parameter", ["tok%65n", "%74oken", "api%2Dkey", "c%6Fde"], ids=repr)
+    def test_a_credential_under_a_percent_encoded_name_is_censored(
+        self, sink: _Sink, parameter: str
+    ) -> None:
+        _log(f'127.0.0.1:1 - "GET /mcp?{parameter}=opaque-value&page=2 HTTP/1.1" 200')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"{parameter}={CENSORED}&page=2" in message, message
+        assert "opaque-value" not in sink.stream.getvalue()
+
     @pytest.mark.parametrize("parameter", ["postcode", "encoding", "areacode"], ids=repr)
     def test_a_parameter_that_merely_contains_code_is_kept(
         self, sink: _Sink, parameter: str

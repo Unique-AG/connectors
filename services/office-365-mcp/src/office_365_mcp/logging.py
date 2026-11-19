@@ -16,10 +16,11 @@ import logging
 import re
 import traceback
 import uuid
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from types import TracebackType
 from typing import cast, override
+from urllib.parse import unquote_plus
 
 from fastmcp.server.dependencies import get_context, get_http_request
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
@@ -64,31 +65,34 @@ _SENSITIVE_MARKERS: tuple[str, ...] = (
 
 _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
 
-_CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
+# A credential in a query string, which is the vector the reference calls
+# `req.query["api-key"]`. uvicorn's access line quotes the path *with* its query string, so
+# this one is about a line this service now emits itself.
+#
+# `code` is matched as a whole parameter name and the rest as substrings, because the OAuth
+# callback's credential is spelled exactly `code` — `GET /auth/callback?code=...`, which
+# upstream's `_SKIP_PATHS` does not quiet — while `postcode` and `encoding` merely contain it.
+#
+# Trap: this alternation is hand-written and must stay that way. `_SENSITIVE_MARKERS` is
+# matched against names with every separator *removed*, this pattern against raw URL text, so
+# rebuilding one from the other stops `?api-key=` being redacted.
+_SENSITIVE_QUERY_NAME = re.compile(r"(?is).*(?:token|key|secret|password|auth).*|code")
+
+
+def _censored_query_value(found: re.Match[str]) -> str:
+    if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(2))) is None:
+        return found.group(0)
+    return found.group(1) + CENSORED
+
+
+_CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str | Callable[[re.Match[str]], str]], ...] = (
     (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9\-._~+/=]{8,}"), r"\1 " + CENSORED),
     # A bare JWT: `eyJ` is base64url of `{"`, so every Entra and Graph token starts with it.
     (re.compile(r"\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*"), CENSORED),
     # `scheme://user:password@host`: `server/readiness.py` logs a store failure with
     # `exc_info=True`, and asyncpg quotes the DSN it failed to reach.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@]+:[^\s/@]+@"), r"\1" + CENSORED + "@"),
-    # A credential in a query string, which is the vector the reference calls
-    # `req.query["api-key"]`. uvicorn's access line quotes the path *with* its query string, so
-    # this one is about a line this service now emits itself.
-    #
-    # `code` is matched as a whole parameter name and the rest as substrings, because the OAuth
-    # callback's credential is spelled exactly `code` — `GET /auth/callback?code=...`, which
-    # upstream's `_SKIP_PATHS` does not quiet — while `postcode` and `encoding` merely contain it.
-    #
-    # Trap: this alternation is hand-written and must stay that way. `_SENSITIVE_MARKERS` is
-    # matched against names with every separator *removed*, this pattern against raw URL text, so
-    # rebuilding one from the other stops `?api-key=` being redacted.
-    (
-        re.compile(
-            r"(?i)([?&](?:[A-Za-z0-9_.%\[\]-]*(?:token|key|secret|password|auth)"
-            + r"[A-Za-z0-9_.%\[\]-]*|code)=)[^&\s\"']+"
-        ),
-        r"\1" + CENSORED,
-    ),
+    (re.compile(r"([?&]([A-Za-z0-9_.%\[\]+-]+)=)[^&\s\"']+"), _censored_query_value),
 )
 
 # Trap: at the cap the container must be replaced, not passed through. An ASGI scope can contain
