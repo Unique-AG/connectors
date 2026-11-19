@@ -26,6 +26,7 @@ import uvicorn
 
 from tests.offline_server import build_server
 from tests.offline_server import fake_upstream_settings
+from world_check_mcp.contexts.screening import derived_case_id
 from world_check_mcp.mcp import http_app
 from world_check_mcp.persistence import InMemoryCaseLocks
 from world_check_mcp.persistence import Persistence
@@ -50,6 +51,9 @@ _screen_modes: list[str] = []
 _writes: list[tuple[str, dict[str, object]]] = []
 # The last entry is the case LSEG maps the external caseId "ext-1" to.
 _ext_1_maps_to: list[str] = ["sys-1"]
+_SCREENED_CASE_ID = derived_case_id(
+    "WATCHLIST", "g-retry", "INDIVIDUAL", "Grace Hopper", None, None, None, None, None, None
+)
 
 
 def _passport_template() -> httpx2.Response:
@@ -234,6 +238,10 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
         )
     if path.endswith("/groups/g1"):
         return _json(200, {"id": "g1", "name": "KYC"})
+    if "/references/cases/" in path and path.endswith(
+        (_SCREENED_CASE_ID, _SCREENED_PASSPORT_CASE_ID)
+    ):
+        return _json(200, {"caseId": "derived", "caseSystemId": "sys-screened"})
     if "/references/cases/" in path and path.endswith("ext-1"):
         return _json(200, {"caseId": "ext-1", "caseSystemId": _ext_1_maps_to[-1]})
     if "/references/cases/" in path and path.endswith("ext-nosys"):
@@ -824,6 +832,24 @@ async def test_screen_entity_refuses_an_existing_case_id() -> None:
             )
 
 
+def test_derived_case_id_ignores_case_and_spacing_and_tells_entities_apart() -> None:
+    assert derived_case_id("a", " Grace   HOPPER ") == derived_case_id("A", "grace hopper")
+    assert derived_case_id("a", "Grace Hopper") != derived_case_id(
+        "a", "Grace Hopper", date(1906, 12, 9)
+    )
+    assert derived_case_id("a", "b", "c") != derived_case_id("a", "bc")
+
+
+@pytest.mark.parametrize("name", ["Grace Hopper", "  grace   HOPPER "])
+async def test_screen_entity_refuses_a_retry_of_the_same_details(name: str) -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match=r"already screened.*sys-screened.*rescreen_case"):
+            await client.call_tool(
+                "screen_entity",
+                {"name": name, "entity_type": "INDIVIDUAL", "group_id": "g-retry"},
+            )
+
+
 async def test_screen_entity_requires_the_group_nationality() -> None:
     async with Client(_server()) as client:
         with pytest.raises(ToolError, match="NATIONALITY"):
@@ -987,6 +1013,18 @@ _PASSPORT = {
     "identification_number": "123456789",
     "date_of_expiry": "2030-01-01",
 }
+_SCREENED_PASSPORT_CASE_ID = derived_case_id(
+    "PASSPORT_CHECK",
+    "g-retry",
+    "PASSPORT",
+    "123456789",
+    "GBR",
+    "GBR",
+    date(1815, 12, 10),
+    date(2030, 1, 1),
+    "Ada Lovelace",
+    "True",
+)
 
 
 async def test_generate_passport_mrz_uses_nationality_codes() -> None:
@@ -1020,6 +1058,12 @@ async def test_passport_check_screens_without_media_check() -> None:
     assert check["passport_matches"][0]["mrz_line_1"] == "P<GBR"
     assert check["watchlist_truncated"] is True
     assert check["watchlist_matches"][1:] == []
+
+
+async def test_passport_check_refuses_a_retry_of_the_same_document() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match=r"already screened.*sys-screened"):
+            await client.call_tool("passport_check", {"passport": _PASSPORT, "group_id": "g-retry"})
 
 
 async def test_passport_check_refuses_an_existing_case_id() -> None:

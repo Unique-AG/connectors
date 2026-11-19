@@ -1601,7 +1601,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. Pass a case_id you chose: a retry then fails as an existing id instead of creating a second case. It does not record a human document comparison. limit truncates WATCHLIST matches only.",
+    "description": "Create a Passport Check case and screen it synchronously, returning its MRZ.\n\nThis writes a case. Without case_id one is derived from the document, so a retry is refused as already screened instead of creating a second case. It does not record a human document comparison. limit truncates WATCHLIST matches only.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1618,7 +1618,7 @@
             }
           ],
           "default": null,
-          "description": "External caseId. Existing ids are refused."
+          "description": "External caseId. Defaults to one derived from the document."
         },
         "custom_fields": {
           "anyOf": [
@@ -2578,7 +2578,7 @@
       "openWorldHint": true,
       "readOnlyHint": false
     },
-    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Repeated calls without case_id create new cases, so pass a case_id you chose: a retry then fails as an existing id instead of duplicating the case. An existing case_id is refused, not rescreened. Matches are candidates, not confirmed identities.",
+    "description": "Create a persistent WATCHLIST case and screen it synchronously.\n\nThis writes a case. Without case_id one is derived from the details, so a retry is refused as already screened instead of creating a second case. Use rescreen_case to screen it again. An existing case_id is refused, not rescreened. Matches are candidates, not confirmed identities.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -2595,7 +2595,7 @@
             }
           ],
           "default": null,
-          "description": "External caseId. Existing ids are refused."
+          "description": "External caseId. Defaults to one derived from the details."
         },
         "country_of_residence": {
           "anyOf": [

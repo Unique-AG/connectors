@@ -31,10 +31,11 @@ INSTRUCTIONS = (
     "\n"
     "Matches are candidates, not confirmed identities. Start with list_groups for a group id. "
     "A case argument takes an internal caseSystemId or an external caseId, and get_case says "
-    "which one matched. screen_entity and passport_check create a case on every call, so pass "
-    "a case_id you chose to make a retry fail instead of duplicating it. resolve_result and "
-    "verify_passport_check save a regulatory record only after the user approves it in the "
-    "client. Every limit has a default and a maximum, and next_page continues a list."
+    "which one matched. screen_entity and passport_check derive a case_id from their details, "
+    "so a retry is refused as already screened and rescreen_case screens it again. "
+    "resolve_result and verify_passport_check save a regulatory record only after the user "
+    "approves it in the client. Every limit has a default and a maximum, and next_page "
+    "continues a list."
 )
 
 

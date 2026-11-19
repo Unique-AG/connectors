@@ -4,6 +4,8 @@ from world_check_mcp.contexts.passport.errors import PassportError
 from world_check_mcp.contexts.passport.models import Passport
 from world_check_mcp.contexts.passport.models import PassportCheck
 from world_check_mcp.contexts.passport.payload import passport_arguments
+from world_check_mcp.contexts.screening import derived_case_id
+from world_check_mcp.contexts.screening import field_parts
 from world_check_mcp.contexts.screening import FieldValue
 from world_check_mcp.contexts.screening import match_from_result
 from world_check_mcp.contexts.screening import refuse_existing_case
@@ -41,7 +43,25 @@ async def passport_check(
 ) -> PassportCheck:
     """Create a Passport Check case and screen it. This does not record a verification decision."""
     try:
-        await refuse_existing_case(upstream=upstream, case_id=case_id)
+        await refuse_existing_case(
+            upstream=upstream,
+            case_id=case_id
+            or derived_case_id(
+                "PASSPORT_CHECK",
+                group_id,
+                passport.document_type,
+                passport.identification_number,
+                passport.issuing_state,
+                passport.nationality,
+                passport.date_of_birth,
+                passport.date_of_expiry,
+                name or f"{passport.given_name} {passport.last_name}",
+                str(include_watchlist),
+                *field_parts(fields=secondary_fields),
+                *field_parts(fields=custom_fields),
+            ),
+            chosen=case_id is not None,
+        )
     except ScreeningError as error:
         raise PassportError(str(error)) from error
     template = await upstream.call(

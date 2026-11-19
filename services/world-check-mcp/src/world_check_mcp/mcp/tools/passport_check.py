@@ -21,9 +21,9 @@ PageSize = Annotated[int, Field(ge=1, le=100, description="WATCHLIST matches to 
     description=(
         "Create a Passport Check case and screen it synchronously, returning its MRZ.\n"
         "\n"
-        "This writes a case. Pass a case_id you chose: a retry then fails as an existing id "
-        "instead of creating a second case. It does not record a human document comparison. "
-        "limit truncates WATCHLIST matches only."
+        "This writes a case. Without case_id one is derived from the document, so a retry is "
+        "refused as already screened instead of creating a second case. It does not record a "
+        "human document comparison. limit truncates WATCHLIST matches only."
     ),
     annotations=ToolAnnotations(
         read_only_hint=False, idempotent_hint=False, destructive_hint=False, open_world_hint=True
@@ -34,7 +34,8 @@ async def passport_check(
     passport: Annotated[contexts.Passport, Field(description="Document details as printed.")],
     group_id: GroupId,
     case_id: Annotated[
-        ExternalId | None, Field(description="External caseId. Existing ids are refused.")
+        ExternalId | None,
+        Field(description="External caseId. Defaults to one derived from the document."),
     ] = None,
     name: Annotated[
         str | None, Field(description="Case name. Defaults to the given and last names.")

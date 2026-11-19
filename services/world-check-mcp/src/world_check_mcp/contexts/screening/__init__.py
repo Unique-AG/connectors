@@ -1,3 +1,5 @@
+from world_check_mcp.contexts.screening.case_id import derived_case_id
+from world_check_mcp.contexts.screening.case_id import field_parts
 from world_check_mcp.contexts.screening.errors import ScreeningError
 from world_check_mcp.contexts.screening.fields import normalized
 from world_check_mcp.contexts.screening.fields import validate_fields
@@ -21,6 +23,8 @@ __all__ = [
     "ScreeningError",
     "ScreeningMatch",
     "ScreeningOutcome",
+    "derived_case_id",
+    "field_parts",
     "match_from_result",
     "normalized",
     "refuse_existing_case",
