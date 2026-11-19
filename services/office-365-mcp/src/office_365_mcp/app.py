@@ -27,7 +27,7 @@ from office_365_mcp.graph_client import (
     create_graph_transport,
     start_operation_series,
 )
-from office_365_mcp.graph_operations import GraphOperationMiddleware
+from office_365_mcp.graph_operations import GraphOperationMiddleware, start_tool_outcomes
 from office_365_mcp.logging import (
     HttpRequestIdMiddleware,
     MessageLogMiddleware,
@@ -161,6 +161,7 @@ def create_app(
     )
     register_tools(mcp, graph_transport, selection)
     start_operation_series(selection.tools, statuses=GRAPH_STATUSES)
+    start_tool_outcomes(selection.tools)
 
     ops_middleware = setup_ops(mcp, duration_buckets=_HTTP_DURATION_BUCKETS)
 

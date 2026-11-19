@@ -27,7 +27,9 @@ __all__ = [
     "GRAPH_PAGES_SCANNED",
     "GRAPH_STEPS_TOTAL",
     "GRAPH_STEP_DURATION_SECONDS",
+    "GRAPH_SLOW_OPERATIONS_TOTAL",
     "GRAPH_THROTTLED_TOTAL",
+    "SLOW_OPERATION_SECONDS",
     "GRAPH_TOKEN_ACQUISITIONS_TOTAL",
     "current_graph_operation",
     "graph_operation",
@@ -45,6 +47,8 @@ __all__ = [
 GRAPH_OPERATIONS_TOTAL = "graph_operations_total"
 GRAPH_OPERATION_DURATION_SECONDS = "graph_operation_duration_seconds"
 GRAPH_THROTTLED_TOTAL = "graph_throttled_total"
+GRAPH_SLOW_OPERATIONS_TOTAL = "graph_slow_operations_total"
+SLOW_OPERATION_SECONDS = 60.0
 GRAPH_PAGES_SCANNED = "graph_pages_scanned"
 GRAPH_STEPS_TOTAL = "graph_steps_total"
 GRAPH_STEP_DURATION_SECONDS = "graph_step_duration_seconds"
@@ -71,10 +75,10 @@ _operation_duration = _meter.create_histogram(
     GRAPH_OPERATION_DURATION_SECONDS,
     unit="s",
     description=(
-        "Wall-clock time of one tool call that reached Graph. This includes the SDK's Retry-After "
-        "waits and every page a paged walk read. It leaves out any wait a tool marked as not "
-        "Microsoft's, such as `outlook_send_draft` asking a person to confirm. For the whole wait "
-        "an MCP client saw, person included, read `mcp_call_duration_seconds`."
+        "Wall-clock time of one tool call that attempted Graph. This includes the SDK's "
+        "Retry-After waits and every page a paged walk read. It leaves out any wait a tool marked "
+        "as not Microsoft's, such as `outlook_send_draft` asking a person to confirm. For the "
+        "whole wait an MCP client saw, person included, read `mcp_call_duration_seconds`."
     ),
 )
 _steps = _meter.create_counter(
@@ -92,6 +96,13 @@ _step_duration = _meter.create_histogram(
         "Wall-clock time one Graph call inside an operation took. This is the axis that says which "
         "call in a slow tool was the slow one. The operation histogram says only that the tool was "
         "slow."
+    ),
+)
+_slow_operations = _meter.create_counter(
+    GRAPH_SLOW_OPERATIONS_TOTAL,
+    description=(
+        "Tool calls that attempted Graph and took more than 60 seconds, the time after which Kong "
+        "and the chat close the request. Measured like graph_operation_duration_seconds."
     ),
 )
 _throttled = _meter.create_counter(
@@ -158,6 +169,8 @@ def record_graph_call(operation: str | None, *, status: str, seconds: float) -> 
         return
     _operations.add(1, {"operation": operation, "status": status})
     _operation_duration.record(seconds, {"operation": operation})
+    if seconds > SLOW_OPERATION_SECONDS:
+        _slow_operations.add(1, {"operation": operation})
 
 
 def record_graph_step(
@@ -200,6 +213,7 @@ def start_operation_series(operations: Iterable[str], *, statuses: Iterable[str]
     for operation in operations:
         for status in status_values:
             _operations.add(0, {"operation": operation, "status": status})
+        _slow_operations.add(0, {"operation": operation})
         for retried in ("true", "false"):
             _throttled.add(0, {"operation": operation, "retried": retried})
         for result in TOKEN_RESULTS:

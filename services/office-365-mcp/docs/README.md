@@ -1396,14 +1396,19 @@ grafana:
 
 The dashboard has these rows:
 
-- **Right now**: the firing alerts, the ready pods, the memory use, and one panel for each alert
-  below, with the alert threshold as the red color.
-- **Totals for the selected time range**: tool calls, tool errors, Graph operations, Graph
+- **End of the selected range: state now, counts for the last hour**: the firing alerts, the ready
+  pods and the memory use at the end of the range, and one panel for each alert below with its
+  count over the hour before that end. The HTTP 5xx panel uses the 15 minutes before that end, as
+  its alert does. Red marks the ratio or count that the alert
+  compares, as a visual threshold. It does not prove that every condition of the alert holds, for
+  example its minimum count or its `for` time. With a range in the past, these panels show that
+  hour, not the present.
+- **Totals for the selected time range**: tool calls, tool failures, Graph operations, Graph
   failures, HTTP 5xx answers, and pod restarts.
 - **MCP tool calls**: calls and errors for each tool, the call duration, and the Graph tokens
   that each tool asked for, by result.
 - **Microsoft Graph**: operations by status, failures for each operation and step, the duration,
-  the operations over 30 and 60 seconds, throttling, and pages read.
+  the operations over 60 seconds, throttling, and pages read.
 - **HTTP transport**: MCP and OAuth requests by path and status, the duration, and the open
   requests.
 - **Pod**: ready pods, restarts, memory against the limit, CPU against the request, probe
@@ -1416,33 +1421,50 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | Alert | Fires when | `for` | Severity |
 |---|---|---|---|
 | `Office365McpDown` | The deployment has no available replica. All tool calls and sign-ins fail | `10m` | `critical` |
-| `Office365McpToolErrors` | More than 20% of the tool calls in the last hour failed, and at least 10 failed | `15m` | `warning` |
+| `Office365McpToolErrors` | Unexpected exceptions or returned error results were more than 10% of all recorded tool outcomes in the last hour, and at least 5 happened | `15m` | `warning` |
 | `Office365McpGraphFailing` | More than 20% of the Graph operations in the last hour got status `unavailable`, `failed`, `error` or `paging_unending`, and at least 10 did | `15m` | `warning` |
 | `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
 | `Office365McpTokenRefused` | Entra refused at least 5 Graph token requests in the last hour | `15m` | `warning` |
+| `Office365McpTokenFailing` | At least 5 Graph token requests in the last hour failed without an AADSTS code: a connection error, or an Entra answer with no AADSTS code | `15m` | `warning` |
 | `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour were throttled, and the callers got an error | `15m` | `warning` |
-| `Office365McpGraphSlow` | At least 3 Graph operations in the last hour took more than 60 seconds. Kong and the chat close the request at 60 seconds | `0m` | `warning` |
+| `Office365McpGraphSlow` | At least 3 tool calls that attempted Graph had a measured duration of more than 60 seconds in the last hour. The measured duration leaves out waits for a person to confirm | `0m` | `warning` |
 | `Office365McpHttp5xx` | More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, and at least 5 did | `5m` | `warning` |
 | `Office365McpMemoryHigh` | A pod uses more than 80% of its memory limit | `30m` | `warning` |
 
-`Office365McpToolErrors` does not count the caller errors `ValidationError`, `NotFoundError` and
-`Advised`. The status `ToolError` also includes Graph errors and refused tokens, so
-`Office365McpToolErrors` can fire together with `Office365McpGraphFailing`,
-`Office365McpGraphForbidden` or `Office365McpTokenRefused`. Follow the runbook of the more
-specific alert first. The tool, Graph and token alerts need a minimum number of failures, so one
-failed call at a time of low traffic does not fire an alert. Each alert has a `runbook` annotation
-with the steps to find the cause.
+`tool_outcomes_total` sorts the tool calls that `GraphOperationMiddleware` sees by what ended
+them: `ok`, `asked` (a question for a person to confirm), `refused` (a refusal the tool raised on
+purpose, such as a malformed handle), `graph` (a refusal or failure with a Graph failure in its
+cause chain), `token` (Entra issued no token), `error` (any other exception, or a result that the tool returned
+as an error) or `cancelled`. A
+refusal counts as `refused` when neither its cause chain nor its context chain holds a Graph
+failure, for example a transcript refusal that a tool raises after it left the `except` block. Each alert selects these labels:
+
+- `Office365McpToolErrors`: `tool_outcomes_total` with `outcome="error"`.
+- `Office365McpGraphFailing`: `graph_operations_total` with status `unavailable`, `failed`,
+  `error` or `paging_unending`.
+- `Office365McpGraphForbidden`: `graph_operations_total` with status `forbidden`.
+- `Office365McpGraphThrottled`: `graph_throttled_total`.
+- `Office365McpTokenRefused` and `Office365McpTokenFailing`: `graph_token_acquisitions_total`
+  with result `refused` and `failed`.
+
+The Graph statuses `not_found`, `too_large` and `cancelled`, and the outcomes `asked`, `refused`
+and `cancelled`, fire none of the status or outcome alerts above. They are answers to the request,
+not faults. `Office365McpGraphSlow` counts by duration, whatever the status: a call cancelled after
+more than 60 measured seconds counts. The tool, Graph and token alerts need a minimum number of
+failures, so one failed call at a time of low traffic does not fire an alert. Each alert has a
+`runbook` annotation with the steps to find the cause.
 
 `Office365McpTokenRefused` counts refusals and not a ratio. A token that the SDK serves from its
 cache counts as a success, so a ratio would hide an Entra outage while cached tokens last.
 
-When the pod starts, it creates `graph_operations_total` for every status,
-`graph_throttled_total` for both `retried` values, and `graph_token_acquisitions_total` for every
-result, at zero, for every registered tool. `increase()` then counts their first failure, except a
-failure that happens before the first scrape of the pod. The other
-series appear on their first use: `mcp_calls_total`, `python_http_requests_total` and the duration
-histograms. `increase()` does not count the first sample of a new series, so the first observation
-of a new status or tool on a pod is not counted.
+When the pod starts, it creates these series at zero for every registered tool:
+`tool_outcomes_total` for every outcome, `graph_operations_total` for every status,
+`graph_slow_operations_total`, `graph_throttled_total` for both `retried` values, and
+`graph_token_acquisitions_total` for every result. `increase()` then counts their first failure,
+except a failure that happens before the first scrape of the pod. `python_http_requests_total`
+comes from a library and appears on first use, so `Office365McpHttp5xx` does not count the 5xx
+answers already present at the first scrape of a new status-code series on a pod. Later increases
+count, including the rest of the same burst.
 
 The alerts select the series with `job="office-365-mcp"` and `deployment="office-365-mcp"`. These
 names come from `fullnameOverride`. Helm does not apply templates to alert values, so a deployment

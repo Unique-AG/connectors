@@ -269,7 +269,7 @@ Once the service runs, it exposes these endpoints:
 - **Admin consent**, `GET /admin/consent`. Redirects to the Microsoft admin-consent page for this
   deployment. It needs no authentication. See "Admin consent" in `docs/README.md`.
 - **Metrics**, `GET /metrics`. Prometheus, through `setup_ops`. Beside `unique_toolkit`'s own HTTP
-  series, seven metrics report what this connector asked Microsoft Graph for:
+  series, eight metrics report what this connector asked Microsoft Graph for:
   - `graph_operations_total{operation,status}`
   - `graph_operation_duration_seconds{operation}`
   - `graph_steps_total{operation,step,status}`
@@ -277,9 +277,15 @@ Once the service runs, it exposes these endpoints:
   - `graph_throttled_total{operation,retried}`
   - `graph_pages_scanned{operation}`
   - `graph_token_acquisitions_total{operation,result}`
+  - `graph_slow_operations_total{operation}`
 
-  `GraphOperationMiddleware` wraps each MCP tool call and counts it under `graph_operations_total`
-  when the call sent at least one Graph request. `GraphCallObserver` is the first handler in the
+  `tool_outcomes_total{operation,outcome}` counts the MCP tool calls that reach
+  `GraphOperationMiddleware` by what ended them. Calls that the rate limiter rejects, and calls to a
+  tool name that the server does not register, are not counted.
+
+  `GraphOperationMiddleware` wraps each MCP tool call. It counts the call under
+  `tool_outcomes_total`, and under `graph_operations_total` when the call attempted at least one
+  Graph request. `GraphCallObserver` is the first handler in the
   Graph SDK pipeline. It sees each Graph answer after the SDK's retries, and counts throttling under
   `graph_throttled_total`. `GraphToken` asks Entra for the Graph token before the first Graph
   request, and counts the result under `graph_token_acquisitions_total`. A tool can mark a
