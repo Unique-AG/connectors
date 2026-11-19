@@ -65,14 +65,14 @@ disagree about a shared fact. The `shared/` package lists every fact they must n
   - the parser for each shape
   - the writer for each shape
   - the permission that each Teams surface reads under
-- `messages.py` owns what a Teams message is:
+- `teams/messages.py` owns what a Teams message is:
   - the shape a message is answered in
   - the sender, normalized out of every identity shape Graph answers with
   - the test for "did a person write this"
 
   One function normalizes this type. So the same message, found by one tool and read by another
   tool, is one type, not two types that must separately agree.
-- `meetings.py` owns how a meeting is reached:
+- `teams/meetings.py` owns how a meeting is reached:
   - a join URL, resolved to the meeting it identifies
   - which occurrence of a series a time window means
   - how far "newest first" holds

@@ -556,8 +556,8 @@ def _fields(node: object, at: str) -> dict[str, object]:
         found |= _fields(items, f"{at}[]")
     branches = schema.get("anyOf")
     if isinstance(branches, list):
-        for branch in cast("Sequence[object]", branches):
-            found |= _fields(branch, at)
+        for index, branch in enumerate(cast("Sequence[object]", branches)):
+            found |= _fields(branch, at if index == 0 else f"{at}|{index}")
     return found
 
 

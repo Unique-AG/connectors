@@ -831,6 +831,7 @@ class TestHowItDeclaresItself:
         assert lead.endswith(
             "OneDrive and SharePoint can show the change to everyone who can open the folder."
         )
+        assert "This call is safe to repeat after a timeout." in description
         assert tool.annotations is not None
         assert tool.annotations.idempotent_hint is True
 

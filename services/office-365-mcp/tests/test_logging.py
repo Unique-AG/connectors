@@ -623,7 +623,7 @@ class TestOneLinePerMessageInTheRightTrace:
         during_the_call = [
             line
             for line in lines
-            if line.get("mcp_method") == "tools/call" or line.get("operation") == "get_me"
+            if line.get("mcp_method") == "tools/call" or line.get("tool") == "get_me"
         ]
         assert during_the_call, "the tool call logged nothing"
         assert all(line.get("trace_id") == _TOOL_CALL_TRACE for line in during_the_call), [
