@@ -8,9 +8,37 @@
       "additionalProperties": false,
       "properties": {
         "access": {
-          "description": "Access entries to add. Each entry must have 'entityId', 'entityType' ('USER' or 'GROUP'), and 'type' ('USE', 'MANAGE', or 'UPLOAD').",
+          "description": "Access entries to add.",
           "items": {
-            "additionalProperties": true,
+            "description": "An access entry to grant to a user or group.",
+            "properties": {
+              "entityId": {
+                "description": "ID of the user or group to grant access to.",
+                "type": "string"
+              },
+              "entityType": {
+                "description": "'USER' or 'GROUP'.",
+                "enum": [
+                  "USER",
+                  "GROUP"
+                ],
+                "type": "string"
+              },
+              "type": {
+                "description": "Access level: 'USE', 'MANAGE', or 'UPLOAD'.",
+                "enum": [
+                  "USE",
+                  "MANAGE",
+                  "UPLOAD"
+                ],
+                "type": "string"
+              }
+            },
+            "required": [
+              "entityId",
+              "entityType",
+              "type"
+            ],
             "type": "object"
           },
           "type": "array"
@@ -284,7 +312,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Get a single module with its full configuration dict.",
+    "description": "Get a single module with its full configuration dict.\n\nCall list_modules first to find module IDs.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -677,9 +705,9 @@
   },
   {
     "annotations": {
-      "idempotentHint": true
+      "idempotentHint": false
     },
-    "description": "Update the current space's SwappableIntelligence harness configuration.\n\nEach parameter targets a specific key in the stored configuration. Only provided\n(non-None) parameters are written; everything else in the existing config is preserved.\nUse get_conduct_config first to inspect the current state.",
+    "description": "Update the current space's SwappableIntelligence harness configuration.\n\nEach parameter targets a specific key in the stored configuration. Only provided\n(non-None) parameters are written; everything else in the existing config is preserved.\nUse get_conduct_config first to inspect the current state.\nCreates a pre-update snapshot before applying changes.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -992,9 +1020,9 @@
   },
   {
     "annotations": {
-      "idempotentHint": true
+      "idempotentHint": false
     },
-    "description": "Update a Magic Table space's RfpAgent module and/or space-level settings.\n\nUpdates the current space by default. Pass target_space_id to configure a Magic Table\nspace from a Conduct or command space that acts as its configuration interface.\nModule-level parameters (language_model, columns, etc.) patch the RfpAgent module config.\nSpace-level parameters (answer_library, hide_sheet_status, etc.) patch\nspace.settings.magicTableConfig. Only provided (non-None) parameters are written.\nUse get_magic_table_config first to inspect the current state.",
+    "description": "Update a Magic Table space's RfpAgent module and/or space-level settings.\n\nUpdates the current space by default. Pass target_space_id to configure a Magic Table\nspace from a Conduct or command space that acts as its configuration interface.\nModule-level parameters (language_model, columns, etc.) patch the RfpAgent module config.\nSpace-level parameters (answer_library, hide_sheet_status, etc.) patch\nspace.settings.magicTableConfig. Only provided (non-None) parameters are written.\nUse get_magic_table_config first to inspect the current state.\nCreates a pre-update snapshot before applying changes.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1289,9 +1317,9 @@
   },
   {
     "annotations": {
-      "idempotentHint": true
+      "idempotentHint": false
     },
-    "description": "Update metadata and configuration of the current space. Only provided fields are changed.",
+    "description": "Update metadata and configuration of the current space. Only provided fields are changed.\n\nCreates a pre-update snapshot before applying changes.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1543,9 +1571,9 @@
   },
   {
     "annotations": {
-      "idempotentHint": true
+      "idempotentHint": false
     },
-    "description": "Update the current space's TranslatorV2 module configuration.\n\nOnly provided (non-None) parameters are written; everything else in the existing config\nis preserved. Use get_translator_config first to inspect the current state.",
+    "description": "Update the current space's TranslatorV2 module configuration.\n\nOnly provided (non-None) parameters are written; everything else in the existing config\nis preserved. Use get_translator_config first to inspect the current state.\nCreates a pre-update snapshot before applying changes.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {

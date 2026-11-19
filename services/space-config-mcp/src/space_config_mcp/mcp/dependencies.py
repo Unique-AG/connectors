@@ -3,6 +3,7 @@ import os
 from typing import cast
 
 from fastmcp.dependencies import CurrentContext
+from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
 from fastmcp.server.context import Context
 
@@ -60,18 +61,31 @@ async def get_caller() -> tuple[str, str]:
     )
 
 
-async def get_space_id() -> str:
-    """Resolve the calling space's assistant ID from request meta.
+async def get_space_id(
+    caller: tuple[str, str] = Depends(get_caller),
+    upstream: Upstream = Depends(get_upstream),
+) -> str:
+    """Resolve and verify the calling space's assistant ID from request meta.
 
     The Unique platform injects ``unique.app/chat/assistant-id`` into every
-    tool call's ``_meta``. Falls back to ``UNIQUE_AUTH_ASSISTANT_ID`` for
-    local development.
+    tool call's ``_meta``. When that value is present, ``get_space`` is called
+    to confirm the space exists under the authenticated company before any tool
+    proceeds — this guards against a forged ``_meta`` value redirecting a tool
+    at a different space within the same company.
+
+    Falls back to ``UNIQUE_AUTH_ASSISTANT_ID`` for local development (skips
+    the verification round-trip in that path).
     """
     if _get_request_meta is not None and _assistant_id_key is not None:
         meta = _get_request_meta()
         if meta is not None:
             aid = meta.get(_assistant_id_key)
             if aid and isinstance(aid, str):
+                user_id, company_id = caller
+                try:
+                    await upstream.get_space(user_id, company_id, aid)
+                except Exception as exc:
+                    raise ToolError("Space not found or not accessible.") from exc
                 return aid
 
     aid = os.environ.get("UNIQUE_AUTH_ASSISTANT_ID")

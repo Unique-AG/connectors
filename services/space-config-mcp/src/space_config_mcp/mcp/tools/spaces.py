@@ -117,7 +117,7 @@ async def get_mcp_server_status(
 @tool(
     title="Update Space",
     meta=_META,
-    annotations=ToolAnnotations(idempotent_hint=True),
+    annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def update_space(  # noqa: PLR0913
     *,
@@ -182,7 +182,10 @@ async def update_space(  # noqa: PLR0913
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space:
-    """Update metadata and configuration of the current space. Only provided fields are changed."""
+    """Update metadata and configuration of the current space. Only provided fields are changed.
+
+    Creates a pre-update snapshot before applying changes.
+    """
     user_id, company_id = caller
     try:
         return await contexts.update_space(

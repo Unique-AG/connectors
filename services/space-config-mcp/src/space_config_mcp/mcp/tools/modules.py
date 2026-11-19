@@ -72,7 +72,10 @@ async def get_module(
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Module:
-    """Get a single module with its full configuration dict."""
+    """Get a single module with its full configuration dict.
+
+    Call list_modules first to find module IDs.
+    """
     user_id, company_id = caller
     return await contexts.get_module(
         upstream=upstream,
@@ -147,7 +150,7 @@ async def get_conduct_config(
 @tool(
     title="Update Conduct Config",
     meta=_META,
-    annotations=ToolAnnotations(idempotent_hint=True),
+    annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def update_conduct_config(  # noqa: PLR0913
     *,
@@ -302,6 +305,7 @@ async def update_conduct_config(  # noqa: PLR0913
     Each parameter targets a specific key in the stored configuration. Only provided
     (non-None) parameters are written; everything else in the existing config is preserved.
     Use get_conduct_config first to inspect the current state.
+    Creates a pre-update snapshot before applying changes.
     """
     user_id, company_id = caller
     claude_patch: ClaudeSDKConfig | None = None
@@ -412,7 +416,7 @@ async def get_translator_config(
 @tool(
     title="Update Translator Config",
     meta=_META,
-    annotations=ToolAnnotations(idempotent_hint=True),
+    annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def update_translator_config(
     *,
@@ -478,6 +482,7 @@ async def update_translator_config(
 
     Only provided (non-None) parameters are written; everything else in the existing config
     is preserved. Use get_translator_config first to inspect the current state.
+    Creates a pre-update snapshot before applying changes.
     """
     user_id, company_id = caller
     patch = TranslationConfig(
@@ -548,7 +553,7 @@ async def get_magic_table_config(
 @tool(
     title="Update Magic Table Config",
     meta=_META,
-    annotations=ToolAnnotations(idempotent_hint=True),
+    annotations=ToolAnnotations(idempotent_hint=False),
 )
 async def update_magic_table_config(  # noqa: PLR0913
     *,
@@ -647,6 +652,7 @@ async def update_magic_table_config(  # noqa: PLR0913
     Space-level parameters (answer_library, hide_sheet_status, etc.) patch
     space.settings.magicTableConfig. Only provided (non-None) parameters are written.
     Use get_magic_table_config first to inspect the current state.
+    Creates a pre-update snapshot before applying changes.
     """
     user_id, company_id = caller
     effective_space_id = target_space_id or space_id

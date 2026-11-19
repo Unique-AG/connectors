@@ -14,6 +14,7 @@ from space_config_mcp.mcp.dependencies import get_persistence
 from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.persistence import Persistence
+from space_config_mcp.shared import AccessEntryParam
 from space_config_mcp.shared import DeleteSpaceAccessResponse
 from space_config_mcp.shared import SpaceAccessResponse
 from space_config_mcp.upstream import Upstream
@@ -51,13 +52,8 @@ async def get_space_access(
 async def add_space_access(
     *,
     access: Annotated[
-        list[dict[str, object]],
-        Field(
-            description=(
-                "Access entries to add. Each entry must have 'entityId', 'entityType' "
-                "('USER' or 'GROUP'), and 'type' ('USE', 'MANAGE', or 'UPLOAD')."
-            )
-        ),
+        list[AccessEntryParam],
+        Field(description="Access entries to add."),
     ],
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
@@ -72,7 +68,7 @@ async def add_space_access(
         user_id=user_id,
         company_id=company_id,
         space_id=space_id,
-        access=access,
+        access=[e.model_dump(by_alias=True) for e in access],
     )
     return SpaceAccessResponse.model_validate(raw)
 

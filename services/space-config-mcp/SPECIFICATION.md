@@ -241,6 +241,29 @@ Feature: Export and import space configuration
 
 ---
 
+## Server info
+
+| Property | Value |
+|---|---|
+| **MCP protocol revision** | `2025-06-18` (FastMCP 4.1.4) |
+| **Transport** | Streamable HTTP (`https://`) |
+| **Auth** | Zitadel OIDC — authorization code + PKCE S256, public client, dynamic client registration |
+| **Tested client** | Unique AI platform (node-chat SDK `@modelcontextprotocol/sdk` 1.3x, up to `2025-11-25`) |
+| **Tool count** | 24 |
+| **Definition size** | ~32 KB |
+
+### Security model
+
+Space identity is derived from `unique.app/chat/assistant-id` injected by the Unique platform in
+`_meta`. Before any tool proceeds, the server calls `get_space` to verify the space exists under
+the authenticated company (using the company-scoped API key). This guards against a forged
+`_meta` value redirecting a tool at a different space within the same company.
+
+The company boundary is enforced by the API key: `SPACE_CONFIG_MCP_UNIQUE_API_KEY` is scoped to
+one company, so cross-company access is not possible regardless of `_meta` values.
+
+---
+
 ## Open questions / potential extensions
 
 - **Granular snapshot deletion**: delete a single version rather than all history (depends on KB API support).

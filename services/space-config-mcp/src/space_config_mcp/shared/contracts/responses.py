@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -6,6 +6,18 @@ from pydantic import Field
 from pydantic.alias_generators import to_camel
 
 _CAMEL: ConfigDict = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
+
+class AccessEntryParam(BaseModel):
+    """An access entry to grant to a user or group."""
+
+    model_config: ClassVar[ConfigDict] = _CAMEL
+
+    entity_id: str = Field(description="ID of the user or group to grant access to.")
+    entity_type: Literal["USER", "GROUP"] = Field(description="'USER' or 'GROUP'.")
+    type: Literal["USE", "MANAGE", "UPLOAD"] = Field(
+        description="Access level: 'USE', 'MANAGE', or 'UPLOAD'."
+    )
 
 
 class AccessEntry(BaseModel):

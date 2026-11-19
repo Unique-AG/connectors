@@ -1,4 +1,5 @@
 from space_config_mcp.shared.contracts import AccessEntry
+from space_config_mcp.shared.contracts import AccessEntryParam
 from space_config_mcp.shared.contracts import AssistantPrompt
 from space_config_mcp.shared.contracts import ClaudeEffort
 from space_config_mcp.shared.contracts import ClaudeSDKConfig
@@ -45,6 +46,7 @@ __all__ = [
     "ConductStrategy",
     "ConductToolConfig",
     "AccessEntry",
+    "AccessEntryParam",
     "DeleteSpaceAccessResponse",
     "LanguageModelsResponse",
     "MagicTableExportAssistant",

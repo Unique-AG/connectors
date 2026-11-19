@@ -16,6 +16,7 @@ from space_config_mcp.shared.contracts.magic_table import MagicTableSpaceSetting
 from space_config_mcp.shared.contracts.magic_table import RfpColumn
 from space_config_mcp.shared.contracts.magic_table import RfpModuleConfig
 from space_config_mcp.shared.contracts.responses import AccessEntry
+from space_config_mcp.shared.contracts.responses import AccessEntryParam
 from space_config_mcp.shared.contracts.responses import DeleteSpaceAccessResponse
 from space_config_mcp.shared.contracts.responses import LanguageModelsResponse
 from space_config_mcp.shared.contracts.responses import McpServerInfo
@@ -49,6 +50,7 @@ __all__ = [
     "ConductStrategy",
     "ConductToolConfig",
     "AccessEntry",
+    "AccessEntryParam",
     "DeleteSpaceAccessResponse",
     "LanguageModelsResponse",
     "MagicTableExportAssistant",
