@@ -3,6 +3,7 @@ import hashlib
 import json
 import pathlib
 import re
+from collections import UserDict
 from collections.abc import Mapping
 from typing import cast
 
@@ -687,8 +688,6 @@ _NOT_AN_AGREEMENT: list[object] = [
     ElicitResult(action="cancel"),
     ElicitResult(action="decline", content={"value": _AGREE}),
     ElicitResult(action="cancel", content={"value": _AGREE}),
-    ElicitResult(action="accept", content={}),
-    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
     CreateMessageResult(
         role="assistant", content=TextContent(type="text", text=_AGREE), model="a-model"
     ),
@@ -699,10 +698,14 @@ _NOT_AN_AGREEMENT_IDS = [
     "cancelled",
     "declined-but-filled-in",
     "cancelled-but-filled-in",
-    "empty-content",
-    "off-schema-content",
     "another-kind-of-answer",
 ]
+
+_AN_UNREADABLE_ACCEPT: list[object] = [
+    ElicitResult(action="accept", content={}),
+    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
+]
+_AN_UNREADABLE_ACCEPT_IDS = ["empty-content", "off-schema-content"]
 
 
 def _modern(*, responses: dict[str, object] | None = None, state: str | None = None) -> Confirm:
@@ -770,6 +773,18 @@ class TestTheEraWithNoBackChannel:
         assert isinstance(refusal, str)
         assert refusal.startswith(_NOTHING_HAPPENED)
         assert "did not agree" in refusal
+        assert "Do not call this tool again" in refusal
+
+    @pytest.mark.parametrize("answer", _AN_UNREADABLE_ACCEPT, ids=_AN_UNREADABLE_ACCEPT_IDS)
+    async def test_an_accept_that_fails_validation_is_no_answer_and_not_a_decline(
+        self, answer: object
+    ) -> None:
+        refusal = await _answering(answer)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "no answer" in refusal
+        assert "did not agree" not in refusal
         assert "Do not call this tool again" in refusal
 
     @pytest.mark.parametrize("state", [None, _ANOTHER_REQUEST], ids=["no-state", "another-id"])
@@ -871,6 +886,11 @@ class TestTheAgreementBinding:
     def test_the_order_of_the_keys_of_a_mapping_does_not_change_the_id(self) -> None:
         assert confirmation_digest("tool", {"a": 1, "b": [2]}) == confirmation_digest(
             "tool", {"b": [2], "a": 1}
+        )
+
+    def test_any_mapping_or_sequence_binds_like_the_dict_or_list_it_holds(self) -> None:
+        assert confirmation_digest("tool", UserDict({"a": range(2)}), (1, 2)) == (
+            confirmation_digest("tool", {"a": [0, 1]}, [1, 2])
         )
 
     def test_the_id_is_a_sha256_of_the_canonical_parts(self) -> None:

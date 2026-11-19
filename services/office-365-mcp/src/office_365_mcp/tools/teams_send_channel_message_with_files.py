@@ -97,14 +97,6 @@ async def send_channel_message_with_files(
     handles = attachment_handles(attachments)
     if isinstance(handles, str):
         raise ToolError(f"{CHANNEL_POST.nothing_sent} {handles}")
-    about = send_binding(
-        (team_id, channel_id, repr(reply_to_id)),
-        message,
-        mentions,
-        subject=subject,
-        importance=importance,
-        files=handles,
-    )
     outcome: ChatMessage | InputRequiredResult | str | None
     with graph_errors():
         files = await attachable_files(client, handles)
@@ -144,7 +136,15 @@ async def send_channel_message_with_files(
                     importance=importance,
                     files=files,
                 ),
-                about,
+                send_binding(
+                    (team_id, channel_id, repr(reply_to_id)),
+                    message,
+                    mentions,
+                    subject=subject,
+                    importance=importance,
+                    files=handles,
+                    attached=files,
+                ),
                 post,
             )
 

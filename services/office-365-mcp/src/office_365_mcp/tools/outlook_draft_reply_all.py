@@ -11,6 +11,7 @@ from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.importance import Importance
 from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
+from msgraph.generated.models.recipient import Recipient
 from msgraph.generated.users.item.messages.item.create_reply_all.create_reply_all_post_request_body import (  # noqa: E501
     CreateReplyAllPostRequestBody,
 )
@@ -244,8 +245,12 @@ async def draft_reply_all(
             original = await read_original(reached, handle, fields=_ORIGINAL_FIELDS)
             addressed = _addressed(original)
             original_cc = spelled_recipients(original.cc_recipients)
-            copied = [*original_cc, *_not_yet_on(added, [*addressed, *original_cc])]
-            blind = _not_yet_on(blind_added, [*addressed, *original_cc])
+            recorded = _recorded(
+                [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
+                original.cc_recipients,
+            )
+            copied = [*original_cc, *_not_yet_on(added, recorded)]
+            blind = _not_yet_on(blind_added, recorded)
             with not_graph():
                 answer = await confirm(
                     _question(
@@ -305,9 +310,23 @@ def _copied_addresses(argument: str, addresses: Sequence[str]) -> list[str]:
     return list(checked)
 
 
+def _sender(original: Message) -> list[Recipient]:
+    return [] if original.from_ is None else [original.from_]
+
+
 def _addressed(original: Message) -> list[str]:
-    sender = [] if original.from_ is None else [original.from_]
-    return spelled_recipients([*(original.reply_to or sender), *(original.to_recipients or [])])
+    return spelled_recipients(
+        [*(original.reply_to or _sender(original)), *(original.to_recipients or [])]
+    )
+
+
+def _recorded(*lists: list[Recipient] | None) -> list[str]:
+    return [
+        one.address
+        for recipients in lists
+        for one in MailAddress.each_of(recipients)
+        if one.address
+    ]
 
 
 def _not_yet_on(added: Sequence[str], present: Sequence[str]) -> list[str]:
@@ -376,13 +395,7 @@ def _fill_body(
     importance: MailImportance | None,
     categories: Sequence[str],
 ) -> Message:
-    on_the_draft = [
-        one.address
-        for one in MailAddress.each_of(
-            [*(created.to_recipients or []), *(created.cc_recipients or [])]
-        )
-        if one.address
-    ]
+    on_the_draft = _recorded(created.to_recipients, created.cc_recipients)
     new = _not_yet_on(added, on_the_draft)
     blind = _not_yet_on(blind_added, on_the_draft)
     return Message(

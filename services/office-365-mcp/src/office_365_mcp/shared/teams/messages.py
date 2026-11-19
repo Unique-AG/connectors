@@ -585,6 +585,7 @@ def send_binding(
     subject: str | None,
     importance: ChatImportance | None,
     files: Sequence[DriveFileHandle] = (),
+    attached: Sequence[AttachableFile] = (),
 ) -> str:
     return confirmation_id_for(
         *destination,
@@ -594,6 +595,8 @@ def send_binding(
         repr(importance),
         str(len(files)),
         *(handle.uri for handle in files),
+        str(len(attached)),
+        *(file.name for file in attached),
     )
 
 

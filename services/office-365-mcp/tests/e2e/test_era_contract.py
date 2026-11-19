@@ -145,16 +145,32 @@ async def _contract(
     for name, value in arguments.items():
         if (other := _changed(value)) is None:
             continue
+        state = (await _asked_again(client, tool, arguments)).request_state
         mark = len(replay.unmatched)
-        refusals.append(
-            await _tried(client, tool, {**arguments, name: other}, accept, first.request_state)
-        )
+        refusals.append(await _tried(client, tool, {**arguments, name: other}, accept, state))
         del replay.unmatched[mark:]
         assert _written(replay) == before, f"{tool}: an answer covered a changed {name}"
     assert None not in refusals, f"{tool}: a changed argument was not refused: {refusals}"
     assert not sealed or set(refusals) <= {"sealed"}, f"{tool}: refused for another reason"
     assert _written(replay) == before, f"{tool} wrote without a matching answer"
-    return await _agreed(client, tool, arguments, accept, first)
+    again = await _asked_again(client, tool, arguments)
+    done = await _agreed(client, tool, arguments, accept, again)
+    if sealed:
+        written = _written(replay)
+        mark = len(replay.unmatched)
+        replayed = await _tried(client, tool, arguments, accept, again.request_state)
+        del replay.unmatched[mark:]
+        assert replayed == "sealed", f"{tool}: one answer was used twice ({replayed})"
+        assert _written(replay) == written, f"{tool}: one answer wrote twice"
+    return done
+
+
+async def _asked_again(
+    client: Client[FastMCPTransport], tool: str, arguments: dict[str, object]
+) -> InputRequiredResult:
+    asked = await client.session.call_tool(tool, arguments, allow_input_required=True)
+    assert isinstance(asked, InputRequiredResult), f"{tool} did not ask again"
+    return asked
 
 
 async def _agreed(

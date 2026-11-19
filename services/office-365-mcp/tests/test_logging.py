@@ -276,6 +276,44 @@ class TestNothingSecretReachesTheLog:
         assert f"code={CENSORED}&state=x" in message, message
         assert "1.AXcAlive-auth-code" not in sink.stream.getvalue()
 
+    @pytest.mark.parametrize("parameter", ["tok%65n", "%74oken", "api%2Dkey", "c%6Fde"], ids=repr)
+    def test_a_credential_under_a_percent_encoded_name_is_censored(
+        self, sink: _Sink, parameter: str
+    ) -> None:
+        _log(f'127.0.0.1:1 - "GET /mcp?{parameter}=opaque-value&page=2 HTTP/1.1" 200')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"{parameter}={CENSORED}&page=2" in message, message
+        assert "opaque-value" not in sink.stream.getvalue()
+
+    def test_a_credential_nested_in_a_benign_value_is_censored(self, sink: _Sink) -> None:
+        _log('127.0.0.1:1 - "GET /mcp?next=https://client.example/cb?token=opaque-value&page=2"')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"cb?token={CENSORED}&page=2" in message, message
+        assert "opaque-value" not in sink.stream.getvalue()
+
+    def test_a_deeply_nested_query_is_logged_and_its_credential_censored(self, sink: _Sink) -> None:
+        _log('"GET /mcp' + "?x=" * 1500 + '?token=opaque-value HTTP/1.1"')
+
+        message = cast("str", sink.one()["msg"])
+        assert message.endswith(f'?x=?token={CENSORED} HTTP/1.1"'), message[-80:]
+        assert "opaque-value" not in sink.stream.getvalue()
+
+    def test_many_benign_parameters_are_scanned_in_linear_time(self, sink: _Sink) -> None:
+        started = time.monotonic()
+        _log('"GET /mcp' + "?x=" * 100_000 + '"')
+
+        assert time.monotonic() - started < 5.0
+        assert sink.one()["msg"]
+
+    def test_an_apostrophe_in_a_credential_does_not_end_its_redaction(self, sink: _Sink) -> None:
+        _log('127.0.0.1:1 - "GET /mcp?token=opaque\'value&page=2 HTTP/1.1" 200')
+
+        message = cast("str", sink.one()["msg"])
+        assert f"token={CENSORED}&page=2" in message, message
+        assert "value" not in sink.stream.getvalue()
+
     @pytest.mark.parametrize(
         "name", ["login_hint", "login%5Fhint", "login%5fhint", "loginhint", "login-hint"], ids=repr
     )

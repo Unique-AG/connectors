@@ -134,6 +134,7 @@ async def send_chat_message_with_files(
                     subject=subject,
                     importance=importance,
                     files=handles,
+                    attached=files,
                 ),
                 post,
             )

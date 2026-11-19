@@ -34,7 +34,12 @@ from office_365_mcp.logging import (
     configure_logging,
 )
 from office_365_mcp.metrics import LATENCY_BUCKETS, configure_metrics
-from office_365_mcp.server import admin_consent_url, ready_response, surface_manifest
+from office_365_mcp.server import (
+    admin_consent_url,
+    ready_response,
+    request_state_security,
+    surface_manifest,
+)
 from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, register_tools, resolve
@@ -107,6 +112,7 @@ def create_app(
         icons=SERVER_ICONS,
         auth=auth,
         mask_error_details=True,
+        request_state_security=request_state_security(),
         # Earlier in this list is further out: `add_middleware` appends and the chain is built over
         # `reversed(middleware)`. The first two are ordered for that, not for tidiness.
         #

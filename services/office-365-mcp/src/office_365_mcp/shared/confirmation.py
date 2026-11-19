@@ -1,3 +1,4 @@
+import json
 import uuid
 from hashlib import sha256
 
@@ -9,7 +10,7 @@ def confirmation_id_for(target: str, *fields: str) -> str:
 
 
 def write_state_for(*parts: str) -> str:
-    return sha256("\x1f".join(parts).encode()).hexdigest()
+    return sha256(json.dumps(parts).encode()).hexdigest()
 
 
 def _canonical(*fields: str) -> str:

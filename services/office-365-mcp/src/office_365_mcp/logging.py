@@ -20,6 +20,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from types import TracebackType
 from typing import cast, override
+from urllib.parse import unquote_plus
 
 from fastmcp.server.dependencies import get_context, get_http_request
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
@@ -65,6 +66,34 @@ _SENSITIVE_MARKERS: tuple[str, ...] = (
 
 _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
 
+# Matched against the percent-decoded name. `code` must be the whole name, so `postcode` is kept.
+_SENSITIVE_QUERY_NAME = re.compile(
+    r"(?is).*(?:token|key|secret|password|auth).*|code|login[_-]?hint"
+)
+
+
+_QUERY_NAME = re.compile(r"[?&]([A-Za-z0-9_.%\[\]+-]+)=")
+_QUERY_VALUE_END = re.compile(r"[&\s\"]|$")
+
+
+def _censor_query_values(text: str) -> str:
+    kept: list[str] = []
+    copied_up_to = 0
+    scan_from = 0
+    while (found := _QUERY_NAME.search(text, scan_from)) is not None:
+        value_start = scan_from = found.end()
+        if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(1))) is None:
+            continue
+        value_end = _QUERY_VALUE_END.search(text, value_start)
+        assert value_end is not None, "the end of the text always ends a value"
+        if value_end.start() == value_start:
+            continue
+        kept.extend((text[copied_up_to:value_start], CENSORED))
+        copied_up_to = scan_from = value_end.start()
+    kept.append(text[copied_up_to:])
+    return "".join(kept)
+
+
 _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9\-._~+/=]{8,}"), r"\1 " + CENSORED),
     # A bare JWT: `eyJ` is base64url of `{"`, so every Entra and Graph token starts with it.
@@ -72,24 +101,6 @@ _CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
     # `scheme://user:password@host`: `server/readiness.py` logs a store failure with
     # `exc_info=True`, and asyncpg quotes the DSN it failed to reach.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@]+:[^\s/@]+@"), r"\1" + CENSORED + "@"),
-    # A credential in a query string, which is the vector the reference calls
-    # `req.query["api-key"]`. uvicorn's access line quotes the path *with* its query string, so
-    # this one is about a line this service now emits itself.
-    #
-    # `code` is matched as a whole parameter name and the rest as substrings, because the OAuth
-    # callback's credential is spelled exactly `code` — `GET /auth/callback?code=...`, which
-    # upstream's `_SKIP_PATHS` does not quiet — while `postcode` and `encoding` merely contain it.
-    #
-    # Trap: this alternation is hand-written and must stay that way. `_SENSITIVE_MARKERS` is
-    # matched against names with every separator *removed*, this pattern against raw URL text, so
-    # rebuilding one from the other stops `?api-key=` being redacted.
-    (
-        re.compile(
-            r"(?i)([?&](?:[A-Za-z0-9_.%\[\]-]*(?:token|key|secret|password|auth)"
-            + r"[A-Za-z0-9_.%\[\]-]*|code|login(?:[_-]|%5[Ff])?hint)=)[^&\s\"']+"
-        ),
-        r"\1" + CENSORED,
-    ),
 )
 
 # Trap: at the cap the container must be replaced, not passed through. An ASGI scope can contain
@@ -153,7 +164,7 @@ def _censor_text(text: str) -> str:
     censored = text
     for pattern, replacement in _CREDENTIAL_SHAPES:
         censored = pattern.sub(replacement, censored)
-    return censored
+    return _censor_query_values(censored)
 
 
 def _censor_bytes(value: bytes) -> bytes:

@@ -34,9 +34,19 @@ type DigestPart = str | int | bool | None | Sequence[DigestPart] | Mapping[str, 
 _CONFIRMATION = "confirm"
 
 
+def _canonical(part: DigestPart) -> object:
+    if isinstance(part, str | int | bool | None):
+        return part
+    if isinstance(part, Mapping):
+        return {key: _canonical(value) for key, value in part.items()}
+    return [_canonical(value) for value in part]
+
+
 def confirmation_digest(*parts: BaseModel | DigestPart) -> str:
     canonical = [
-        part.model_dump(mode="json", exclude_none=True) if isinstance(part, BaseModel) else part
+        part.model_dump(mode="json", exclude_none=True)
+        if isinstance(part, BaseModel)
+        else _canonical(part)
         for part in parts
     ]
     return hashlib.sha256(json.dumps(canonical, sort_keys=True).encode()).hexdigest()
@@ -120,7 +130,7 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
         try:
             accepted = handle_elicit_accept(answers, answered.content)
         except Exception:
-            return _not_agreed(nothing_happened)
+            return _no_answer(nothing_happened)
         chosen = cast("str", accepted.data)
         return None if chosen == agree else _not_agreed(nothing_happened)
 
