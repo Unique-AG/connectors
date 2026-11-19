@@ -38,10 +38,8 @@ class PostgresResponseCache:
         self._database: Database = database
 
     async def get(self, key: str) -> CachedAnswer | None:
-        # A read is a use: it moves the answer to the back of the eviction order. Only one older
-        # than `_TOUCH_AFTER` is moved, and only while no other transaction holds its row, so
-        # that reads of the same answer, such as the pages of one graph, neither wait on each
-        # other's row lock nor leave a dead tuple each.
+        # A read moves the answer in the eviction order only once `_TOUCH_AFTER` has passed, and
+        # skips a row another transaction holds, so a hit rarely writes and never waits.
         hit = select(
             ResponseCacheRow.body,
             ResponseCacheRow.cached_at,
@@ -91,8 +89,7 @@ class PostgresResponseCache:
     async def cull(self, *, max_bytes: int) -> None:
         # Keeps the most recently used answers whose sizes add up to at most `max_bytes`. The sum
         # is a BIGINT, so `max_bytes` binds as one past the 2 GB an INTEGER holds. A row is
-        # deleted only as it was ranked: one whose read moved it meanwhile has a newer
-        # `last_used_at` and stays.
+        # deleted only as it was ranked: one read meanwhile has a newer `last_used_at` and stays.
         ranked = select(
             ResponseCacheRow.key,
             ResponseCacheRow.last_used_at,

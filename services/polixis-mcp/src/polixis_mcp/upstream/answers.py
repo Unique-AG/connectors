@@ -71,9 +71,8 @@ class _Route(BaseModel):
 
 
 def _accepts(model: _Parses) -> Callable[[bytes], bool]:
-    """Validates the bytes themselves, as the caller parses them: parsed into a dict first, a key
-    the body repeats would keep only its last value. The rejection is read from the JSON itself,
-    since a model without `error` drops it.
+    """Validates the bytes as the caller parses them, since a dict keeps only a repeated key's
+    last value, and reads the rejection from the JSON, since a model without `error` drops it.
     """
 
     def accepts(body: bytes) -> bool:

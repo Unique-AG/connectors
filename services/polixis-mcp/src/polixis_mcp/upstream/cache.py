@@ -79,11 +79,8 @@ class CachingTransport(httpx2.AsyncBaseTransport):
     reads none of the first one's answers. It does not bind it to the credentials: every account
     gets the same data.
 
-    Requests that miss under the same key at once, such as parallel tool calls on one entity,
-    send one request: the others wait for it and read its answer from the cache. That holds
-    within one replica, and for an answer the cache keeps: after one it does not, such as a
-    rejection, each waiting request sends its own in turn. A request waits at most `wait_seconds`
-    for the one ahead of it, then sends its own.
+    Requests in one replica that miss under the same key at once send one request: the others
+    wait for it, at most `wait_seconds`, and read its answer from the cache if it kept one.
     """
 
     def __init__(
