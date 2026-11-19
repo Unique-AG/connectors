@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetLookupsInputSchema = z.object({
   virtualTable: z.string().optional().describe('Table name derived from the EB.LOOKUP table ID'),
@@ -11,14 +12,7 @@ export const GetLookupsInputSchema = z.object({
 
 export type GetLookupsInput = z.infer<typeof GetLookupsInputSchema>;
 
-export const GetLookupsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetLookupsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetLookupsResult = z.infer<typeof GetLookupsOutputSchema>;
 
@@ -37,11 +31,11 @@ export class GetLookupsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/lookups', {
+      const response = await this.client.get<unknown>('/reference/lookups', {
         virtualTable: input.virtualTable,
         otherInfo: input.otherInfo,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Lookup') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetSharedLimitsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -10,14 +11,7 @@ export const GetSharedLimitsInputSchema = z.object({
 
 export type GetSharedLimitsInput = z.infer<typeof GetSharedLimitsInputSchema>;
 
-export const GetSharedLimitsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetSharedLimitsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetSharedLimitsResult = z.infer<typeof GetSharedLimitsOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetSharedLimitsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/limits/sharedLimits', {
+      const response = await this.client.get<unknown>('/holdings/limits/sharedLimits', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Shared limit') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

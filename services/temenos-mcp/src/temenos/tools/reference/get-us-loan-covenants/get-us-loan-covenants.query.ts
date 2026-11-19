@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetUsLoanCovenantsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -10,14 +11,7 @@ export const GetUsLoanCovenantsInputSchema = z.object({
 
 export type GetUsLoanCovenantsInput = z.infer<typeof GetUsLoanCovenantsInputSchema>;
 
-export const GetUsLoanCovenantsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetUsLoanCovenantsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetUsLoanCovenantsResult = z.infer<typeof GetUsLoanCovenantsOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetUsLoanCovenantsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/us/covenants', {
+      const response = await this.client.get<unknown>('/reference/us/covenants', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Loan covenant') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

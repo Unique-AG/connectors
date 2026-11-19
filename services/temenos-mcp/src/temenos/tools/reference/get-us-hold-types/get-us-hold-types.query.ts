@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetUsHoldTypesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -10,14 +11,7 @@ export const GetUsHoldTypesInputSchema = z.object({
 
 export type GetUsHoldTypesInput = z.infer<typeof GetUsHoldTypesInputSchema>;
 
-export const GetUsHoldTypesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetUsHoldTypesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetUsHoldTypesResult = z.infer<typeof GetUsHoldTypesOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetUsHoldTypesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/us/holdtypes', {
+      const response = await this.client.get<unknown>('/reference/us/holdtypes', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Hold type') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

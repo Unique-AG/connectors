@@ -3,19 +3,13 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetSectorsInputSchema = z.object({});
 
 export type GetSectorsInput = z.infer<typeof GetSectorsInputSchema>;
 
-export const GetSectorsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetSectorsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetSectorsResult = z.infer<typeof GetSectorsOutputSchema>;
 
@@ -34,8 +28,8 @@ export class GetSectorsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/sectors/', undefined);
-      return { success: true, data };
+      const response = await this.client.get<unknown>('/reference/sectors/', undefined);
+      return { success: true, ...toTitledRecords(response, 'Sector') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

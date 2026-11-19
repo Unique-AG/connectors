@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetChequeTypesInputSchema = z.object({
   productName: z.string().optional().describe('Product name of the bank for this account'),
@@ -10,14 +11,7 @@ export const GetChequeTypesInputSchema = z.object({
 
 export type GetChequeTypesInput = z.infer<typeof GetChequeTypesInputSchema>;
 
-export const GetChequeTypesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetChequeTypesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetChequeTypesResult = z.infer<typeof GetChequeTypesOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetChequeTypesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/chequeTypes', {
+      const response = await this.client.get<unknown>('/reference/chequeTypes', {
         productName: input.productName,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Cheque type') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

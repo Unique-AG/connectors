@@ -41,6 +41,8 @@ The server exposes **49** tools across five domains, each wrapping a single Teme
 | Product | 1 | `get_interest_conditions` |
 | Reference | 23 | `get_countries`, `get_industries`, `get_companies`, `get_sectors`, `get_account_officers`, `get_lookups`, `get_system_dates`, `get_us_states` |
 
+A successful call returns `{ success: true, data, header }`. `data` holds one `{ title, record }` entry per Temenos record: `record` is the record unchanged, and `title` combines the record type, its id and its name (e.g. `Guarantee GT2026001 - Northwind Traders`), so a chat client can cite each record by name. Temenos records have no web page to link to, so no entry carries a URL. `header` is the Temenos paging header.
+
 On a Temenos 4xx/5xx other than 429, the HTTP client raises a `TemenosApiError` carrying the upstream status, request path, and the best available error message (`message` / `detail` / `title` / `error`, else `HTTP <status>`). HTTP 429 raises `TemenosRateLimitError` with the message `Rate limit exceeded` and, when the `Retry-After` header is a non-negative integer, `retryAfterSeconds`. That path does not read the body. Raw upstream bodies are never echoed into errors or logs.
 
 ## Configuration

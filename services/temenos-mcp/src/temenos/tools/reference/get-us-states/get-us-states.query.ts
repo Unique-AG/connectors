@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetUsStatesInputSchema = z.object({
   countryId: z.string().optional().describe('ISO country code of the financial institution'),
@@ -10,14 +11,7 @@ export const GetUsStatesInputSchema = z.object({
 
 export type GetUsStatesInput = z.infer<typeof GetUsStatesInputSchema>;
 
-export const GetUsStatesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetUsStatesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetUsStatesResult = z.infer<typeof GetUsStatesOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetUsStatesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/us/states', {
+      const response = await this.client.get<unknown>('/reference/us/states', {
         countryId: input.countryId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'State') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

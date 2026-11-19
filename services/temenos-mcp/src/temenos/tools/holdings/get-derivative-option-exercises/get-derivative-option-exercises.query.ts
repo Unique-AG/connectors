@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetDerivativeOptionExercisesInputSchema = z.object({
   tradeStatus: z.string().optional().describe('Trade status: ACTIVE or CLOSED'),
@@ -33,14 +34,7 @@ export type GetDerivativeOptionExercisesInput = z.infer<
   typeof GetDerivativeOptionExercisesInputSchema
 >;
 
-export const GetDerivativeOptionExercisesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetDerivativeOptionExercisesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetDerivativeOptionExercisesResult = z.infer<
   typeof GetDerivativeOptionExercisesOutputSchema
@@ -63,7 +57,7 @@ export class GetDerivativeOptionExercisesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/instruments/options/exercises', {
+      const response = await this.client.get<unknown>('/holdings/instruments/options/exercises', {
         tradeStatus: input.tradeStatus,
         lot: input.lot,
         tradeType: input.tradeType,
@@ -81,7 +75,7 @@ export class GetDerivativeOptionExercisesQuery {
         optionStyle: input.optionStyle,
         referenceId: input.referenceId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Option exercise') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

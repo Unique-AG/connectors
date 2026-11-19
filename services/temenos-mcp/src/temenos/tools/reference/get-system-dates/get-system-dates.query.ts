@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetSystemDatesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -12,14 +13,7 @@ export const GetSystemDatesInputSchema = z.object({
 
 export type GetSystemDatesInput = z.infer<typeof GetSystemDatesInputSchema>;
 
-export const GetSystemDatesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetSystemDatesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetSystemDatesResult = z.infer<typeof GetSystemDatesOutputSchema>;
 
@@ -38,12 +32,12 @@ export class GetSystemDatesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/dates', {
+      const response = await this.client.get<unknown>('/reference/dates', {
         recordId: input.recordId,
         nextWorkingDate: input.nextWorkingDate,
         lastWorkingDate: input.lastWorkingDate,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'System dates') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

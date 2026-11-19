@@ -3,19 +3,13 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetPurposesInputSchema = z.object({});
 
 export type GetPurposesInput = z.infer<typeof GetPurposesInputSchema>;
 
-export const GetPurposesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetPurposesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetPurposesResult = z.infer<typeof GetPurposesOutputSchema>;
 
@@ -34,8 +28,8 @@ export class GetPurposesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/purposes/', undefined);
-      return { success: true, data };
+      const response = await this.client.get<unknown>('/reference/purposes/', undefined);
+      return { success: true, ...toTitledRecords(response, 'Purpose') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {
