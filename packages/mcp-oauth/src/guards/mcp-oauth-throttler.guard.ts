@@ -34,15 +34,24 @@ export class McpOAuthThrottlerGuard extends ThrottlerGuard {
   }
 
   public override async canActivate(context: ExecutionContext): Promise<boolean> {
-    const allowed = await super.canActivate(context);
+    if (this.moduleOptions.disableRateLimiting) {
+      return true;
+    }
+    // The ceiling runs first so a request it rejects allocates no per-credential record.
     const ceiling = this.reflector.getAllAndOverride<PerIpCeilingOptions | undefined>(
       PER_IP_CEILING_KEY,
       [context.getHandler(), context.getClass()],
     );
-    if (!ceiling || this.moduleOptions.disableRateLimiting) {
-      return allowed;
+    if (ceiling) {
+      await this.enforceCeiling(context, ceiling);
     }
+    return super.canActivate(context);
+  }
 
+  private async enforceCeiling(
+    context: ExecutionContext,
+    ceiling: PerIpCeilingOptions,
+  ): Promise<void> {
     const { req, res } = this.getRequestResponse(context);
     const tracker = await this.getTracker(req);
     const key = this.generateKey(context, tracker, PER_IP_CEILING_NAME);
@@ -63,10 +72,5 @@ export class McpOAuthThrottlerGuard extends ThrottlerGuard {
         tracker,
       });
     }
-    return allowed;
-  }
-
-  protected override async shouldSkip(_context: ExecutionContext): Promise<boolean> {
-    return this.moduleOptions.disableRateLimiting;
   }
 }

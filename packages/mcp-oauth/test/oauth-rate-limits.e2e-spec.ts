@@ -1,5 +1,6 @@
 import { type INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
+import { getStorageToken, type ThrottlerStorageService } from '@nestjs/throttler';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { OAUTH_ENDPOINTS } from '../src';
@@ -146,12 +147,14 @@ describe('OAuth rate limits with the emergency switch on (E2E)', () => {
 describe('OAuth token endpoint per-IP ceiling (E2E)', () => {
   let app: INestApplication;
   let clientId: string;
+  let storage: ThrottlerStorageService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [McpOAuthModule.forRootAsync({ useFactory: () => createMockModuleConfig() })],
     }).compile();
 
+    storage = moduleFixture.get(getStorageToken());
     app = moduleFixture.createNestApplication();
     await app.init();
 
@@ -193,5 +196,16 @@ describe('OAuth token endpoint per-IP ceiling (E2E)', () => {
     });
     expect(overTheCeiling.status).toBe(429);
     expect(overTheCeiling.headers['retry-after']).toBeDefined();
+
+    const recordsAtTheCeiling = storage.storage.size;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const blocked = await request(app.getHttpServer()).post(OAUTH_ENDPOINTS.token).send({
+        grant_type: 'refresh_token',
+        refresh_token: `random-token-blocked-`,
+        client_id: clientId,
+      });
+      expect(blocked.status).toBe(429);
+    }
+    expect(storage.storage.size).toBe(recordsAtTheCeiling);
   });
 });
