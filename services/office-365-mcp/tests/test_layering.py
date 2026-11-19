@@ -545,12 +545,24 @@ def _reached_modules(source: str, package: str | None = None) -> list[tuple[str,
     """`from office_365_mcp import config` names the module `office_365_mcp`, so the member is what
     tells which part of the package it reaches."""
     tree = ast.parse(source)
+    return (
+        [(module, line) for module, line in _imported_modules(tree, package) if module != _PACKAGE]
+        + _whole_package_imports(tree)
+        + [
+            (member, line)
+            for member, line in _imported_members(tree, package)
+            if member.rsplit(".", 1)[0] == _PACKAGE
+        ]
+    )
+
+
+def _whole_package_imports(tree: ast.AST) -> list[tuple[str, int]]:
     return [
-        (module, line) for module, line in _imported_modules(tree, package) if module != _PACKAGE
-    ] + [
-        (member, line)
-        for member, line in _imported_members(tree, package)
-        if member.rsplit(".", 1)[0] == _PACKAGE
+        (alias.name, node.lineno)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name == _PACKAGE
     ]
 
 
@@ -563,8 +575,30 @@ def _undeclared_dependencies(source: str, package: str | None = None) -> list[tu
     ]
 
 
-def _surface_of(tool_name: str) -> str | None:
+def _surface_of(tool_name: str | None) -> str | None:
+    if tool_name is None:
+        return None
     return next((surface for surface in _SURFACES if tool_name.startswith(f"{surface}_")), None)
+
+
+def _declared_tool_name(source: pathlib.Path) -> str | None:
+    return next(
+        (
+            node.value.value
+            for node in ast.parse(source.read_text()).body
+            if isinstance(node, ast.Assign)
+            and any(
+                isinstance(target, ast.Name) and target.id == "TOOL_NAME" for target in node.targets
+            )
+            and isinstance(node.value, ast.Constant)
+            and isinstance(node.value.value, str)
+        ),
+        None,
+    )
+
+
+def _tool_surface(source: pathlib.Path) -> str | None:
+    return _surface_of(_declared_tool_name(source))
 
 
 def _other_surface_imports(
@@ -766,6 +800,13 @@ class TestTheDetectionItself:
             ("office_365_mcp.logging", 2),
         ]
 
+    def test_catches_a_tool_importing_the_whole_package(self) -> None:
+        assert _undeclared_dependencies(
+            "import office_365_mcp\n"
+            + "import office_365_mcp as package\n"
+            + "from office_365_mcp import shared\n"
+        ) == [("office_365_mcp", 1), ("office_365_mcp", 2)]
+
     def test_leaves_the_three_dependencies_of_a_tool_alone(self) -> None:
         assert not _undeclared_dependencies(
             "from office_365_mcp.shared.seam import READ_ONLY\n"
@@ -799,6 +840,22 @@ class TestTheDetectionItself:
             _surface_of(name)
             for name in ("outlook_list_mail", "teams_list_chats", "sharepointish_tool", "get_me")
         ] == ["outlook", "teams", None, None]
+
+    def test_names_the_surface_by_the_declared_tool_name_and_not_the_file_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        module = tmp_path / "teams_renamed.py"
+        _ = module.write_text('TOOL_NAME = "outlook_list_mail"\n')
+
+        assert _tool_surface(module) == "outlook"
+
+    def test_names_no_surface_for_a_module_that_declares_no_tool_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        module = tmp_path / "teams_helpers.py"
+        _ = module.write_text('STEP = "chats"\n')
+
+        assert _tool_surface(module) is None
 
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
         reached = _internal_imports(
@@ -1077,8 +1134,8 @@ class TestAToolLeansOnlyOnSharedAndTheTransport:
 class TestAToolStaysOnItsOwnSurface:
     @pytest.mark.parametrize("surface", _SURFACES)
     def test_every_surface_actually_has_tools(self, surface: str) -> None:
-        assert any(_surface_of(source.stem) == surface for source in _tool_modules()), (
-            f"no tool module is named {surface}_…, so rule 10 checks nothing for it"
+        assert any(_tool_surface(source) == surface for source in _tool_modules()), (
+            f"no tool module declares a TOOL_NAME {surface}_…, so rule 10 checks nothing for it"
         )
 
     @pytest.mark.parametrize(
@@ -1089,7 +1146,7 @@ class TestAToolStaysOnItsOwnSurface:
         users = [
             source
             for source in _tool_modules()
-            if _surface_of(source.stem) == surface
+            if _tool_surface(source) == surface
             and _imports_under(source.read_text(), prefix, _package_of(source))
         ]
         assert users, (
@@ -1099,13 +1156,13 @@ class TestAToolStaysOnItsOwnSurface:
 
     @pytest.mark.parametrize(
         "source",
-        [source for source in _tool_modules() if _surface_of(source.stem) is not None],
+        [source for source in _tool_modules() if _tool_surface(source) is not None],
         ids=_source_id,
     )
     def test_no_tool_imports_the_shared_modules_of_another_surface(
         self, source: pathlib.Path
     ) -> None:
-        surface = _surface_of(source.stem)
+        surface = _tool_surface(source)
         assert surface is not None
         violations = [
             f"{source.relative_to(_SRC)}:{line} imports {module}"
@@ -1268,15 +1325,23 @@ class TestConfigIsBuiltOnlyAtTheCompositionRoot:
 
 
 def _elicitations(source: str) -> list[int]:
-    """Every line on which `<anything>.elicit(...)` is called."""
+    """Every line on which `<anything>.elicit(...)` is called, or a question is built by hand."""
     tree = ast.parse(source)
     return sorted(
         node.lineno
         for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "elicit"
+        if isinstance(node, ast.Call) and _asks_by_hand(node.func)
     )
+
+
+def _asks_by_hand(called: ast.expr) -> bool:
+    if isinstance(called, ast.Attribute):
+        name = called.attr
+    elif isinstance(called, ast.Name):
+        name = called.id
+    else:
+        return False
+    return name in ("elicit", "InputRequiredResult") or name.startswith("ElicitRequest")
 
 
 class TestOnlyTheSeamPutsAQuestionToAPerson:
@@ -1296,6 +1361,24 @@ class TestOnlyTheSeamPutsAQuestionToAPerson:
         ) == [2]
         assert not _elicitations("async def f(ctx):\n    return ctx.elicitation\n")
 
+    def test_catches_a_question_built_by_hand(self) -> None:
+        assert _elicitations(
+            "def f(question):\n"
+            + "    return InputRequiredResult(\n"
+            + "        input_requests={'confirm': types.ElicitRequest(\n"
+            + "            params=ElicitRequestFormParams(message=question, requested_schema={})\n"
+            + "        )},\n"
+            + "    )\n"
+        ) == [2, 3, 4]
+
+    def test_leaves_an_annotation_and_a_passed_on_answer_alone(self) -> None:
+        assert not _elicitations(
+            "async def f(confirm) -> InputRequiredResult | None:\n"
+            + "    asked: InputRequiredResult | None = None\n"
+            + "    answer = await confirm('q', 'about')\n"
+            + "    return answer if isinstance(answer, InputRequiredResult) else asked\n"
+        )
+
     def test_no_other_module_asks(self) -> None:
         violations = [
             f"{_source_id(source)}:{line}"
@@ -1304,8 +1387,9 @@ class TestOnlyTheSeamPutsAQuestionToAPerson:
             for line in _elicitations(source.read_text())
         ]
         assert not violations, (
-            "only shared/seam/elicitation.py may call `.elicit(`: a direct call works on a "
-            + "handshake-era connection and refuses on a 2026-07-28 one, and the tests that stub "
-            + "Context never notice. Ask through `person_confirms` from shared/seam/ instead:\n  "
+            "only shared/seam/elicitation.py may call `.elicit(` or build an "
+            + "`InputRequiredResult` or an `ElicitRequest`: a direct call works on one protocol "
+            + "era and refuses on the other, and the tests that stub Context never notice. Ask "
+            + "through `person_confirms` from shared/seam/ instead:\n  "
             + "\n  ".join(violations)
         )

@@ -492,6 +492,8 @@ class TestWhereTheMappingSits:
         assert raised is not None and raised[1] is not None
         causes = _chain(raised[1])
 
+        assert isinstance(raised[1], ToolError), raised[1]
+        assert "Ask a Microsoft 365 administrator to grant the delegated" in str(raised[1])
         assert any(isinstance(cause, GraphForbidden) for cause in causes), causes
 
 

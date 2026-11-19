@@ -880,3 +880,8 @@ class TestOneLinePerToolFailure:
 
         failures = [line for line in sink.lines() if cast("int", line["level"]) >= _PINO_WARN]
         assert [line["msg"] for line in failures] == ["Tool call failed"], failures
+        assert not [
+            line
+            for line in sink.lines()
+            if str(line.get("msg", "")).startswith("Error calling tool")
+        ], sink.lines()

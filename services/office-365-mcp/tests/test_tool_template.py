@@ -242,7 +242,9 @@ class TestEveryToolFollowsOneTemplate:
         repeatable = {
             tool.name
             for tool in await every_tool.list_tools()
-            if tool.annotations is not None and tool.annotations.idempotent_hint is False
+            if tool.annotations is not None
+            and tool.annotations.read_only_hint is False
+            and tool.annotations.idempotent_hint is False
         }
         violators = {
             name for name in repeatable if not _calls(_module_tree(name), _sends_without_retry)
