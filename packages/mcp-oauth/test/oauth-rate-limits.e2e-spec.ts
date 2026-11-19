@@ -98,3 +98,47 @@ describe('OAuth rate limits (E2E)', () => {
     expect(statuses[10]).toBe(429);
   });
 });
+
+describe('OAuth rate limits with the emergency switch on (E2E)', () => {
+  let app: INestApplication;
+  let clientId: string;
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [
+        McpOAuthModule.forRootAsync({
+          useFactory: () => ({ ...createMockModuleConfig(), disableRateLimiting: true }),
+        }),
+      ],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+
+    const registration = await request(app.getHttpServer())
+      .post(OAUTH_ENDPOINTS.register)
+      .send({
+        client_name: 'Unthrottled client',
+        redirect_uris: [REDIRECT_URI],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+      });
+    clientId = registration.body.client_id;
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('no longer limits a replayed refresh token from one IP', async () => {
+    for (let attempt = 0; attempt < 15; attempt++) {
+      const response = await request(app.getHttpServer()).post(OAUTH_ENDPOINTS.token).send({
+        grant_type: 'refresh_token',
+        refresh_token: 'replayed-refresh-token',
+        client_id: clientId,
+      });
+      expect(response.status, `attempt ${attempt + 1}`).not.toBe(429);
+    }
+  });
+});

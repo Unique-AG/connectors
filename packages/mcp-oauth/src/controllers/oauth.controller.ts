@@ -17,13 +17,14 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
-import { seconds, Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { seconds, Throttle } from '@nestjs/throttler';
 import { type NextFunction, type Request, type Response } from 'express';
 import { ZodValidationPipe } from 'nestjs-zod';
 import passport from 'passport';
 import { serializeError } from 'serialize-error-cjs';
 import { OAUTH_ENDPOINTS, OAUTH_FALLBACK_ENDPOINTS } from '../constants/oauth.constants';
 import { ConsentDecisionDto } from '../dtos/consent-decision.dto';
+import { McpOAuthThrottlerGuard } from '../guards/mcp-oauth-throttler.guard';
 import type { IOAuthStore } from '../interfaces/io-auth-store.interface';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
@@ -46,7 +47,7 @@ import { decodeProviderState } from '../utils/provider-state';
 const BROWSER_FLOW_THROTTLE = { default: { limit: 30, ttl: seconds(60) } };
 
 @Controller()
-@UseGuards(ThrottlerGuard)
+@UseGuards(McpOAuthThrottlerGuard)
 export class OAuthController {
   private readonly logger = new Logger(this.constructor.name);
 

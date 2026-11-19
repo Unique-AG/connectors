@@ -1,4 +1,4 @@
-import { type DynamicModule, Module, type Provider } from '@nestjs/common';
+import { type DynamicModule, Logger, Module, type Provider } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { seconds, ThrottlerModule } from '@nestjs/throttler';
@@ -68,8 +68,15 @@ export class McpOAuthModule extends ConfigurableModuleClass {
     const providers: Provider[] = [
       {
         provide: MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
-        useFactory: (rawOptions: McpOAuthModuleOptionsInput) =>
-          mcpOAuthModuleOptionsSchema.parse(rawOptions),
+        useFactory: (rawOptions: McpOAuthModuleOptionsInput) => {
+          const resolved = mcpOAuthModuleOptionsSchema.parse(rawOptions);
+          if (resolved.disableRateLimiting) {
+            new Logger(McpOAuthModule.name).warn(
+              'Rate limiting is disabled on every OAuth route. Re-enable it once the incident is understood.',
+            );
+          }
+          return resolved;
+        },
         inject: [MCP_OAUTH_MODULE_OPTIONS_TOKEN],
       },
       McpOAuthService,

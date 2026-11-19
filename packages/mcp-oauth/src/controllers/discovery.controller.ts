@@ -1,13 +1,14 @@
 import { Controller, Get, Header, Inject, UseGuards } from '@nestjs/common';
-import { SkipThrottle, ThrottlerGuard } from '@nestjs/throttler';
+import { SkipThrottle } from '@nestjs/throttler';
 import { OAUTH_ENDPOINTS } from '../constants/oauth.constants';
+import { McpOAuthThrottlerGuard } from '../guards/mcp-oauth-throttler.guard';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
   type McpOAuthModuleOptions,
 } from '../mcp-oauth.module-definition';
 
 @Controller('.well-known')
-@UseGuards(ThrottlerGuard)
+@UseGuards(McpOAuthThrottlerGuard)
 @SkipThrottle()
 export class DiscoveryController {
   public constructor(

@@ -1,3 +1,4 @@
+| `AUTH_DISABLE_RATE_LIMITING` | `mcpConfig.auth.disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 <!-- confluence-page-id: 1802338327 -->
 <!-- confluence-space-key: PUBDOC -->
 

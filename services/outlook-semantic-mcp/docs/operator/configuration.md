@@ -1,3 +1,4 @@
+| `AUTH_DISABLE_RATE_LIMITING` | `disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 <!-- confluence-page-id: 2065629188 -->
 <!-- confluence-space-key: PUBDOC -->
 

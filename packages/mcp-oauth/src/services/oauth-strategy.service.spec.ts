@@ -20,6 +20,7 @@ describe('OAuthStrategyService', () => {
 
     options = {
       hmacSecret: 'test-secret',
+      disableRateLimiting: false,
       authCodeExpiresIn: 600,
       accessTokenExpiresIn: 3600,
       refreshTokenExpiresIn: 86400,
