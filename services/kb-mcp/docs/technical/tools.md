@@ -54,8 +54,11 @@ just keyword matches, and returns them as citation-ready chunks.
 | `metadata_filter` | UniqueQL narrowing, AND-ed with the admin filter |
 | `limit`, `score_threshold` | Override the admin defaults for this call |
 
-`KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY` (default `8`) bounds the parallel scope lookups used to
-build citation links.
+Each hit is one JSON text block, `{title, url, content_id, pages?, text}`, that also carries a
+`unique.app/reference` in its `_meta` for Unique AI. `url` is the knowledge-upload deep link when
+`UNIQUE_MCP_FRONTEND_BASE_URL` is set and the folder is known, an external page's own URL, or else
+`unique://content/{id}`. `KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY` (default `8`) bounds the parallel
+scope lookups used to build the deep links.
 
 ### `content_tree`
 
@@ -80,6 +83,10 @@ view; only that mode's arguments apply, and passing one that doesn't (e.g. `quer
 
 Admin defaults: `limit` 50 (1000 for `mode='tree'`), `min_score` 0.6, `match_on` `both`, and a
 filter excluding `user-memory` folders.
+
+`mode='tree'` returns the rendered tree as text. `list` and `search` return one JSON object, an
+optional `notice` list and `results`, one `{title, url, content_id, score?}` per file, with its
+path as `title` and `url` built as for `search`.
 
 !!! note "Incomplete vs. truncated"
     Incomplete means the walk is still running; calling again with the same arguments usually
@@ -131,7 +138,8 @@ views over the same visible-file snapshot.
 
 ### `read_file`
 
-Returns file content by `content_id`, as surfaced by `content_tree` or `search`.
+Returns file content by `content_id`, as surfaced by `content_tree` or `search`, as one JSON
+object, `{title, url, content_id, text}`, with `url` built as for `search`.
 
 `max_tokens_per_call` (admin default `8000`) bounds one response. Larger files are split into
 virtual pages of that size, selected with `start_page` and `end_page`. A caller may raise or

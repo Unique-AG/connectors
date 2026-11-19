@@ -3,6 +3,7 @@
 import asyncio
 import gc
 import inspect
+import json
 import logging
 import weakref
 from dataclasses import dataclass, field
@@ -76,6 +77,14 @@ def _make_content_info(content_id: str, key: str = "", metadata: dict | None = N
     info.owner_id = "user_123"
     info.key = key or content_id
     return info
+
+
+def _listing(result: ToolResult) -> dict[str, Any]:
+    return json.loads(result.content[0].text)  # type: ignore[union-attr]
+
+
+def _listed_ids(result: ToolResult) -> list[str]:
+    return [row["content_id"] for row in _listing(result)["results"]]
 
 
 def _make_fuzzy_match(path_segments: list[str], score: float, content_id: str):
@@ -217,10 +226,15 @@ async def test_mode_list_returns_list_view_only():
         )
 
     assert isinstance(result, ToolResult)
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "[LIST/VIEW](unique://content/list-result) (content_id=list-result)" in text
-    assert "TREE VIEW" not in text
-    assert "search-result" not in text
+    assert _listing(result) == {
+        "results": [
+            {
+                "title": "LIST/VIEW",
+                "url": "unique://content/list-result",
+                "content_id": "list-result",
+            }
+        ]
+    }
 
 
 @pytest.mark.asyncio
@@ -234,13 +248,16 @@ async def test_mode_search_returns_search_view_only():
         )
 
     assert isinstance(result, ToolResult)
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert (
-        "[SEARCH/VIEW](unique://content/search-result) "
-        "(score=0.90, content_id=search-result)"
-    ) in text
-    assert "TREE VIEW" not in text
-    assert "list-result" not in text
+    assert _listing(result) == {
+        "results": [
+            {
+                "title": "SEARCH/VIEW",
+                "url": "unique://content/search-result",
+                "content_id": "search-result",
+                "score": 0.9,
+            }
+        ]
+    }
 
 
 @pytest.mark.asyncio
@@ -350,9 +367,7 @@ async def test_search_mode_accepts_folder_path():
 
     assert isinstance(result, ToolResult)
     assert result.is_error is not True
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "content_id=c1" in text
-    assert "content_id=c2" not in text
+    assert _listed_ids(result) == ["c1"]
 
 
 @pytest.mark.asyncio
@@ -395,10 +410,7 @@ async def test_folder_path_prefix_filter_is_case_sensitive_exact_match():
             config=ContentTreeToolConfig(),
         )
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "content_id=c1" in text
-    assert "content_id=c2" not in text
-    assert "content_id=c3" not in text
+    assert _listed_ids(result) == ["c1"]
 
 
 @pytest.mark.asyncio
@@ -427,10 +439,7 @@ async def test_folder_path_filter_matches_display_path_with_brackets_stripped():
             config=ContentTreeToolConfig(),
         )
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "content_id=c1" in text
-    assert "content_id=c2" not in text
-    assert "content_id=c3" not in text
+    assert _listed_ids(result) == ["c1"]
 
 
 @pytest.mark.asyncio
@@ -447,9 +456,14 @@ async def test_limit_none_falls_back_to_config_default_limit():
             config=config,
         )
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "first 2 of 5 files" in text
-    assert len([line for line in text.splitlines() if "content_id=" in line]) == 2
+    listing = _listing(result)
+    assert listing["notice"] == [
+        (
+            "Showing the first 2 of 5 files. Raise `limit` or narrow "
+            "`folder_path` to see the rest."
+        )
+    ]
+    assert _listed_ids(result) == ["c0", "c1"]
 
 
 @pytest.mark.asyncio
@@ -697,9 +711,10 @@ async def test_list_empty_hits_with_llm_filter_append_retry_hint():
             config=ContentTreeToolConfig(),
         )
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text.startswith("No visible files match.")
-    assert METADATA_FILTER_EMPTY_RETRY_HINT in text
+    assert _listing(result) == {
+        "notice": ["No visible files match.", METADATA_FILTER_EMPTY_RETRY_HINT],
+        "results": [],
+    }
 
 
 @pytest.mark.asyncio
@@ -765,16 +780,19 @@ async def test_list_uses_frontend_deep_link_when_scope_known(monkeypatch):
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert (
-        "[Contracts/a.pdf]"
-        "(https://example.unique.app/knowledge-upload/scope_leaf?file=c1)" in text
-    )
+    assert _listing(result)["results"] == [
+        {
+            "title": "Contracts/a.pdf",
+            "url": "https://example.unique.app/knowledge-upload/scope_leaf?file=c1",
+            "content_id": "c1",
+        }
+    ]
 
 
 @pytest.mark.asyncio
 async def test_list_strips_brackets_from_bracketed_folder_path():
-    """``[ORG]/Alpha/Audit_Report_….pdf`` must emit a clean markdown link."""
+    """``[ORG]/Alpha/Audit_Report_….pdf`` is titled without brackets, so a
+    model building ``[title](url)`` from it gets a valid markdown link."""
     info = _make_content_info("cont_ioi3voailf7hr011zcp6b7eh")
     bracketed_folder = "[ORG]"
     mock_tree = _make_mock_tree(
@@ -790,13 +808,15 @@ async def test_list_strips_brackets_from_bracketed_folder_path():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text == (
-        "[ORG/Alpha/Audit_Report_FY2023.pdf]"
-        "(unique://content/cont_ioi3voailf7hr011zcp6b7eh) "
-        "(content_id=cont_ioi3voailf7hr011zcp6b7eh)"
-    )
-    assert "[ORG]" not in text
+    assert _listing(result) == {
+        "results": [
+            {
+                "title": "ORG/Alpha/Audit_Report_FY2023.pdf",
+                "url": "unique://content/cont_ioi3voailf7hr011zcp6b7eh",
+                "content_id": "cont_ioi3voailf7hr011zcp6b7eh",
+            }
+        ]
+    }
 
 
 @pytest.mark.asyncio
@@ -819,12 +839,13 @@ async def test_list_strips_no_folder_path_sentinel_keeps_unique_link():
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "_no_folder_path" not in text
-    assert (
-        "[Chat_1234567890123_Shareholder_Letter_H1_2024.pdf]"
-        "(unique://content/chat_orphan) (content_id=chat_orphan)" in text
-    )
+    assert _listing(result)["results"] == [
+        {
+            "title": "Chat_1234567890123_Shareholder_Letter_H1_2024.pdf",
+            "url": "unique://content/chat_orphan",
+            "content_id": "chat_orphan",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -846,12 +867,14 @@ async def test_search_strips_no_folder_path_sentinel_keeps_unique_link():
             config=ContentTreeToolConfig(),
         )
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "_no_folder_path" not in text
-    assert (
-        "[Chat_orphan.pdf](unique://content/c_orphan) "
-        "(score=0.95, content_id=c_orphan)" in text
-    )
+    assert _listing(result)["results"] == [
+        {
+            "title": "Chat_orphan.pdf",
+            "url": "unique://content/c_orphan",
+            "content_id": "c_orphan",
+            "score": 0.95,
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -868,13 +891,13 @@ async def test_list_orphan_with_scope_owner_keeps_deep_link(monkeypatch):
     with patch("kb_mcp.tools.content_tree.tool.ContentTree", return_value=mock_tree):
         result = await content_tree(mode="list", config=ContentTreeToolConfig())
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "_no_folder_path" not in text
-    assert (
-        "[orphan.pdf]"
-        "(https://example.unique.app/knowledge-upload/scope_leaf?file=c_scope)" in text
-    )
-    assert "(content_id=c_scope)" in text
+    assert _listing(result)["results"] == [
+        {
+            "title": "orphan.pdf",
+            "url": "https://example.unique.app/knowledge-upload/scope_leaf?file=c_scope",
+            "content_id": "c_scope",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -1047,10 +1070,8 @@ async def test_incomplete_search_does_not_wait_on_fuzzy_and_still_matches():
         )
 
     mock_tree.search_visible_files_fuzzy_async.assert_not_called()
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text.startswith("This listing is incomplete.")
-    assert "content_id=c1" in text
-    assert "content_id=c2" not in text
+    assert _listing(result)["notice"][0].startswith("This listing is incomplete.")
+    assert _listed_ids(result) == ["c1"]
 
 
 @pytest.mark.parametrize(
@@ -1092,7 +1113,7 @@ async def test_incomplete_search_respects_match_options(
     if expected_content_id is None:
         assert "No matching files found." in text
     else:
-        assert f"content_id={expected_content_id}" in text
+        assert expected_content_id in _listed_ids(result)
 
 
 @pytest.mark.asyncio
@@ -1597,10 +1618,7 @@ async def test_search_scopes_to_a_bracket_stripped_folder_path():
         )
 
     assert result.is_error is not True
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert "content_id=c1" in text
-    assert "content_id=c2" not in text
-    assert "content_id=c3" not in text
+    assert _listed_ids(result) == ["c1"]
 
 
 @pytest.mark.asyncio

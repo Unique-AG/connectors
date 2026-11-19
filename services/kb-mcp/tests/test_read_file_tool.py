@@ -1,10 +1,13 @@
 """Tests for the read_file tool — extension dispatch, size cutoff, page ranges."""
 
+import json
 import logging
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from fastmcp.tools import ToolResult
 from unique_toolkit.content.schemas import Content, ContentChunk
 
 from kb_mcp.common.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
@@ -38,6 +41,10 @@ def _make_content(
     return Content(
         id="cont_abc", key=key, chunks=chunks or [], metadata=None, mime_type=mime_type
     )
+
+
+def _read(result: ToolResult) -> dict[str, Any]:
+    return json.loads(result.content[0].text)  # type: ignore[union-attr]
 
 
 def _make_chunk(text: str, order: int, start_page: int, end_page: int) -> ContentChunk:
@@ -240,7 +247,7 @@ async def test_json_mime_type_is_supported_despite_not_being_under_text():
         result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
 
     assert result.is_error is not True
-    assert '{"a": 1}' in result.content[0].text  # type: ignore[union-attr]
+    assert _read(result)["text"] == '{"a": 1}'
 
 
 @pytest.mark.asyncio
@@ -485,12 +492,12 @@ async def test_text_small_doc_returns_full_text_no_markers_no_page_language():
         )
 
     assert result.is_error is not True
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text == (
-        "[notes.md](unique://content/cont_abc)\n\n"
-        "# Title\n\nSome short markdown content."
-    )
-    assert "--- page" not in text
+    assert _read(result) == {
+        "title": "notes.md",
+        "url": "unique://content/cont_abc",
+        "content_id": "cont_abc",
+        "text": "# Title\n\nSome short markdown content.",
+    }
 
 
 @pytest.mark.asyncio
@@ -529,9 +536,8 @@ async def test_text_range_given_returns_token_boundary_slice_with_prefix():
         )
 
     assert result.is_error is not True
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text.startswith("[notes.txt](unique://content/cont_abc)\n\n")
-    assert "showing tokens 0-10 of" in text
+    text = _read(result)["text"]
+    assert text.startswith("showing tokens 0-10 of")
     assert "word" in text
 
 
@@ -622,14 +628,41 @@ async def test_identity_refusal_surfaces_as_tool_error(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_successful_read_starts_with_reference_link():
+async def test_successful_read_is_a_titled_record_with_unique_link():
     chunks = [_make_chunk("hello", 0, 1, 1)]
     content = _make_content("doc.pdf", chunks)
     with _patch_search_contents(content):
         result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text.startswith("[doc.pdf](unique://content/cont_abc)\n\n")
+    assert _read(result) == {
+        "title": "doc.pdf",
+        "url": "unique://content/cont_abc",
+        "content_id": "cont_abc",
+        "text": "--- page 1 ---\nhello",
+    }
+
+
+@pytest.mark.asyncio
+async def test_successful_read_links_to_knowledge_upload_when_frontend_configured(
+    monkeypatch,
+):
+    monkeypatch.setenv("UNIQUE_MCP_FRONTEND_BASE_URL", "https://example.unique.app")
+    content = Content(
+        id="cont_abc",
+        key="doc.pdf",
+        title="Annual Report 2025",
+        chunks=[_make_chunk("hello", 0, 1, 1)],
+        metadata={"folderIdPath": "uniquepathid://scope_root/scope_leaf"},
+    )
+    with _patch_search_contents(content):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    record = _read(result)
+    assert record["title"] == "Annual Report 2025"
+    assert (
+        record["url"]
+        == "https://example.unique.app/knowledge-upload/scope_leaf?file=cont_abc"
+    )
 
 
 @pytest.mark.parametrize(
