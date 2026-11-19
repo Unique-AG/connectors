@@ -556,9 +556,21 @@ def _fields(node: object, at: str) -> dict[str, object]:
         found |= _fields(items, f"{at}[]")
     branches = schema.get("anyOf")
     if isinstance(branches, list):
-        for index, branch in enumerate(cast("Sequence[object]", branches)):
-            found |= _fields(branch, at if index == 0 else f"{at}|{index}")
+        for branch in cast("Sequence[object]", branches):
+            found = _without_overwriting(found, _fields(branch, at))
     return found
+
+
+def _without_overwriting(
+    found: Mapping[str, object], more: Mapping[str, object]
+) -> dict[str, object]:
+    merged = dict(found)
+    for where, field in more.items():
+        key, copy = where, 1
+        while key in merged:
+            key, copy = f"{where}#{copy}", copy + 1
+        merged[key] = field
+    return merged
 
 
 def _optional_types(schema: object) -> list[dict[str, object]]:
