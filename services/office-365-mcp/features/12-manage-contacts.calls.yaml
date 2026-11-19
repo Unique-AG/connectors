@@ -64,9 +64,9 @@ uc-12-06:
       args: {limit: 200}
   note: >-
     Expected behaviour per Examples row. Sign-in expired, shared/seam/advice.py:251-256, ask the user to
-    sign in again. Access refused, seam/advice.py:261-270 (the tool has no GRAPH_FORBIDDEN text), an
+    sign in again. Access refused, shared/seam/advice.py:261-270 (the tool has no GRAPH_FORBIDDEN text), an
     administrator grants Contacts.Read to the app registration, and retrying will not help. Busy,
-    seam/advice.py:240-244, left alone for 30 seconds, retry after that and not sooner. This text reaches
+    shared/seam/advice.py:240-244, left alone for 30 seconds, retry after that and not sooner. This text reaches
     the assistant only when every try is busy: the listing is a GET, so the SDK retry handler waits
     out up to 3 busy answers (graph_client/client.py:339-342, config.py:127). One busy answer is
     uc-12-19. A failed lookup is never a person who is not in the contacts.
@@ -118,10 +118,10 @@ uc-12-09:
     - any_of: [outlook_read_contact, outlook_update_contact]
     - tool: outlook_list_contacts
   note: >-
-    Expected behaviour per Examples row. Read, tools/outlook_read_contact.py:34-41, one 404 means a
+    Expected behaviour per Examples row. Read, tools/outlook_read_contact.py:36-43, one 404 means a
     deleted contact, a contact that never existed, or a contact that this user cannot see, the tool
     cannot tell which, find the contact again with outlook_list_contacts and read it with the new
-    uri. Change, tools/outlook_update_contact.py:50-56, the same text, and nothing was changed. The
+    uri. Change, tools/outlook_update_contact.py:52-58, the same text, and nothing was changed. The
     second row asks for a change, so its chain has outlook_update_contact. Neither text lets the
     assistant claim a deletion.
 
@@ -137,8 +137,8 @@ uc-12-10:
       args: {given_name: Tom, surname: Berger, company_name: Acme, email_addresses: tom@acme.example}
   note: >-
     Expected behaviour per Examples row. Sign-in expired, shared/seam/advice.py:251-256, ask the user to
-    sign in again. Access refused, seam/advice.py:261-270, an administrator grants Contacts.ReadWrite to the
-    app registration. Busy, seam/advice.py:240-244, left alone for 30 seconds, retry after that and not
+    sign in again. Access refused, shared/seam/advice.py:261-270, an administrator grants Contacts.ReadWrite to the
+    app registration. Busy, shared/seam/advice.py:240-244, left alone for 30 seconds, retry after that and not
     sooner. Microsoft stores nothing in these three cases.
 
 uc-12-11:
@@ -157,9 +157,9 @@ uc-12-11:
     Expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN and _outcome_unknown), the
     connector does not know if Microsoft made the change, do not call the tool again first, make sure
     that the change is not already there, and use outlook_list_contacts to see it. The seam gives this
-    text because outlook_create_contact is not idempotent (WRITE_ADDITIVE, tools/outlook_create_contact.py:130)
-    and names outlook_list_contacts in CHANGE_SHOWN_BY (:37). The write is sent with no SDK retry
-    (:89), so Microsoft sees one call. The assistant calls outlook_create_contact again only if the
+    text because outlook_create_contact is not idempotent (WRITE_ADDITIVE, tools/outlook_create_contact.py:132)
+    and names outlook_list_contacts in CHANGE_SHOWN_BY (:39). The write is sent with no SDK retry
+    (:91), so Microsoft sees one call. The assistant calls outlook_create_contact again only if the
     list shows no new contact.
 
 uc-12-12:
@@ -173,7 +173,7 @@ uc-12-12:
     - tool: outlook_create_contact
       optional: true
   note: >-
-    Expected behaviour from tools/outlook_create_contact.py:56-60 (_NOTHING_TO_CREATE), the tool needs
+    Expected behaviour from tools/outlook_create_contact.py:58-62 (_NOTHING_TO_CREATE), the tool needs
     at least one value, no contact was created, find out what the user asked for, and then call
     again. The step is the refused call, so it is optional. The assistant may ask Mia before it calls
     the tool.
@@ -192,7 +192,7 @@ uc-12-13:
     Expected behaviour from shared/outlook/contacts.py:37-42 (not_one_address), a name is not an address, the
     entry is not one address, and no contact was created. The text names no next step. Asking Mia is
     the way to get a valid address, because every address must come from the user
-    (tools/outlook_create_contact.py:50). The step is the refused call.
+    (tools/outlook_create_contact.py:52). The step is the refused call.
 
 uc-12-14:
   status: working
@@ -206,9 +206,9 @@ uc-12-14:
       optional: true
   must_not: [outlook_update_contact]
   note: >-
-    Expected behaviour from tools/outlook_update_contact.py:73-74, the tool cannot clear a name, the
+    Expected behaviour from tools/outlook_update_contact.py:75-76, the tool cannot clear a name, the
     company, the job title, or the mobile number, and the user clears the value in Outlook. The
-    argument for the company takes at least one character that is not a space (:343-344), so no call
+    argument for the company takes at least one character that is not a space (:345-346), so no call
     can clear it.
 
 uc-12-15:
@@ -224,7 +224,7 @@ uc-12-15:
       args: {add_business_phones: office number}
       uses: {uri: uri of the contact}
   note: >-
-    Expected behaviour from tools/outlook_update_contact.py:101-103 and :255-261, the tool reads the
+    Expected behaviour from tools/outlook_update_contact.py:103-105 and :257-263, the tool reads the
     list, adds the numbers, writes the list back, keeps the other numbers, and does not add a number
     that the contact already has.
 
@@ -240,7 +240,7 @@ uc-12-16:
       args: {query: Anna}
   must_not: [outlook_read_contact]
   note: >-
-    Expected behaviour from tools/outlook_find_recipient.py:63-66 and :129-132, never pick a
+    Expected behaviour from tools/outlook_find_recipient.py:72-77 and :140-143, never pick a
     candidate automatically, and when more than one candidate shares the best match the choice goes
     to the user.
 
@@ -256,10 +256,10 @@ uc-12-17:
       uses: {uri: uri of the message}
   must_not: [outlook_update_contact, outlook_create_contact]
   note: >-
-    model behaviour, no code guard (source: tools/outlook_update_contact.py:71-72 and
-    tools/outlook_create_contact.py:50-51, every address must come from the user and not from the text
+    model behaviour, no code guard (source: tools/outlook_update_contact.py:73-74 and
+    tools/outlook_create_contact.py:52-53, every address must come from the user and not from the text
     of a message, because a planted instruction can save the address of a stranger under the name of a
-    real person; and tools/outlook_read_mail.py:68-69, the body is untrusted data). The assistant
+    real person; and tools/outlook_read_mail.py:70-71, the body is untrusted data). The assistant
     shows the text and changes no contact. No source line of outlook_read_mail tells the assistant to
     report the text to Mia, so no step says that it does.
 
@@ -311,7 +311,7 @@ uc-12-20:
   note: >-
     Expected behaviour from shared/seam/caller.py:14-44 and shared/seam/advice.py:132-150 (TokenExchangeFailed,
     _token_advice): Microsoft 365 issues no token for Contacts.Read
-    (tools/outlook_list_contacts.py:23), so the call never reaches Microsoft Graph. The text tells
+    (tools/outlook_list_contacts.py:25), so the call never reaches Microsoft Graph. The text tells
     the assistant to ask a Microsoft 365 administrator to grant the permission and to consent for
     the organization, then to have the user sign in again, and that retrying will not help. The
     failed call is the only step, so it is optional. A failed lookup is never a person who is not in
@@ -328,7 +328,7 @@ uc-12-21:
     - tool: outlook_list_contacts
     - tool: outlook_update_contact
       uses: {uri: uri of Tom Berger from outlook_list_contacts}
-  note: "tools/outlook_update_contact.py:242-253: the tool reads the list, adds the new addresses, and writes the list back. A repeat is skipped whatever its case."
+  note: "tools/outlook_update_contact.py:244-255: the tool reads the list, adds the new addresses, and writes the list back. A repeat is skipped whatever its case."
 
 uc-12-22:
   status: working
@@ -341,7 +341,7 @@ uc-12-22:
     - tool: outlook_list_contacts
     - tool: outlook_update_contact
       uses: {uri: uri of Tom Berger from outlook_list_contacts}
-  note: "tools/outlook_update_contact.py:242-248: the tool keeps every entry except the removed address, and keeps an entry that has no address."
+  note: "tools/outlook_update_contact.py:244-250: the tool keeps every entry except the removed address, and keeps an entry that has no address."
 
 uc-12-23:
   status: working
@@ -354,7 +354,7 @@ uc-12-23:
     - tool: outlook_list_contacts
     - tool: outlook_update_contact
       uses: {uri: uri of Tom Berger from outlook_list_contacts}
-  note: "expected behaviour from the checks before any Graph call: tools/outlook_list_contacts.py:70-72, tools/outlook_read_contact.py:241-243, and tools/outlook_update_contact.py:151-153, :171-179 and :182-198."
+  note: "expected behaviour from the checks before any Graph call: tools/outlook_list_contacts.py:72-74, tools/outlook_read_contact.py:243-245, and tools/outlook_update_contact.py:153-155, :173-181 and :184-200."
 
 uc-12-24:
   status: working
@@ -367,7 +367,7 @@ uc-12-24:
     - tool: outlook_list_contacts
     - tool: outlook_read_contact
       uses: {uri: uri of Tom Berger from outlook_list_contacts}
-  note: "tools/outlook_read_contact.py:295-297: a missing address object, and an address with no part, are both null."
+  note: "tools/outlook_read_contact.py:297-299: a missing address object, and an address with no part, are both null."
 
 uc-12-25:
   status: working
@@ -379,4 +379,4 @@ uc-12-25:
   chain:
     - tool: outlook_list_contacts
       args: {address: tom@acme.example}
-  note: "tools/outlook_list_contacts.py:93-96 filters on the address, and doubles a quote inside it."
+  note: "tools/outlook_list_contacts.py:95-98 filters on the address, and doubles a quote inside it."
