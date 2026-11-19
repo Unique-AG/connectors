@@ -5,6 +5,8 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectAllPages } from '~/msgraph/graph-pagination';
 import { MsChannel, MsChannelSchema, MsTeam, MsTeamSchema } from './chat.dtos';
 
+const CHANNEL_FIELDS = 'id,displayName,description,createdDateTime,membershipType,webUrl';
+
 @Injectable()
 export class ChannelService {
   private readonly logger = new Logger(ChannelService.name);
@@ -44,10 +46,7 @@ export class ChannelService {
 
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     // /teams/{id}/channels supports $select but not $top; it pages via @odata.nextLink.
-    const response = await client
-      .api(`/teams/${teamId}/channels`)
-      .select('id,displayName,description,createdDateTime,membershipType')
-      .get();
+    const response = await client.api(`/teams/${teamId}/channels`).select(CHANNEL_FIELDS).get();
 
     const { items } = await collectAllPages(client, response, { label: 'listChannels' });
     const channels = z.array(MsChannelSchema).parse(items);
@@ -74,7 +73,7 @@ export class ChannelService {
     const client = this.graphClientFactory.createClientForUser(userProfileId);
     const response = await client
       .api(`/teams/${teamId}/channels/${channelId}`)
-      .select('id,displayName,description,createdDateTime,membershipType')
+      .select(CHANNEL_FIELDS)
       .get();
 
     return MsChannelSchema.parse(response);

@@ -4,13 +4,14 @@ import pLimit from 'p-limit';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { ChannelService } from './channel.service';
 import {
-  type MsChat,
   type MsChatMessage,
   type MsSearchHit,
   MsSearchResponseSchema,
+  messageTitle,
 } from './chat.dtos';
 import { ChatService } from './chat.service';
 import { type BuildSearchQueryParams, buildSearchQuery } from './utils/build-search-query';
+import { chatMessageWebUrl } from './utils/teams-links';
 
 export interface SearchMessagesParams extends BuildSearchQueryParams {
   offset: number;
@@ -19,6 +20,8 @@ export interface SearchMessagesParams extends BuildSearchQueryParams {
 
 export interface SearchMessageRow {
   id: string;
+  /** The message subject, or else its sender and the start of its text. */
+  title: string | null;
   source: 'chat' | 'channel' | 'unknown';
   chatId: string | null;
   teamId: string | null;
@@ -70,18 +73,14 @@ function channelKey(teamId: string, channelId: string): string {
   return `${teamId}/${channelId}`;
 }
 
-function chatName(chat: MsChat): string | null {
-  if (chat.topic) {
-    return chat.topic;
-  }
-  const memberNames = chat.members.flatMap((member) =>
-    member.displayName ? [member.displayName] : [],
-  );
-  return memberNames.length > 0 ? memberNames.join(', ') : null;
-}
-
 function withoutContent(row: SearchMessageRow, senderAddress: string | null): SearchMessageRow {
-  return { ...row, senderDisplayName: row.senderDisplayName ?? senderAddress };
+  const senderDisplayName = row.senderDisplayName ?? senderAddress;
+  // The summary is the index's excerpt, with <c0> highlights and a <ddd/> ellipsis.
+  const title = messageTitle(null, senderDisplayName, {
+    contentType: 'html',
+    content: row.summary ?? '',
+  });
+  return { ...row, senderDisplayName, title };
 }
 
 // Rejects when `work` outlives `ms`. The request is left to finish on its own:
@@ -199,6 +198,7 @@ export class SearchService {
     const chatId = nonEmpty(resource?.chatId);
 
     const isChannel = teamId !== null && channelId !== null;
+    const id = nonEmpty(resource?.id) ?? nonEmpty(hit.hitId) ?? '';
     const source = isChannel ? 'channel' : chatId !== null ? 'chat' : 'unknown';
 
     const from = resource?.from;
@@ -212,7 +212,8 @@ export class SearchService {
 
     return {
       row: {
-        id: nonEmpty(resource?.id) ?? nonEmpty(hit.hitId) ?? '',
+        id,
+        title: null,
         source,
         // The ids a row carries describe the container it reports, so a hit that
         // proves a channel does not also hand back a chat id to follow.
@@ -227,8 +228,12 @@ export class SearchService {
         createdDateTime: nonEmpty(resource?.createdDateTime),
         // The retrievable-property list names `webUrl` (a Teams deep link); the
         // documented example payloads carry `webLink` (an Outlook Web URL)
-        // instead, so this field may hold either kind of link.
-        webUrl: resource?.webUrl ?? resource?.webLink ?? null,
+        // instead. A chat message's own Teams link is built from its ids, so the
+        // hit's link is only used when the ids cannot name the message.
+        webUrl:
+          !isChannel && chatId !== null && id !== ''
+            ? chatMessageWebUrl(chatId, id)
+            : (resource?.webUrl ?? resource?.webLink ?? null),
       },
       senderAddress: nonEmpty(from?.emailAddress?.address),
     };
@@ -293,7 +298,7 @@ export class SearchService {
     ]);
 
     return {
-      chats: new Map(chatEntries.map(([chatId, chat]) => [chatId, chat ? chatName(chat) : null])),
+      chats: new Map(chatEntries.map(([chatId, chat]) => [chatId, chat?.title ?? null])),
       teams: new Map((teams ?? []).map((team) => [team.id, team.displayName])),
       channels: new Map(
         channelEntries.map(([key, channel]) => [key, channel?.displayName ?? null]),
@@ -362,11 +367,14 @@ export class SearchService {
             const message = await withDeadline(fetchMessage(), remaining);
 
             // The hit's own fields only fill gaps, so a row reads the same
-            // whether or not the fetch landed. `webUrl` is never taken from the
-            // message: chatmessage-get returns null for a chat message and would
-            // blank the link the hit gave us.
+            // whether or not the fetch landed. The exceptions name and link the
+            // message: its title is built from the whole body rather than the
+            // index excerpt, and its `webUrl` is a Teams link, which beats the
+            // hit's, as that may be an Outlook one.
             return {
               ...row,
+              title: message.title ?? withoutContent(row, senderAddress).title,
+              webUrl: message.webUrl ?? row.webUrl,
               senderDisplayName:
                 row.senderDisplayName ?? message.from?.displayName ?? senderAddress,
               // The hit's timestamp is the index time, not the creation time: a

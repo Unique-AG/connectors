@@ -213,3 +213,114 @@ describe('ChatService listChats lastMessagePreview', () => {
     expect(preview).toBeNull();
   });
 });
+
+describe('ChatService listChats title and link', () => {
+  it('titles a chat by its topic and keeps the Teams link Graph sends', async () => {
+    const [chat] = makeChats('a', 1);
+    const webUrl = 'https://teams.microsoft.com/l/chat/19%3Aa-0%40unq.gbl.spaces/0?tenantId=t-1';
+    const { service } = makeService(makePage([{ ...chat, topic: 'Launch crew', webUrl }]));
+
+    const [mapped] = await service.listChats('user-profile-1');
+
+    expect(mapped).toMatchObject({ title: 'Launch crew', webUrl });
+  });
+
+  it("titles a chat without a topic by its members' names and builds its Teams link", async () => {
+    const [chat] = makeChats('a', 1);
+    const { service } = makeService(
+      makePage([
+        {
+          ...chat,
+          members: [
+            { userId: 'user-1', displayName: 'Alice Smith' },
+            { userId: 'user-2', displayName: 'Ben Ortiz' },
+          ],
+        },
+      ]),
+    );
+
+    const [mapped] = await service.listChats('user-profile-1');
+
+    expect(mapped).toMatchObject({
+      title: 'Alice Smith, Ben Ortiz',
+      webUrl: 'https://teams.microsoft.com/l/chat/19%3Aa-0%40unq.gbl.spaces/conversations',
+    });
+  });
+});
+
+describe('ChatService chat message title and link', () => {
+  const graphMessage = {
+    id: '1657782060227',
+    messageType: 'message',
+    body: { contentType: 'html', content: '<p>Deploy is <strong>green</strong>.</p>' },
+    from: { user: { id: 'user-1', displayName: 'Carol Lee' } },
+    createdDateTime: '2026-07-14T07:01:01.123Z',
+    webUrl: null,
+  };
+  const chatId = '19:launch@thread.v2';
+  const chatMessageLink =
+    'https://teams.microsoft.com/l/message/19%3Alaunch%40thread.v2/1657782060227?context=%7B%22contextType%22%3A%22chat%22%7D';
+
+  it('titles a message without a subject by its sender and text, and links it to Teams', async () => {
+    const { service } = makeService(makePage([graphMessage]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message).toMatchObject({
+      title: 'Carol Lee: Deploy is green.',
+      webUrl: chatMessageLink,
+    });
+  });
+
+  it('titles a message by its subject when it has one', async () => {
+    const { service } = makeService(makePage([{ ...graphMessage, subject: 'Release 4.2' }]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Release 4.2');
+  });
+
+  it('cuts a long text in the title to an excerpt', async () => {
+    const { service } = makeService(
+      makePage([{ ...graphMessage, body: { contentType: 'text', content: 'a'.repeat(200) } }]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe(`Carol Lee: ${'a'.repeat(79)}…`);
+  });
+
+  it('leaves the title null for an event with no sender and no text', async () => {
+    const { service } = makeService(
+      makePage([
+        {
+          ...graphMessage,
+          messageType: 'systemEventMessage',
+          from: null,
+          body: { contentType: 'html', content: '<systemEventMessage/>' },
+        },
+      ]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBeNull();
+  });
+
+  it('keeps the Teams link Graph sends for a message', async () => {
+    const webUrl = 'https://teams.microsoft.com/l/message/19%3Alaunch%40thread.v2/1657782060227';
+    const { service } = makeService(makePage([{ ...graphMessage, webUrl }]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.webUrl).toBe(webUrl);
+  });
+
+  it('links a message read by id to Teams', async () => {
+    const { service } = makeService(graphMessage as unknown as PageCollection);
+
+    const message = await service.getChatMessageById('user-profile-1', chatId, graphMessage.id);
+
+    expect(message.webUrl).toBe(chatMessageLink);
+  });
+});
