@@ -295,7 +295,7 @@ def person_confirms(ctx: Context, *, agree: str, decline: str, nothing_happened:
         try:
             accepted = handle_elicit_accept(answers, answered.content)
         except Exception:
-            return _not_agreed(nothing_happened)
+            return _no_answer(nothing_happened)
         chosen = cast("str", accepted.data)
         return None if chosen == agree else _not_agreed(nothing_happened)
 

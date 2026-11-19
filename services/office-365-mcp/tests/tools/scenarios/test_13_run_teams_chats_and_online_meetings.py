@@ -1036,18 +1036,28 @@ class TestAChatProgramOfTheNewerKind:
 
     @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
     @pytest.mark.parametrize(
-        "reply",
-        [Person(approval="no"), Says(1), Says("maybe")],
+        ("reply", "said"),
+        [
+            (Person(approval="no"), NOT_AGREED),
+            (Says(1), NOT_AGREED),
+            (Says("maybe"), "received no answer"),
+        ],
         ids=["declines", "the word for no", "a word that is no choice"],
     )
     async def test_it_changes_nothing_unless_the_answer_is_the_word_for_yes(
-        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str, reply: Person | Says
+        self,
+        graph: respx.MockRouter,
+        tool: str,
+        arguments: Row,
+        nothing: str,
+        reply: Person | Says,
+        said: str,
     ) -> None:
         writes = _everything_is_readable(graph, _the_writes_are_answered)
 
         message = await refused_on_the_newer_protocol(tool, person=reply, **arguments)
 
-        assert nothing in message and NOT_AGREED in message
+        assert nothing in message and said in message
         assert writes.call_count == 0
 
 

@@ -687,8 +687,6 @@ _NOT_AN_AGREEMENT: list[object] = [
     ElicitResult(action="cancel"),
     ElicitResult(action="decline", content={"value": _AGREE}),
     ElicitResult(action="cancel", content={"value": _AGREE}),
-    ElicitResult(action="accept", content={}),
-    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
     CreateMessageResult(
         role="assistant", content=TextContent(type="text", text=_AGREE), model="a-model"
     ),
@@ -699,10 +697,14 @@ _NOT_AN_AGREEMENT_IDS = [
     "cancelled",
     "declined-but-filled-in",
     "cancelled-but-filled-in",
-    "empty-content",
-    "off-schema-content",
     "another-kind-of-answer",
 ]
+
+_AN_UNREADABLE_ACCEPT: list[object] = [
+    ElicitResult(action="accept", content={}),
+    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
+]
+_AN_UNREADABLE_ACCEPT_IDS = ["empty-content", "off-schema-content"]
 
 
 def _modern(*, responses: dict[str, object] | None = None, state: str | None = None) -> Confirm:
@@ -770,6 +772,18 @@ class TestTheEraWithNoBackChannel:
         assert isinstance(refusal, str)
         assert refusal.startswith(_NOTHING_HAPPENED)
         assert "did not agree" in refusal
+        assert "Do not call this tool again" in refusal
+
+    @pytest.mark.parametrize("answer", _AN_UNREADABLE_ACCEPT, ids=_AN_UNREADABLE_ACCEPT_IDS)
+    async def test_an_accept_that_fails_validation_is_no_answer_and_not_a_decline(
+        self, answer: object
+    ) -> None:
+        refusal = await _answering(answer)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "no answer" in refusal
+        assert "did not agree" not in refusal
         assert "Do not call this tool again" in refusal
 
     @pytest.mark.parametrize("state", [None, _ANOTHER_REQUEST], ids=["no-state", "another-id"])
