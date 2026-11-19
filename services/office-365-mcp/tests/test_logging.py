@@ -284,6 +284,13 @@ class TestNothingSecretReachesTheLog:
         assert f"cb?token={CENSORED}&page=2" in message, message
         assert "opaque-value" not in sink.stream.getvalue()
 
+    def test_a_deeply_nested_query_is_logged_and_its_credential_censored(self, sink: _Sink) -> None:
+        _log('"GET /mcp' + "?x=" * 1500 + '?token=opaque-value HTTP/1.1"')
+
+        message = cast("str", sink.one()["msg"])
+        assert message.endswith(f'?x=?token={CENSORED} HTTP/1.1"'), message[-80:]
+        assert "opaque-value" not in sink.stream.getvalue()
+
     def test_an_apostrophe_in_a_credential_does_not_end_its_redaction(self, sink: _Sink) -> None:
         _log('127.0.0.1:1 - "GET /mcp?token=opaque\'value&page=2 HTTP/1.1" 200')
 

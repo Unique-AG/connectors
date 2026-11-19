@@ -16,7 +16,7 @@ import logging
 import re
 import traceback
 import uuid
-from collections.abc import Callable, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from contextvars import ContextVar
 from types import TracebackType
 from typing import cast, override
@@ -79,23 +79,36 @@ _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
 _SENSITIVE_QUERY_NAME = re.compile(r"(?is).*(?:token|key|secret|password|auth).*|code")
 
 
-_QUERY_PARAMETER = re.compile(r"([?&]([A-Za-z0-9_.%\[\]+-]+)=)([^&\s\"]+)")
+_QUERY_NAME = re.compile(r"[?&]([A-Za-z0-9_.%\[\]+-]+)=")
+_QUERY_VALUE_END = re.compile(r"[&\s\"]|$")
 
 
-def _censored_query_value(found: re.Match[str]) -> str:
-    if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(2))) is None:
-        return found.group(1) + _QUERY_PARAMETER.sub(_censored_query_value, found.group(3))
-    return found.group(1) + CENSORED
+def _censor_query_values(text: str) -> str:
+    kept: list[str] = []
+    copied_up_to = 0
+    scan_from = 0
+    while (found := _QUERY_NAME.search(text, scan_from)) is not None:
+        value_start = found.end()
+        value_end = _QUERY_VALUE_END.search(text, value_start)
+        assert value_end is not None, "the end of the text always ends a value"
+        scan_from = value_start
+        if value_end.start() == value_start:
+            continue
+        if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(1))) is None:
+            continue
+        kept.extend((text[copied_up_to:value_start], CENSORED))
+        copied_up_to = scan_from = value_end.start()
+    kept.append(text[copied_up_to:])
+    return "".join(kept)
 
 
-_CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str | Callable[[re.Match[str]], str]], ...] = (
+_CREDENTIAL_SHAPES: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"(?i)\b(bearer|basic)\s+[A-Za-z0-9\-._~+/=]{8,}"), r"\1 " + CENSORED),
     # A bare JWT: `eyJ` is base64url of `{"`, so every Entra and Graph token starts with it.
     (re.compile(r"\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{4,}\.[A-Za-z0-9_-]*"), CENSORED),
     # `scheme://user:password@host`: `server/readiness.py` logs a store failure with
     # `exc_info=True`, and asyncpg quotes the DSN it failed to reach.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]*://)[^\s:/@]+:[^\s/@]+@"), r"\1" + CENSORED + "@"),
-    (_QUERY_PARAMETER, _censored_query_value),
 )
 
 # Trap: at the cap the container must be replaced, not passed through. An ASGI scope can contain
@@ -159,7 +172,7 @@ def _censor_text(text: str) -> str:
     censored = text
     for pattern, replacement in _CREDENTIAL_SHAPES:
         censored = pattern.sub(replacement, censored)
-    return censored
+    return _censor_query_values(censored)
 
 
 def _censor_bytes(value: bytes) -> bytes:
