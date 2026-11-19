@@ -17,7 +17,7 @@ import unique_sdk
 from fastmcp.dependencies import Depends
 from fastmcp.tools import ToolResult, tool
 from mcp.types import TextContent, ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
@@ -47,9 +47,9 @@ from kb_mcp.common.metadata_filter import (
 )
 from kb_mcp.common.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    FileRecord,
     MetadataFilterArgument,
     file_reference_url,
-    markdown_citation_link,
 )
 from kb_mcp.common.scoped_walk import ScopedContentTree
 from kb_mcp.common.tree_cache import get_tree_cache
@@ -73,43 +73,68 @@ _LOGGER = logging.getLogger(__name__)
 _INCOMPLETE_NOTICE = (
     "This listing is incomplete. The folder walk is still running in the "
     "background; call content_tree again (same arguments) to get the "
-    "complete tree — that follow-up is usually instant from cache.\n\n"
+    "complete tree — that follow-up is usually instant from cache."
 )
 
 
-def _with_incomplete_notice(complete: bool, body: str) -> str:
-    return ("" if complete else _INCOMPLETE_NOTICE) + body
+class _ListedFile(FileRecord):
+    score: float | None = None
 
 
-def _with_truncation_notice(body: str, *, shown: int, total: int, noun: str) -> str:
+class _FileListing(BaseModel):
+    """``results`` is a container key Unique's MCP citation extractor reads, so
+    each file is cited by its own title and link."""
+
+    notice: list[str] | None = None
+    results: list[_ListedFile]
+
+
+def _incomplete_notice(complete: bool) -> str | None:
+    return None if complete else _INCOMPLETE_NOTICE
+
+
+def _truncation_notice(*, shown: int, total: int, noun: str) -> str | None:
     """Distinct from the incomplete notice: there is more, but it was not asked for.
 
     Incomplete means the walk is still running; truncated means it finished and
     the result was capped. Calling again changes nothing — raise `limit` instead.
     """
     if shown >= total:
-        return body
+        return None
     return (
         f"Showing the first {shown} of {total} {noun}. Raise `limit` or narrow "
-        "`folder_path` to see the rest.\n\n"
-    ) + body
+        "`folder_path` to see the rest."
+    )
 
 
-def _with_limit_reached_notice(body: str, *, shown: int, limit: int, noun: str) -> str:
+def _limit_reached_notice(*, shown: int, limit: int, noun: str) -> str | None:
     """For list/search: unlike tree mode, the true total isn't always known
     (a bounded SDK query only returns up to `limit`), so this signals "there
-    may be more" without a total count `_with_truncation_notice` would need."""
+    may be more" without a total count `_truncation_notice` would need."""
     if shown < limit:
-        return body
-    return f"Showing {shown} {noun}. Raise `limit` to see more.\n\n" + body
+        return None
+    return f"Showing {shown} {noun}. Raise `limit` to see more."
 
 
-def _with_empty_metadata_filter_hint(
-    body: str, *, empty: bool, complete: bool, llm_filter: object
-) -> str:
+def _empty_metadata_filter_hint(
+    *, empty: bool, complete: bool, llm_filter: object
+) -> str | None:
     if empty and complete and llm_filter is not None:
-        return f"{body}\n{METADATA_FILTER_EMPTY_RETRY_HINT}"
-    return body
+        return METADATA_FILTER_EMPTY_RETRY_HINT
+    return None
+
+
+def _present(*notices: str | None) -> list[str]:
+    return [notice for notice in notices if notice]
+
+
+def _listing_result(files: list[_ListedFile], notices: list[str]) -> ToolResult:
+    listing = _FileListing(notice=notices or None, results=files)
+    return ToolResult(
+        content=[
+            TextContent(type="text", text=listing.model_dump_json(exclude_none=True))
+        ]
+    )
 
 
 def _mode_misuse_error(
@@ -342,20 +367,24 @@ def _substring_matches(
     return matches[:limit]
 
 
-def _file_link(
+def _listed_file(
     content_info: ContentInfo,
     path: PathLike,
     frontend_base_url: str | None,
-) -> str:
-    """Render a file row as a markdown citation (sentinel/brackets stripped)."""
-    display = display_path(path)
-    url = file_reference_url(
-        content_info.id,
-        metadata=content_info.metadata,
-        owner_id=content_info.owner_id,
-        frontend_base_url=frontend_base_url,
+    score: float | None = None,
+) -> _ListedFile:
+    """Titled by its display path (sentinel and brackets stripped)."""
+    return _ListedFile(
+        title=display_path(path),
+        url=file_reference_url(
+            content_info.id,
+            metadata=content_info.metadata,
+            owner_id=content_info.owner_id,
+            frontend_base_url=frontend_base_url,
+        ),
+        content_id=content_info.id,
+        score=score,
     )
-    return markdown_citation_link(display, url)
 
 
 _META = merge_tool_meta(
@@ -522,9 +551,10 @@ async def content_tree(
     filename/path lookup when you know roughly what a file is called but not
     where it is — not for finding files by their content, use search for that.
     Capped at `limit`; says when there may be more to raise it for.
-    'list' and 'search' rows start with a markdown link that opens the file
-    in the Unique knowledge base — paste it as-is when referring the user to
-    a file; use the content_id for read_file calls.
+    'list' and 'search' return one JSON object: an optional notice list and
+    results, one per file with its path as title, a url that opens it in the
+    Unique knowledge base (refer the user to a file as [title](url)), its
+    content_id for read_file calls, and in 'search' its score.
     Listings are cached per user (~10 min); repeat calls are fast. When the
     user says they added, deleted, or changed files and needs a fresh tree,
     call with refresh=true (expect a slower ~20s refetch).
@@ -662,37 +692,34 @@ async def content_tree(
                 max_depth=max_depth,
                 folders_only=folders_only,
             )
-            tree_body = _with_empty_metadata_filter_hint(
-                render_tree_with_folder_ids(
-                    capped.snapshot,
-                    # Ids come from the full snapshot, not the truncated one, or a
-                    # cut folder would lose the folder_id a follow-up call needs.
-                    folder_scope_ids(snapshot.files),
-                    max_depth=max_depth,
-                    show_files=not folders_only,
-                ),
+            rendered = render_tree_with_folder_ids(
+                capped.snapshot,
+                # Ids come from the full snapshot, not the truncated one, or a
+                # cut folder would lose the folder_id a follow-up call needs.
+                folder_scope_ids(snapshot.files),
+                max_depth=max_depth,
+                show_files=not folders_only,
+            )
+            hint = _empty_metadata_filter_hint(
                 empty=not snapshot.files,
                 complete=snapshot.complete,
                 llm_filter=parsed_llm_filter,
             )
-            # No file notice under folders_only: no files render by design
-            # there, not truncated, so "shown of total" would misreport.
-            if not folders_only:
-                tree_body = _with_truncation_notice(
-                    tree_body,
-                    shown=capped.shown_files,
-                    total=capped.total_files,
-                    noun="files",
-                )
-            text = _with_incomplete_notice(
-                snapshot.complete,
-                _with_truncation_notice(
-                    tree_body,
-                    shown=capped.shown_dirs,
-                    total=capped.total_dirs,
-                    noun="folders",
+            notices = _present(
+                _incomplete_notice(snapshot.complete),
+                _truncation_notice(
+                    shown=capped.shown_dirs, total=capped.total_dirs, noun="folders"
+                ),
+                # No file notice under folders_only: no files render by design
+                # there, not truncated, so "shown of total" would misreport.
+                None
+                if folders_only
+                else _truncation_notice(
+                    shown=capped.shown_files, total=capped.total_files, noun="files"
                 ),
             )
+            body = f"{rendered}\n{hint}" if hint else rendered
+            text = "\n\n".join([*notices, body])
             _LOGGER.info("content_tree complete correlation_id=%s mode=%s", cid, mode)
             return ToolResult(content=[TextContent(type="text", text=text)])
 
@@ -702,30 +729,30 @@ async def content_tree(
             effective_limit = limit if limit is not None else config.default_limit
             rows = list(snapshot.files)[:effective_limit]
             frontend_base_url = kb_settings.frontend_base_url_str()
-            lines = [
-                f"{_file_link(content_info, path, frontend_base_url)} "
-                f"(content_id={content_info.id})"
-                for content_info, path in rows
-            ]
-            body = _with_empty_metadata_filter_hint(
-                "\n".join(lines) if lines else "No visible files match.",
-                empty=not lines,
-                complete=snapshot.complete,
-                llm_filter=parsed_llm_filter,
-            )
-            text = _with_incomplete_notice(
-                snapshot.complete,
-                _with_truncation_notice(
-                    body, shown=len(rows), total=len(snapshot.files), noun="files"
-                ),
-            )
             _LOGGER.info(
                 "content_tree complete correlation_id=%s mode=%s result_count=%d",
                 cid,
                 mode,
                 len(rows),
             )
-            return ToolResult(content=[TextContent(type="text", text=text)])
+            return _listing_result(
+                [
+                    _listed_file(content_info, path, frontend_base_url)
+                    for content_info, path in rows
+                ],
+                _present(
+                    _incomplete_notice(snapshot.complete),
+                    _truncation_notice(
+                        shown=len(rows), total=len(snapshot.files), noun="files"
+                    ),
+                    None if rows else "No visible files match.",
+                    _empty_metadata_filter_hint(
+                        empty=not rows,
+                        complete=snapshot.complete,
+                        llm_filter=parsed_llm_filter,
+                    ),
+                ),
+            )
 
         assert query is not None and mode == "search"
         effective_limit = limit if limit is not None else config.default_limit
@@ -766,30 +793,35 @@ async def content_tree(
                 case_sensitive=effective_case_sensitive,
             )
         frontend_base_url = kb_settings.frontend_base_url_str()
-        lines = [
-            f"{_file_link(m.content_info, m.path_segments, frontend_base_url)} "
-            f"(score={m.score:.2f}, content_id={m.content_info.id})"
-            for m in matches
-        ]
-        body = _with_empty_metadata_filter_hint(
-            "\n".join(lines) if lines else "No matching files found.",
-            empty=not lines,
-            complete=snapshot.complete,
-            llm_filter=parsed_llm_filter,
-        )
-        text = _with_incomplete_notice(
-            snapshot.complete,
-            _with_limit_reached_notice(
-                body, shown=len(matches), limit=effective_limit, noun="matches"
-            ),
-        )
         _LOGGER.info(
             "content_tree complete correlation_id=%s mode=%s result_count=%d",
             cid,
             mode,
             len(matches),
         )
-        return ToolResult(content=[TextContent(type="text", text=text)])
+        return _listing_result(
+            [
+                _listed_file(
+                    m.content_info,
+                    m.path_segments,
+                    frontend_base_url,
+                    score=round(m.score, 2),
+                )
+                for m in matches
+            ],
+            _present(
+                _incomplete_notice(snapshot.complete),
+                _limit_reached_notice(
+                    shown=len(matches), limit=effective_limit, noun="matches"
+                ),
+                None if matches else "No matching files found.",
+                _empty_metadata_filter_hint(
+                    empty=not matches,
+                    complete=snapshot.complete,
+                    llm_filter=parsed_llm_filter,
+                ),
+            ),
+        )
     except Exception as exc:
         _LOGGER.exception(
             "content_tree error correlation_id=%s mode=%s error_type=%s",
