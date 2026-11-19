@@ -563,14 +563,12 @@ async def post_once_agreed(
     question: str,
     about: str,
     post: Callable[[], Awaitable[ChatMessage | None]],
-) -> ChatMessage | InputRequiredResult | str:
+) -> ChatMessage | InputRequiredResult | str | None:
     with not_graph():
         answer = await confirm(question, about)
     if answer is not None:
         return answer
-    sent = await post()
-    assert sent is not None, "a post that nothing refused answered with no message"
-    return sent
+    return await post()
 
 
 def mention_in_question(mention: OutgoingMention) -> str:

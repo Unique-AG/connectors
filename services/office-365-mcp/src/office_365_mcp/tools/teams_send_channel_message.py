@@ -113,22 +113,23 @@ async def send_channel_message(
         )
         messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
         configuration = RequestConfiguration[QueryParameters](options=no_retry())
-        return await (
-            messages.post(outgoing, request_configuration=configuration)
-            if reply_to_id is None
-            else messages.by_chat_message_id(reply_to_id).replies.post(
-                outgoing, request_configuration=configuration
+        measured = graph_step(STEP_SEND) if reply_to_id is None else graph_step(STEP_REPLY)
+        with measured:
+            return await (
+                messages.post(outgoing, request_configuration=configuration)
+                if reply_to_id is None
+                else messages.by_chat_message_id(reply_to_id).replies.post(
+                    outgoing, request_configuration=configuration
+                )
             )
-        )
 
-    measured = graph_step(STEP_SEND) if reply_to_id is None else graph_step(STEP_REPLY)
-    with measured:
-        outcome = await post_once_agreed(confirm, question, about, post)
+    outcome = await post_once_agreed(confirm, question, about, post)
 
     if isinstance(outcome, InputRequiredResult):
         return outcome
     if isinstance(outcome, str):
         raise ToolError(outcome)
+    assert outcome is not None, "a post that nothing refused answered with no message"
     assert outcome.id is not None, "Graph accepted a channel message post but returned no id"
     return TeamsMessage.from_message(
         outcome,

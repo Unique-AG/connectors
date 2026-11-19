@@ -105,7 +105,7 @@ async def send_channel_message_with_files(
         importance=importance,
         files=handles,
     )
-    outcome: ChatMessage | InputRequiredResult | str
+    outcome: ChatMessage | InputRequiredResult | str | None
     with graph_errors():
         files = await attachable_files(client, handles)
         if isinstance(files, str):
@@ -152,6 +152,7 @@ async def send_channel_message_with_files(
         return outcome
     if isinstance(outcome, str):
         raise ToolError(outcome)
+    assert outcome is not None, "a post that nothing refused answered with no message"
     assert outcome.id is not None, "Graph accepted a channel message post but returned no id"
     return TeamsMessage.from_message(
         outcome,

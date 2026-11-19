@@ -79,7 +79,7 @@ async def send_chat_message(
     importance: ChatImportance | None = None,
     subject: str | None = None,
 ) -> TeamsMessage | InputRequiredResult:
-    outcome: ChatMessage | InputRequiredResult | str
+    outcome: ChatMessage | InputRequiredResult | str | None
     with graph_errors():
         members = await mentioned_members(client, chat_id, mentions)
         if isinstance(members, str):
@@ -120,6 +120,7 @@ async def send_chat_message(
         return outcome
     if isinstance(outcome, str):
         raise ToolError(outcome)
+    assert outcome is not None, "a send that nothing refused answered with no message"
     assert outcome.id is not None, "Graph accepted a chat message post but returned no id"
     return TeamsMessage.from_message(outcome, handle=MessageHandle(outcome.id, chat_id=chat_id))
 
