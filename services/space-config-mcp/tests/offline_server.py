@@ -23,7 +23,7 @@ def fake_upstream_settings() -> UpstreamSettings:
 
 
 def fake_persistence_settings() -> PersistenceSettings:
-    return PersistenceSettings(history_folder="_space-config-history-test")
+    return PersistenceSettings()
 
 
 def build_server(

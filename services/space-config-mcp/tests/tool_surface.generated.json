@@ -23,27 +23,34 @@
     },
     "name": "add_space_access",
     "outputSchema": {
+      "description": "Access entries currently granted on a space.",
       "properties": {
         "access": {
+          "description": "List of access entries.",
           "items": {
+            "description": "A single access entry granting a user or group access to a space.",
             "properties": {
-              "entityId": {
+              "entity_id": {
+                "description": "ID of the user or group.",
                 "type": "string"
               },
-              "entityType": {
+              "entity_type": {
+                "description": "'USER' or 'GROUP'.",
                 "type": "string"
               },
               "id": {
+                "description": "Access entry ID.",
                 "type": "string"
               },
               "type": {
+                "description": "Access level: 'USE', 'MANAGE', or 'UPLOAD'.",
                 "type": "string"
               }
             },
             "required": [
               "id",
-              "entityId",
-              "entityType",
+              "entity_id",
+              "entity_type",
               "type"
             ],
             "type": "object"
@@ -98,8 +105,10 @@
     },
     "name": "delete_space_access",
     "outputSchema": {
+      "description": "Result of a delete space access operation.",
       "properties": {
         "success": {
+          "description": "True if the access entries were removed.",
           "type": "boolean"
         }
       },
@@ -159,7 +168,25 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "List MCP servers (connectors) enabled on the current space with their tool selection and OAuth state.",
+    "description": "Return the RfpAgent (Magic Table) module ID and its raw configuration for the current space.\n\nUse this before calling update_magic_table_config to inspect the current state,\nincluding the full column list.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_magic_table_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Get Magic Table Config"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "List MCP servers enabled on the current space with their tool selection and OAuth state.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {},
@@ -167,30 +194,37 @@
     },
     "name": "get_mcp_server_status",
     "outputSchema": {
+      "description": "MCP server status for all servers connected to a space.",
       "properties": {
-        "mcpServers": {
+        "mcp_servers": {
+          "description": "Status of each MCP server.",
           "items": {
-            "description": "The calling user's own state for an MCP server enabled on a space.",
+            "description": "Runtime status of an MCP server for a specific space.",
             "properties": {
-              "enabledToolNames": {
+              "enabled_tool_names": {
+                "description": "Names of tools currently enabled for this space.",
                 "items": {
                   "type": "string"
                 },
                 "type": "array"
               },
-              "isEnabled": {
+              "is_enabled": {
+                "description": "Whether the server is enabled for this space.",
                 "type": "boolean"
               },
-              "isOAuth2Connected": {
+              "is_o_auth2_connected": {
+                "description": "Whether the user has connected via OAuth2 for this server.",
                 "type": "boolean"
               },
-              "mcpServerId": {
+              "mcp_server_id": {
+                "description": "ID of the MCP server.",
                 "type": "string"
               },
               "name": {
+                "description": "Human-readable name of the MCP server.",
                 "type": "string"
               },
-              "oauth2Url": {
+              "oauth2_url": {
                 "anyOf": [
                   {
                     "type": "string"
@@ -198,32 +232,35 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "default": null,
+                "description": "OAuth2 authorization URL to connect, if requiresOAuth is true."
               },
-              "requiresOAuth": {
+              "requires_oauth": {
+                "description": "Whether the server requires an OAuth connection.",
                 "type": "boolean"
               }
             },
             "required": [
-              "mcpServerId",
+              "mcp_server_id",
               "name",
-              "isEnabled",
-              "requiresOAuth",
-              "isOAuth2Connected",
-              "oauth2Url",
-              "enabledToolNames"
+              "is_enabled",
+              "requires_oauth",
+              "is_o_auth2_connected",
+              "enabled_tool_names"
             ],
             "type": "object"
           },
           "type": "array"
         },
-        "spaceId": {
+        "space_id": {
+          "description": "ID of the space.",
           "type": "string"
         }
       },
       "required": [
-        "spaceId",
-        "mcpServers"
+        "space_id",
+        "mcp_servers"
       ],
       "type": "object"
     },
@@ -282,7 +319,7 @@
       "idempotentHint": true,
       "readOnlyHint": true
     },
-    "description": "Get the full configuration of the current space: metadata, modules, scope rules, and access.",
+    "description": "Get the current space's full configuration: metadata, modules, scope rules, and access.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {},
@@ -304,27 +341,34 @@
     },
     "name": "get_space_access",
     "outputSchema": {
+      "description": "Access entries currently granted on a space.",
       "properties": {
         "access": {
+          "description": "List of access entries.",
           "items": {
+            "description": "A single access entry granting a user or group access to a space.",
             "properties": {
-              "entityId": {
+              "entity_id": {
+                "description": "ID of the user or group.",
                 "type": "string"
               },
-              "entityType": {
+              "entity_type": {
+                "description": "'USER' or 'GROUP'.",
                 "type": "string"
               },
               "id": {
+                "description": "Access entry ID.",
                 "type": "string"
               },
               "type": {
+                "description": "Access level: 'USE', 'MANAGE', or 'UPLOAD'.",
                 "type": "string"
               }
             },
             "required": [
               "id",
-              "entityId",
-              "entityType",
+              "entity_id",
+              "entity_type",
               "type"
             ],
             "type": "object"
@@ -341,9 +385,27 @@
   },
   {
     "annotations": {
+      "idempotentHint": true,
+      "readOnlyHint": true
+    },
+    "description": "Return the TranslatorV2 module ID and its typed TranslationConfig for the current space.\n\nThe configuration dict uses camelCase keys. Use this before calling\nupdate_translator_config to inspect the current state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {},
+      "type": "object"
+    },
+    "name": "get_translator_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
+    "title": "Get Translator Config"
+  },
+  {
+    "annotations": {
       "idempotentHint": false
     },
-    "description": "Apply a previously exported JSON config to the current space. Auto-snapshots before applying.",
+    "description": "Apply a previously exported JSON config to the current space, auto-snapshotting first.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -377,9 +439,10 @@
     },
     "name": "list_language_models",
     "outputSchema": {
-      "description": "Response for getting available LLM models.",
+      "description": "Language models available for selection in this environment.",
       "properties": {
         "models": {
+          "description": "Model identifiers available for configuration.",
           "items": {
             "type": "string"
           },
@@ -406,12 +469,15 @@
     },
     "name": "list_mcp_servers",
     "outputSchema": {
+      "description": "Catalogue of available MCP servers.",
       "properties": {
-        "mcpServers": {
+        "mcp_servers": {
+          "description": "Available MCP servers.",
           "items": {
-            "description": "An MCP server (connector) of the company that can be attached to a space.",
+            "description": "An MCP server available for connection to spaces.",
             "properties": {
-              "allowedSpaceIds": {
+              "allowed_space_ids": {
+                "description": "Space IDs this server may be added to (empty when not space-restricted).",
                 "items": {
                   "type": "string"
                 },
@@ -425,23 +491,30 @@
                   {
                     "type": "null"
                   }
-                ]
+                ],
+                "default": null,
+                "description": "Server description."
               },
               "id": {
+                "description": "Server ID.",
                 "type": "string"
               },
-              "isSpaceRestricted": {
+              "is_space_restricted": {
+                "description": "Whether this server can only be added to specific spaces.",
                 "type": "boolean"
               },
               "name": {
+                "description": "Human-readable server name.",
                 "type": "string"
               },
-              "requiresOAuth": {
+              "requires_oauth": {
+                "description": "Whether connecting requires an OAuth flow.",
                 "type": "boolean"
               },
               "tools": {
+                "description": "Tools offered by this server.",
                 "items": {
-                  "description": "A tool of an MCP server that the company has enabled.",
+                  "description": "A tool offered by an MCP server in the catalogue.",
                   "properties": {
                     "description": {
                       "anyOf": [
@@ -451,15 +524,17 @@
                         {
                           "type": "null"
                         }
-                      ]
+                      ],
+                      "default": null,
+                      "description": "Tool description."
                     },
                     "name": {
+                      "description": "Tool name.",
                       "type": "string"
                     }
                   },
                   "required": [
-                    "name",
-                    "description"
+                    "name"
                   ],
                   "type": "object"
                 },
@@ -469,10 +544,9 @@
             "required": [
               "id",
               "name",
-              "description",
-              "requiresOAuth",
-              "isSpaceRestricted",
-              "allowedSpaceIds",
+              "requires_oauth",
+              "is_space_restricted",
+              "allowed_space_ids",
               "tools"
             ],
             "type": "object"
@@ -481,7 +555,7 @@
         }
       },
       "required": [
-        "mcpServers"
+        "mcp_servers"
       ],
       "type": "object"
     },
@@ -898,6 +972,252 @@
   },
   {
     "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Update the current space's RfpAgent (Magic Table) module and/or space-level settings.\n\nModule-level parameters (language_model, columns, etc.) patch the RfpAgent module config.\nSpace-level parameters (answer_library, hide_sheet_status, etc.) patch\nspace.settings.magicTableConfig. Only provided (non-None) parameters are written.\nUse get_magic_table_config first to inspect the current state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "answer_library": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Show the Answer Library section to space members."
+        },
+        "answer_library_access_entity_ids": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Restrict Answer Library access to these entity IDs. Omit to show it to every space member."
+        },
+        "auto_reprocess_on_source_add": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If True, automatically reprocess all rows when new sources are added."
+        },
+        "columns": {
+          "anyOf": [
+            {
+              "items": {
+                "description": "Definition of a single column in the Magic Table (RfpAgent).",
+                "properties": {
+                  "assistant_prompt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Trigger / user prompt template for the LLM that fills this column."
+                  },
+                  "editable": {
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Whether users can edit cell values in this column."
+                  },
+                  "name": {
+                    "description": "Column identifier. Built-in names: Section, Question, Answers, References, HallucinationScore.",
+                    "type": "string"
+                  },
+                  "system_prompt": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "System prompt for the LLM that fills this column."
+                  },
+                  "width": {
+                    "anyOf": [
+                      {
+                        "type": "integer"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Column width in pixels."
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Full column list. Providing this replaces all existing columns. Use get_magic_table_config to fetch columns you don't want to change."
+        },
+        "disable_notifications_by_default": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hide the sheet notification toggle and keep default assignee emails."
+        },
+        "export_assistants": {
+          "anyOf": [
+            {
+              "items": {
+                "description": "An assistant shown in the Magic Table export menu.",
+                "properties": {
+                  "assistant_id": {
+                    "description": "ID of the assistant to invoke.",
+                    "type": "string"
+                  },
+                  "label": {
+                    "description": "Button label shown in the export menu.",
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "description": "Prompt sent to the assistant when the user triggers export.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "label",
+                  "prompt",
+                  "assistant_id"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Assistants available in the export menu. Providing this list replaces all existing export assistants."
+        },
+        "hallucination_enabled": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Enable the hallucination check column."
+        },
+        "hide_sheet_status": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hide the sheet status indicator from users."
+        },
+        "language_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Default language model for all columns that don't override it."
+        },
+        "question_extraction_language_model": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model used to extract questions from uploaded documents."
+        },
+        "question_extraction_max_rows": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum number of questions to extract per document."
+        },
+        "question_extraction_use_full_document": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Extract questions from the full document in one call rather than chunk-by-chunk."
+        }
+      },
+      "type": "object"
+    },
+    "name": "update_magic_table_config",
+    "title": "Update Magic Table Config"
+  },
+  {
+    "annotations": {
       "idempotentHint": false
     },
     "description": "Merge config_patch into a module's configuration dict. Existing unpatched keys are kept.",
@@ -927,7 +1247,7 @@
     "annotations": {
       "idempotentHint": true
     },
-    "description": "Update metadata and configuration of the current space. Only the fields you provide are changed.",
+    "description": "Update metadata and configuration of the current space. Only provided fields are changed.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -959,6 +1279,7 @@
           "anyOf": [
             {
               "items": {
+                "description": "A custom prompt shown as a suggestion in the chat UI.",
                 "properties": {
                   "id": {
                     "anyOf": [
@@ -969,7 +1290,8 @@
                         "type": "null"
                       }
                     ],
-                    "default": null
+                    "default": null,
+                    "description": "Prompt ID assigned by the platform."
                   },
                   "order": {
                     "anyOf": [
@@ -980,12 +1302,15 @@
                         "type": "null"
                       }
                     ],
-                    "default": null
+                    "default": null,
+                    "description": "Display order among prompts (lower = first)."
                   },
                   "prompt": {
+                    "description": "Prompt text inserted into the chat input when selected.",
                     "type": "string"
                   },
                   "title": {
+                    "description": "Button label displayed in the chat UI.",
                     "type": "string"
                   }
                 },
@@ -1060,19 +1385,24 @@
           "anyOf": [
             {
               "items": {
+                "description": "An MCP server attached to the space and its tool selection.",
                 "properties": {
                   "mcpServerId": {
+                    "description": "ID of the MCP server to attach.",
                     "type": "string"
                   },
                   "tools": {
                     "anyOf": [
                       {
                         "items": {
+                          "description": "A single tool within an MCP server configuration.",
                           "properties": {
                             "isEnabled": {
+                              "description": "Whether this tool is enabled for the space.",
                               "type": "boolean"
                             },
                             "name": {
+                              "description": "Tool name as registered on the MCP server.",
                               "type": "string"
                             }
                           },
@@ -1088,7 +1418,8 @@
                         "type": "null"
                       }
                     ],
-                    "default": null
+                    "default": null,
+                    "description": "Per-tool enable/disable overrides. Omit to keep existing selection."
                   }
                 },
                 "required": [
@@ -1134,11 +1465,14 @@
           "anyOf": [
             {
               "items": {
+                "description": "A language model available for selection in the space settings.",
                 "properties": {
                   "displayName": {
+                    "description": "Human-readable label shown in the UI.",
                     "type": "string"
                   },
                   "languageModel": {
+                    "description": "Model identifier, e.g. 'AZURE_GPT_4o_2024_1120'.",
                     "type": "string"
                   }
                 },
@@ -1162,5 +1496,189 @@
     },
     "name": "update_space",
     "title": "Update Space"
+  },
+  {
+    "annotations": {
+      "idempotentHint": true
+    },
+    "description": "Update the current space's TranslatorV2 module configuration.\n\nOnly provided (non-None) parameters are written; everything else in the existing config\nis preserved. Use get_translator_config first to inspect the current state.",
+    "inputSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "custom_output_token_limit": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Override the model's default output token limit. Set to null to use the model default."
+        },
+        "file_name_translation_glossary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "File name of the glossary file within the glossary scope."
+        },
+        "language_model_language_detection": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model used for language detection."
+        },
+        "language_model_translation": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Model used for the translation step, e.g. 'AZURE_GPT_4o_2024_1120'."
+        },
+        "post_processing": {
+          "anyOf": [
+            {
+              "items": {
+                "description": "A pre- or post-processing step applied during translation.",
+                "properties": {
+                  "language": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Restrict this step to a specific language, e.g. 'German'. Omit to apply to all."
+                  },
+                  "name": {
+                    "description": "Step identifier, e.g. 'translation_glossary'.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "Whether the step is active.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Steps applied after translation. Providing this list replaces all existing ones."
+        },
+        "pre_processing": {
+          "anyOf": [
+            {
+              "items": {
+                "description": "A pre- or post-processing step applied during translation.",
+                "properties": {
+                  "language": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "default": null,
+                    "description": "Restrict this step to a specific language, e.g. 'German'. Omit to apply to all."
+                  },
+                  "name": {
+                    "description": "Step identifier, e.g. 'translation_glossary'.",
+                    "type": "string"
+                  },
+                  "value": {
+                    "description": "Whether the step is active.",
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Steps applied before translation. Providing this list replaces all existing ones."
+        },
+        "scope_id_translation_glossary": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Scope ID of the KB folder containing the translation glossary."
+        },
+        "streaming_activated": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Stream translation tokens to the UI as they arrive."
+        },
+        "temperature_translation": {
+          "anyOf": [
+            {
+              "maximum": 2,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Sampling temperature for translation (0\u20132). Lower = more deterministic."
+        }
+      },
+      "type": "object"
+    },
+    "name": "update_translator_config",
+    "title": "Update Translator Config"
   }
 ]

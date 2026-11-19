@@ -40,9 +40,7 @@ class Persistence:
         )
         return self._kb_scope_id
 
-    async def _resolve_content_id(
-        self, user_id: str, company_id: str, space_id: str
-    ) -> str | None:
+    async def _resolve_content_id(self, user_id: str, company_id: str, space_id: str) -> str | None:
         """Return the content item ID for a space's snapshot file, or None."""
         scope_id = self._require_kb_scope_id()
         result = await unique_sdk.Content.get_infos_async(
@@ -57,13 +55,13 @@ class Persistence:
             item_scope = item.get("scopeId") or item.get("readScopeId") or ""
             if scope_id in str(item_scope):
                 content_id = item.get("id")
-                if isinstance(content_id, str):
+                if isinstance(content_id, str):  # pyright: ignore[reportUnnecessaryIsInstance]
                     return content_id
         # Fallback: accept any match when scopeId field is absent from the response.
         infos = result.get("contentInfos") or []
         if infos:
             content_id = infos[0].get("id")
-            return content_id if isinstance(content_id, str) else None
+            return content_id if isinstance(content_id, str) else None  # pyright: ignore[reportUnnecessaryIsInstance]
         return None
 
     async def save_snapshot(
@@ -98,7 +96,7 @@ class Persistence:
                 "key": key,
                 "title": title,
                 "mimeType": _MIME_TYPE,
-                "ingestionConfig": ingestion_config,
+                "ingestionConfig": ingestion_config,  # pyright: ignore[reportArgumentType]
                 "metadata": metadata,
             },
             scopeId=scope_id,
@@ -125,7 +123,7 @@ class Persistence:
                 "title": title,
                 "mimeType": _MIME_TYPE,
                 "byteSize": len(json_bytes),
-                "ingestionConfig": ingestion_config,
+                "ingestionConfig": ingestion_config,  # pyright: ignore[reportArgumentType]
                 "metadata": metadata,
             },
             scopeId=scope_id,
@@ -184,14 +182,18 @@ class Persistence:
                     "content_id": content_id,
                 }
             )
-        return sorted(rows, key=lambda x: int(x.get("version_number", 0)), reverse=True)
+        return sorted(
+            rows,
+            key=lambda x: int(x.get("version_number", 0)),  # pyright: ignore[reportArgumentType]
+            reverse=True,
+        )
 
     async def get_snapshot(
         self,
         user_id: str,
         company_id: str,
         *,
-        space_id: str,
+        space_id: str,  # noqa: ARG002  # pyright: ignore[reportUnusedParameter]
         snapshot_id: str,
     ) -> dict[str, object]:
         """Download and return the config JSON for a specific version."""

@@ -9,11 +9,16 @@ from space_config_mcp.shared import CodexSDKConfig
 from space_config_mcp.shared import ConductConfig
 from space_config_mcp.shared import ConductSetupConfig
 from space_config_mcp.shared import ConductStrategy
+from space_config_mcp.shared import MagicTableSpaceSettings
 from space_config_mcp.shared import PiAgentSDKConfig
+from space_config_mcp.shared import RfpModuleConfig
 from space_config_mcp.shared import SpaceConfigError
+from space_config_mcp.shared import TranslationConfig
 from space_config_mcp.upstream import Upstream
 
 _CONDUCT_MODULE_NAME = "SwappableIntelligence"
+_TRANSLATOR_MODULE_NAME = "TranslatorV2"
+_MAGIC_TABLE_MODULE_NAME = "RfpAgent"
 
 
 async def update_module_config(
@@ -138,3 +143,125 @@ async def update_conduct_config(
         config["setup"] = _deep_merge(existing, patch_dict)
 
     return await upstream.modify_module(user_id, company_id, mod.id, configuration=config)
+
+
+async def get_translator_config(
+    *,
+    upstream: Upstream,
+    user_id: str,
+    company_id: str,
+    space_id: str,
+) -> dict[str, object]:
+    """Return the TranslatorV2 module ID and its parsed TranslationConfig."""
+    modules = await upstream.list_modules(user_id, company_id, space_id)
+    mod = next((m for m in modules if m.name == _TRANSLATOR_MODULE_NAME), None)
+    if mod is None:
+        raise SpaceConfigError(f"No {_TRANSLATOR_MODULE_NAME} module found on space {space_id!r}")
+    raw: dict[str, object] = cast(dict[str, object], mod.configuration or {})
+    nested: dict[str, object] = cast(dict[str, object], raw.get("TranslationConfig") or {})
+    config = TranslationConfig.model_validate(nested)
+    return {"module_id": mod.id, "configuration": config.model_dump(by_alias=True)}
+
+
+async def update_translator_config(
+    *,
+    upstream: Upstream,
+    persistence: Persistence,
+    user_id: str,
+    company_id: str,
+    space_id: str,
+    patch: TranslationConfig,
+) -> unique_sdk.Module:
+    """Deep-merge a TranslationConfig patch into the TranslatorV2 module configuration."""
+    await snapshot_space(
+        upstream=upstream,
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        label="pre-update_translator_config",
+    )
+    modules = await upstream.list_modules(user_id, company_id, space_id)
+    mod = next((m for m in modules if m.name == _TRANSLATOR_MODULE_NAME), None)
+    if mod is None:
+        raise SpaceConfigError(f"No {_TRANSLATOR_MODULE_NAME} module found on space {space_id!r}")
+
+    existing: dict[str, object] = cast(dict[str, object], mod.configuration or {})
+    existing_nested: dict[str, object] = cast(
+        dict[str, object], existing.get("TranslationConfig") or {}
+    )
+    patch_dict = patch.model_dump(by_alias=True, exclude_none=True)
+    merged_nested = _deep_merge(existing_nested, patch_dict)
+    merged: dict[str, object] = {**existing, "TranslationConfig": merged_nested}
+    return await upstream.modify_module(user_id, company_id, mod.id, configuration=merged)
+
+
+async def get_magic_table_config(
+    *,
+    upstream: Upstream,
+    user_id: str,
+    company_id: str,
+    space_id: str,
+) -> dict[str, object]:
+    """Return the RfpAgent module ID and its raw configuration dict."""
+    modules = await upstream.list_modules(user_id, company_id, space_id)
+    mod = next((m for m in modules if m.name == _MAGIC_TABLE_MODULE_NAME), None)
+    if mod is None:
+        raise SpaceConfigError(f"No {_MAGIC_TABLE_MODULE_NAME} module found on space {space_id!r}")
+    raw: dict[str, object] = cast(dict[str, object], mod.configuration or {})
+    return {"module_id": mod.id, "configuration": raw}
+
+
+async def update_magic_table_config(  # noqa: PLR0913
+    *,
+    upstream: Upstream,
+    persistence: Persistence,
+    user_id: str,
+    company_id: str,
+    space_id: str,
+    module_patch: RfpModuleConfig | None = None,
+    space_settings_patch: MagicTableSpaceSettings | None = None,
+) -> unique_sdk.Module:
+    """Update the RfpAgent module config and/or space-level Magic Table settings."""
+    await snapshot_space(
+        upstream=upstream,
+        persistence=persistence,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        label="pre-update_magic_table_config",
+    )
+    modules = await upstream.list_modules(user_id, company_id, space_id)
+    mod = next((m for m in modules if m.name == _MAGIC_TABLE_MODULE_NAME), None)
+    if mod is None:
+        raise SpaceConfigError(f"No {_MAGIC_TABLE_MODULE_NAME} module found on space {space_id!r}")
+
+    existing: dict[str, object] = cast(dict[str, object], mod.configuration or {})
+
+    if module_patch is not None:
+        patch_dict = module_patch.model_dump(by_alias=True, exclude_none=True)
+        if "columns" in patch_dict:
+            # columns replaces entirely when provided
+            existing = {**existing, **patch_dict}
+        else:
+            existing = _deep_merge(existing, patch_dict)
+
+    updated_module = await upstream.modify_module(
+        user_id, company_id, mod.id, configuration=existing
+    )
+
+    if space_settings_patch is not None:
+        space = await upstream.get_space(user_id, company_id, space_id)
+        existing_settings: dict[str, object] = cast(dict[str, object], space.settings or {})
+        existing_magic: dict[str, object] = cast(
+            dict[str, object], existing_settings.get("magicTableConfig") or {}
+        )
+        settings_patch_dict = space_settings_patch.model_dump(by_alias=True, exclude_none=True)
+        merged_magic = _deep_merge(existing_magic, settings_patch_dict)
+        new_settings: dict[str, object] = {**existing_settings, "magicTableConfig": merged_magic}
+        space_patch: unique_sdk.Space.UpdateParams = cast(
+            unique_sdk.Space.UpdateParams, cast(object, {"settings": new_settings})
+        )
+        await upstream.update_space(user_id, company_id, space_id, patch=space_patch)
+
+    return updated_module

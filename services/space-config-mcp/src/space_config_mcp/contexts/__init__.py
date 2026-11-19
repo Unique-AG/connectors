@@ -2,10 +2,14 @@ from space_config_mcp.contexts.access import add_space_access
 from space_config_mcp.contexts.access import delete_space_access
 from space_config_mcp.contexts.access import get_space_access
 from space_config_mcp.contexts.modules import get_conduct_config
+from space_config_mcp.contexts.modules import get_magic_table_config
 from space_config_mcp.contexts.modules import get_module
+from space_config_mcp.contexts.modules import get_translator_config
 from space_config_mcp.contexts.modules import list_modules
 from space_config_mcp.contexts.modules import update_conduct_config
+from space_config_mcp.contexts.modules import update_magic_table_config
 from space_config_mcp.contexts.modules import update_module_config
+from space_config_mcp.contexts.modules import update_translator_config
 from space_config_mcp.contexts.snapshots import delete_snapshots
 from space_config_mcp.contexts.snapshots import export_space_config
 from space_config_mcp.contexts.snapshots import get_snapshot
@@ -26,8 +30,10 @@ __all__ = [
     "delete_space_access",
     "export_space_config",
     "get_conduct_config",
+    "get_magic_table_config",
     "get_mcp_server_status",
     "get_module",
+    "get_translator_config",
     "list_language_models",
     "list_mcp_servers",
     "get_snapshot",
@@ -40,6 +46,8 @@ __all__ = [
     "revert_space",
     "snapshot_space",
     "update_conduct_config",
+    "update_magic_table_config",
     "update_module_config",
+    "update_translator_config",
     "update_space",
 ]

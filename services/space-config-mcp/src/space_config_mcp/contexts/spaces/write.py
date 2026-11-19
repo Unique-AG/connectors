@@ -1,5 +1,4 @@
-from typing import Literal
-from typing import cast
+from typing import cast, Literal
 
 import unique_sdk
 

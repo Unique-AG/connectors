@@ -1,5 +1,4 @@
-from typing import Annotated
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastmcp.dependencies import Depends
 from fastmcp.exceptions import ToolError
@@ -10,8 +9,6 @@ from unique_mcp.meta.context_requirements import ContextRequirements
 from unique_mcp.meta.keys import MetaKeys
 from unique_mcp.meta.part import merge_tool_meta
 import unique_sdk
-from unique_sdk.api_resources._llm_models import LLMModels
-from unique_sdk.api_resources._mcp import McpServersResponse
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
@@ -20,7 +17,10 @@ from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.persistence import Persistence
 from space_config_mcp.shared import AssistantPrompt
+from space_config_mcp.shared import LanguageModelsResponse
 from space_config_mcp.shared import McpServerParam
+from space_config_mcp.shared import McpServersListResponse
+from space_config_mcp.shared import McpServerStatusResponse
 from space_config_mcp.shared import SwitchableLanguageModel
 from space_config_mcp.upstream import Upstream
 
@@ -43,16 +43,17 @@ async def list_language_models(
     *,
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
-) -> LLMModels.LLMModelsResponse:
+) -> LanguageModelsResponse:
     """List all language model IDs available to the company.
 
     Use this before calling update_space or update_conduct_config to get the exact
     model identifier strings accepted by language_model and switchable_language_models.
     """
     user_id, company_id = caller
-    return await contexts.list_language_models(
+    raw = await contexts.list_language_models(
         upstream=upstream, user_id=user_id, company_id=company_id
     )
+    return LanguageModelsResponse.model_validate(raw)
 
 
 @tool(
@@ -64,7 +65,7 @@ async def list_mcp_servers(
     *,
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
-) -> McpServersResponse:
+) -> McpServersListResponse:
     """List all MCP servers (connectors) available to the company.
 
     Returns each server's id, name, description, requiresOAuth flag, and the full
@@ -72,9 +73,8 @@ async def list_mcp_servers(
     before calling update_space with mcp_servers.
     """
     user_id, company_id = caller
-    return await contexts.list_mcp_servers(
-        upstream=upstream, user_id=user_id, company_id=company_id
-    )
+    raw = await contexts.list_mcp_servers(upstream=upstream, user_id=user_id, company_id=company_id)
+    return McpServersListResponse.model_validate(raw)
 
 
 @tool(
@@ -88,7 +88,7 @@ async def get_space(
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space:
-    """Get the full configuration of the current space: metadata, modules, scope rules, and access."""
+    """Get the current space's full configuration: metadata, modules, scope rules, and access."""
     user_id, company_id = caller
     return await contexts.get_space(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
@@ -105,12 +105,13 @@ async def get_mcp_server_status(
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Space.McpServerStatusResponse:
-    """List MCP servers (connectors) enabled on the current space with their tool selection and OAuth state."""
+) -> McpServerStatusResponse:
+    """List MCP servers enabled on the current space with their tool selection and OAuth state."""
     user_id, company_id = caller
-    return await contexts.get_mcp_server_status(
+    raw = await contexts.get_mcp_server_status(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
     )
+    return McpServerStatusResponse.model_validate(raw)
 
 
 @tool(
@@ -181,7 +182,7 @@ async def update_space(  # noqa: PLR0913
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Space:
-    """Update metadata and configuration of the current space. Only the fields you provide are changed."""
+    """Update metadata and configuration of the current space. Only provided fields are changed."""
     user_id, company_id = caller
     try:
         return await contexts.update_space(

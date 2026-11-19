@@ -209,7 +209,7 @@ async def import_space_config(
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
 ) -> dict[str, object]:
-    """Apply a previously exported JSON config to the current space. Auto-snapshots before applying."""
+    """Apply a previously exported JSON config to the current space, auto-snapshotting first."""
     user_id, company_id = caller
     return await contexts.import_space_config(
         upstream=upstream,

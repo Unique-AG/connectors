@@ -7,7 +7,6 @@ from pydantic import Field
 from unique_mcp.meta.context_requirements import ContextRequirements
 from unique_mcp.meta.keys import MetaKeys
 from unique_mcp.meta.part import merge_tool_meta
-import unique_sdk
 
 from space_config_mcp import contexts
 from space_config_mcp.mcp.dependencies import get_caller
@@ -15,6 +14,8 @@ from space_config_mcp.mcp.dependencies import get_persistence
 from space_config_mcp.mcp.dependencies import get_space_id
 from space_config_mcp.mcp.dependencies import get_upstream
 from space_config_mcp.persistence import Persistence
+from space_config_mcp.shared import DeleteSpaceAccessResponse
+from space_config_mcp.shared import SpaceAccessResponse
 from space_config_mcp.upstream import Upstream
 
 _META = merge_tool_meta(
@@ -33,12 +34,13 @@ async def get_space_access(
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Space.SpaceAccessResponse:
+) -> SpaceAccessResponse:
     """List current access entries for the current space."""
     user_id, company_id = caller
-    return await contexts.get_space_access(
+    raw = await contexts.get_space_access(
         upstream=upstream, user_id=user_id, company_id=company_id, space_id=space_id
     )
+    return SpaceAccessResponse.model_validate(raw)
 
 
 @tool(
@@ -61,10 +63,10 @@ async def add_space_access(
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Space.SpaceAccessResponse:
+) -> SpaceAccessResponse:
     """Grant access to a user or group on the current space."""
     user_id, company_id = caller
-    return await contexts.add_space_access(
+    raw = await contexts.add_space_access(
         upstream=upstream,
         persistence=persistence,
         user_id=user_id,
@@ -72,6 +74,7 @@ async def add_space_access(
         space_id=space_id,
         access=access,
     )
+    return SpaceAccessResponse.model_validate(raw)
 
 
 @tool(
@@ -89,10 +92,10 @@ async def delete_space_access(
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Space.DeleteSpaceAccessResponse:
+) -> DeleteSpaceAccessResponse:
     """Revoke access entries from the current space."""
     user_id, company_id = caller
-    return await contexts.delete_space_access(
+    raw = await contexts.delete_space_access(
         upstream=upstream,
         persistence=persistence,
         user_id=user_id,
@@ -100,3 +103,4 @@ async def delete_space_access(
         space_id=space_id,
         access_ids=access_ids,
     )
+    return DeleteSpaceAccessResponse.model_validate(raw)
