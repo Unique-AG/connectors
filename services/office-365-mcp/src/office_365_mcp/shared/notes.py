@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -768,4 +769,4 @@ def accepted_operation(
 
 
 def write_state_for(*parts: str) -> str:
-    return sha256("\x1f".join(parts).encode()).hexdigest()
+    return sha256(json.dumps(parts).encode()).hexdigest()
