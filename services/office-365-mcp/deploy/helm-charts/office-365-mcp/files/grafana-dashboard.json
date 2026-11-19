@@ -537,7 +537,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Tool calls in the last hour whose measured duration was more than 60 seconds (graph_slow_operations_total). The measured duration is the one in graph_operation_duration_seconds: it leaves out waits that a tool marks as not Microsoft's, such as a person confirming. A call that the client timed out at 60 seconds is not here when that wait made it long. Red at 3 (Office365McpGraphSlow). Before this counter existed, the stat reads the duration histogram instead, for each pod and tool that has no counter.",
+      "description": "Tool calls in the last hour whose measured duration was more than 60 seconds (graph_slow_operations_total). The measured duration is the one in graph_operation_duration_seconds: it leaves out waits that a tool marks as not Microsoft's, such as a person confirming. A call that the client timed out at 60 seconds is not here when that wait made it long. Red at 3 (Office365McpGraphSlow). Before this counter existed, the stat reads the duration histogram instead, for each pod and tool that has no counter. That value is an estimate: it subtracts two increase() results, which can extrapolate differently and show a slow call that did not happen. Office365McpGraphSlow reads only the counter.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -2267,7 +2267,7 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "graph_slow_operations_total for each tool, in each time bucket of at least 15 minutes. It is the counter that Office365McpGraphSlow sums over one hour. It uses the measured duration, which leaves out waits for a person to confirm, and it counts a call whatever its status, cancelled included. Kong and the chat close the request at 60 seconds. Before this counter existed, the panel reads the duration histogram instead, for each pod and tool that has no counter.",
+      "description": "graph_slow_operations_total for each tool, in each time bucket of at least 15 minutes. It is the counter that Office365McpGraphSlow sums over one hour. It uses the measured duration, which leaves out waits for a person to confirm, and it counts a call whatever its status, cancelled included. Kong and the chat close the request at 60 seconds. Before this counter existed, the panel reads the duration histogram instead, for each pod and tool that has no counter. That value is an estimate: it subtracts two increase() results, which can extrapolate differently and show a slow call that did not happen. Office365McpGraphSlow reads only the counter.",
       "fieldConfig": {
         "defaults": {
           "color": {
