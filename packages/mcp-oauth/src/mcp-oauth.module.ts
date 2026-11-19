@@ -122,15 +122,12 @@ export class McpOAuthModule extends ConfigurableModuleClass {
       imports: [
         ...(baseModule.imports || []),
         ScheduleModule.forRoot(),
+        // Keep this to one throttler. `@SkipThrottle()` without arguments only exempts the one
+        // named `default`, so a second name would silently rate-limit the discovery endpoints.
         ThrottlerModule.forRoot({
           throttlers: [
             {
               name: 'default',
-              ttl: seconds(60),
-              limit: 10,
-            },
-            {
-              name: 'auth',
               ttl: seconds(60),
               limit: 10,
             },

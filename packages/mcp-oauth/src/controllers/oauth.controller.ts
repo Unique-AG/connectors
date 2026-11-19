@@ -39,6 +39,12 @@ import { CONSENT_PAGE_HEADERS, renderConsentPage } from '../utils/consent-page';
 import { normalizeError } from '../utils/normalize-error';
 import { decodeProviderState } from '../utils/provider-state';
 
+/**
+ * Every user behind one corporate NAT shares a per-IP bucket, so these routes allow a whole
+ * office to sign in within a minute rather than three or five people.
+ */
+const BROWSER_FLOW_THROTTLE = { default: { limit: 30, ttl: seconds(60) } };
+
 @Controller()
 @UseGuards(ThrottlerGuard)
 export class OAuthController {
@@ -55,7 +61,7 @@ export class OAuthController {
   ) {}
 
   @Get(OAUTH_ENDPOINTS.authorize)
-  @Throttle({ auth: { limit: 3, ttl: seconds(60) } })
+  @Throttle(BROWSER_FLOW_THROTTLE)
   public async authorize(
     @Query('response_type') responseType: string,
     @Query('client_id') clientId: string,
@@ -173,7 +179,7 @@ export class OAuthController {
   }
 
   @Post(OAUTH_ENDPOINTS.consent)
-  @Throttle({ default: { limit: 5, ttl: seconds(60) } })
+  @Throttle(BROWSER_FLOW_THROTTLE)
   @UsePipes(ZodValidationPipe)
   public async consent(
     @Body() { session_id: sessionId, csrf_token: csrfToken, decision }: ConsentDecisionDto,
@@ -207,7 +213,7 @@ export class OAuthController {
   }
 
   @Get(OAUTH_ENDPOINTS.callback)
-  @Throttle({ default: { limit: 5, ttl: seconds(60) } })
+  @Throttle(BROWSER_FLOW_THROTTLE)
   public async callback(
     @Query('state') state: string,
     @Req() request: Request,
