@@ -3,6 +3,7 @@ import hashlib
 import json
 import pathlib
 import re
+from collections import UserDict
 from collections.abc import Mapping
 from typing import cast
 
@@ -885,6 +886,11 @@ class TestTheAgreementBinding:
     def test_the_order_of_the_keys_of_a_mapping_does_not_change_the_id(self) -> None:
         assert confirmation_digest("tool", {"a": 1, "b": [2]}) == confirmation_digest(
             "tool", {"b": [2], "a": 1}
+        )
+
+    def test_any_mapping_or_sequence_binds_like_the_dict_or_list_it_holds(self) -> None:
+        assert confirmation_digest("tool", UserDict({"a": range(2)}), (1, 2)) == (
+            confirmation_digest("tool", {"a": [0, 1]}, [1, 2])
         )
 
     def test_the_id_is_a_sha256_of_the_canonical_parts(self) -> None:
