@@ -487,7 +487,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get paginated match facts by internal caseSystemId or exact external caseId.\n\nreference_id identifies a profile. result_id identifies the match on this case.",
+    "description": "Get paginated match facts by internal caseSystemId or exact external caseId.\n\nname is the matched record's name. reference_id identifies a profile. result_id identifies the match on this case.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -543,7 +543,18 @@
           "description": "LSEG-generated internal case ID (caseSystemId).",
           "type": "string"
         },
-        "matches": {
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor for the next page, or null when there is none."
+        },
+        "results": {
           "description": "Matches on this page.",
           "items": {
             "properties": {
@@ -557,6 +568,17 @@
                   }
                 ],
                 "description": "Match strength, e.g. EXACT or WEAK."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
               },
               "provider_type": {
                 "anyOf": [
@@ -604,6 +626,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -613,22 +636,11 @@
             "type": "object"
           },
           "type": "array"
-        },
-        "next_page": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
         "case_system_id",
-        "matches",
+        "results",
         "next_page"
       ],
       "type": "object"
@@ -1127,7 +1139,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get the World-Check record for a match: its names and categories.\n\nPass the match's referenceId, not its resultId.",
+    "description": "Get the World-Check record for a match: its names, categories, and the first public source page LSEG cites for it, if any.\n\nPass the match's referenceId, not its resultId.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1156,6 +1168,17 @@
           "description": "Entity type, INDIVIDUAL or ORGANISATION.",
           "type": "string"
         },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Primary name of the record."
+        },
         "names": {
           "description": "Names on the record, primary first.",
           "items": {
@@ -1166,9 +1189,22 @@
         "reference_id": {
           "description": "World-Check record reference ID.",
           "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First public source page LSEG cites for the record, or null when it has none."
         }
       },
       "required": [
+        "name",
+        "url",
         "reference_id",
         "entity_type",
         "names",
@@ -1502,7 +1538,18 @@
     "name": "list_cases",
     "outputSchema": {
       "properties": {
-        "cases": {
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor for the next page, or null when there is none."
+        },
+        "results": {
           "description": "Cases on this page, newest first.",
           "items": {
             "properties": {
@@ -1577,21 +1624,10 @@
             "type": "object"
           },
           "type": "array"
-        },
-        "next_page": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
-        "cases",
+        "results",
         "next_page"
       ],
       "type": "object"
@@ -2039,6 +2075,17 @@
                 "default": null,
                 "description": "Third MRZ line, passport results only."
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
+              },
               "provider_type": {
                 "anyOf": [
                   {
@@ -2085,6 +2132,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -2146,6 +2194,17 @@
                 "default": null,
                 "description": "Third MRZ line, passport results only."
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
+              },
               "provider_type": {
                 "anyOf": [
                   {
@@ -2192,6 +2251,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -2360,6 +2420,17 @@
                 "default": null,
                 "description": "Third MRZ line, passport results only."
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
+              },
               "provider_type": {
                 "anyOf": [
                   {
@@ -2406,6 +2477,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -2467,6 +2539,17 @@
                 "default": null,
                 "description": "Third MRZ line, passport results only."
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
+              },
               "provider_type": {
                 "anyOf": [
                   {
@@ -2513,6 +2596,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -3050,6 +3134,17 @@
                 "default": null,
                 "description": "Third MRZ line, passport results only."
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
+              },
               "provider_type": {
                 "anyOf": [
                   {
@@ -3096,6 +3191,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -3157,6 +3253,17 @@
                 "default": null,
                 "description": "Third MRZ line, passport results only."
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Matched World-Check record name: its primary name, else the matched term."
+              },
               "provider_type": {
                 "anyOf": [
                   {
@@ -3203,6 +3310,7 @@
               }
             },
             "required": [
+              "name",
               "result_id",
               "reference_id",
               "provider_type",
@@ -3317,7 +3425,18 @@
     "name": "search_cases",
     "outputSchema": {
       "properties": {
-        "cases": {
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor for the next page, or null when there is none."
+        },
+        "results": {
           "description": "Cases on this page, newest first.",
           "items": {
             "properties": {
@@ -3392,21 +3511,10 @@
             "type": "object"
           },
           "type": "array"
-        },
-        "next_page": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Cursor for the next page, or null when there is none."
         }
       },
       "required": [
-        "cases",
+        "results",
         "next_page"
       ],
       "type": "object"

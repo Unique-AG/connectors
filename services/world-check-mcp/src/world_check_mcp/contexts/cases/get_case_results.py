@@ -12,7 +12,7 @@ from world_check_mcp.upstream import ResultsFilterRequestInput
 from world_check_mcp.upstream import Upstream
 
 
-@traced(arguments=("case", "limit", "page_reference"), result=lambda r: {"matches": len(r.matches)})
+@traced(arguments=("case", "limit", "page_reference"), result=lambda r: {"matches": len(r.results)})
 async def get_case_results(
     *,
     upstream: Upstream,
@@ -37,8 +37,9 @@ async def get_case_results(
     )
     return CaseResults(
         case_system_id=resolved.case_system_id,
-        matches=[
+        results=[
             Match(
+                name=result.matched_name,
                 result_id=result.result_id,
                 reference_id=result.reference_id,
                 provider_type=result.provider_type,

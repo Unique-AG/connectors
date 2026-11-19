@@ -32,7 +32,8 @@ Expression = Annotated[
     description=(
         "Get paginated match facts by internal caseSystemId or exact external caseId.\n"
         "\n"
-        "reference_id identifies a profile. result_id identifies the match on this case."
+        "name is the matched record's name. reference_id identifies a profile. result_id "
+        "identifies the match on this case."
     ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )

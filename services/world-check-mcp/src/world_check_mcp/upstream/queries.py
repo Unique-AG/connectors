@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import ClassVar
 
 from mcp_openapi.upstream import Operation
@@ -9,7 +10,9 @@ from pydantic import TypeAdapter
 from world_check_mcp.upstream.generated.vendor_requests import GetOngoingScreeningUpdatesRequest
 from world_check_mcp.upstream.generated.vendor_requests import GetResultsRequest
 from world_check_mcp.upstream.generated.vendor_requests import SearchCasesRequest
+from world_check_mcp.upstream.generated.vendor_responses import MatchedTerm
 from world_check_mcp.upstream.generated.vendor_responses import PaginationReferenceResponse
+from world_check_mcp.upstream.generated.vendor_responses import RecordName
 from world_check_mcp.upstream.generated.vendor_responses import WatchlistResults
 
 
@@ -73,6 +76,14 @@ class ResultWire(BaseModel):
     mrz_line_1: str | None = Field(default=None, alias="mrzLine1")
     mrz_line_2: str | None = Field(default=None, alias="mrzLine2")
     mrz_line_3: str | None = Field(default=None, alias="mrzLine3")
+    names: list[RecordName] | None = None
+    matched_terms: list[MatchedTerm] | None = Field(default=None, alias="matchedTerms")
+
+    @property
+    def matched_name(self) -> str | None:
+        """The matched record's primary name, else the first term LSEG matched."""
+        terms = (term.term for term in self.matched_terms or [] if term.term)
+        return primary_name(self.names or []) or next(terms, None)
 
 
 class ResultsWire(BaseModel):
@@ -122,6 +133,17 @@ SEARCH_CASES = Operation[CaseSearchWire, SearchCasesRequest](
 GET_SCREENING_STATUS = Operation[list[ScreeningStatusWire]](
     "getScreeningStatus", TypeAdapter(list[ScreeningStatusWire])
 )
+
+
+def primary_name(names: Sequence[RecordName]) -> str | None:
+    """A record's name, preferring a PRIMARY name and its FULL_NAME part over the rest."""
+    parts = [
+        (name.type != "PRIMARY", detail.type != "FULL_NAME", detail.value)
+        for name in names
+        for detail in name.details or []
+        if detail.value
+    ]
+    return min(parts, key=lambda part: part[:2])[2] if parts else None
 
 
 def next_page(pagination: PaginationReferenceResponse | None) -> str | None:

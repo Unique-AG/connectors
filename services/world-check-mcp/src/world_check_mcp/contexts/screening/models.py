@@ -25,6 +25,9 @@ class FieldValue(BaseModel):
 
 
 class ScreeningMatch(BaseModel):
+    name: str | None = Field(
+        description="Matched World-Check record name: its primary name, else the matched term."
+    )
     result_id: str | None = Field(description="ID of the result within the case.")
     reference_id: str | None = Field(
         description="World-Check record reference ID, for get_profile."
