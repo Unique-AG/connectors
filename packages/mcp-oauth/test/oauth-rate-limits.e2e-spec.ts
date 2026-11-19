@@ -76,7 +76,8 @@ describe('OAuth rate limits (E2E)', () => {
           refresh_token: `refresh-token-of-user-${user}`,
           client_id: clientId,
         });
-      expect(response.status, `user ${user + 1}`).not.toBe(429);
+      expect(response.status, `user ${user + 1}`).toBe(400);
+      expect(response.body.error, `user ${user + 1}`).toBe('invalid_grant');
     }
   });
 
@@ -91,7 +92,7 @@ describe('OAuth rate limits (E2E)', () => {
       statuses.push(response.status);
     }
 
-    expect(statuses.slice(0, 10)).not.toContain(429);
+    expect(statuses.slice(0, 10)).toEqual(Array(10).fill(400));
     expect(statuses[10]).toBe(429);
   });
 });
@@ -121,6 +122,7 @@ describe('OAuth rate limits with the emergency switch on (E2E)', () => {
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
       });
+    expect(registration.status).toBe(201);
     clientId = registration.body.client_id;
   });
 
@@ -135,7 +137,8 @@ describe('OAuth rate limits with the emergency switch on (E2E)', () => {
         refresh_token: 'replayed-refresh-token',
         client_id: clientId,
       });
-      expect(response.status, `attempt ${attempt + 1}`).not.toBe(429);
+      expect(response.status, `attempt ${attempt + 1}`).toBe(400);
+      expect(response.body.error, `attempt ${attempt + 1}`).toBe('invalid_grant');
     }
   });
 });
@@ -161,6 +164,7 @@ describe('OAuth token endpoint per-IP ceiling (E2E)', () => {
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
       });
+    expect(registration.status).toBe(201);
     clientId = registration.body.client_id;
   });
 
@@ -178,7 +182,8 @@ describe('OAuth token endpoint per-IP ceiling (E2E)', () => {
           refresh_token: `random-token-${attempt}`,
           client_id: clientId,
         });
-      expect(response.status, `attempt ${attempt + 1}`).not.toBe(429);
+      expect(response.status, `attempt ${attempt + 1}`).toBe(400);
+      expect(response.body.error, `attempt ${attempt + 1}`).toBe('invalid_grant');
     }
 
     const overTheCeiling = await request(app.getHttpServer()).post(OAUTH_ENDPOINTS.token).send({

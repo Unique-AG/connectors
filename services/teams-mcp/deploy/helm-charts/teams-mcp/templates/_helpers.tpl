@@ -70,5 +70,5 @@ All mcpConfig environment variables, shared by deployment and hook job container
 - name: AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS
   value: {{ .Values.mcpConfig.auth.refreshTokenExpiresInSeconds | quote }}
 - name: AUTH_DISABLE_RATE_LIMITING
-  value: {{ .Values.mcpConfig.auth.disableRateLimiting | quote }}
+  value: {{ .Values.mcpConfig.auth.disableRateLimiting | default false | quote }}
 {{- end -}}
