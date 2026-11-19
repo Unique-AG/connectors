@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
+from world_check_mcp.persistence.cache import Cache
 from world_check_mcp.persistence.case_locks import CaseLocks
 from world_check_mcp.persistence.case_locks import PostgresCaseLocks
 from world_check_mcp.persistence.store import open_store
@@ -29,6 +30,10 @@ class Persistence(BaseModel):
 
     store: Store
     case_locks: CaseLocks
+
+    @property
+    def cache(self) -> Cache:
+        return Cache(self.store)
 
 
 @asynccontextmanager

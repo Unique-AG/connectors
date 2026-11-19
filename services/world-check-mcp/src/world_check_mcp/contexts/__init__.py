@@ -16,15 +16,17 @@ from world_check_mcp.contexts.cases import ScreeningStatus
 from world_check_mcp.contexts.cases import search_cases
 from world_check_mcp.contexts.cases import SearchMode
 from world_check_mcp.contexts.groups import get_group_settings
-from world_check_mcp.contexts.groups import Group
+from world_check_mcp.contexts.groups import GroupEntry
+from world_check_mcp.contexts.groups import GroupPage
+from world_check_mcp.contexts.groups import GroupPageError
 from world_check_mcp.contexts.groups import GroupSettings
 from world_check_mcp.contexts.groups import list_groups
+from world_check_mcp.contexts.groups import SettingsSection
 from world_check_mcp.contexts.monitoring import enable_ongoing_screening
 from world_check_mcp.contexts.monitoring import get_ogs_updates
 from world_check_mcp.contexts.monitoring import MonitoringError
 from world_check_mcp.contexts.monitoring import OgsPage
 from world_check_mcp.contexts.monitoring import OngoingScreening
-from world_check_mcp.contexts.monitoring import UpdateMode
 from world_check_mcp.contexts.passport import apply_passport_verification
 from world_check_mcp.contexts.passport import generate_passport_mrz
 from world_check_mcp.contexts.passport import Mrz
@@ -69,7 +71,9 @@ __all__ = [
     "EntityType",
     "FieldValue",
     "Gender",
-    "Group",
+    "GroupEntry",
+    "GroupPage",
+    "GroupPageError",
     "GroupSettings",
     "MonitoringError",
     "OgsPage",
@@ -93,7 +97,7 @@ __all__ = [
     "ScreeningOutcome",
     "ScreeningStatus",
     "SearchMode",
-    "UpdateMode",
+    "SettingsSection",
     "apply_passport_verification",
     "apply_resolution",
     "enable_ongoing_screening",

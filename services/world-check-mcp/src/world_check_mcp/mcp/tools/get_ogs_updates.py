@@ -15,7 +15,7 @@ from world_check_mcp.upstream import Upstream
 When = Annotated[
     datetime | None, Field(description="Timezone-aware timestamp. Reuse it when paging.")
 ]
-PageSize = Annotated[int, Field(ge=1, le=1000, description="Updates per page.")]
+PageSize = Annotated[int, Field(ge=1, le=100, description="Updates per page.")]
 PageReference = Annotated[str | None, Field(description="next_page from the previous page.")]
 
 
@@ -30,7 +30,7 @@ PageReference = Annotated[str | None, Field(description="next_page from the prev
     ),
     annotations=ToolAnnotations(read_only_hint=True, idempotent_hint=True, open_world_hint=True),
 )
-@trace_arguments("group_id", "case", "mode", "limit", "page_reference")
+@trace_arguments("group_id", "case", "limit", "page_reference")
 async def get_ogs_updates(
     since: When = None,
     until: When = None,
@@ -39,12 +39,8 @@ async def get_ogs_updates(
         str | None,
         Field(description="Internal caseSystemId or exact external caseId."),
     ] = None,
-    limit: PageSize = 100,
+    limit: PageSize = 25,
     page_reference: PageReference = None,
-    mode: Annotated[
-        contexts.UpdateMode,
-        Field(description="FULL returns match detail. SUMMARY returns counts."),
-    ] = "FULL",
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.OgsPage:
     try:
@@ -56,7 +52,6 @@ async def get_ogs_updates(
             case=case,
             limit=limit,
             page_reference=page_reference,
-            mode=mode,
         )
     except contexts.CaseNotFoundError as error:
         raise ToolError(str(error)) from error

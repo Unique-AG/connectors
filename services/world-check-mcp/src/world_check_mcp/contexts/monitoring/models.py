@@ -1,9 +1,5 @@
-from typing import Literal
-
 from pydantic import BaseModel
 from pydantic import Field
-
-UpdateMode = Literal["FULL", "SUMMARY"]
 
 
 class OngoingScreening(BaseModel):

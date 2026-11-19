@@ -641,13 +641,44 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get one group's case template and resolution toolkit.\n\nSecondary field type ids and resolution ids are group-specific. Read them before screening or resolving a match.",
+    "description": "Get one group's case template and resolution toolkit.\n\nSecondary field type ids and resolution ids are group-specific. Read them before screening or resolving a match. Ask for section fields before screening and toolkits before resolving, and narrow the fields with entity_type or required_only. A part you did not ask for is null, not empty.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
+        "entity_type": {
+          "anyOf": [
+            {
+              "enum": [
+                "INDIVIDUAL",
+                "ORGANISATION"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only the fields of INDIVIDUAL or ORGANISATION cases."
+        },
         "group_id": {
           "description": "Group id from `list_groups`. It owns the case template.",
           "minLength": 1,
+          "type": "string"
+        },
+        "required_only": {
+          "default": false,
+          "description": "Only the fields a case must carry.",
+          "type": "boolean"
+        },
+        "section": {
+          "default": "all",
+          "description": "fields for the case template, toolkits for resolutions, or all.",
+          "enum": [
+            "fields",
+            "toolkits",
+            "all"
+          ],
           "type": "string"
         }
       },
@@ -658,15 +689,13 @@
     },
     "name": "get_group_settings",
     "outputSchema": {
-      "$defs": {
-        "Group": {
+      "properties": {
+        "group": {
+          "description": "The group.",
           "properties": {
-            "child_groups": {
-              "description": "Direct child groups, nested.",
-              "items": {
-                "$ref": "#/$defs/Group"
-              },
-              "type": "array"
+            "child_group_count": {
+              "description": "Number of groups directly under this one.",
+              "type": "integer"
             },
             "id": {
               "description": "Group ID.",
@@ -691,117 +720,10 @@
           },
           "required": [
             "id",
-            "name"
+            "name",
+            "child_group_count"
           ],
           "type": "object"
-        },
-        "ResolutionOption": {
-          "properties": {
-            "id": {
-              "description": "Option ID, passed back when resolving a result.",
-              "type": "string"
-            },
-            "label": {
-              "description": "Human-readable option label.",
-              "type": "string"
-            },
-            "status_type": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Status category, for a status option."
-            }
-          },
-          "required": [
-            "id",
-            "label"
-          ],
-          "type": "object"
-        },
-        "ResolutionToolkit": {
-          "properties": {
-            "provider_type": {
-              "description": "Provider the toolkit applies to, e.g. WATCHLIST.",
-              "type": "string"
-            },
-            "reasons": {
-              "description": "Allowed resolution reasons.",
-              "items": {
-                "$ref": "#/$defs/ResolutionOption"
-              },
-              "type": "array"
-            },
-            "risks": {
-              "description": "Allowed risk ratings.",
-              "items": {
-                "$ref": "#/$defs/ResolutionOption"
-              },
-              "type": "array"
-            },
-            "statuses": {
-              "description": "Allowed resolution statuses.",
-              "items": {
-                "$ref": "#/$defs/ResolutionOption"
-              },
-              "type": "array"
-            }
-          },
-          "required": [
-            "provider_type",
-            "statuses",
-            "risks",
-            "reasons"
-          ],
-          "type": "object"
-        },
-        "SecondaryField": {
-          "properties": {
-            "entity_type": {
-              "description": "Entity type the field applies to, e.g. individual.",
-              "type": "string"
-            },
-            "label": {
-              "description": "Human-readable field label, e.g. DATE_OF_BIRTH.",
-              "type": "string"
-            },
-            "provider": {
-              "description": "Provider the field applies to, e.g. watchlist.",
-              "type": "string"
-            },
-            "required": {
-              "description": "Whether the field is required when screening.",
-              "type": "boolean"
-            },
-            "type_id": {
-              "description": "Field typeId, passed back in screening secondary fields.",
-              "type": "string"
-            },
-            "value_type": {
-              "description": "Value type, e.g. DATE, COUNTRY, GENDER, or TEXT.",
-              "type": "string"
-            }
-          },
-          "required": [
-            "provider",
-            "entity_type",
-            "type_id",
-            "label",
-            "value_type",
-            "required"
-          ],
-          "type": "object"
-        }
-      },
-      "properties": {
-        "group": {
-          "$ref": "#/$defs/Group",
-          "description": "The group."
         },
         "mandatory_provider_types": {
           "description": "Providers that must be screened, e.g. WATCHLIST.",
@@ -815,18 +737,177 @@
           "type": "string"
         },
         "secondary_fields": {
-          "description": "Secondary fields the group's cases accept.",
-          "items": {
-            "$ref": "#/$defs/SecondaryField"
-          },
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "entity_type": {
+                    "description": "Entity type the field applies to, e.g. individual.",
+                    "type": "string"
+                  },
+                  "label": {
+                    "description": "Human-readable field label, e.g. DATE_OF_BIRTH.",
+                    "type": "string"
+                  },
+                  "provider": {
+                    "description": "Provider the field applies to, e.g. watchlist.",
+                    "type": "string"
+                  },
+                  "required": {
+                    "description": "Whether the field is required when screening.",
+                    "type": "boolean"
+                  },
+                  "type_id": {
+                    "description": "Field typeId, passed back in screening secondary fields.",
+                    "type": "string"
+                  },
+                  "value_type": {
+                    "description": "Value type, e.g. DATE, COUNTRY, GENDER, or TEXT.",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "provider",
+                  "entity_type",
+                  "type_id",
+                  "label",
+                  "value_type",
+                  "required"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Secondary fields the group's cases accept, or null when not asked for."
         },
         "toolkits": {
-          "description": "Resolution toolkits available for the group.",
-          "items": {
-            "$ref": "#/$defs/ResolutionToolkit"
-          },
-          "type": "array"
+          "anyOf": [
+            {
+              "items": {
+                "properties": {
+                  "provider_type": {
+                    "description": "Provider the toolkit applies to, e.g. WATCHLIST.",
+                    "type": "string"
+                  },
+                  "reasons": {
+                    "description": "Allowed resolution reasons.",
+                    "items": {
+                      "properties": {
+                        "id": {
+                          "description": "Option ID, passed back when resolving a result.",
+                          "type": "string"
+                        },
+                        "label": {
+                          "description": "Human-readable option label.",
+                          "type": "string"
+                        },
+                        "status_type": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "description": "Status category, for a status option."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "risks": {
+                    "description": "Allowed risk ratings.",
+                    "items": {
+                      "properties": {
+                        "id": {
+                          "description": "Option ID, passed back when resolving a result.",
+                          "type": "string"
+                        },
+                        "label": {
+                          "description": "Human-readable option label.",
+                          "type": "string"
+                        },
+                        "status_type": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "description": "Status category, for a status option."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "statuses": {
+                    "description": "Allowed resolution statuses.",
+                    "items": {
+                      "properties": {
+                        "id": {
+                          "description": "Option ID, passed back when resolving a result.",
+                          "type": "string"
+                        },
+                        "label": {
+                          "description": "Human-readable option label.",
+                          "type": "string"
+                        },
+                        "status_type": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "default": null,
+                          "description": "Status category, for a status option."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "provider_type",
+                  "statuses",
+                  "risks",
+                  "reasons"
+                ],
+                "type": "object"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Resolution toolkits available for the group, or null when not asked for."
         }
       },
       "required": [
@@ -875,20 +956,11 @@
           "description": "Limit updates to this group."
         },
         "limit": {
-          "default": 100,
+          "default": 25,
           "description": "Updates per page.",
-          "maximum": 1000,
+          "maximum": 100,
           "minimum": 1,
           "type": "integer"
-        },
-        "mode": {
-          "default": "FULL",
-          "description": "FULL returns match detail. SUMMARY returns counts.",
-          "enum": [
-            "FULL",
-            "SUMMARY"
-          ],
-          "type": "string"
         },
         "page_reference": {
           "anyOf": [
@@ -1532,65 +1604,122 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "List the LSEG groups this service account can screen in, including descendant groups.\n\nCall it before screening, then pass a group id to `get_group_settings`.",
+    "description": "List the LSEG groups this service account can screen in, including descendant groups, a page at a time.\n\nCall it before screening, then pass a group id to `get_group_settings`. Pass a few words of the group's name as query, or a parent_id for the groups directly under one. Pass next_page back as page_reference with the same query and parent_id.",
     "inputSchema": {
       "additionalProperties": false,
-      "properties": {},
+      "properties": {
+        "limit": {
+          "default": 25,
+          "description": "Groups per page.",
+          "maximum": 100,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "page_reference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "next_page from the previous page. Keep the same query and parent_id."
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Only the groups directly under this group."
+        },
+        "query": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Words of the group name. Typos match."
+        }
+      },
       "type": "object"
     },
     "name": "list_groups",
     "outputSchema": {
-      "$defs": {
-        "Group": {
-          "properties": {
-            "child_groups": {
-              "description": "Direct child groups, nested.",
-              "items": {
-                "$ref": "#/$defs/Group"
-              },
-              "type": "array"
-            },
-            "id": {
-              "description": "Group ID.",
-              "type": "string"
-            },
-            "name": {
-              "description": "Group name.",
-              "type": "string"
-            },
-            "parent_id": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "description": "Parent group ID, or null for a root."
-            }
-          },
-          "required": [
-            "id",
-            "name"
-          ],
-          "type": "object"
-        }
-      },
       "properties": {
-        "result": {
+        "groups": {
+          "description": "Groups on this page, best match first.",
           "items": {
-            "$ref": "#/$defs/Group"
+            "properties": {
+              "child_group_count": {
+                "description": "Number of groups directly under this one.",
+                "type": "integer"
+              },
+              "id": {
+                "description": "Group ID.",
+                "type": "string"
+              },
+              "name": {
+                "description": "Group name.",
+                "type": "string"
+              },
+              "parent_id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Parent group ID, or null for a root."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "child_group_count"
+            ],
+            "type": "object"
           },
           "type": "array"
+        },
+        "next_page": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Cursor for the next page, or null when there is none."
+        },
+        "total": {
+          "description": "Groups that match, before paging.",
+          "type": "integer"
         }
       },
       "required": [
-        "result"
+        "groups",
+        "total",
+        "next_page"
       ],
-      "type": "object",
-      "x-fastmcp-wrap-result": true
+      "type": "object"
     },
     "title": "List Groups"
   },

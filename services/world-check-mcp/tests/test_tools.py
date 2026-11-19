@@ -7,10 +7,11 @@ from datetime import timedelta
 from datetime import UTC
 import json
 import socket
-from typing import cast
+from typing import cast, Self
 
 from fastmcp import Client
 from fastmcp import FastMCP
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import StaticTokenVerifier
 import httpx2
@@ -588,13 +589,141 @@ def _server() -> FastMCP:
     )
 
 
-async def test_list_groups_returns_descendant_groups() -> None:
-    async with Client(_server()) as client:
+_GROUP_TREE: list[dict[str, object]] = [
+    {
+        "id": "g1",
+        "name": "KYC",
+        "childGroups": [
+            {"id": "g2", "name": "EU Onboarding"},
+            {"id": "g3", "name": "EU Monitoring"},
+        ],
+    },
+    {"id": "g4", "name": "Third Party Due Diligence"},
+]
+
+
+def _counting_server() -> tuple[FastMCP, list[str]]:
+    """The server over a larger group tree, with the LSEG paths each request asked for."""
+    paths: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("/groups") and request.url.params.get("showAllChildGroups"):
+            return _json(200, _GROUP_TREE)
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=MemoryStore(), case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(handler),
+    )
+    return server, paths
+
+
+class _StoreThatCountsExits(MemoryStore):
+    """Postgres closes its pool when the store is exited, and FastMCP exits what a dependency
+    returns if it is a context manager.
+    """
+
+    exits: int = 0
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        self.exits += 1
+
+
+async def test_a_tool_that_reads_the_cache_never_exits_the_store() -> None:
+    store = _StoreThatCountsExits()
+    paths: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        paths.append(request.url.path)
+        if request.url.path.endswith("/groups") and request.url.params.get("showAllChildGroups"):
+            return _json(200, _GROUP_TREE)
+        return _world_check(request)
+
+    server = build_server(
+        fake_upstream_settings(),
+        Persistence(store=store, case_locks=InMemoryCaseLocks()),
+        httpx2.MockTransport(handler),
+    )
+    async with Client(server) as client:
+        await client.call_tool("list_groups", {})
+        await client.call_tool("list_groups", {})
+
+    assert store.exits == 0
+    assert [path for path in paths if path.endswith("/groups")] == ["/groups"]
+
+
+async def _group_ids(client: Client[FastMCPTransport], **arguments: object) -> list[str]:
+    result = await client.call_tool("list_groups", arguments)
+    page = result.structured_content
+    assert page is not None
+    return [group["id"] for group in cast(list[dict[str, str]], page["groups"])]
+
+
+async def test_list_groups_returns_a_flat_page_with_parents_and_child_counts() -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
         result = await client.call_tool("list_groups", {})
 
-    groups = result.structured_content
-    assert groups is not None
-    assert groups["result"][0]["child_groups"][0]["name"] == "EU"
+    page = result.structured_content
+    assert page is not None
+    groups = cast(list[dict[str, object]], page["groups"])
+    assert [(group["id"], group["parent_id"], group["child_group_count"]) for group in groups] == [
+        ("g1", None, 2),
+        ("g2", "g1", 0),
+        ("g3", "g1", 0),
+        ("g4", None, 0),
+    ]
+    assert page["total"] == 4
+    assert page["next_page"] is None
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected"),
+    [
+        ({"query": "eu"}, ["g3", "g2"]),
+        ({"query": "Onbording"}, ["g2"]),
+        ({"query": "due diligence third"}, ["g4"]),
+        ({"query": "zzz"}, []),
+        ({"parent_id": "g1"}, ["g2", "g3"]),
+        ({"parent_id": "g1", "query": "monitoring"}, ["g3"]),
+    ],
+)
+async def test_list_groups_finds_groups_by_words_typos_and_parent(
+    arguments: dict[str, str], expected: list[str]
+) -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
+        assert await _group_ids(client, **arguments) == expected
+
+
+async def test_list_groups_pages_through_the_matches() -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
+        first = (await client.call_tool("list_groups", {"limit": 3})).structured_content
+        assert first is not None
+        assert first["next_page"] == "3"
+        assert await _group_ids(client, limit=3, page_reference=first["next_page"]) == ["g4"]
+
+
+async def test_list_groups_refuses_a_page_reference_it_did_not_hand_out() -> None:
+    server, _ = _counting_server()
+    async with Client(server) as client:
+        with pytest.raises(ToolError, match="next_page"):
+            await client.call_tool("list_groups", {"page_reference": "abc"})
+
+
+async def test_list_groups_asks_lseg_once_while_the_cache_holds() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        await client.call_tool("list_groups", {})
+        await client.call_tool("list_groups", {"query": "eu"})
+
+    assert [path for path in paths if path.endswith("/groups")] == ["/groups"]
 
 
 async def test_get_group_settings_joins_the_template_and_toolkit() -> None:
@@ -605,6 +734,60 @@ async def test_get_group_settings_joins_the_template_and_toolkit() -> None:
     assert settings is not None
     assert settings["secondary_fields"][0]["type_id"] == "SFCT_5"
     assert settings["toolkits"][0]["statuses"][0]["status_type"] == "POSITIVE"
+
+
+async def test_get_group_settings_returns_only_the_section_asked_for() -> None:
+    async with Client(_server()) as client:
+        fields = (
+            await client.call_tool("get_group_settings", {"group_id": "g1", "section": "fields"})
+        ).structured_content
+        toolkits = (
+            await client.call_tool("get_group_settings", {"group_id": "g1", "section": "toolkits"})
+        ).structured_content
+
+    assert fields is not None
+    assert toolkits is not None
+    assert fields["secondary_fields"] and fields["toolkits"] is None
+    assert toolkits["toolkits"] and toolkits["secondary_fields"] is None
+
+
+async def test_get_group_settings_narrows_the_fields_by_entity_type_and_requirement() -> None:
+    async with Client(_server()) as client:
+        everything = (
+            await client.call_tool("get_group_settings", {"group_id": "g1"})
+        ).structured_content
+        required = (
+            await client.call_tool("get_group_settings", {"group_id": "g1", "required_only": True})
+        ).structured_content
+        organisations = (
+            await client.call_tool(
+                "get_group_settings", {"group_id": "g1", "entity_type": "ORGANISATION"}
+            )
+        ).structured_content
+
+    assert everything is not None
+    assert required is not None
+    assert organisations is not None
+    all_fields = cast(list[dict[str, object]], everything["secondary_fields"])
+    assert all(
+        field["required"] for field in cast(list[dict[str, object]], required["secondary_fields"])
+    )
+    assert {
+        str(field["entity_type"]).casefold()
+        for field in cast(list[dict[str, object]], organisations["secondary_fields"])
+    } <= {"organisation"}
+    assert len(cast(list[object], organisations["secondary_fields"])) < len(all_fields)
+
+
+async def test_get_group_settings_asks_lseg_once_while_the_cache_holds() -> None:
+    server, paths = _counting_server()
+    async with Client(server) as client:
+        await client.call_tool("get_group_settings", {"group_id": "g1"})
+        await client.call_tool("get_group_settings", {"group_id": "g1", "section": "toolkits"})
+
+    assert [path for path in paths if path.endswith("/groups/g1/case-template")] == [
+        "/groups/g1/case-template"
+    ]
 
 
 async def test_get_case_resolves_an_external_id_after_the_internal_lookup_misses() -> None:
@@ -995,6 +1178,12 @@ async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
     assert page is not None
     assert page["updates"] == []
     assert page["next_page"] is None
+
+
+async def test_get_ogs_updates_refuses_a_page_larger_than_100() -> None:
+    async with Client(_server()) as client:
+        with pytest.raises(ToolError, match="100"):
+            await client.call_tool("get_ogs_updates", {"limit": 101})
 
 
 async def test_get_ogs_updates_requires_the_original_window_on_the_next_page() -> None:
