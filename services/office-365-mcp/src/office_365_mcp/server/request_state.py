@@ -36,7 +36,8 @@ class SingleUseRequestState(RequestStateCodec):
     def unseal(self, token: str) -> bytes:
         payload = self._codec.unseal(token)
         now = self._clock()
-        self._spent = {spent: until for spent, until in self._spent.items() if until > now}
+        while self._spent and next(iter(self._spent.values())) <= now:
+            del self._spent[next(iter(self._spent))]
         key = hashlib.sha256(token.encode()).digest()
         if key in self._spent:
             raise InvalidRequestState("replayed")

@@ -54,6 +54,19 @@ class TestSingleUseRequestState:
         clock.now += 1.0
         assert codec.unseal(token) == _PAYLOAD
 
+    def test_forgetting_an_expired_token_keeps_a_later_one_spent(self) -> None:
+        clock = _Clock()
+        codec = _single_use(clock)
+        earlier, later = codec.seal(_PAYLOAD), codec.seal(_PAYLOAD)
+        _ = codec.unseal(earlier)
+        clock.now += 100.0
+        _ = codec.unseal(later)
+
+        clock.now += 600.0
+        assert codec.unseal(earlier) == _PAYLOAD
+        with pytest.raises(InvalidRequestState, match="replayed"):
+            _ = codec.unseal(later)
+
 
 def test_the_server_policy_seals_single_use_answers() -> None:
     security = request_state_security()
