@@ -65,17 +65,7 @@ _SENSITIVE_MARKERS: tuple[str, ...] = (
 
 _NOT_ALPHANUMERIC = re.compile(r"[^a-z0-9]")
 
-# A credential in a query string, which is the vector the reference calls
-# `req.query["api-key"]`. uvicorn's access line quotes the path *with* its query string, so
-# this one is about a line this service now emits itself.
-#
-# `code` is matched as a whole parameter name and the rest as substrings, because the OAuth
-# callback's credential is spelled exactly `code` — `GET /auth/callback?code=...`, which
-# upstream's `_SKIP_PATHS` does not quiet — while `postcode` and `encoding` merely contain it.
-#
-# Trap: this alternation is hand-written and must stay that way. `_SENSITIVE_MARKERS` is
-# matched against names with every separator *removed*, this pattern against raw URL text, so
-# rebuilding one from the other stops `?api-key=` being redacted.
+# Matched against the percent-decoded name. `code` must be the whole name, so `postcode` is kept.
 _SENSITIVE_QUERY_NAME = re.compile(r"(?is).*(?:token|key|secret|password|auth).*|code")
 
 
