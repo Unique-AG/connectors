@@ -2,7 +2,9 @@ import asyncio
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from datetime import date
+from datetime import datetime
 from datetime import timedelta
+from datetime import UTC
 import json
 import socket
 from typing import cast
@@ -924,13 +926,21 @@ async def test_enable_ongoing_screening_reports_a_failure_body() -> None:
     assert screening["failures"] == ["Case cannot be monitored."]
 
 
+# LSEG keeps 30 days of updates and the tool refuses a window outside them, so the window the
+# tests ask for moves with the clock.
+_OGS_UNTIL = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+_OGS_SINCE = _OGS_UNTIL - timedelta(days=2)
+_OGS_SINCE_STAMP = _OGS_SINCE.strftime("%Y-%m-%dT%H:%M:%SZ")
+_OGS_UNTIL_STAMP = _OGS_UNTIL.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 async def test_get_ogs_updates_returns_watchlist_counts() -> None:
     async with Client(_server()) as client:
         result = await client.call_tool(
             "get_ogs_updates",
             {
-                "since": "2026-10-20T00:00:00Z",
-                "until": "2026-10-22T00:00:00Z",
+                "since": _OGS_SINCE_STAMP,
+                "until": _OGS_UNTIL_STAMP,
                 "group_id": "g1",
             },
         )
@@ -941,7 +951,7 @@ async def test_get_ogs_updates_returns_watchlist_counts() -> None:
     assert [update["case_system_id"] for update in updates] == ["sys-1"]
     assert page["updates"][0]["new_results"] == 1
     assert page["next_page"] == "page-2"
-    assert page["window"]["until"] == "2026-10-22T00:00:00Z"
+    assert page["window"]["until"] == _OGS_UNTIL_STAMP
 
 
 async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
@@ -949,8 +959,8 @@ async def test_get_ogs_updates_turns_no_updates_into_an_empty_page() -> None:
         result = await client.call_tool(
             "get_ogs_updates",
             {
-                "since": "2026-10-20T00:00:00Z",
-                "until": "2026-10-22T00:00:00Z",
+                "since": _OGS_SINCE_STAMP,
+                "until": _OGS_UNTIL_STAMP,
                 "page_reference": "none",
             },
         )
@@ -1301,7 +1311,7 @@ async def test_get_ogs_updates_rejects_a_future_end() -> None:
         with pytest.raises(ToolError, match="last 30 days"):
             await client.call_tool(
                 "get_ogs_updates",
-                {"since": "2026-10-20T00:00:00Z", "until": "2999-01-01T00:00:00Z"},
+                {"since": _OGS_SINCE_STAMP, "until": "2999-01-01T00:00:00Z"},
             )
 
 
