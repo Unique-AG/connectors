@@ -21,6 +21,9 @@ env:
   # zitadel is the default and needs the ZITADEL_* variables below, or the app fails at startup.
   # none serves without sign-in, on loopback only: HOST must then be a loopback address, not 0.0.0.0.
   MCP_AUTH_MODE: zitadel
+  # Two attempts and at most 10 s of waiting keep a call with LSEG inside the 50 s tool deadline.
+  UPSTREAM_RETRY_MAX_ATTEMPTS: "2"
+  UPSTREAM_RETRY_MAX_WAIT_SECONDS: "10"
 
 # Set per deployment in the overlay. The app refuses to start without them.
 # - MCP_BASE_URL: the public https origin, matching routes.hostname

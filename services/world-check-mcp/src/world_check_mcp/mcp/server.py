@@ -19,6 +19,7 @@ from mcp_observability import validate_trace_declarations
 
 from world_check_mcp.mcp.approval import ApprovalGate
 from world_check_mcp.mcp.approval import request_state_security
+from world_check_mcp.mcp.deadline import ToolDeadlineMiddleware
 from world_check_mcp.persistence import Persistence
 from world_check_mcp.upstream import open_upstream
 from world_check_mcp.upstream import upstream_http
@@ -86,7 +87,7 @@ def create_server(
         request_state_security=request_state_security(elicitation),
         auth=auth,
         # Outermost: its log lines replace FastMCP's per-call lines, which can quote the input.
-        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting],
+        middleware=[ToolCallObservabilityMiddleware(), *rate_limiting, ToolDeadlineMiddleware()],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")
