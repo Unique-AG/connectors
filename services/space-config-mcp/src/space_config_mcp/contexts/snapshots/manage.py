@@ -30,28 +30,31 @@ async def snapshot_space(
     are always returned, even when persistence fails.
     """
     space = await upstream.get_space(user_id, company_id, space_id)
-    snapshot_id = str(uuid.uuid4())
+    metadata_id = str(uuid.uuid4())
     captured_at = datetime.now(UTC).isoformat()
     effective_label = label or f"snapshot-{captured_at}"
+    kb_version_id: str | None = None
     try:
-        await persistence.save_snapshot(
+        kb_version_id = await persistence.save_snapshot(
             user_id,
             company_id,
             space_id=space_id,
-            snapshot_id=snapshot_id,
+            snapshot_id=metadata_id,
             label=effective_label,
             captured_at=captured_at,
             config=dict(space),
         )
     except Exception:
         _LOGGER.warning(
-            "Failed to persist snapshot %s for space %s — "
+            "Failed to persist snapshot for space %s — "
             "snapshot captured but not stored in the knowledge base.",
-            snapshot_id,
             space_id,
             exc_info=True,
         )
-    return {"snapshot_id": snapshot_id, "label": effective_label}
+    # Return the KB contentVersionId so callers can pass it to get_snapshot / revert_space.
+    # Fall back to the metadata UUID only when persistence failed.
+    returned_id = kb_version_id if kb_version_id is not None else metadata_id
+    return {"snapshot_id": returned_id, "label": effective_label}
 
 
 async def list_snapshots(

@@ -70,11 +70,16 @@ async def get_module(
     module_id: Annotated[str, Field(description="ID of the module to retrieve.")],
     upstream: Upstream = Depends(get_upstream),
     caller: tuple[str, str] = Depends(get_caller),
+    space_id: str = Depends(get_space_id),
 ) -> unique_sdk.Module:
     """Get a single module with its full configuration dict."""
     user_id, company_id = caller
     return await contexts.get_module(
-        upstream=upstream, user_id=user_id, company_id=company_id, module_id=module_id
+        upstream=upstream,
+        user_id=user_id,
+        company_id=company_id,
+        space_id=space_id,
+        module_id=module_id,
     )
 
 

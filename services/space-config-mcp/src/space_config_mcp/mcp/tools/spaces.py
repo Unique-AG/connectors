@@ -172,7 +172,7 @@ async def update_space(  # noqa: PLR0913
                 "Each entry needs an mcpServerId. "
                 "Optionally supply a tools list — each tool entry needs a name and isEnabled. "
                 "An empty tools list disables the server. "
-                "Omitting tools enables all callable tools for that server. "
+                "Omitting tools keeps the existing tool selection for that server. "
                 "Use get_mcp_server_status to find server IDs and current tool names."
             )
         ),

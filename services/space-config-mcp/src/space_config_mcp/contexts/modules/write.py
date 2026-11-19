@@ -40,7 +40,10 @@ async def update_module_config(
         space_id=space_id,
         label="pre-update_module_config",
     )
-    current = await upstream.get_module(user_id, company_id, module_id)
+    space_modules = await upstream.list_modules(user_id, company_id, space_id)
+    current = next((m for m in space_modules if m.id == module_id), None)
+    if current is None:
+        raise SpaceConfigError(f"Module {module_id!r} not found in space {space_id!r}")
     existing_config: dict[str, object] = cast(dict[str, object], current.configuration or {})
     merged = {**existing_config, **config_patch}
     return await upstream.modify_module(user_id, company_id, module_id, configuration=merged)
@@ -246,9 +249,12 @@ async def update_magic_table_config(  # noqa: PLR0913
         else:
             existing = _deep_merge(existing, patch_dict)
 
-    updated_module = await upstream.modify_module(
-        user_id, company_id, mod.id, configuration=existing
-    )
+    if module_patch is not None:
+        updated_module = await upstream.modify_module(
+            user_id, company_id, mod.id, configuration=existing
+        )
+    else:
+        updated_module = mod
 
     if space_settings_patch is not None:
         space = await upstream.get_space(user_id, company_id, space_id)

@@ -50,7 +50,10 @@ class McpServerStatus(BaseModel):
     mcp_server_id: str = Field(description="ID of the MCP server.")
     name: str = Field(description="Human-readable name of the MCP server.")
     is_enabled: bool = Field(description="Whether the server is enabled for this space.")
-    requires_oauth: bool = Field(description="Whether the server requires an OAuth connection.")
+    requires_oauth: bool = Field(
+        alias="requiresOAuth",
+        description="Whether the server requires an OAuth connection.",
+    )
     is_o_auth2_connected: bool = Field(
         description="Whether the user has connected via OAuth2 for this server."
     )
@@ -89,7 +92,10 @@ class McpServerInfo(BaseModel):
     id: str = Field(description="Server ID.")
     name: str = Field(description="Human-readable server name.")
     description: str | None = Field(default=None, description="Server description.")
-    requires_oauth: bool = Field(description="Whether connecting requires an OAuth flow.")
+    requires_oauth: bool = Field(
+        alias="requiresOAuth",
+        description="Whether connecting requires an OAuth flow.",
+    )
     is_space_restricted: bool = Field(
         description="Whether this server can only be added to specific spaces."
     )

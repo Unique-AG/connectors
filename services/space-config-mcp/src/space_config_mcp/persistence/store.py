@@ -74,8 +74,8 @@ class Persistence:
         label: str,
         captured_at: str,
         config: dict[str, object],
-    ) -> None:
-        """Upsert the space's snapshot file, creating a new KB version."""
+    ) -> str | None:
+        """Upsert the space's snapshot file and return the new KB contentVersionId."""
         scope_id = self._require_kb_scope_id()
 
         json_bytes = json.dumps(config, default=str).encode()
@@ -130,6 +130,21 @@ class Persistence:
             fileUrl=str(initial.readUrl),
             versioningEnabled=True,
         )
+
+        try:
+            content_id = await self._resolve_content_id(user_id, company_id, space_id)
+            if content_id is None:
+                return None
+            versions = await unique_sdk.Content.versions_async(
+                user_id, company_id, contentId=content_id, take=1
+            )
+            data = versions.get("data") or []
+            if data:
+                version_id = data[0].get("id")
+                return str(version_id) if version_id else None
+        except Exception:  # noqa: BLE001
+            pass
+        return None
 
     async def delete_snapshots(
         self,
@@ -193,10 +208,21 @@ class Persistence:
         user_id: str,
         company_id: str,
         *,
-        space_id: str,  # noqa: ARG002  # pyright: ignore[reportUnusedParameter]
+        space_id: str,
         snapshot_id: str,
     ) -> dict[str, object]:
         """Download and return the config JSON for a specific version."""
+        content_id = await self._resolve_content_id(user_id, company_id, space_id)
+        if content_id is not None:
+            versions = await unique_sdk.Content.versions_async(
+                user_id, company_id, contentId=content_id, take=200
+            )
+            valid_ids = {v.get("id") for v in (versions.get("data") or [])}
+            if snapshot_id not in valid_ids:
+                raise SpaceConfigError(
+                    f"Snapshot {snapshot_id!r} does not belong to space {space_id!r}"
+                )
+
         try:
             url_result = await unique_sdk.Content.version_download_url_async(
                 user_id,
