@@ -7,7 +7,6 @@ import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
-from msgraph.generated.models.task_status import TaskStatus
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.generated.users.item.todo.lists.item.tasks.tasks_request_builder import (
     TasksRequestBuilder,
@@ -55,6 +54,12 @@ GRAPH_NOT_FOUND = (
 _TasksQuery = TasksRequestBuilder.TasksRequestBuilderGetQueryParameters
 
 Shown = Literal["open", "completed", "any"]
+
+_STATUS_FILTER: Mapping[Shown, str | None] = {
+    "open": "status ne 'completed'",
+    "completed": "status eq 'completed'",
+    "any": None,
+}
 
 _DESCRIPTION = """\
 Lists the tasks in one Microsoft To Do task list of the signed-in user, given the `uri` of an \
@@ -123,12 +128,14 @@ async def list_tasks(
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened="This tool read nothing."))
     if runs_backwards(due_after, due_before, zone=zone):
         raise ToolError(_BACKWARDS)
-    matches = _matcher(show, title_contains, due_after, due_before, zone)
+    matches = _matcher(title_contains, due_after, due_before, zone)
 
     with graph_errors(), graph_step(STEP):
         first_page = await client.me.todo.lists.by_todo_task_list_id(handle.list_id).tasks.get(
             request_configuration=RequestConfiguration[_TasksQuery](
-                query_parameters=_TasksQuery(select=list(SUMMARY_FIELDS), top=_PAGE_SIZE)
+                query_parameters=_TasksQuery(
+                    filter=_STATUS_FILTER[show], select=list(SUMMARY_FIELDS), top=_PAGE_SIZE
+                )
             )
         )
         assert first_page is not None, "Graph answered a task listing with no collection"
@@ -144,7 +151,6 @@ async def list_tasks(
 
 
 def _matcher(
-    show: Shown,
     title_contains: str | None,
     due_after: date | datetime | None,
     due_before: date | datetime | None,
@@ -153,9 +159,6 @@ def _matcher(
     words = None if title_contains is None else title_contains.strip().casefold()
 
     def matches(task: TodoTask) -> bool:
-        done = task.status == TaskStatus.Completed
-        if (show == "open" and done) or (show == "completed" and not done):
-            return False
         if words and words not in (task.title or "").casefold():
             return False
         if due_after is None and due_before is None:

@@ -87,10 +87,9 @@ class TestFindingTasks:
         tasks = [
             _task("T1", "Send the Q3 report", due_utc="2026-11-26T23:00:00.0000000"),
             _task("T2", "Book the venue", due_utc="2026-11-30T23:00:00.0000000"),
-            _task("T3", "Old report", status="completed", due_utc="2026-11-24T23:00:00.0000000"),
             _task("T4", "No date"),
         ]
-        _ = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
+        route = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
 
         answer = await call(
             "outlook_list_tasks",
@@ -107,22 +106,23 @@ class TestFindingTasks:
             f"outlook:///tasks/{LIST_ID}/T1",
         )
         assert answer["capped"] is False
+        assert route.calls.last.request.url.params["$filter"] == "status ne 'completed'"
 
     async def test_completed_tasks_are_listed_by_a_word_of_their_title(
         self, graph: respx.MockRouter
     ) -> None:
         tasks = [
-            _task("T1", "Send the Q3 report"),
             _task("T2", "Old REPORT", status="completed"),
             _task("T3", "Book the venue", status="completed"),
         ]
-        _ = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
+        route = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
 
         answer = await call(
             "outlook_list_tasks", task_list=TASK_LIST, show="completed", title_contains="report"
         )
 
         assert [row["title"] for row in _rows(answer, "tasks")] == ["Old REPORT"]
+        assert route.calls.last.request.url.params["$filter"] == "status eq 'completed'"
 
     async def test_a_task_is_read_with_its_notes(self, graph: respx.MockRouter) -> None:
         task = _task(
@@ -261,9 +261,24 @@ class TestRefusals:
             _ = await call("outlook_list_tasks", task_list=TASK_LIST)
 
     async def test_the_tasks_of_another_person_are_not_offered(self) -> None:
-        asked = await _input_properties("outlook_list_task_lists")
+        offered = {
+            f"{tool}.{argument}"
+            for tool in _TASK_TOOLS
+            for argument in await _input_properties(tool)
+            if any(word in argument for word in ("user", "mailbox", "owner", "person"))
+        }
 
-        assert not set(asked) & {"mailbox", "user", "owner", "shared_mailbox"}
+        assert offered == set()
+
+
+_TASK_TOOLS = (
+    "outlook_list_task_lists",
+    "outlook_list_tasks",
+    "outlook_read_task",
+    "outlook_create_task",
+    "outlook_update_task",
+    "outlook_complete_task",
+)
 
 
 @functools.cache
