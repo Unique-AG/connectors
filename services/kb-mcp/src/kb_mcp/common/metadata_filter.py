@@ -68,13 +68,15 @@ def merge_request_metadata_filter(
     folder_ids: list[str] | None = None,
     include_subfolders: bool = True,
     llm_metadata_filter: RawOrParsedUniqueQL = None,
+    chat_metadata_filter: RawOrParsedUniqueQL = None,
     admin_scope_ids: list[str] | None = None,
 ) -> dict[str, Any] | None:
     result: RawOrParsedUniqueQL = admin_metadata_filter
-    if llm_metadata_filter is not None:
-        llm_dict = uniqueql_to_dict(llm_metadata_filter)
-        assert llm_dict is not None
-        result = merge_scope_clause_into_metadata_filter(llm_dict, result)
+    for additional_filter in (chat_metadata_filter, llm_metadata_filter):
+        if additional_filter is not None:
+            additional_dict = uniqueql_to_dict(additional_filter)
+            assert additional_dict is not None
+            result = merge_scope_clause_into_metadata_filter(additional_dict, result)
     if folder_ids:
         result = merge_scope_clause_into_metadata_filter(
             _folder_ids_clause(folder_ids, include_subfolders=include_subfolders),

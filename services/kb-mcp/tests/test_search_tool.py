@@ -1,12 +1,15 @@
 """Tests for the search tool — config schema, routing logic, and references."""
 
 import inspect
+import json
 import logging
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastmcp import FastMCP
 from fastmcp.tools import ToolResult
+from unique_mcp.meta.keys import CONFIG_META_KEY
 from unique_mcp.meta.rjsf import ConfigSchemaMeta
 from unique_sdk import UniqueError
 from unique_toolkit.content.schemas import ContentChunk, ContentMetadata
@@ -900,3 +903,310 @@ async def test_search_uses_frontend_deep_links_when_scopes_resolved():
         "https://example.unique.app/knowledge-upload/"
         "scope_uy3cznkuysy3gasrxx2m4ezb?file=cont_aaaaaaaaaaaaaaaaaaaaaaa1"
     ) in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_search_clamps_per_call_args_and_merges_env_and_meta_policy(monkeypatch):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG",
+        json.dumps(
+            {
+                "service_config": {
+                    "filtering": {"limit": 50, "score_threshold": 0.4},
+                    "scope_ids": ["scope_env", "scope_shared"],
+                    "metadata_filter": {
+                        "operator": "equals",
+                        "path": ["dept"],
+                        "value": "Legal",
+                    },
+                }
+            }
+        ),
+    )
+    meta = {
+        CONFIG_META_KEY: {
+            "serviceConfig": {
+                "filtering": {"limit": 200, "scoreThreshold": 0.1},
+                "scopeIds": ["scope_shared", "scope_meta"],
+                "metadataFilter": None,
+            }
+        }
+    }
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: meta,
+    )
+
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    mcp = FastMCP("test")
+    mcp.add_tool(search)
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ) as mock_from_config,
+        _patch_post_processor([_make_chunk("result A")]),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+        _patch_is_unique_ai_client(False),
+    ):
+        await mcp.call_tool(
+            "search",
+            {
+                "search_string": "query",
+                "limit": 150,
+                "score_threshold": 0.2,
+                "folder_ids": ["scope_folder"],
+            },
+        )
+
+    sc = mock_from_config.call_args.args[0]
+    assert sc.filtering.limit == 50
+    assert sc.filtering.score_threshold == 0.2
+    clauses = mock_service.state.metadata_filter_override["and"]
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_env", "scope_shared"],
+    } in clauses
+    assert {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_shared", "scope_meta"],
+    } in clauses
+    assert {
+        "or": [
+            {"operator": "contains", "path": ["folderIdPath"], "value": "scope_folder"}
+        ]
+    } in clauses
+    assert {"operator": "equals", "path": ["dept"], "value": "Legal"} in clauses
+
+
+@pytest.mark.asyncio
+async def test_search_non_overlapping_scope_ids_stay_restrictive_with_absent_call_args(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG",
+        json.dumps({"service_config": {"scope_ids": ["scope_env"]}}),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {CONFIG_META_KEY: {"serviceConfig": {"scopeIds": ["scope_meta"]}}},
+    )
+
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    mcp = FastMCP("test")
+    mcp.add_tool(search)
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ) as mock_from_config,
+        _patch_post_processor([]),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await mcp.call_tool("search", {"search_string": "query"})
+
+    sc = mock_from_config.call_args.args[0]
+    assert mock_service.state.metadata_filter_override == "UNSET_SENTINEL"
+    assert sc.scope_ids == ["scope_env"]
+    assert sc.metadata_filter is not None
+    assert sc.metadata_filter.to_dict() == {
+        "operator": "in",
+        "path": ["folderId"],
+        "value": ["scope_meta"],
+    }
+
+
+@pytest.mark.asyncio
+async def test_search_absent_meta_does_not_duplicate_env_filter(monkeypatch):
+    env_filter = {"operator": "equals", "path": ["dept"], "value": "Legal"}
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG",
+        json.dumps({"service_config": {"metadata_filter": env_filter}}),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: None,
+    )
+
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    mcp = FastMCP("test")
+    mcp.add_tool(search)
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ) as mock_from_config,
+        _patch_post_processor([]),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        await mcp.call_tool("search", {"search_string": "query"})
+
+    sc = mock_from_config.call_args.args[0]
+    assert mock_service.state.metadata_filter_override == "UNSET_SENTINEL"
+    assert sc.metadata_filter.to_dict() == env_filter
+
+
+@pytest.mark.asyncio
+async def test_search_allows_narrower_meta_and_per_call_args_within_env_policy(
+    monkeypatch,
+):
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG",
+        json.dumps(
+            {"service_config": {"filtering": {"limit": 50, "score_threshold": 0.4}}}
+        ),
+    )
+    monkeypatch.setattr(
+        "kb_mcp.common.tool_config.unique_injectors.get_request_meta",
+        lambda: {
+            CONFIG_META_KEY: {
+                "serviceConfig": {"filtering": {"limit": 20, "scoreThreshold": 0.6}}
+            }
+        },
+    )
+
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    mcp = FastMCP("test")
+    mcp.add_tool(search)
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ) as mock_from_config,
+        _patch_post_processor([_make_chunk("result A")]),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+        _patch_is_unique_ai_client(False),
+    ):
+        await mcp.call_tool("search", {"search_string": "query"})
+        sc_default = mock_from_config.call_args.args[0]
+        await mcp.call_tool(
+            "search",
+            {"search_string": "query", "limit": 10, "score_threshold": 0.8},
+        )
+        sc_narrow = mock_from_config.call_args.args[0]
+
+    assert sc_default.filtering.limit == 20
+    assert sc_default.filtering.score_threshold == 0.6
+    assert sc_narrow.filtering.limit == 10
+    assert sc_narrow.filtering.score_threshold == 0.8
+
+
+@pytest.mark.asyncio
+async def test_search_applies_merged_filter_even_when_chat_context_is_present(
+    monkeypatch,
+):
+    """When _meta has a chat-id, settings.chat is non-None with chat.metadata_filter=None.
+    search must still set metadata_filter_override rather than falling back to chat."""
+    from fastmcp import Client
+    from pydantic import SecretStr
+    from unique_toolkit.app.unique_settings import (
+        AuthContext,
+        ChatContext,
+        UniqueSettings,
+    )
+
+    env_filter = {"operator": "equals", "path": ["dept"], "value": "Legal"}
+    monkeypatch.setenv(
+        "UNIQUE_MCP_TOOL_SEARCH_TOOL_CONFIG",
+        json.dumps(
+            {
+                "service_config": {
+                    "metadata_filter": env_filter,
+                    "scope_ids": ["scope_env"],
+                }
+            }
+        ),
+    )
+
+    real_settings = UniqueSettings(
+        auth=AuthContext(
+            user_id=SecretStr("user-token"), company_id=SecretStr("comp-token")
+        ),
+        app=MagicMock(),
+        api=MagicMock(),
+        chat=ChatContext(
+            chat_id="chat-1",
+            assistant_id="asst-1",
+            metadata_filter={
+                "operator": "equals",
+                "path": ["team"],
+                "value": "Alpha",
+            },
+        ),
+    )
+
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = _FakeState()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    mcp = FastMCP("test")
+    mcp.add_tool(search)
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor([]),
+        patch(
+            "kb_mcp.tools.search.tool.get_unique_settings_async",
+            new=AsyncMock(return_value=real_settings),
+        ),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        async with Client(mcp) as client:
+            await client.call_tool(
+                "search",
+                {"search_string": "query"},
+                meta={
+                    CONFIG_META_KEY: {
+                        "serviceConfig": {
+                            "metadataFilter": {
+                                "operator": "equals",
+                                "path": ["region"],
+                                "value": "EU",
+                            }
+                        }
+                    }
+                },
+            )
+
+    clauses = mock_service.state.metadata_filter_override["and"]
+    assert {"operator": "in", "path": ["folderId"], "value": ["scope_env"]} in clauses
+    assert {"operator": "equals", "path": ["region"], "value": "EU"} in clauses
+    assert {"operator": "equals", "path": ["dept"], "value": "Legal"} in clauses
+    assert {
+        "operator": "equals",
+        "path": ["team"],
+        "value": "Alpha",
+    } in clauses
+    bound = mock_service.bind_settings.call_args.args[0]
+    assert bound.authcontext.get_confidential_user_id() == "user-token"
+    assert bound.authcontext.get_confidential_company_id() == "comp-token"
