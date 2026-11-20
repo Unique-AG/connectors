@@ -53,6 +53,11 @@ class EntityProfile(BaseModel):
     """The requested sections of one entity's profile. A section not requested is null."""
 
     pid: str = Field(description="The pid looked up.")
+    name: str | None = Field(
+        default=None,
+        description="Its CURRENT_NAME record, else the first name Polixis lists, in English "
+        "where Polixis has one, whichever sections were asked for; null when rejected.",
+    )
     rejected: str | None = Field(
         default=None,
         description="Polixis's reason for rejecting the pid, such as an unknown id, which this "
@@ -107,5 +112,5 @@ class EntityProfile(BaseModel):
 class EntityProfiles(BaseModel):
     """The profiles of the entities asked for, in the order asked."""
 
-    profiles: list[EntityProfile] = Field(description="One profile per distinct pid.")
+    results: list[EntityProfile] = Field(description="One profile per distinct pid.")
     freshness: Freshness

@@ -86,7 +86,7 @@ async def get_related_parties(
         relations_by_source={
             publisher: group.total_elements or 0 for publisher, group in groups.items()
         },
-        parties=page,
+        results=page,
         next_cursor=encode_cursor(next_query) if next_query is not None else None,
         freshness=freshness(),
     )
@@ -249,7 +249,7 @@ class RelatedPartiesPage(BaseModel):
         description="Polixis's count of related parties each source (register or list) "
         "reports, across every page. A party several sources report counts in each."
     )
-    parties: list[RelatedPartyView] = Field(description="The parties of this page.")
+    results: list[RelatedPartyView] = Field(description="The parties of this page.")
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )

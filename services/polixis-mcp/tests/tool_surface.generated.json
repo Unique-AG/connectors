@@ -76,75 +76,6 @@
           ],
           "description": "Computed by this MCP: the steps on the shortest path; null when not connected."
         },
-        "parties": {
-          "description": "Every party on the paths, with its flags; `distance` is null here.",
-          "items": {
-            "description": "An organization or person in the network.",
-            "properties": {
-              "alerts": {
-                "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "distance": {
-                "anyOf": [
-                  {
-                    "type": "integer"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "The fewest links from the entity asked about at which Polixis reached it."
-              },
-              "entity_type": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
-              },
-              "flags": {
-                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              "name": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Its name, from Polixis's smart graph; null for a party only the full graph has, which Polixis sends without names and `get_entity_profiles` can name."
-              },
-              "pid": {
-                "description": "Its pid, for the other Polixis tools.",
-                "type": "string"
-              }
-            },
-            "required": [
-              "pid",
-              "name",
-              "entity_type",
-              "flags",
-              "alerts",
-              "distance"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        },
         "paths": {
           "description": "The paths found, usually one: the shortest Polixis knows.",
           "items": {
@@ -298,6 +229,75 @@
           },
           "type": "array"
         },
+        "results": {
+          "description": "Every party on the paths, with its flags; `distance` is null here.",
+          "items": {
+            "description": "An organization or person in the network.",
+            "properties": {
+              "alerts": {
+                "description": "Polixis's alert categories of the party itself, such as STATECO (state-owned or -controlled, or a public body), RESTRICTION (a significant regulatory, legal or business restriction), SANCTIONTERRITORY (an address in a sanction-sensitive territory), REGULATORY (such as legal proceedings), CLOSED (liquidated, dissolved or deceased) or LISTED (listed on a stock exchange).",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "distance": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The fewest links from the entity asked about at which Polixis reached it."
+              },
+              "entity_type": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "PERSON or ORGANIZATION; vessels and aircraft are organizations."
+              },
+              "flags": {
+                "description": "Polixis's flags: PEP, a politically exposed person; FORMER_PEP, a PEP Polixis declassified once 5 years had passed since the function ended; SANCTION, designated on a sanctions list Polixis covers; DELISTED or DELISTED_ENTITY, designated once and later delisted; VESSEL or AIRCRAFT, for an organization that is one; REP, which Polixis sends but its documentation does not define, and which most likely marks reputational risk, as in its PEP&REP screening.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, from Polixis's smart graph; null for a party only the full graph has, which Polixis sends without names and `get_entity_profiles` can name."
+              },
+              "pid": {
+                "description": "Its pid, for the other Polixis tools.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "pid",
+              "name",
+              "entity_type",
+              "flags",
+              "alerts",
+              "distance"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
         "to_pid": {
           "description": "The entity looked for.",
           "type": "string"
@@ -309,7 +309,7 @@
         "connected",
         "hops",
         "paths",
-        "parties",
+        "results",
         "freshness"
       ],
       "type": "object"
@@ -372,7 +372,49 @@
     "outputSchema": {
       "description": "Court decisions naming an entity or its related parties, one page of them.",
       "properties": {
-        "decisions": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "results": {
           "description": "The decisions of this page: those naming the entity first, then the newest.",
           "items": {
             "description": "A court decision, without its text.",
@@ -422,6 +464,11 @@
                 "description": "Computed by this MCP: the length of its full text, in characters.",
                 "type": "integer"
               },
+              "title": {
+                "description": "Computed by this MCP, since Polixis gives none: its court, country, year and id.",
+                "readOnly": true,
+                "type": "string"
+              },
               "year": {
                 "anyOf": [
                   {
@@ -441,53 +488,12 @@
               "country",
               "year",
               "snippets",
-              "text_characters"
+              "text_characters",
+              "title"
             ],
             "type": "object"
           },
           "type": "array"
-        },
-        "freshness": {
-          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
-          "properties": {
-            "cached_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
-            },
-            "fetched_at": {
-              "description": "When this server put this result together.",
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          "required": [
-            "fetched_at",
-            "cached_at"
-          ],
-          "type": "object"
-        },
-        "next_cursor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Pass it as `cursor` for the next page; null on the last page."
-        },
-        "pid": {
-          "description": "The entity asked about.",
-          "type": "string"
         },
         "total_decisions": {
           "description": "Decisions across every page. Polixis answers an id it does not know as one without decisions, so 0 also follows a wrong pid.",
@@ -502,7 +508,7 @@
         "pid",
         "total_decisions",
         "total_naming_entity",
-        "decisions",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -583,11 +589,69 @@
     "outputSchema": {
       "description": "The flagged parties in the network around an entity, one page of them.",
       "properties": {
-        "flagged": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "parties_checked": {
+          "description": "Computed by this MCP: the parties in Polixis's network, the entity left out.",
+          "type": "integer"
+        },
+        "pid": {
+          "description": "The entity the walk started at.",
+          "type": "string"
+        },
+        "results": {
           "description": "The flagged parties of this page.",
           "items": {
             "description": "A party of Polixis's network around the entity that carries a risk marker, picked by\nthis MCP.",
             "properties": {
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The party's name, as in `party`.",
+                "readOnly": true
+              },
               "party": {
                 "description": "The flagged party.",
                 "properties": {
@@ -799,57 +863,12 @@
             "required": [
               "party",
               "risks",
-              "path"
+              "path",
+              "name"
             ],
             "type": "object"
           },
           "type": "array"
-        },
-        "freshness": {
-          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
-          "properties": {
-            "cached_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
-            },
-            "fetched_at": {
-              "description": "When this server put this result together.",
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          "required": [
-            "fetched_at",
-            "cached_at"
-          ],
-          "type": "object"
-        },
-        "next_cursor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Pass it as `cursor` for the next page; null on the last page."
-        },
-        "parties_checked": {
-          "description": "Computed by this MCP: the parties in Polixis's network, the entity left out.",
-          "type": "integer"
-        },
-        "pid": {
-          "description": "The entity the walk started at.",
-          "type": "string"
         },
         "total_by_risk": {
           "additionalProperties": {
@@ -873,7 +892,7 @@
         "truncated_by_polixis",
         "total_flagged",
         "total_by_risk",
-        "flagged",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -953,7 +972,49 @@
     "outputSchema": {
       "description": "The companies tied to an entity, one page of them.",
       "properties": {
-        "companies": {
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "results": {
           "description": "The companies of this page: the nearest first, then the flagged, then those tied through the most people.",
           "items": {
             "description": "A company tied to the entity, and how, as this MCP found it in Polixis's network.",
@@ -1115,6 +1176,18 @@
                 "description": "Computed by this MCP: links between the entity and the company; 1 is direct.",
                 "type": "integer"
               },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The company's name, as in `company`.",
+                "readOnly": true
+              },
               "risks": {
                 "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
                 "items": {
@@ -1264,53 +1337,12 @@
               "hops",
               "direct_links",
               "through_total",
-              "through"
+              "through",
+              "name"
             ],
             "type": "object"
           },
           "type": "array"
-        },
-        "freshness": {
-          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
-          "properties": {
-            "cached_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
-            },
-            "fetched_at": {
-              "description": "When this server put this result together.",
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          "required": [
-            "fetched_at",
-            "cached_at"
-          ],
-          "type": "object"
-        },
-        "next_cursor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Pass it as `cursor` for the next page; null on the last page."
-        },
-        "pid": {
-          "description": "The entity asked about.",
-          "type": "string"
         },
         "total_by_risk": {
           "additionalProperties": {
@@ -1343,7 +1375,7 @@
         "total_flagged",
         "total_by_risk",
         "truncated_by_polixis",
-        "companies",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -1486,6 +1518,11 @@
           "description": "This part of the text, in the decision's own language.",
           "type": "string"
         },
+        "title": {
+          "description": "Computed by this MCP, since Polixis gives none: its court, country, year and id.",
+          "readOnly": true,
+          "type": "string"
+        },
         "total_characters": {
           "description": "The length of the whole text, in characters.",
           "type": "integer"
@@ -1512,7 +1549,8 @@
         "total_characters",
         "text",
         "next_cursor",
-        "freshness"
+        "freshness",
+        "title"
       ],
       "type": "object"
     },
@@ -1608,7 +1646,7 @@
           ],
           "type": "object"
         },
-        "profiles": {
+        "results": {
           "description": "One profile per distinct pid.",
           "items": {
             "description": "The requested sections of one entity's profile. A section not requested is null.",
@@ -1790,6 +1828,18 @@
                 ],
                 "default": null,
                 "description": "Legal forms, in English."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Its CURRENT_NAME record, else the first name Polixis lists, in English where Polixis has one, whichever sections were asked for; null when rejected."
               },
               "name_records": {
                 "anyOf": [
@@ -2041,7 +2091,7 @@
         }
       },
       "required": [
-        "profiles",
+        "results",
         "freshness"
       ],
       "type": "object"
@@ -2169,7 +2219,18 @@
           ],
           "description": "Pass it as `cursor` for the next page; null on the last page."
         },
-        "parties": {
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "relations_by_source": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "description": "Polixis's count of related parties each source (register or list) reports, across every page. A party several sources report counts in each.",
+          "type": "object"
+        },
+        "results": {
           "description": "The parties of this page.",
           "items": {
             "description": "An organization or person related to the entity, with how.",
@@ -2343,17 +2404,6 @@
           },
           "type": "array"
         },
-        "pid": {
-          "description": "The entity asked about.",
-          "type": "string"
-        },
-        "relations_by_source": {
-          "additionalProperties": {
-            "type": "integer"
-          },
-          "description": "Polixis's count of related parties each source (register or list) reports, across every page. A party several sources report counts in each.",
-          "type": "object"
-        },
         "total_parties": {
           "anyOf": [
             {
@@ -2370,7 +2420,7 @@
         "pid",
         "total_parties",
         "relations_by_source",
-        "parties",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -2537,7 +2587,7 @@
           "description": "The entity asked about.",
           "type": "string"
         },
-        "related": {
+        "results": {
           "description": "The sanctioned related parties of this page, the nearest first.",
           "items": {
             "description": "A sanctioned party related to the entity, and the relations that lead to it.",
@@ -2754,7 +2804,7 @@
         "pid",
         "own_listings",
         "total_related",
-        "related",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -2818,7 +2868,103 @@
     "outputSchema": {
       "description": "The entities of an ownership tree, the largest effective share first, one page of them.",
       "properties": {
-        "entities": {
+        "flagged": {
+          "description": "Computed by this MCP: at most 25 entities of the whole tree with a risk marker, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
+          "items": {
+            "description": "A flagged entity of the tree, wherever its rows fall, picked by this MCP.",
+            "properties": {
+              "depth": {
+                "description": "As on its entity row: the fewest links to it.",
+                "type": "integer"
+              },
+              "effective_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "As on its entity row: computed by this MCP from the link shares, not sent by Polixis; null when no chain reports a share on every link."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, null when Polixis gives none."
+              },
+              "pid": {
+                "description": "The entity's pid.",
+                "type": "string"
+              },
+              "risks": {
+                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pid",
+              "name",
+              "effective_share_percent",
+              "depth",
+              "risks"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "results": {
           "description": "The entities of this page.",
           "items": {
             "description": "An entity in Polixis's ownership tree, with every chain that reaches it added up by this\nMCP.",
@@ -2969,102 +3115,6 @@
           },
           "type": "array"
         },
-        "flagged": {
-          "description": "Computed by this MCP: at most 25 entities of the whole tree with a risk marker, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
-          "items": {
-            "description": "A flagged entity of the tree, wherever its rows fall, picked by this MCP.",
-            "properties": {
-              "depth": {
-                "description": "As on its entity row: the fewest links to it.",
-                "type": "integer"
-              },
-              "effective_share_percent": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "As on its entity row: computed by this MCP from the link shares, not sent by Polixis; null when no chain reports a share on every link."
-              },
-              "name": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Its name, null when Polixis gives none."
-              },
-              "pid": {
-                "description": "The entity's pid.",
-                "type": "string"
-              },
-              "risks": {
-                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              }
-            },
-            "required": [
-              "pid",
-              "name",
-              "effective_share_percent",
-              "depth",
-              "risks"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "freshness": {
-          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
-          "properties": {
-            "cached_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
-            },
-            "fetched_at": {
-              "description": "When this server put this result together.",
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          "required": [
-            "fetched_at",
-            "cached_at"
-          ],
-          "type": "object"
-        },
-        "next_cursor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Pass it as `cursor` for the next page; null on the last page."
-        },
-        "pid": {
-          "description": "The entity asked about.",
-          "type": "string"
-        },
         "total_by_risk": {
           "additionalProperties": {
             "type": "integer"
@@ -3097,7 +3147,7 @@
         "total_flagged",
         "total_by_risk",
         "flagged",
-        "entities",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -3161,7 +3211,103 @@
     "outputSchema": {
       "description": "The entities of an ownership tree, the largest effective share first, one page of them.",
       "properties": {
-        "entities": {
+        "flagged": {
+          "description": "Computed by this MCP: at most 25 entities of the whole tree with a risk marker, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
+          "items": {
+            "description": "A flagged entity of the tree, wherever its rows fall, picked by this MCP.",
+            "properties": {
+              "depth": {
+                "description": "As on its entity row: the fewest links to it.",
+                "type": "integer"
+              },
+              "effective_share_percent": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "As on its entity row: computed by this MCP from the link shares, not sent by Polixis; null when no chain reports a share on every link."
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Its name, null when Polixis gives none."
+              },
+              "pid": {
+                "description": "The entity's pid.",
+                "type": "string"
+              },
+              "risks": {
+                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "pid",
+              "name",
+              "effective_share_percent",
+              "depth",
+              "risks"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "freshness": {
+          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
+          "properties": {
+            "cached_at": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
+            },
+            "fetched_at": {
+              "description": "When this server put this result together.",
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          "required": [
+            "fetched_at",
+            "cached_at"
+          ],
+          "type": "object"
+        },
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "pid": {
+          "description": "The entity asked about.",
+          "type": "string"
+        },
+        "results": {
           "description": "The entities of this page.",
           "items": {
             "description": "An entity in Polixis's ownership tree, with every chain that reaches it added up by this\nMCP.",
@@ -3312,102 +3458,6 @@
           },
           "type": "array"
         },
-        "flagged": {
-          "description": "Computed by this MCP: at most 25 entities of the whole tree with a risk marker, the sanctioned first, then in the order of the rows; on the first page only, empty on the others. When `total_flagged` is larger, the rest carry their flags on their entity rows, further down the pages.",
-          "items": {
-            "description": "A flagged entity of the tree, wherever its rows fall, picked by this MCP.",
-            "properties": {
-              "depth": {
-                "description": "As on its entity row: the fewest links to it.",
-                "type": "integer"
-              },
-              "effective_share_percent": {
-                "anyOf": [
-                  {
-                    "type": "number"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "As on its entity row: computed by this MCP from the link shares, not sent by Polixis; null when no chain reports a share on every link."
-              },
-              "name": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ],
-                "description": "Its name, null when Polixis gives none."
-              },
-              "pid": {
-                "description": "The entity's pid.",
-                "type": "string"
-              },
-              "risks": {
-                "description": "Computed by this MCP from the party's flags and alerts: the flags SANCTION, PEP, FORMER_PEP and REP, and the alert categories SANCTION, SANCTIONTERRITORY, RESTRICTION and STATECO, the ones it carries. Other alerts, such as LISTED or HIGHPROFILE, are not counted as risks.",
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              }
-            },
-            "required": [
-              "pid",
-              "name",
-              "effective_share_percent",
-              "depth",
-              "risks"
-            ],
-            "type": "object"
-          },
-          "type": "array"
-        },
-        "freshness": {
-          "description": "Computed by this MCP: when this result was put together, and whether any of its data came\nfrom this server's cache of Polixis's answers rather than from Polixis on this call.",
-          "properties": {
-            "cached_at": {
-              "anyOf": [
-                {
-                  "format": "date-time",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "description": "Null when all of this result came from Polixis on this call. Otherwise some or all of it came from this server's cache, and this is when Polixis's answer was cached, the oldest one when several were: the data is as of then. When its age matters, as for sanctions or PEP status, tell the user the data is as of this time."
-            },
-            "fetched_at": {
-              "description": "When this server put this result together.",
-              "format": "date-time",
-              "type": "string"
-            }
-          },
-          "required": [
-            "fetched_at",
-            "cached_at"
-          ],
-          "type": "object"
-        },
-        "next_cursor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Pass it as `cursor` for the next page; null on the last page."
-        },
-        "pid": {
-          "description": "The entity asked about.",
-          "type": "string"
-        },
         "total_by_risk": {
           "additionalProperties": {
             "type": "integer"
@@ -3440,7 +3490,7 @@
         "total_flagged",
         "total_by_risk",
         "flagged",
-        "entities",
+        "results",
         "next_cursor",
         "freshness"
       ],
@@ -3632,7 +3682,18 @@
           ],
           "type": "object"
         },
-        "matches": {
+        "next_cursor": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Pass it as `cursor` for the next page; null on the last page."
+        },
+        "results": {
           "description": "The matches on this page.",
           "items": {
             "description": "An organization or person the search matched.",
@@ -3804,17 +3865,6 @@
           },
           "type": "array"
         },
-        "next_cursor": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "Pass it as `cursor` for the next page; null on the last page."
-        },
         "total_matches": {
           "anyOf": [
             {
@@ -3828,7 +3878,7 @@
         }
       },
       "required": [
-        "matches",
+        "results",
         "total_matches",
         "next_cursor",
         "freshness"

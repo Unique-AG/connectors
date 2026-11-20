@@ -125,7 +125,7 @@ class OwnershipPage(BaseModel):
             "their flags on their entity rows, further down the pages."
         )
     )
-    entities: list[OwnershipEntity] = Field(description="The entities of this page.")
+    results: list[OwnershipEntity] = Field(description="The entities of this page.")
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )

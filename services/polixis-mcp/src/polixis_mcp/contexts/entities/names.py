@@ -19,6 +19,12 @@ def name_record(record: NameRecord) -> NameRecordView | None:
     )
 
 
+def display_name(records: list[NameRecordView], names: list[str]) -> str | None:
+    """Its CURRENT_NAME record, else its first name, else its first record."""
+    current = next((record.name for record in records if record.kind == "CURRENT_NAME"), None)
+    return current or next(iter(names), None) or next((record.name for record in records), None)
+
+
 class NameRecordView(BaseModel, frozen=True):
     """A name the entity is known by, with its kind and original script."""
 

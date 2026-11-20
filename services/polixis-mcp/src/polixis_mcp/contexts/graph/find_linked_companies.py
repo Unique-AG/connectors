@@ -1,6 +1,7 @@
 from itertools import pairwise
 
 from pydantic import BaseModel
+from pydantic import computed_field
 from pydantic import Field
 
 from polixis_mcp.contexts.freshness import Freshness
@@ -57,7 +58,7 @@ async def find_linked_companies(
         total_flagged=sum(1 for found in companies if found.risks),
         total_by_risk=risk_counts(found.risks for found in companies),
         truncated_by_polixis=network.truncated,
-        companies=page,
+        results=page,
         next_cursor=(
             encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
@@ -183,6 +184,11 @@ class LinkedCompany(BaseModel):
         "with Polixis's links along each."
     )
 
+    @computed_field(description="The company's name, as in `company`.")
+    @property
+    def name(self) -> str | None:
+        return self.company.name
+
 
 class LinkedCompaniesPage(BaseModel):
     """The companies tied to an entity, one page of them."""
@@ -201,7 +207,7 @@ class LinkedCompaniesPage(BaseModel):
             "exists: say the network was cut, rather than that none was found."
         )
     )
-    companies: list[LinkedCompany] = Field(
+    results: list[LinkedCompany] = Field(
         description="The companies of this page: the nearest first, then the flagged, then "
         "those tied through the most people."
     )
