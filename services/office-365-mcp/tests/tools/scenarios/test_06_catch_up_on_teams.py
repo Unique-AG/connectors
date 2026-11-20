@@ -1330,3 +1330,107 @@ class TestTheReactionsOfAMessage:
         assert _uncalled(routes) == []
         (reaction,) = _rows(read, "reactions")
         assert reaction["user_id"] and reaction["reaction_type"] and reaction["created_at"]
+
+
+GROUP_CHAT_ID = "19:release@thread.v2"
+CHAT_MESSAGE_PATH = f"/chats/{GROUP_CHAT_ID}/messages/1770000000000"
+CHAT_MESSAGE_URI = f"teams:///chats/{quote(GROUP_CHAT_ID, safe='')}/messages/1770000000000"
+CHANNEL_MESSAGE_URI = f"{CHANNEL_POST_URI}/1770000000000"
+
+
+class TestWhatACitationOfTeamsShows:
+    async def test_a_chat_message_without_a_subject_is_named_by_its_sender_and_opening(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(200, json=message_payload())
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert (read["subject"], read["title"]) == (None, "Ada Lovelace: cut the release on Friday")
+
+    async def test_a_chat_message_without_a_link_opens_through_the_deep_link_to_its_chat(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(200, json=message_payload(web_url=None))
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["web_url"] == (
+            "https://teams.microsoft.com/l/message/19:release@thread.v2/1770000000000"
+            + "?context=%7B%22contextType%22%3A%22chat%22%7D"
+        )
+
+    async def test_a_message_keeps_its_subject_and_the_link_microsoft_gives_it(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = "https://teams.microsoft.invalid/l/message/19:releases@thread.tacv2/1770000000000"
+        _ = graph.get(f"{CHANNEL_MESSAGES_PATH}/1770000000000").mock(
+            return_value=httpx.Response(
+                200, json={**message_payload(web_url=link), "subject": "Release on Friday"}
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHANNEL_MESSAGE_URI)
+
+        assert (read["title"], read["web_url"]) == ("Release on Friday", link)
+
+    async def test_a_system_event_without_a_sender_is_named_by_the_event(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(
+                    sender=None,
+                    message_type="systemEventMessage",
+                    content="",
+                    event_detail={"@odata.type": "#microsoft.graph.membersAddedEventMessageDetail"},
+                ),
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["title"] == "members added"
+
+    async def test_a_chat_is_named_by_its_topic_or_its_members_and_opens_in_teams(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = "https://teams.microsoft.invalid/l/chat/19%3Anamed%40thread.v2/0"
+        named = {**chat_payload("19:named@thread.v2", topic="Release planning"), "webUrl": link}
+        unnamed = chat_payload(
+            "19:unnamed@thread.v2",
+            topic=None,
+            members=[aad_member("Anna Meier"), aad_member("Tom Berger")],
+        )
+        _ = _chats_are(graph, named, unnamed)
+
+        rows = _rows(await call("teams_list_chats"), "chats")
+
+        assert [(row["title"], row["web_url"]) for row in rows] == [
+            ("Release planning", link),
+            ("Anna Meier, Tom Berger", None),
+        ]
+
+    async def test_a_channel_opens_at_the_link_microsoft_gives_it(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = "https://teams.microsoft.invalid/l/channel/19%3Areleases%40thread.tacv2/Releases"
+        channel = {
+            "id": CHANNEL_ID,
+            "displayName": "Releases",
+            "membershipType": "standard",
+            "webUrl": link,
+        }
+        route = graph.get(f"/teams/{TEAM_ID}/channels").mock(
+            return_value=httpx.Response(200, json={"value": [channel]})
+        )
+
+        (row,) = _rows(await call("teams_list_channels", team_id=TEAM_ID), "channels")
+
+        assert (row["display_name"], row["web_url"]) == ("Releases", link)
+        assert "webUrl" in route.calls.last.request.url.params["$select"].split(",")

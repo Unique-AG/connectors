@@ -132,7 +132,7 @@ uc-01-10:
       bind: {file: "sharepoint:///files/b%21RUNDRIVE/01RUNREPORT"}
       expect:
         tool_error:
-          tools.sharepoint_read_file._too_large: {size: 11010048, web_url: "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Annual%20Report.pdf"}
+          tools.sharepoint_read_file._too_large: {size: 11010048, web_url: "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Annual%20Report.pdf?web=1"}
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNREPORT: 1}
   note: the tool refuses above 10 MB and sends no part of the file
   fixture: uc-01-10

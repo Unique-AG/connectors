@@ -273,6 +273,28 @@ class TestReadingAPage:
         assert "This page holds one picture." in cast("str", read["html"])
         assert cast("Row", read["page"])["title"] == "seed-v1 Gallery"
 
+    @pytest.mark.parametrize(
+        ("html", "title"),
+        [
+            (
+                b"<html><head><title>Acme  kickoff &amp; plan</title></head></html>",
+                "Acme kickoff & plan",
+            ),
+            (b"<html><head><title> </title></head></html>", "Acme kickoff"),
+            (b"<html><body><p>decision one</p></body></html>", "Acme kickoff"),
+        ],
+        ids=["own-title", "blank-title", "no-title"],
+    )
+    async def test_a_read_page_is_named_and_linked_for_a_citation(
+        self, graph: respx.MockRouter, html: bytes, title: str
+    ) -> None:
+        _ = graph.get(_PAGE_PATH).mock(return_value=httpx.Response(200, json=_page()))
+        _ = graph.get(f"{_PAGE_PATH}/content").mock(return_value=_page_html(html))
+
+        read = await call("onenote_read_page", page=_PAGE)
+
+        assert (read["title"], read["web_url"]) == (title, _WEB_URL)
+
     async def test_a_page_of_exactly_one_megabyte_is_read_as_a_whole(
         self, graph: respx.MockRouter
     ) -> None:

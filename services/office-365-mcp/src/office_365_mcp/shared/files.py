@@ -3,7 +3,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Self
-from urllib.parse import quote, unquote
+from urllib.parse import quote, unquote, urlsplit
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
@@ -78,8 +78,38 @@ _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryPara
 _URL_CHARACTERS_TO_KEEP = ":/?#@!$&'()*+,;=%~"
 
 
-def browser_url(url: str) -> str:
+def _browser_url(url: str) -> str:
     return quote(url, safe=_URL_CHARACTERS_TO_KEEP)
+
+
+VIEWER_QUERY = "?web=1"
+
+# SharePoint's own pages, such as the `Doc.aspx` viewer of an Office document, live under here.
+_SHAREPOINT_PAGES = "/_layouts/"
+
+
+def view_url(item: DriveItem) -> str | None:
+    """The address that opens the item in the browser rather than downloading it.
+
+    Graph's `webUrl` for most Office documents is a viewer page, but for other files it
+    is the file's own path, which a browser downloads. SharePoint opens that path in its file
+    viewer when `web=1` is added. Microsoft's own links do the same: Copilot cites a OneDrive PDF
+    as `.../Handbook.pdf?web=1` in the Copilot interaction export reference, and Graph's
+    `callRecordingUrl` is `.../Meeting Recording.mp4?web=1` in its system messages reference.
+    """
+    download = _download_url(item)
+    if download is not None:
+        return download + VIEWER_QUERY
+    return None if item.web_url is None else _browser_url(item.web_url)
+
+
+def _download_url(item: DriveItem) -> str | None:
+    if item.file is None or item.web_url is None:
+        return None
+    address = _browser_url(item.web_url)
+    parts = urlsplit(address)
+    is_a_page = bool(parts.query) or _SHAREPOINT_PAGES in parts.path
+    return None if is_a_page else address
 
 
 class DriveItemSummary(BaseModel):
@@ -121,8 +151,17 @@ class DriveItemSummary(BaseModel):
         description=(
             "The address that opens this item in a browser. Always give this address to the user "
             + "when you answer from this item or about it, and copy it exactly: never decode its "
-            + "`%` escapes. It is not a download link, and this "
-            + "connector cannot read a file from it. Null when Graph gave no address."
+            + "`%` escapes. When Graph gave the file's own path, this address adds `?web=1` so "
+            + "that SharePoint shows the file instead of downloading it. It is not a download "
+            + "link, and this connector cannot read a file from it. Null when Graph gave no "
+            + "address."
+        )
+    )
+    download_url: str | None = Field(
+        description=(
+            "The file's own address in SharePoint or OneDrive, which a browser downloads rather "
+            + "than shows. Give it only to a user who asks to download the file. Null for a "
+            + "folder, and when Graph gave a viewer page, as it does for most Office documents."
         )
     )
     created_at: datetime | None = Field(
@@ -206,7 +245,8 @@ class DriveItemSummary(BaseModel):
             name=item.name,
             is_folder=is_folder,
             size=item.size,
-            web_url=None if item.web_url is None else browser_url(item.web_url),
+            web_url=view_url(item),
+            download_url=_download_url(item),
             created_at=item.created_date_time,
             created_by=display_name(item.created_by),
             last_modified_at=item.last_modified_date_time,

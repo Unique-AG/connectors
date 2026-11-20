@@ -44,7 +44,14 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Channel.ReadBasic.All",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"}
 
 # Excludes `isArchived` (a Teams preview) and `layoutType` (Graph documents it as always null).
-_CHANNEL_FIELDS = ("id", "displayName", "description", "createdDateTime", "membershipType")
+_CHANNEL_FIELDS = (
+    "id",
+    "displayName",
+    "description",
+    "createdDateTime",
+    "membershipType",
+    "webUrl",
+)
 
 # TRAP: without this header Graph reports a shared channel's `membershipType` as the literal
 # `unknownFutureValue` — `shared` sits after that sentinel in the evolvable enum.
@@ -105,6 +112,12 @@ class ChannelSummary(BaseModel):
     created_at: datetime | None = Field(
         description="When the channel was created — useful to tell apart similarly named channels."
     )
+    web_url: str | None = Field(
+        description=(
+            "The link that opens this channel in Microsoft Teams, as Graph reports it. Give it to "
+            + "the user when you answer about this channel. Null when Graph sent none."
+        )
+    )
 
     @classmethod
     def from_channel(cls, channel: Channel) -> Self:
@@ -116,6 +129,7 @@ class ChannelSummary(BaseModel):
             description=channel.description,
             membership_type=channel.membership_type,
             created_at=channel.created_date_time,
+            web_url=channel.web_url,
         )
 
 
