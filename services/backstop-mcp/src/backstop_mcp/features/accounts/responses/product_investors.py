@@ -13,7 +13,7 @@ Figures appear only when the caller passed `include_latest_value`: each account'
 and totals per holding and per investor, summed by currency. Totals never mix currencies.
 """
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date
 from typing import Literal, Self
 
@@ -138,6 +138,14 @@ class InvestorResponse(OmitNoneModel):
             "on a later party resolve."
         ),
     )
+    url: str | None = Field(
+        default=None,
+        description=(
+            "Canonical CRM UI URL for this investor (no tab). Omitted when this deployment has "
+            "no UI origin, or when `resource_type` is `contacts` and so names no page. Echo "
+            "it; never invent one."
+        ),
+    )
     has_open_account: bool = Field(
         description=(
             "Whether this investor has an open account in these products. False for an investor "
@@ -186,6 +194,7 @@ def investors_from_listings(
     tenure: Mapping[str, TenureDto],
     open_owner_ids: frozenset[str],
     owners_without_rows: Mapping[str, OwnerResponse],
+    owner_url: Callable[[OwnerResponse], str | None],
 ) -> tuple[InvestorResponse, ...]:
     """One entry per owner id, first-seen order. Owners are not rolled up to a parent.
 
@@ -217,6 +226,7 @@ def investors_from_listings(
             id=owner_id,
             name=owner.name,
             resource_type=owner.resource_type,
+            url=owner_url(owner),
             has_open_account=owner_id in open_owner_ids,
             holdings=tuple(
                 InvestorHoldingResponse(

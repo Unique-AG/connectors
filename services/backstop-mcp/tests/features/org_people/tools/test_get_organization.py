@@ -316,7 +316,7 @@ class TestGetOrganization:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_resolved_organization_carries_canonical_url(
+    async def test_resolved_organization_carries_its_name_and_canonical_url_at_the_top(
         self, client: BackstopClient
     ) -> None:
         respx.get(f"{BASE_URL}/organizations/trusted-9").mock(
@@ -348,7 +348,9 @@ class TestGetOrganization:
             OrganizationResolvedResponse,
         )
 
-        assert result.url == (
+        payload = tool_payload(result)
+        assert payload["name"] == "From Body"
+        assert payload["url"] == (
             "https://tenant.example.test/backstop/crm/ManageOrganization.action"
             "?display=&party_id=trusted-9"
         )

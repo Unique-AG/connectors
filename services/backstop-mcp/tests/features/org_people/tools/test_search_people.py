@@ -146,7 +146,7 @@ class TestSearchPeople:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_url_is_opt_in(self) -> None:
+    async def test_url_is_on_by_default_and_drops_out_of_a_custom_list(self) -> None:
         base_url = f"{BASE_URL}/people-search-url"
         respx.get(f"{base_url}/people").mock(
             return_value=_page(
@@ -157,16 +157,16 @@ class TestSearchPeople:
 
         async with tool_client(base_url) as client:
             query = make_search_people_query(client, ui_base_url="https://crm.example")
-            plain = tool_model(
+            linked = tool_model(
                 await search_people(
                     last_name="West", search_people_query=query, search_config=_CONFIG
                 ),
                 SearchPeopleResolvedResponse,
             )
-            linked = tool_model(
+            plain = tool_model(
                 await search_people(
                     last_name="West",
-                    fields=["name", "url"],
+                    fields=["name"],
                     search_people_query=query,
                     search_config=_CONFIG,
                 ),
@@ -177,8 +177,10 @@ class TestSearchPeople:
         linked_row = object_dict(object_list(tool_payload(linked)["rows"])[0])
         assert "url" not in plain_row
         assert plain_row["id"] == "42"
-        assert "party_id=42" in str(linked_row["url"])
-        assert "ManagePerson.action" in str(linked_row["url"])
+        assert linked_row["name"] == "West, Ann"
+        assert linked_row["url"] == (
+            "https://crm.example/backstop/crm/ManagePerson.action?display=&party_id=42"
+        )
 
     @pytest.mark.asyncio
     @respx.mock

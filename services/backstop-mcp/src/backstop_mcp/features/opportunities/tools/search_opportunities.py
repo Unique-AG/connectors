@@ -60,7 +60,7 @@ SearchRowField = Literal[
     "product",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
-    {"id", "name", "stage", "is_open", "expected_investment_date", "investor", "product"}
+    {"id", "url", "name", "stage", "is_open", "expected_investment_date", "investor", "product"}
 )
 
 
@@ -231,10 +231,10 @@ async def search_opportunities(
         list[SearchRowField] | None,
         Field(
             description=(
-                "Sparse row fields. Defaults to id, name, stage, is_open, "
+                "Sparse row fields. Defaults to id, url, name, stage, is_open, "
                 "expected_investment_date, investor, product. "
-                "`id` is always included. Select `url` when the answer will link to the "
-                "deals — it is off by default so a page stays small."
+                "`id` is always included. Keep `url` in a custom list when the answer will "
+                "link to the deals."
             ),
         ),
     ] = None,

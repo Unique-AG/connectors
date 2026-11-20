@@ -13,6 +13,7 @@ from backstop_mcp.features.accounts import (
     GetTimeSeriesQuery,
     SearchProductsQuery,
 )
+from backstop_mcp.features.ui_links import BuildEntityLinkUtil
 from tests.helpers import client_factory, credential
 
 # Tenure `years` are measured up to today, so the factories pin it.
@@ -39,11 +40,12 @@ def make_get_latest_account_values_query(client: BackstopClient) -> GetLatestAcc
 
 
 def make_get_product_investors_query(
-    client: BackstopClient, *, max_valued_accounts: int = 50
+    client: BackstopClient, *, max_valued_accounts: int = 50, ui_base_url: str | None = None
 ) -> GetProductInvestorsQuery:
     return GetProductInvestorsQuery(
         get_accounts_for_product_query=make_get_accounts_for_product_query(client),
         get_latest_account_values_query=make_get_latest_account_values_query(client),
+        build_entity_link_util=BuildEntityLinkUtil(ui_base_url=ui_base_url),
         max_valued_accounts=max_valued_accounts,
         clock=lambda: TODAY,
     )

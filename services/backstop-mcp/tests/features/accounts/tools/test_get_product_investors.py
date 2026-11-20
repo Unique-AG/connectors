@@ -203,6 +203,65 @@ class TestGetProductInvestors:
 
     @pytest.mark.asyncio
     @respx.mock
+    async def test_each_investor_carries_its_name_and_the_crm_page_of_its_kind(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account("1", owner_id="o1", name="Tailspin NGUP"),
+                _account("2", owner_id="p1", name="West NGUP"),
+                _account("3", owner_id="c1", name="Unknown NGUP"),
+                included=[
+                    _owner("o1", name="Tailspin Investments"),
+                    resource(
+                        "p1",
+                        "contacts",
+                        name="West, Ann",
+                        specificResource={"resourceType": "people", "resourceId": "p1"},
+                    ),
+                    resource("c1", "contacts", name="Fabrikam Trust"),
+                ],
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                client=client,
+                get_product_investors_query=make_get_product_investors_query(
+                    client,
+                    max_valued_accounts=_MAX_VALUED_ACCOUNTS,
+                    ui_base_url="https://tenant.example.test",
+                ),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        investors = [
+            object_dict(investor) for investor in object_list(tool_payload(result)["investors"])
+        ]
+        assert [
+            (investor["name"], investor["resource_type"], investor.get("url"))
+            for investor in investors
+        ] == [
+            (
+                "Tailspin Investments",
+                "organizations",
+                "https://tenant.example.test/backstop/crm/ManageOrganization.action"
+                + "?display=&party_id=o1",
+            ),
+            (
+                "West, Ann",
+                "people",
+                "https://tenant.example.test/backstop/crm/ManagePerson.action?display=&party_id=p1",
+            ),
+            ("Fabrikam Trust", "contacts", None),
+        ]
+
+    @pytest.mark.asyncio
+    @respx.mock
     async def test_exclude_custom_fields_does_not_request_them(
         self, client: BackstopClient
     ) -> None:

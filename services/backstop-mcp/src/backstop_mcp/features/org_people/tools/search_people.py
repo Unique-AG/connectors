@@ -55,7 +55,7 @@ SearchPersonField = Literal[
     "employments",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
-    {"id", "name", "email", "job_title", "company_name", "city", "country", "locations"}
+    {"id", "url", "name", "email", "job_title", "company_name", "city", "country", "locations"}
 )
 
 
@@ -235,11 +235,11 @@ async def search_people(
         list[SearchPersonField] | None,
         Field(
             description=(
-                "Sparse row fields. Defaults to id, name, email, job_title, company_name, "
-                "city, country, locations. `city`, `country`, `state`, `postal_code`, "
-                "`street_address`, and `location_title` are the primary location; "
-                "`locations` is every address. `id` is always included. Select `url` when "
-                "the answer will link to the person — it is off by default. Select "
+                "Sparse row fields. Defaults to id, url, name, email, job_title, "
+                "company_name, city, country, locations. `city`, `country`, `state`, "
+                "`postal_code`, `street_address`, and `location_title` are the primary "
+                "location; `locations` is every address. `id` is always included. Keep "
+                "`url` in a custom list when the answer will link to the people. Select "
                 "`employments` for every organization the person is linked to; it doubles "
                 "the read, so it is off by default. "
                 "`custom_field_values` is included automatically unless "
