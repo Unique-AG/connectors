@@ -1,5 +1,18 @@
 # Changelog
 
+## [3.3.1](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.3.0...sharepoint-connector@3.3.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **sharepoint-connector:** skip empty rows in the sites configuration list (UN-17307) ([#1736](https://github.com/Unique-AG/connectors/issues/1736)) ([d5c1e4c](https://github.com/Unique-AG/connectors/commit/d5c1e4c756b3bc04943316ab0981212b3a70bc3f))
+
+
+### Dependencies
+
+* **deps:** bump @azure/msal-node from 7.2.1 to 7.2.2 ([#1699](https://github.com/Unique-AG/connectors/issues/1699)) ([8f3895f](https://github.com/Unique-AG/connectors/commit/8f3895f10372880eb8908367c5624a66d76117d8))
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+
 ## [3.3.0](https://github.com/Unique-AG/connectors/compare/sharepoint-connector@3.2.0...sharepoint-connector@3.3.0) (2026-11-12)
 
 
