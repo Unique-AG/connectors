@@ -7,7 +7,7 @@ from with_intelligence_mcp.features.managers.api_responses import (
     ManagerContactAttributes,
     ManagerExtendedAttributes,
 )
-from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel, WebLinkedRecord
 from with_intelligence_mcp.utils import html_to_markdown, names, when_either, when_present
 
 
@@ -31,7 +31,7 @@ class ManagerAumResponse(OmitNoneModel):
     )
 
 
-class ManagerProfileResponse(OmitNoneModel):
+class ManagerProfileResponse(WebLinkedRecord):
     """One management company.
 
     AUM figures are in MILLIONS. Service-provider lists are who administers, audits, and

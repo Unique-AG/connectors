@@ -54,3 +54,16 @@ class TestProjection:
         assert result.email == "contact@example.invalid"
         assert result.services == ["Consultant", "Investment Consultant"]
         assert result.strategies == ["Global Macro"]
+
+    @respx.mock
+    async def test_is_titled_by_name_and_never_cites_its_website(self) -> None:
+        respx.get(f"{BASE_URL}/v3/consultants/-1098972655").mock(
+            return_value=httpx.Response(200, json=CONSULTANT)
+        )
+        client, _ = build_client()
+        result = await get_consultant(consultant_id=-1098972655, client=client)
+        assert isinstance(result, ConsultantProfileResponse)
+        dumped = result.model_dump()
+        assert dumped["name"] == "Example Associates"
+        assert dumped["web_url"] is None
+        assert dumped["website"] == "https://example.invalid"

@@ -45,7 +45,7 @@ class GetPeopleForInvestorQuery:
         response = PeopleForInvestorResponse(
             investor_id=investor.id,
             investor_name=investor.name,
-            people=people,
+            results=people,
             total_at_organisation=total,
             contacts_on_investor_record=investor.contacts_total,
             returned=len(people),

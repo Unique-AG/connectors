@@ -3,11 +3,11 @@ from typing import Literal, Self
 from pydantic import Field
 
 from with_intelligence_mcp.features.consultants.api_responses import ConsultantExtendedAttributes
-from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel, WebLinkedRecord
 from with_intelligence_mcp.utils import names, when_either, when_present
 
 
-class ConsultantProfileResponse(OmitNoneModel):
+class ConsultantProfileResponse(WebLinkedRecord):
     """One consulting firm: where it is, how to reach it, and what it advises on."""
 
     id: int = Field(description="With Intelligence consultant identifier.")

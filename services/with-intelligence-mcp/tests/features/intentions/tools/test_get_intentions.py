@@ -3,7 +3,7 @@
 import httpx
 import respx
 
-from tests.helpers import BASE_URL, build_client, page_body
+from tests.helpers import BASE_URL, build_client, page_body, sent_records
 from with_intelligence_mcp.features.intentions import InvestorIntentionsResponse
 from with_intelligence_mcp.features.intentions.queries import GetIntentionsQuery
 from with_intelligence_mcp.features.intentions.tools.get_intentions import (
@@ -99,7 +99,7 @@ class TestEntitlement:
         client, _ = build_client()
         result = await get_intentions(investor_id=2504, client=client)
         assert isinstance(result, InvestorIntentionsResponse)
-        assert result.intentions == []
+        assert result.results == []
         assert result.total == 0
 
 
@@ -118,7 +118,7 @@ class TestProjection:
         client, _ = build_client()
         result = await get_intentions(investor_id=2504, client=client)
         assert isinstance(result, InvestorIntentionsResponse)
-        intention = result.intentions[0]
+        intention = result.results[0]
         assert intention.status == "Potential"
         assert intention.sub_status == "Early"
         assert intention.asset_class == "Hedge Funds"
@@ -128,3 +128,26 @@ class TestProjection:
         assert intention.preference_only is False
         assert intention.structures == ["Commingled"]
         assert intention.note == "Looking at global macro. Ticket is firm."
+
+
+class TestCitation:
+    @respx.mock
+    async def test_titles_each_intention_by_what_it_targets(self) -> None:
+        respx.get(f"{BASE_URL}/v3/intentions").mock(
+            return_value=httpx.Response(
+                200,
+                json=page_body([{"id": 7, "date": "2026-06-01"}, {"id": 8}], total=2),
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/intentions/7").mock(
+            return_value=httpx.Response(200, json=INTENTION)
+        )
+        respx.get(f"{BASE_URL}/v3/intentions/8").mock(return_value=httpx.Response(404))
+        _mock_investor()
+        client, _ = build_client()
+        result = await get_intentions(investor_id=2504, client=client)
+        assert isinstance(result, InvestorIntentionsResponse)
+        assert [intention["title"] for intention in sent_records(result)] == [
+            "Intention: Hedge Funds, Global Macro, Discretionary",
+            "Intention 8",
+        ]

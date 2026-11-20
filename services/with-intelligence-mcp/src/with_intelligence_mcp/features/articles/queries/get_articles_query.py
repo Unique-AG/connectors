@@ -53,7 +53,7 @@ class GetArticlesQuery:
         response = InvestorArticlesResponse(
             investor_id=investor.id,
             investor_name=investor.name,
-            articles=articles,
+            results=articles,
             total=total,
             returned=len(articles),
             page=page,

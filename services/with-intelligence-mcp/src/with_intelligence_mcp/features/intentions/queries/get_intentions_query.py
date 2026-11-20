@@ -61,7 +61,7 @@ class GetIntentionsQuery:
         response = InvestorIntentionsResponse(
             investor_id=investor.id,
             investor_name=investor.name,
-            intentions=intentions,
+            results=intentions,
             total=total,
             returned=len(intentions),
             page=page,

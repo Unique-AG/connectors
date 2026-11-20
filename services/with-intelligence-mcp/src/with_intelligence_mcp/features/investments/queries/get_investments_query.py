@@ -50,13 +50,13 @@ class GetInvestmentsQuery:
         positions = [
             PositionResponse.from_attributes(detail)
             if detail
-            else PositionResponse(id=listed[index].id)
+            else PositionResponse.from_listing(listed[index])
             for index, detail in enumerate(details)
         ]
         response = InvestorPositionsResponse(
             investor_id=investor.id,
             investor_name=investor.name,
-            positions=positions,
+            results=positions,
             total=total,
             returned=len(positions),
             page=page,

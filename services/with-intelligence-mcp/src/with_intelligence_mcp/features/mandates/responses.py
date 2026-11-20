@@ -4,9 +4,10 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.mandates.api_responses import (
     MandateExtendedAttributes,
+    MandateListItemAttributes,
     MandateNoteAttributes,
 )
-from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel, WebLinkedRecord
 from with_intelligence_mcp.utils import html_to_markdown, names
 
 
@@ -23,10 +24,14 @@ class MandateAmountResponse(OmitNoneModel):
     )
 
 
-class MandateResponse(OmitNoneModel):
+class MandateResponse(WebLinkedRecord):
     """One allocation search by this investor."""
 
     id: int = Field(description="With Intelligence mandate identifier.", examples=[21])
+    title: str = Field(
+        description="Short label: the service and what it targets. Mandates have no name.",
+        examples=["Manager Search: Equity, Long/Short Equity"],
+    )
     status: str | None = Field(
         default=None,
         description="With Intelligence's current mandate status; do not infer a boolean.",
@@ -107,26 +112,28 @@ class MandateResponse(OmitNoneModel):
         strategies_available = bool(
             {"primary_strategies", "secondary_strategies"} & attributes.model_fields_set
         )
+        service = attributes.service.name if attributes.service else None
+        asset_classes = (
+            names(attributes.asset_class) if "asset_class" in attributes.model_fields_set else None
+        )
+        strategies = (
+            names(attributes.primary_strategies) + names(attributes.secondary_strategies)
+            if strategies_available
+            else None
+        )
         return cls(
             id=attributes.id,
+            title=_title(attributes.id, service, strategies or asset_classes),
             status=attributes.status.name if attributes.status else None,
             sub_status=(
                 attributes.status.sub_status.name
                 if attributes.status and attributes.status.sub_status
                 else None
             ),
-            service=attributes.service.name if attributes.service else None,
+            service=service,
             amount=_amount(attributes),
-            asset_classes=(
-                names(attributes.asset_class)
-                if "asset_class" in attributes.model_fields_set
-                else None
-            ),
-            strategies=(
-                names(attributes.primary_strategies) + names(attributes.secondary_strategies)
-                if strategies_available
-                else None
-            ),
+            asset_classes=asset_classes,
+            strategies=strategies,
             structures=(
                 names(attributes.fund_structures)
                 if "fund_structures" in attributes.model_fields_set
@@ -152,6 +159,14 @@ class MandateResponse(OmitNoneModel):
             latest_note_date=latest_note.date if latest_note else None,
         )
 
+    @classmethod
+    def from_listing(cls, attributes: MandateListItemAttributes) -> Self:
+        return cls(
+            id=attributes.id,
+            title=_title(attributes.id, None, None),
+            updated_at=attributes.updated_at,
+        )
+
 
 class InvestorMandatesResponse(OmitNoneModel):
     """An investor's allocation searches, newest first.
@@ -161,7 +176,7 @@ class InvestorMandatesResponse(OmitNoneModel):
 
     investor_id: int = Field(description="With Intelligence investor identifier.")
     investor_name: str | None = Field(default=None, description="Resolved investor name.")
-    mandates: list[MandateResponse] = Field(
+    results: list[MandateResponse] = Field(
         default_factory=list, description="Mandates on the requested page, newest first."
     )
     total: int = Field(default=0, description="How many mandates With Intelligence holds in total.")
@@ -170,6 +185,12 @@ class InvestorMandatesResponse(OmitNoneModel):
     has_more: bool = Field(
         default=False, description="True when another page of mandates is available."
     )
+
+
+def _title(mandate_id: int, service: str | None, targets: list[str] | None) -> str:
+    if targets:
+        return f"{service or 'Mandate'}: {', '.join(targets)}"
+    return service or f"Mandate {mandate_id}"
 
 
 def _amount(attributes: MandateExtendedAttributes) -> MandateAmountResponse | None:
