@@ -2,7 +2,7 @@ import hashlib
 import secrets
 import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Iterable
 from datetime import UTC, datetime, timedelta
 from typing import ClassVar, Literal, override
 
@@ -11,6 +11,7 @@ from mcp.server.auth.provider import (
     AuthorizationCode,
     AuthorizationParams,
     RefreshToken,
+    RegistrationError,
     TokenError,
     construct_redirect_uri,
 )
@@ -32,6 +33,11 @@ from mcp_credential_auth.models import (
     OAuthToken as OAuthTokenRow,
 )
 from mcp_credential_auth.models import PendingAuthorization
+from mcp_credential_auth.redirect_policy import (
+    DEFAULT_ALLOWED_REDIRECT_HOSTS,
+    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
+    RedirectUriPolicy,
+)
 
 type SubjectFactory = Callable[[AsyncSession], Awaitable[str]]
 
@@ -76,6 +82,7 @@ class CredentialOAuthProvider(OAuthProvider):
 
     _session_factory: async_sessionmaker[AsyncSession]
     _issuer: str
+    _redirect_policy: RedirectUriPolicy
     login_path: str
     access_token_ttl: timedelta
     refresh_token_ttl: timedelta
@@ -92,6 +99,8 @@ class CredentialOAuthProvider(OAuthProvider):
         refresh_token_ttl: timedelta | None = None,
         authorization_code_ttl: timedelta | None = None,
         pending_authorization_ttl: timedelta | None = None,
+        allowed_redirect_hosts: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_HOSTS,
+        allowed_redirect_schemes: Iterable[str] = DEFAULT_ALLOWED_REDIRECT_SCHEMES,
     ) -> None:
         super().__init__(
             base_url=base_url,
@@ -101,6 +110,9 @@ class CredentialOAuthProvider(OAuthProvider):
         self._session_factory = session_factory
         self.login_path = login_path
         self._issuer = base_url
+        self._redirect_policy = RedirectUriPolicy(
+            allowed_hosts=allowed_redirect_hosts, allowed_schemes=allowed_redirect_schemes
+        )
         self.access_token_ttl = (
             self.ACCESS_TOKEN_TTL if access_token_ttl is None else access_token_ttl
         )
@@ -124,11 +136,24 @@ class CredentialOAuthProvider(OAuthProvider):
             row = await session.get(OAuthClientRow, client_id)
         if row is None:
             return None
-        return OAuthClientInformationFull.model_validate(row.client_metadata)
+        client = OAuthClientInformationFull.model_validate(row.client_metadata)
+        # A client registered before the policy existed keeps only the URIs it still allows, so
+        # the SDK refuses any other one at /authorize with a direct error rather than a redirect.
+        allowed = [
+            uri for uri in client.redirect_uris or [] if self._redirect_policy.allows(str(uri))
+        ]
+        return client.model_copy(update={"redirect_uris": allowed or None})
 
     @override
     async def register_client(self, client_info: OAuthClientInformationFull) -> None:
         assert client_info.client_id is not None, "client_id must be assigned before registration"
+        for uri in client_info.redirect_uris or []:
+            reason = self._redirect_policy.rejection_reason(str(uri))
+            if reason is not None:
+                raise RegistrationError(
+                    error="invalid_redirect_uri",
+                    error_description=f"Redirect URI {uri} {reason}",
+                )
         async with transaction(self._session_factory) as session:
             session.add(
                 OAuthClientRow(

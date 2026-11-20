@@ -327,6 +327,19 @@ class TestAuthConfig:
         with pytest.raises(ValueError, match="cleanup_interval_hours"):
             AuthConfig(cleanup_interval_hours=0)
 
+    def test_reads_the_redirect_allowlist_from_auth_env_vars(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_HOSTS", raising=False)
+        monkeypatch.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "chat.customer.example")
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_SCHEMES", "")
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts[-1] == "chat.customer.example"
+        assert "claude.ai" in config.allowed_redirect_hosts
+        assert config.allowed_redirect_schemes == ()
+
 
 class TestPublicBaseUrl:
     """The OAuth issuer clients are redirected to, so a leftover local default is a dead deploy."""

@@ -9,6 +9,7 @@ from with_intelligence_mcp.config import (
     AppConfig,
     AppEnv,
     AssetClassGroup,
+    AuthConfig,
     DatabaseConfig,
     WithIntelligenceConfig,
     normalize_asyncpg_url,
@@ -163,3 +164,18 @@ class TestNormalizeAsyncpgUrl:
     def test_rejects_an_unknown_sslmode(self) -> None:
         with pytest.raises(ValueError, match="Unsupported sslmode"):
             normalize_asyncpg_url("postgresql://u:p@db/wi?sslmode=sideways")
+
+
+class TestAuthConfig:
+    def test_reads_the_redirect_allowlist_from_auth_env_vars(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.delenv("AUTH_ALLOWED_REDIRECT_HOSTS", raising=False)
+        monkeypatch.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "chat.customer.example")
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_SCHEMES", "")
+
+        config = AuthConfig()
+
+        assert config.allowed_redirect_hosts[-1] == "chat.customer.example"
+        assert "claude.ai" in config.allowed_redirect_hosts
+        assert config.allowed_redirect_schemes == ()
