@@ -6567,8 +6567,8 @@ packages:
       webpack:
         optional: true
 
-  update-browserslist-db@1.3.4:
-    resolution: {integrity: sha512-t8wonIOdQyOjtPd2VktlBu6QjTVTks6v8bSi7kd0r2Vll8TK1JYDZtRRdbmCHOAMphkZgrzK+L+vXK4pyZ8t4A==}
+  update-browserslist-db@1.4.0:
+    resolution: {integrity: sha512-WPJuOnjI9FWDct4fB+ej4Mz8opLaw5CDcZ2t44tFZ0vIQVYWzBhWR3mkixuUj/A7+vY4V9+ApOZ2YYLwdgq46w==}
     hasBin: true
     peerDependencies:
       browserslist: '>= 4.21.0'
@@ -9354,7 +9354,7 @@ snapshots:
       caniuse-lite: 1.0.30001826
       electron-to-chromium: 1.5.485
       node-releases: 2.0.64
-      update-browserslist-db: 1.3.4(browserslist@4.29.5)
+      update-browserslist-db: 1.4.0(browserslist@4.29.5)
     optional: true
 
   buffer-crc32@1.0.0: {}
@@ -11808,7 +11808,7 @@ snapshots:
       vite: 8.3.8(@types/node@26.6.6)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.51.2)(tsx@4.23.15)(yaml@2.9.1)
       webpack: 5.106.2(@swc/core@1.16.22)(esbuild@0.28.2)
 
-  update-browserslist-db@1.3.4(browserslist@4.29.5):
+  update-browserslist-db@1.4.0(browserslist@4.29.5):
     dependencies:
       browserslist: 4.29.5
       escalade: 3.2.0
