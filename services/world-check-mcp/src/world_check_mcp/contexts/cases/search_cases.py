@@ -17,7 +17,7 @@ from world_check_mcp.upstream import Upstream
 
 @traced(
     arguments=("group_id", "search_mode", "limit", "page_reference"),
-    result=lambda r: {"cases": len(r.cases)},
+    result=lambda r: {"cases": len(r.results)},
 )
 async def search_cases(
     *,
@@ -46,7 +46,7 @@ async def search_cases(
         ),
     )
     return CasePage(
-        cases=[
+        results=[
             CaseSummary(
                 case_id=hit.case_id,
                 case_system_id=hit.case_system_id,

@@ -310,9 +310,36 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             {
                 "entityType": "INDIVIDUAL",
                 "referenceId": "e_1",
-                "names": {"nameDetails": [{"details": [{"value": "Ada Lovelace"}]}]},
+                "names": {
+                    "nameDetails": [
+                        {"type": "AKA", "details": [{"type": "FULL_NAME", "value": "Countess A"}]},
+                        {
+                            "type": "PRIMARY",
+                            "details": [
+                                {"type": "FIRST_NAME", "value": "Ada"},
+                                {"type": "FULL_NAME", "value": "Ada Lovelace"},
+                            ],
+                        },
+                    ]
+                },
                 "sources": [],
                 "categories": [{"value": "PEP"}],
+                "sourceReferenceLinks": {
+                    "sourceReferenceLinkDetails": [
+                        {"uri": "ftp://registry.example.org/e_1"},
+                        {"uri": "https://registry.example.org/officials/e_1", "tags": ["PDF"]},
+                    ]
+                },
+            },
+        )
+    if path.endswith("/references/records/e_2"):
+        return _json(
+            200,
+            {
+                "entityType": "INDIVIDUAL",
+                "referenceId": "e_2",
+                "names": {"nameDetails": [{"details": [{"value": "Grace Hopper"}]}]},
+                "sources": [],
             },
         )
     if path.endswith("/references/countries"):
@@ -401,7 +428,22 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                         "providerType": "WATCHLIST",
                         "matchStrength": "EXACT",
                         "submittedTerm": "Ada Lovelace",
-                    }
+                        "matchedTerms": [{"term": "A. Lovelace", "type": "AKA"}],
+                        "names": [
+                            {
+                                "type": "PRIMARY",
+                                "details": [{"type": "FULL_NAME", "value": "Augusta Ada King"}],
+                            }
+                        ],
+                    },
+                    {
+                        "resultId": "r2",
+                        "referenceId": "e_2",
+                        "providerType": "WATCHLIST",
+                        "matchStrength": "WEAK",
+                        "submittedTerm": "Ada Lovelace",
+                        "matchedTerms": [{"term": "Ada Lovell", "type": "PRIMARY"}],
+                    },
                 ],
                 "pagination": {"pageReferences": {}},
             },
@@ -472,7 +514,12 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             200,
             _screened(
                 [
-                    {"resultId": "r1", "referenceId": "e_1", "providerType": "WATCHLIST"},
+                    {
+                        "resultId": "r1",
+                        "referenceId": "e_1",
+                        "providerType": "WATCHLIST",
+                        "matchedTerms": [{"term": "Ada Lovell", "type": "PRIMARY"}],
+                    },
                     {"resultId": "r2", "referenceId": "e_2", "providerType": "WATCHLIST"},
                 ]
             ),
@@ -835,8 +882,28 @@ async def test_get_profile_uses_the_record_reference_id() -> None:
 
     profile = result.structured_content
     assert profile is not None
-    assert profile["names"] == ["Ada Lovelace"]
+    assert profile["names"] == ["Countess A", "Ada", "Ada Lovelace"]
     assert profile["categories"] == ["PEP"]
+
+
+async def test_get_profile_is_titled_by_the_primary_name_and_links_its_first_source_page() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_1"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["name"] == "Ada Lovelace"
+    assert profile["url"] == "https://registry.example.org/officials/e_1"
+
+
+async def test_get_profile_has_no_link_when_lseg_cites_no_source_page() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_2"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["name"] == "Grace Hopper"
+    assert profile["url"] is None
 
 
 async def test_list_cases_filters_to_the_group() -> None:
@@ -845,7 +912,9 @@ async def test_list_cases_filters_to_the_group() -> None:
 
     page = result.structured_content
     assert page is not None
-    assert page["cases"][0]["case_system_id"] == "sys-1"
+    assert page["results"][0]["case_system_id"] == "sys-1"
+    assert page["results"][0]["name"] == "Ada Lovelace"
+    assert "url" not in page["results"][0]
     assert page["next_page"] == "page-2"
 
 
@@ -863,7 +932,7 @@ async def test_search_cases_keeps_the_group_filter_with_the_query() -> None:
 
     page = result.structured_content
     assert page is not None
-    assert page["cases"][0]["name"] == "Ada Lovelace"
+    assert page["results"][0]["name"] == "Ada Lovelace"
 
 
 @pytest.mark.parametrize(
@@ -894,7 +963,17 @@ async def test_get_case_results_resolves_an_external_case_id() -> None:
     results = result.structured_content
     assert results is not None
     assert results["case_system_id"] == "sys-1"
-    assert results["matches"][0]["reference_id"] == "e_1"
+    assert results["results"][0]["reference_id"] == "e_1"
+
+
+async def test_get_case_results_titles_each_match_by_the_matched_record_name() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_case_results", {"case": "sys-1"})
+
+    assert result.structured_content is not None
+    matches = cast(list[dict[str, object]], result.structured_content["results"])
+    assert [match["name"] for match in matches] == ["Augusta Ada King", "Ada Lovell"]
+    assert all("url" not in match for match in matches)
 
 
 async def test_get_screening_status_reports_watchlist_progress() -> None:
@@ -949,6 +1028,7 @@ async def test_screen_entity_persists_a_watchlist_case_and_truncates_matches() -
     assert outcome["case_system_id"] == "sys-new"
     assert outcome["watchlist_truncated"] is True
     assert outcome["watchlist_matches"][0]["result_id"] == "r1"
+    assert outcome["watchlist_matches"][0]["name"] == "Ada Lovell"
     assert outcome["watchlist_matches"][1:] == []
     assert outcome["passport_matches"] == []
 

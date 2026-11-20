@@ -43,13 +43,16 @@ class CaseSummary(BaseModel):
 
 
 class CasePage(BaseModel):
-    cases: list[CaseSummary] = Field(description="Cases on this page, newest first.")
+    results: list[CaseSummary] = Field(description="Cases on this page, newest first.")
     next_page: str | None = Field(
         description="Cursor for the next page, or null when there is none."
     )
 
 
 class Match(BaseModel):
+    name: str | None = Field(
+        description="Matched World-Check record name: its primary name, else the matched term."
+    )
     result_id: str | None = Field(description="ID of the result within the case.")
     reference_id: str | None = Field(
         description="World-Check record reference ID, for get_profile."
@@ -63,7 +66,7 @@ class Match(BaseModel):
 
 class CaseResults(BaseModel):
     case_system_id: str = Field(description="LSEG-generated internal case ID (caseSystemId).")
-    matches: list[Match] = Field(description="Matches on this page.")
+    results: list[Match] = Field(description="Matches on this page.")
     next_page: str | None = Field(
         description="Cursor for the next page, or null when there is none."
     )

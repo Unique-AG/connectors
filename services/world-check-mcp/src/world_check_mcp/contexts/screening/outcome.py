@@ -32,6 +32,7 @@ def watchlist_results(results: list[ResultWire]) -> list[ResultWire]:
 
 def match_from_result(*, item: ResultWire) -> ScreeningMatch:
     return ScreeningMatch(
+        name=item.matched_name,
         result_id=item.result_id,
         reference_id=item.reference_id,
         provider_type=item.provider_type,
