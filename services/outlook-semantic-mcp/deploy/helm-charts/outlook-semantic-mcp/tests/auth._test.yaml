@@ -28,6 +28,7 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: AUTH_DISABLE_RATE_LIMITING
+          any: true
 
   - it: renders AUTH_DISABLE_RATE_LIMITING=true when the switch is on
     values:
