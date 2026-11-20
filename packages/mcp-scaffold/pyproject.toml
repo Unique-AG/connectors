@@ -33,7 +33,7 @@ dev = [
 # packages/ is not listed: the scaffold pins its version from that package's pyproject.toml.
 service = [
     "fastmcp==4.1.6",
-    "httpx2==2.16.0",
+    "httpx2==2.16.2",
     "mcp-types==2.3.0",
     "pydantic==2.14.3",
     "pydantic-settings==2.16.3",
