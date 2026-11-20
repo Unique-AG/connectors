@@ -54,6 +54,8 @@ mock_provider "azuread" {
         "Place.Read.All"                   = "f1111111-1111-1111-1111-111111111111"
         "Contacts.Read"                    = "f2222222-2222-2222-2222-222222222222"
         "Contacts.ReadWrite"               = "f3333333-3333-3333-3333-333333333333"
+        "Tasks.Read"                       = "f4444444-4444-4444-4444-444444444444"
+        "Tasks.ReadWrite"                  = "f5555555-5555-5555-5555-555555555555"
         "Group.Read.All"                   = "f4444444-4444-4444-4444-444444444444"
         "Notes.Read.All"                   = "d4444444-4444-4444-4444-444444444444"
       }
@@ -239,6 +241,8 @@ run "every_preset_as_a_list_resolves_every_tool" {
       "outlook-group-calendar",
       "outlook-contacts",
       "outlook-contacts-write",
+      "outlook-tasks",
+      "outlook-tasks-write",
       "sharepoint-search",
       "sharepoint-read",
       "sharepoint-write",
@@ -712,6 +716,48 @@ run "preset_outlook_contacts_write" {
   assert {
     condition     = length(local.admin_consent) == 0
     error_message = "Microsoft marks the delegated Contacts.ReadWrite as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_tasks" {
+  variables {
+    tools_preset = "outlook-tasks"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Tasks.Read"
+    error_message = "outlook-tasks composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 4
+    error_message = "outlook-tasks resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "Microsoft marks the delegated Tasks.Read as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_tasks_write" {
+  variables {
+    tools_preset = "outlook-tasks-write"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Tasks.Read,Tasks.ReadWrite"
+    error_message = "outlook-tasks-write composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 7
+    error_message = "outlook-tasks-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "Microsoft marks the delegated Tasks.ReadWrite as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
   }
 }
 

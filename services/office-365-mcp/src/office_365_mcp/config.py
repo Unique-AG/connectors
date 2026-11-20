@@ -97,6 +97,8 @@ class ToolsPreset(StrEnum):
     OUTLOOK_GROUP_CALENDAR = "outlook-group-calendar"
     OUTLOOK_CONTACTS = "outlook-contacts"
     OUTLOOK_CONTACTS_WRITE = "outlook-contacts-write"
+    OUTLOOK_TASKS = "outlook-tasks"
+    OUTLOOK_TASKS_WRITE = "outlook-tasks-write"
     SHAREPOINT_SEARCH = "sharepoint-search"
     SHAREPOINT_READ = "sharepoint-read"
     SHAREPOINT_WRITE = "sharepoint-write"

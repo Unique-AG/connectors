@@ -12,9 +12,9 @@
 office-365-mcp is a Python MCP server, built on FastMCP. It connects Microsoft 365 to MCP clients
 through the Microsoft Graph API.
 
-- **Reaches:** Outlook mail, calendar, and contacts. Microsoft Teams. SharePoint and OneDrive.
+- **Reaches:** Outlook mail, calendar, contacts, and tasks. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 130 tools in total.
+- **Size:** 136 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -41,6 +41,7 @@ on fewer to cover part of it.
 | [Scheduling and answering meetings](use-cases.md#scheduling-and-answering-meetings) | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
 | [Sharing and delegating calendars](use-cases.md#sharing-and-delegating-calendars) | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
 | [Managing contacts](use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
+| [Keeping track of tasks](use-cases.md#keeping-track-of-tasks) | Find, read, add, change, and complete tasks in Microsoft To Do. | `outlook-tasks-write` | No |
 | [Catching up on Teams](use-cases.md#catching-up-on-teams) | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
 | [Posting in Teams](use-cases.md#posting-in-teams) | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
 | [Running Teams chats and online meetings](use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
@@ -134,6 +135,13 @@ Each row links to the section of that preset. The count of tools does not includ
 | --- | --- | --- | --- |
 | [`outlook-contacts`](#outlook-contacts) | Read your contacts. | 2 | No |
 | [`outlook-contacts-write`](#outlook-contacts-write) | Create and change contacts. | 4 | No |
+
+**Outlook tasks.** The task lists of Microsoft To Do, which Outlook also shows.
+
+| Preset | Use it to | Tools | Admin consent |
+| --- | --- | --- | --- |
+| [`outlook-tasks`](#outlook-tasks) | Read your tasks. | 3 | No |
+| [`outlook-tasks-write`](#outlook-tasks-write) | Create, change, and complete tasks. | 6 | No |
 
 **SharePoint and OneDrive.** Files, folders, sharing, sites, and lists.
 
@@ -977,6 +985,65 @@ The default Contacts folder.
 - **Admin consent:** Not required.
 - **User approval:** None. No tool of this preset asks the user.
 
+## Outlook tasks presets
+
+The task lists of Microsoft To Do, which Outlook also shows.
+
+**Note:** A deployment gets these presets only when it names them. They add the Graph permissions
+`Tasks.Read` and `Tasks.ReadWrite`. These need no admin consent, but a tenant that turns a preset on
+must let users consent to the new permission, or grant it for them. The tools reach only the signed-in user's own To Do and the lists
+that other people share with the user. They cannot reach the tasks of another person or of a shared
+mailbox.
+
+### `outlook-tasks`
+
+**3 tools** · Admin consent: **not required**
+
+**You can**
+
+- List your task lists, including the lists that people share with you.
+- List the tasks in one list, by status, by words in the title, and by due date.
+- Read one task with its notes.
+
+**Tools**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_list_task_lists` | 🟢 Read | — | Lists your To Do task lists and says which ones are built in or shared. |
+| `outlook_list_tasks` | 🟢 Read | — | Lists the tasks in one list. Narrows by status, title words, and due date. |
+| `outlook_read_task` | 🟢 Read | — | Reads one task in full, including its notes. |
+
+**What it needs**
+
+- **Graph permissions (2):** `Tasks.Read`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
+### `outlook-tasks-write`
+
+**6 tools** · Admin consent: **not required** · Builds on [`outlook-tasks`](#outlook-tasks)
+
+**You can**
+
+- Do everything in `outlook-tasks`.
+- Create a task with a due date, a priority, and notes.
+- Change a task, reopen it, or remove its due date.
+- Mark a task as completed.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_create_task` | 🟠 Add | — | Creates one task in a list, with a due date, a priority, and notes. |
+| `outlook_update_task` | 🔴 Change | — | Changes only the given fields of one task. Replaces the whole notes when it gets new notes. |
+| `outlook_complete_task` | 🔴 Change | — | Marks one task as completed. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Tasks.Read`, `Tasks.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** None. No tool of this preset asks the user.
+
 ## SharePoint and OneDrive presets
 
 Files, folders, sharing, sites, and lists.
@@ -1624,6 +1691,12 @@ This reference lists all 129 tools. Use it to build an `enabled` list, or to fin
 | `outlook_read_contact` | 🟢 Read | `Contacts.Read` | No | — |
 | `outlook_create_contact` | 🟠 Write, adds | `Contacts.ReadWrite` | No | — |
 | `outlook_update_contact` | 🔴 Write, changes or removes, safe to repeat | `Contacts.ReadWrite` | No | — |
+| `outlook_list_task_lists` | 🟢 Read | `Tasks.Read` | No | — |
+| `outlook_list_tasks` | 🟢 Read | `Tasks.Read` | No | — |
+| `outlook_read_task` | 🟢 Read | `Tasks.Read` | No | — |
+| `outlook_create_task` | 🟠 Write, adds | `Tasks.ReadWrite` | No | — |
+| `outlook_update_task` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | — |
+| `outlook_complete_task` | 🟠 Write, safe to repeat | `Tasks.ReadWrite` | No | — |
 
 ### SharePoint and OneDrive
 

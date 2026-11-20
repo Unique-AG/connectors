@@ -32,7 +32,7 @@ the [tool reference](README.md).
 
 **On this page**
 
-- Outlook: [Finding and reading mail](#finding-and-reading-mail), [Drafting and sending mail](#drafting-and-sending-mail), [Organizing the mailbox](#organizing-the-mailbox), [Mailbox preferences](#mailbox-preferences), [Reading the calendar](#reading-the-calendar), [Scheduling and answering meetings](#scheduling-and-answering-meetings), [Sharing and delegating calendars](#sharing-and-delegating-calendars), [Managing contacts](#managing-contacts)
+- Outlook: [Finding and reading mail](#finding-and-reading-mail), [Drafting and sending mail](#drafting-and-sending-mail), [Organizing the mailbox](#organizing-the-mailbox), [Mailbox preferences](#mailbox-preferences), [Reading the calendar](#reading-the-calendar), [Scheduling and answering meetings](#scheduling-and-answering-meetings), [Sharing and delegating calendars](#sharing-and-delegating-calendars), [Managing contacts](#managing-contacts), [Keeping track of tasks](#keeping-track-of-tasks)
 - Teams: [Catching up on Teams](#catching-up-on-teams), [Posting in Teams](#posting-in-teams), [Running Teams chats and online meetings](#running-teams-chats-and-online-meetings)
 - SharePoint: [Finding and reading files in OneDrive and SharePoint](#finding-and-reading-files-in-onedrive-and-sharepoint), [Organizing and sharing files in OneDrive and SharePoint](#organizing-and-sharing-files-in-onedrive-and-sharepoint), [Finding and reading SharePoint lists](#finding-and-reading-sharepoint-lists)
 - OneNote: [Working with notes in OneNote](#working-with-notes-in-onenote)
@@ -5145,6 +5145,195 @@ Situation: Mia has the contact "Tom Berger" with the address "tom@acme.example".
 What happens:
 
 - The assistant lists "Tom Berger".
+
+### Keeping track of tasks
+
+Mia keeps her to-dos in Microsoft To Do, and Outlook shows the same tasks. Mia asks her assistant to find her tasks, to add a task, and to mark a task done.
+
+#### The assistant finds Mia's tasks
+
+**The lists show which one is built in and which one is shared**
+
+Ask your assistant: "What task lists do I have?"
+
+Tests: 1
+
+Situation: Mia has the built-in Tasks list, the list of flagged mail, and the list "Team launch" that Anna shares with her.
+
+What happens:
+
+- The assistant lists the three lists.
+- It tells Mia that "Team launch" is shared.
+
+**The open tasks due this week are found by the day of Mia**
+
+Ask your assistant: "What is due this week?"
+
+Tests: 1
+
+Situation: Mia works in Zurich and her Tasks list holds "Send the Q3 report" due on Friday 27 November. The list holds an open task due next week, a completed task, and a task with no due date.
+
+What happens:
+
+- The assistant shows only "Send the Q3 report", due on 27 November.
+
+**Completed tasks are found by a word of their title**
+
+Ask your assistant: "Which report tasks did I complete?"
+
+Tests: 1
+
+Situation: Mia has the completed task "Old report" and the open task "Send the Q3 report".
+
+What happens:
+
+- The assistant shows only "Old report".
+
+**A task is read with its notes**
+
+Ask your assistant: "What does my task Send the Q3 report say?"
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" has the notes "Use the numbers from Anna.".
+
+What happens:
+
+- The assistant answers with the notes and the due date.
+
+#### The assistant changes Mia's tasks without a question
+
+**A task is added with a due date and nobody is asked**
+
+Ask your assistant: "Add Send the Q3 report to my tasks, due Friday, high priority."
+
+Tests: 1
+
+Situation: Mia works in Zurich.
+
+What happens:
+
+- The Tasks list holds "Send the Q3 report", due on 27 November.
+- No question is put to Mia first.
+
+**A task is marked done**
+
+Ask your assistant: "Mark Send the Q3 report as done."
+
+Tests: 1
+
+Situation: Mia has the open task "Send the Q3 report".
+
+What happens:
+
+- The task is completed.
+
+**A task is reopened and its due date is removed**
+
+Ask your assistant: "Reopen Send the Q3 report and remove its due date."
+
+Tests: 1
+
+Situation: Mia has the completed task "Send the Q3 report" with a due date.
+
+What happens:
+
+- The task is open again and has no due date.
+
+#### Mia is told why a task cannot be found or changed
+
+**A list name is not taken as a list**
+
+Ask your assistant: "Add Book the venue to my Tasks list."
+
+Tests: 1
+
+Situation: Mia has the list "Tasks".
+
+What happens:
+
+- No task is created.
+- The assistant is told to take the handle from the list of task lists.
+
+**A task handle is required to read a task**
+
+Ask your assistant: "Read my task."
+
+Tests: 1
+
+Situation: Mia has the list "Tasks".
+
+What happens:
+
+- Nothing is read.
+- The assistant is told that a list handle is not a task handle.
+
+**An update that changes nothing is refused**
+
+Ask your assistant: "Change my task Send the Q3 report."
+
+Tests: 1
+
+Situation: Mia has the task "Send the Q3 report".
+
+What happens:
+
+- Nothing is changed.
+
+**A due date and its removal together are refused**
+
+Ask your assistant: "Set the due date of Send the Q3 report to Friday and remove it."
+
+Tests: 1
+
+Situation: Mia has the task "Send the Q3 report".
+
+What happens:
+
+- Nothing is changed.
+
+**A Windows zone name is refused**
+
+Ask your assistant: "What is due this week?"
+
+Tests: 1
+
+Situation: Mia works in Zurich.
+
+What happens:
+
+- Nothing is read.
+- The assistant is told to name an IANA zone such as "Europe/Zurich".
+
+**A deleted task sends the assistant back to the list**
+
+Ask your assistant: "Mark Send the Q3 report as done."
+
+Tests: 1
+
+Situation: Mia deleted the task "Send the Q3 report" in To Do.
+
+What happens:
+
+- The assistant tells Mia that the task is gone.
+- The assistant is told to find the task again in its list.
+
+**A deleted list sends the assistant back to the lists**
+
+Ask your assistant: "What is in Team launch?"
+
+Tests: 1
+
+Situation: Anna stopped sharing the list "Team launch" with Mia.
+
+What happens:
+
+- The assistant tells Mia that the list is gone.
+- The assistant is told to list the task lists again.
+
+#### Not supported yet in keeping track of tasks
+
+- The assistant reads only Mia's own tasks and the lists that people share with her, not the tasks of another person or of a shared mailbox.
 
 ## Teams
 

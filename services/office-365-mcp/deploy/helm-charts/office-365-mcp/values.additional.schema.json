@@ -60,7 +60,7 @@
               "oneOf": [
                 {
                   "type": "string",
-                  "pattern": "^\\s*(teams|teams-chat|teams-messages|teams-channels|teams-transcripts|teams-call-transcripts|teams-recordings|teams-meetings|teams-write|teams-write-files|teams-edit|teams-meetings-write|teams-chat-admin|teams-files|outlook-read|outlook-mailbox|outlook-write|outlook-delete|outlook-send|outlook-automate|outlook-rules|outlook-calendar|outlook-calendar-write|outlook-calendar-manage|outlook-calendar-delegate|outlook-calendar-rooms|outlook-group-calendar|outlook-contacts|outlook-contacts-write|sharepoint-search|sharepoint-read|sharepoint-write|sharepoint-share|sharepoint-sites|sharepoint-lists|sharepoint-lists-write|sharepoint-lists-delete|onenote-read|onenote-write|onenote-delete)(\\s*,\\s*(teams|teams-chat|teams-messages|teams-channels|teams-transcripts|teams-call-transcripts|teams-recordings|teams-meetings|teams-write|teams-write-files|teams-edit|teams-meetings-write|teams-chat-admin|teams-files|outlook-read|outlook-mailbox|outlook-write|outlook-delete|outlook-send|outlook-automate|outlook-rules|outlook-calendar|outlook-calendar-write|outlook-calendar-manage|outlook-calendar-delegate|outlook-calendar-rooms|outlook-group-calendar|outlook-contacts|outlook-contacts-write|sharepoint-search|sharepoint-read|sharepoint-write|sharepoint-share|sharepoint-sites|sharepoint-lists|sharepoint-lists-write|sharepoint-lists-delete|onenote-read|onenote-write|onenote-delete))*\\s*$"
+                  "pattern": "^\\s*(teams|teams-chat|teams-messages|teams-channels|teams-transcripts|teams-call-transcripts|teams-recordings|teams-meetings|teams-write|teams-write-files|teams-edit|teams-meetings-write|teams-chat-admin|teams-files|outlook-read|outlook-mailbox|outlook-write|outlook-delete|outlook-send|outlook-automate|outlook-rules|outlook-calendar|outlook-calendar-write|outlook-calendar-manage|outlook-calendar-delegate|outlook-calendar-rooms|outlook-group-calendar|outlook-contacts|outlook-contacts-write|outlook-tasks|outlook-tasks-write|sharepoint-search|sharepoint-read|sharepoint-write|sharepoint-share|sharepoint-sites|sharepoint-lists|sharepoint-lists-write|sharepoint-lists-delete|onenote-read|onenote-write|onenote-delete)(\\s*,\\s*(teams|teams-chat|teams-messages|teams-channels|teams-transcripts|teams-call-transcripts|teams-recordings|teams-meetings|teams-write|teams-write-files|teams-edit|teams-meetings-write|teams-chat-admin|teams-files|outlook-read|outlook-mailbox|outlook-write|outlook-delete|outlook-send|outlook-automate|outlook-rules|outlook-calendar|outlook-calendar-write|outlook-calendar-manage|outlook-calendar-delegate|outlook-calendar-rooms|outlook-group-calendar|outlook-contacts|outlook-contacts-write|outlook-tasks|outlook-tasks-write|sharepoint-search|sharepoint-read|sharepoint-write|sharepoint-share|sharepoint-sites|sharepoint-lists|sharepoint-lists-write|sharepoint-lists-delete|onenote-read|onenote-write|onenote-delete))*\\s*$"
                 },
                 {
                   "type": "array",
@@ -97,6 +97,8 @@
                       "outlook-group-calendar",
                       "outlook-contacts",
                       "outlook-contacts-write",
+                      "outlook-tasks",
+                      "outlook-tasks-write",
                       "sharepoint-search",
                       "sharepoint-read",
                       "sharepoint-write",

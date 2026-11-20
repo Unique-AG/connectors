@@ -225,6 +225,25 @@ class ContactHandle:
 
 
 @dataclass(frozen=True, slots=True)
+class TaskListHandle:
+    list_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///tasklists/{_segment(self.list_id)}"
+
+
+@dataclass(frozen=True, slots=True)
+class TaskHandle:
+    list_id: str
+    task_id: str
+
+    @property
+    def uri(self) -> str:
+        return f"outlook:///tasks/{_segment(self.list_id)}/{_segment(self.task_id)}"
+
+
+@dataclass(frozen=True, slots=True)
 class DriveFileHandle:
     drive_id: str
     item_id: str
@@ -342,6 +361,8 @@ _EVENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)\Z")
 _EVENT_ATTACHMENT_HANDLE = re.compile(r"\Aoutlook:///events/([^/]+)/([^/]+)/attachments/([^/]+)\Z")
 _CALENDAR_PERMISSION_HANDLE = re.compile(r"\Aoutlook:///calendarpermissions/([^/]+)/([^/]+)\Z")
 _CONTACT_HANDLE = re.compile(r"\Aoutlook:///contacts/([^/]+)\Z")
+_TASK_LIST_HANDLE = re.compile(r"\Aoutlook:///tasklists/([^/]+)\Z")
+_TASK_HANDLE = re.compile(r"\Aoutlook:///tasks/([^/]+)/([^/]+)\Z")
 _DRIVE_FILE_HANDLE = re.compile(r"\Asharepoint:///files/([^/]+)/([^/]+)\Z")
 _DRIVE_FOLDER_HANDLE = re.compile(r"\Asharepoint:///folders/([^/]+)/([^/]+)\Z")
 _LIST_HANDLE = re.compile(r"\Asharepoint:///lists/([^/]+)/([^/]+)\Z")
@@ -480,6 +501,16 @@ def calendar_permission_handle(uri: str) -> CalendarPermissionHandle | None:
 def contact_handle(uri: str) -> ContactHandle | None:
     contact_id = _single_id(_CONTACT_HANDLE, uri)
     return None if contact_id is None else ContactHandle(contact_id)
+
+
+def task_list_handle(uri: str) -> TaskListHandle | None:
+    list_id = _single_id(_TASK_LIST_HANDLE, uri)
+    return None if list_id is None else TaskListHandle(list_id)
+
+
+def task_handle(uri: str) -> TaskHandle | None:
+    ids = _two_ids(_TASK_HANDLE, uri)
+    return None if ids is None else TaskHandle(*ids)
 
 
 def drive_file_handle(uri: str) -> DriveFileHandle | None:

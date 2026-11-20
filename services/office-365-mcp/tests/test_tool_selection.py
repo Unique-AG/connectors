@@ -576,10 +576,20 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "onenote_get_operation": {
         "operation": ("onenote_copy_page", "onenote_copy_section", "onenote_copy_notebook")
     },
+    "outlook_list_tasks": {"task_list": ("outlook_list_task_lists",)},
+    "outlook_create_task": {"task_list": ("outlook_list_task_lists",)},
+    "outlook_read_task": {"uri": ("outlook_list_tasks", "outlook_create_task")},
+    "outlook_update_task": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
+    "outlook_complete_task": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
 }
 
 
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
+    "outlook_create_task": frozenset({"title"}),
     "teams_send_chat_message": frozenset({"message", "name"}),
     "teams_send_channel_message": frozenset({"message", "name"}),
     "teams_send_chat_message_with_files": frozenset({"message", "name"}),
@@ -1203,6 +1213,13 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ("User.Read", "Contacts.Read", "Contacts.ReadWrite"),
         0,
         5,
+    ),
+    (ToolsPreset.OUTLOOK_TASKS, ("User.Read", "Tasks.Read"), 0, 4),
+    (
+        ToolsPreset.OUTLOOK_TASKS_WRITE,
+        ("User.Read", "Tasks.Read", "Tasks.ReadWrite"),
+        0,
+        7,
     ),
     (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 4),
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 5),

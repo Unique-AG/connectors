@@ -601,7 +601,12 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
         "created_after",
         "created_before",
     ),
+    "outlook_list_tasks": ("due_after", "due_before"),
 }
+
+_A_DUE_DAY_IS_ONE_DAY_NOT_A_WINDOW: frozenset[str] = frozenset(
+    {"outlook_create_task.due_date", "outlook_update_task.due_date"}
+)
 
 
 _MESSAGE_TOOLS: tuple[str, ...] = (
@@ -697,6 +702,9 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_delete_calendar",
         "outlook_create_contact",
         "outlook_update_contact",
+        "outlook_create_task",
+        "outlook_update_task",
+        "outlook_complete_task",
         "onenote_create_page",
         "onenote_append_to_page",
         "onenote_create_notebook",
@@ -826,7 +834,7 @@ class TestTheToolsThisServerAdvertises:
                 if formats & {"date", "date-time"}:
                     found.add(f"{tool.name}.{name}")
 
-        assert found == recorded, (
+        assert found == recorded | _A_DUE_DAY_IS_ONE_DAY_NOT_A_WINDOW, (
             "a date-shaped argument is either a search window — record it in `_WINDOWED_TOOLS`, "
             + "where the test above holds it to both shapes — or it is not a window at all, in "
             + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"

@@ -1,0 +1,188 @@
+uc-17-01:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_the_lists_show_which_is_built_in_and_which_is_shared"
+  ask: "What task lists do I have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+
+uc-17-02:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_open_tasks_due_this_week_are_listed_by_the_day_of_the_user"
+  ask: "What is due this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {due_after: monday, due_before: sunday, time_zone: Europe/Zurich}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-03:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_completed_tasks_are_listed_by_a_word_of_their_title"
+  ask: "Which report tasks did I complete?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {show: completed, title_contains: report}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-04:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_a_task_is_read_with_its_notes"
+  ask: "What does my task Send the Q3 report say?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+
+uc-17-05:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestChangingTasks::test_a_task_is_created_due_at_midnight_of_the_user_and_nobody_is_asked"
+  ask: "Add Send the Q3 report to my tasks, due Friday, high priority."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Send the Q3 report, due_date: friday, priority: high, time_zone: Europe/Zurich}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-06:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestChangingTasks::test_a_task_is_completed"
+  ask: "Mark Send the Q3 report as done."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_complete_task
+      uses: {uri: uri of the task}
+
+uc-17-07:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestChangingTasks::test_a_task_is_reopened_and_its_due_date_is_removed"
+  ask: "Reopen Send the Q3 report and remove its due date."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {show: completed, title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_update_task
+      args: {status: not_started, clear_due_date: true}
+      uses: {uri: uri of the task}
+
+uc-17-08:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_list_name_is_refused_before_any_call"
+  ask: "Add Book the venue to my Tasks list."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_create_task
+      args: {task_list: Tasks, title: Book the venue}
+
+uc-17-09:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_list_handle_is_refused_where_a_task_belongs"
+  ask: "Read my task."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_read_task
+      args: {uri: the handle of a list}
+
+uc-17-10:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_an_update_that_changes_nothing_is_refused"
+  ask: "Change my task Send the Q3 report."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_update_task
+      uses: {uri: uri of the task}
+
+uc-17-11:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_due_date_and_its_removal_together_are_refused"
+  ask: "Set the due date of Send the Q3 report to Friday and remove it."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_update_task
+      args: {due_date: friday, clear_due_date: true}
+      uses: {uri: uri of the task}
+
+uc-17-12:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_windows_zone_name_is_refused"
+  ask: "What is due this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_tasks
+      args: {time_zone: W. Europe Standard Time}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-13:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_deleted_task_sends_the_assistant_back_to_the_list"
+  ask: "Mark Send the Q3 report as done."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_complete_task
+      uses: {uri: uri of a deleted task}
+
+uc-17-14:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_deleted_list_sends_the_assistant_back_to_the_lists"
+  ask: "What is in Team launch?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      uses: {task_list: uri of a list that is gone}
+
+uc-17-15:
+  status: gap
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_the_tasks_of_another_person_are_not_offered"
+  ask: "What are Anna's tasks?"
+  blocker:
+    kind: graph
+    tool: outlook_list_task_lists
+    text: Microsoft Graph documents To Do access for the signed-in user only, with no delegated access to the lists of another person or of a shared mailbox.
+    user: The assistant reads only Mia's own tasks and the lists that people share with her, not the tasks of another person or of a shared mailbox.
+  provenance: drafted
+  asks_user: false
+  chain: []

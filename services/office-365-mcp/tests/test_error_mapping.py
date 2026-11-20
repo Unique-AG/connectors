@@ -86,6 +86,7 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_create_event_on_behalf",
         "outlook_create_folder",
         "outlook_create_mail_rule",
+        "outlook_create_task",
         "outlook_delete_folder",
         "outlook_draft_mail",
         "outlook_draft_reply",

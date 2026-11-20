@@ -8,13 +8,13 @@ A scenario is `working` when the connector meets it, `partly` when a limit block
 
 | Surface | working | partly | gap | total |
 | --- | --- | --- | --- | --- |
-| Outlook | 375 | 0 | 1 | 376 |
+| Outlook | 389 | 0 | 2 | 391 |
 | Teams | 146 | 0 | 0 | 146 |
 | SharePoint | 107 | 0 | 3 | 110 |
 | OneNote | 73 | 0 | 1 | 74 |
 | Across sources | 26 | 0 | 0 | 26 |
 
-Scenarios with an executable run: 19 of 732.
+Scenarios with an executable run: 19 of 747.
 
 ## Tests by surface
 
@@ -22,13 +22,13 @@ A scenario has `tests` (node ids of pytest tests), or `no_test` (a kind and a re
 
 | Surface | tests | no test | pending | total |
 | --- | --- | --- | --- | --- |
-| Outlook | 366 | 10 | 0 | 376 |
+| Outlook | 381 | 10 | 0 | 391 |
 | Teams | 142 | 4 | 0 | 146 |
 | SharePoint | 109 | 1 | 0 | 110 |
 | OneNote | 73 | 1 | 0 | 74 |
 | Across sources | 25 | 1 | 0 | 26 |
 
-Scenarios with an executable test: 715 of 732 (17 with an explained reason, 0 pending).
+Scenarios with an executable test: 730 of 747 (17 with an explained reason, 0 pending).
 
 ## Happy and unhappy paths by surface
 
@@ -36,7 +36,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 | Surface | happy | unhappy | total |
 | --- | --- | --- | --- |
-| Outlook | 164 | 212 | 376 |
+| Outlook | 171 | 220 | 391 |
 | Teams | 53 | 93 | 146 |
 | SharePoint | 41 | 69 | 110 |
 | OneNote | 30 | 44 | 74 |
@@ -60,12 +60,13 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
 | `uc-08-02` | Working with notes in OneNote | A page is found by a word that is only in its body | gap | `onenote_list_pages` | Microsoft Graph has no full-text search over the words of a page for a work or school account. |
+| `uc-17-15` | Keeping track of tasks | The tasks of another person are read | gap | `outlook_list_task_lists` | Microsoft Graph documents To Do access for the signed-in user only, with no delegated access to the lists of another person or of a shared mailbox. |
 
 ## It fails in prod and the cause is not known
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 14 of 732. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 14 of 747. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |
@@ -89,7 +90,7 @@ Scenarios tagged `@deferred`: 14 of 732. Recorder cases with a `deferred` reason
 
 ## Tool coverage
 
-127 of 130 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
+133 of 136 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
 
 | Tool | happy | unhappy | Reason |
 | --- | --- | --- | --- |

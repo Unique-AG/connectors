@@ -24,6 +24,21 @@ READ_TOOLS = frozenset(
         "outlook_suggest_meeting_times",
     }
 )
+_NO_TODO_CORPUS = (
+    "The dogfood app registration does not grant Tasks.Read or Tasks.ReadWrite yet, so the seed "
+    "run has no To Do corpus to record or scrub."
+)
+UNRECORDED: Mapping[str, str] = dict.fromkeys(
+    (
+        "outlook_list_task_lists",
+        "outlook_list_tasks",
+        "outlook_read_task",
+        "outlook_create_task",
+        "outlook_update_task",
+        "outlook_complete_task",
+    ),
+    _NO_TODO_CORPUS,
+)
 READ_POSTS: Mapping[str, tuple[str, ...]] = {
     "outlook_check_availability": ("POST /v1.0/me/calendar/getSchedule",),
     "outlook_suggest_meeting_times": ("POST /v1.0/me/findMeetingTimes",),
