@@ -268,7 +268,8 @@ export class SemanticSearchEmailsQuery {
         const folderId = metadata.parentFolderId ?? '';
 
         const result: SearchEmailResult = {
-          title: item.content.title ?? '',
+          // The content title is the ingested file name, `<subject>.eml`.
+          title: metadata.subject ?? item.content.title?.replace(/\.eml$/, '') ?? '',
           uniqueContentId: item.content.id,
           uniqueContentUrl: item.content.url ?? undefined,
           outlookWebLink: metadata.webLink ?? '',
@@ -302,31 +303,23 @@ export class SemanticSearchEmailsQuery {
 
     // Semantic-backend IDs are always immutable. For delegated mailboxes the stored webLink may
     // use the new outlook.cloud.microsoft format (broken for some tenants) — translate the
-    // immutable ID to a RestId and construct a working OWA URL.
-    const buildWebLinksForIds = rawResults.flatMap((message) => {
-      if (!message.sourceMailbox) {
-        return [];
-      }
-
-      return [
-        {
-          id: message.msGraphMessageId,
-          isImmutable: true,
-          mailbox: message.sourceMailbox,
-          webLink: message.outlookWebLink,
-        },
-      ];
-    });
-
+    // immutable ID to a RestId and construct a working OWA URL. A message whose mailbox is
+    // unknown is opened from the signed-in mailbox, so its stored webLink is kept the same way.
+    const mailboxOf = (message: SearchEmailResult) => message.sourceMailbox ?? userProfile.email;
     const webLinks = await this.buildWebLinksCommand.run({
       userProfileId: userProfile.id,
       userProfileEmail: userProfile.email,
-      ids: buildWebLinksForIds,
+      ids: rawResults.map((message) => ({
+        id: message.msGraphMessageId,
+        isImmutable: true,
+        mailbox: mailboxOf(message),
+        webLink: message.outlookWebLink,
+      })),
     });
 
     const results = rawResults.map((message) => ({
       ...message,
-      outlookWebLink: webLinks.get(message.sourceMailbox, message.msGraphMessageId),
+      outlookWebLink: webLinks.get(mailboxOf(message), message.msGraphMessageId),
     }));
 
     return results;

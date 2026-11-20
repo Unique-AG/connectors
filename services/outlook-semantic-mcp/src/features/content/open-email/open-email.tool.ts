@@ -82,6 +82,14 @@ const OpenEmailByIdOutputSchema = z.object({
   success: z.boolean(),
   status: z.string().optional(),
   message: z.string().optional(),
+  title: z.string().nullable().optional().describe('Subject of the email.'),
+  webLink: z
+    .string()
+    .nullable()
+    .optional()
+    .describe(
+      'Direct URL to open this email in Outlook on the web. When null, show the subject as plain text. Never construct or guess an email URL.',
+    ),
   emailData: EmailDataSchema.optional(),
 });
 
@@ -126,8 +134,8 @@ export class OpenEmailTool {
 
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
     try {
-      const emailData = await this.openEmailQuery.run({
-        userProfileId: userProfileTypeId.toString(),
+      const { webLink, ...emailData } = await this.openEmailQuery.run({
+        userProfileId: userProfileTypeId,
         id: input.id,
         mailbox: input.mailbox,
         folderId: input.parentFolderId,
@@ -137,7 +145,7 @@ export class OpenEmailTool {
         chunkIds: input.chunkIds,
         outputTimeZone: outputTimeZone,
       });
-      return { success: true, emailData };
+      return { success: true, title: emailData.title, webLink, emailData };
     } catch (err) {
       // 404: deleted or moved in Outlook since it was indexed. 400: an id Graph does not accept,
       // such as a Unique content id from `openEmailParams` of an older search.
