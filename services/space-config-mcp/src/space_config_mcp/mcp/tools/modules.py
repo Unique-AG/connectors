@@ -520,7 +520,7 @@ async def get_magic_table_config(
         str | None,
         Field(
             default=None,
-            pattern=r"^[a-zA-Z0-9_-]+$",
+            pattern=r"^assistant_[a-z0-9]+$",
             description=(
                 "ID of the Magic Table space to read. Defaults to the current space. "
                 "Set this when calling from a Conduct or command space to read a "
@@ -563,7 +563,7 @@ async def update_magic_table_config(  # noqa: PLR0913
         str | None,
         Field(
             default=None,
-            pattern=r"^[a-zA-Z0-9_-]+$",
+            pattern=r"^assistant_[a-z0-9]+$",
             description=(
                 "ID of the Magic Table space to update. Defaults to the current space. "
                 "Set this when calling from a Conduct or command space to configure a "
