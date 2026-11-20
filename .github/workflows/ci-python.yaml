@@ -7,7 +7,7 @@ on:
   # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
   # Only `paths` decides when the workflow runs.
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "packages/mcp-architecture/**"
       - "packages/mcp-configs/**"
@@ -45,10 +45,12 @@ concurrency:
 jobs:
   detect-changes:
     name: Detect changes (Python)
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
       packages: ${{ steps.build-matrix.outputs.packages }}
+      deploy-packages: ${{ steps.build-matrix.outputs.deploy-packages }}
       shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
       mcp-architecture-changed: ${{ steps.filter.outputs.mcp_architecture }}
       mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
@@ -177,12 +179,19 @@ jobs:
           fi
 
           echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
+            deploy_packages="$packages"
+          else
+            deploy_packages=$(echo "${SERVICES_FILES:-[]}" | jq -c --argjson packages "$packages" '[.[] | split("/") | select(.[0] == "services" and .[2] == "deploy") | .[1] | select(. as $name | $packages | index($name))] | unique')
+          fi
+          echo "deploy-packages=$deploy_packages" >> "$GITHUB_OUTPUT"
           echo "Python packages to validate: $packages"
 
   # Each project keeps its own uv.lock, and a bump of one package can reach one project only, so
   # versions drift between alignments. This lists the drift as a warning and never fails.
   version-drift:
     name: Report Python version drift
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-slim
     timeout-minutes: 5
     steps:
@@ -489,11 +498,11 @@ jobs:
   validate-helm:
     name: Helm ${{ matrix.package }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.packages != '[]'
+    if: needs.detect-changes.outputs.deploy-packages != '[]'
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+        package: ${{ fromJson(needs.detect-changes.outputs.deploy-packages) }}
     permissions:
       contents: read # to let the called workflow read the repository
       packages: read # to let the called workflow pull the base chart from GHCR
@@ -505,11 +514,11 @@ jobs:
   validate-terraform:
     name: Terraform ${{ matrix.package }}
     needs: detect-changes
-    if: needs.detect-changes.outputs.packages != '[]'
+    if: needs.detect-changes.outputs.deploy-packages != '[]'
     strategy:
       fail-fast: false
       matrix:
-        package: ${{ fromJson(needs.detect-changes.outputs.packages) }}
+        package: ${{ fromJson(needs.detect-changes.outputs.deploy-packages) }}
     permissions:
       contents: read # to let the called workflow read the repository
     uses: ./.github/workflows/_template-terraform.yaml

@@ -37,6 +37,8 @@ Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suit
 
 To run the same commands on your machine, use Helm v3.19.0. This is the version that CI uses, and a newer version can report more problems. Install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the commands in the chart directory, as CI does.
 
+CI validates the Helm chart and the Terraform modules of a service only when a file in `services/<service>/deploy` changes. It also validates them when a CI workflow file changes. A change to a shared package or to `pnpm-lock.yaml` does not start this validation.
+
 ## Release Workflows
 
 release-please opens one release pull request for each service. Merge it to start `[Release] Please`. The workflow handles each released service that has a Helm chart. It builds the image from the release tag and signs it. It also pushes the chart, scans the image, and publishes the docs in `services/<service>/docs` to Confluence.
@@ -206,6 +208,8 @@ poor trade for a local-only inconvenience.
 2. `docker-compose up -d`
 3. Make changes, run `pnpm check-all`
 4. Open a PR — releases are automated via [release-please](https://github.com/googleapis/release-please)
+
+The `[CI]` workflows, `[Security] Dependency Review`, and `[Security] Pinned Actions` do not run on a draft pull request. They start when you mark the pull request ready for review.
 
 ## Releases
 
