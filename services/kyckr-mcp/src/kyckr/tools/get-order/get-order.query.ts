@@ -8,8 +8,10 @@ import {
   KyckrOrderDetailsAgentSchema,
   KyckrOrderDetailsSchema,
   McpEnvelopeShape,
+  OrderTitleSchema,
 } from '../../schemas/kyckr-response.schemas';
 import { appendDetail, fetchOrder, stripLinks } from '../_shared/fetch-order';
+import { orderTitle } from '../_shared/titles';
 
 export const GetOrderInputSchema = z.object({
   orderId: z
@@ -32,6 +34,7 @@ const GetOrderEnvelopeSchema = z
 export const GetOrderOutputSchema = z
   .object({
     ...McpEnvelopeShape,
+    title: OrderTitleSchema,
     data: KyckrOrderDetailsAgentSchema.optional(),
   })
   .loose();
@@ -69,6 +72,7 @@ export class GetOrderQuery {
         return {
           success: true,
           ...response,
+          title: orderTitle(response.data),
           data: dataWithoutLinks,
         };
       }
@@ -80,6 +84,7 @@ export class GetOrderQuery {
       return {
         success: true,
         ...response,
+        title: orderTitle(response.data),
         details: appendDetail(response.details, detail),
         data: { ...dataWithoutLinks, documentJson },
       };

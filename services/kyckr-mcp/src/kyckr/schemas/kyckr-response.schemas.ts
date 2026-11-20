@@ -72,6 +72,22 @@ export const McpEnvelopeShape = {
   ...KyckrBaseResponseShape,
 } as const;
 
+// Kyckr returns no page a user can open for a company or order, so these titled
+// results carry no link; the API's own `links` are API paths, not web pages.
+export const CompanyTitleSchema = z
+  .string()
+  .optional()
+  .describe(
+    'Display title of the company: its registered name, or its English name when the registry gives no other. Cite the company by this title.',
+  );
+
+export const OrderTitleSchema = z
+  .string()
+  .optional()
+  .describe(
+    'Display title of the order: the ordered product and the company, e.g. "Annual Accounts 2025 - Acme Ltd". Cite the order by this title.',
+  );
+
 export const KyckrNormalizedDateSchema = z
   .object({
     original: z

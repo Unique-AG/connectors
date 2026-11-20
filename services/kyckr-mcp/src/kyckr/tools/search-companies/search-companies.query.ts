@@ -3,7 +3,12 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
 import { type KyckrToolCallResult, Metrics } from '../../metrics';
-import { KyckrBaseResponseShape, McpEnvelopeShape } from '../../schemas/kyckr-response.schemas';
+import {
+  CompanyTitleSchema,
+  KyckrBaseResponseShape,
+  McpEnvelopeShape,
+} from '../../schemas/kyckr-response.schemas';
+import { companyTitle } from '../_shared/titles';
 
 export const SearchCompaniesInputSchema = z
   .object({
@@ -80,7 +85,7 @@ export const SearchCompaniesOutputSchema = z
   .object({
     ...McpEnvelopeShape,
     data: z
-      .array(SearchResultItemSchema)
+      .array(SearchResultItemSchema.extend({ title: CompanyTitleSchema }))
       .optional()
       .describe(
         'Companies matched by the search. Empty array when the registry has no matches. Absent on error.',
@@ -117,7 +122,11 @@ export class SearchCompaniesQuery {
       this.metrics.recordCreditsConsumed('search_companies', response.cost?.value ?? 0);
       this.logger.debug({ resultCount: response.data?.length ?? 0 }, 'search_companies: succeeded');
 
-      return { success: true, ...response };
+      return {
+        success: true,
+        ...response,
+        data: response.data?.map((company) => ({ ...company, title: companyTitle(company) })),
+      };
     } catch (err) {
       result = 'error';
       if (err instanceof KyckrApiError) {
