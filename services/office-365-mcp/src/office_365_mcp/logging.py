@@ -72,8 +72,14 @@ _SENSITIVE_QUERY_NAME = re.compile(
 )
 
 
-_QUERY_NAME = re.compile(r"[?&]([A-Za-z0-9_.%\[\]+-]+)=")
-_QUERY_VALUE_END = re.compile(r"[&\s\"]|$")
+_QUERY_NAME = re.compile(
+    r"(?:[?&#;]|%3[Ff]|%26)((?:[A-Za-z0-9_.\[\]+-]|%(?!26|3[DdFf])[0-9A-Fa-f]{2})+)(?:=|%3[Dd])"
+)
+_QUERY_VALUE_END = re.compile(r"[&#\s\"]|%26|$")
+_KEYED_VALUE = re.compile(
+    r"""(?<![A-Za-z0-9_.-])(?P<quote>['"]?)(?P<key>[A-Za-z_][A-Za-z0-9_.-]*)(?P=quote)\s*[:=]\s*"""
+    + r"""(?:'(?P<single>(?:[^'\\]|\\.)*)'|"(?P<double>(?:[^"\\]|\\.)*)")"""
+)
 
 
 def _censor_query_values(text: str) -> str:
@@ -160,11 +166,18 @@ def _is_sensitive(name: object) -> bool:
     return any(marker in normalised for marker in _SENSITIVE_MARKERS)
 
 
+def _censor_keyed_value(found: re.Match[str]) -> str:
+    value = "single" if found["single"] is not None else "double"
+    if not found[value] or not _is_sensitive(found["key"]):
+        return found[0]
+    return found[0][: found.start(value) - found.start()] + CENSORED + found[0][-1]
+
+
 def _censor_text(text: str) -> str:
     censored = text
     for pattern, replacement in _CREDENTIAL_SHAPES:
         censored = pattern.sub(replacement, censored)
-    return _censor_query_values(censored)
+    return _censor_query_values(_KEYED_VALUE.sub(_censor_keyed_value, censored))
 
 
 def _censor_bytes(value: bytes) -> bytes:

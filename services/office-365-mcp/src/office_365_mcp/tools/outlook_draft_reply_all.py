@@ -245,9 +245,12 @@ async def draft_reply_all(
             original = await read_original(reached, handle, fields=_ORIGINAL_FIELDS)
             addressed = _addressed(original)
             original_cc = spelled_recipients(original.cc_recipients)
-            recorded = _recorded(
-                [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
-                original.cc_recipients,
+            recorded = _not_yet_on(
+                _recorded(
+                    [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
+                    original.cc_recipients,
+                ),
+                [mailbox],
             )
             copied = [*original_cc, *_not_yet_on(added, recorded)]
             blind = _not_yet_on(blind_added, recorded)

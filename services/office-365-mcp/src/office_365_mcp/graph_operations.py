@@ -19,12 +19,12 @@ from office_365_mcp.shared.seam import TokenExchangeFailed
 __all__ = [
     "TOOL_OUTCOMES",
     "TOOL_OUTCOMES_TOTAL",
-    "TOOL_REFUSALS",
     "GraphOperationMiddleware",
+    "is_refusal",
     "start_tool_outcomes",
 ]
 
-TOOL_REFUSALS: tuple[type[Exception], ...] = (ToolError, ValidationError, ArgumentsRejected)
+_TOOL_REFUSALS: tuple[type[Exception], ...] = (ToolError, ValidationError, ArgumentsRejected)
 
 TOOL_OUTCOMES_TOTAL = "tool_outcomes_total"
 TOOL_OUTCOMES: tuple[str, ...] = (
@@ -96,6 +96,10 @@ def _ending(error: Exception) -> BaseException:
     return error
 
 
+def is_refusal(error: Exception) -> bool:
+    return isinstance(_ending(error), _TOOL_REFUSALS)
+
+
 def _outcome(error: Exception) -> str:
     ending = _ending(error)
     if any(isinstance(cause, TokenExchangeFailed) for cause in _causes(ending)):
@@ -121,7 +125,7 @@ class GraphOperationMiddleware(Middleware):
         if name == UNRESOLVED_NAME:
             return await call_next(context)
         try:
-            with measured_graph_operation(name, not_failures=TOOL_REFUSALS):
+            with measured_graph_operation(name, is_refusal=is_refusal):
                 result = await call_next(context)
         except CancelledError:
             _outcomes.add(1, {"operation": name, "outcome": "cancelled"})
