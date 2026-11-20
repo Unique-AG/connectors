@@ -519,11 +519,13 @@ async def get_magic_table_config(
     target_space_id: Annotated[
         str | None,
         Field(
+            default=None,
+            pattern=r"^[a-zA-Z0-9_-]+$",
             description=(
                 "ID of the Magic Table space to read. Defaults to the current space. "
                 "Set this when calling from a Conduct or command space to read a "
                 "Magic Table space that has no chat interface of its own."
-            )
+            ),
         ),
     ] = None,
     upstream: Upstream = Depends(get_upstream),
@@ -560,11 +562,13 @@ async def update_magic_table_config(  # noqa: PLR0913
     target_space_id: Annotated[
         str | None,
         Field(
+            default=None,
+            pattern=r"^[a-zA-Z0-9_-]+$",
             description=(
                 "ID of the Magic Table space to update. Defaults to the current space. "
                 "Set this when calling from a Conduct or command space to configure a "
                 "Magic Table space that has no chat interface of its own."
-            )
+            ),
         ),
     ] = None,
     language_model: Annotated[

@@ -193,7 +193,7 @@ async def update_translator_config(
     existing_nested: dict[str, object] = cast(
         dict[str, object], existing.get("TranslationConfig") or {}
     )
-    patch_dict = patch.model_dump(by_alias=True, exclude_none=True)
+    patch_dict = patch.model_dump(by_alias=True, include=patch.model_fields_set)
     merged_nested = _deep_merge(existing_nested, patch_dict)
     merged: dict[str, object] = {**existing, "TranslationConfig": merged_nested}
     return await upstream.modify_module(user_id, company_id, mod.id, configuration=merged)

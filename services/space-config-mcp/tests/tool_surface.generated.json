@@ -203,6 +203,7 @@
         "target_space_id": {
           "anyOf": [
             {
+              "pattern": "^[a-zA-Z0-9_-]+$",
               "type": "string"
             },
             {
@@ -1273,6 +1274,7 @@
         "target_space_id": {
           "anyOf": [
             {
+              "pattern": "^[a-zA-Z0-9_-]+$",
               "type": "string"
             },
             {
