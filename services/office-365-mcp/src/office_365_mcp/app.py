@@ -35,6 +35,7 @@ from office_365_mcp.logging import (
 )
 from office_365_mcp.metrics import LATENCY_BUCKETS, configure_metrics
 from office_365_mcp.server import (
+    SpendAnsweredState,
     admin_consent_url,
     ready_response,
     request_state_security,
@@ -125,6 +126,7 @@ def create_app(
             ToolCallObservabilityMiddleware(),
             BoundedNameMiddleware(),
             GraphAdviceMiddleware(graph_advice(selection)),
+            SpendAnsweredState(),
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, or its line carries the session task's stale trace.
             MessageLogMiddleware(),

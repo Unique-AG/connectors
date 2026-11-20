@@ -293,12 +293,101 @@ class TestNothingSecretReachesTheLog:
         assert f"cb?token={CENSORED}&page=2" in message, message
         assert "opaque-value" not in sink.stream.getvalue()
 
+    @pytest.mark.parametrize(
+        "line",
+        [
+            '"GET /mcp?next=https%3A%2F%2Fclient.example%2Fcb%3Ftoken%3Dopaque-value HTTP/1.1"',
+            '"GET /mcp?next=https%3A%2F%2Fc.invalid%2Fcb%3Fp%3D2%26token%3Dopaque-value%26a%3D1"',
+            '<a href="/cb?page=2&amp;access_token=opaque-value&amp;state=x">',
+            '"GET /cb#access_token=opaque-value&state=x HTTP/1.1"',
+            '"GET /mcp?api-key=%26opaque-value&amp;page=2 HTTP/1.1"',
+        ],
+        ids=[
+            "encoded nested query",
+            "encoded nested second parameter",
+            "html-escaped",
+            "fragment",
+            "value starting with an encoded ampersand",
+        ],
+    )
+    def test_a_credential_in_another_query_form_is_censored(self, sink: _Sink, line: str) -> None:
+        _log(line)
+
+        assert CENSORED in cast("str", sink.one()["msg"])
+        assert "opaque-value" not in sink.stream.getvalue()
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            "refreshed {'refresh_token': '0.AXcAopaque-value', 'expires_in': 3600}",
+            'refreshed {"client_secret": "opaque-value"}',
+            "Token(access_token='opaque-value', expires_on=1)",
+            '{"api key": "opaque-value"}',
+            '{"detail": "Token(access_token=\'opaque-value\')"}',
+            '{"body": "{\\"token\\": \\"opaque-value\\"}"}',
+        ],
+        ids=[
+            "dict repr",
+            "json",
+            "dataclass repr",
+            "spaced key",
+            "inside a benign value",
+            "escaped json in a value",
+        ],
+    )
+    def test_an_opaque_credential_under_a_sensitive_key_is_censored(
+        self, sink: _Sink, line: str
+    ) -> None:
+        _log(line)
+
+        message = cast("str", sink.one()["msg"])
+        assert CENSORED in message, message
+        assert "opaque-value" not in sink.stream.getvalue()
+
     def test_a_deeply_nested_query_is_logged_and_its_credential_censored(self, sink: _Sink) -> None:
         _log('"GET /mcp' + "?x=" * 1500 + '?token=opaque-value HTTP/1.1"')
 
         message = cast("str", sink.one()["msg"])
         assert message.endswith(f'?x=?token={CENSORED} HTTP/1.1"'), message[-80:]
         assert "opaque-value" not in sink.stream.getvalue()
+
+    @pytest.mark.parametrize(
+        "line",
+        [
+            '"token": "' + "\\" * 60 + "x",
+            "a" * 200_000,
+            "id=AAMkAGI2" + "Q" * 200_000,
+            "?" + "%26" * 70_000,
+            '\\"token\\": \\"' + "\\\\" * 50_000 + "x",
+            '\\"a\\": \\"' * 20_000,
+        ],
+        ids=[
+            "unclosed escapes",
+            "identifier run",
+            "long id",
+            "encoded ampersands",
+            "unclosed escaped value",
+            "escaped keys",
+        ],
+    )
+    def test_a_hostile_line_is_redacted_in_linear_time(self, sink: _Sink, line: str) -> None:
+        started = time.monotonic()
+        _log(line)
+
+        assert time.monotonic() - started < 5.0
+        assert sink.one()["msg"]
+
+    def test_escaped_json_keeps_its_escaping_and_its_other_fields(self, sink: _Sink) -> None:
+        _log('{"body": "{\\"token\\": \\"opaque-value\\", \\"note\\": \\"a \\\\\\"b\\\\\\"\\"}"}')
+
+        assert cast("str", sink.one()["msg"]) == (
+            f'{{"body": "{{\\"token\\": \\"{CENSORED}\\", \\"note\\": \\"a \\\\\\"b\\\\\\"\\"}}"}}'
+        )
+
+    def test_a_key_that_only_contains_auth_keeps_its_value(self, sink: _Sink) -> None:
+        _log('{"author": "Jane", "keyword": "plan"}')
+
+        assert cast("str", sink.one()["msg"]) == '{"author": "Jane", "keyword": "plan"}'
 
     def test_many_benign_parameters_are_scanned_in_linear_time(self, sink: _Sink) -> None:
         started = time.monotonic()

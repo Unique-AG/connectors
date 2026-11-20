@@ -15,6 +15,7 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
+from office_365_mcp.shared.files import BrowserUrl
 from office_365_mcp.shared.handles import ListHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.sharepoint.sites import not_a_site, site_by_path, site_path_of
@@ -64,7 +65,7 @@ class ListSummary(BaseModel):
     description: str | None = Field(
         description="The description of the list. Null when the list has none."
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens the list in a browser. Give it to the user when you answer "
             + "about this list. It is not a handle. Null when Graph recorded none."

@@ -9,6 +9,12 @@ itself: the SDK belongs to `graph_client/`, and the requests belong to each tool
 from office_365_mcp.server.consent import admin_consent_url
 from office_365_mcp.server.manifest import surface_manifest
 from office_365_mcp.server.readiness import ready_response
-from office_365_mcp.server.request_state import request_state_security
+from office_365_mcp.server.request_state import SpendAnsweredState, request_state_security
 
-__all__ = ["admin_consent_url", "ready_response", "request_state_security", "surface_manifest"]
+__all__ = [
+    "SpendAnsweredState",
+    "admin_consent_url",
+    "ready_response",
+    "request_state_security",
+    "surface_manifest",
+]
