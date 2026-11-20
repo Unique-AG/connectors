@@ -247,6 +247,8 @@ INVALID_METADATA_FILTER_MESSAGE = (
     f"{_UNIQUEQL_EQUALS_PDF_JSON}."
 )
 
+UNEXPECTED_ERROR_MESSAGE = "An unexpected error occurred. Please try again."
+
 METADATA_FILTER_EMPTY_RETRY_HINT = (
     "Drop metadata_filter and retry before telling the user there is no content."
 )
