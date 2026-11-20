@@ -216,8 +216,8 @@ importers:
         specifier: 6.1.4
         version: 6.1.4
       skills:
-        specifier: 1.8.1
-        version: 1.8.1
+        specifier: 1.9.0
+        version: 1.9.0
       syncpack:
         specifier: 15.3.3
         version: 15.3.3
@@ -6097,8 +6097,8 @@ packages:
     resolution: {integrity: sha512-bzyZ1e88w9O1iNJbKnOlvYTrWPDl46O1bG0D3XInv+9tkPrxrN8jUUTiFlDkkmKWgn1M6CfIA13SuGqOa9Korw==}
     engines: {node: '>=14'}
 
-  skills@1.8.1:
-    resolution: {integrity: sha512-QK3wlZ5j8wcpLPUOXt7+1Gu1f9JKpv7lBpO0zmqKa5VBrt45/woVo8Max1x4wha3pCNafNHiiodYK6Xi/0alQQ==}
+  skills@1.9.0:
+    resolution: {integrity: sha512-8p27fa6SnpDLrGIpqbhNIHg8+uukR2lg/0qDoKPk85pU3/zyXiU67tEjvXHLrzybBefIAWpWZ2Oc+enlvSSVqg==}
     engines: {node: '>=22.20.0'}
     hasBin: true
 
@@ -11333,7 +11333,7 @@ snapshots:
 
   signal-exit@4.1.0: {}
 
-  skills@1.8.1:
+  skills@1.9.0:
     dependencies:
       nostics: 1.3.0
       tar: 7.5.23
