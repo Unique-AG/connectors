@@ -324,8 +324,16 @@ class TestNothingSecretReachesTheLog:
             "Token(access_token='opaque-value', expires_on=1)",
             '{"api key": "opaque-value"}',
             '{"detail": "Token(access_token=\'opaque-value\')"}',
+            '{"body": "{\\"token\\": \\"opaque-value\\"}"}',
         ],
-        ids=["dict repr", "json", "dataclass repr", "spaced key", "inside a benign value"],
+        ids=[
+            "dict repr",
+            "json",
+            "dataclass repr",
+            "spaced key",
+            "inside a benign value",
+            "escaped json in a value",
+        ],
     )
     def test_an_opaque_credential_under_a_sensitive_key_is_censored(
         self, sink: _Sink, line: str
@@ -350,8 +358,17 @@ class TestNothingSecretReachesTheLog:
             "a" * 200_000,
             "id=AAMkAGI2" + "Q" * 200_000,
             "?" + "%26" * 70_000,
+            '\\"token\\": \\"' + "\\\\" * 50_000 + "x",
+            '\\"a\\": \\"' * 20_000,
         ],
-        ids=["unclosed escapes", "identifier run", "long id", "encoded ampersands"],
+        ids=[
+            "unclosed escapes",
+            "identifier run",
+            "long id",
+            "encoded ampersands",
+            "unclosed escaped value",
+            "escaped keys",
+        ],
     )
     def test_a_hostile_line_is_redacted_in_linear_time(self, sink: _Sink, line: str) -> None:
         started = time.monotonic()
@@ -359,6 +376,13 @@ class TestNothingSecretReachesTheLog:
 
         assert time.monotonic() - started < 5.0
         assert sink.one()["msg"]
+
+    def test_escaped_json_keeps_its_escaping_and_its_other_fields(self, sink: _Sink) -> None:
+        _log('{"body": "{\\"token\\": \\"opaque-value\\", \\"note\\": \\"a \\\\\\"b\\\\\\"\\"}"}')
+
+        assert cast("str", sink.one()["msg"]) == (
+            f'{{"body": "{{\\"token\\": \\"{CENSORED}\\", \\"note\\": \\"a \\\\\\"b\\\\\\"\\"}}"}}'
+        )
 
     def test_a_key_that_only_contains_auth_keeps_its_value(self, sink: _Sink) -> None:
         _log('{"author": "Jane", "keyword": "plan"}')

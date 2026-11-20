@@ -79,9 +79,10 @@ _QUERY_NAME = re.compile(
 _QUERY_VALUE_END = re.compile(r"[&#\s\"]|$")
 _ENCODED_QUERY_VALUE_END = re.compile(r"[&#\s\"]|%26|$")
 _KEYED_VALUE = re.compile(
-    r"""(?:(?P<quote>['"])(?P<quoted_key>[^'"\\\n]{1,64})(?P=quote)"""
+    r"""(?:\\?(?P<quote>['"])(?P<quoted_key>[^'"\\\n]{1,64})\\?(?P=quote)"""
     + r"""|(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z_][A-Za-z0-9_.-]*))\s*[:=]\s*"""
-    + r"""(?:'(?P<single>(?:[^'\\]|\\.)*)'|"(?P<double>(?:[^"\\]|\\.)*)")"""
+    + r"""(?:'(?P<single>(?:[^'\\]|\\.)*)'|"(?P<double>(?:[^"\\]|\\.)*)"""
+    + r""""|\\"(?P<escaped>(?:[^"\\]|\\[^"\\]|\\\\(?:[^"\\]|\\.))*)\\")"""
 )
 _NESTED_VALUE_DEPTH = 3
 
@@ -173,15 +174,16 @@ def _is_sensitive(name: object) -> bool:
 
 def _censor_keyed_values(text: str, depth: int = 0) -> str:
     def censored(found: re.Match[str]) -> str:
-        value = "single" if found["single"] is not None else "double"
+        value = next(name for name in ("single", "double", "escaped") if found[name] is not None)
         head = found[0][: found.start(value) - found.start()]
+        closing = found[0][found.end(value) - found.start() :]
         if not found[value]:
             return found[0]
         if _is_sensitive(found["quoted_key"] or found["key"]):
-            return head + CENSORED + found[0][-1]
+            return head + CENSORED + closing
         if depth >= _NESTED_VALUE_DEPTH:
             return found[0]
-        return head + _censor_keyed_values(found[value], depth + 1) + found[0][-1]
+        return head + _censor_keyed_values(found[value], depth + 1) + closing
 
     return _KEYED_VALUE.sub(censored, text)
 
