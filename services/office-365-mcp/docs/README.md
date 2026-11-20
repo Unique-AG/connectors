@@ -1226,6 +1226,9 @@ Notebooks, sections, and pages.
 - Add to a page, edit it, and rename it.
 - Copy a page, a section, or a notebook, and poll the copy.
 
+**Note:** Microsoft Graph cannot set the indent level of a page. A new page is at the top level of
+its section. To make it a subpage, the user indents it in OneNote.
+
 **Tools added by this preset**
 
 | Tool | Kind | User approval | What it does |

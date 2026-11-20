@@ -105,6 +105,9 @@ people or belongs to somebody else. A page in the user's own unshared notebook i
 a question.
 - Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
 section of the default notebook.
+- Microsoft Graph cannot set the indent level of a page, so the new page is always at the top \
+level of its section. If the user wants a subpage, tell them to right-click the page in OneNote \
+and select Make Subpage.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
 days.

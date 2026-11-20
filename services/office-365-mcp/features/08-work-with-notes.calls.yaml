@@ -1102,3 +1102,17 @@ uc-08-75:
       uses:
         page: handle of the page
         to_section: handle of the section Archive
+
+uc-08-76:
+  status: gap
+  tests:
+    - "tests/tools/scenarios/test_08_work_with_notes.py::TestCapturingNotes::test_a_page_level_is_not_offered"
+  ask: "Create the page Action items as a subpage of Acme kickoff."
+  blocker:
+    kind: graph
+    tool: onenote_create_page
+    text: Microsoft Graph has the page level as a read-only property, and no create or update call sets it.
+    user: The assistant cannot make a page a subpage. A new page is at the top level of its section, and Mia indents it in OneNote.
+  provenance: drafted
+  asks_user: false
+  chain: []

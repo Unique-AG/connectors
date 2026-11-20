@@ -9667,6 +9667,7 @@ What happens:
 #### Not supported yet in working with notes in onenote
 
 - The assistant can find a note by its title only, and not by words in its body.
+- The assistant cannot make a page a subpage. A new page is at the top level of its section, and Mia indents it in OneNote.
 
 ## Across sources
 

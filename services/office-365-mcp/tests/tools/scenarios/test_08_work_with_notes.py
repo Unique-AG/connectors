@@ -309,6 +309,15 @@ class TestCapturingNotes:
         )
         assert (created["section_uri"], person.asked) == (section, [])
 
+    async def test_a_page_level_is_not_offered(self) -> None:
+        async with Client(FastMCPTransport(_server()), mode="legacy") as client:
+            tools = {tool.name: tool for tool in await client.list_tools()}
+
+        for name in ("onenote_create_page", "onenote_edit_page"):
+            asked = set(cast("Mapping[str, object]", tools[name].input_schema["properties"]))
+            assert not asked & {"level", "parent_page", "subpage", "indent", "order"}
+            assert "Make Subpage" in str(tools[name].description)
+
     async def test_a_task_list_is_appended_and_nothing_else_is_sent(
         self, graph: respx.MockRouter
     ) -> None:
