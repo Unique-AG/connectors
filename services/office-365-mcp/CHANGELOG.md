@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.4.1](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.4.0...office-365-mcp@0.4.1) (2026-11-20)
+
+
+### Features
+
+* **office-365-mcp:** add alerts, dashboard and metrics middleware ([#1649](https://github.com/Unique-AG/connectors/issues/1649)) ([33a6d79](https://github.com/Unique-AG/connectors/commit/33a6d7988c931ae2d70ed7c811ce662b6991da81))
+
+
+### Bug Fixes
+
+* **office-365-mcp:** close confirmation and log-redaction gaps (UN-27228) ([#1765](https://github.com/Unique-AG/connectors/issues/1765)) ([bc4ad29](https://github.com/Unique-AG/connectors/commit/bc4ad2958ffebf45a73966b403ce1973d0065e52))
+* **office-365-mcp:** escape file links and return one with a read file ([#1735](https://github.com/Unique-AG/connectors/issues/1735)) ([199e45a](https://github.com/Unique-AG/connectors/commit/199e45af0ed3edf7298f3fc6ca2622fde0f5b1a4))
+
+
+### Dependencies
+
+* **deps:** bump authlib from 1.9.5 to 1.9.6 ([#1748](https://github.com/Unique-AG/connectors/issues/1748)) ([8c32dc1](https://github.com/Unique-AG/connectors/commit/8c32dc11ed0da23f0249d5698d8f3ff3e9da2afa))
+* **deps:** bump authlib from 1.9.6 to 1.9.8 ([#1794](https://github.com/Unique-AG/connectors/issues/1794)) ([a737049](https://github.com/Unique-AG/connectors/commit/a737049e13c4ee3c25efbb95b9df7dcfd2284bd0))
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+* **deps:** bump cyclopts from 5.3.3 to 5.4.2 ([#1698](https://github.com/Unique-AG/connectors/issues/1698)) ([fc38cc2](https://github.com/Unique-AG/connectors/commit/fc38cc21ded9e058430d43ef2bd833dd4259be17))
+* **deps:** bump cyclopts from 5.4.2 to 5.5.0 ([#1749](https://github.com/Unique-AG/connectors/issues/1749)) ([537e27b](https://github.com/Unique-AG/connectors/commit/537e27be4b64c3c51a281a9f8bbab455529dd1e0))
+* **deps:** bump cyclopts from 5.5.0 to 5.5.2 ([#1780](https://github.com/Unique-AG/connectors/issues/1780)) ([cac9f6f](https://github.com/Unique-AG/connectors/commit/cac9f6f1c2e94970c861c1fd128e8f0754769cb4))
+* **deps:** bump email-validator from 2.3.0 to 2.4.0 ([#1750](https://github.com/Unique-AG/connectors/issues/1750)) ([79df80f](https://github.com/Unique-AG/connectors/commit/79df80f6ed1ba3d9a7e52c7cae5efc0f7c0e32b6))
+* **deps:** bump filelock from 4.2.9 to 4.2.10 ([#1661](https://github.com/Unique-AG/connectors/issues/1661)) ([3a24a96](https://github.com/Unique-AG/connectors/commit/3a24a965bc6d139df14257504d03bcfd24233da4))
+* **deps:** bump gherkin-official from 42.0.1 to 43.0.0 ([#1700](https://github.com/Unique-AG/connectors/issues/1700)) ([4b3ee8a](https://github.com/Unique-AG/connectors/commit/4b3ee8a6a7beee9efcec4957a41033c8af75cfb2))
+* **deps:** bump httpx2 from 2.16.0 to 2.16.2 ([#1785](https://github.com/Unique-AG/connectors/issues/1785)) ([9613d9a](https://github.com/Unique-AG/connectors/commit/9613d9a5b39d60fcd92c0b6ad1f87a53e489c136))
+* **deps:** bump markdown-it-py from 4.2.0 to 4.3.0 ([#1668](https://github.com/Unique-AG/connectors/issues/1668)) ([de3ce06](https://github.com/Unique-AG/connectors/commit/de3ce068a0c8fb84db5f555da324b8ee2f8cc315))
+* **deps:** bump numpy from 2.5.4 to 2.5.5 ([#1763](https://github.com/Unique-AG/connectors/issues/1763)) ([d5410b6](https://github.com/Unique-AG/connectors/commit/d5410b620f844177b4c6e6abb935da3350c3c4aa))
+* **deps:** bump pydantic-settings from 2.16.2 to 2.16.3 ([#1720](https://github.com/Unique-AG/connectors/issues/1720)) ([1d248c1](https://github.com/Unique-AG/connectors/commit/1d248c177601907f67d3bb0af5721cf4fe5e0da5))
+* **deps:** bump pytest-asyncio from 1.4.1.post1 to 1.5.0 ([#1701](https://github.com/Unique-AG/connectors/issues/1701)) ([aaf83d7](https://github.com/Unique-AG/connectors/commit/aaf83d711cb601fb1e93f9c6507bc2af2c4a13b0))
+* **deps:** bump python-multipart from 0.0.33 to 0.0.34 ([#1795](https://github.com/Unique-AG/connectors/issues/1795)) ([e9308f1](https://github.com/Unique-AG/connectors/commit/e9308f15747922a00562d05a9bae9b0c084af7cc))
+* **deps:** bump regex from 2026.11.9 to 2026.11.15 ([#1764](https://github.com/Unique-AG/connectors/issues/1764)) ([89a3c6a](https://github.com/Unique-AG/connectors/commit/89a3c6a7bdd760577bfb4cd981a7aec075d23d4c))
+* **deps:** bump ruff from 0.17.4 to 0.17.5 ([#1702](https://github.com/Unique-AG/connectors/issues/1702)) ([ead00ca](https://github.com/Unique-AG/connectors/commit/ead00cafd35fde6016e2d0f614575ae2e83ef1df))
+* **deps:** bump uncalled-for from 0.6.0 to 0.6.1 ([#1671](https://github.com/Unique-AG/connectors/issues/1671)) ([040c049](https://github.com/Unique-AG/connectors/commit/040c0493a01443a0ee87604114402bac7999719f))
+* **deps:** bump unique packages ([#1692](https://github.com/Unique-AG/connectors/issues/1692)) ([44717f1](https://github.com/Unique-AG/connectors/commit/44717f16b84c1fd7c55dca389fb0c7e6069c71be))
+
 ## [0.4.0](https://github.com/Unique-AG/connectors/compare/office-365-mcp@0.3.3...office-365-mcp@0.4.0) (2026-11-12)
 
 
