@@ -48,6 +48,7 @@ describe('OAuthController', () => {
   beforeEach(async () => {
     mockOptions = {
       hmacSecret: 'test-hmac-secret',
+      disableRateLimiting: false,
       authCodeExpiresIn: 600,
       accessTokenExpiresIn: 3600,
       refreshTokenExpiresIn: 86400,

@@ -359,6 +359,8 @@ mcpConfig:
     accessTokenExpiresInSeconds: 60
     # -- Refresh token expiration time in seconds (default: 30 days)
     refreshTokenExpiresInSeconds: 2592000
+    # -- Emergency switch: skip the rate limit on every OAuth route. Leave false unless rate limiting itself is suspected in an incident
+    disableRateLimiting: false
     # hmacSecret is loaded from a secret, see envVars
 
   # Note: The following secrets must be provided via envVars:
