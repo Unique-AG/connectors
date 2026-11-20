@@ -33,6 +33,7 @@ export class OpaqueTokenService {
 
   private readonly ACCESS_TOKEN_BYTES = 64;
   private readonly REFRESH_TOKEN_BYTES = 64;
+  private readonly REFRESH_REPLAY_GRACE_MS = 30_000;
 
   public constructor(
     @Inject(MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN)
@@ -177,7 +178,7 @@ export class OpaqueTokenService {
     const { familyId } = metadata;
     assert.ok(familyId, 'Refresh token has no family');
 
-    if (metadata.usedAt) {
+    if (metadata.usedAt && !this.isWithinReplayGrace(metadata, clientId)) {
       await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
       return null;
     }
@@ -203,10 +204,12 @@ export class OpaqueTokenService {
     }
 
     // The used row is kept until it expires, so a later replay is still recognised as one.
-    const redeemed = await this.store.redeemRefreshToken(refreshToken);
-    if (!redeemed) {
-      await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
-      return null;
+    if (!metadata.usedAt) {
+      const redeemed = await this.store.redeemRefreshToken(refreshToken);
+      if (!redeemed && !(await this.isConcurrentlyRedeemedWithinGrace(refreshToken, clientId))) {
+        await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
+        return null;
+      }
     }
 
     const tokenPair = await this.generateTokenPair(
@@ -233,6 +236,28 @@ export class OpaqueTokenService {
     }
 
     return tokenPair;
+  }
+
+  /**
+   * A client that retries or refreshes concurrently presents a token that was redeemed moments
+   * ago. Treating that as theft revokes the family and logs the user out, so a replay inside the
+   * grace window is served a fresh pair instead. Stored tokens are hashed, so the pair issued to
+   * the first request cannot be handed out again.
+   */
+  private isWithinReplayGrace(metadata: RefreshTokenMetadata, clientId: string): boolean {
+    return (
+      metadata.usedAt != null &&
+      metadata.clientId === clientId &&
+      Date.now() - metadata.usedAt.getTime() <= this.REFRESH_REPLAY_GRACE_MS
+    );
+  }
+
+  private async isConcurrentlyRedeemedWithinGrace(
+    refreshToken: string,
+    clientId: string,
+  ): Promise<boolean> {
+    const current = await this.store.getRefreshToken(refreshToken);
+    return current !== undefined && this.isWithinReplayGrace(current, clientId);
   }
 
   private async findUnexpiredRefreshToken(

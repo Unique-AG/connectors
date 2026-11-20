@@ -185,8 +185,11 @@ describe('OpaqueTokenService', () => {
       );
     });
 
-    it('revokes the token family when a used refresh token is replayed', async () => {
-      store.getRefreshToken.mockResolvedValue({ ...mockRefreshMetadata, usedAt: new Date() });
+    it('revokes the token family when a used refresh token is replayed after the grace window', async () => {
+      store.getRefreshToken.mockResolvedValue({
+        ...mockRefreshMetadata,
+        usedAt: new Date(Date.now() - 60_000),
+      });
       store.revokeTokenFamily.mockResolvedValue(undefined);
 
       const result = await service.refreshAccessToken('used-token', 'client-123');
@@ -197,8 +200,47 @@ describe('OpaqueTokenService', () => {
       expect(store.storeRefreshToken).not.toHaveBeenCalled();
     });
 
-    it('revokes the token family when a concurrent request redeemed the token first', async () => {
-      store.getRefreshToken.mockResolvedValue(mockRefreshMetadata);
+    it('revokes the token family when a recently used token is presented by another client', async () => {
+      store.getRefreshToken.mockResolvedValue({ ...mockRefreshMetadata, usedAt: new Date() });
+      store.revokeTokenFamily.mockResolvedValue(undefined);
+
+      const result = await service.refreshAccessToken('used-token', 'other-client');
+
+      expect(result).toBeNull();
+      expect(store.revokeTokenFamily).toHaveBeenCalledWith('tkfam_123');
+    });
+
+    it('issues a fresh pair when a used refresh token is replayed inside the grace window', async () => {
+      store.getRefreshToken.mockResolvedValue({ ...mockRefreshMetadata, usedAt: new Date() });
+
+      const result = await service.refreshAccessToken('used-token', 'client-123');
+
+      expect(result).toHaveProperty('refresh_token');
+      expect(store.revokeTokenFamily).not.toHaveBeenCalled();
+      expect(store.redeemRefreshToken).not.toHaveBeenCalled();
+      expect(store.storeRefreshToken).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({ familyId: 'tkfam_123', generation: 2 }),
+      );
+    });
+
+    it('issues a fresh pair when a concurrent request redeemed the token first', async () => {
+      store.getRefreshToken
+        .mockResolvedValueOnce(mockRefreshMetadata)
+        .mockResolvedValue({ ...mockRefreshMetadata, usedAt: new Date() });
+      store.redeemRefreshToken.mockResolvedValue(false);
+
+      const result = await service.refreshAccessToken('refresh-token', 'client-123');
+
+      expect(result).toHaveProperty('refresh_token');
+      expect(store.revokeTokenFamily).not.toHaveBeenCalled();
+      expect(store.storeRefreshToken).toHaveBeenCalled();
+    });
+
+    it('revokes the token family when the concurrently redeemed token is gone', async () => {
+      store.getRefreshToken
+        .mockResolvedValueOnce(mockRefreshMetadata)
+        .mockResolvedValueOnce(undefined);
       store.redeemRefreshToken.mockResolvedValue(false);
       store.revokeTokenFamily.mockResolvedValue(undefined);
 
