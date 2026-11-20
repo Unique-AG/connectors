@@ -5,8 +5,8 @@ description: >-
   profiles with their related parties, relationship graphs, top-down ownership
   and ultimate beneficial owners, and sanctions and PEP flags.
 type: application
-version: 0.0.1
-appVersion: 0.0.1
+version: 0.0.2
+appVersion: 0.0.2
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm

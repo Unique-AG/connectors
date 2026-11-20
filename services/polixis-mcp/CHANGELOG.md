@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.0.2](https://github.com/Unique-AG/connectors/compare/polixis-mcp@0.0.1...polixis-mcp@0.0.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **polixis-mcp:** spare the response cache's row locks and Polixis's quota (UN-28805) ([#1755](https://github.com/Unique-AG/connectors/issues/1755)) ([bee562e](https://github.com/Unique-AG/connectors/commit/bee562eaae7a6f95e0ee990494bc2c141b591970))
+
+
+### Dependencies
+
+* **deps:** bump authlib from 1.9.6 to 1.9.8 ([#1794](https://github.com/Unique-AG/connectors/issues/1794)) ([a737049](https://github.com/Unique-AG/connectors/commit/a737049e13c4ee3c25efbb95b9df7dcfd2284bd0))
+* **deps:** bump cyclopts from 5.5.0 to 5.5.2 ([#1780](https://github.com/Unique-AG/connectors/issues/1780)) ([cac9f6f](https://github.com/Unique-AG/connectors/commit/cac9f6f1c2e94970c861c1fd128e8f0754769cb4))
+* **deps:** bump httpx2 from 2.16.0 to 2.16.2 ([#1785](https://github.com/Unique-AG/connectors/issues/1785)) ([9613d9a](https://github.com/Unique-AG/connectors/commit/9613d9a5b39d60fcd92c0b6ad1f87a53e489c136))
+* **deps:** bump numpy from 2.5.4 to 2.5.5 ([#1763](https://github.com/Unique-AG/connectors/issues/1763)) ([d5410b6](https://github.com/Unique-AG/connectors/commit/d5410b620f844177b4c6e6abb935da3350c3c4aa))
+* **deps:** bump python-multipart from 0.0.33 to 0.0.34 ([#1795](https://github.com/Unique-AG/connectors/issues/1795)) ([e9308f1](https://github.com/Unique-AG/connectors/commit/e9308f15747922a00562d05a9bae9b0c084af7cc))
+* **deps:** bump regex from 2026.11.9 to 2026.11.15 ([#1764](https://github.com/Unique-AG/connectors/issues/1764)) ([89a3c6a](https://github.com/Unique-AG/connectors/commit/89a3c6a7bdd760577bfb4cd981a7aec075d23d4c))
+* **deps:** bump sqlalchemy from 2.1.8 to 2.1.9 ([#1786](https://github.com/Unique-AG/connectors/issues/1786)) ([9e0efdc](https://github.com/Unique-AG/connectors/commit/9e0efdc77b846a9b0531fafe37745b96a4f05b01))
+
 ## 0.0.1 (2026-11-18)
 
 
