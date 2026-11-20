@@ -39,6 +39,7 @@ dev = [
     "pytest-asyncio==1.5.0",
     "pytest==9.2.0",
     "ruff==0.17.5",
+    "vulture==2.16",
 ]
 
 [tool.poe.tasks]
@@ -48,6 +49,7 @@ lint = "ruff check ."
 lint-fix = "ruff check --fix ."
 fix = ["format", "lint-fix", "format"]
 typecheck = "basedpyright"
+deadcode = { cmd = "vulture", help = "names nothing uses. Not in ci: vulture cannot tell a wire field from a dead one" }
 imports = "lint-imports"
 architecture = { script = "mcp_architecture.check:main" }
 surface = { script = "mcp_architecture.check:main(update=True)", help = "record what a client sees in tests/tool_surface.generated.json" }
@@ -72,6 +74,16 @@ extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
 "!src/world_check_mcp/contexts/**" = ["PLR0917"]
 # Generated from the vendor's spec, so its field names are the vendor's.
 "src/world_check_mcp/upstream/generated/vendor_responses.py" = ["N815"]
+
+[tool.vulture]
+paths = ["src", "tests"]
+# Generated from the vendor's spec, which lists more than the tools use. The output models' fields
+# are the wire contract a client reads, so nothing in this code reads them either.
+exclude = ["*/upstream/generated/*", "*/models.py"]
+ignore_decorators = ["@tool", "@traced", "@trace_arguments", "@override", "@property", "@asynccontextmanager"]
+# A pydantic config, an enum member chosen by an environment variable, TypedDict keys read by
+# fastmcp, and an attribute set on uvicorn's server.
+ignore_names = ["model_config", "NONE", "stateless_http", "host_origin_protection", "should_exit"]
 
 [tool.basedpyright]
 # The type check every MCP keeps. Make a report stricter here, but never turn one down.
