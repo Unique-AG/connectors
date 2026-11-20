@@ -37,9 +37,13 @@ Charts keep [helm-unittest](https://github.com/helm-unittest/helm-unittest) suit
 
 To run the same commands on your machine, use Helm v3.19.0. This is the version that CI uses, and a newer version can report more problems. Install the plugin once with `helm plugin install https://github.com/helm-unittest/helm-unittest`. Then run the commands in the chart directory, as CI does.
 
+The pull request CI runs the Helm and Terraform checks only when a file in `services/<service>/deploy/` changed, or when a workflow that runs them changed. A change to a lock file or to the source code does not run them.
+
 ## Release Workflows
 
 release-please opens one release pull request for each service. Merge it to start `[Release] Please`. The workflow handles each released service that has a Helm chart. It builds the image from the release tag and signs it. It also pushes the chart, scans the image, and publishes the docs in `services/<service>/docs` to Confluence.
+
+A release pull request changes only versions and changelogs. The CI workflows, the helm schema check, and the dependency review skip it, because the code in it already passed those checks in its own pull request. The release gate and the gatekeeper still run.
 
 If a release stops halfway, do not use "Re-run failed jobs" on the `release-please` job. That job finds no release the second time. Run `[Release] Manual Re-Run` instead. Start it from `main`, choose the service, and type the version without a leading v.
 
