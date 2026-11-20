@@ -3,19 +3,13 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetAccountOfficersInputSchema = z.object({});
 
 export type GetAccountOfficersInput = z.infer<typeof GetAccountOfficersInputSchema>;
 
-export const GetAccountOfficersOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetAccountOfficersOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetAccountOfficersResult = z.infer<typeof GetAccountOfficersOutputSchema>;
 
@@ -34,8 +28,8 @@ export class GetAccountOfficersQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/accountOfficers', undefined);
-      return { success: true, data };
+      const response = await this.client.get<unknown>('/reference/accountOfficers', undefined);
+      return { success: true, ...toTitledRecords(response, 'Account officer') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

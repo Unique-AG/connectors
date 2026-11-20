@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetGuaranteesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -15,14 +16,7 @@ export const GetGuaranteesInputSchema = z.object({
 
 export type GetGuaranteesInput = z.infer<typeof GetGuaranteesInputSchema>;
 
-export const GetGuaranteesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetGuaranteesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetGuaranteesResult = z.infer<typeof GetGuaranteesOutputSchema>;
 
@@ -41,12 +35,12 @@ export class GetGuaranteesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/guarantees/requests', {
+      const response = await this.client.get<unknown>('/holdings/guarantees/requests', {
         recordId: input.recordId,
         customerId: input.customerId,
         eventStatus: input.eventStatus,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Guarantee') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

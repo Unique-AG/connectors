@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetLimitMasterGroupsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -10,14 +11,7 @@ export const GetLimitMasterGroupsInputSchema = z.object({
 
 export type GetLimitMasterGroupsInput = z.infer<typeof GetLimitMasterGroupsInputSchema>;
 
-export const GetLimitMasterGroupsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetLimitMasterGroupsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetLimitMasterGroupsResult = z.infer<typeof GetLimitMasterGroupsOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetLimitMasterGroupsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/limits/customers/masterGroups', {
+      const response = await this.client.get<unknown>('/holdings/limits/customers/masterGroups', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Limit master group') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

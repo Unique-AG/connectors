@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetCountriesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -10,14 +11,7 @@ export const GetCountriesInputSchema = z.object({
 
 export type GetCountriesInput = z.infer<typeof GetCountriesInputSchema>;
 
-export const GetCountriesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetCountriesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetCountriesResult = z.infer<typeof GetCountriesOutputSchema>;
 
@@ -36,10 +30,10 @@ export class GetCountriesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/countries', {
+      const response = await this.client.get<unknown>('/reference/countries', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Country') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

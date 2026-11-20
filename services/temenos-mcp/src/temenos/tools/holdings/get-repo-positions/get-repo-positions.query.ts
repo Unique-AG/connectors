@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetRepoPositionsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -14,14 +15,7 @@ export const GetRepoPositionsInputSchema = z.object({
 
 export type GetRepoPositionsInput = z.infer<typeof GetRepoPositionsInputSchema>;
 
-export const GetRepoPositionsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetRepoPositionsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetRepoPositionsResult = z.infer<typeof GetRepoPositionsOutputSchema>;
 
@@ -40,7 +34,7 @@ export class GetRepoPositionsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>(
+      const response = await this.client.get<unknown>(
         '/holdings/instruments/repurchaseAgreements/positions',
         {
           recordId: input.recordId,
@@ -50,7 +44,7 @@ export class GetRepoPositionsQuery {
           quantity: input.quantity,
         },
       );
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Repo position') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

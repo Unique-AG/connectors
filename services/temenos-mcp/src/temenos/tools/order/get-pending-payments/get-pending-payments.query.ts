@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetPendingPaymentsInputSchema = z.object({
   company: z.string().optional().describe('The company code'),
@@ -29,14 +30,7 @@ export const GetPendingPaymentsInputSchema = z.object({
 
 export type GetPendingPaymentsInput = z.infer<typeof GetPendingPaymentsInputSchema>;
 
-export const GetPendingPaymentsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetPendingPaymentsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetPendingPaymentsResult = z.infer<typeof GetPendingPaymentsOutputSchema>;
 
@@ -55,7 +49,7 @@ export class GetPendingPaymentsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/order/payments/pendingOrders', {
+      const response = await this.client.get<unknown>('/order/payments/pendingOrders', {
         company: input.company,
         date: input.date,
         transactionReference: input.transactionReference,
@@ -68,7 +62,7 @@ export class GetPendingPaymentsQuery {
         debitAccountId: input.debitAccountId,
         creditAccountId: input.creditAccountId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Payment order') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

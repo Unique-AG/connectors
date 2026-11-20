@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetExternalUserPreferencesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -10,14 +11,7 @@ export const GetExternalUserPreferencesInputSchema = z.object({
 
 export type GetExternalUserPreferencesInput = z.infer<typeof GetExternalUserPreferencesInputSchema>;
 
-export const GetExternalUserPreferencesOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetExternalUserPreferencesOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetExternalUserPreferencesResult = z.infer<
   typeof GetExternalUserPreferencesOutputSchema
@@ -40,10 +34,13 @@ export class GetExternalUserPreferencesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/party/externalUsers/externalUserPreferences', {
-        recordId: input.recordId,
-      });
-      return { success: true, data };
+      const response = await this.client.get<unknown>(
+        '/party/externalUsers/externalUserPreferences',
+        {
+          recordId: input.recordId,
+        },
+      );
+      return { success: true, ...toTitledRecords(response, 'External user preferences') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

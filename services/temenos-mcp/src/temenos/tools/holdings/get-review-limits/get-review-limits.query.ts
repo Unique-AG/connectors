@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetReviewLimitsInputSchema = z.object({
   limitReviewDate: z.string().optional().describe('The next date on which the limit is reviewed'),
@@ -18,14 +19,7 @@ export const GetReviewLimitsInputSchema = z.object({
 
 export type GetReviewLimitsInput = z.infer<typeof GetReviewLimitsInputSchema>;
 
-export const GetReviewLimitsOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetReviewLimitsOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetReviewLimitsResult = z.infer<typeof GetReviewLimitsOutputSchema>;
 
@@ -44,12 +38,12 @@ export class GetReviewLimitsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/limits/reviewLimits', {
+      const response = await this.client.get<unknown>('/holdings/limits/reviewLimits', {
         limitReviewDate: input.limitReviewDate,
         approvalDate: input.approvalDate,
         liabilityNumber: input.liabilityNumber,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Limit') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

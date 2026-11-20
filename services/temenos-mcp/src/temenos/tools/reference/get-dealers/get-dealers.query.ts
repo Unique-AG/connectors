@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosRecordsOutputSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetDealersInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -11,14 +12,7 @@ export const GetDealersInputSchema = z.object({
 
 export type GetDealersInput = z.infer<typeof GetDealersInputSchema>;
 
-export const GetDealersOutputSchema = z
-  .object({
-    success: z.boolean(),
-    data: z.unknown().optional(),
-    statusCode: z.number().optional(),
-    message: z.string().optional(),
-  })
-  .loose();
+export const GetDealersOutputSchema = TemenosRecordsOutputSchema;
 
 export type GetDealersResult = z.infer<typeof GetDealersOutputSchema>;
 
@@ -37,11 +31,11 @@ export class GetDealersQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/dealers', {
+      const response = await this.client.get<unknown>('/reference/dealers', {
         recordId: input.recordId,
         displayName: input.displayName,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Dealer') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {
