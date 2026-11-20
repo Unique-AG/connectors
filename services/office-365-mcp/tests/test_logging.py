@@ -300,8 +300,15 @@ class TestNothingSecretReachesTheLog:
             '"GET /mcp?next=https%3A%2F%2Fc.invalid%2Fcb%3Fp%3D2%26token%3Dopaque-value%26a%3D1"',
             '<a href="/cb?page=2&amp;access_token=opaque-value&amp;state=x">',
             '"GET /cb#access_token=opaque-value&state=x HTTP/1.1"',
+            '"GET /mcp?api-key=%26opaque-value&amp;page=2 HTTP/1.1"',
         ],
-        ids=["encoded nested query", "encoded nested second parameter", "html-escaped", "fragment"],
+        ids=[
+            "encoded nested query",
+            "encoded nested second parameter",
+            "html-escaped",
+            "fragment",
+            "value starting with an encoded ampersand",
+        ],
     )
     def test_a_credential_in_another_query_form_is_censored(self, sink: _Sink, line: str) -> None:
         _log(line)
@@ -315,8 +322,10 @@ class TestNothingSecretReachesTheLog:
             "refreshed {'refresh_token': '0.AXcAopaque-value', 'expires_in': 3600}",
             'refreshed {"client_secret": "opaque-value"}',
             "Token(access_token='opaque-value', expires_on=1)",
+            '{"api key": "opaque-value"}',
+            '{"detail": "Token(access_token=\'opaque-value\')"}',
         ],
-        ids=["dict repr", "json", "dataclass repr"],
+        ids=["dict repr", "json", "dataclass repr", "spaced key", "inside a benign value"],
     )
     def test_an_opaque_credential_under_a_sensitive_key_is_censored(
         self, sink: _Sink, line: str

@@ -10,7 +10,6 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.tools.base import InputRequiredToolResult, ToolResult
 from mcp.types import CallToolRequestParams
 from opentelemetry import metrics
-from pydantic import ValidationError
 
 from office_365_mcp.cardinality import UNRESOLVED_NAME
 from office_365_mcp.graph_client import GraphFailure, measured_graph_operation
@@ -24,7 +23,7 @@ __all__ = [
     "start_tool_outcomes",
 ]
 
-_TOOL_REFUSALS: tuple[type[Exception], ...] = (ToolError, ValidationError, ArgumentsRejected)
+_TOOL_REFUSALS: tuple[type[Exception], ...] = (ToolError, ArgumentsRejected)
 
 TOOL_OUTCOMES_TOTAL = "tool_outcomes_total"
 TOOL_OUTCOMES: tuple[str, ...] = (

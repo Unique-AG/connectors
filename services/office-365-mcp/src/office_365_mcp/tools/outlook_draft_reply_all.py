@@ -244,7 +244,7 @@ async def draft_reply_all(
         if mailbox is not None:
             original = await read_original(reached, handle, fields=_ORIGINAL_FIELDS)
             addressed = _addressed(original)
-            original_cc = spelled_recipients(original.cc_recipients)
+            original_cc = spelled_recipients(_without(original.cc_recipients, mailbox))
             recorded = _not_yet_on(
                 _recorded(
                     [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
@@ -329,6 +329,15 @@ def _recorded(*lists: list[Recipient] | None) -> list[str]:
         for recipients in lists
         for one in MailAddress.each_of(recipients)
         if one.address
+    ]
+
+
+def _without(recipients: list[Recipient] | None, address: str) -> list[Recipient]:
+    return [
+        one
+        for one in recipients or []
+        if one.email_address is None
+        or (one.email_address.address or "").casefold() != address.casefold()
     ]
 
 

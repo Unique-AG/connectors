@@ -193,11 +193,13 @@ def measured_graph_operation(
         status = _CANCELLED
         raise
     except Exception as error:
-        failure = _graph_failure_behind(error)
-        if failure is not None:
-            status = _status_of(failure)
+        caused_by = _graph_failure_behind(error, implicit=False)
+        if caused_by is not None:
+            status = _status_of(caused_by)
         elif not is_refusal(error):
             status = _UNCLASSIFIED
+        elif (handled := _graph_failure_behind(error, implicit=True)) is not None:
+            status = _status_of(handled)
         elif state.last_failure is not None:
             status = state.last_failure
         raise
@@ -210,14 +212,14 @@ def measured_graph_operation(
             )
 
 
-def _graph_failure_behind(error: BaseException) -> GraphFailure | None:
+def _graph_failure_behind(error: BaseException, *, implicit: bool) -> GraphFailure | None:
     seen: set[int] = set()
     current: BaseException | None = error
     while current is not None and id(current) not in seen:
         if isinstance(current, GraphFailure):
             return current
         seen.add(id(current))
-        current = current.__cause__ or current.__context__
+        current = current.__cause__ or (current.__context__ if implicit else None)
     return None
 
 

@@ -983,6 +983,12 @@ def _probe_server(client: GraphServiceClient) -> FastMCP[None]:
             raise ToolError("Microsoft refused") from ValueError("parsed after the refusal")
         return "unreachable"
 
+    @server.tool(name="zz_reads_then_builds_a_bad_answer")
+    async def reads_then_builds_a_bad_answer() -> str:
+        with graph_errors():
+            _ = await client.me.get()
+        return str(SignedInUser.model_validate({}))
+
     @server.tool(name="zz_builds_a_bad_answer")
     async def builds_a_bad_answer() -> str:
         return str(SignedInUser.model_validate({}))
@@ -1021,7 +1027,12 @@ class TestTheServerCountsEachToolCallUnderItsRegisteredName:
 
     @pytest.mark.parametrize(
         ("tool", "graph_answer", "not_blamed"),
-        [("zz_reads_then_crashes", 200, "ok"), ("zz_recovers_then_crashes", 403, "forbidden")],
+        [
+            ("zz_reads_then_crashes", 200, "ok"),
+            ("zz_reads_then_builds_a_bad_answer", 200, "ok"),
+            ("zz_recovers_then_crashes", 403, "forbidden"),
+            ("zz_crashes_inside_a_handler", 403, "forbidden"),
+        ],
     )
     async def test_a_crash_after_graph_answered_is_counted_as_an_error_and_not_as_graph(
         self,
@@ -1076,6 +1087,7 @@ class TestEachToolCallIsCountedUnderHowItEnded:
             ("zz_refuses_with_another_cause", 403, "graph"),
             ("zz_returns_an_error", None, "error"),
             ("zz_builds_a_bad_answer", None, "error"),
+            ("zz_reads_then_builds_a_bad_answer", 200, "error"),
         ],
     )
     async def test_the_outcome_names_what_ended_the_call(
