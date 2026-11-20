@@ -1,0 +1,155 @@
+# mcp-scaffold-commit: 5264f9f14505, timestamp: 2026-11-02T00:13:01+00:00
+# space-config-mcp chart defaults — portable app only.
+# Unique hostname / TLS / NP-on live in the monorepo Argo overlay (Gateway API routes).
+# Third parties: helm install + expose however they want (LB, Ingress controller, Mesh…).
+
+nameOverride: space-config-mcp
+fullnameOverride: space-config-mcp
+selectorComponentLabel: server
+
+# Loki scrapes use this label to parse stderr as pino-json (mcp_observability.configure_logging).
+podLabels:
+  logging.unique.app/format: pino-json
+
+env:
+  # Bind address — 0.0.0.0 so the pod is reachable from the mesh.
+  # ServerSettings reads HOST (not UNIQUE_MCP_LOCAL_BASE_URL); MCP_BASE_URL is set via
+  # chart.config.mcpEnv below when mcpConfig.enabled is true.
+  HOST: "0.0.0.0"
+  LOG_LEVEL: info
+  LOGS_DIAGNOSTICS_DATA_POLICY: conceal
+
+mcpConfig:
+  enabled: true
+  app:
+    publicBaseUrl: "" # e.g. https://space-config-mcp.mcp.qa.unique.app. Must match routes.hostname
+  zitadel:
+    baseUrl: "" # e.g. https://id.qa.unique.app
+    clientId: ""
+
+# Required secrets (via envVars in overlay):
+#   - SPACE_CONFIG_MCP_UNIQUE_API_KEY  Unique platform API key
+#   - SPACE_CONFIG_MCP_UNIQUE_APP_ID   Unique platform app ID
+#   - ZITADEL_JWT_SIGNING_KEY          openssl rand -hex 32 (local to FastMCP, never sent to Zitadel)
+# For QA with ephemeral OAuth storage, set ALLOW_EPHEMERAL_OAUTH_STORAGE=true in envVars.
+# For prod, set DATABASE_URL and ENCRYPTION_KEY (openssl rand -hex 32) for durable storage.
+envVars: []
+
+image:
+  registry: ghcr.io
+  repository: unique-ag/connectors/services/space-config-mcp
+  tag: 0.0.0 # x-release-please-version
+  pullPolicy: IfNotPresent
+
+ports:
+  application: 8000
+
+resources:
+  limits:
+    memory: 256Mi
+  requests:
+    cpu: 10m
+    memory: 128Mi
+
+probes:
+  enabled: true
+  liveness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  readiness:
+    failureThreshold: 6
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+  startup:
+    failureThreshold: 30
+    httpGet:
+      path: /probe
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+serviceAccount:
+  enabled: true
+
+# Writable /tmp — base chart defaults to readOnlyRootFilesystem: true.
+volumes:
+  - name: tmp
+    emptyDir:
+      sizeLimit: 64Mi
+
+volumeMounts:
+  - name: tmp
+    mountPath: /tmp
+
+postgresql:
+  enabled: false
+
+rabbitmq:
+  enabled: false
+
+service:
+  port: 80
+
+# Who may call this service (used by base NetworkPolicy generators).
+internalServices:
+  dependents:
+    ingressGateway:
+      name: gateway
+      namespace: system
+
+# Gateway API (HTTPRoute) via base chart — off until overlay sets hostname + paths.
+# Unique QA example overlay:
+#   routes:
+#     hostname: space-config-mcp.mcp.qa.unique.app
+#     auth:
+#       jwt: false
+#     paths:
+#       default:
+#         enabled: true
+#       probe:
+#         enabled: true
+routes:
+  hostname: ""
+  auth:
+    jwt: false
+
+hooks:
+  migration:
+    enabled: false
+
+# NetworkPolicy stub (off). Unique QA overlay sets enabled: true.
+# Kong ingress allow is generated from internalServices.dependents.ingressGateway.
+networkPolicy:
+  enabled: false
+  flavor: cilium
+  enableDefaultDeny:
+    ingress: true
+    egress: true
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+  baseline:
+    prometheus:
+      enabled: false
+    ephemeralPorts:
+      enabled: false
+    # *.unique.app covers single-label hosts; templates/_ext.tpl adds the
+    # Zitadel host explicitly since multi-label hosts don't match the pattern.
+    egress:
+      unique:
+        toFQDNs:
+          - matchPattern: "*.unique.app"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
