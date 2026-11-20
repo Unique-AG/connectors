@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.2.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.1.0...confluence-connector@3.2.0) (2026-11-20)
+
+
+### Features
+
+* **confluence-connector:** rebuild Grafana dashboard around sync health ([#1622](https://github.com/Unique-AG/connectors/issues/1622)) ([ece21d8](https://github.com/Unique-AG/connectors/commit/ece21d858d0039143de9e0c697d5272b98647515))
+
+
+### Bug Fixes
+
+* **confluence-connector,ci:** count failed syncs and items, and alert on them ([#1621](https://github.com/Unique-AG/connectors/issues/1621)) ([b19c72f](https://github.com/Unique-AG/connectors/commit/b19c72fb15928981a23e36a67cf306c8d97e7920))
+* **confluence-connector:** point Unique API error alert at emitted metrics ([#1620](https://github.com/Unique-AG/connectors/issues/1620)) ([56ebf68](https://github.com/Unique-AG/connectors/commit/56ebf68a3dd91833c7c124b708dd1350a1a9429e))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+
 ## [3.1.0](https://github.com/Unique-AG/connectors/compare/confluence-connector@3.0.4...confluence-connector@3.1.0) (2026-11-12)
 
 
