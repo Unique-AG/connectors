@@ -124,6 +124,23 @@ class TestFindingTasks:
         assert [row["title"] for row in _rows(answer, "tasks")] == ["Old REPORT"]
         assert route.calls.last.request.url.params["$filter"] == "status eq 'completed'"
 
+    @pytest.mark.parametrize(
+        ("show", "sent"),
+        [
+            ("open", "status ne 'completed'"),
+            ("completed", "status eq 'completed'"),
+            ("any", None),
+        ],
+    )
+    async def test_the_status_to_show_is_asked_of_microsoft_365(
+        self, graph: respx.MockRouter, show: str, sent: str | None
+    ) -> None:
+        route = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": []}))
+
+        _ = await call("outlook_list_tasks", task_list=TASK_LIST, show=show)
+
+        assert route.calls.last.request.url.params.get("$filter") == sent
+
     async def test_a_task_is_read_with_its_notes(self, graph: respx.MockRouter) -> None:
         task = _task(
             TASK_ID,
