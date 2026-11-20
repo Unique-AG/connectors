@@ -199,11 +199,13 @@ describe('OAuth token endpoint per-IP ceiling (E2E)', () => {
 
     const recordsAtTheCeiling = storage.storage.size;
     for (let attempt = 0; attempt < 5; attempt++) {
-      const blocked = await request(app.getHttpServer()).post(OAUTH_ENDPOINTS.token).send({
-        grant_type: 'refresh_token',
-        refresh_token: `random-token-blocked-`,
-        client_id: clientId,
-      });
+      const blocked = await request(app.getHttpServer())
+        .post(OAUTH_ENDPOINTS.token)
+        .send({
+          grant_type: 'refresh_token',
+          refresh_token: `random-token-blocked-${attempt}`,
+          client_id: clientId,
+        });
       expect(blocked.status).toBe(429);
     }
     expect(storage.storage.size).toBe(recordsAtTheCeiling);

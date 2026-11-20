@@ -1,0 +1,74 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Auth config env injection
+templates:
+  - all.yaml
+tests:
+  - it: omits AUTH_DISABLE_RATE_LIMITING when the switch is not set
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+        microsoft:
+          clientId: test-client-id
+        auth:
+          accessTokenExpiresInSeconds: 60
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS
+            value: "60"
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_DISABLE_RATE_LIMITING
+
+  - it: renders AUTH_DISABLE_RATE_LIMITING=true when the switch is on
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+        microsoft:
+          clientId: test-client-id
+        auth:
+          disableRateLimiting: true
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_DISABLE_RATE_LIMITING
+            value: "true"
+
+  - it: renders AUTH_DISABLE_RATE_LIMITING=false when the switch is set off explicitly
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+        microsoft:
+          clientId: test-client-id
+        auth:
+          disableRateLimiting: false
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: AUTH_DISABLE_RATE_LIMITING
+            value: "false"

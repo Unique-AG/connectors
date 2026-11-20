@@ -1,4 +1,3 @@
-| `AUTH_DISABLE_RATE_LIMITING` | `disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 <!-- confluence-page-id: 2065629188 -->
 <!-- confluence-space-key: PUBDOC -->
 
@@ -184,6 +183,7 @@ Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for 
 |----------|----------|---------|-------------|
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+| `AUTH_DISABLE_RATE_LIMITING` | `disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 
 ### Application Configuration
 

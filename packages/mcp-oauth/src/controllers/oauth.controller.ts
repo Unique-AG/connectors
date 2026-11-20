@@ -40,7 +40,7 @@ import { CONSENT_PAGE_HEADERS, renderConsentPage } from '../utils/consent-page';
 import { normalizeError } from '../utils/normalize-error';
 import { decodeProviderState } from '../utils/provider-state';
 
-/** Users behind one NAT share the per-IP bucket. */
+/** Keyed by App Gateway IP, so every browser behind the gateway shares it. */
 const BROWSER_FLOW_THROTTLE = { default: { limit: 30, ttl: seconds(60) } };
 
 @Controller()
