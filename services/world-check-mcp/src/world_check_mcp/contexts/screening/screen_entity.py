@@ -4,6 +4,8 @@ from mcp_observability import traced
 
 from world_check_mcp.contexts.cases import CaseNotFoundError
 from world_check_mcp.contexts.cases import get_case_reference
+from world_check_mcp.contexts.lookups import forget_template_if_rejected
+from world_check_mcp.contexts.lookups import screening_lookups
 from world_check_mcp.contexts.screening.case_id import derived_case_id
 from world_check_mcp.contexts.screening.case_id import field_parts
 from world_check_mcp.contexts.screening.errors import ScreeningError
@@ -14,15 +16,10 @@ from world_check_mcp.contexts.screening.models import FieldValue
 from world_check_mcp.contexts.screening.models import Gender
 from world_check_mcp.contexts.screening.models import ScreeningOutcome
 from world_check_mcp.contexts.screening.outcome import outcome
-from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
-from world_check_mcp.upstream import GET_COUNTRIES
-from world_check_mcp.upstream import GET_NATIONALITIES
-from world_check_mcp.upstream import GetCaseTemplateForGroupPath
-from world_check_mcp.upstream import GetCaseTemplateForGroupRequest
-from world_check_mcp.upstream import GetCountriesRequest
-from world_check_mcp.upstream import GetNationalitiesRequest
+from world_check_mcp.persistence import Cache
 from world_check_mcp.upstream import SAVE_AND_SCREEN
 from world_check_mcp.upstream import Upstream
+from world_check_mcp.upstream import UpstreamError
 
 
 @traced(
@@ -32,6 +29,7 @@ from world_check_mcp.upstream import Upstream
 async def screen_entity(
     *,
     upstream: Upstream,
+    cache: Cache,
     name: str,
     entity_type: EntityType,
     group_id: str,
@@ -74,32 +72,29 @@ async def screen_entity(
     await refuse_existing_case(
         upstream=upstream, case_id=effective_case_id, chosen=case_id is not None
     )
-    template = await upstream.call(
-        GET_CASE_TEMPLATE_FOR_GROUP,
-        GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
+    lookups = await screening_lookups(upstream=upstream, cache=cache, group_id=group_id)
+    arguments = screening_arguments(
+        name=name,
+        entity_type=entity_type,
+        group_id=group_id,
+        template=lookups.template,
+        countries=lookups.countries,
+        nationalities=lookups.nationalities,
+        case_id=effective_case_id,
+        dob=dob,
+        nationality=nationality,
+        country_of_residence=country_of_residence,
+        place_of_birth=place_of_birth,
+        registered_country=registered_country,
+        gender=gender,
+        secondary_fields=list(secondary_fields or []),
+        custom_fields=list(custom_fields or []),
     )
-    countries = await upstream.call(GET_COUNTRIES, GetCountriesRequest())
-    nationalities = await upstream.call(GET_NATIONALITIES, GetNationalitiesRequest())
-    saved = await upstream.call_untyped(
-        SAVE_AND_SCREEN,
-        **screening_arguments(
-            name=name,
-            entity_type=entity_type,
-            group_id=group_id,
-            template=template,
-            countries=countries.root,
-            nationalities=nationalities.root,
-            case_id=effective_case_id,
-            dob=dob,
-            nationality=nationality,
-            country_of_residence=country_of_residence,
-            place_of_birth=place_of_birth,
-            registered_country=registered_country,
-            gender=gender,
-            secondary_fields=list(secondary_fields or []),
-            custom_fields=list(custom_fields or []),
-        ),
-    )
+    try:
+        saved = await upstream.call_untyped(SAVE_AND_SCREEN, **arguments)
+    except UpstreamError as error:
+        await forget_template_if_rejected(cache=cache, group_id=group_id, error=error)
+        raise
     return outcome(screened=saved, limit=limit)
 
 

@@ -8,9 +8,11 @@ from mcp_types import ToolAnnotations
 from pydantic import Field
 
 from world_check_mcp import contexts
+from world_check_mcp.mcp.dependencies import get_cache
 from world_check_mcp.mcp.dependencies import get_upstream
 from world_check_mcp.mcp.inputs.identifiers import ExternalId
 from world_check_mcp.mcp.inputs.identifiers import GroupId
+from world_check_mcp.persistence import Cache
 from world_check_mcp.upstream import Upstream
 
 Name = Annotated[str, Field(min_length=1, max_length=1000, description="Name to screen.")]
@@ -69,10 +71,12 @@ async def screen_entity(
     ] = None,
     limit: PageSize = 20,
     upstream: Upstream = Depends(get_upstream),
+    cache: Cache = Depends(get_cache),
 ) -> contexts.ScreeningOutcome:
     try:
         return await contexts.screen_entity(
             upstream=upstream,
+            cache=cache,
             name=name,
             entity_type=entity_type,
             group_id=group_id,
