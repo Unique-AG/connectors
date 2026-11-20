@@ -5,6 +5,7 @@ import * as z from 'zod';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { collectUntil } from '~/msgraph/graph-pagination';
 import { MsChat, MsChatMessage, MsChatMessageSchema, MsChatSchema } from './chat.dtos';
+import { chatMessageWebUrl } from './utils/teams-links';
 
 // Graph serves at most this many chats in one /me/chats response, whatever the
 // $top, because the call expands members (documented chat-list limitation, and
@@ -103,7 +104,10 @@ export class ChatService {
       // 'message', so a raw `=== 'message'` check would wrongly drop those.
       filter: excludeSystemMessages ? (m) => (m.messageType ?? 'message') === 'message' : undefined,
     });
-    const messages = z.array(MsChatMessageSchema).parse(raw);
+    const messages = z
+      .array(MsChatMessageSchema)
+      .parse(raw)
+      .map((message) => this.withChatMessageLink(message, chatId));
 
     span?.setAttribute('result_count', messages.length);
     this.logger.debug({ userProfileId, chatId, count: messages.length }, 'Retrieved chat messages');
@@ -181,7 +185,7 @@ export class ChatService {
     // message and let the schema pick out the fields we need.
     const response = await client.api(`/chats/${chatId}/messages/${messageId}`).get();
 
-    return MsChatMessageSchema.parse(response);
+    return this.withChatMessageLink(MsChatMessageSchema.parse(response), chatId);
   }
 
   @Span()
@@ -240,5 +244,10 @@ export class ChatService {
     this.logger.log({ userProfileId, chatId, messageId: result.id }, 'Message sent to chat');
 
     return result;
+  }
+
+  // Graph leaves `webUrl` null on most chat messages, unlike channel posts.
+  private withChatMessageLink(message: MsChatMessage, chatId: string): MsChatMessage {
+    return { ...message, webUrl: message.webUrl || chatMessageWebUrl(chatId, message.id) };
   }
 }

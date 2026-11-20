@@ -29,6 +29,7 @@ const ListChannelsOutputSchema = z.object({
       description: z.string().optional(),
       createdDateTime: z.string().nullable(),
       membershipType: z.string().nullable(),
+      webUrl: z.string().nullable().describe('Link that opens the channel in Microsoft Teams.'),
     }),
   ),
 });
@@ -93,11 +94,13 @@ export class ListChannelsTool {
           description?: string;
           createdDateTime: string | null;
           membershipType: string | null;
+          webUrl: string | null;
         } = {
           channelId: c.id,
           displayName: c.displayName,
           createdDateTime: c.createdDateTime ?? null,
           membershipType: c.membershipType ?? null,
+          webUrl: c.webUrl || null,
         };
         if (input.includeDescriptions && c.description) {
           channel.description = c.description;

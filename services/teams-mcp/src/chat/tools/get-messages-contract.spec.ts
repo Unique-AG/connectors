@@ -13,6 +13,7 @@ const context = {} as Context;
 
 const htmlMessage: MsChatMessage = {
   id: '1657782060227',
+  title: 'Carol Lee: Deploy is green.',
   messageType: 'message',
   subject: null,
   body: { contentType: 'html', content: '<p>Deploy is <strong>green</strong>.</p>' },

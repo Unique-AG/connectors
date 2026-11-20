@@ -35,6 +35,11 @@ const ListChatsOutputSchema = z.object({
         ),
       chatType: z.string(),
       topic: z.string().nullable(),
+      title: z
+        .string()
+        .nullable()
+        .describe("The chat's topic, or its members' names when it has none."),
+      webUrl: z.string().describe('Link that opens the chat in Microsoft Teams.'),
       createdDateTime: z.string().nullable(),
       lastMessageAt: z.string().nullable(),
       lastMessagePreview: z
@@ -124,6 +129,8 @@ export class ListChatsTool {
       chatId: string;
       chatType: string;
       topic: string | null;
+      title: string | null;
+      webUrl: string;
       createdDateTime: string | null;
       lastMessageAt: string | null;
       lastMessagePreview: string | null;
@@ -132,6 +139,8 @@ export class ListChatsTool {
       chatId: chat.id,
       chatType: chat.chatType,
       topic: chat.topic ?? null,
+      title: chat.title,
+      webUrl: chat.webUrl,
       createdDateTime: chat.createdDateTime,
       lastMessageAt: chat.lastMessageAt,
       lastMessagePreview: chat.lastMessagePreview,
