@@ -5574,8 +5574,8 @@ packages:
     resolution: {integrity: sha512-LA4ZjwlnUblHVgq0oBF3Jl/6h/Nvs5fzBLwdEF4nuxnFdsfajde4WfxtJr3CaiH+F6ewcIB/q4jQ4UzPyid+CQ==}
     hasBin: true
 
-  node-releases@2.0.64:
-    resolution: {integrity: sha512-zAPCKqMcnqs2nGy6nlkm7JduFseiBJy3EXHGLh+8pFR+TxGCBxxiEN21+UROU5CKwX/f4TlUcYjiM+vs/tsyxw==}
+  node-releases@2.0.65:
+    resolution: {integrity: sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA==}
     engines: {node: '>=18'}
 
   normalize-path@3.0.0:
@@ -9354,7 +9354,7 @@ snapshots:
       baseline-browser-mapping: 2.11.38
       caniuse-lite: 1.0.30001826
       electron-to-chromium: 1.5.486
-      node-releases: 2.0.64
+      node-releases: 2.0.65
       update-browserslist-db: 1.4.0(browserslist@4.29.5)
     optional: true
 
@@ -10720,7 +10720,7 @@ snapshots:
 
   node-gyp-build@4.8.4: {}
 
-  node-releases@2.0.64:
+  node-releases@2.0.65:
     optional: true
 
   normalize-path@3.0.0: {}
