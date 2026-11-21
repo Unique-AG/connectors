@@ -77,6 +77,7 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
+| `AUTH_DISABLE_RATE_LIMITING` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 | `MCP_DEBUG_MODE` | `disabled` | Debug mode for the MCP server (enabled/disabled) |
 | `LOGS_BUFFERING` | `disabled` | Buffer logs before writing to reduce I/O (enabled/disabled) |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls what diagnostic data is logged (conceal/expose) |

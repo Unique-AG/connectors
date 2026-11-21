@@ -18,6 +18,12 @@ const ConfigSchema = z.object({
   hmacSecret: redacted(z.string().min(1)).describe(
     'The secret key for the MCP Server to sign the OAuth session state and hash the stored MCP tokens. Rotating it signs out every user.',
   ),
+  disableRateLimiting: z
+    .stringbool()
+    .default(false)
+    .describe(
+      'Emergency switch that skips the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident.',
+    ),
 });
 
 export const authConfig = registerConfig('auth', ConfigSchema);

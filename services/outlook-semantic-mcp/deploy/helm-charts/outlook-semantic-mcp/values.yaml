@@ -56,7 +56,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/outlook-semantic-mcp
-  tag: 5.0.1 # x-release-please-version
+  tag: 5.0.2 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -463,6 +463,7 @@ mcpConfig:
   # Or set env vars directly:
   #   AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS=60
   #   AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS=2592000
+  #   AUTH_DISABLE_RATE_LIMITING=false            # emergency switch, skips the rate limit on every OAuth route
   # hmacSecret is loaded from a secret, see envVars
 
   # Note: The following secrets must be provided via envVars:

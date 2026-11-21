@@ -324,6 +324,11 @@
               "type": "integer",
               "description": "Refresh token expiration time in seconds",
               "default": 2592000
+            },
+            "disableRateLimiting": {
+              "type": "boolean",
+              "description": "Emergency switch that skips the rate limit on every OAuth route. Leave false unless rate limiting itself is suspected in an incident",
+              "default": false
             }
           }
         }

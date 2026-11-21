@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.1...teams-mcp@0.5.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** stop rate-limiting OAuth discovery, serve the default OAuth paths, add a rate-limit kill switch ([#1778](https://github.com/Unique-AG/connectors/issues/1778)) ([67df6eb](https://github.com/Unique-AG/connectors/commit/67df6eb8e4cdc78331de1f60cca8ad069bb64239))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+
 ## [0.5.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.0...teams-mcp@0.5.1) (2026-11-12)
 
 

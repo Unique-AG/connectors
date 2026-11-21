@@ -14,9 +14,10 @@ export interface ConsentPage {
 export async function openConsentPage(
   app: INestApplication,
   query: Record<string, string>,
+  path = OAUTH_ENDPOINTS.authorize,
 ): Promise<ConsentPage> {
   const response = await request(app.getHttpServer())
-    .get(OAUTH_ENDPOINTS.authorize)
+    .get(path)
     .query({ response_type: 'code', code_challenge_method: 'S256', ...query });
   assert.strictEqual(response.status, 200, `Expected the consent page, got ${response.status}`);
 

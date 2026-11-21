@@ -27,4 +27,4 @@ jobs:
           persist-credentials: false
 
       - name: Verify pinned actions
-        uses: unique-ag/actions/github/policies/verify-pinned-actions@84a4f60c0a56daae108b22e096b72bb10f476d08 # main
+        uses: unique-ag/actions/github/policies/verify-pinned-actions@9524ae40b5c9e274735d1aea8435b90ed3e33ee0 # verify-pinned-actions@1.0.0

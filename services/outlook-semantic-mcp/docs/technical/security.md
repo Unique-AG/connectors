@@ -128,7 +128,7 @@ MCP requests pass through each layer from top to bottom. Each layer must pass be
 | Layer | Mechanism | Protects Against |
 |-------|-----------|------------------|
 | **Transport** | TLS 1.2+ via Kong Gateway | Eavesdropping, man-in-the-middle |
-| **Rate Limiting** | IP-based throttling at ingress layer (e.g., Kong) | Brute-force, abuse |
+| **Rate Limiting** | Per-route limits on the OAuth routes and per-user limits on tool calls in the application, plus optional IP-based throttling at the ingress layer (e.g., Kong) | Brute-force, abuse |
 | **Authentication** | OAuth 2.1 + PKCE | Unauthorized access, authorization code interception |
 | **Session Integrity** | HMAC-SHA256 on OAuth session state | Session hijacking via forged callbacks |
 | **Token Design** | 512-bit cryptographically random opaque values | Token guessing |
@@ -330,13 +330,20 @@ sequenceDiagram
 
 ## Rate Limiting
 
-Rate limiting is expected to be handled at the infrastructure/ingress layer (e.g., Kong ingress controller), not within the application itself. The following limits are recommended:
+The application rate-limits its OAuth routes. Buckets are keyed by the client address the ingress forwards, so every browser behind one gateway shares a bucket. The token route is keyed by address and credential instead, because every user of a tenant refreshes through the same egress IP and must not share one bucket.
 
+| Route | Limit | Key |
+| --- | --- | --- |
+| `/auth/authorize`, `/auth/consent`, `/auth/callback` | 30 requests / 60 seconds | address |
+| `/auth/token` and its alias `/token` | 10 requests / 60 seconds per credential, under a ceiling of 600 requests / 60 seconds per address | address + hash of the code or refresh token; address |
+| `/auth/register`, `/auth/introspect`, `/auth/revoke` | 10 requests / 60 seconds | address |
+| `/.well-known/*` discovery documents | none | |
 
-| Scope                  | Recommended Limit        | Layer | Purpose                                |
-| ---------------------- | ------------------------ | ----- | -------------------------------------- |
-| Global (all endpoints) | 10 requests / 60 seconds | Ingress (Kong) | General brute-force protection         |
-| Authorization endpoint | 3 requests / 60 seconds  | Ingress (Kong) | Tighter protection for auth initiation |
+MCP tool calls are limited per user separately, see the `mcpRateLimit` configuration.
+
+`AUTH_DISABLE_RATE_LIMITING` (default `false`) switches every OAuth route limit off. It exists to rule rate limiting in or out during an incident without a release. The server logs a warning at startup while it is on.
+
+Throttling at the ingress layer (e.g., Kong) is an optional layer in front of these limits. A limit there must leave room for a tenant whose users all reach the server through one egress IP.
 
 
 ## Secret Management

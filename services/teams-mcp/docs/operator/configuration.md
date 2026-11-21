@@ -65,6 +65,7 @@ Set via `mcpConfig.auth` in Helm values:
 |----------|-----------|---------|-------------|
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.accessTokenExpiresInSeconds` | `60` | MCP access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `mcpConfig.auth.refreshTokenExpiresInSeconds` | `2592000` | MCP refresh token TTL (30 days) |
+| `AUTH_DISABLE_RATE_LIMITING` | `mcpConfig.auth.disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 
 ### Runtime Configuration
 
