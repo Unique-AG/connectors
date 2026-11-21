@@ -9,6 +9,7 @@ import respx
 from fastmcp import Client
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
+from mcp.shared.exceptions import MCPError
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS
 from office_365_mcp.shared.handles import DriveFolderHandle, MessageHandle
@@ -762,9 +763,8 @@ class TestAChatProgramOfTheNewerKind:
         [
             (Person(approval="no"), NOT_AGREED),
             (Says(1), NOT_AGREED),
-            (Says("maybe"), "received no answer"),
         ],
-        ids=["declines", "the word for no", "a word that is no choice"],
+        ids=["declines", "the word for no"],
     )
     async def test_it_changes_nothing_unless_the_answer_is_the_word_for_yes(
         self,
@@ -780,6 +780,18 @@ class TestAChatProgramOfTheNewerKind:
         message = await refused_on_the_newer_protocol(tool, person=reply, **arguments)
 
         assert nothing in message and said in message
+        assert writes.call_count == 0
+
+    @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
+    async def test_an_answer_outside_the_choice_list_changes_nothing(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str
+    ) -> None:
+        _ = nothing
+        writes = _everything_is_readable(graph, _the_writes_are_answered)
+
+        with pytest.raises(MCPError, match="is not one of"):
+            _ = await call_on_the_newer_protocol(tool, person=Says("maybe"), **arguments)
+
         assert writes.call_count == 0
 
 
