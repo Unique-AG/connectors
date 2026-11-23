@@ -29,6 +29,7 @@ from office_365_mcp.shared.files import (
     FOLDER_HANDLE_SOURCES,
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
+    BrowserUrl,
     folder_label,
     item_access_refused,
     item_for_a_question,
@@ -140,7 +141,7 @@ class CopyStarted(BaseModel):
             + "handle. The original stays where it is, and this tool does not change it."
         )
     )
-    source_web_url: str | None = Field(
+    source_web_url: BrowserUrl | None = Field(
         description=(
             "The web address that opens the original item in a browser. Always give it to the "
             + "user when you report this copy."
@@ -153,7 +154,7 @@ class CopyStarted(BaseModel):
             + "it to sharepoint_browse_folder to see the copy."
         )
     )
-    destination_web_url: str | None = Field(
+    destination_web_url: BrowserUrl | None = Field(
         description=(
             "The web address that opens the destination folder in a browser. Always give it to "
             + "the user, so that the user can open the folder and find the copy there."

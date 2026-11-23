@@ -431,7 +431,7 @@ describe('McpOAuthService', () => {
       const refreshRevokeDto = { ...revokeDto, token_type_hint: 'refresh_token' as const };
 
       clientService.validateClientCredentials.mockResolvedValue(true);
-      tokenService.validateRefreshToken.mockResolvedValue({
+      tokenService.findRefreshTokenForRevocation.mockResolvedValue({
         userId: 'user-123',
         clientId: 'client-123',
         scope: 'read write',

@@ -19,6 +19,7 @@ from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth.providers.azure import AzureProvider
 from fastmcp.server.dependencies import AccessToken
+from mcp.shared.exceptions import MCPError
 from mcp.types import (
     CallToolResult,
     ElicitRequest,
@@ -274,6 +275,48 @@ class TestTheWholeConfirmationOverARealClient:
         assert isinstance(second, CallToolResult), "the bound accept asked again instead"
         assert not second.is_error, second.content
         assert _posts(graph) == [_SEND_ROUTE], f"a bound accept posted {_posts(graph)}"
+
+    async def test_an_answer_rejected_for_other_arguments_still_sends_with_the_asked_ones(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        first = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME, dict(sender.GRAPH_CALL_EXAMPLE), allow_input_required=True
+        )
+
+        assert isinstance(first, InputRequiredResult), "the question was never put to anybody"
+        requests = first.input_requests or {}
+        (key,) = requests
+        yes = CarriedAnswer(action="accept", content={"value": _the_word_for_yes(requests[key])})
+        other = {"message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-draft-0002%3D"}
+
+        with pytest.raises(MCPError, match="Invalid or expired requestState"):
+            _ = await an_agreeing_client.session.call_tool(
+                sender.TOOL_NAME,
+                other,
+                input_responses={key: yes},
+                request_state=first.request_state,
+                allow_input_required=True,
+            )
+        second = await an_agreeing_client.session.call_tool(
+            sender.TOOL_NAME,
+            dict(sender.GRAPH_CALL_EXAMPLE),
+            input_responses={key: yes},
+            request_state=first.request_state,
+            allow_input_required=True,
+        )
+
+        assert isinstance(second, CallToolResult), "the bound accept asked again instead"
+        assert not second.is_error, second.content
+        assert _posts(graph) == [_SEND_ROUTE], f"a bound accept posted {_posts(graph)}"
+        with pytest.raises(MCPError, match="Invalid or expired requestState"):
+            _ = await an_agreeing_client.session.call_tool(
+                sender.TOOL_NAME,
+                dict(sender.GRAPH_CALL_EXAMPLE),
+                input_responses={key: yes},
+                request_state=first.request_state,
+                allow_input_required=True,
+            )
+        assert _posts(graph) == [_SEND_ROUTE], "a replayed accept posted again"
 
     async def test_an_accept_for_a_draft_edited_after_the_question_sends_nothing(
         self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter

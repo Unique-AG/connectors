@@ -697,7 +697,7 @@ describe('McpOAuthStore', () => {
         TEST_HMAC_SECRET,
       );
 
-      const result = await unit.redeemRefreshToken('refresh-token');
+      const result = await unit.redeemRefreshToken('refresh-token', 'sealed-successor');
 
       expect(result).toBe(true);
       expect(mockDrizzle.update).toHaveBeenCalled();
@@ -713,7 +713,7 @@ describe('McpOAuthStore', () => {
         TEST_HMAC_SECRET,
       );
 
-      const result = await unit.redeemRefreshToken('refresh-token');
+      const result = await unit.redeemRefreshToken('refresh-token', 'sealed-successor');
 
       expect(result).toBe(false);
     });

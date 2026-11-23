@@ -25,6 +25,7 @@ from office_365_mcp.shared.addresses import ONE_ADDRESS, repeated_address
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
+    BrowserUrl,
     display_name,
     item_access_refused,
     item_for_a_question,
@@ -177,7 +178,7 @@ class Invitation(BaseModel):
             + "sharepoint_read_file for a file, or to sharepoint_browse_folder for a folder."
         )
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens the shared item in a browser. Always give this address to "
             + "the user when you report this invitation. Null when Graph gave no address."

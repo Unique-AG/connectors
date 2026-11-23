@@ -1,11 +1,11 @@
 <!-- confluence-page-id: 2760507523 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Office 365 MCP
+# Office 365
 
-!!! danger "Documentation Disclaimer"
-    This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
-    discontinued, or have breaking changes without notice.
+!!! note "Beta"
+    office-365-mcp is in beta. You can use it in production. Tools, presets, and configuration can
+    change between versions, so read the release notes before you upgrade. No formal SLA applies.
 
 ## Overview
 
@@ -18,38 +18,33 @@ through the Microsoft Graph API.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
-- **Use cases:** The [use cases](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md)
-  show what people ask an assistant to do, and what the tools do for each request.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
 
 ## Start from what you want to do
 
-Find the use case in the table. Each use case has a section in the
-[use cases](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md)
-page. That section shows what users ask and what the assistant does. The Presets column lists the
-presets that hold every tool of the use case. Turn on all of them to cover the whole use case. Turn
-on fewer to cover part of it.
+Find the use case in the table. The Presets column lists the presets that hold every tool of the
+use case. Turn on all of them to cover the whole use case. Turn on fewer to cover part of it.
 
 | Use case | Ask your assistant to | Presets | Admin consent |
 | --- | --- | --- | --- |
-| [Finding and reading mail](use-cases.md#finding-and-reading-mail) | Find a message, read it with its attachments, and follow a conversation. | `outlook-read` | No |
-| [Drafting and sending mail](use-cases.md#drafting-and-sending-mail) | Write a draft, change it, and send it after you approve it. | `outlook-send` | No |
-| [Organizing the mailbox](use-cases.md#organizing-the-mailbox) | File and mark mail, make folders and categories, and make inbox rules. | `outlook-delete`, `outlook-rules`, `outlook-automate`, `outlook-mailbox` | No |
-| [Mailbox preferences](use-cases.md#mailbox-preferences) | Set the automatic reply and the focused inbox. | `outlook-write`, `outlook-automate`, `outlook-mailbox` | No |
-| [Reading the calendar](use-cases.md#reading-the-calendar) | List events, read an event, and show free time. | `outlook-read`, `outlook-calendar` | No |
-| [Scheduling and answering meetings](use-cases.md#scheduling-and-answering-meetings) | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
-| [Sharing and delegating calendars](use-cases.md#sharing-and-delegating-calendars) | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
-| [Managing contacts](use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
-| [Keeping track of tasks](use-cases.md#keeping-track-of-tasks) | Find, read, add, change, and complete tasks in Microsoft To Do. | `outlook-tasks-write` | No |
-| [Catching up on Teams](use-cases.md#catching-up-on-teams) | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
-| [Posting in Teams](use-cases.md#posting-in-teams) | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
-| [Running Teams chats and online meetings](use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
-| [Finding and reading files in OneDrive and SharePoint](use-cases.md#finding-and-reading-files-in-onedrive-and-sharepoint) | Find a file, open a folder, and read a file. | `sharepoint-write`, `sharepoint-sites`, `teams-files`, `teams-channels` | ⚠️ Yes |
-| [Organizing and sharing files in OneDrive and SharePoint](use-cases.md#organizing-and-sharing-files-in-onedrive-and-sharepoint) | Move, copy, and rename files, and share them. | `sharepoint-share`, `sharepoint-sites`, `teams-write-files`, `outlook-read` | ⚠️ Yes |
-| [Finding and reading SharePoint lists](use-cases.md#finding-and-reading-sharepoint-lists) | Find a site, read its lists and columns, and add, change, or erase list items. | `sharepoint-lists-delete` | ⚠️ Yes |
-| [Working with notes in OneNote](use-cases.md#working-with-notes-in-onenote) | Find, read, write, and copy notes. | `onenote-delete`, `sharepoint-sites`, `teams-channels` | ⚠️ Yes |
-| [Working across mail, calendar, files, and Teams](use-cases.md#working-across-mail-calendar-files-and-teams) | Join the work of the areas above in one request. | `teams`, `outlook-write`, `outlook-calendar`, `outlook-read`, `sharepoint-share`, `sharepoint-sites` | ⚠️ Yes |
+| Finding and reading mail | Find a message, read it with its attachments, and follow a conversation. | `outlook-read` | No |
+| Drafting and sending mail | Write a draft, change it, and send it after you approve it. | `outlook-send` | No |
+| Organizing the mailbox | File and mark mail, make folders and categories, and make inbox rules. | `outlook-delete`, `outlook-rules`, `outlook-automate`, `outlook-mailbox` | No |
+| Mailbox preferences | Set the automatic reply and the focused inbox. | `outlook-write`, `outlook-automate`, `outlook-mailbox` | No |
+| Reading the calendar | List events, read an event, and show free time. | `outlook-read`, `outlook-calendar` | No |
+| Scheduling and answering meetings | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
+| Sharing and delegating calendars | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
+| Managing contacts | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
+| Keeping track of tasks | Find, read, add, change, and complete tasks in Microsoft To Do. | `outlook-tasks-write` | No |
+| Catching up on Teams | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
+| Posting in Teams | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
+| Running Teams chats and online meetings | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
+| Finding and reading files in OneDrive and SharePoint | Find a file, open a folder, and read a file. | `sharepoint-write`, `sharepoint-sites`, `teams-files`, `teams-channels` | ⚠️ Yes |
+| Organizing and sharing files in OneDrive and SharePoint | Move, copy, and rename files, and share them. | `sharepoint-share`, `sharepoint-sites`, `teams-write-files`, `outlook-read` | ⚠️ Yes |
+| Finding and reading SharePoint lists | Find a site, read its lists and columns, and add, change, or erase list items. | `sharepoint-lists-delete` | ⚠️ Yes |
+| Working with notes in OneNote | Find, read, write, and copy notes. | `onenote-delete`, `sharepoint-sites`, `teams-channels` | ⚠️ Yes |
+| Working across mail, calendar, files, and Teams | Join the work of the areas above in one request. | `teams`, `outlook-write`, `outlook-calendar`, `outlook-read`, `sharepoint-share`, `sharepoint-sites` | ⚠️ Yes |
 
 ## Choose a preset
 
@@ -1490,7 +1485,7 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
 | `Office365McpTokenRefused` | Entra refused at least 5 Graph token requests in the last hour | `15m` | `warning` |
 | `Office365McpTokenFailing` | At least 5 Graph token requests in the last hour failed without an AADSTS code: a connection error, or an Entra answer with no AADSTS code | `15m` | `warning` |
-| `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour were throttled, and the callers got an error | `15m` | `warning` |
+| `Office365McpGraphThrottled` | More than 5 Graph requests in the last hour were throttled after the SDK retries | `15m` | `warning` |
 | `Office365McpGraphSlow` | At least 3 tool calls that attempted Graph had a measured duration of more than 60 seconds in the last hour. The measured duration leaves out waits for a person to confirm | `0m` | `warning` |
 | `Office365McpHttp5xx` | More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, and at least 5 did | `5m` | `warning` |
 | `Office365McpMemoryHigh` | A pod uses more than 80% of its memory limit | `30m` | `warning` |

@@ -39,8 +39,6 @@ function createPod(db: DrizzleDatabase) {
   return { store, tokenService: new OpaqueTokenService(tokenServiceOptions, store) };
 }
 
-type Pod = ReturnType<typeof createPod>;
-
 const hashToken = (token: string) =>
   createHmac('sha256', HMAC_SECRET).update(`mcp-token:${token}`).digest('hex');
 
@@ -90,11 +88,62 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     );
   });
 
-  it('rejects a replayed refresh token and revokes the tokens issued from it', async () => {
+  async function ageRedeemedToken(refreshToken: string, ageMs: number) {
+    await db
+      .update(schema.tokens)
+      .set({ usedAt: new Date(Date.now() - ageMs) })
+      .where(eq(schema.tokens.token, hashToken(refreshToken)));
+  }
+
+  it('serves the same pair when a used refresh token is replayed inside the grace window', async () => {
     const pod = createPod(db);
     const initial = await issueInitialTokens(pod.tokenService);
     const rotated = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    const replayed = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
     expect(rotated).not.toBeNull();
+    expect(replayed).toEqual(rotated);
+    expect(await pod.tokenService.validateRefreshToken(rotated?.refresh_token ?? '')).toEqual(
+      expect.objectContaining({ generation: 1 }),
+    );
+  });
+
+  it('serves the same pair on every replay inside the grace window', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+    const rotated = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    const second = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+    const third = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    expect(second).toEqual(rotated);
+    expect(third).toEqual(rotated);
+    expect(await pod.tokenService.validateRefreshToken(rotated?.refresh_token ?? '')).toEqual(
+      expect.objectContaining({ generation: 1 }),
+    );
+  });
+
+  it('serves the live pair when the replayed token was rotated twice inside the grace window', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+    const first = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+    const second = await pod.tokenService.refreshAccessToken(first?.refresh_token ?? '', CLIENT_ID);
+
+    const replayed = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    expect(second).not.toBeNull();
+    expect(replayed).toEqual(second);
+    expect(await pod.tokenService.validateRefreshToken(second?.refresh_token ?? '')).toEqual(
+      expect.objectContaining({ generation: 2 }),
+    );
+  });
+
+  it('revokes the family when a used refresh token is replayed after the grace window', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+    const rotated = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+    await ageRedeemedToken(initial.refresh_token, 60_000);
 
     const replayed = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
 
@@ -105,19 +154,28 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     expect(await db.select().from(schema.tokens)).toEqual([]);
   });
 
-  it('rejects a refresh token replayed on another pod after it was rotated', async () => {
+  it('revokes the family when a used refresh token is replayed by another client', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+    const rotated = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    const replayed = await pod.tokenService.refreshAccessToken(initial.refresh_token, 'client-b');
+
+    expect(replayed).toBeNull();
+    expect(await pod.tokenService.validateRefreshToken(rotated?.refresh_token ?? '')).toBeNull();
+  });
+
+  it('serves the same pair to another pod that replays the token inside the grace window', async () => {
     const podA = createPod(db);
     const podB = createPod(db);
     const initial = await issueInitialTokens(podA.tokenService);
-    // Pod B has seen the token before it was rotated.
     expect(await podB.tokenService.validateRefreshToken(initial.refresh_token)).not.toBeNull();
 
     const rotated = await podA.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
     const replayed = await podB.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
 
     expect(rotated).not.toBeNull();
-    expect(replayed).toBeNull();
-    expect(await podA.tokenService.validateRefreshToken(rotated?.refresh_token ?? '')).toBeNull();
+    expect(replayed).toEqual(rotated);
   });
 
   it('lets exactly one of two concurrent redemptions of the same token succeed', async () => {
@@ -126,45 +184,62 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     const initial = await issueInitialTokens(podA.tokenService);
 
     const results = await Promise.all([
-      podA.store.redeemRefreshToken(initial.refresh_token),
-      podB.store.redeemRefreshToken(initial.refresh_token),
+      podA.store.redeemRefreshToken(initial.refresh_token, 'successor-a'),
+      podB.store.redeemRefreshToken(initial.refresh_token, 'successor-b'),
     ]);
 
     expect(results.filter(Boolean)).toHaveLength(1);
   });
 
-  async function expectNoUsableTokens(pod: Pod, tokenPairs: (TokenPair | null)[]) {
-    for (const tokenPair of tokenPairs) {
-      expect(await pod.tokenService.validateAccessToken(tokenPair?.access_token ?? '')).toBeNull();
-      expect(
-        await pod.tokenService.validateRefreshToken(tokenPair?.refresh_token ?? ''),
-      ).toBeNull();
-    }
-    expect(await db.select().from(schema.tokens)).toEqual([]);
-  }
-
-  it('leaves neither caller with usable tokens after two concurrent refreshes', async () => {
+  it('serves both of two concurrent refreshes the same pair', async () => {
     const podA = createPod(db);
     const podB = createPod(db);
     const initial = await issueInitialTokens(podA.tokenService);
 
-    const results = await Promise.all([
+    const [resultA, resultB] = await Promise.all([
       podA.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID),
       podB.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID),
     ]);
 
-    await expectNoUsableTokens(createPod(db), results);
+    expect(resultA).not.toBeNull();
+    expect(resultA).toEqual(resultB);
+    const pod = createPod(db);
+    expect(await pod.tokenService.validateRefreshToken(resultA?.refresh_token ?? '')).toEqual(
+      expect.objectContaining({ generation: 1 }),
+    );
+    // The loser's own pair was removed: the initial pair and the winner's pair remain.
+    expect(await db.select().from(schema.tokens)).toHaveLength(4);
   });
 
-  it('revokes the winner of a concurrent refresh when the loser revoked the family before the winner stored its tokens', async () => {
+  it('serves the loser the pair the winner stored when the loser lost the redeem', async () => {
+    const podA = createPod(db);
+    const podB = createPod(db);
+    const initial = await issueInitialTokens(podA.tokenService);
+    let winnerResult: TokenPair | null = null;
+    const redeem = podB.store.redeemRefreshToken.bind(podB.store);
+    vi.spyOn(podB.store, 'redeemRefreshToken').mockImplementation(async (token, successor) => {
+      winnerResult = await podA.tokenService.refreshAccessToken(token, CLIENT_ID);
+      return redeem(token, successor);
+    });
+
+    const loserResult = await podB.tokenService.refreshAccessToken(
+      initial.refresh_token,
+      CLIENT_ID,
+    );
+
+    expect(winnerResult).not.toBeNull();
+    expect(loserResult).toEqual(winnerResult);
+  });
+
+  it('revokes the winner when a loser revoked the family before the winner stored its tokens', async () => {
     const podA = createPod(db);
     const podB = createPod(db);
     const initial = await issueInitialTokens(podA.tokenService);
     let loserResult: TokenPair | null = null;
     const redeem = podA.store.redeemRefreshToken.bind(podA.store);
-    vi.spyOn(podA.store, 'redeemRefreshToken').mockImplementation(async (token) => {
-      const redeemed = await redeem(token);
-      loserResult = await podB.tokenService.refreshAccessToken(token, CLIENT_ID);
+    vi.spyOn(podA.store, 'redeemRefreshToken').mockImplementation(async (token, successor) => {
+      const redeemed = await redeem(token, successor);
+      loserResult = await podB.tokenService.refreshAccessToken(token, 'client-b');
       return redeemed;
     });
 
@@ -175,29 +250,7 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
 
     expect(winnerResult).toBeNull();
     expect(loserResult).toBeNull();
-    await expectNoUsableTokens(createPod(db), [winnerResult, loserResult]);
-  });
-
-  it('revokes the winner of a concurrent refresh when the loser revoked the family after the winner stored its tokens', async () => {
-    const podA = createPod(db);
-    const podB = createPod(db);
-    const initial = await issueInitialTokens(podA.tokenService);
-    let winnerResult: TokenPair | null = null;
-    const redeem = podB.store.redeemRefreshToken.bind(podB.store);
-    vi.spyOn(podB.store, 'redeemRefreshToken').mockImplementation(async (token) => {
-      winnerResult = await podA.tokenService.refreshAccessToken(token, CLIENT_ID);
-      return redeem(token);
-    });
-
-    const loserResult = await podB.tokenService.refreshAccessToken(
-      initial.refresh_token,
-      CLIENT_ID,
-    );
-
-    expect(winnerResult).not.toBeNull();
-    expect(loserResult).toBeNull();
-    // The winner's pod still has the new access token in its per-pod cache until that expires.
-    await expectNoUsableTokens(createPod(db), [winnerResult, loserResult]);
+    expect(await db.select().from(schema.tokens)).toEqual([]);
   });
 
   it('does not accept an unused refresh token as an access token', async () => {

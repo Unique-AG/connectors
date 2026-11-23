@@ -101,12 +101,12 @@ export class MockOAuthStore implements IOAuthStore {
     this.refreshTokens.delete(token);
   }
 
-  public async redeemRefreshToken(token: string): Promise<boolean> {
+  public async redeemRefreshToken(token: string, successor: string): Promise<boolean> {
     const metadata = this.refreshTokens.get(token);
     if (!metadata || metadata.usedAt) {
       return false;
     }
-    this.refreshTokens.set(token, { ...metadata, usedAt: new Date() });
+    this.refreshTokens.set(token, { ...metadata, usedAt: new Date(), successor });
     return true;
   }
 
