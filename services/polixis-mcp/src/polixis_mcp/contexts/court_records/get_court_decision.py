@@ -1,6 +1,8 @@
 from pydantic import BaseModel
+from pydantic import computed_field
 from pydantic import Field
 
+from polixis_mcp.contexts.court_records.decisions import decision_title
 from polixis_mcp.contexts.court_records.decisions import DecisionSubject
 from polixis_mcp.contexts.court_records.decisions import fetch_decisions
 from polixis_mcp.contexts.freshness import Freshness
@@ -76,6 +78,19 @@ class CourtDecisionText(BaseModel):
         description="Pass it as `cursor` for the next part; null on the last."
     )
     freshness: Freshness
+
+    @computed_field(
+        description="Computed by this MCP, since Polixis gives none: its court, country, year "
+        "and id."
+    )
+    @property
+    def title(self) -> str:
+        return decision_title(
+            decision_id=self.decision_id,
+            court_type=self.court_type,
+            country=self.country,
+            year=self.year,
+        )
 
 
 class CourtDecisionNotFoundError(Exception):

@@ -40,7 +40,7 @@ async def test_search_entities_returns_matches_in_our_own_shape(mcp_client: McpC
         returns=contexts.EntitySearchResults,
     )
 
-    assert [match.model_dump() for match in results.matches] == [
+    assert [match.model_dump() for match in results.results] == [
         {
             "pid": "O00000000000000000000000000000100",
             "entity_type": "ORGANIZATION",
@@ -137,7 +137,7 @@ async def test_search_entities_names_a_match_by_a_current_name_past_the_records_
         returns=contexts.EntitySearchResults,
     )
 
-    match = results.matches[0]
+    match = results.results[0]
     assert (match.name, match.name_count, len(match.name_records), match.other_names) == (
         "Example Holdings AG",
         12,

@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel
 from pydantic import Field
 
+from polixis_mcp.contexts.entities.names import display_name
 from polixis_mcp.contexts.entities.names import name_record
 from polixis_mcp.contexts.entities.names import NameRecordView
 from polixis_mcp.contexts.formats import dates_by_kind
@@ -49,7 +50,7 @@ async def search_entities(*, upstream: Upstream, query: EntitySearchQuery) -> En
     pagination = response.pagination
     has_next = pagination is not None and bool(pagination.has_next)
     return EntitySearchResults(
-        matches=[match for hit in response.hits or [] if (match := _match(hit=hit)) is not None],
+        results=[match for hit in response.hits or [] if (match := _match(hit=hit)) is not None],
         total_matches=pagination.total_hits if pagination is not None else None,
         next_cursor=(
             encode_cursor(query.model_copy(update={"page": query.page + 1})) if has_next else None
@@ -68,11 +69,10 @@ def _match(*, hit: SearchHit) -> EntityMatch | None:
     in_records = {spelling for record in all_records for spelling in (record.name, record.original)}
     other_names = [name for name in names if name not in in_records]
     addresses = hit.addresses or []
-    current = next((record.name for record in all_records if record.kind == "CURRENT_NAME"), None)
     return EntityMatch(
         pid=hit.pid,
         entity_type=hit.entity_type,
-        name=current or next(iter(names), None),
+        name=display_name(all_records, names),
         name_count=len(unique([*names, *in_records])),
         name_records=records,
         other_names=other_names[: _NAMES_LISTED - len(records)],
@@ -106,8 +106,8 @@ class EntityMatch(BaseModel):
         description="PERSON or ORGANIZATION; vessels and aircraft are organizations."
     )
     name: str | None = Field(
-        description="Its CURRENT_NAME record, else the first name Polixis lists, in English "
-        "where Polixis has one."
+        description="Computed by this MCP from Polixis's names and name records: its "
+        "CURRENT_NAME record, else the first name Polixis lists, else its first name record."
     )
     name_count: int = Field(
         description="Computed by this MCP: how many distinct names and spellings Polixis holds "
@@ -154,7 +154,7 @@ class EntitySearchResults(BaseModel):
     risks and prominent ones.
     """
 
-    matches: list[EntityMatch] = Field(description="The matches on this page.")
+    results: list[EntityMatch] = Field(description="The matches on this page.")
     total_matches: int | None = Field(
         description="Matches across every page, or null when Polixis does not say."
     )

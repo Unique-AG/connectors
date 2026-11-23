@@ -76,7 +76,7 @@ async def get_ownership(*, upstream: Upstream, query: OwnershipQuery) -> Ownersh
         total_flagged=len(flagged),
         total_by_risk=risk_counts(flag.risks for flag in flagged),
         flagged=flagged[:FLAGGED_SHOWN] if query.offset == 0 else [],
-        entities=page,
+        results=page,
         next_cursor=(
             encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None

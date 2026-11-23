@@ -31,6 +31,14 @@ async def fetch_decisions(*, upstream: Upstream, pid: str) -> list[Decision]:
     ]
 
 
+def decision_title(
+    *, decision_id: str, court_type: str | None, country: str | None, year: str | None
+) -> str:
+    """Such as `Federal Court, CH, 2019 (ch_2019_1)`: Polixis gives a decision no title."""
+    heading = ", ".join(part for part in (court_type, country, year) if part)
+    return f"{heading} ({decision_id})" if heading else decision_id
+
+
 def without_highlights(snippet: str) -> str:
     """The snippet without the `<em>` tags Polixis puts around the matched name."""
     return snippet.replace("<em>", "").replace("</em>", "")

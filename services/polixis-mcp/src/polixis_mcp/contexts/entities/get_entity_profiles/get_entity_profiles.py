@@ -7,6 +7,7 @@ from polixis_mcp.contexts.entities.get_entity_profiles.outputs import EntityProf
 from polixis_mcp.contexts.entities.get_entity_profiles.outputs import PositionHeld
 from polixis_mcp.contexts.entities.get_entity_profiles.outputs import ProfileAlert
 from polixis_mcp.contexts.entities.get_entity_profiles.outputs import SanctionListing
+from polixis_mcp.contexts.entities.names import display_name
 from polixis_mcp.contexts.entities.names import name_record
 from polixis_mcp.contexts.formats import dates_by_kind
 from polixis_mcp.contexts.formats import partial_date
@@ -42,19 +43,20 @@ async def get_entity_profiles(
             ]
     except* UpstreamError as errors:
         raise errors.exceptions[0] from None
-    return EntityProfiles(profiles=[lookup.result() for lookup in lookups], freshness=freshness())
+    return EntityProfiles(results=[lookup.result() for lookup in lookups], freshness=freshness())
 
 
 async def _profile(
     *, upstream: Upstream, pid: str, sections: list[ProfileSection]
 ) -> EntityProfile:
+    fetched: list[ProfileSection] = ["name_records", "names", *sections]
     try:
         profile = await upstream.call(
             GET_PROFILE_FIELDS,
             GetProfileFieldsRequest(
                 path=GetProfileFieldsPath(id=pid),
                 body=CompletionRequestInput(
-                    fields=[_POLIXIS_FIELDS[section] for section in sections]
+                    fields=unique(_POLIXIS_FIELDS[section] for section in fetched)
                 ),
             ),
         )
@@ -70,10 +72,13 @@ def _names(names: dict[str, list[str]]) -> list[str]:
 
 
 def _entity_profile(*, pid: str, profile: Profile, sections: set[ProfileSection]) -> EntityProfile:
+    names = _names(profile.names or {})
+    name_records = unique(name_record(record) for record in profile.name_records or [])
     mapped = EntityProfile(
         pid=pid,
-        names=_names(profile.names or {}),
-        name_records=unique(name_record(record) for record in profile.name_records or []),
+        name=display_name(name_records, names),
+        names=names,
+        name_records=name_records,
         identifiers=profile.unis or {},
         countries=profile.countries or {},
         dates=dates_by_kind(profile.dates),

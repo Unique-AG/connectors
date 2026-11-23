@@ -30,13 +30,13 @@ async def test_get_sanctions_exposure_gives_the_own_listings_and_the_nearest_par
         }
     ]
     assert exposure.total_related == 3
-    assert [(party.pid, party.hops) for party in exposure.related] == [
+    assert [(party.pid, party.hops) for party in exposure.results] == [
         ("O00000000000000000000000000000900", 1),
         ("P00000000000000000000000000000400", 2),
         (None, None),
     ]
-    assert exposure.related[0].path[0].start_date == "2013-12-31"
-    assert exposure.related[0].listings[0].listed_on == "2024-06-13"
+    assert exposure.results[0].path[0].start_date == "2013-12-31"
+    assert exposure.results[0].listings[0].listed_on == "2024-06-13"
 
 
 async def test_get_sanctions_exposure_keeps_every_relation_on_the_path(
@@ -55,7 +55,7 @@ async def test_get_sanctions_exposure_keeps_every_relation_on_the_path(
         returns=contexts.SanctionsExposurePage,
     )
 
-    [party] = rest.related
+    [party] = rest.results
     assert [
         (listing.status, listing.programs, listing.listed_on) for listing in party.listings
     ] == [("ACTIVE", ["EXAMPLE-EO1"], "2022-04-14")]
@@ -98,7 +98,7 @@ async def test_get_sanctions_exposure_leaves_the_distance_unknown_past_an_unname
         returns=contexts.SanctionsExposurePage,
     )
 
-    assert [(party.pid, party.hops) for party in exposure.related] == [
+    assert [(party.pid, party.hops) for party in exposure.results] == [
         ("P00000000000000000000000000000402", 1),
         ("P00000000000000000000000000000401", None),
     ]
@@ -122,6 +122,6 @@ async def test_get_sanctions_exposure_keeps_a_sanctioned_party_without_a_pid(
     )
 
     assert exposure.total_related == 1
-    assert [(party.pid, party.name, party.hops) for party in exposure.related] == [
+    assert [(party.pid, party.name, party.hops) for party in exposure.results] == [
         (None, "Unregistered Sample", 1)
     ]

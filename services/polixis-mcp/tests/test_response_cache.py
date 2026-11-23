@@ -48,7 +48,7 @@ async def test_the_next_page_reads_the_tree_from_the_cache(
     assert [request.url.path for request in upstream_requests if "/api/" in request.url.path] == [
         "/api/graph/ubo/O00000000000000000000000000000100"
     ]
-    assert [entity.pid for entity in second.entities] == ["P00000000000000000000000000000700"]
+    assert [entity.pid for entity in second.results] == ["P00000000000000000000000000000700"]
 
 
 async def test_another_tool_on_the_same_entity_reuses_the_graph(
@@ -317,7 +317,7 @@ async def test_a_failed_cache_write_still_returns_polixis_answer(
             returns=contexts.OwnershipPage,
         )
 
-    assert owners.entities
+    assert owners.results
     assert "Could not cache a Polixis response" in caplog.messages
 
 
@@ -344,7 +344,7 @@ async def test_a_failed_cache_read_asks_polixis(
             returns=contexts.OwnershipPage,
         )
 
-    assert owners.entities
+    assert owners.results
     assert "Could not read the Polixis response cache, asking Polixis" in caplog.messages
 
 
@@ -444,5 +444,5 @@ async def test_a_cached_answer_is_served_while_the_quota_is_spent(
         )
         cached = await _owners(client)
 
-    assert cached.entities == fresh.entities
+    assert cached.results == fresh.results
     assert cached.freshness.cached_at is not None

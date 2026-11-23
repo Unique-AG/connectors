@@ -41,7 +41,7 @@ async def find_connections(*, upstream: Upstream, from_pid: str, to_pid: str) ->
         connected=bool(paths),
         hops=min(len(path.steps) for path in paths) if paths else None,
         paths=paths,
-        parties=[
+        results=[
             party_of(pid=pid, node=nodes[pid], meta=meta, distance=None)
             for pid in on_paths
             if pid in nodes
@@ -137,7 +137,7 @@ class Connections(BaseModel):
     paths: list[ConnectionPath] = Field(
         description="The paths found, usually one: the shortest Polixis knows."
     )
-    parties: list[Party] = Field(
+    results: list[Party] = Field(
         description="Every party on the paths, with its flags; `distance` is null here."
     )
     freshness: Freshness

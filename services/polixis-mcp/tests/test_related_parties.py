@@ -24,7 +24,7 @@ async def test_get_related_parties_merges_a_party_every_publisher_reports(
 
     assert page.total_parties is None
     assert page.relations_by_source == {"Example Commercial Register": 3, "Example PEP List": 41}
-    assert [party.model_dump() for party in page.parties] == [
+    assert [party.model_dump() for party in page.results] == [
         {
             "pid": "P00000000000000000000000000000200",
             "name": "Anna Example",
@@ -119,7 +119,7 @@ async def test_get_related_parties_reads_the_next_page_from_the_cache(
         returns=contexts.RelatedPartiesPage,
     )
 
-    assert [party.name for party in [*first.parties, *second.parties]] == [
+    assert [party.name for party in [*first.results, *second.results]] == [
         "Anna Example",
         "Pat Signatory",
     ]
@@ -188,7 +188,7 @@ async def test_get_related_parties_ranks_a_party_by_how_many_sources_report_it(
         },
     )
 
-    assert [party.name for party in page.parties] == ["Zoe Example", "Ava Example"]
+    assert [party.name for party in page.results] == ["Zoe Example", "Ava Example"]
 
 
 async def test_get_related_parties_keeps_apart_two_parties_without_a_pid(
@@ -209,7 +209,7 @@ async def test_get_related_parties_keeps_apart_two_parties_without_a_pid(
         },
     )
 
-    assert [(party.name, party.flags) for party in page.parties] == [
+    assert [(party.name, party.flags) for party in page.results] == [
         ("Pat Signatory", []),
         ("Pat Signatory", ["PEP"]),
     ]
@@ -231,7 +231,7 @@ async def test_get_related_parties_takes_a_name_only_a_later_publisher_gives(
         },
     )
 
-    assert [(party.pid, party.name, party.entity_type) for party in page.parties] == [
+    assert [(party.pid, party.name, party.entity_type) for party in page.results] == [
         (pid, "Eve", "PERSON")
     ]
 
@@ -247,7 +247,7 @@ async def test_get_related_parties_keeps_a_relation_polixis_gives_no_details_for
 
     page = await _page(mcp_client, monkeypatch, {"Register": _publisher(item)})
 
-    assert [relation.relation_type for relation in page.parties[0].relations] == [
+    assert [relation.relation_type for relation in page.results[0].relations] == [
         "board",
         "executive",
     ]

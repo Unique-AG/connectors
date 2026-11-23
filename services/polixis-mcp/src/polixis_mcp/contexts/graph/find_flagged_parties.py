@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from pydantic import computed_field
 from pydantic import Field
 
 from polixis_mcp.contexts.freshness import Freshness
@@ -69,7 +70,7 @@ async def find_flagged_parties(
         truncated_by_polixis=network.truncated,
         total_flagged=len(flagged),
         total_by_risk=risk_counts(found.risks for found in flagged),
-        flagged=page,
+        results=page,
         next_cursor=(
             encode_cursor(query.model_copy(update={"offset": next_offset, "snapshot": snapshot}))
             if next_offset is not None
@@ -101,6 +102,15 @@ class FlaggedParty(BaseModel):
         "by a breadth-first walk, with the roles at each step."
     )
 
+    @computed_field(
+        description="Computed by this MCP: `party.name` repeated, the first English name "
+        "Polixis's smart graph lists for it, else its first original-script name; null when it "
+        "lists none."
+    )
+    @property
+    def name(self) -> str | None:
+        return self.party.name
+
 
 class FlaggedPartiesPage(BaseModel):
     """The flagged parties in the network around an entity, one page of them."""
@@ -120,7 +130,7 @@ class FlaggedPartiesPage(BaseModel):
         description="Computed by this MCP: parties with a risk marker, across every page."
     )
     total_by_risk: dict[str, int] = Field(description=RISK_COUNTS_DESCRIPTION)
-    flagged: list[FlaggedParty] = Field(description="The flagged parties of this page.")
+    results: list[FlaggedParty] = Field(description="The flagged parties of this page.")
     next_cursor: str | None = Field(
         description="Pass it as `cursor` for the next page; null on the last page."
     )

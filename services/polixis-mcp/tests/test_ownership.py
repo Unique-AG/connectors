@@ -25,7 +25,7 @@ async def test_get_ultimate_beneficial_owners_ranks_owners_by_their_summed_effec
     assert page.total_share_unknown == 0
     assert [
         (entity.name, entity.effective_share_percent, entity.depth, entity.chains)
-        for entity in page.entities
+        for entity in page.results
     ] == [
         ("Example Parent AG", 80.0, 1, 1),
         ("Carla Sample", 50.0, 1, 2),
@@ -43,7 +43,7 @@ async def test_get_ultimate_beneficial_owners_counts_an_owner_listed_twice_under
         returns=contexts.OwnershipPage,
     )
 
-    owner = page.entities[2]
+    owner = page.results[2]
     assert (owner.name, owner.effective_share_percent, owner.chains) == ("Anna Example", 20.0, 1)
     assert (owner.direct_share_percent, owner.roles) == (20.0, ["shareholder", "beneficial owner"])
 
@@ -58,14 +58,14 @@ async def test_get_ultimate_beneficial_owners_keeps_the_strongest_chain_of_an_ow
         returns=contexts.OwnershipPage,
     )
 
-    owner = page.entities[1]
+    owner = page.results[1]
     assert (owner.direct_share_percent, owner.end_of_chain, owner.flags) == (10.0, True, ["PEP"])
     assert owner.roles == ["shareholder", "reported shareholder"]
     assert [(link.pid, link.share_percent) for link in owner.strongest_chain] == [
         ("O00000000000000000000000000000600", 80.0),
         ("P00000000000000000000000000000700", 50.0),
     ]
-    assert page.entities[0].end_of_chain is False
+    assert page.results[0].end_of_chain is False
 
 
 async def test_get_ultimate_beneficial_owners_lists_the_sanctioned_owners_first_on_the_first_page(
@@ -90,7 +90,7 @@ async def test_get_ultimate_beneficial_owners_lists_the_sanctioned_owners_first_
         ("Anna Example", 20.0, ["SANCTION"]),
         ("Carla Sample", 50.0, ["PEP"]),
     ]
-    assert [entity.pid for entity in second.entities] == ["P00000000000000000000000000000700"]
+    assert [entity.pid for entity in second.results] == ["P00000000000000000000000000000700"]
     assert (second.total_flagged, second.flagged) == (2, [])
 
 
@@ -106,7 +106,7 @@ async def test_get_top_down_ownership_leaves_an_unreported_share_unknown(
 
     assert upstream_requests[-1].url.path == "/api/graph/topdown/O00000000000000000000000000000100"
     assert page.truncated_by_polixis is True
-    holding, minority = page.entities
+    holding, minority = page.results
     assert (holding.name, holding.alerts) == ("Example Shipping Ltd", ["STATECO"])
     assert (minority.effective_share_percent, minority.share_unknown_on_some_chain) == (None, True)
     assert page.total_share_unknown == 1
@@ -184,8 +184,8 @@ async def test_a_page_holds_the_rows_that_fit_in_its_token_budget(
         returns=contexts.OwnershipPage,
     )
 
-    assert [entity.pid for entity in first.entities] == ["O00000000000000000000000000000600"]
-    assert [entity.pid for entity in rest.entities] == ["P00000000000000000000000000000700"]
+    assert [entity.pid for entity in first.results] == ["O00000000000000000000000000000600"]
+    assert [entity.pid for entity in rest.results] == ["P00000000000000000000000000000700"]
     assert rest.next_cursor is not None
 
 
@@ -197,7 +197,7 @@ async def test_a_page_size_caps_the_rows_below_the_token_budget(mcp_client: McpC
         returns=contexts.OwnershipPage,
     )
 
-    assert [entity.pid for entity in page.entities] == [
+    assert [entity.pid for entity in page.results] == [
         "O00000000000000000000000000000600",
         "P00000000000000000000000000000700",
     ]
@@ -227,7 +227,7 @@ async def test_ownership_reaches_the_owners_behind_a_node_without_an_id(
         returns=contexts.OwnershipPage,
     )
 
-    assert [(entity.pid, entity.effective_share_percent) for entity in page.entities] == [
+    assert [(entity.pid, entity.effective_share_percent) for entity in page.results] == [
         ("P00000000000000000000000000000700", 40.0)
     ]
 
@@ -259,7 +259,7 @@ async def test_ownership_keeps_apart_two_owners_without_an_id_on_the_way_to_one_
     )
 
     assert [
-        (entity.pid, entity.effective_share_percent, entity.chains) for entity in page.entities
+        (entity.pid, entity.effective_share_percent, entity.chains) for entity in page.results
     ] == [("P00000000000000000000000000000700", 50.0, 2)]
 
 

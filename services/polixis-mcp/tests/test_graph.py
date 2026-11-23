@@ -25,7 +25,7 @@ async def test_find_linked_companies_lists_direct_ties_before_ties_through_peopl
     assert (found.total_companies, found.total_direct, found.total_flagged) == (2, 1, 1)
     assert found.total_by_risk["STATECO"] == 1
     assert found.truncated_by_polixis is False
-    direct, through_person = found.companies
+    direct, through_person = found.results
     assert (direct.company.name, direct.through_total) == ("Example Shipping Ltd", 0)
     assert direct.direct_links[0].relations[0].share_percent == 100.0
     assert (through_person.company.name, through_person.risks) == (
@@ -56,12 +56,12 @@ async def test_find_linked_companies_follows_two_people_in_a_row_at_radius_3(
         "id": "O00000000000000000000000000000100",
         "radius": 3,
     }
-    assert [(linked.company.pid, linked.hops) for linked in found.companies] == [
+    assert [(linked.company.pid, linked.hops) for linked in found.results] == [
         ("O00000000000000000000000000000300", 1),
         ("O00000000000000000000000000000310", 2),
         ("O00000000000000000000000000000320", 3),
     ]
-    [chain] = found.companies[2].through
+    [chain] = found.results[2].through
     assert [person.name for person in chain.people] == ["Pia Example", "Paul Sample"]
     assert [link.relations[0].role for link in chain.links] == [
         "director",
@@ -92,7 +92,7 @@ async def test_find_linked_companies_adds_minor_ties_from_the_full_graph(
     }
     assert (found.total_companies, found.total_direct) == (3, 2)
     assert found.truncated_by_polixis is True
-    assert [linked.company.pid for linked in [*found.companies, *rest.companies]] == [
+    assert [linked.company.pid for linked in [*found.results, *rest.results]] == [
         "O00000000000000000000000000000500",
         "O00000000000000000000000000000300",
         "O00000000000000000000000000000310",
@@ -127,7 +127,7 @@ async def test_find_connections_orders_the_steps_of_the_path_polixis_finds(
         ("Example Shipping Ltd", "Boris Sample"),
     ]
     assert path.steps[2].links[0].relations[0].role == "director"
-    assert [(party.pid, party.flags, party.alerts) for party in connections.parties] == [
+    assert [(party.pid, party.flags, party.alerts) for party in connections.results] == [
         ("P00000000000000000000000000000200", ["PEP"], []),
         ("O00000000000000000000000000000100", [], []),
         ("O00000000000000000000000000000300", [], ["STATECO"]),
@@ -181,13 +181,13 @@ async def test_find_flagged_parties_lists_the_most_severe_first_with_the_path_to
     )
 
     assert found.parties_checked == 8
-    assert [(flagged.party.pid, flagged.risks, len(flagged.path)) for flagged in found.flagged] == [
+    assert [(flagged.party.pid, flagged.risks, len(flagged.path)) for flagged in found.results] == [
         ("P00000000000000000000000000000400", ["SANCTION"], 2),
         ("P00000000000000000000000000000200", ["PEP"], 1),
         ("O00000000000000000000000000000500", ["STATECO"], 1),
         ("O00000000000000000000000000000310", ["STATECO"], 2),
     ]
-    assert found.flagged[2].party.name is None
+    assert found.results[2].party.name is None
     assert found.total_by_risk == {
         "FORMER_PEP": 0,
         "PEP": 1,
