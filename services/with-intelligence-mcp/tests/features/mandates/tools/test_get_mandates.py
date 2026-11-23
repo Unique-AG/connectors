@@ -3,7 +3,7 @@
 import httpx
 import respx
 
-from tests.helpers import BASE_URL, build_client, page_body, sent_query
+from tests.helpers import BASE_URL, build_client, page_body, sent_query, sent_records
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorNotEntitledResponse,
@@ -98,7 +98,7 @@ class TestStatus:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        mandate = result.mandates[0]
+        mandate = result.results[0]
         assert mandate.status == "Open"
         assert mandate.sub_status == "Shortlisting"
         assert mandate.service == "Manager Search"
@@ -110,7 +110,7 @@ class TestStatus:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        assert result.mandates[0].last_reviewed == "2024-01-31"
+        assert result.results[0].last_reviewed == "2024-01-31"
 
     @respx.mock
     async def test_names_the_fund_that_won_it(self) -> None:
@@ -118,7 +118,7 @@ class TestStatus:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        assert result.mandates[0].awarded_to == "Example Macro Fund"
+        assert result.results[0].awarded_to == "Example Macro Fund"
 
 
 class TestWhatTheyAreLookingFor:
@@ -128,7 +128,7 @@ class TestWhatTheyAreLookingFor:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        mandate = result.mandates[0]
+        mandate = result.results[0]
         assert mandate.asset_classes is None
         assert mandate.strategies is None
         assert mandate.structures is None
@@ -149,7 +149,7 @@ class TestWhatTheyAreLookingFor:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        mandate = result.mandates[0]
+        mandate = result.results[0]
         assert mandate.asset_classes is None
         assert mandate.strategies is None
         assert mandate.structures is None
@@ -161,7 +161,7 @@ class TestWhatTheyAreLookingFor:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        mandate = result.mandates[0]
+        mandate = result.results[0]
         assert mandate.strategies == ["Equity", "Long/Short Equity"]
         assert mandate.structures == ["Managed Account"]
         assert mandate.market_focuses == ["Developed Markets"]
@@ -172,7 +172,7 @@ class TestWhatTheyAreLookingFor:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        amount = result.mandates[0].amount
+        amount = result.results[0].amount
         assert amount is not None
         assert amount.value_millions == 300.0
         assert amount.currency == "USD"
@@ -183,9 +183,9 @@ class TestWhatTheyAreLookingFor:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        assert result.mandates[0].consultant == "A. Consultant"
-        assert result.mandates[0].consultant_firm == "Consultant One"
-        assert result.mandates[0].rfp_link == "https://example.invalid/rfp"
+        assert result.results[0].consultant == "A. Consultant"
+        assert result.results[0].consultant_firm == "Consultant One"
+        assert result.results[0].rfp_link == "https://example.invalid/rfp"
 
 
 class TestNotes:
@@ -196,8 +196,8 @@ class TestNotes:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        assert result.mandates[0].latest_note == "Shortlist drawn up."
-        assert result.mandates[0].latest_note_date == "2026-07-15"
+        assert result.results[0].latest_note == "Shortlist drawn up."
+        assert result.results[0].latest_note_date == "2026-07-15"
 
     @respx.mock
     async def test_notes_are_plain_text(self) -> None:
@@ -218,8 +218,8 @@ class TestNotes:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        assert result.mandates[0].note == "Approved a $25m commitment. See the recap."
-        assert result.mandates[0].latest_note == "Shortlist drawn up."
+        assert result.results[0].note == "Approved a $25m commitment. See the recap."
+        assert result.results[0].latest_note == "Shortlist drawn up."
 
     @respx.mock
     async def test_a_mandate_with_no_notes_omits_them(self) -> None:
@@ -227,7 +227,7 @@ class TestNotes:
         client, _ = build_client()
         result = await get_mandates(investor_id=2504, client=client)
         assert isinstance(result, InvestorMandatesResponse)
-        assert result.mandates[0].latest_note is None
+        assert result.results[0].latest_note is None
 
 
 class TestScoping:
@@ -279,3 +279,53 @@ class TestScoping:
         result = await get_mandates(name="Virginia", client=client)
         assert isinstance(result, InvestorAmbiguousResponse)
         assert listing.call_count == 0
+
+
+class TestCitation:
+    @respx.mock
+    async def test_titles_each_mandate_under_results_without_a_web_link(self) -> None:
+        """The RFP link is a document, so a null `web_url` keeps it from being cited."""
+        _mock([OPEN_SEARCH, AWARDED])
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        mandates = sent_records(result)
+        assert [mandate["title"] for mandate in mandates] == [
+            "Manager Search: Equity, Long/Short Equity",
+            "Mandate 22",
+        ]
+        assert [mandate["web_url"] for mandate in mandates] == [None, None]
+        assert mandates[0]["rfp_link"] == "https://example.invalid/rfp"
+
+    @respx.mock
+    async def test_titles_a_mandate_without_strategies_by_its_asset_class(self) -> None:
+        _mock(
+            [
+                {
+                    "id": 23,
+                    "service": {"id": 2, "name": "Manager Search"},
+                    "asset_class": [{"id": 1, "name": "Hedge Funds"}],
+                }
+            ]
+        )
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        assert result.results[0].title == "Manager Search: Hedge Funds"
+
+    @respx.mock
+    async def test_titles_a_mandate_whose_detail_is_unavailable(self) -> None:
+        respx.get(f"{BASE_URL}/v3/mandates").mock(
+            return_value=httpx.Response(
+                200, json=page_body([{"id": 21, "updated_at": "2026-08-01"}], total=1)
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/mandates/21").mock(return_value=httpx.Response(403))
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        assert result.results[0].title == "Mandate 21"
+        assert result.results[0].updated_at == "2026-08-01"

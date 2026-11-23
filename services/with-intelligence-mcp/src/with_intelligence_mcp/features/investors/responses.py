@@ -11,7 +11,7 @@ from with_intelligence_mcp.features.investors.api_responses import (
     InvestorExtendedAttributes,
     StrategyGroupAttributes,
 )
-from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel, WebLinkedRecord
 from with_intelligence_mcp.utils import html_to_markdown, names, when_present
 
 
@@ -49,7 +49,7 @@ class ConsultantResponse(OmitNoneModel):
     role: str | None = None
 
 
-class InvestorProfileResponse(OmitNoneModel):
+class InvestorProfileResponse(WebLinkedRecord):
     """One institutional investor, as a meeting-prep sheet.
 
     `managers` is who they currently allocate to. A field that is absent is unknown to With

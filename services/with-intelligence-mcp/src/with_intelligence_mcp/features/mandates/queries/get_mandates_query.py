@@ -47,13 +47,13 @@ class GetMandatesQuery:
         mandates = [
             MandateResponse.from_attributes(detail)
             if detail
-            else MandateResponse(id=listed[index].id)
+            else MandateResponse.from_listing(listed[index])
             for index, detail in enumerate(details)
         ]
         response = InvestorMandatesResponse(
             investor_id=investor.id,
             investor_name=investor.name,
-            mandates=mandates,
+            results=mandates,
             total=total,
             returned=len(mandates),
             page=page,

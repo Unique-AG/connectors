@@ -3,7 +3,7 @@
 import httpx
 import respx
 
-from tests.helpers import BASE_URL, build_client, page_body, sent_query
+from tests.helpers import BASE_URL, build_client, page_body, sent_query, sent_records
 from with_intelligence_mcp.features.investors import (
     InvestorAmbiguousResponse,
     InvestorNotEntitledResponse,
@@ -84,7 +84,7 @@ class TestRoleSelection:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].job_title == "Director of Hedge Funds"
+        assert result.results[0].job_title == "Director of Hedge Funds"
 
     @respx.mock
     async def test_matches_on_org_entity_id_too(self) -> None:
@@ -101,7 +101,7 @@ class TestRoleSelection:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].job_title == "CIO"
+        assert result.results[0].job_title == "CIO"
 
     @respx.mock
     async def test_prefers_a_current_role_over_one_they_left(self) -> None:
@@ -121,8 +121,8 @@ class TestRoleSelection:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].job_title == "Head of Manager Selection"
-        assert result.people[0].is_current is True
+        assert result.results[0].job_title == "Head of Manager Selection"
+        assert result.results[0].is_current is True
 
     @respx.mock
     async def test_prefers_the_latest_role_when_all_roles_have_ended(self) -> None:
@@ -142,8 +142,8 @@ class TestRoleSelection:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].job_title == "CIO"
-        assert result.people[0].role_ended == "2025-01-01"
+        assert result.results[0].job_title == "CIO"
+        assert result.results[0].role_ended == "2025-01-01"
 
     @respx.mock
     async def test_a_person_with_no_role_here_still_returns_their_name(self) -> None:
@@ -151,9 +151,9 @@ class TestRoleSelection:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].name == "D. Allocator"
-        assert result.people[0].job_title is None
-        assert result.people[0].is_current is None
+        assert result.results[0].name == "D. Allocator"
+        assert result.results[0].job_title is None
+        assert result.results[0].is_current is None
 
 
 class TestDepartures:
@@ -173,8 +173,8 @@ class TestDepartures:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].is_current is False
-        assert result.people[0].role_ended == "2024-06-30"
+        assert result.results[0].is_current is False
+        assert result.results[0].role_ended == "2024-06-30"
 
 
 class TestContactDetails:
@@ -202,9 +202,9 @@ class TestContactDetails:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert [person.name for person in result.people] == ["Available", "Restricted"]
-        assert result.people[1].is_current is None
-        assert result.people[1].specialisms is None
+        assert [person.name for person in result.results] == ["Available", "Restricted"]
+        assert result.results[1].is_current is None
+        assert result.results[1].specialisms is None
 
     @respx.mock
     async def test_surfaces_title_seniority_email_and_main_contact_flag(self) -> None:
@@ -234,7 +234,7 @@ class TestContactDetails:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        person = result.people[0]
+        person = result.results[0]
         assert person.seniority == "Director"
         assert person.specialisms == ["Hedge Funds", "Real Assets"]
         assert person.email == "f.allocator@example.invalid"
@@ -333,7 +333,7 @@ class TestWiEncodings:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].specialisms == ["Real Assets"]
+        assert result.results[0].specialisms == ["Real Assets"]
 
     @respx.mock
     async def test_a_specialism_sent_as_a_bare_object_also_parses(self) -> None:
@@ -349,7 +349,7 @@ class TestWiEncodings:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].specialisms == ["Real Assets"]
+        assert result.results[0].specialisms == ["Real Assets"]
 
     @respx.mock
     async def test_a_seniority_sent_as_a_list_collapses_to_one(self) -> None:
@@ -361,4 +361,27 @@ class TestWiEncodings:
         client, _ = build_client()
         result = await get_people_for_investor(investor_id=2504, client=client)
         assert isinstance(result, PeopleForInvestorResponse)
-        assert result.people[0].seniority == "Director"
+        assert result.results[0].seniority == "Director"
+
+
+class TestCitation:
+    @respx.mock
+    async def test_names_each_person_under_results_and_never_cites_linkedin(self) -> None:
+        """Without a null `web_url` the chat would cite the LinkedIn profile as the record."""
+        _mock_roster(
+            [
+                {
+                    **_person(1, "K. Allocator", [_role(2504, job_title="CIO")]),
+                    "linked_in_url": "https://www.linkedin.com/in/example",
+                },
+                _person(2, "L. Allocator", [_role(2504)]),
+            ],
+            total=2,
+        )
+        client, _ = build_client()
+        result = await get_people_for_investor(investor_id=2504, client=client)
+        assert isinstance(result, PeopleForInvestorResponse)
+        people = sent_records(result)
+        assert [person["name"] for person in people] == ["K. Allocator", "L. Allocator"]
+        assert [person["web_url"] for person in people] == [None, None]
+        assert people[0]["linkedin"] == "https://www.linkedin.com/in/example"

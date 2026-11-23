@@ -3,7 +3,7 @@
 import httpx
 import respx
 
-from tests.helpers import BASE_URL, build_client, page_body, sent_query
+from tests.helpers import BASE_URL, build_client, page_body, sent_query, sent_records
 from with_intelligence_mcp.features.articles import InvestorArticlesResponse
 from with_intelligence_mcp.features.articles.queries import GetArticlesQuery
 from with_intelligence_mcp.features.articles.tools.get_articles import (
@@ -78,7 +78,7 @@ class TestProjection:
         assert "firm_type=institutional_investor" in query
         assert "post_date%5Bfrom%5D=2026-01-01" in query
         assert "sort%5Bid%5D=desc" in query
-        article = result.articles[0]
+        article = result.results[0]
         assert article.title == "Example portfolio update"
         assert article.excerpt == "Example RS returned 7%."
         assert article.body == "The full note on Example RS."
@@ -104,5 +104,39 @@ class TestProjection:
         client, _ = build_client()
         result = await get_articles(investor_id=2504, client=client)
         assert isinstance(result, InvestorArticlesResponse)
-        assert result.articles[0].title == "Listing title"
-        assert result.articles[0].excerpt is None
+        assert result.results[0].title == "Listing title"
+        assert result.results[0].excerpt is None
+
+
+class TestCitation:
+    @respx.mock
+    async def test_titles_each_article_under_results_and_never_cites_the_attachment(
+        self,
+    ) -> None:
+        """The attachment is a download; a null `web_url` keeps it from being cited."""
+        with_document = {
+            **ARTICLE,
+            "id": 101,
+            "post_title": "Example quarterly letter",
+            "document": {"url": "https://files.example.invalid/letter.pdf", "title": "Letter"},
+        }
+        respx.get(f"{BASE_URL}/v3/articles").mock(
+            return_value=httpx.Response(200, json=page_body([{"id": 100}, {"id": 101}], total=2))
+        )
+        respx.get(f"{BASE_URL}/v3/articles/100").mock(
+            return_value=httpx.Response(200, json=ARTICLE)
+        )
+        respx.get(f"{BASE_URL}/v3/articles/101").mock(
+            return_value=httpx.Response(200, json=with_document)
+        )
+        _mock_investor()
+        client, _ = build_client()
+        result = await get_articles(investor_id=2504, client=client)
+        assert isinstance(result, InvestorArticlesResponse)
+        articles = sent_records(result)
+        assert [article["title"] for article in articles] == [
+            "Example portfolio update",
+            "Example quarterly letter",
+        ]
+        assert [article["web_url"] for article in articles] == [None, None]
+        assert articles[1]["document_url"] == "https://files.example.invalid/letter.pdf"

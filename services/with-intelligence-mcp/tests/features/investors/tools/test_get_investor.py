@@ -164,6 +164,19 @@ class TestById:
         assert search.call_count == 0
 
     @respx.mock
+    async def test_is_titled_by_name_and_never_cites_its_website(self) -> None:
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=VIRGINIA)
+        )
+        client, _ = build_client()
+        result = await get_investor(investor_id=2504, client=client)
+        assert isinstance(result, InvestorProfileResponse)
+        dumped = result.model_dump()
+        assert dumped["name"] == VIRGINIA["name"]
+        assert dumped["web_url"] is None
+        assert dumped["website"] == VIRGINIA["website"]
+
+    @respx.mock
     async def test_an_unknown_id_is_reported(self) -> None:
         respx.get(f"{BASE_URL}/v3/investors/1").mock(return_value=httpx.Response(404))
         client, _ = build_client()

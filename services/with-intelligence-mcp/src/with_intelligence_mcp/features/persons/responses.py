@@ -6,10 +6,10 @@ from with_intelligence_mcp.features.persons.api_responses import (
     PersonExtendedAttributes,
     PersonRoleAttributes,
 )
-from with_intelligence_mcp.models import OmitNoneModel
+from with_intelligence_mcp.models import OmitNoneModel, WebLinkedRecord
 
 
-class PersonResponse(OmitNoneModel):
+class PersonResponse(WebLinkedRecord):
     """One contact, as their role at the investor asked about — not their whole career."""
 
     id: int = Field(description="With Intelligence person identifier.", examples=[650889])
@@ -96,7 +96,7 @@ class PeopleForInvestorResponse(OmitNoneModel):
 
     investor_id: int = Field(description="With Intelligence investor identifier.")
     investor_name: str | None = Field(default=None, description="Resolved investor name.")
-    people: list[PersonResponse] = Field(
+    results: list[PersonResponse] = Field(
         default_factory=list,
         description="People on the requested page, ordered by most recently updated.",
     )
