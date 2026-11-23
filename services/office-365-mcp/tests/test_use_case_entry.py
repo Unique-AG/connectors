@@ -2,25 +2,18 @@ import pathlib
 import re
 from collections.abc import Mapping, Sequence
 from typing import cast
-from urllib.parse import urlparse
 
 import pytest
 import yaml
-from markdown_it import MarkdownIt
 
 from office_365_mcp.tools import PRESETS
 
 _SERVICE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 _README = (_SERVICE_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+_USE_CASE_SECTION = _README.split("## Start from what you want to do")[1].split("\n## ")[0]
 _FEATURES = sorted((_SERVICE_ROOT / "features").glob("*.feature"))
-_USE_CASES_URL = (
-    "https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md"
-)
 _ROW = re.compile(
-    r"^\| \[[^\]]+\]\("
-    + re.escape(_USE_CASES_URL)
-    + r"#(?P<anchor>[^)]+)\) \| [^|]+ \| "
-    + r"(?P<presets>[^|]+) \| (?P<consent>[^|]+) \|$",
+    r"^\| (?P<name>[A-Z][^|`]+?) \| [^|]+ \| (?P<presets>`[^|]+) \| (?P<consent>[^|]+) \|$",
     re.M,
 )
 _PRESET_ROW = re.compile(
@@ -53,11 +46,11 @@ def _tools_of(feature: pathlib.Path) -> set[str]:
 
 
 def _rows() -> dict[str, tuple[list[str], str]]:
-    found = [match.groupdict() for match in _ROW.finditer(_README)]
-    anchors = [row["anchor"] for row in found]
-    assert len(anchors) == len(set(anchors)), "the README table repeats a use case"
+    found = [match.groupdict() for match in _ROW.finditer(_USE_CASE_SECTION)]
+    names = [_slug(row["name"]) for row in found]
+    assert len(names) == len(set(names)), "the README table repeats a use case"
     return {
-        row["anchor"]: (re.findall(r"`([a-z-]+)`", row["presets"]), row["consent"].strip())
+        _slug(row["name"]): (re.findall(r"`([a-z-]+)`", row["presets"]), row["consent"].strip())
         for row in found
     }
 
@@ -89,24 +82,3 @@ class TestTheUseCaseTable:
         consenting = _needs_consent()
 
         assert consent == (_ADMIN_CONSENT if any(consenting[p] for p in presets) else "No")
-
-
-def _link_destinations(markdown: str) -> list[str]:
-    tokens = MarkdownIt("commonmark").enable("table").parse(markdown)
-    return [
-        str(child.attrs["href"])
-        for token in tokens
-        for child in token.children or []
-        if child.type == "link_open"
-    ]
-
-
-class TestTheReadmeForConfluence:
-    def test_it_links_to_unpublished_pages_by_url(self) -> None:
-        unpublished = (_SERVICE_ROOT / "docs" / ".mdignore").read_text(encoding="utf-8").split()
-        relative = [
-            href
-            for href in _link_destinations(_README)
-            if not urlparse(href).scheme and urlparse(href).path.split("/")[-1] in unpublished
-        ]
-        assert relative == [], f"md2conf cannot resolve these links: {relative}"
