@@ -1330,3 +1330,83 @@ class TestTheReactionsOfAMessage:
         assert _uncalled(routes) == []
         (reaction,) = _rows(read, "reactions")
         assert reaction["user_id"] and reaction["reaction_type"] and reaction["created_at"]
+
+
+GROUP_CHAT_ID = "19:release@thread.v2"
+CHAT_MESSAGE_PATH = f"/chats/{GROUP_CHAT_ID}/messages/1770000000000"
+CHAT_MESSAGE_URI = f"teams:///chats/{quote(GROUP_CHAT_ID, safe='')}/messages/1770000000000"
+CHANNEL_MESSAGE_URI = f"{CHANNEL_POST_URI}/1770000000000"
+
+
+class TestWhatACitationOfTeamsShows:
+    async def test_a_chat_message_without_a_subject_is_named_by_its_sender_and_opening(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(200, json=message_payload())
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert (read["subject"], read["title"]) == (None, "Ada Lovelace: cut the release on Friday")
+
+    async def test_a_plain_text_message_keeps_its_angle_brackets_in_its_title(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(content="Deploy  <release-id>\nnow", content_type="text"),
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["title"] == "Ada Lovelace: Deploy <release-id> now"
+
+    async def test_a_chat_message_without_a_link_opens_through_the_deep_link_to_its_chat(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(200, json=message_payload(web_url=None))
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["web_url"] == (
+            "https://teams.microsoft.com/l/message/19:release@thread.v2/1770000000000"
+            + "?context=%7B%22contextType%22%3A%22chat%22%7D"
+        )
+
+    async def test_a_message_keeps_its_subject_and_the_link_microsoft_gives_it(
+        self, graph: respx.MockRouter
+    ) -> None:
+        link = "https://teams.microsoft.invalid/l/message/19:releases@thread.tacv2/1770000000000"
+        _ = graph.get(f"{CHANNEL_MESSAGES_PATH}/1770000000000").mock(
+            return_value=httpx.Response(
+                200, json={**message_payload(web_url=link), "subject": "Release on Friday"}
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHANNEL_MESSAGE_URI)
+
+        assert (read["title"], read["web_url"]) == ("Release on Friday", link)
+
+    async def test_a_system_event_without_a_sender_is_named_by_the_event(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(
+                    sender=None,
+                    message_type="systemEventMessage",
+                    content="",
+                    event_detail={"@odata.type": "#microsoft.graph.membersAddedEventMessageDetail"},
+                ),
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["title"] == "members added"

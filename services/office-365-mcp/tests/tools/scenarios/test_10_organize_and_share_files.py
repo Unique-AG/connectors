@@ -243,6 +243,28 @@ class TestFilingDocuments:
         assert _body(copy)["name"] == "Template copy.docx"
         assert started["name"] == "Template copy.docx"
 
+    async def test_a_copied_file_links_to_its_viewer_and_the_folder_to_its_own_page(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-sharepoint_copy_item-brochure")
+        source, folder = _handles(routes, "GET")[1:3]
+
+        started = await call(
+            "sharepoint_copy_item",
+            item=DriveFileHandle(*source).uri,
+            to_folder=DriveFolderHandle(*folder).uri,
+            name="Template copy.docx",
+        )
+
+        assert started["source_web_url"] == (
+            "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/"
+            + "seed-v1%20Seed%20Files/seed-v1%20Brochure%20Proof.pdf?web=1"
+        )
+        assert started["destination_web_url"] == (
+            "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/"
+            + "seed-v1%20Seed%20Files/synthetic%20text%2006"
+        )
+
     async def test_an_existing_file_is_not_replaced_and_the_tool_offers_no_replace(
         self, graph: respx.MockRouter
     ) -> None:

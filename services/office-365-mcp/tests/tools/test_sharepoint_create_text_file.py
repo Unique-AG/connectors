@@ -660,7 +660,7 @@ class TestWhatItAnswers:
 
         assert reread.call_count == 0
         assert answer.uri is None
-        assert answer.web_url == f"https://contoso.sharepoint.invalid/items/{_FILE_ID}"
+        assert answer.web_url == f"https://contoso.sharepoint.invalid/items/{_FILE_ID}?web=1"
 
     async def test_a_complete_answer_is_not_read_again(
         self, client: GraphServiceClient, graph: respx.MockRouter

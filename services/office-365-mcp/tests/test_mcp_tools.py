@@ -940,6 +940,7 @@ class TestTheToolsThisServerAdvertises:
         }
         assert set(_properties(tools["teams_read_message"].output_schema)) == {
             "uri",
+            "title",
             "message_id",
             "chat_id",
             "team_id",

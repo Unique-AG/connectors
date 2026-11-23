@@ -35,6 +35,7 @@ from office_365_mcp.shared.files import (
     item_for_a_question,
     item_label,
     unusable_name,
+    view_url,
 )
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
@@ -220,9 +221,9 @@ async def copy_item(
                 )
             started = CopyStarted(
                 source_uri=source.uri,
-                source_web_url=original.web_url,
+                source_web_url=view_url(original),
                 destination_uri=DriveFolderHandle(destination.drive_id, target.id).uri,
-                destination_web_url=target.web_url,
+                destination_web_url=view_url(target),
                 name=name if name is not None else original.name,
             )
 

@@ -132,7 +132,7 @@ uc-01-10:
       bind: {file: "sharepoint:///files/b%21RUNDRIVE/01RUNREPORT"}
       expect:
         tool_error:
-          tools.sharepoint_read_file._too_large: {size: 11010048, web_url: "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Annual%20Report.pdf"}
+          tools.sharepoint_read_file._too_large: {size: 11010048, web_url: "https://contoso.sharepoint.com/sites/Sales/Shared%20Documents/Brightway%20Annual%20Report.pdf?web=1"}
         graph_calls: {GET /v1.0/drives/b!RUNDRIVE/items/01RUNREPORT: 1}
   note: the tool refuses above 10 MB and sends no part of the file
   fixture: uc-01-10
@@ -251,7 +251,7 @@ uc-01-17:
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
       bind: {file: "$prev.files[0].uri"}
-  note: "expected behaviour per row. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again, because retrying unchanged fails the same way. No access, from shared/seam/advice.py:261-270 (sharepoint_read_file has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Files.Read.All, and retrying will not help. File gone, from tools/sharepoint_read_file.py:129-136 (GRAPH_NOT_FOUND): most probably deleted or moved, search again with sharepoint_search_files and take the uri from the new result, and do not retry the same handle."
+  note: "expected behaviour per row. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again, because retrying unchanged fails the same way. No access, from shared/seam/advice.py:261-270 (sharepoint_read_file has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Files.Read.All, and retrying will not help. File gone, from tools/sharepoint_read_file.py:136-143 (GRAPH_NOT_FOUND): most probably deleted or moved, search again with sharepoint_search_files and take the uri from the new result, and do not retry the same handle."
   variants:
     sign-in-expired:
       fixture: uc-01-17
@@ -444,7 +444,7 @@ uc-01-22:
       uses: {file: folder handle from the search}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Tenders}
-  note: "expected behaviour from tools/sharepoint_read_file.py:86-96 (_NOT_A_FILE_HANDLE, raised at :153-155 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:197-198), so the assistant may browse without the failed read, which is why that step is optional."
+  note: "expected behaviour from tools/sharepoint_read_file.py:93-103 (_NOT_A_FILE_HANDLE, raised at :160-162 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:230-231), so the assistant may browse without the failed read, which is why that step is optional."
 
 uc-01-23:
   status: working
@@ -458,7 +458,7 @@ uc-01-23:
       args: {query: Customers}
     - tool: sharepoint_read_file
       uses: {file: handle of the item from the search}
-  note: "expected behaviour for both rows from tools/sharepoint_read_file.py:105-112 (_NOT_A_PLAIN_FILE): Microsoft does not hold the item as a plain file, a OneNote notebook and a shortcut to another drive both look like files, open the item in a browser instead, reading it again fails the same way"
+  note: "expected behaviour for both rows from tools/sharepoint_read_file.py:112-119 (_NOT_A_PLAIN_FILE): Microsoft does not hold the item as a plain file, a OneNote notebook and a shortcut to another drive both look like files, open the item in a browser instead, reading it again fails the same way"
 
 uc-01-24:
   status: working
@@ -473,7 +473,7 @@ uc-01-24:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from tools/sharepoint_read_file.py:122-128 (_NO_SIZE): the tool will not fetch a file whose size it does not know, this is a gap in what Microsoft reported, open the file in a browser instead"
+  note: "expected behaviour from tools/sharepoint_read_file.py:129-135 (_NO_SIZE): the tool will not fetch a file whose size it does not know, this is a gap in what Microsoft reported, open the file in a browser instead"
 
 uc-01-25:
   status: working
@@ -488,7 +488,7 @@ uc-01-25:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from tools/sharepoint_read_file.py:98-104 (_NOTHING_CAME_BACK): a fault on the side of Microsoft, ask for this file again later, if it fails again tell the user to open the file in a browser"
+  note: "expected behaviour from tools/sharepoint_read_file.py:105-111 (_NOTHING_CAME_BACK): a fault on the side of Microsoft, ask for this file again later, if it fails again tell the user to open the file in a browser"
 
 uc-01-26:
   status: working
@@ -502,7 +502,7 @@ uc-01-26:
       optional: true
     - tool: sharepoint_read_file
       uses: {file: handle of the file from the search}
-  note: "expected behaviour from shared/files.py:27 and tools/sharepoint_read_file.py:183-184: MAX_BYTES is 10 MB and only a size above it is refused, so a file of exactly 10 MB is read. A file above the cap is uc-01-10."
+  note: "expected behaviour from shared/files.py:27 and tools/sharepoint_read_file.py:193-194: MAX_BYTES is 10 MB and only a size above it is refused, so a file of exactly 10 MB is read. A file above the cap is uc-01-10."
 
 uc-01-27:
   status: working
@@ -517,7 +517,7 @@ uc-01-27:
     - tool: sharepoint_browse_folder
       args: {order_by: last_modified}
       uses: {folder: handle of the folder Archive from the search}
-  note: "expected behaviour from tools/sharepoint_browse_folder.py:67-69 and 101-106 (description and order_covers_level): with order_by the tool reads up to 1000 items and sorts them, capped is true, and an item that the tool did not read can belong earlier in the order"
+  note: "expected behaviour from tools/sharepoint_browse_folder.py:69-71 and 103-108 (description and order_covers_level): with order_by the tool reads up to 1000 items and sorts them, capped is true, and an item that the tool did not read can belong earlier in the order"
 
 uc-01-28:
   status: working
@@ -591,7 +591,7 @@ uc-01-32:
   asks_user: false
   chain:
     - tool: sharepoint_list_drives
-  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:94-99)
+  note: the answer gives the name of each drive and the web address that opens it, and the description tells the assistant to give that address to the user (tools/sharepoint_list_drives.py:96-101)
 
 uc-01-33:
   status: working
@@ -616,7 +616,7 @@ uc-01-34:
   chain:
     - tool: sharepoint_search_sites
       args: {query: Zephyr}
-  note: "expected behaviour from tools/sharepoint_search_sites.py:83-85 (SiteList.sites): an empty list means that no site matched. The tool states no sentence for Mia, so the assistant reports the empty list as found no site."
+  note: "expected behaviour from tools/sharepoint_search_sites.py:85-87 (SiteList.sites): an empty list means that no site matched. The tool states no sentence for Mia, so the assistant reports the empty list as found no site."
 
 uc-01-35:
   status: working
@@ -632,7 +632,7 @@ uc-01-35:
     - tool: sharepoint_search_sites
       optional: true
       args: {query: Project, limit: 1000}
-  note: "expected behaviour from tools/sharepoint_search_sites.py:89-93 (SiteList.capped): capped is true when `limit` or the cap of 1000 sites stopped the search while more sites matched, and the field text says to raise `limit` up to 1000 or to make `query` more specific. Below 1000 matches a raised `limit` shows all of them (default 25, tools/sharepoint_search_sites.py:143-150), so the scenario states more than 1000 matches, where capped stays true after the second search with `limit` 1000. The source has no text that tells the assistant to report the cap to Mia, so the Then states only that the assistant does not call the list complete (model behaviour from the capped field, no code guard)."
+  note: "expected behaviour from tools/sharepoint_search_sites.py:91-95 (SiteList.capped): capped is true when `limit` or the cap of 1000 sites stopped the search while more sites matched, and the field text says to raise `limit` up to 1000 or to make `query` more specific. Below 1000 matches a raised `limit` shows all of them (default 25, tools/sharepoint_search_sites.py:145-152), so the scenario states more than 1000 matches, where capped stays true after the second search with `limit` 1000. The source has no text that tells the assistant to report the cap to Mia, so the Then states only that the assistant does not call the list complete (model behaviour from the capped field, no code guard)."
 
 uc-01-36:
   status: working
@@ -663,7 +663,7 @@ uc-01-37:
   asks_user: false
   chain:
     - any_of: [sharepoint_read_file, sharepoint_browse_folder]
-  note: "expected behaviour per row from tools/sharepoint_read_file.py:86-97 (_NOT_A_FILE_HANDLE: a folder handle is not a file handle) and tools/sharepoint_browse_folder.py:72-80 (_NOT_A_FOLDER_HANDLE: a file handle is not a folder handle). Both checks come before any Graph call."
+  note: "expected behaviour per row from tools/sharepoint_read_file.py:93-104 (_NOT_A_FILE_HANDLE: a folder handle is not a file handle) and tools/sharepoint_browse_folder.py:74-82 (_NOT_A_FOLDER_HANDLE: a file handle is not a folder handle). Both checks come before any Graph call."
 
 uc-01-38:
   status: working
@@ -676,7 +676,7 @@ uc-01-38:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
       uses: {file: handle of the file}
-  note: "expected behaviour from tools/sharepoint_read_file.py:255-259 (_converted_name): the name of the PDF is the name of the file with its last extension replaced by .pdf, and a name with no extension gets .pdf added. A real conversion cannot be recorded: the recorder refuses the converted PDF, which is a binary body that the seed generator did not make."
+  note: "expected behaviour from tools/sharepoint_read_file.py:278-282 (_converted_name): the name of the PDF is the name of the file with its last extension replaced by .pdf, and a name with no extension gets .pdf added. A real conversion cannot be recorded: the recorder refuses the converted PDF, which is a binary body that the seed generator did not make."
 
 uc-01-39:
   status: working
@@ -701,7 +701,7 @@ uc-01-40:
   chain:
     - tool: sharepoint_read_file
       uses: {file: handle of the file}
-  note: "expected behaviour from tools/sharepoint_read_file.py:262-268 (_media_type) and shared/files.py:462-467 (is_utf8): a file with no type from Microsoft, and a text type with a body that is not valid UTF-8, come back as application/octet-stream."
+  note: "expected behaviour from tools/sharepoint_read_file.py:285-291 (_media_type) and shared/files.py:496-501 (is_utf8): a file with no type from Microsoft, and a text type with a body that is not valid UTF-8, come back as application/octet-stream."
 
 uc-01-41:
   status: working
@@ -713,7 +713,7 @@ uc-01-41:
   chain:
     - tool: sharepoint_read_file
       uses: {file: handle of the file}
-  note: "expected behaviour from tools/sharepoint_read_file.py:200-201 and 281-297 (_too_large with no size): the download stops at 10 MB, and the text says that the file is more than 10 MB and gives the web address of the file."
+  note: "expected behaviour from tools/sharepoint_read_file.py:210-211 and 304-320 (_too_large with no size): the download stops at 10 MB, and the text says that the file is more than 10 MB and gives the web address of the file."
 
 uc-01-42:
   status: working
@@ -725,7 +725,7 @@ uc-01-42:
   chain:
     - tool: sharepoint_search_files
       args: {query: Brightway, modified_after: "2026-10-30", modified_before: "2026-10-26"}
-  note: "expected behaviour from tools/sharepoint_search_files.py:76-82 (_WINDOW_RUNS_BACKWARDS): put the earlier point in modified_after and the later one in modified_before, then call again. The check comes before any Graph call."
+  note: "expected behaviour from tools/sharepoint_search_files.py:78-84 (_WINDOW_RUNS_BACKWARDS): put the earlier point in modified_after and the later one in modified_before, then call again. The check comes before any Graph call."
 
 uc-01-43:
   status: working
@@ -736,7 +736,7 @@ uc-01-43:
   asks_user: false
   chain:
     - tool: sharepoint_search_files
-  note: "expected behaviour from tools/sharepoint_search_files.py:84-88 (_NOTHING_TO_SEARCH_FOR): query holds no word to look for and no other argument was given, so the tool searches nothing."
+  note: "expected behaviour from tools/sharepoint_search_files.py:86-90 (_NOTHING_TO_SEARCH_FOR): query holds no word to look for and no other argument was given, so the tool searches nothing."
 
 uc-01-44:
   status: working
@@ -748,7 +748,7 @@ uc-01-44:
   chain:
     - tool: sharepoint_search_files
       args: {query: Team Charter}
-  note: "expected behaviour from tools/sharepoint_search_files.py:213-227 (_sites): the sites come from the group of results for the field SPSiteURL, ranked by the count that Microsoft gives, and a bucket with no key or no count is left out. The test tenant answers with no group of results, so the answer in the test is made by hand."
+  note: "expected behaviour from tools/sharepoint_search_files.py:215-229 (_sites): the sites come from the group of results for the field SPSiteURL, ranked by the count that Microsoft gives, and a bucket with no key or no count is left out. The test tenant answers with no group of results, so the answer in the test is made by hand."
 
 uc-01-45:
   status: working
@@ -760,7 +760,7 @@ uc-01-45:
   chain:
     - tool: sharepoint_search_files
       args: {query: Brightway}
-  note: "expected behaviour from tools/sharepoint_search_files.py:213-231 (_sites, _hits_container): an answer with no group of results, or with a group of another field only, gives an empty files list and an empty sites list. An empty list is never a sign that the matches have no site."
+  note: "expected behaviour from tools/sharepoint_search_files.py:215-233 (_sites, _hits_container): an answer with no group of results, or with a group of another field only, gives an empty files list and an empty sites list. An empty list is never a sign that the matches have no site."
 
 uc-01-46:
   status: working
@@ -772,7 +772,7 @@ uc-01-46:
   chain:
     - tool: sharepoint_search_files
       args: {query: Brightway, modified_after: "2026-10-26T08:00:00+00:00", modified_before: "2026-10-30T17:45:30.250000+00:00"}
-  note: "expected behaviour from tools/sharepoint_search_files.py:261-270 (_closing_term, _wire): a time as the upper bound closes the window at that moment, and a time with a fraction of a second keeps the fraction."
+  note: "expected behaviour from tools/sharepoint_search_files.py:263-272 (_closing_term, _wire): a time as the upper bound closes the window at that moment, and a time with a fraction of a second keeps the fraction."
 
 uc-01-47:
   status: working
@@ -783,7 +783,7 @@ uc-01-47:
   asks_user: false
   chain:
     - tool: sharepoint_resolve_url
-  note: "expected behaviour from tools/sharepoint_resolve_url.py:47-53 (_NOT_A_WEB_ADDRESS) and 84-89 (_is_web_address): the tool takes a full address that starts with https:// and names a host. A name, an http address and an address that urlsplit cannot read are refused before any Graph call."
+  note: "expected behaviour from tools/sharepoint_resolve_url.py:49-55 (_NOT_A_WEB_ADDRESS) and 95-100 (_is_web_address): the tool takes a full address that starts with https:// and names a host. A name, an http address and an address that urlsplit cannot read are refused before any Graph call."
 
 uc-01-48:
   status: working
@@ -794,4 +794,4 @@ uc-01-48:
   asks_user: false
   chain:
     - any_of: [sharepoint_list_drives, sharepoint_search_sites]
-  note: "expected behaviour from tools/sharepoint_list_drives.py:114-118 (a drive with no id is left out, because the tool cannot address it) and tools/sharepoint_search_sites.py:69-73 (a site with no web address is left out)."
+  note: "expected behaviour from tools/sharepoint_list_drives.py:116-120 (a drive with no id is left out, because the tool cannot address it) and tools/sharepoint_search_sites.py:71-75 (a site with no web address is left out)."

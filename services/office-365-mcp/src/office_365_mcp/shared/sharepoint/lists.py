@@ -153,6 +153,12 @@ async def list_label(client: GraphServiceClient, handle: ListHandle) -> str:
 
 class ListItemSummary(BaseModel):
     uri: str = Field(description="The handle of this item. Copy it exactly. Never build one.")
+    title: str | None = Field(
+        description=(
+            "The item's `Title` column, or the file name of an item in a document library. Name "
+            + "the item by it when you cite it. Null when the item has neither."
+        )
+    )
     fields: dict[str, object] = Field(
         description=(
             "The column values of the item, keyed by internal column name, as Microsoft "
@@ -179,10 +185,22 @@ class ListItemSummary(BaseModel):
             values = {"id": fields.id, **values}
         return cls(
             uri=ListItemHandle(handle.site_id, handle.list_id, item.id).uri,
+            title=_item_title(values),
             fields=values,
             web_url=_display_form_url(item),
             last_modified_at=item.last_modified_date_time,
         )
+
+
+_TITLE_COLUMNS = ("Title", "FileLeafRef")
+
+
+def _item_title(values: Mapping[str, object]) -> str | None:
+    for column in _TITLE_COLUMNS:
+        value = values.get(column)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return None
 
 
 def _display_form_url(item: ListItem) -> str | None:
