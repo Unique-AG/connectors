@@ -20,7 +20,7 @@ from tests.offline_server import fake_upstream_settings
 from tests.offline_server import open_fake_persistence
 
 _ENV_PREFIXES = ("UPSTREAM_", "MCP_", "ZITADEL_", "PG_", "DB_", "LOGS_", "OTEL_")
-_ENV_NAMES = {"DATABASE_URL", "HOST", "PORT", "LOG_LEVEL"}
+_ENV_NAMES = {"DATABASE_URL", "HOST", "PORT", "LOG_LEVEL", "LIBRARY_LOG_LEVELS"}
 
 
 @pytest.fixture(autouse=True)
