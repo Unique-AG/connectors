@@ -993,7 +993,8 @@ The task lists of Microsoft To Do, which Outlook also shows.
 `Tasks.Read` and `Tasks.ReadWrite`. These need no admin consent, but a tenant that turns a preset on
 must let users consent to the new permission, or grant it for them. The tools reach only the signed-in user's own To Do and the lists
 that other people share with the user. They cannot reach the tasks of another person or of a shared
-mailbox.
+mailbox. A write tool asks the user before it changes a list that other people share. It also asks
+when Microsoft 365 does not report the list as private.
 
 ### `outlook-tasks`
 
@@ -1036,7 +1037,7 @@ mailbox.
 | --- | --- | --- | --- |
 | `outlook_create_task` | 🟠 Add | 🤝 Shared list | Creates one task in a list, with a due date, a priority, and notes. |
 | `outlook_update_task` | 🔴 Change | 🤝 Shared list | Changes only the given fields of one task. Replaces the whole notes when it gets new notes. |
-| `outlook_complete_task` | 🔴 Change | 🤝 Shared list | Marks one task as completed. |
+| `outlook_complete_task` | 🟠 Add | 🤝 Shared list | Marks one task as completed. |
 
 **What it needs**
 

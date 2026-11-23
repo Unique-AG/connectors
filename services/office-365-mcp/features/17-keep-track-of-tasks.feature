@@ -67,6 +67,13 @@ Feature: Keeping track of tasks
       When Mia asks her assistant to mark "Book the venue" as done, and she declines the approval
       Then "Book the venue" stays open
 
+    @happy @uc-17-18
+    Scenario: A list that Microsoft 365 does not report as private is asked about
+      Given Mia has the list "Team launch", and Microsoft 365 does not say whether it is shared
+      When Mia asks her assistant to mark "Book the venue" as done
+      Then Mia is asked to approve the change first, because others can possibly see it
+      And after she approves, "Book the venue" is completed
+
   Rule: Mia is told why a task cannot be found or changed
 
     @unhappy @uc-17-08

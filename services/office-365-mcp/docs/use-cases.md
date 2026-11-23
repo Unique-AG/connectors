@@ -5268,6 +5268,19 @@ What happens:
 - "Book the venue" stays open.
 - The assistant asks Mia to approve first.
 
+**A list that Microsoft 365 does not report as private is asked about**
+
+Ask your assistant: "Mark Book the venue as done."
+
+Tests: 1
+
+Situation: Mia has the list "Team launch", and Microsoft 365 does not say whether it is shared.
+
+What happens:
+
+- Mia is asked to approve the change first, because others can possibly see it.
+- After she approves, "Book the venue" is completed.
+
 #### Mia is told why a task cannot be found or changed
 
 **A list name is not taken as a list**

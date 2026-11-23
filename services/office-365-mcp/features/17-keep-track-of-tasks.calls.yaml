@@ -215,3 +215,18 @@ uc-17-17:
       uses: {task_list: uri of Team launch}
     - tool: outlook_complete_task
       uses: {uri: uri of the task}
+
+uc-17-18:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_list_that_does_not_say_whether_it_is_shared_is_asked_about"
+  ask: "Mark Book the venue as done."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Book the venue}
+      uses: {task_list: uri of Team launch}
+    - tool: outlook_complete_task
+      uses: {uri: uri of the task}

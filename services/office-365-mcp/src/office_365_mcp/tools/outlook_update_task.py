@@ -78,7 +78,9 @@ are. There is no draft and no review step. outlook_complete_task marks a task do
 
 Notes:
 - `notes` replaces the whole notes of the task. To add to them, read the task with \
-outlook_read_task first and send the old notes with the new words.
+outlook_read_task first. If `notes_format` is `html`, write the old notes again as Markdown, \
+without HTML tags, because `notes` shows a tag as text. Then send the old notes with the new \
+words.
 - To reopen a completed task, pass `status="not_started"`.
 - This tool asks the user to agree before it changes a task in a list that other people share, \
 because they see the change. A task in the user's own unshared list changes without a question.

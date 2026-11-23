@@ -2,12 +2,14 @@ import functools
 import json
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from contextlib import asynccontextmanager
-from typing import cast
+from dataclasses import dataclass, field
+from typing import cast, override
 
 import httpx
 import pytest
 import respx
 from fastmcp import Client, FastMCP
+from fastmcp.client.elicitation import ElicitRequestParams, ElicitResult
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 
@@ -55,6 +57,20 @@ def _list_is(graph: respx.MockRouter, *, shared: bool | None, name: str = "Tasks
     if shared is not None:
         listed["isShared"] = shared
     _ = graph.get(ONE_LIST).mock(return_value=httpx.Response(200, json=listed))
+
+
+@dataclass
+class _PersonWatchingWrites(Person):
+    write: respx.Route | None = None
+    writes_before_each_question: list[int] = field(default_factory=list)
+
+    @override
+    async def __call__(
+        self, message: str, _type: type | None, params: ElicitRequestParams, _context: object
+    ) -> ElicitResult[dict[str, str]]:
+        assert self.write is not None, "the write route is set before the call"
+        self.writes_before_each_question.append(self.write.call_count)
+        return await super().__call__(message, _type, params, _context)
 
 
 def _rows(answer: Mapping[str, object], key: str) -> Sequence[Mapping[str, object]]:
@@ -119,6 +135,26 @@ class TestFindingTasks:
         )
         assert answer["capped"] is False
         assert route.calls.last.request.url.params["$filter"] == "status ne 'completed'"
+
+    async def test_a_task_due_on_a_day_matches_a_moment_later_that_day(
+        self, graph: respx.MockRouter
+    ) -> None:
+        tasks = [
+            _task("T1", "Send the Q3 report", due_utc="2026-11-22T23:00:00.0000000"),
+            _task("T2", "Book the venue", due_utc="2026-11-21T23:00:00.0000000"),
+        ]
+        _ = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
+
+        answer = await call(
+            "outlook_list_tasks",
+            task_list=TASK_LIST,
+            due_after="2026-11-23T12:00:00+01:00",
+            time_zone=ZURICH,
+        )
+
+        assert [(row["title"], row["due_date"]) for row in _rows(answer, "tasks")] == [
+            ("Send the Q3 report", "2026-11-23")
+        ]
 
     async def test_completed_tasks_are_listed_by_a_word_of_their_title(
         self, graph: respx.MockRouter
@@ -249,7 +285,7 @@ class TestASharedList:
         _list_is(graph, shared=True, name="Team launch")
         created = _task(TASK_ID, "Book the venue")
         route = graph.post(TASKS).mock(return_value=httpx.Response(201, json=created))
-        person = Person()
+        person = _PersonWatchingWrites(write=route)
 
         _ = await call(
             "outlook_create_task", task_list=TASK_LIST, title="Book the venue", person=person
@@ -257,6 +293,7 @@ class TestASharedList:
 
         [question] = person.asked
         assert "'Book the venue'" in question and "'Team launch'" in question
+        assert person.writes_before_each_question == [0]
         assert route.call_count == 1
 
     async def test_a_declined_completion_in_a_shared_list_changes_nothing(
@@ -276,7 +313,7 @@ class TestASharedList:
         _list_is(graph, shared=True, name="Team launch")
         changed = _task(TASK_ID, "Book the venue", importance="high")
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=changed))
-        person = Person()
+        person = _PersonWatchingWrites(write=route)
 
         async with _modern_client(person) as client:
             answer = await client.call_tool(
@@ -286,6 +323,7 @@ class TestASharedList:
         assert answer.structured_content is not None
         [question] = person.asked
         assert "'Team launch'" in question
+        assert person.writes_before_each_question == [0]
         assert route.call_count == 1
 
     async def test_a_list_that_does_not_say_whether_it_is_shared_is_asked_about(

@@ -219,8 +219,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=(
                     "List only the tasks due on or after this point. A date, such as "
                     + "`2026-11-23`, opens at midnight of that day in `time_zone`. A moment, "
-                    + "such as `2026-11-23T12:00:00+01:00`, opens at that instant. A task with no "
-                    + "due date never matches a due bound."
+                    + "such as `2026-11-23T12:00:00+01:00`, opens at that instant. A due date is "
+                    + "a whole day in `time_zone`, so a task matches when any part of its due day "
+                    + "is on or after this point: a task due on 2026-11-23 matches a moment at "
+                    + "noon of that day. A task with no due date never matches a due bound."
                 )
             ),
         ] = None,
