@@ -91,8 +91,10 @@ the page with onenote_read_page and resend only the missing commands.
 cannot make a page a subpage. If the user wants one, tell them to do two steps in OneNote. \
 First, move the page in the page list to directly below the page that must be its parent. Then \
 make it a subpage: on a computer, right-click the page and select Make Subpage. On an iPad or an \
-iPhone, tap Edit, select the page, and tap the indent control. If the parent is a subpage itself, \
-do the indent step again, until the page is one level below its parent.
+iPhone, tap Edit, select the page, and tap the indent control. Each indent moves the page one \
+level down, and OneNote has only two subpage levels. Under a top-level parent, indent once. Under \
+a parent that is a subpage, indent twice. A parent at the second subpage level cannot have \
+subpages.
 - To show a check box, a star or another built-in note tag, use the `data-tag` attribute. Put it \
 on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
 empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
