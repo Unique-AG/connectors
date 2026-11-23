@@ -72,8 +72,19 @@ _SENSITIVE_QUERY_NAME = re.compile(
 )
 
 
-_QUERY_NAME = re.compile(r"[?&]([A-Za-z0-9_.%\[\]+-]+)=")
-_QUERY_VALUE_END = re.compile(r"[&\s\"]|$")
+_QUERY_NAME = re.compile(
+    r"(?P<delimiter>[?&#;]|%3[Ff]|%26)"
+    + r"(?P<name>(?:[A-Za-z0-9_.\[\]+-]|%(?!26|3[DdFf])[0-9A-Fa-f]{2})+)(?:=|%3[Dd])"
+)
+_QUERY_VALUE_END = re.compile(r"[&#\s\"]|$")
+_ENCODED_QUERY_VALUE_END = re.compile(r"[&#\s\"]|%26|$")
+_KEYED_VALUE = re.compile(
+    r"""(?:\\?(?P<quote>['"])(?P<quoted_key>[^'"\\\n]{1,64})\\?(?P=quote)"""
+    + r"""|(?<![A-Za-z0-9_.-])(?P<key>[A-Za-z_][A-Za-z0-9_.-]*))\s*[:=]\s*"""
+    + r"""(?:'(?P<single>(?:[^'\\]|\\.)*)'|"(?P<double>(?:[^"\\]|\\.)*)"""
+    + r""""|\\"(?P<escaped>(?:[^"\\]|\\[^"\\]|\\\\(?:[^"\\]|\\.))*)\\")"""
+)
+_NESTED_VALUE_DEPTH = 3
 
 
 def _censor_query_values(text: str) -> str:
@@ -82,9 +93,10 @@ def _censor_query_values(text: str) -> str:
     scan_from = 0
     while (found := _QUERY_NAME.search(text, scan_from)) is not None:
         value_start = scan_from = found.end()
-        if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found.group(1))) is None:
+        if _SENSITIVE_QUERY_NAME.fullmatch(unquote_plus(found["name"])) is None:
             continue
-        value_end = _QUERY_VALUE_END.search(text, value_start)
+        ends = _QUERY_VALUE_END if found["delimiter"][0] != "%" else _ENCODED_QUERY_VALUE_END
+        value_end = ends.search(text, value_start)
         assert value_end is not None, "the end of the text always ends a value"
         if value_end.start() == value_start:
             continue
@@ -160,11 +172,27 @@ def _is_sensitive(name: object) -> bool:
     return any(marker in normalised for marker in _SENSITIVE_MARKERS)
 
 
+def _censor_keyed_values(text: str, depth: int = 0) -> str:
+    def censored(found: re.Match[str]) -> str:
+        value = next(name for name in ("single", "double", "escaped") if found[name] is not None)
+        head = found[0][: found.start(value) - found.start()]
+        closing = found[0][found.end(value) - found.start() :]
+        if not found[value]:
+            return found[0]
+        if _is_sensitive(found["quoted_key"] or found["key"]):
+            return head + CENSORED + closing
+        if depth >= _NESTED_VALUE_DEPTH:
+            return found[0]
+        return head + _censor_keyed_values(found[value], depth + 1) + closing
+
+    return _KEYED_VALUE.sub(censored, text)
+
+
 def _censor_text(text: str) -> str:
     censored = text
     for pattern, replacement in _CREDENTIAL_SHAPES:
         censored = pattern.sub(replacement, censored)
-    return _censor_query_values(censored)
+    return _censor_query_values(_censor_keyed_values(censored))
 
 
 def _censor_bytes(value: bytes) -> bytes:

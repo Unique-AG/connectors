@@ -154,6 +154,7 @@ _CHAIN = (
     "ToolCallObservabilityMiddleware",
     "BoundedNameMiddleware",
     "GraphAdviceMiddleware",
+    "SpendAnsweredState",
     "TraceContextRestoreMiddleware",
     "MessageLogMiddleware",
     "RateLimitMiddleware",
