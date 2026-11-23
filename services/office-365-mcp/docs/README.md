@@ -1,11 +1,11 @@
 <!-- confluence-page-id: 2760507523 -->
 <!-- confluence-space-key: PUBDOC -->
 
-# Office 365 MCP
+# Office 365
 
-!!! danger "Documentation Disclaimer"
-    This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
-    discontinued, or have breaking changes without notice.
+!!! note "Beta"
+    office-365-mcp is in beta. You can use it in production. Tools, presets, and configuration can
+    change between versions, so read the release notes before you upgrade. No formal SLA applies.
 
 ## Overview
 
@@ -33,22 +33,22 @@ on fewer to cover part of it.
 
 | Use case | Ask your assistant to | Presets | Admin consent |
 | --- | --- | --- | --- |
-| [Finding and reading mail](use-cases.md#finding-and-reading-mail) | Find a message, read it with its attachments, and follow a conversation. | `outlook-read` | No |
-| [Drafting and sending mail](use-cases.md#drafting-and-sending-mail) | Write a draft, change it, and send it after you approve it. | `outlook-send` | No |
-| [Organizing the mailbox](use-cases.md#organizing-the-mailbox) | File and mark mail, make folders and categories, and make inbox rules. | `outlook-delete`, `outlook-rules`, `outlook-automate`, `outlook-mailbox` | No |
-| [Mailbox preferences](use-cases.md#mailbox-preferences) | Set the automatic reply and the focused inbox. | `outlook-write`, `outlook-automate`, `outlook-mailbox` | No |
-| [Reading the calendar](use-cases.md#reading-the-calendar) | List events, read an event, and show free time. | `outlook-read`, `outlook-calendar` | No |
-| [Scheduling and answering meetings](use-cases.md#scheduling-and-answering-meetings) | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
-| [Sharing and delegating calendars](use-cases.md#sharing-and-delegating-calendars) | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
-| [Managing contacts](use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
-| [Catching up on Teams](use-cases.md#catching-up-on-teams) | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
-| [Posting in Teams](use-cases.md#posting-in-teams) | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
-| [Running Teams chats and online meetings](use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
-| [Finding and reading files in OneDrive and SharePoint](use-cases.md#finding-and-reading-files-in-onedrive-and-sharepoint) | Find a file, open a folder, and read a file. | `sharepoint-write`, `sharepoint-sites`, `teams-files`, `teams-channels` | ⚠️ Yes |
-| [Organizing and sharing files in OneDrive and SharePoint](use-cases.md#organizing-and-sharing-files-in-onedrive-and-sharepoint) | Move, copy, and rename files, and share them. | `sharepoint-share`, `sharepoint-sites`, `teams-write-files`, `outlook-read` | ⚠️ Yes |
-| [Finding and reading SharePoint lists](use-cases.md#finding-and-reading-sharepoint-lists) | Find a site, read its lists and columns, and add, change, or erase list items. | `sharepoint-lists-delete` | ⚠️ Yes |
-| [Working with notes in OneNote](use-cases.md#working-with-notes-in-onenote) | Find, read, write, and copy notes. | `onenote-delete`, `sharepoint-sites`, `teams-channels` | ⚠️ Yes |
-| [Working across mail, calendar, files, and Teams](use-cases.md#working-across-mail-calendar-files-and-teams) | Join the work of the areas above in one request. | `teams`, `outlook-write`, `outlook-calendar`, `outlook-read`, `sharepoint-share`, `sharepoint-sites` | ⚠️ Yes |
+| [Finding and reading mail](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#finding-and-reading-mail) | Find a message, read it with its attachments, and follow a conversation. | `outlook-read` | No |
+| [Drafting and sending mail](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#drafting-and-sending-mail) | Write a draft, change it, and send it after you approve it. | `outlook-send` | No |
+| [Organizing the mailbox](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#organizing-the-mailbox) | File and mark mail, make folders and categories, and make inbox rules. | `outlook-delete`, `outlook-rules`, `outlook-automate`, `outlook-mailbox` | No |
+| [Mailbox preferences](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#mailbox-preferences) | Set the automatic reply and the focused inbox. | `outlook-write`, `outlook-automate`, `outlook-mailbox` | No |
+| [Reading the calendar](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#reading-the-calendar) | List events, read an event, and show free time. | `outlook-read`, `outlook-calendar` | No |
+| [Scheduling and answering meetings](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#scheduling-and-answering-meetings) | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
+| [Sharing and delegating calendars](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#sharing-and-delegating-calendars) | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
+| [Managing contacts](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#managing-contacts) | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
+| [Catching up on Teams](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#catching-up-on-teams) | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
+| [Posting in Teams](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#posting-in-teams) | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
+| [Running Teams chats and online meetings](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#running-teams-chats-and-online-meetings) | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
+| [Finding and reading files in OneDrive and SharePoint](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#finding-and-reading-files-in-onedrive-and-sharepoint) | Find a file, open a folder, and read a file. | `sharepoint-write`, `sharepoint-sites`, `teams-files`, `teams-channels` | ⚠️ Yes |
+| [Organizing and sharing files in OneDrive and SharePoint](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#organizing-and-sharing-files-in-onedrive-and-sharepoint) | Move, copy, and rename files, and share them. | `sharepoint-share`, `sharepoint-sites`, `teams-write-files`, `outlook-read` | ⚠️ Yes |
+| [Finding and reading SharePoint lists](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#finding-and-reading-sharepoint-lists) | Find a site, read its lists and columns, and add, change, or erase list items. | `sharepoint-lists-delete` | ⚠️ Yes |
+| [Working with notes in OneNote](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#working-with-notes-in-onenote) | Find, read, write, and copy notes. | `onenote-delete`, `sharepoint-sites`, `teams-channels` | ⚠️ Yes |
+| [Working across mail, calendar, files, and Teams](https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md#working-across-mail-calendar-files-and-teams) | Join the work of the areas above in one request. | `teams`, `outlook-write`, `outlook-calendar`, `outlook-read`, `sharepoint-share`, `sharepoint-sites` | ⚠️ Yes |
 
 ## Choose a preset
 

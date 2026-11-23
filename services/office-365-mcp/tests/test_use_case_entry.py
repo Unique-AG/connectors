@@ -11,9 +11,14 @@ from office_365_mcp.tools import PRESETS
 _SERVICE_ROOT = pathlib.Path(__file__).resolve().parents[1]
 _README = (_SERVICE_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
 _FEATURES = sorted((_SERVICE_ROOT / "features").glob("*.feature"))
+_USE_CASES_URL = (
+    "https://github.com/Unique-AG/connectors/blob/main/services/office-365-mcp/docs/use-cases.md"
+)
 _ROW = re.compile(
-    r"^\| \[[^\]]+\]\(use-cases\.md#(?P<anchor>[^)]+)\) \| [^|]+ \| (?P<presets>[^|]+) \| "
-    + r"(?P<consent>[^|]+) \|$",
+    r"^\| \[[^\]]+\]\("
+    + re.escape(_USE_CASES_URL)
+    + r"#(?P<anchor>[^)]+)\) \| [^|]+ \| "
+    + r"(?P<presets>[^|]+) \| (?P<consent>[^|]+) \|$",
     re.M,
 )
 _PRESET_ROW = re.compile(
@@ -82,3 +87,14 @@ class TestTheUseCaseTable:
         consenting = _needs_consent()
 
         assert consent == (_ADMIN_CONSENT if any(consenting[p] for p in presets) else "No")
+
+
+class TestTheReadmeForConfluence:
+    def test_it_links_to_unpublished_pages_by_url(self) -> None:
+        unpublished = (_SERVICE_ROOT / "docs" / ".mdignore").read_text(encoding="utf-8").split()
+        relative = [
+            link
+            for link in re.findall(r"\]\(([^)#]+)", _README)
+            if not link.startswith("https://") and link.split("/")[-1] in unpublished
+        ]
+        assert relative == [], f"md2conf cannot resolve these links: {relative}"
