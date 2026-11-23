@@ -2,7 +2,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Self
+from typing import Annotated, Self
 from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
@@ -13,7 +13,7 @@ from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.item_reference import ItemReference
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_step
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
@@ -74,12 +74,15 @@ _ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
 
 _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
 
-# Keeps every character with a meaning, `%` included, so an already escaped address is unchanged.
-_URL_CHARACTERS_TO_KEEP = ":/?#@!$&'()*+,;=%~"
+_URL_CHARACTERS_TO_KEEP = ":/?#@!$&'*+,=%~"
+_STRAY_PERCENT = re.compile(r"%(?![0-9A-Fa-f]{2})")
 
 
 def browser_url(url: str) -> str:
-    return quote(url, safe=_URL_CHARACTERS_TO_KEEP)
+    return quote(_STRAY_PERCENT.sub("%25", url), safe=_URL_CHARACTERS_TO_KEEP)
+
+
+BrowserUrl = Annotated[str, AfterValidator(browser_url)]
 
 
 class DriveItemSummary(BaseModel):
@@ -117,7 +120,7 @@ class DriveItemSummary(BaseModel):
             + "refused rather than returned."
         )
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens this item in a browser. Always give this address to the user "
             + "when you answer from this item or about it, and copy it exactly: never decode its "
@@ -206,7 +209,7 @@ class DriveItemSummary(BaseModel):
             name=item.name,
             is_folder=is_folder,
             size=item.size,
-            web_url=None if item.web_url is None else browser_url(item.web_url),
+            web_url=item.web_url,
             created_at=item.created_date_time,
             created_by=display_name(item.created_by),
             last_modified_at=item.last_modified_date_time,

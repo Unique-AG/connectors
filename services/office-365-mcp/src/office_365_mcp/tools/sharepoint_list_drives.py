@@ -23,7 +23,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
-from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, display_name
+from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, BrowserUrl, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.sharepoint.sites import not_a_site, site_path_of
@@ -91,7 +91,7 @@ class DriveSummary(BaseModel):
             + "is a SharePoint document library. Null when Graph reported none."
         )
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens this drive in a browser. Always give it to the user when you "
             + "answer about this drive. It is not a folder handle, so do not pass it to "

@@ -272,7 +272,7 @@ prometheus:
       alert: Office365McpGraphThrottled
       annotations:
         summary: "Microsoft Graph throttles Office 365 MCP in {{ $labels.namespace }}"
-        description: 'Graph throttled {{ $value | printf "%.0f" }} operations in the last hour, and the callers got an error.'
+        description: 'Graph throttled {{ $value | printf "%.0f" }} requests in the last hour after the SDK retries. A tool can recover from a throttled request, so the count can be larger than the number of failed tool calls.'
         runbook: |
           1. Open the Office 365 MCP dashboard and find the operation in "Throttling rate by operation"
           2. If retried is true, the SDK retried and Graph still refused. Too many calls go to one mailbox or one tenant. Find the agent or the user that sends them

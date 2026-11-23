@@ -9,6 +9,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages
+from office_365_mcp.shared.files import BrowserUrl
 from office_365_mcp.shared.handles import ListHandle, ListItemHandle
 from office_365_mcp.shared.prose import cut_for_a_question
 
@@ -158,7 +159,7 @@ class ListItemSummary(BaseModel):
             + "returned them."
         )
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens the item in a browser. Give it to the user when you answer "
             + "about this item. Null when Graph recorded none."

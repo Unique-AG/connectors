@@ -11,7 +11,7 @@ to "branch on the `innerError.code` value, not the message text"
 import logging
 import unicodedata
 from asyncio import CancelledError
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -178,7 +178,7 @@ _OPERATION_STATE: ContextVar[_OperationState | None] = ContextVar(
 
 @contextmanager
 def measured_graph_operation(
-    operation: str, *, not_failures: tuple[type[Exception], ...] = ()
+    operation: str, *, is_refusal: Callable[[Exception], bool] = lambda _: False
 ) -> Generator[None]:
     started = perf_counter()
     unmeasured: list[float] = []
@@ -193,13 +193,15 @@ def measured_graph_operation(
         status = _CANCELLED
         raise
     except Exception as error:
-        failure = _graph_failure_behind(error)
-        if failure is not None:
-            status = _status_of(failure)
+        caused_by = _graph_failure_behind(error, implicit=False)
+        if caused_by is not None:
+            status = _status_of(caused_by)
+        elif not is_refusal(error):
+            status = _UNCLASSIFIED
+        elif (handled := _graph_failure_behind(error, implicit=True)) is not None:
+            status = _status_of(handled)
         elif state.last_failure is not None:
             status = state.last_failure
-        elif not isinstance(error, not_failures):
-            status = _UNCLASSIFIED
         raise
     finally:
         _UNMEASURED.reset(outer_unmeasured)
@@ -210,14 +212,14 @@ def measured_graph_operation(
             )
 
 
-def _graph_failure_behind(error: BaseException) -> GraphFailure | None:
+def _graph_failure_behind(error: BaseException, *, implicit: bool) -> GraphFailure | None:
     seen: set[int] = set()
     current: BaseException | None = error
     while current is not None and id(current) not in seen:
         if isinstance(current, GraphFailure):
             return current
         seen.add(id(current))
-        current = current.__cause__ or current.__context__
+        current = current.__cause__ or (current.__context__ if implicit else None)
     return None
 
 

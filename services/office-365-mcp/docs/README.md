@@ -1422,7 +1422,7 @@ The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 | `Office365McpGraphForbidden` | More than 20% of the Graph operations in the last hour got 401 or 403, and at least 10 did | `15m` | `warning` |
 | `Office365McpTokenRefused` | Entra refused at least 5 Graph token requests in the last hour | `15m` | `warning` |
 | `Office365McpTokenFailing` | At least 5 Graph token requests in the last hour failed without an AADSTS code: a connection error, or an Entra answer with no AADSTS code | `15m` | `warning` |
-| `Office365McpGraphThrottled` | More than 5 Graph operations in the last hour were throttled, and the callers got an error | `15m` | `warning` |
+| `Office365McpGraphThrottled` | More than 5 Graph requests in the last hour were throttled after the SDK retries | `15m` | `warning` |
 | `Office365McpGraphSlow` | At least 3 tool calls that attempted Graph had a measured duration of more than 60 seconds in the last hour. The measured duration leaves out waits for a person to confirm | `0m` | `warning` |
 | `Office365McpHttp5xx` | More than 5% of the MCP and OAuth requests in the last 15 minutes got a 5xx answer, and at least 5 did | `5m` | `warning` |
 | `Office365McpMemoryHigh` | A pod uses more than 80% of its memory limit | `30m` | `warning` |
