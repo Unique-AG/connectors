@@ -39,7 +39,12 @@ The MCP endpoint is then available at `http://localhost:9542/mcp`.
 | `get_order` | `GET /orders/{orderId}` | Free |
 | `list_orders` | `GET /orders` | Free |
 
-All tools return `{ success: false, statusCode, message, correlationId }` on Kyckr 4xx/5xx so the agent can branch on `success` instead of catching exceptions. Successful responses pass the Kyckr payload through under `data` unchanged.
+All tools return `{ success: false, statusCode, message, correlationId }` on Kyckr 4xx/5xx so the agent can branch on `success` instead of catching exceptions. Successful responses carry the Kyckr payload under `data`, with these additions:
+
+- Each company in `search_companies` (`data`) and each order in `list_orders` (`data`) gets a `title`.
+- `list_orders` returns the orders as the `data` list and moves the paging fields (`pageNumber`, `pageSize`, `pageOffset`, `totalCount`, `accountId`) to the top level of the result. Kyckr nests both under `data`.
+- `get_lite_profile`, `get_enhanced_profile` and `get_order` return a top-level `title`.
+- `get_order` removes the order's `links` (Kyckr API paths) from `data`, and for a completed order whose document has a JSON form it adds that document as `data.documentJson`.
 
 ## Configuration
 

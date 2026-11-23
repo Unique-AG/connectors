@@ -5,6 +5,7 @@ import { type KyckrConfig, kyckrConfig } from '~/config';
 import { KyckrApiError, KyckrHttpClient } from '../../kyckr-http.client';
 import { type KyckrToolCallResult, Metrics } from '../../metrics';
 import {
+  CompanyTitleSchema,
   KyckrActivitySchema,
   KyckrAddressSchema,
   KyckrAlternativeNameSchema,
@@ -19,6 +20,7 @@ import {
   KyckrRegistrationTypeDetailsSchema,
   McpEnvelopeShape,
 } from '../../schemas/kyckr-response.schemas';
+import { companyTitle } from '../_shared/titles';
 
 export const GetEnhancedProfileInputSchema = z.object({
   kyckrId: KyckrIdSchema,
@@ -234,6 +236,7 @@ const EnhancedProfileEnvelopeSchema = z
 export const GetEnhancedProfileOutputSchema = z
   .object({
     ...McpEnvelopeShape,
+    title: CompanyTitleSchema,
     data: EnhancedProfileDataSchema.optional(),
   })
   .loose();
@@ -264,7 +267,7 @@ export class GetEnhancedProfileQuery {
       const response = EnhancedProfileEnvelopeSchema.parse(raw);
       this.metrics.recordCreditsConsumed('get_enhanced_profile', response.cost?.value ?? 0);
       this.logger.debug({ kyckrId: input.kyckrId }, 'get_enhanced_profile: succeeded');
-      return { success: true, ...response };
+      return { success: true, ...response, title: companyTitle(response.data) };
     } catch (err) {
       result = 'error';
       if (err instanceof KyckrApiError) {

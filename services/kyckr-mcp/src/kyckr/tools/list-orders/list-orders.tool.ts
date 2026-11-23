@@ -17,7 +17,7 @@ export class ListOrdersTool {
     name: 'list_orders',
     title: 'List Orders',
     description:
-      'List previously placed Kyckr orders. Free to call. Optional filters: `startDate` / `endDate` (ISO 8601), `isoCode` (jurisdiction). Orders are under `data.orders[]`; pagination metadata at `data.pageNumber` / `data.pageSize` / `data.totalCount`. Each entry has the same shape as `get_order.data` - `orderId`, `status`, `cost`, `companyDetails`, and `links` once completed. Use to reconcile when an `orderId` is not in context.',
+      'List previously placed Kyckr orders. Free to call. Optional filters: `startDate` / `endDate` (ISO 8601), `isoCode` (jurisdiction). Orders are under `data[]`; pagination metadata at the top level, `pageNumber` / `pageSize` / `totalCount`. Each order has the same shape as `get_order.data` plus a `title` - `orderId`, `status`, `cost`, `companyDetails`, and `links` once completed. Use to reconcile when an `orderId` is not in context.',
     parameters: ListOrdersInputSchema,
     outputSchema: ListOrdersOutputSchema,
     annotations: {

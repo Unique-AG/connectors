@@ -3,6 +3,7 @@ export const serverInstructions = `
 
 ### Company lookup flow
 - Start with \`search_companies\` to obtain the Kyckr company id. Prefer \`isoCode + companyNumber\` for deterministic results; name search may return many candidates and require disambiguation.
+- Companies in \`search_companies\`, orders in \`list_orders\`, and the results of \`get_lite_profile\`, \`get_enhanced_profile\` and \`get_order\` carry a \`title\`. Cite them by that title.
 - Use \`get_enhanced_profile\` first for structured director/shareholder data. Fall back to \`get_lite_profile\` when the jurisdiction returns 405 for enhanced profiles.
 - Only call \`list_company_documents\`, \`create_document_order\`, and \`get_order\` when structured profile data is insufficient or an official PDF is needed as evidence.
 

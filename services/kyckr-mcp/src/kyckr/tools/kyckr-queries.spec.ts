@@ -108,13 +108,33 @@ describe('SearchCompaniesQuery', () => {
       companyNumber: undefined,
       isoCode: 'GB',
     });
-    expect(result).toEqual({ success: true, ...response });
+    expect(result).toEqual({
+      success: true,
+      ...response,
+      data: [{ id: 'GB|123', companyName: 'Acme Ltd', title: 'Acme Ltd' }],
+    });
     expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('search_companies', 0);
     expect(mockMetrics.recordToolDuration).toHaveBeenCalledWith(
       'search_companies',
       'success',
       expect.any(Number),
     );
+  });
+
+  it('titles each company by its registered name and links none of them', async () => {
+    mockKyckrClient.get.mockResolvedValueOnce({
+      data: [
+        { id: 'GB|123', companyName: 'Acme Ltd', links: { self: '/companies/GB|123' } },
+        { id: 'JP|456', companyName: '', englishName: 'Acme Japan KK' },
+      ],
+    });
+
+    const result = await unit.run({ name: 'Acme' });
+
+    expect(result.data?.map((company) => company.title)).toEqual(['Acme Ltd', 'Acme Japan KK']);
+    for (const company of result.data ?? []) {
+      expect(company).not.toHaveProperty('url');
+    }
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -174,8 +194,17 @@ describe('GetLiteProfileQuery', () => {
     expect(mockKyckrClient.get).toHaveBeenCalledWith('/companies/GB%7C123/lite', {
       customerReference: 'customer-ref-123',
     });
-    expect(result).toEqual({ success: true, ...response });
+    expect(result).toEqual({ success: true, ...response, title: 'Acme Ltd' });
     expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_lite_profile', 2);
+  });
+
+  it('titles the profile by the English name when the registry gives no other', async () => {
+    mockKyckrClient.get.mockResolvedValueOnce({ data: { englishName: 'Acme Japan KK' } });
+
+    const result = await unit.run({ kyckrId: 'JP|456' });
+
+    expect(result.title).toBe('Acme Japan KK');
+    expect(result).not.toHaveProperty('url');
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -228,8 +257,26 @@ describe('GetEnhancedProfileQuery', () => {
     expect(mockKyckrClient.get).toHaveBeenCalledWith('/companies/GB%7C123/enhanced', {
       customerReference: 'customer-ref-123',
     });
-    expect(result).toEqual({ success: true, ...response });
+    expect(result).toEqual({ success: true, ...response, title: 'Acme Ltd' });
     expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('get_enhanced_profile', 5);
+  });
+
+  it('keeps registry API links off the titled profile record', async () => {
+    mockKyckrClient.get.mockResolvedValueOnce({
+      data: {
+        companyName: 'Acme Ltd',
+        links: {
+          document: '/orders/12345/download',
+          data: 'https://api.example.com/v2/orders/12345/download?format=json',
+        },
+      },
+    });
+
+    const result = await unit.run({ kyckrId: 'GB|123' });
+
+    expect(result.title).toBe('Acme Ltd');
+    expect(result).not.toHaveProperty('url');
+    expect(result).not.toHaveProperty('link');
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -515,6 +562,7 @@ describe('GetOrderQuery', () => {
     expect(mockKyckrClient.get).toHaveBeenCalledWith('/orders/ORD-1');
     expect(result).toMatchObject({
       success: true,
+      title: 'Kyckr order ORD-1',
       data: { orderId: 'ORD-1', status: 'Pending' },
     });
     expect(result.data?.links).toBeUndefined();
@@ -580,6 +628,7 @@ describe('GetOrderQuery', () => {
     expect(result).toEqual({
       success: true,
       ...orderResponse,
+      title: 'Kyckr order ORD-1',
       details: PDF_ONLY_DETAIL,
       data: { ...orderResponse.data, documentJson: undefined },
     });
@@ -607,6 +656,7 @@ describe('GetOrderQuery', () => {
     expect(result).toEqual({
       success: true,
       ...orderResponse,
+      title: 'Kyckr order ORD-1',
       details: PDF_ONLY_DETAIL,
       data: { ...dataWithoutLinks, documentJson: undefined },
     });
@@ -626,9 +676,28 @@ describe('GetOrderQuery', () => {
     expect(result).toEqual({
       success: true,
       ...orderResponse,
+      title: 'Kyckr order ORD-1',
       details: `Success ${PDF_ONLY_DETAIL}`,
       data: { ...orderResponse.data, documentJson: undefined },
     });
+  });
+
+  it('titles the order by product and company and links it nowhere', async () => {
+    mockKyckrClient.get.mockResolvedValueOnce({
+      data: {
+        orderId: 'ORD-1',
+        status: 'Pending',
+        productDetails: { productName: 'Annual Accounts 2025' },
+        companyDetails: { companyName: 'Acme Ltd' },
+        links: { document: 'https://downloads.example.com/ORD-1.pdf' },
+      },
+    });
+
+    const result = await unit.run({ orderId: 'ORD-1' });
+
+    expect(result.title).toBe('Annual Accounts 2025 - Acme Ltd');
+    expect(result).not.toHaveProperty('url');
+    expect(result.data).not.toHaveProperty('links');
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
@@ -664,7 +733,7 @@ describe('ListOrdersQuery', () => {
     );
   });
 
-  it('returns the paginated orders response on success', async () => {
+  it('returns the orders as data with the paging at the top level', async () => {
     const response = {
       correlationId: 'corr-orders',
       cost: { value: 0 },
@@ -688,8 +757,38 @@ describe('ListOrdersQuery', () => {
       endDate: '2026-01-31',
       isoCode: 'GB',
     });
-    expect(result).toEqual({ success: true, ...response });
+    expect(result).toEqual({
+      success: true,
+      correlationId: 'corr-orders',
+      cost: { value: 0 },
+      totalCount: 1,
+      pageNumber: 1,
+      pageSize: 50,
+      data: [{ orderId: 'ORD-1', status: 'Pending', title: 'Kyckr order ORD-1' }],
+    });
     expect(mockMetrics.recordCreditsConsumed).toHaveBeenCalledWith('list_orders', 0);
+  });
+
+  it('titles each order by its product and company', async () => {
+    mockKyckrClient.get.mockResolvedValueOnce({
+      data: {
+        orders: [
+          {
+            orderId: 1,
+            productDetails: { productName: 'Annual Accounts 2025' },
+            companyDetails: { companyName: 'Acme Ltd' },
+          },
+          { orderId: 2, productDetails: { productName: 'Register of Members' } },
+        ],
+      },
+    });
+
+    const result = await unit.run({});
+
+    expect(result.data?.map((order) => order.title)).toEqual([
+      'Annual Accounts 2025 - Acme Ltd',
+      'Register of Members',
+    ]);
   });
 
   it('returns a structured failure for Kyckr API errors', async () => {
