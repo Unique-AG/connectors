@@ -152,6 +152,38 @@ async def test_a_client_registers_with_the_advertised_scopes_when_an_org_id_is_s
 
 
 @pytest.mark.usefixtures("zitadel_discovery")
+def test_offline_access_is_asked_for_and_registrable_but_not_required(
+    server_settings: ServerSettings,
+) -> None:
+    auth = create_auth(
+        zitadel=_zitadel("https://refresh.zitadel.example.com"),
+        server=server_settings,
+        store=MemoryStore(),
+    )
+
+    registration_options = auth.client_registration_options
+    assert registration_options is not None
+    assert "offline_access" in auth._extra_authorize_params["scope"].split()
+    assert "offline_access" in (registration_options.valid_scopes or [])
+    assert "offline_access" not in (auth.required_scopes or [])
+
+
+@pytest.mark.usefixtures("zitadel_discovery")
+def test_the_org_scope_is_not_a_scope_a_client_can_register(
+    server_settings: ServerSettings,
+) -> None:
+    auth = create_auth(
+        zitadel=_zitadel("https://org-scope.zitadel.example.com", org_id="org-1"),
+        server=server_settings,
+        store=MemoryStore(),
+    )
+
+    registration_options = auth.client_registration_options
+    assert registration_options is not None
+    assert ORG_SCOPE not in (registration_options.valid_scopes or [])
+
+
+@pytest.mark.usefixtures("zitadel_discovery")
 async def test_the_sign_in_state_is_encrypted_at_rest_with_the_signing_key(
     server_settings: ServerSettings,
 ) -> None:

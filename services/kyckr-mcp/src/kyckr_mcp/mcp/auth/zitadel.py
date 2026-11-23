@@ -19,6 +19,7 @@ from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 # Zitadel adds it for the `urn:zitadel:iam:user:resourceowner` scope, which every sign-in asks for.
 ORG_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 _ORG_SCOPE = "urn:zitadel:iam:org:id:"
+_OFFLINE_ACCESS = "offline_access"
 _logger = logging.getLogger(__name__)
 
 
@@ -56,10 +57,13 @@ class IdTokenVerifier(TokenVerifier):
 def create_auth(
     *, zitadel: ZitadelSettings, server: ServerSettings, store: AsyncKeyValue
 ) -> OIDCProxy:
-    """Signs users in with Zitadel. Clients register with identity scopes only. With an org id the
-    proxy also asks Zitadel for the org scope, which refuses other orgs, and checks the id token.
+    """Signs users in with Zitadel. Clients may register identity scopes and `offline_access`. With
+    an org id the proxy also asks Zitadel for the org scope, never registered, and checks the token.
     """
     signing_key = zitadel.jwt_signing_key.get_secret_value()
+    # Zitadel sends a refresh token only for `offline_access`: asked for and registrable, never
+    # required, since a required scope is checked on every token. The org scope is only asked for.
+    registrable = [*ZITADEL_DEFAULT_MCP_SCOPES, _OFFLINE_ACCESS]
     return create_zitadel_oidc_proxy(
         mcp_server_base_url=server.base_url,
         zitadel_oidc_proxy_settings=ZitadelOIDCProxySettings(
@@ -78,10 +82,9 @@ def create_auth(
         ),
         verify_id_token=True,
         token_verifier=_id_token_verifier(zitadel),
+        valid_scopes=registrable,
         extra_authorize_params={
-            "scope": " ".join(
-                dict.fromkeys([*ZITADEL_DEFAULT_MCP_SCOPES, *zitadel.required_scopes])
-            )
+            "scope": " ".join(dict.fromkeys([*registrable, *zitadel.required_scopes]))
         },
     )
 
