@@ -4045,8 +4045,8 @@ packages:
       bare-abort-controller:
         optional: true
 
-  bare-fs@4.8.4:
-    resolution: {integrity: sha512-MPC2eyrpbk3A873sK4y6rk+Iv4o2enxTjHZ8zH3HO0mjrpm5XjnguY2XmfidIsDV6vnjpbMBKUAJpV0ISD2SsQ==}
+  bare-fs@4.8.5:
+    resolution: {integrity: sha512-5gborbd4IEFpnyqAiwD0tl6sH9fvPvIaK2hdM8DXU+xAMxSB7B3D3D04CD21k4T5C6u5Oxw3iajkBQhNLxINKg==}
     engines: {bare: '>=1.28.0'}
     peerDependencies:
       bare-buffer: '*'
@@ -9236,7 +9236,7 @@ snapshots:
 
   bare-events@2.9.2: {}
 
-  bare-fs@4.8.4:
+  bare-fs@4.8.5:
     dependencies:
       bare-events: 2.9.2
       bare-path: 3.1.3
@@ -11537,7 +11537,7 @@ snapshots:
       pump: 3.0.4
       tar-stream: 3.1.7
     optionalDependencies:
-      bare-fs: 4.8.4
+      bare-fs: 4.8.5
       bare-path: 3.1.3
     transitivePeerDependencies:
       - bare-abort-controller
