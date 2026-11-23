@@ -1,8 +1,8 @@
-# office-365-mcp use cases
+# Office 365 use cases
 
-!!! danger "Documentation Disclaimer"
-    This feature is `EXPERIMENTAL` and under active development. It may change significantly, be
-    discontinued, or have breaking changes without notice.
+!!! note "Beta"
+    office-365-mcp is in beta. You can use it in production. Tools, presets, and configuration can
+    change between versions, so read the release notes before you upgrade. No formal SLA applies.
 
 ## Overview
 

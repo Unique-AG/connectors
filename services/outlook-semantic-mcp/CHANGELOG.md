@@ -1,5 +1,12 @@
 # Changelog
 
+## [5.0.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.2...outlook-semantic-mcp@5.0.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** serve the first-use pair on a refresh replay inside a 10s grace window ([#1802](https://github.com/Unique-AG/connectors/issues/1802)) ([0fe880a](https://github.com/Unique-AG/connectors/commit/0fe880a90ba41b238f715ea9a592c93dd2f56d82))
+
 ## [5.0.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.1...outlook-semantic-mcp@5.0.2) (2026-11-20)
 
 

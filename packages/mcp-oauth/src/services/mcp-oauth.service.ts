@@ -487,7 +487,7 @@ export class McpOAuthService {
 
     // Refresh Token
     if (!token_type_hint || token_type_hint === 'refresh_token') {
-      const refreshTokenResult = await this.tokenService.validateRefreshToken(token);
+      const refreshTokenResult = await this.tokenService.findRefreshTokenForRevocation(token);
 
       if (!refreshTokenResult) {
         return;
