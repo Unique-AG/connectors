@@ -1,0 +1,41 @@
+scenario: outlook_update_event-occurrence
+fixture: rec-tool-outlook_update_event-occurrence
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:35:04+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 66
+  keys dropped: 48
+  persona addresses: 26
+  persona names: 25
+  query parameters dropped: 12
+  response headers dropped: 42
+  text kept: 54
+  text replaced: 2
+literals:
+- '2026-11-03'
+- '2026-11-03T09:00:00'
+- '2026-11-03T09:30:00'
+- '2026-11-17T10:00:00'
+- '2026-11-17T10:30:00'
+- '2026-12-22'
+- Europe/Zurich
+- numbered
+- persona:anna
+- seed-v1
+- seed-v1 case-outlook_update_event-occurrence
+- tuesday
+- weekly
+- ~nextTuesday
+- ~nextTuesday+14T10:00:00
+- ~nextTuesday+14T10:30:00
+- ~nextTuesday+49
+- ~nextTuesdayT09:00:00
+- ~nextTuesdayT09:30:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -1,0 +1,30 @@
+scenario: teams_create_meeting-attendees
+fixture: rec-tool-teams_create_meeting-attendees
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:29:47+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 12
+  keys dropped: 29
+  persona addresses: 1
+  query parameters dropped: 2
+  response headers dropped: 8
+  text kept: 2
+  text replaced: 6
+literals:
+- '2026-11-03T15:00:00Z'
+- '2026-11-03T15:30:00Z'
+- persona:anna.id
+- persona:anna.name
+- persona:tom.id
+- persona:tom.name
+- seed-v1 case-teams_create_meeting-attendees meeting
+- ~tomorrowT15:00:00Z
+- ~tomorrowT15:30:00Z
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -1,0 +1,20 @@
+scenario: teams_browse_channel-standard
+fixture: rec-tool-teams_browse_channel-standard
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:43:51+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 28
+  keys dropped: 31
+  query parameters dropped: 12
+  response headers dropped: 24
+  text replaced: 13
+literals:
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

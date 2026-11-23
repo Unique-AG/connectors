@@ -1,0 +1,21 @@
+scenario: outlook_read_thread-long-preview
+fixture: rec-tool-outlook_read_thread-long-preview
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:05:17+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 50
+  keys dropped: 4
+  persona addresses: 20
+  persona names: 20
+  response headers dropped: 28
+  text kept: 18
+literals:
+- Printer replacement
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

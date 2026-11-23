@@ -1,0 +1,20 @@
+scenario: outlook_read_contact-first
+fixture: rec-tool-outlook_read_contact-first
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:58:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 7
+  keys dropped: 3
+  persona addresses: 2
+  persona names: 2
+  response headers dropped: 14
+  text kept: 20
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

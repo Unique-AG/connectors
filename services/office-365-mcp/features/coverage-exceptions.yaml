@@ -1,0 +1,9 @@
+outlook_list_calendar_groups:
+  exempt: unhappy
+  reason: The only condition of its own is a listing that stops after 1000 groups or calendars, which no user reaches. The faults of a read are stated for the read chain of uc-03-10.
+teams_list_call_transcripts:
+  exempt: both
+  reason: Call transcripts are a separate Teams surface, and the current use-case corpus covers meetings but has no call scenario yet.
+teams_read_call_transcript:
+  exempt: both
+  reason: Call transcripts are a separate Teams surface, and the current use-case corpus covers meetings but has no call scenario yet.

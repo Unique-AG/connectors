@@ -8,20 +8,23 @@ to "branch on the `innerError.code` value, not the message text"
 (https://learn.microsoft.com/en-us/graph/api/calltranscript-get).
 """
 
+import logging
 import unicodedata
 from asyncio import CancelledError
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from time import perf_counter
-from typing import cast
+from typing import cast, override
 
 import httpx
 from kiota_abstractions.api_error import APIError
 from kiota_http._exceptions import KiotaHTTPXError
-from kiota_http.middleware.options.retry_handler_option import RetryHandlerOption
-from kiota_http.middleware.retry_handler import RetryHandler
+from kiota_http.middleware.middleware import BaseMiddleware
+from kiota_http.middleware.retry_handler import RETRY_ATTEMPT, RetryHandler
 from msgraph.generated.models.o_data_errors.o_data_error import ODataError
+from opentelemetry import trace
 
 from office_365_mcp.graph_client.observability import (
     current_graph_operation,
@@ -30,6 +33,8 @@ from office_365_mcp.graph_client.observability import (
     record_graph_step,
     record_graph_throttled,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class GraphFailure(Exception):
@@ -69,9 +74,15 @@ class GraphThrottled(GraphFailure):
         request_id: str | None,
         retry_after_seconds: float | None,
         inner_code: str | None = None,
+        reason: str | None = None,
     ) -> None:
         super().__init__(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=reason,
         )
         self.retry_after_seconds: float | None = retry_after_seconds
 
@@ -143,25 +154,92 @@ GRAPH_STATUSES: frozenset[str] = frozenset({*_STATUS.values(), _OK, _UNCLASSIFIE
 
 
 @contextmanager
-def graph_errors(operation: str, *, step: str | None = None) -> Generator[None]:
-    """Translate SDK failures into Graph error types, and count what the operation cost.
-
-    `operation` is the tool's own `TOOL_NAME`, never anything taken off a URL — see
-    `observability.py`. `step` names the single Graph call inside this block, for a tool that makes
-    exactly one. A tool that makes several uses `graph_step` instead.
-    """
-    with _measured(operation, step=step):
+def graph_errors() -> Generator[None]:
+    with _measured(step=None):
         yield
 
 
 @contextmanager
 def graph_step(step: str) -> Generator[None]:
-    """Measure one Graph call inside the `graph_errors` block in scope.
-
-    Outside any such block there is no operation to attribute the step to, and nothing is recorded.
-    """
-    with _measured(current_graph_operation(), step=step, operation_level=False):
+    with _measured(step=step):
         yield
+
+
+@dataclass
+class _OperationState:
+    reached: bool = False
+    last_failure: str | None = None
+
+
+_OPERATION_STATE: ContextVar[_OperationState | None] = ContextVar(
+    "office_365_mcp_operation_state", default=None
+)
+
+
+@contextmanager
+def measured_graph_operation(
+    operation: str, *, is_refusal: Callable[[Exception], bool] = lambda _: False
+) -> Generator[None]:
+    started = perf_counter()
+    unmeasured: list[float] = []
+    state = _OperationState()
+    outer_unmeasured = _UNMEASURED.set(unmeasured)
+    outer_state = _OPERATION_STATE.set(state)
+    status = _OK
+    try:
+        with graph_operation(operation):
+            yield
+    except CancelledError:
+        status = _CANCELLED
+        raise
+    except Exception as error:
+        caused_by = _graph_failure_behind(error, implicit=False)
+        if caused_by is not None:
+            status = _status_of(caused_by)
+        elif not is_refusal(error):
+            status = _UNCLASSIFIED
+        elif (handled := _graph_failure_behind(error, implicit=True)) is not None:
+            status = _status_of(handled)
+        elif state.last_failure is not None:
+            status = state.last_failure
+        raise
+    finally:
+        _UNMEASURED.reset(outer_unmeasured)
+        _OPERATION_STATE.reset(outer_state)
+        if state.reached:
+            record_graph_call(
+                operation, status=status, seconds=perf_counter() - started - sum(unmeasured)
+            )
+
+
+def _graph_failure_behind(error: BaseException, *, implicit: bool) -> GraphFailure | None:
+    seen: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in seen:
+        if isinstance(current, GraphFailure):
+            return current
+        seen.add(id(current))
+        current = current.__cause__ or (current.__context__ if implicit else None)
+    return None
+
+
+class GraphCallObserver(BaseMiddleware):
+    @override
+    async def send(
+        self, request: httpx.Request, transport: httpx.AsyncBaseTransport
+    ) -> httpx.Response:
+        state = _OPERATION_STATE.get()
+        if state is not None:
+            state.reached = True
+        response = await super().send(request, transport)
+        retry_after_seconds = _retry_after_seconds(
+            {name.lower(): value for name, value in response.headers.items()}
+        )
+        if _is_throttling(response.status_code, retry_after_seconds):
+            record_graph_throttled(
+                current_graph_operation(), retried=RETRY_ATTEMPT in response.request.headers
+            )
+        return response
 
 
 # The waits inside the innermost measured block that its clock leaves out. A list that is mutated
@@ -193,12 +271,8 @@ def not_graph() -> Generator[None]:
 
 
 @contextmanager
-def _measured(
-    operation: str | None, *, step: str | None, operation_level: bool = True
-) -> Generator[None]:
-    """`operation_level` is False for a step inside an operation: the outer block already counts the
-    whole thing, and counting twice turns `graph_operations_total` into a count of blocks entered.
-    """
+def _measured(*, step: str | None) -> Generator[None]:
+    operation = current_graph_operation()
     started = perf_counter()
     unmeasured: list[float] = []
     outer = _UNMEASURED.set(unmeasured)
@@ -206,25 +280,22 @@ def _measured(
     # escaped that this seam cannot describe.
     status = _UNCLASSIFIED
     try:
-        with graph_operation(operation):
-            yield
+        yield
         status = _OK
     except APIError as error:
         failure = _classify(error)
         status = _status_of(failure)
-        if isinstance(failure, GraphThrottled):
-            record_graph_throttled(operation, retried=_sdk_spent_its_retries(failure))
+        _report(operation, step, failure)
         raise failure from error
     except httpx.TransportError as error:
         # DNS, connect, or read timeout: no HTTP response exists yet, and the request adapter raises
         # `APIError` only once one does, so this never reaches the clause above.
         status = _STATUS[GraphUnavailable]
-        raise GraphUnavailable(
-            f"Microsoft Graph was unreachable: {error}",
-            status=None,
-            code=None,
-            request_id=None,
-        ) from error
+        unreachable = GraphUnavailable(
+            f"Microsoft Graph was unreachable: {error}", status=None, code=None, request_id=None
+        )
+        _report(operation, step, unreachable)
+        raise unreachable from error
     except GraphFailure as failure:
         # Raised inside the block, not translated here: `collect_pages` refusing an unending
         # collection is the one that happens.
@@ -239,44 +310,49 @@ def _measured(
         if not isinstance(error, KiotaHTTPXError) and type(error) is not Exception:
             raise
         status = _STATUS[GraphUnavailable]
-        raise GraphUnavailable(
+        unreadable = GraphUnavailable(
             f"Microsoft Graph gave an answer this connector could not read: {error}",
             status=None,
             code=None,
             request_id=None,
-        ) from error
+        )
+        _report(operation, step, unreadable)
+        raise unreadable from error
     finally:
         _UNMEASURED.reset(outer)
         enclosing = _UNMEASURED.get()
         if enclosing is not None:
             # A wait a step left out is one the operation around it leaves out too.
             enclosing.extend(unmeasured)
-        # One reading of the clock serves both instruments. Two readings land two different
-        # durations in the low end of the histograms, exactly where a call answered from a warm
-        # pool sits.
-        elapsed = perf_counter() - started - sum(unmeasured)
-        if operation_level:
-            record_graph_call(operation, status=status, seconds=elapsed)
-        record_graph_step(operation, step=step, status=status, seconds=elapsed)
+        state = _OPERATION_STATE.get()
+        if state is not None and status not in (_OK, _CANCELLED):
+            state.last_failure = status
+        record_graph_step(
+            operation, step=step, status=status, seconds=perf_counter() - started - sum(unmeasured)
+        )
+
+
+def _report(operation: str | None, step: str | None, failure: GraphFailure) -> None:
+    fields = {
+        "graph_operation": operation,
+        "graph_step": step,
+        "graph_remedy": _status_of(failure),
+        "graph_status": failure.status,
+        "graph_code": failure.code,
+        "graph_inner_code": failure.inner_code,
+        "graph_request_id": failure.request_id,
+        "graph_reason": failure.reason,
+    }
+    present = {name: value for name, value in fields.items() if value is not None}
+    level = logging.INFO if isinstance(failure, GraphForbidden | GraphNotFound) else logging.WARNING
+    logger.log(level, "graph call failed", extra=present)
+    trace.get_current_span().set_attributes(
+        {name: value for name, value in present.items() if name != "graph_reason"}
+    )
 
 
 def _status_of(failure: GraphFailure) -> str:
     return _STATUS.get(type(failure), _STATUS[GraphFailure])
-
-
-def _sdk_spent_its_retries(failure: GraphThrottled) -> bool:
-    """Whether the SDK retried this throttling before giving up on it.
-
-    The retry handler refuses to wait at all once the delay reaches its 180 s ceiling
-    (`kiota_http/middleware/retry_handler.py:97`), so a `Retry-After` that long means no attempt was
-    made. Anything shorter, or no header, means `GraphSettings.max_retries` were spent.
-
-    TRAP for whoever tunes `GraphSettings.max_retries`: that ceiling is per attempt, not cumulative.
-    `RetryHandlerOption` documents a `retry_time_limit` meant to bound the total, and never
-    implements one, so three retries of a `Retry-After: 179` is nine minutes inside one tool call.
-    """
-    advice = failure.retry_after_seconds
-    return advice is None or advice < RetryHandlerOption.MAX_DELAY
 
 
 # Borrowed rather than restated so the two cannot disagree
@@ -293,10 +369,8 @@ _TOO_MANY_REQUESTS = 429
 def _is_throttling(status: int | None, retry_after_seconds: float | None) -> bool:
     """Whether Graph held this caller off, rather than a failure to serve it.
 
-    Restricted to the statuses the SDK retries, which is what keeps `_sdk_spent_its_retries`
-    accurate: the handler takes its delay from `Retry-After` only on those statuses. On any other
-    status the handler never waits out `Retry-After`, so marking it `retried` misreports a retry
-    that never happened.
+    Restricted to the statuses the SDK retries: the handler takes its delay from `Retry-After` only
+    on those statuses.
     """
     if status == _TOO_MANY_REQUESTS:
         return True
@@ -320,10 +394,16 @@ def _classify(error: APIError) -> GraphFailure:
             request_id=request_id,
             inner_code=inner_code,
             retry_after_seconds=retry_after_seconds,
+            reason=_reason(error),
         )
     if status in (401, 403):
         return GraphForbidden(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=_reason(error),
         )
     if status == 404:
         return GraphNotFound(
@@ -331,7 +411,12 @@ def _classify(error: APIError) -> GraphFailure:
         )
     if status is not None and status >= 500:
         return GraphUnavailable(
-            message, status=status, code=code, request_id=request_id, inner_code=inner_code
+            message,
+            status=status,
+            code=code,
+            request_id=request_id,
+            inner_code=inner_code,
+            reason=_reason(error),
         )
     return GraphFailure(
         message,

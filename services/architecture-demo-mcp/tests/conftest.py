@@ -90,6 +90,29 @@ class FakeTiingo:
 
 
 @pytest.fixture
+def zitadel_discovery(monkeypatch: pytest.MonkeyPatch) -> list[str]:
+    """The discovery URLs the proxy fetched, answered without a network for any issuer."""
+    requested: list[str] = []
+
+    def get(url: str, **_: object) -> httpx2.Response:
+        requested.append(url)
+        issuer = url.removesuffix("/.well-known/openid-configuration")
+        configuration = {
+            "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/oauth/v2/authorize",
+            "token_endpoint": f"{issuer}/oauth/v2/token",
+            "jwks_uri": f"{issuer}/oauth/v2/keys",
+            "response_types_supported": ["code"],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+        }
+        return httpx2.Response(200, json=configuration, request=httpx2.Request("GET", url))
+
+    monkeypatch.setattr(httpx2, "get", get)
+    return requested
+
+
+@pytest.fixture
 def server_settings() -> ServerSettings:
     """Every field given, so neither the environment nor `.env` changes what the tests see."""
     return ServerSettings(

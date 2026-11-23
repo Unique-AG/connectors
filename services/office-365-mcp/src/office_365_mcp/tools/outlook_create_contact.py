@@ -12,8 +12,9 @@ from msgraph.generated.models.email_address import EmailAddress
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry
-from office_365_mcp.shared.contacts import (
+from office_365_mcp.graph_client import graph_step, no_retry
+from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.outlook.contacts import (
     COMPANY_NAME_FIELD,
     GIVEN_NAME_FIELD,
     JOB_TITLE_FIELD,
@@ -24,11 +25,12 @@ from office_365_mcp.shared.contacts import (
     not_one_address,
     repeated_entry,
 )
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_create_contact"
+
+PRESETS: tuple[str, ...] = ("outlook-contacts-write",)
 
 STEP_CREATE = "create_contact"
 
@@ -82,7 +84,7 @@ async def create_contact(client: GraphServiceClient, *, details: NewContact) -> 
         raise ToolError(_NOTHING_TO_CREATE)
     checked = replace(details, email_addresses=_addresses(details.email_addresses))
 
-    with graph_errors(TOOL_NAME, step=STEP_CREATE):
+    with graph_step(STEP_CREATE):
         created = await client.me.contacts.post(
             _body(checked),
             request_configuration=RequestConfiguration[QueryParameters](
@@ -125,7 +127,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Contact",
+        title="Outlook: Create a Contact",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

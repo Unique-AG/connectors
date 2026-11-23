@@ -10,12 +10,20 @@ from msgraph.generated.models.reminder import Reminder
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.calendar import EventTime, event_time, window_bounds, zone_named
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_reminders"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP = "reminder_view"
 
@@ -138,12 +146,12 @@ async def list_reminders(
     view = client.me.reminder_view_with_start_date_time_with_end_date_time(
         end_date_time=closes, start_date_time=opens
     )
-    base_url = view.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+    base_url = view.request_adapter.base_url
     documented_view = view.with_url(
         f"{base_url}/me/reminderView(startDateTime='{opens}',endDateTime='{closes}')"
     )
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await documented_view.get()
         assert first_page is not None, "Graph answered a reminder view with no collection"
         collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
@@ -165,7 +173,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Reminders",
+        title="Outlook: List Reminders",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

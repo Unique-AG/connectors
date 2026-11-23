@@ -1,0 +1,25 @@
+scenario: teams_create_chat-by-email
+fixture: rec-tool-teams_create_chat-by-email
+source: recorded
+target: graph
+recorded_at: '2026-11-10T11:30:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 4
+  keys dropped: 3
+  persona addresses: 4
+  query parameters dropped: 1
+  response headers dropped: 18
+  text kept: 2
+  text replaced: 5
+literals:
+- group
+- persona:anna
+- persona:tom
+- seed-v1 case-teams-chat
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.5

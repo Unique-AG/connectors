@@ -1,8 +1,14 @@
-from mcp_openapi.upstream import Operation, OperationClient, UpstreamError
-from pydantic import TypeAdapter, ValidationError
+from mcp_openapi.upstream import OperationClient, UpstreamError
+from pydantic import ValidationError
 
 from kyckr_mcp.client import KyckrApiError
+from kyckr_mcp.models import operations
 from kyckr_mcp.models.replies import OrderData, OrderReply
+from kyckr_mcp.models.vendor_requests import (
+    GetOrdersOrderIdDownloadPath,
+    GetOrdersOrderIdDownloadQuery,
+    GetOrdersOrderIdDownloadRequest,
+)
 from kyckr_mcp.models.vendor_responses import BaseResponse, OrderDetails, PostOrdersResponse
 
 _PDF_NOT_SUPPORTED_DETAIL = (
@@ -13,7 +19,6 @@ _DOCUMENT_NOT_FETCHED_DETAIL = (
     "The document could not be fetched just now. The order is placed: call `get_order` with "
     "its order id again to get the document."
 )
-DOWNLOAD_ORDER = Operation("get-orders-orderId-download", TypeAdapter(dict[str, object]))
 
 
 def as_order(details: OrderDetails | None) -> OrderData | None:
@@ -37,13 +42,20 @@ async def _document(
     api: OperationClient, order_id: str
 ) -> tuple[dict[str, object] | None, str | None]:
     try:
-        body = await api.call(DOWNLOAD_ORDER, orderId=order_id, format="json")
+        download = await api.call(
+            operations.GET_ORDERS_ORDER_ID_DOWNLOAD,
+            GetOrdersOrderIdDownloadRequest(
+                path=GetOrdersOrderIdDownloadPath(order_id=order_id),
+                query=GetOrdersOrderIdDownloadQuery(format="json"),
+            ),
+        )
     except UpstreamError as error:
         unreadable = isinstance(error.__cause__, ValidationError)
         return None, _PDF_NOT_SUPPORTED_DETAIL if unreadable else _DOCUMENT_NOT_FETCHED_DETAIL
     except KyckrApiError as error:
         no_json_view = error.status == 404
         return None, _PDF_NOT_SUPPORTED_DETAIL if no_json_view else _DOCUMENT_NOT_FETCHED_DETAIL
+    body = download.model_dump()
     document = body.get("Data", body.get("data"))
     if isinstance(document, dict):
         return {str(key): value for key, value in document.items()}, None

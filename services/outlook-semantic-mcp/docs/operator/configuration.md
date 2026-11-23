@@ -78,6 +78,7 @@ Set via `mcpConfig.microsoft` in Helm values:
 |----------|----------|---------|-------------|
 | `MICROSOFT_CLIENT_ID` | `clientId` | (required) | Entra app client ID |
 | `MICROSOFT_SIGN_IN_TENANT_ID` | `signInTenantId` | `common` | Sign-in tenant ID the OAuth login should open. Set a GUID when sign-in must use the Enterprise Application (service principal) in a foreign tenant. Leave as `common` when users choose their directory at login. Independent of `clientId`/`clientSecret`; not the tenant that owns the app registration |
+| `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | `adminConsentRedirectUri` | `https://www.unique.ai/setup/consent-completed/entra-id` | Where Microsoft Entra sends a tenant admin after they grant admin consent through `/admin/consent`. Must be registered as a redirect URI on the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
 
@@ -182,6 +183,7 @@ Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for 
 |----------|----------|---------|-------------|
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+| `AUTH_DISABLE_RATE_LIMITING` | `disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 
 ### Application Configuration
 

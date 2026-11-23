@@ -22,14 +22,17 @@ from msgraph.graph_service_client import GraphServiceClient
 from office_365_mcp.graph_client import GraphNotFound, GraphUnavailable
 from office_365_mcp.shared.handles import meeting_handle, meeting_uri_for
 from office_365_mcp.shared.identity import Person
-from office_365_mcp.shared.meetings import not_a_meeting_handle
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm, Confirmed
+from office_365_mcp.shared.teams.meetings import not_a_meeting_handle
 from office_365_mcp.tools import teams_update_meeting as updater
 from office_365_mcp.tools.teams_update_meeting import (
     UpdatedMeeting,
     a_person_agrees,
     update_meeting,
 )
+from tests.tools.scenarios.support import Person as Approver
+from tests.tools.scenarios.support import call, serve
+from tests.tools.teams_recordings import uncalled, was_sent
 
 from .conftest import (
     JOIN_WEB_URL,
@@ -901,7 +904,8 @@ class TestHowItDeclaresItself:
             + "event."
         ) in description
         assert "outlook_update_event" not in description
-        assert "This call is safe to repeat after a timeout." in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
 
     async def test_the_description_says_the_question_shows_the_object_id(
         self, transport: httpx.AsyncClient
@@ -911,9 +915,6 @@ class TestHowItDeclaresItself:
         description = " ".join((tool.description or "").split())
         assert (
             "The question shows the Microsoft Entra object id of each person in the new list."
-        ) in description
-        assert (
-            "The name is only a label, because Teams identifies each attendee by the object id."
         ) in description
 
     async def test_the_description_says_the_new_list_replaces_and_who_it_removes(
@@ -979,7 +980,6 @@ class TestHowItDeclaresItself:
             "Copy it from the `user_id` of get_me, of a teams_list_chat_members row, or of a "
             + "teams_list_chats member. Never build it from a name or an email address."
         ) in str(person["user_id"]["description"])
-        assert "as a label only" in str(person["name"]["description"])
 
     async def test_the_attendees_say_what_an_empty_list_and_an_omitted_list_do(
         self, transport: httpx.AsyncClient
@@ -1005,3 +1005,31 @@ class TestHowItDeclaresItself:
             )
 
         assert len(graph.calls) == 0, "an attendee the schema refuses reached Graph"
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_renames_a_meeting_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_update_meeting-subject")
+        created = await call(
+            "teams_create_meeting",
+            subject="seed-v1 case-teams_update_meeting-subject meeting",
+            starts_at="2026-10-31T16:00:00Z",
+            ends_at="2026-10-31T16:30:00Z",
+            attendees=[],
+        )
+        mia = Approver()
+
+        updated = await call(
+            "teams_update_meeting",
+            person=mia,
+            meeting_uri=created["meeting_uri"],
+            subject="seed-v1 case-teams_update_meeting-subject renamed",
+        )
+
+        assert updated["meeting_uri"] == created["meeting_uri"]
+        assert updated["subject"] == "seed-v1 case-teams_update_meeting-subject renamed"
+        assert "seed-v1 case-teams_update_meeting-subject renamed" in mia.asked[0]
+        assert was_sent(routes, "PATCH", "/me/onlineMeetings/")
+        assert uncalled(routes) == []

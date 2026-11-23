@@ -9,7 +9,7 @@ from msgraph.generated.models.recent_notebook import RecentNotebook as GraphRece
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.notes import client_url_of, web_url_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -23,6 +23,8 @@ _SOURCE_SERVICE_TEXT: Mapping[OnenoteSourceService, _SourceService] = {
 }
 
 TOOL_NAME = "onenote_list_recent_notebooks"
+
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
 
 STEP_RECENT_NOTEBOOKS = "recent_notebooks"
 
@@ -89,7 +91,7 @@ class RecentNotebooks(BaseModel):
 async def list_recent_notebooks(
     client: GraphServiceClient, *, include_personal_notebooks: bool = True
 ) -> RecentNotebooks:
-    with graph_errors(TOOL_NAME, step=STEP_RECENT_NOTEBOOKS):
+    with graph_step(STEP_RECENT_NOTEBOOKS):
         first_page = await (
             client.me.onenote.notebooks.get_recent_notebooks_with_include_personal_notebooks(
                 include_personal_notebooks
@@ -120,7 +122,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Recent Notebooks",
+        title="OneNote: List Recent Notebooks",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

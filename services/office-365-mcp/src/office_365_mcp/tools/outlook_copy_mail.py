@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     MailDestination,
     MailFault,
@@ -28,6 +27,7 @@ from office_365_mcp.shared.mail import (
     raise_when_no_message_succeeded,
     resolve_destination,
 )
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -40,6 +40,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_copy_mail"
+
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
 
 STEP_COPY = "copy_message"
 
@@ -117,7 +119,9 @@ _NOT_A_MESSAGE_HANDLE = (
     + "message handle. A subject line, an email address, an Outlook web link, and a bare message "
     + "id are not handles. A folder handle and a rule handle are not message "
     + "handles either. This tool makes sure that every handle is valid before it copies a "
-    + "message. No message was copied. Fix the value and call again with the whole batch."
+    + "message. No message was copied. If you have no handles, call outlook_list_mail or "
+    + "outlook_search_mail and use the `uri` values. If the value is a folder handle, pass it as "
+    + "`folder_ref`. Fix the value and call again with the whole batch."
 )
 
 _HIDDEN_DESTINATION = (
@@ -223,7 +227,7 @@ async def copy_mail(
 
     answer: Confirmed = None
     attempts: list[MessageAttempt[CopiedMessage]] = []
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         target = await resolve_destination(reached, wanted)
         if not isinstance(target, MailFault):
             if mailbox is not None:
@@ -308,7 +312,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy Mail to a Folder",
+        title="Outlook: Copy Mail to a Folder",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

@@ -14,14 +14,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import meeting_handle
-from office_365_mcp.shared.meetings import (
-    not_a_meeting_handle,
-    not_the_organizer,
-    organized_by,
-    resolve_meeting,
-)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -29,8 +23,16 @@ from office_365_mcp.shared.seam import (
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.meetings import (
+    not_a_meeting_handle,
+    not_the_organizer,
+    organized_by,
+    resolve_meeting,
+)
 
 TOOL_NAME = "teams_delete_meeting"
+
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
 
 STEP_DELETE = "delete_meeting"
 
@@ -112,7 +114,7 @@ async def delete_meeting(
     found: OnlineMeeting | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await resolve_meeting(client, handle)
         if found is None or found.id is None:
             refused = _NO_SUCH_MEETING
@@ -157,7 +159,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Teams Meeting",
+        title="Teams: Delete a Meeting",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

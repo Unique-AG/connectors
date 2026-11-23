@@ -1,0 +1,24 @@
+scenario: outlook_suggest_meeting_times-afternoon
+fixture: rec-tool-outlook_suggest_meeting_times-afternoon
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:05:32+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 1
+  persona addresses: 6
+  response headers dropped: 8
+  text kept: 3
+literals:
+- '2026-11-09T08:00:00'
+- '2026-11-09T18:00:00'
+- Europe/Zurich
+- persona:anna
+- ~nextMondayT08:00:00
+- ~nextMondayT18:00:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

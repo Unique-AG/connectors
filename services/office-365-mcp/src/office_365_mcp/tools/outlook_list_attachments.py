@@ -8,11 +8,13 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors
-from office_365_mcp.shared.attachments import AttachmentSummary, message_attachments
 from office_365_mcp.shared.handles import mail_message_handle
+from office_365_mcp.shared.outlook.attachments import AttachmentSummary, message_attachments
 from office_365_mcp.shared.seam import MAILBOX_FIELD, READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_attachments"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.Read", "Mail.Read.Shared")
 
@@ -74,7 +76,7 @@ async def list_attachments(
     if handle is None:
         raise ToolError(_BAD_HANDLE)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await message_attachments(client, handle=handle, mailbox=mailbox)
 
     return MessageAttachments(attachments=found.items, capped=found.capped)
@@ -85,7 +87,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Mail Attachments",
+        title="Outlook: List Mail Attachments",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

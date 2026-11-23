@@ -1,0 +1,21 @@
+scenario: onenote_find_notebook_from_url-seed
+fixture: rec-tool-onenote_find_notebook_from_url-seed
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:51:23+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 108
+  keys dropped: 30
+  query parameters dropped: 8
+  response headers dropped: 36
+  text kept: 46
+  text replaced: 89
+literals:
+- seed-v1 Dogfood
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

@@ -1,18 +1,23 @@
-import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
 import { UniqueApiModule } from '@unique-ag/unique-api';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
-import { type AppConfig, appConfig, healthConfig, proxyConfig } from './config';
+import {
+  type AppConfig,
+  appConfig,
+  getTenantConfigs,
+  healthConfig,
+  type ProxyConfig,
+  proxyConfig,
+} from './config';
 import { HealthModule } from './health/health.module';
+import { createAppLoggerOptions } from './logger-options';
 import { ProxyModule } from './proxy';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { TenantModule, tenantStorage } from './tenant';
-import { Redacted } from './utils/redacted';
+import { TenantModule } from './tenant';
 
 @Module({
   imports: [
@@ -32,33 +37,9 @@ import { Redacted } from './utils/redacted';
     HealthModule,
     SchedulerModule,
     LoggerModule.forRootAsync({
-      useFactory(appConfigValue: AppConfig) {
-        return {
-          ...defaultLoggerOptions,
-          pinoHttp: {
-            ...defaultLoggerOptions.pinoHttp,
-            level: appConfigValue.logLevel,
-            // Injects tenantName into every log. Logs emitted before tenantStorage.run() is
-            // called (during bootstrap) won't have it — those sites must set it explicitly.
-            mixin: () => {
-              const tenant = tenantStorage.getStore();
-              return tenant ? { tenantName: tenant.name } : {};
-            },
-            genReqId: () => {
-              const ctx = trace.getSpanContext(context.active());
-              if (!ctx) {
-                return crypto.randomUUID();
-              }
-              return ctx.traceId;
-            },
-            redact: {
-              paths: ['req.headers.authorization'],
-              censor: (value) => (value instanceof Redacted ? value : new Redacted(value)),
-            },
-          },
-        };
-      },
-      inject: [appConfig.KEY],
+      useFactory: (app: AppConfig, proxy: ProxyConfig) =>
+        createAppLoggerOptions(app, proxy, getTenantConfigs()),
+      inject: [appConfig.KEY, proxyConfig.KEY],
     }),
     ProbeModule.forRoot({
       VERSION: packageJson.version,

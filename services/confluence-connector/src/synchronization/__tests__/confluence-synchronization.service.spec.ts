@@ -193,11 +193,15 @@ describe('ConfluenceSynchronizationService', () => {
       );
     });
 
-    it('logs individual page failures without aborting the sync', async () => {
+    // A failed item is new again on the next sync. If it were the only change and failed the sync,
+    // one broken page would fail every sync of a quiet tenant.
+    it('keeps the sync successful when every page fails, after finishing cleanup', async () => {
       vi.mocked(mockContentFetcher.fetchPageContent).mockRejectedValue(new Error('fetch failure'));
 
-      await tenantStorage.run(tenant, () => service.synchronize());
+      const result = await tenantStorage.run(tenant, () => service.synchronize());
 
+      expect(result).toEqual({ status: 'success' });
+      expect(mockScopeManagementService.cleanupRemovedSpaces).toHaveBeenCalledWith(new Set(['SP']));
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
@@ -484,8 +488,9 @@ describe('ConfluenceSynchronizationService', () => {
         new Error('attachment ingestion boom'),
       );
 
-      await tenantStorage.run(tenant, () => service.synchronize());
+      const result = await tenantStorage.run(tenant, () => service.synchronize());
 
+      expect(result).toEqual({ status: 'success' });
       expect(tenant.isScanning).toBe(false);
       expect(mockLogger.log).toHaveBeenCalledWith({
         total: 1,
@@ -493,7 +498,6 @@ describe('ConfluenceSynchronizationService', () => {
         failed: 1,
         msg: 'Attachment ingestion summary',
       });
-      expect(mockLogger.log).toHaveBeenCalledWith({ msg: 'Sync work done' });
     });
   });
 
@@ -597,6 +601,26 @@ describe('ConfluenceSynchronizationService', () => {
       expect(metrics.recordAttachmentsProcessed).toHaveBeenCalledWith(1, 'success');
       expect(metrics.recordAttachmentsProcessed).toHaveBeenCalledWith(1, 'failure');
       expect(vi.mocked(metrics.recordAttachmentsProcessed).mock.calls).toHaveLength(2);
+    });
+
+    it('records a failed sync result when the sync throws', async () => {
+      vi.mocked(mockScopeManagementService.initialize).mockRejectedValueOnce(new Error('boom'));
+      const metrics = createMetricsSpy();
+      const svc = createService(
+        mockScanner,
+        mockContentFetcher,
+        mockFileDiffService,
+        mockIngestionService,
+        metrics,
+      );
+
+      await tenantStorage.run(tenant, () => svc.synchronize());
+
+      expect(metrics.recordSyncStart).toHaveBeenCalledOnce();
+      expect(metrics.recordSyncResult).toHaveBeenCalledExactlyOnceWith(
+        expect.any(Number),
+        'failure',
+      );
     });
 
     it('walks through sync phases and ends on Idle', async () => {

@@ -23,11 +23,13 @@ from office_365_mcp.graph_client import (
     request_with_json_body,
     send_no_response_content,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     FOLDER_HANDLE_SOURCES,
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
+    BrowserUrl,
     folder_label,
     item_access_refused,
     item_for_a_question,
@@ -40,7 +42,6 @@ from office_365_mcp.shared.handles import (
     drive_folder_handle,
     drive_item_handle,
 )
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -49,6 +50,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_copy_item"
+
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
 
 STEP_COPY = "copy_item"
 
@@ -74,6 +77,10 @@ change to everyone who can open the folder.
 
 Notes:
 - This tool asks the user to agree before it creates anything, every time.
+- To copy into another drive, take `to_folder` from the `uri` of a folder, from the \
+`parent_uri` of an item, or from the `root_uri` of a drive. To list the libraries of a site, \
+call sharepoint_list_drives with the web address of the site as `site`. To find a folder on a \
+site, give that web address as `path` of sharepoint_search_files.
 - The copy gets the permissions of the destination folder, not the permissions of the original. \
 It has only the latest version of a file, and Microsoft does not copy the metadata of the original.
 - If the destination already holds an item with the same name, the copy fails. This error can \
@@ -134,7 +141,7 @@ class CopyStarted(BaseModel):
             + "handle. The original stays where it is, and this tool does not change it."
         )
     )
-    source_web_url: str | None = Field(
+    source_web_url: BrowserUrl | None = Field(
         description=(
             "The web address that opens the original item in a browser. Always give it to the "
             + "user when you report this copy."
@@ -147,7 +154,7 @@ class CopyStarted(BaseModel):
             + "it to sharepoint_browse_folder to see the copy."
         )
     )
-    destination_web_url: str | None = Field(
+    destination_web_url: BrowserUrl | None = Field(
         description=(
             "The web address that opens the destination folder in a browser. Always give it to "
             + "the user, so that the user can open the folder and find the copy there."
@@ -196,7 +203,7 @@ async def copy_item(
     started: CopyStarted | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         original = await item_for_a_question(client, source.drive_id, source.item_id)
         target = await item_for_a_question(client, destination.drive_id, destination.item_id)
         refused = _cannot_copy(original, target)
@@ -272,7 +279,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy an Item",
+        title="SharePoint: Copy an Item",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

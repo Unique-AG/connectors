@@ -27,6 +27,14 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_calendars"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP = "calendars"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (
@@ -81,7 +89,7 @@ class Calendars(BaseModel):
 
 
 async def list_calendars(client: GraphServiceClient) -> Calendars:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         user = await identity.signed_in_user(client)
         with graph_step(STEP):
             # Container types such as `calendar` support no immutable id, so no `Prefer` header
@@ -107,7 +115,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Calendars",
+        title="Outlook: List Calendars",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

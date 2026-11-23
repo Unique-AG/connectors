@@ -1,0 +1,22 @@
+scenario: outlook_list_mail-drafts
+fixture: rec-tool-outlook_list_mail-drafts
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:57:15+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 5
+  keys dropped: 2
+  persona addresses: 1
+  persona names: 1
+  response headers dropped: 14
+  text kept: 4
+literals:
+- drafts
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

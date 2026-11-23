@@ -1,0 +1,26 @@
+scenario: outlook_respond_to_invite-decline
+fixture: rec-tool-outlook_respond_to_invite-decline
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:38:17+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 14
+  keys dropped: 11
+  persona addresses: 7
+  persona names: 7
+  query parameters dropped: 2
+  response headers dropped: 28
+  text kept: 10
+literals:
+- '2026-11-03'
+- Design critique
+- I cannot join.
+- decline
+- ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

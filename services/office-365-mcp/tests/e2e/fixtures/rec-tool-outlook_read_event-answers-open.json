@@ -1,0 +1,206 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/calendarView",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "endDateTime": "~day+2",
+      "startDateTime": "~tomorrow",
+      "$filter": "contains(subject,'Content review')",
+      "$orderby": "start/dateTime",
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"d1Spem93PxWXTx6Z0slaklRI2mSsRn==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "tentativelyAccepted",
+                "time": "2026-11-02T20:46:11.5271511Z"
+              },
+              "type": "required"
+            },
+            {
+              "emailAddress": {
+                "address": "tom@example.test",
+                "name": "Tom Berger"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "Read the new copy and note the changes.",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-03T11:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "YXcMMcUPKDZIBGCKUrakZy0jfBOqCH-QMz1Ge5Zcpu43YhCYMc2C2udhaqZV3lBOkDBV",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "Room Rigi",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": null,
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-11-03T10:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "Content review",
+          "type": "singleInstance",
+          "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCRz0Yp1Fdkx66TvHWHr9A0efwbcGZ1hSHoYSB&exvsurl=1"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/YXcMMcUPKDZIBGCKUrakZy0jfBOqCH-QMz1Ge5Zcpu43YhCYMc2C2udhaqZV3lBOkDBV",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\", outlook.body-content-type=\"text\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance,body,hasAttachments,responseRequested,allowNewTimeProposals,hideAttendees,originalStartTimeZone,originalEndTimeZone,recurrence"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId,outlook.body-content-type=\"text\""
+    },
+    "response_json": {
+      "@odata.etag": "W/\"d1Spem93PxWXTx6Z0slaklRI2mSsRn==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "tentativelyAccepted",
+            "time": "2026-11-02T20:46:11.5271511Z"
+          },
+          "type": "required"
+        },
+        {
+          "emailAddress": {
+            "address": "tom@example.test",
+            "name": "Tom Berger"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "body": {
+        "content": "Read the new copy and note the changes.",
+        "contentType": "text"
+      },
+      "bodyPreview": "Read the new copy and note the changes.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-03T11:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "id": "YXcMMcUPKDZIBGCKUrakZy0jfBOqCH-QMz1Ge5Zcpu43YhCYMc2C2udhaqZV3lBOkDBV",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "Room Rigi",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "W. Europe Standard Time",
+      "originalStartTimeZone": "W. Europe Standard Time",
+      "recurrence": null,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-03T10:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Content review",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FCRz0Yp1Fdkx66TvHWHr9A0efwbcGZ1hSHoYSB&exvsurl=1"
+    }
+  }
+]

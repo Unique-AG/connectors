@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from contextlib import suppress
 from datetime import UTC, datetime
 from typing import Annotated, Literal, Self
 
@@ -13,10 +14,11 @@ from msgraph.generated.models.online_meeting import OnlineMeeting
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.graph_client import GraphNotFound, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.handles import MeetingHandle, meeting_handle
-from office_365_mcp.shared.meetings import (
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.meetings import (
     MEETING_PERMISSION,
     not_a_meeting_handle,
     organized_by,
@@ -24,10 +26,11 @@ from office_365_mcp.shared.meetings import (
     resolve_meeting,
     settled,
 )
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_read_meeting"
+
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
 
 STEP_REPORTS = "attendance_reports"
 STEP_RECORDS = "attendance_records"
@@ -296,7 +299,7 @@ class MeetingAttendance(BaseModel):
 async def teams_read_meeting(
     client: GraphServiceClient, *, handle: MeetingHandle
 ) -> MeetingAttendance:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingAttendance(
@@ -316,12 +319,16 @@ async def teams_read_meeting(
                 more_records=False,
             )
         reports_of = client.me.online_meetings.by_online_meeting_id(meeting.id).attendance_reports
-        with graph_step(STEP_REPORTS):
+        listed = None
+        with suppress(GraphNotFound), graph_step(STEP_REPORTS):
             listed = await reports_of.get()
             assert listed is not None, "Graph answered an attendance report listing with no value"
-            collected = await collect_pages(listed, client, limit=MAX_REPORTS)
+        found: list[MeetingAttendanceReport] = []
+        if listed is not None:
+            with graph_step(STEP_REPORTS):
+                found = (await collect_pages(listed, client, limit=MAX_REPORTS)).items
         reports = sorted(
-            (AttendanceReportSummary.from_report(report) for report in collected.items),
+            (AttendanceReportSummary.from_report(report) for report in found),
             key=_began_at,
             reverse=True,
         )
@@ -360,7 +367,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Meeting and Its Attendance",
+        title="Teams: Read a Meeting and Its Attendance",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

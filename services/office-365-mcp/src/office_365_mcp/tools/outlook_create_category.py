@@ -10,12 +10,14 @@ from msgraph.generated.models.outlook_category import OutlookCategory
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry
-from office_365_mcp.shared.categories import CategoryName
+from office_365_mcp.graph_client import graph_step, no_retry
 from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import CategoryName
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, graph_client_for_caller
 
 TOOL_NAME = "outlook_create_category"
+
+PRESETS: tuple[str, ...] = ("outlook-automate", "outlook-rules")
 
 STEP_CREATE_CATEGORY = "create_category"
 
@@ -63,6 +65,9 @@ If this deployment exposes outlook_mark_mail, that tool puts a category on a mes
 Notes:
 - Each category name is unique in the list. Microsoft refuses a name that the list already has. \
 If you call this tool again with the same arguments, the call will fail the same way.
+- A category name cannot change after this call. To rename a category, create a new one, move \
+the messages to it, and delete the old one. If this deployment exposes outlook_mark_mail and \
+outlook_delete_category, they do the last two steps.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 outlook_list_categories does not show a category named `name`.
 """
@@ -86,7 +91,7 @@ class CreatedCategory(BaseModel):
 async def create_category(
     client: GraphServiceClient, *, name: str, color: CategoryColorName
 ) -> CreatedCategory:
-    with graph_errors(TOOL_NAME, step=STEP_CREATE_CATEGORY):
+    with graph_step(STEP_CREATE_CATEGORY):
         created = await client.me.outlook.master_categories.post(
             OutlookCategory(display_name=name, color=CategoryColor(color)),
             request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
@@ -107,7 +112,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Category",
+        title="Outlook: Create a Category",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

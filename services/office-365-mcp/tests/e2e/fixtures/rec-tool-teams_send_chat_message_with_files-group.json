@@ -1,0 +1,244 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 Meeting Notes"
+          },
+          "size": 1
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "hitsContainers": [
+            {
+              "hits": [
+                {
+                  "hitId": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+                  "rank": 1,
+                  "resource": {
+                    "@odata.type": "#microsoft.graph.driveItem",
+                    "createdBy": {
+                      "user": {
+                        "displayName": "Mia Keller",
+                        "email": "mia@example.test"
+                      }
+                    },
+                    "createdDateTime": "2026-10-29T15:20:52Z",
+                    "file": {
+                      "mimeType": "text/plain"
+                    },
+                    "id": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+                    "lastModifiedBy": {
+                      "user": {
+                        "displayName": "Mia Keller",
+                        "email": "mia@example.test"
+                      }
+                    },
+                    "lastModifiedDateTime": "2026-10-29T15:20:52Z",
+                    "name": "seed-v1 Meeting Notes.txt",
+                    "parentReference": {
+                      "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+                      "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+                      "siteId": "kiaqdpzfkcrfinyqw-ic.squsbkdinx.ifd,00000000-84a1-4040-8976-7aac948926e9,00000000-a564-4d8d-89c6-a011992bbd1c"
+                    },
+                    "size": 107,
+                    "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt"
+                  },
+                  "summary": "<c0>Meeting</c0> <c0>notes</c0>, weekly project sync. Redirect test done. Two press pages missing. Next: <ddd/>"
+                }
+              ],
+              "moreResultsAvailable": true,
+              "total": 2
+            }
+          ],
+          "searchTerms": ["seed-v1", "meeting", "notes"]
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me",
+    "query": {
+      "$select": "id,displayName,givenName,surname,mail,userPrincipalName,jobTitle,officeLocation,businessPhones,mobilePhone,preferredLanguage"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "businessPhones": [],
+      "displayName": "synthetic text 01",
+      "givenName": null,
+      "id": "00000000-aa0f-4286-8305-d989485e14b5",
+      "jobTitle": "synthetic text 02",
+      "mail": "mia@example.test",
+      "mobilePhone": null,
+      "officeLocation": null,
+      "preferredLanguage": null,
+      "surname": null,
+      "userPrincipalName": "mia@example.test"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats",
+    "json": {
+      "chatType": "group",
+      "members": [
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')",
+          "roles": ["owner"]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-a6b4-4b6e-8a2b-9e1c3f1e88e1')",
+          "roles": ["owner"]
+        },
+        {
+          "@odata.type": "#microsoft.graph.aadUserConversationMember",
+          "user@odata.bind": "https://graph.microsoft.com/v1.0/users('00000000-e469-40d3-8f5b-9a7c5dac541e')",
+          "roles": ["owner"]
+        }
+      ],
+      "topic": "seed-v1 case-teams-chat"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "chatType": "group",
+      "createdDateTime": "2026-11-02T09:38:17.59Z",
+      "id": "19:49npe4j97h6r4pq24y89027518021510@thread.v2",
+      "lastUpdatedDateTime": "2026-11-02T09:38:17.59Z",
+      "onlineMeetingInfo": null,
+      "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+      "topic": "seed-v1 case-teams-chat",
+      "viewpoint": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2004/19:49npe4j97h6r4pq24y89027518021510@thread.v2/synthetic%20text%2005"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/items/01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+    "query": {
+      "$select": "id,name,eTag,webDavUrl,file,folder,parentReference"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "\"{00000000-4897-4DBD-827C-66309915E60D},0\"",
+      "eTag": "\"{00000000-4897-4DBD-827C-66309915E60D},0\"",
+      "file": {
+        "mimeType": "text/plain"
+      },
+      "id": "01NQFDA6PL7AGVVDJ3N9HMZ6F1MLHIDL99",
+      "name": "seed-v1 Meeting Notes.txt",
+      "parentReference": {
+        "driveId": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+        "driveType": "business",
+        "id": "01UKPLM94OZ5K7N6WY9IBF1SMDTUQ8OPDR",
+        "name": "seed-v1 Seed Files",
+        "path": "/drives/b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_/root:/seed-v1 Seed Files",
+        "siteId": "00000000-84a1-4040-8976-7aac948926e9"
+      },
+      "webDavUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/chats/19:49npe4j97h6r4pq24y89027518021510@thread.v2/messages",
+    "json": {
+      "attachments": [
+        {
+          "contentType": "reference",
+          "contentUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt",
+          "id": "00000000-4897-4dbd-827c-66309915e60d",
+          "name": "seed-v1 Meeting Notes.txt"
+        }
+      ],
+      "body": {
+        "content": "<p>seed-v1 case-teams_send_chat_message_with_files-group notes</p> <attachment id=\"00000000-4897-4dbd-827c-66309915e60d\"></attachment>",
+        "contentType": "html"
+      }
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2006/chats('synthetic%20text%2007')/messages('1805800773417')"
+    },
+    "response_json": {
+      "attachments": [
+        {
+          "content": null,
+          "contentType": "reference",
+          "contentUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/seed-v1%20Seed%20Files/seed-v1%20Meeting%20Notes.txt",
+          "id": "00000000-4897-4dbd-827c-66309915e60d",
+          "name": "seed-v1 Meeting Notes.txt",
+          "teamsAppId": null,
+          "thumbnailUrl": null
+        }
+      ],
+      "body": {
+        "content": "synthetic text 08",
+        "contentType": "html"
+      },
+      "channelIdentity": null,
+      "chatId": "19:49npe4j97h6r4pq24y89027518021510@thread.v2",
+      "createdDateTime": "2026-11-02T09:38:18.324Z",
+      "deletedDateTime": null,
+      "etag": "1805800773417",
+      "eventDetail": null,
+      "from": {
+        "application": null,
+        "device": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "displayName": "synthetic text 01",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5",
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userIdentityType": "aadUser"
+        }
+      },
+      "id": "1805800773417",
+      "importance": "normal",
+      "lastEditedDateTime": null,
+      "lastModifiedDateTime": "2026-11-02T09:38:18.324Z",
+      "locale": "en-us",
+      "mentions": [],
+      "messageType": "message",
+      "reactions": [],
+      "replyToId": null,
+      "subject": null,
+      "summary": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2003/synthetic%20text%2009/19:49npe4j97h6r4pq24y89027518021510@thread.v2/1805800773417"
+    }
+  }
+]

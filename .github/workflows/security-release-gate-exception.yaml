@@ -1,0 +1,35 @@
+name: "[Security] Release Gate Exception"
+
+on:
+  pull_request:
+    types: [labeled, unlabeled]
+
+permissions:
+  contents: read # to read the repository
+
+concurrency:
+  group: security-release-gate-exception-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: github.event.label.name == 'security-exception' && startsWith(github.head_ref, 'release-please--branches--main--components--')
+    permissions:
+      contents: read # to read the repository
+      pull-requests: write # to write the comment that records who set the label
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github/actions/release-gate
+          persist-credentials: false
+
+      - name: Record who set or removed the label
+        env:
+          ACTION: ${{ github.event.action }}
+          ACTOR: ${{ github.event.sender.login }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PULL_REQUEST_NUMBER: ${{ github.event.pull_request.number }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .github/actions/release-gate/record.mjs

@@ -14,6 +14,7 @@ import {
 } from '~/db';
 import { NewTrace } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import {
   FAILED_HEARTBEAT_MINUTES,
   RUNNING_HEARTBEAT_MINUTES,
@@ -70,6 +71,8 @@ export class FullSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
     this.schedulerRegistry.addCronJob('full-sync-recovery', job);
     job.start();
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.full-sync-recovery')
   public async checkAndRetriggerStuckFullSyncs(): Promise<void> {

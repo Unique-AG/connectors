@@ -69,7 +69,7 @@ sequenceDiagram
     KB-->>Server: Results
     Server-->>Client: Search results
 
-    Client->>Server: Opaque MCP token + create_draft_email
+    Client->>Server: Opaque MCP token + draft_email
     Server->>Graph: Create draft (using stored MS token)
     Graph-->>Server: Draft created
     Server-->>Client: Draft link
@@ -128,7 +128,7 @@ MCP requests pass through each layer from top to bottom. Each layer must pass be
 | Layer | Mechanism | Protects Against |
 |-------|-----------|------------------|
 | **Transport** | TLS 1.2+ via Kong Gateway | Eavesdropping, man-in-the-middle |
-| **Rate Limiting** | IP-based throttling at ingress layer (e.g., Kong) | Brute-force, abuse |
+| **Rate Limiting** | Per-route limits on the OAuth routes and per-user limits on tool calls in the application, plus optional IP-based throttling at the ingress layer (e.g., Kong) | Brute-force, abuse |
 | **Authentication** | OAuth 2.1 + PKCE | Unauthorized access, authorization code interception |
 | **Session Integrity** | HMAC-SHA256 on OAuth session state | Session hijacking via forged callbacks |
 | **Token Design** | 512-bit cryptographically random opaque values | Token guessing |
@@ -280,6 +280,21 @@ Each token pair shares a `familyId` (format: `tkfam_...`) and a `generation` cou
 
 This detects scenarios where an attacker obtains a refresh token and uses it while the legitimate client still holds the original. Whichever uses it second triggers the revocation.
 
+## Log Redaction
+
+Every log line has the secrets this deployment is configured with replaced by `[Redacted]`: the HMAC
+secret, the Microsoft client and webhook secrets, the encryption key in its hex and base64 forms, the
+database and RabbitMQ passwords, the proxy password and the Basic credentials it is sent as, and the
+Zitadel client secret in external mode.
+
+The tokens a request, RabbitMQ handler or scheduled job reads are redacted too, but only from the
+lines logged while it runs: an HTTP request is covered by the request redaction middleware, and each
+`@RabbitSubscribe` handler and scheduled job by `@LogSecretsScope()` (`src/utils/log-secrets.ts`).
+The error handler that logs a failed RabbitMQ message (`src/amqp/amqp.utils.ts`) runs after the
+handler has returned, so it redacts the deployment's secrets but not a token the handler read. A new
+handler or job method needs `@LogSecretsScope()` above `@NewTrace` and, for a handler, below
+`@RabbitSubscribe`.
+
 ## Webhook Validation
 
 Microsoft Graph webhook notifications are validated using the `clientState` field:
@@ -315,13 +330,20 @@ sequenceDiagram
 
 ## Rate Limiting
 
-Rate limiting is expected to be handled at the infrastructure/ingress layer (e.g., Kong ingress controller), not within the application itself. The following limits are recommended:
+The application rate-limits its OAuth routes. Buckets are keyed by the client address the ingress forwards, so every browser behind one gateway shares a bucket. The token route is keyed by address and credential instead, because every user of a tenant refreshes through the same egress IP and must not share one bucket.
 
+| Route | Limit | Key |
+| --- | --- | --- |
+| `/auth/authorize`, `/auth/consent`, `/auth/callback` | 30 requests / 60 seconds | address |
+| `/auth/token` and its alias `/token` | 10 requests / 60 seconds per credential, under a ceiling of 600 requests / 60 seconds per address | address + hash of the code or refresh token; address |
+| `/auth/register`, `/auth/introspect`, `/auth/revoke` | 10 requests / 60 seconds | address |
+| `/.well-known/*` discovery documents | none | |
 
-| Scope                  | Recommended Limit        | Layer | Purpose                                |
-| ---------------------- | ------------------------ | ----- | -------------------------------------- |
-| Global (all endpoints) | 10 requests / 60 seconds | Ingress (Kong) | General brute-force protection         |
-| Authorization endpoint | 3 requests / 60 seconds  | Ingress (Kong) | Tighter protection for auth initiation |
+MCP tool calls are limited per user separately, see the `mcpRateLimit` configuration.
+
+`AUTH_DISABLE_RATE_LIMITING` (default `false`) switches every OAuth route limit off. It exists to rule rate limiting in or out during an incident without a release. The server logs a warning at startup while it is on.
+
+Throttling at the ingress layer (e.g., Kong) is an optional layer in front of these limits. A limit there must leave room for a tenant whose users all reach the server through one egress IP.
 
 
 ## Secret Management

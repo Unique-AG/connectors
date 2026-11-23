@@ -1,0 +1,23 @@
+scenario: teams_react_to_message-post
+fixture: rec-tool-teams_react_to_message-post
+source: recorded
+target: graph
+recorded_at: '2026-11-02T09:12:48+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 23
+  keys dropped: 30
+  query parameters dropped: 4
+  response headers dropped: 45
+  text kept: 6
+  text replaced: 9
+literals:
+- seed-v1 case-teams_react_to_message-post target
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

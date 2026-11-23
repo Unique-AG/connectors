@@ -179,6 +179,7 @@ def channel_hit(
     message_id: str = "1770000000000",
 ) -> dict[str, object]:
     resource = _chat_message(message_id=message_id, sender=MAILBOX_SENDER)
+    resource["chatId"] = channel_id
     resource["channelIdentity"] = {"teamId": team_id, "channelId": channel_id}
     resource["webUrl"] = f"https://teams.microsoft.invalid/l/message/{channel_id}/{message_id}"
     return {"hitId": message_id, "rank": 1, "summary": "synthetic snippet", "resource": resource}
@@ -186,7 +187,7 @@ def channel_hit(
 
 def _chat_message(*, message_id: str, sender: Mapping[str, object] | None) -> dict[str, object]:
     return {
-        "@odata.type": "#microsoft.graph.chatMessage",
+        "@odata.type": "microsoft.graph.chatMessage",
         "id": message_id,
         "createdDateTime": "2026-02-11T09:15:22.31Z",
         "lastModifiedDateTime": "2026-02-11T09:20:00Z",

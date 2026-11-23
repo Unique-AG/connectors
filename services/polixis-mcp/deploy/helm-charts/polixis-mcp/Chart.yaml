@@ -1,0 +1,13 @@
+apiVersion: v2
+name: polixis-mcp
+description: >-
+  Looks up organizations and people in Polixis corporate data: search, corporate
+  profiles with their related parties, relationship graphs, top-down ownership
+  and ultimate beneficial owners, and sanctions and PEP flags.
+type: application
+version: 0.0.1
+appVersion: 0.0.1
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-3aa55e

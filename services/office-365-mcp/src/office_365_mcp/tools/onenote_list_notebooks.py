@@ -51,6 +51,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner
 
 TOOL_NAME = "onenote_list_notebooks"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_NOTEBOOKS = "notebooks"
 STEP_SECTIONS = "sections"
 STEP_SECTION_GROUPS = "section_groups"
@@ -274,7 +276,7 @@ async def list_notebooks(
     root = onenote_root(client, owner)
     with (
         owner_refused(owner is not None, named_owner_refused("Notes.Read")),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
     ):
         with graph_step(STEP_NOTEBOOKS):
             first_notebooks = await get_with_query(
@@ -443,7 +445,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Notebooks",
+        title="OneNote: List Notebooks",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

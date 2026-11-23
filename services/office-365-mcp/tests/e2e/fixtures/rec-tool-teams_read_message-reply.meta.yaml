@@ -1,0 +1,21 @@
+scenario: teams_read_message-reply
+fixture: rec-tool-teams_read_message-reply
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:06:54+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 622
+  keys dropped: 110
+  query parameters dropped: 272
+  response headers dropped: 40
+  text kept: 80
+  text replaced: 207
+literals:
+- standard
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

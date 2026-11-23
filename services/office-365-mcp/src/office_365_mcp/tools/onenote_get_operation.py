@@ -7,12 +7,19 @@ from fastmcp.exceptions import ToolError
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import fetch_response, graph_step, native_response
 from office_365_mcp.shared.handles import onenote_operation_handle
-from office_365_mcp.shared.notes import OWNED_REFUSED, OperationSummary, onenote_root
+from office_365_mcp.shared.notes import (
+    OWNED_REFUSED,
+    OperationSummary,
+    accepted_operation,
+    onenote_root,
+)
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_get_operation"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_OPERATION = "operation"
 
@@ -65,16 +72,18 @@ async def get_operation(client: GraphServiceClient, *, operation: str) -> Operat
 
     with (
         owner_refused(handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME, step=STEP_OPERATION),
+        graph_step(STEP_OPERATION),
     ):
-        found = await (
-            onenote_root(client, handle.owner)
-            .operations.by_onenote_operation_id(handle.operation_id)
-            .get()
+        builder = onenote_root(client, handle.owner).operations.by_onenote_operation_id(
+            handle.operation_id
         )
+        request = builder.to_get_request_information()
+        request.add_request_options(native_response())
+        fetched = await fetch_response(client, request)
 
-    assert found is not None, "Graph answered an operation read with no operation"
-    return OperationSummary.from_operation(found, owner=handle.owner)
+    summary = accepted_operation(fetched, owner=handle.owner)
+    assert summary is not None, "Graph answered an operation read with no operation"
+    return summary
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -82,7 +91,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Get an Operation's Status",
+        title="OneNote: Get an Operation's Status",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

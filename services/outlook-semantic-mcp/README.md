@@ -40,6 +40,7 @@ Copy `.env.example` to `.env` and configure the following:
 | `AMQP_URL` | RabbitMQ connection string |
 | `MICROSOFT_CLIENT_ID` | Azure AD application client ID |
 | `MICROSOFT_SIGN_IN_TENANT_ID` | Optional. Sign-in tenant ID the OAuth login should open (`common` by default; set a GUID to pin a foreign tenant's service principal) |
+| `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | Optional. Where Entra sends a tenant admin after admin consent through `/admin/consent` (`https://www.unique.ai/setup/consent-completed/entra-id` by default; must be registered on the app registration) |
 | `MICROSOFT_CLIENT_SECRET` | Azure AD application client secret |
 | `MICROSOFT_WEBHOOK_SECRET` | 128-char hex secret used as `clientState` for webhook validation |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | Publicly reachable URL for Microsoft webhooks |
@@ -76,6 +77,7 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
+| `AUTH_DISABLE_RATE_LIMITING` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 | `MCP_DEBUG_MODE` | `disabled` | Debug mode for the MCP server (enabled/disabled) |
 | `LOGS_BUFFERING` | `disabled` | Buffer logs before writing to reduce I/O (enabled/disabled) |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `conceal` | Controls what diagnostic data is logged (conceal/expose) |

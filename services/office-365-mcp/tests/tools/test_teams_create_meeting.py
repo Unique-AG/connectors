@@ -701,9 +701,6 @@ class TestHowItDeclaresItself:
 
         description = " ".join((tool.description or "").split())
         assert "The question shows the Microsoft Entra object id of each attendee." in description
-        assert (
-            "The name is only a label, because Teams identifies each attendee by the object id."
-        ) in description
 
     async def test_the_description_says_the_meeting_is_on_no_calendar_and_invites_nobody(
         self, transport: httpx.AsyncClient
@@ -713,10 +710,6 @@ class TestHowItDeclaresItself:
         description = " ".join((tool.description or "").split())
         assert "It is on no calendar, and this tool sends no invitation." in description
         assert "To share the meeting, use the `join_web_url` of the answer." in description
-        assert (
-            "Microsoft documents a calendar event with an online meeting as the way to read the "
-            + "transcript of a meeting later."
-        ) in description
         assert "teams_send_chat_message" not in description
         assert "outlook_draft_mail" not in description
         assert "outlook_create_event" not in description
@@ -726,14 +719,13 @@ class TestHowItDeclaresItself:
 
         assert "Give this URL to the user." in join_web_url
 
-    async def test_the_description_says_a_repeat_creates_no_second_meeting(
+    async def test_the_annotations_say_a_repeat_creates_no_second_meeting(
         self, transport: httpx.AsyncClient
     ) -> None:
         _parameters, tool = await _registered(transport)
 
-        description = " ".join((tool.description or "").split())
-        assert "This call is safe to repeat after a timeout." in description
-        assert "creates no second meeting" in description
+        assert tool.annotations is not None
+        assert tool.annotations.idempotent_hint is True
 
     async def test_the_description_keeps_the_house_length(
         self, transport: httpx.AsyncClient

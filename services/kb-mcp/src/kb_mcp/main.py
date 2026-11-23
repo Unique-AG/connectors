@@ -1,9 +1,7 @@
 import asyncio
-import base64
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
-from functools import cache
 from pathlib import Path
 from typing import override
 
@@ -12,9 +10,17 @@ from fastmcp import FastMCP
 from fastmcp.server.providers import FileSystemProvider
 from fastmcp.server.providers.base import Provider
 from fastmcp.server.providers.skills import SkillsDirectoryProvider
-from mcp.types import Icon
+from mcp_configs import LoggingSettings, RateLimitSettings
+from mcp_observability import (
+    RateLimitMiddleware,
+    RedactRequestSecretsMiddleware,
+    RedactToolCallSecretsMiddleware,
+    SecretRedaction,
+    ToolCallObservabilityMiddleware,
+    access_token_subject,
+    configure_logging,
+)
 from starlette.middleware import Middleware
-from unique_mcp.logging import configure_logging
 from unique_mcp.monitoring import setup_ops
 from unique_toolkit.monitoring import configure_tracing
 from unique_toolkit.monitoring.memory import start_memory_trimmer
@@ -28,19 +34,10 @@ from kb_mcp.common.tree_cache import expire_idle_trees_loop
 from kb_mcp.favicon import add_favicon_route
 from kb_mcp.health import PoolHealthMiddleware
 from kb_mcp.http_client import install_pooled_http_client
+from kb_mcp.server_icons import SERVER_ICONS
 from kb_mcp.settings import ENV_FILE, Settings, get_settings
 
 _LOGGER = logging.getLogger(__name__)
-
-_LOGO_PATH = Path(__file__).parent / "assets" / "logo.webp"
-
-
-@cache
-def _server_icon() -> Icon:
-    """The connect-time icon: the OAuth consent page and serverInfo.icons both
-    read FastMCP's `icons=`, and fall back to FastMCP's own logo without it."""
-    logo_b64 = base64.b64encode(_LOGO_PATH.read_bytes()).decode("ascii")
-    return Icon(src=f"data:image/webp;base64,{logo_b64}", mime_type="image/webp")
 
 
 class _DowngradeMemoryTrimNoise(logging.Filter):
@@ -109,7 +106,11 @@ def main() -> None:
     settings = get_settings()
     # Opt-in via OTEL_* (e.g. OTEL_TRACES_EXPORTER=console locally).
     configure_tracing(service_name="kb-mcp")
-    configure_logging()
+    configure_logging(
+        LoggingSettings(),
+        own_loggers=("kb_mcp",),
+        redaction=SecretRedaction(secrets=settings.secret_values()),
+    )
     logging.getLogger("unique_toolkit.monitoring.memory").addFilter(
         _DowngradeMemoryTrimNoise()
     )
@@ -128,17 +129,28 @@ def main() -> None:
     mcp = FastMCP(
         "Unique Knowledge Base Search MCP",
         instructions=server_instructions(skill_available),
-        icons=[_server_icon()],
+        icons=SERVER_ICONS,
         auth=oidc_proxy,
         providers=providers,
         lifespan=tree_cache_expire_lifespan,
+        # Redaction first, so the tool-call lines are redacted too.
+        middleware=[
+            RedactToolCallSecretsMiddleware(),
+            ToolCallObservabilityMiddleware(),
+            RateLimitMiddleware(
+                RateLimitSettings(), get_request_key=access_token_subject
+            ),
+        ],
+        mask_error_details=True,
     )
     apply_enabled_tools(mcp, settings)
     add_favicon_route(mcp)
 
     # No CORS: /mcp is server-side and OAuth redirects are top-level navigation.
     middleware = [
-        # First: short-circuits /probe before anything else looks at it.
+        # First, so the bearer token is redacted from every line logged below it.
+        Middleware(RedactRequestSecretsMiddleware),
+        # Short-circuits /probe before anything else of ours looks at it.
         Middleware(PoolHealthMiddleware),
         # HTTP Prometheus metrics; MCP tool spans come from FastMCP + configure_tracing.
         setup_ops(mcp),

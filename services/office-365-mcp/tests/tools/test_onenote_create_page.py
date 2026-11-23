@@ -23,13 +23,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import OWNED_REFUSED, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_create_page as creator
 from office_365_mcp.tools.onenote_create_page import CreatedPage, a_person_agrees, create_page
@@ -1054,6 +1055,28 @@ class TestThePersonBetweenTheRequestAndThePage:
         _ = await _create(client, section=_SECTION_URI, confirm=capturing)
 
         assert bound[0] == write_state_for("create", "section", _SECTION_ID, _TITLE, _BODY_HTML)
+
+    async def test_a_delimiter_in_the_title_cannot_move_text_into_the_body(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads_section_parent(graph, _NOTEBOOK_ID)
+        _ = _reads_notebook(graph, is_shared=True, user_role="Owner")
+        _ = graph.post(_SECTION_ROUTE).mock(return_value=httpx.Response(201, json=_page_payload()))
+        bound: list[str] = []
+
+        async def capturing(question: str, about: str) -> str | None:
+            assert question
+            bound.append(about)
+            return None
+
+        _ = await _create(
+            client, section=_SECTION_URI, title="A\x1fB", body_html="C", confirm=capturing
+        )
+        _ = await _create(
+            client, section=_SECTION_URI, title="A", body_html="B\x1fC", confirm=capturing
+        )
+
+        assert bound[0] != bound[1]
 
 
 def _context(answer: object) -> Context:

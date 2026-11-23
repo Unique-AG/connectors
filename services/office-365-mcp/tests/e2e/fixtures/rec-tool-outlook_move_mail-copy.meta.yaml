@@ -1,0 +1,24 @@
+scenario: outlook_move_mail-copy
+fixture: rec-tool-outlook_move_mail-copy
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:12:13+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 39
+  keys dropped: 27
+  persona addresses: 14
+  persona names: 14
+  response headers dropped: 63
+  text kept: 23
+literals:
+- inbox
+- seed-v1
+- seed-v1 case-outlook_move_mail-copy from
+- seed-v1 case-outlook_move_mail-copy to
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

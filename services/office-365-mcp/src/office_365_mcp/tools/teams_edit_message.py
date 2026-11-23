@@ -12,14 +12,22 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     MessageHandle,
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.messages import (
+from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.seam import (
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Confirm,
+    graph_client_for_caller,
+    narrowed_to,
+    person_confirms,
+)
+from office_365_mcp.shared.teams.messages import (
     EVERYONE_SEES_IT,
     Mention,
     OutgoingMention,
@@ -34,16 +42,10 @@ from office_365_mcp.shared.messages import (
     outgoing_message,
     sent_by,
 )
-from office_365_mcp.shared.prose import cut_for_a_question
-from office_365_mcp.shared.seam import (
-    WRITE_DESTRUCTIVE_IDEMPOTENT,
-    Confirm,
-    graph_client_for_caller,
-    narrowed_to,
-    person_confirms,
-)
 
 TOOL_NAME = "teams_edit_message"
+
+PRESETS: tuple[str, ...] = ("teams-edit",)
 
 STEP_EDIT = "edit_message"
 
@@ -147,7 +149,7 @@ async def edit_message(
     mentions: Sequence[Mention] = (),
 ) -> EditedMessage | InputRequiredResult:
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await get_message(client, handle)
         assert found is not None, "Graph answered a message read with no message"
         current = TeamsMessage.from_message(found, handle=handle)
@@ -245,7 +247,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Edit a Teams Message",
+        title="Teams: Edit a Message",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

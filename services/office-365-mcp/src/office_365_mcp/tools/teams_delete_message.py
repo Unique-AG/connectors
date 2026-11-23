@@ -13,20 +13,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
     MessageHandle,
     message_handle,
     not_a_message_handle,
-)
-from office_365_mcp.shared.messages import (
-    EVERYONE_SEES_IT,
-    TeamsMessage,
-    get_message,
-    message_in_question,
-    not_the_sender,
-    sent_by,
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -35,8 +27,18 @@ from office_365_mcp.shared.seam import (
     narrowed_to,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import (
+    EVERYONE_SEES_IT,
+    TeamsMessage,
+    get_message,
+    message_in_question,
+    not_the_sender,
+    sent_by,
+)
 
 TOOL_NAME = "teams_delete_message"
+
+PRESETS: tuple[str, ...] = ("teams-edit",)
 
 STEP_DELETE = "delete_message"
 
@@ -128,7 +130,7 @@ async def delete_message(
     client: GraphServiceClient, *, handle: MessageHandle, confirm: Confirm
 ) -> DeletedMessage | InputRequiredResult:
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await get_message(client, handle)
         assert found is not None, "Graph answered a message read with no message"
         current = TeamsMessage.from_message(found, handle=handle)
@@ -201,7 +203,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Teams Message",
+        title="Teams: Delete a Message",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

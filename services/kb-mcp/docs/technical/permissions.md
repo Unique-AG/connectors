@@ -11,13 +11,16 @@ service-wide credential that could read another user's content.
 
 ## Zitadel Scopes
 
-`kb-mcp` requests three scopes, all identity-only.
+`kb-mcp` requires three scopes, all identity-only.
 
 | Scope | Purpose |
 |---|---|
 | `openid` | Standard OIDC subject claim |
 | `profile` | Basic profile claims |
 | `urn:zitadel:iam:user:resourceowner` | Resolves the user's owning organisation, which becomes the company id |
+
+It also requests `offline_access`, which gives it no access to data. It makes Zitadel return a
+refresh token, which `kb-mcp` keeps and uses to renew the session without another sign-in.
 
 `mcp:*` scopes are advertised on the OAuth metadata endpoint but never required. This is standard OAuth
 authorization-server metadata behavior (RFC 8414). Zitadel decides

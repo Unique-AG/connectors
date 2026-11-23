@@ -38,12 +38,20 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import calendar_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.odata import odata_literal, spelled
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_events"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_EVENTS = "calendar_events"
 
@@ -210,7 +218,7 @@ async def list_events(
     opens, closes = window_bounds(starts_on, ends_on, zone=zone)
     narrowed = _filter_for(subject_contains=subject_contains, cancelled=cancelled)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         calendar = await calendar_of(client, calendar_id=named)
         calendar_id = calendar.id
         assert calendar_id is not None, "Graph answered a calendar read with a calendar with no id"
@@ -304,7 +312,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Calendar Events",
+        title="Outlook: List Calendar Events",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

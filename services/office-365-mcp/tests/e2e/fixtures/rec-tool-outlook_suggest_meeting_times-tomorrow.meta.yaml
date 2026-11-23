@@ -1,0 +1,31 @@
+scenario: outlook_suggest_meeting_times-tomorrow
+fixture: rec-tool-outlook_suggest_meeting_times-tomorrow
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:57:16+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 12
+  keys dropped: 12
+  persona addresses: 6
+  persona names: 5
+  query parameters dropped: 2
+  response headers dropped: 29
+  text kept: 12
+literals:
+- '2026-10-29'
+- '2026-10-30'
+- '2026-10-31T08:00:00'
+- '2026-10-31T18:00:00'
+- Europe/Zurich
+- Hosting review
+- ~today
+- ~tomorrowT08:00:00
+- ~tomorrowT18:00:00
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

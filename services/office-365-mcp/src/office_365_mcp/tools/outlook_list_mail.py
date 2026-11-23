@@ -19,10 +19,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.addresses import ONE_ADDRESS
 from office_365_mcp.shared.handles import mail_folder_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
-    ONE_ADDRESS,
     SUMMARY_FIELDS,
     MailImportance,
     MailSummary,
@@ -31,6 +30,7 @@ from office_365_mcp.shared.mail import (
     has_flag_state,
 )
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -40,6 +40,8 @@ from office_365_mcp.shared.seam import (
 from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_mail"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP_FOLDER = "mail_folder"
 STEP_MESSAGES = "folder_messages"
@@ -56,6 +58,13 @@ GRAPH_NOT_FOUND = (
     + "`folder`, this mailbox has no folder by that well-known name. `archive` and `clutter` in "
     + "particular are absent from a mailbox that never had them. `outlook_browse_folders` lists "
     + "what this mailbox actually has. Retrying with the same argument will fail identically."
+)
+
+GRAPH_FORBIDDEN = (
+    "Microsoft 365 refused to open this mailbox for the signed-in user. No message was "
+    + "listed. The user can lack access to the mailbox, or a policy of the organization can "
+    + "refuse the request. Tell the user about the refusal. The owner of the mailbox can give "
+    + "the user access. A call with the same arguments fails the same way."
 )
 
 MAX_RESULTS = 1000
@@ -160,7 +169,7 @@ async def list_mail(
     address = _folder_address(folder, folder_ref)
     reached = graph_mailbox(client, mailbox)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_FOLDER):
             found = await reached.mail_folders.by_mail_folder_id(address).get(
                 request_configuration=RequestConfiguration[_FolderQuery](
@@ -338,7 +347,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Mail in a Folder",
+        title="Outlook: List Mail in a Folder",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

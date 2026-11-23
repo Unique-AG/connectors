@@ -32,6 +32,7 @@ export class GraphClientFactory {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly signInTenantId: string;
+  private readonly allowedTenantIds: string[];
   private readonly scopes: string[];
 
   public constructor(
@@ -50,6 +51,7 @@ export class GraphClientFactory {
     this.clientId = this.configService.get('microsoft.clientId', { infer: true });
     this.clientSecret = this.configService.get('microsoft.clientSecret', { infer: true }).value;
     this.signInTenantId = this.configService.get('microsoft.signInTenantId', { infer: true });
+    this.allowedTenantIds = this.configService.get('microsoft.allowedTenantIds', { infer: true });
     this.scopes = resolveMicrosoftScopes({
       chat: this.configService.get('chat.integration', { infer: true }),
       ingestion: this.configService.get('unique.integration', { infer: true }),
@@ -63,6 +65,7 @@ export class GraphClientFactory {
         clientId: this.clientId,
         clientSecret: this.clientSecret,
         signInTenantId: this.signInTenantId,
+        allowedTenantIds: this.allowedTenantIds,
         scopes: this.scopes,
       },
       {

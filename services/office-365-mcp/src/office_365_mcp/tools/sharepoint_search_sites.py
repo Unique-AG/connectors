@@ -11,13 +11,20 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import (
     collect_pages,
-    graph_errors,
+    graph_step,
     request_with_query,
     send_parsed,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_search_sites"
+
+PRESETS: tuple[str, ...] = (
+    "sharepoint-sites",
+    "sharepoint-lists",
+    "sharepoint-lists-write",
+    "sharepoint-lists-delete",
+)
 
 STEP = "site_search"
 
@@ -27,8 +34,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "finance"}
 
 _DESCRIPTION = """\
 Finds SharePoint sites by free text, for the signed-in user. Each row has the `web_url` of one \
-site, with its `display_name` and its `description`. Pass `web_url` as `path` to \
-sharepoint_search_files to search only this site. This tool finds sites. It does not find files \
+site, with its `display_name` and its `description`. If this deployment exposes \
+sharepoint_search_files, pass `web_url` as `path` to it to search only this site. This tool finds \
+sites. It does not find files \
 or folders.
 
 Notes:
@@ -40,9 +48,9 @@ class SiteSummary(BaseModel):
     web_url: str = Field(
         description=(
             "The web address of the site, for example "
-            + "`https://contoso.sharepoint.com/sites/Finance`. Pass it as `path` to "
-            + "sharepoint_search_files to search only this site. Always give it to the user when "
-            + "you answer about this site."
+            + "`https://contoso.sharepoint.com/sites/Finance`. If this "
+            + "deployment exposes sharepoint_search_files, pass it as `path` to that tool to "
+            + "search only this site. Always give it to the user when you answer about this site."
         )
     )
     display_name: str | None = Field(
@@ -88,7 +96,7 @@ class SiteList(BaseModel):
 
 async def search_sites(client: GraphServiceClient, *, query: str, limit: int) -> SiteList:
     assert limit >= 1, f"limit must be at least 1, got {limit}"
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(client, query)
         assert first_page is not None, "Graph answered a site search with no collection"
         collected = await collect_pages(first_page, client, limit=limit)
@@ -116,7 +124,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Search Sites",
+        title="SharePoint: Search Sites",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

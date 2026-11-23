@@ -22,8 +22,9 @@ _MAX_TOOL_NAME = 64
 
 class ToolCallObservabilityMiddleware(Middleware):
     """Logs one `started` and one `completed`, `failed` or `cancelled` line per tool call, a failure
-    at its `failure_level`. Make it the outermost FastMCP middleware: it drops FastMCP's own
-    per-call lines, which repeat these and can quote the input."""
+    at its `failure_level`. Make it the outermost FastMCP middleware, after only
+    `RedactToolCallSecretsMiddleware`: it drops FastMCP's own per-call lines, which repeat these
+    and can quote the input."""
 
     def __init__(self) -> None:
         super().__init__()

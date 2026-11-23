@@ -8,14 +8,13 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
 from msgraph.generated.models.copy_notebook_model import CopyNotebookModel
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.users.item.onenote.notebooks.get_notebook_from_web_url import (
     get_notebook_from_web_url_post_request_body as _post_body,
 )
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step, send_parsed
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
@@ -36,6 +35,8 @@ from office_365_mcp.shared.notes import (
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
 
 TOOL_NAME = "onenote_find_notebook_from_url"
+
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
 
 STEP_NOTEBOOK_FROM_URL = "notebook_from_url"
 
@@ -171,7 +172,7 @@ async def find_notebook_from_url(
     named = owner_named(group=group, site=site)
     with (
         owner_refused(named is not None, named_owner_refused("Notes.Read")),
-        graph_errors(TOOL_NAME, step=STEP_NOTEBOOK_FROM_URL),
+        graph_step(STEP_NOTEBOOK_FROM_URL),
     ):
         found = await _resolve(client, web_url, named)
     assert found is not None, "Graph answered getNotebookFromWebUrl with nothing"
@@ -185,14 +186,12 @@ async def _resolve(
     builder = onenote_root(client, owner).notebooks.get_notebook_from_web_url
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _post_body.GetNotebookFromWebUrlPostRequestBody(web_url=web_url),
     )
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, CopyNotebookModel, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, CopyNotebookModel)
 
 
 def _answer(found: CopyNotebookModel, owner: OnenoteOwner | None) -> FoundNotebook:
@@ -219,7 +218,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Find Notebook From URL",
+        title="OneNote: Find Notebook From URL",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

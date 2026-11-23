@@ -24,7 +24,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import ZONE_NAME, confirmation_id_for, event_of, wall_clock
+from office_365_mcp.shared.calendar import ZONE_NAME, event_of, wall_clock
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
@@ -35,6 +36,13 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_respond_to_invite"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_RESPOND = "respond_to_invite"
 
@@ -208,7 +216,7 @@ async def respond_to_invite(
         else (proposed_new_time.starts_at, proposed_new_time.ends_at, proposed_new_time.time_zone)
     )
     about = confirmation_id_for(handle.uri, response, repr(comment), repr(send_response), *proposed)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(
             client,
             calendar_id=handle.calendar_id,
@@ -373,7 +381,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Respond to a Calendar Invitation",
+        title="Outlook: Respond to a Calendar Invitation",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

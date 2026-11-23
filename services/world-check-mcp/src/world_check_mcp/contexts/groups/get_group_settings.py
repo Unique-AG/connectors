@@ -1,0 +1,123 @@
+import asyncio
+
+from mcp_observability import traced
+from pydantic import TypeAdapter
+
+from world_check_mcp.contexts.groups.models import GroupSettings
+from world_check_mcp.contexts.groups.models import ResolutionOption
+from world_check_mcp.contexts.groups.models import ResolutionToolkit
+from world_check_mcp.contexts.groups.models import SecondaryField
+from world_check_mcp.contexts.groups.models import SettingsSection
+from world_check_mcp.contexts.groups.summary import group_entry
+from world_check_mcp.contexts.screening import EntityType
+from world_check_mcp.persistence import Cache
+from world_check_mcp.upstream import CaseTemplateResponse
+from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
+from world_check_mcp.upstream import GET_GROUP_BY_ID
+from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
+from world_check_mcp.upstream import GetCaseTemplateForGroupPath
+from world_check_mcp.upstream import GetCaseTemplateForGroupRequest
+from world_check_mcp.upstream import GetGroupByIdPath
+from world_check_mcp.upstream import GetGroupByIdRequest
+from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
+from world_check_mcp.upstream import GetResolutionToolkitsForGroupRequest
+from world_check_mcp.upstream import ResolutionField
+from world_check_mcp.upstream import ResolutionToolkitResponse
+from world_check_mcp.upstream import StatusResolutionField
+from world_check_mcp.upstream import Upstream
+
+_CACHE_SECONDS = 600
+_SETTINGS = TypeAdapter(GroupSettings)
+
+
+@traced(arguments=("group_id", "section", "entity_type", "required_only"))
+async def get_group_settings(
+    *,
+    upstream: Upstream,
+    cache: Cache,
+    group_id: str,
+    section: SettingsSection = "all",
+    entity_type: EntityType | None = None,
+    required_only: bool = False,
+) -> GroupSettings:
+    """The group's template and the resolution choices its matches accept."""
+    settings = await cache.read_through(
+        key=f"group-settings:{group_id}",
+        adapter=_SETTINGS,
+        ttl_seconds=_CACHE_SECONDS,
+        load=lambda: _load(upstream=upstream, group_id=group_id),
+    )
+    fields = [
+        field
+        for field in settings.secondary_fields or []
+        if (entity_type is None or field.entity_type.casefold() == entity_type.casefold())
+        and (not required_only or field.required)
+    ]
+    return settings.model_copy(
+        update={
+            "secondary_fields": fields if section in {"fields", "all"} else None,
+            "toolkits": settings.toolkits if section in {"toolkits", "all"} else None,
+        }
+    )
+
+
+async def _load(*, upstream: Upstream, group_id: str) -> GroupSettings:
+    group, template, toolkits = await asyncio.gather(
+        upstream.call(
+            GET_GROUP_BY_ID, GetGroupByIdRequest(path=GetGroupByIdPath(group_id=group_id))
+        ),
+        upstream.call(
+            GET_CASE_TEMPLATE_FOR_GROUP,
+            GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
+        ),
+        upstream.call(
+            GET_RESOLUTION_TOOLKITS_FOR_GROUP,
+            GetResolutionToolkitsForGroupRequest(
+                path=GetResolutionToolkitsForGroupPath(group_id=group_id)
+            ),
+        ),
+    )
+    return GroupSettings(
+        group=group_entry(summary=group),
+        screening_type=template.group_screening_type,
+        mandatory_provider_types=template.mandatory_provider_types or [],
+        secondary_fields=_secondary_fields(template=template),
+        toolkits=[_toolkit(toolkit=toolkit) for toolkit in toolkits.root.values()],
+    )
+
+
+def _secondary_fields(*, template: CaseTemplateResponse) -> list[SecondaryField]:
+    by_provider = template.secondary_fields_by_provider or {}
+    return [
+        SecondaryField(
+            provider=provider,
+            entity_type=entity_type,
+            type_id=field.type_id,
+            label=field.label,
+            value_type=field.field_value_type,
+            required=bool(field.field_required),
+        )
+        for provider, by_entity in by_provider.items()
+        for entity_type, fields in by_entity.secondary_fields_by_entity.items()
+        for field in fields
+    ]
+
+
+def _toolkit(*, toolkit: ResolutionToolkitResponse) -> ResolutionToolkit:
+    fields = toolkit.resolution_fields
+    return ResolutionToolkit(
+        provider_type=toolkit.provider_type or "",
+        statuses=_statuses(fields=fields.statuses) if fields else [],
+        risks=_options(fields=fields.risks) if fields else [],
+        reasons=_options(fields=fields.reasons) if fields else [],
+    )
+
+
+def _options(*, fields: list[ResolutionField]) -> list[ResolutionOption]:
+    return [ResolutionOption(id=field.id, label=field.label) for field in fields]
+
+
+def _statuses(*, fields: list[StatusResolutionField]) -> list[ResolutionOption]:
+    return [
+        ResolutionOption(id=field.id, label=field.label, status_type=field.type) for field in fields
+    ]

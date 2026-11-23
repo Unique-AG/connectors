@@ -38,20 +38,20 @@ No meeting, transcript, or recording scope is requested. For full justifications
 
 ## Unique SaaS
 
-**Recommended for most clients.** When Unique runs Teams MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent:
+**Recommended for most clients.** When Unique runs Teams MCP, Unique provisions the Entra ID app registration for you. You only need to grant admin consent. Open the `/admin/consent` path of your Teams MCP server, the same address you connect to with `/mcp` replaced by `/admin/consent`:
 
 ```
-https://login.microsoftonline.com/organizations/v2.0/adminconsent?client_id=7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f&scope=https://graph.microsoft.com/.default&redirect_uri=https%3A%2F%2Fwww.unique.ai%2Fsetup%2Fconsent-completed%2Fentra-id
+https://<your-teams-mcp-host>/admin/consent
 ```
 
-After approving, you are redirected to a Unique confirmation page.
+The link needs no sign-in. It redirects to the Microsoft admin consent page for the app registration and sign-in tenant of that deployment. After approving, you are redirected to a Unique confirmation page.
 
 The consent prompt lists the [Required Permissions](#Required-Permissions) above, of which `ChannelMessage.Read.All` is the one that needs admin consent. Without it, users will see an error when trying to connect.
 
-If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. See [Grant tenant-wide admin consent to an application](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent) for a tenant-specific admin consent URL; use application (client) ID `7c4f0aab-b24e-48c4-9b2d-d1c22dfdf99f`.
+If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. Unless Unique pinned your deployment to one directory, Microsoft opens the directory of the admin account you sign in with. See [Admin consent link](#Admin-consent-link).
 
 !!! note "Transcript capture uses a different app registration"
-    The URL above consents to the chat-only app. A deployment with `UNIQUE_INTEGRATION=enabled` runs on its own app registration, which additionally requests the meeting-content scopes — grant consent for it with the URL in [Recordings & Transcripts — Grant admin consent](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#Grant-admin-consent).
+    The link above consents to the app of the deployment you open it on. A deployment with `UNIQUE_INTEGRATION=enabled` runs on its own app registration, which additionally requests the meeting-content scopes — grant consent for it as described in [Recordings & Transcripts — Grant admin consent](https://unique-ch.atlassian.net/wiki/spaces/PUBDOC/pages/2535522323/Recordings+Transcripts+-+Operator+Manual#Grant-admin-consent).
 
 ## Self-Hosted
 
@@ -169,6 +169,19 @@ https://login.microsoftonline.com/<tenant>/oauth2/v2.0/token
 `organizations` and `consumers` are also valid Microsoft tenant aliases.
 
 If Microsoft returns **AADSTS50194**, `/common` is not accepted for that Enterprise Application — set `signInTenantId` to the directory that holds it.
+
+#### Admin consent link
+
+`GET {SELF_URL}/admin/consent` needs no sign-in and redirects a tenant admin to:
+
+```
+https://login.microsoftonline.com/<tenant>/v2.0/adminconsent?client_id=<MICROSOFT_CLIENT_ID>&scope=https://graph.microsoft.com/.default&redirect_uri=<MICROSOFT_ADMIN_CONSENT_REDIRECT_URI>
+```
+
+- `<tenant>` is `organizations`, so Microsoft opens the directory of the admin's work or school account. When `MICROSOFT_SIGN_IN_TENANT_ID` pins one directory (a GUID or domain), `<tenant>` is that directory instead, and admins can only consent there. The aliases `common` and `consumers` also fall back to `organizations`, because personal Microsoft accounts cannot grant admin consent.
+- `redirect_uri` is `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` (Helm `mcpConfig.microsoft.adminConsentRedirectUri`). It defaults to `https://www.unique.ai/setup/consent-completed/entra-id`, which the Terraform module registers by default through `admin_consent_redirect_uri`. If you change one, change the other: Microsoft rejects a redirect URI that is not registered on the app registration.
+
+Share this link with tenant admins instead of assembling the Microsoft URL by hand.
 
 ### Secret Management
 

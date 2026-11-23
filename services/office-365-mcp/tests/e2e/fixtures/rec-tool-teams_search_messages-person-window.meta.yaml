@@ -1,0 +1,25 @@
+scenario: teams_search_messages-person-window
+fixture: rec-tool-teams_search_messages-person-window
+source: recorded
+target: graph
+recorded_at: '2026-11-03T12:02:11+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 40
+  keys dropped: 1
+  persona addresses: 6
+  persona names: 5
+  response headers dropped: 6
+  text kept: 5
+  text replaced: 11
+literals:
+- '2026-01-01'
+- '2026-11-04'
+- persona:tom
+- ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -45,10 +45,12 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner
 
 TOOL_NAME = "onenote_list_sections"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_SECTIONS = "sections"
 STEP_SECTION_GROUPS = "section_groups"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "parent": "onenote:///notebooks/1-SYNTHETICNOTEBOOK0000"
@@ -254,7 +256,7 @@ async def list_sections(
     max_scanned = limit if created_by is None else MAX_SCANNED_ITEMS
 
     owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
-    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors():
         with graph_step(STEP_SECTIONS):
             first_sections = await _first_sections(
                 client, handle, top=top, query_filter=query_filter, orderby=orderby
@@ -389,7 +391,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Sections",
+        title="OneNote: List Sections",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

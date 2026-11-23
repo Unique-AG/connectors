@@ -11,7 +11,7 @@ from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 from fastmcp.server.providers.openapi import MCPType, OpenAPIProvider, RouteMap
 from fastmcp.tools import Tool, ToolResult
 from mcp_types import CallToolRequestParams
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from mcp_architecture import (
     masks_error_details,
@@ -81,6 +81,54 @@ async def test_undescribed_tools_lists_tools_and_parameters_but_skips_spec_opera
         "cancel_order(order_id)",
         "place_order",
         "place_order(product_id)",
+    ]
+
+
+async def test_undescribed_tools_lists_fields_of_outputs_and_nested_arguments() -> None:
+    mcp = FastMCP(name="Shop")
+
+    class Customer(BaseModel):
+        """Who placed the order."""
+
+        customer_id: str
+
+    class OrderLine(BaseModel):
+        sku: str = Field(description="The product's stock keeping unit.")
+        quantity: int
+
+    class Category(BaseModel):
+        name: str
+        children: list[Category] = Field(description="The categories under this one.")
+
+    class Receipt(BaseModel):
+        order_id: str
+        total: float = Field(description="In the shop's currency.")
+        customer: Customer
+        referrer: Customer | None = None
+        lines: list[OrderLine] = Field(description="One per product.")
+        category: Category = Field(description="Where the first product is listed.")
+
+    class Order(BaseModel):
+        sku: str
+        note: str = Field(description="Shown to the courier.")
+
+    @mcp.tool
+    def place_order(order: Annotated[Order, Field(description="What to order.")]) -> Receipt:
+        """Place an order."""
+        raise NotImplementedError(order)
+
+    @mcp.tool
+    def list_lines() -> list[OrderLine]:
+        """List the lines of the open order."""
+        raise NotImplementedError
+
+    assert sorted(await undescribed_tools(mcp)) == [
+        "list_lines -> result[].quantity",
+        "place_order -> Category.name",
+        "place_order -> Customer.customer_id",
+        "place_order -> OrderLine.quantity",
+        "place_order -> order_id",
+        "place_order(order.sku)",
     ]
 
 

@@ -48,7 +48,9 @@ from office_365_mcp.cardinality import (
 )
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.graph_client import GraphSettings, create_graph_transport
+from office_365_mcp.graph_operations import GraphOperationMiddleware
 from office_365_mcp.server import readiness
+from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import REQUESTABLE_PERMISSIONS, graph_scope
 from office_365_mcp.tools import ALWAYS_ON, TOOL_NAMES, Selection, register_tools, resolve
 
@@ -334,7 +336,7 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
     that cannot be obtained after sign-in. The tuple is asserted, not the set: two tools name the
     same permission all over this registry, so a reorder leaves the set identical, and production
     is keyed by the list as a string. A derivation compared with the files it came from agrees with
-    a typo, so the names are also checked against `shared/seam.py`'s hand-written
+    a typo, so the names are also checked against `shared/seam/permissions.py`'s hand-written
     `REQUESTABLE_PERMISSIONS`. Every assertion is written against `TOOLS_PRESET=teams`.
     """
 
@@ -398,8 +400,9 @@ class TestSignInAsksForEveryPermissionAnyToolCanRedeem:
         assert not unknown, (
             "a permission a tool declares has to be one Microsoft defines and one this connector "
             + "is willing to ask every user to consent to — check the spelling against "
-            + "`REQUESTABLE_PERMISSIONS` in shared/seam.py, and if the permission is genuinely "
-            + f"new, add it there deliberately and to the README's table: {sorted(unknown)}"
+            + "`REQUESTABLE_PERMISSIONS` in shared/seam/permissions.py, and if the permission is "
+            + "genuinely new, add it there deliberately and to the README's table: "
+            + f"{sorted(unknown)}"
         )
 
     def test_no_tool_declares_an_empty_permission_tuple(self) -> None:
@@ -651,6 +654,13 @@ def main_module(tmp_path_factory: pytest.TempPathFactory) -> Iterator[_MainModul
         os.environ.update(environment_before)
 
 
+class TestServerInfo:
+    async def test_initialize_advertises_the_server_icons(self) -> None:
+        async with Client(FastMCPTransport(_server_of(_app()))) as client:
+            assert client.server_info is not None
+            assert client.server_info.icons == SERVER_ICONS
+
+
 class TestMainEntrypoint:
     """A string target (`"office_365_mcp.main:app"`) makes uvicorn re-import this module when it is
     run as a script rather than through the `office-365-mcp` console script, running `create_app()`
@@ -853,6 +863,17 @@ class TestTheNameLabelIsBoundedByWhatIsRegistered:
         assert ours[0] < metrics[0], (
             "BoundedNameMiddleware has to run outside unique_mcp's metrics middleware, which reads "
             + "the tool name the client sent as a Prometheus label before anything resolves it"
+        )
+
+    def test_it_is_mounted_outside_the_graph_operation_middleware(self) -> None:
+        installed = _server_of(_app()).middleware
+        ours = [i for i, mw in enumerate(installed) if isinstance(mw, BoundedNameMiddleware)]
+        graph = [i for i, mw in enumerate(installed) if isinstance(mw, GraphOperationMiddleware)]
+
+        assert len(ours) == 1 and len(graph) == 1, f"expected one of each: {installed}"
+        assert ours[0] < graph[0], (
+            "GraphOperationMiddleware labels graph_operations_total with the tool name, so the "
+            + "name has to be bounded before it gets there"
         )
 
 

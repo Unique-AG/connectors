@@ -1,0 +1,309 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/mailFolders",
+    "json": {
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/mailFolders('AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=')"
+    },
+    "response_json": {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed",
+      "id": "AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+      "isHidden": false,
+      "parentFolderId": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW=",
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+    "query": {
+      "$select": "id,parentFolderId,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed",
+      "id": "AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+      "parentFolderId": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/syncissues",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/msgfolderroot",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/conflicts",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/conversationhistory",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkDHnsSGO4ADK6CWNlRHclTSD2DN48Fmt1DSN6SKUaHEMfM4UjYWBpHYTDZFYwtjsNPJoiBIrtJ5g2HTW5CRNquHbjNezvCKCcTbXn-PvnFAXGXV-lFEK="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/archive",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkTTozVMU4EDU4VAMsUTaoLFS4JI21Hof2PYA2EVBdJVYvE3JiWPRjTNUBYMUzanrHBAzhVHenQ1o7YGX0JWWudOtkNaavTIBvZsHu-MvtSTRCow7LIPL="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/deleteditems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkMPtjSNH9GHG7LGVeJAsrRVN2CE54Itw3BXO1CMHnDXVfW6FgZOJiNBCCGACkztcVQFjkGSvkY9w3OQP5NHUvuUdxAejoUCNrOoHz-OrzBGRFLKEYMBN="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/clutter",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkCCclHMF7GJE6YYErTDjgJKK4AJ92Apk5YRN8PSCnHJMaM8JyWJZjAQKDPWLapgkNEQqbGPluW5b6QUP8LRAxjAolOblsCPKhJeXd-AepYGMlRkyjAYO="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/drafts",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/localfailures",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/junkemail",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkOAvsWPG6CEY9TIKgQQtfOTR2QN39Cby5MFY0MQYcBFAdJ1UjOPQoJNJULZRujxvXJIafTZfxV2e2FVX4JQNvbTzrSaphAGLrYgRq-CohTBSYtj9MEGY="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/outbox",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkGOxxLNI4THM3OLOeXShgLEE4SD01Vmp6YYS3ERHfOFHoK6VkVLPaTNXTUQNgtrgJZTgfZWdlG4n8QOW7YDDidHarQcxaLPFsKoTe-KvdFVJHBIWERAD="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/recoverableitemsdeletions",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkDNnlZRE5YDK8FDRqZBctSUY1SN02Rmz6ORC5JVXwVBWqZ0GgCNVvPILGSNOfrbtBYIpjRLczU6q3WYM5KEFsxVovQuzoHNDeCuPn-IirGVZSkx4wXKY="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/searchfolders",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkMRxpGUM5MXS2LBNrWMfeICH7XK85Pdr4XKF7VXYlMVArK6CfPUPxHCFGPNYefedRMEbxFLenO6u3AGY5FZUpeIntQeufHPGhJaKg-TqqWKVNPECBIGT="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/sentitems",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkQLqcOKX6FZP0PBViQGwlTFJ7TD91Oag1SEB5BFPxLCDvX0QbDOQlLBOTYHAkumsOMHrxABxvH3w3CVY5YADtaIbxDajcBCEgJlHw-ZnoTREWQYXEVBG="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/scheduled",
+    "query": {
+      "$select": "id"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "id": "AAMkHDakLUN0JWM2KHKzCScmSOT7LW13Xfm1WGP8ITYnJRUgY3IvSYEbBTBEUGDibnfXTWaaQKoaO2y8KRK5UIXgmWofEsybJRClMsJt-EcuSOZjKtfvFFF="
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/serverfailures",
+    "query": {
+      "$select": "id"
+    },
+    "status": 404,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "error": {
+        "code": "ErrorFolderNotFound",
+        "message": "synthetic text 01"
+      }
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/mailFolders/AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+    "json": {
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed again"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "childFolderCount": 0,
+      "displayName": "seed-v1 case-outlook_rename_folder-renamed again",
+      "id": "AAMkLIsrVPI8XHI9FISfNOnxZHJ3HP35Fmj3KQA8QSLvOLEwL7TlFLEfSDORXOCranaYFTpbPSqaX9z0WBK7ZCDktDduSmddONBmGwZp-UfgAEOsHnyoVST=",
+      "isHidden": false,
+      "parentFolderId": "AAMkJEcqHOX9JWL2QTKtMKvaOFJ1HF81Txb4PUP8DITfXNZxT9NoBDOuDABBIJBmpisTUTgoKSriW8k6QKQ4EPCrxHwnFtvmLGAwQeQr-AtwJYEEOCRUSBW=",
+      "totalItemCount": 0,
+      "unreadItemCount": 0
+    }
+  }
+]

@@ -1,0 +1,27 @@
+scenario: outlook_cancel_event-budget
+fixture: rec-tool-outlook_cancel_event-budget
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:20:39+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 14
+  keys dropped: 11
+  persona addresses: 5
+  persona names: 5
+  query parameters dropped: 2
+  response headers dropped: 28
+  text kept: 10
+literals:
+- '2026-10-29'
+- '2026-10-30'
+- Budget alignment
+- The numbers are not final.
+- ~today
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

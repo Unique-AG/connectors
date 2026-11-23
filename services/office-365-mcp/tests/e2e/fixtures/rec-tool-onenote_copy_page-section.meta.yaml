@@ -1,0 +1,24 @@
+scenario: onenote_copy_page-section
+fixture: rec-tool-onenote_copy_page-section
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:00:15+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 148
+  keys dropped: 41
+  query parameters dropped: 11
+  response headers dropped: 117
+  text kept: 61
+  text replaced: 97
+literals:
+- <p>Start.</p>
+- Copies
+- seed-v1 Scratch
+- seed-v1 case-onenote_copy_page-section
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

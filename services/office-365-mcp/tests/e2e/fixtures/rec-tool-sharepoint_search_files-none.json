@@ -1,0 +1,45 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/search/query",
+    "json": {
+      "requests": [
+        {
+          "aggregations": [
+            {
+              "bucketDefinition": {
+                "isDescending": true,
+                "minimumCount": 0,
+                "sortBy": "count"
+              },
+              "field": "SPSiteURL"
+            }
+          ],
+          "entityTypes": ["driveItem"],
+          "from": 0,
+          "query": {
+            "queryString": "seed-v1 zzqqxx nothing"
+          },
+          "size": 25
+        }
+      ]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "hitsContainers": [
+            {
+              "moreResultsAvailable": false,
+              "total": 0
+            }
+          ],
+          "searchTerms": ["seed-v1", "zzqqxx", "nothing"]
+        }
+      ]
+    }
+  }
+]

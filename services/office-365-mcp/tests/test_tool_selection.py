@@ -410,6 +410,8 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "teams_search_messages": {"mentions": ("get_me",)},
     "teams_list_meeting_transcripts": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_transcript": {"uri": ("teams_list_meeting_transcripts",)},
+    "teams_list_call_transcripts": {"chat_id": ("teams_list_chats",)},
+    "teams_read_call_transcript": {"uri": ("teams_list_call_transcripts",)},
     "teams_list_meeting_recordings": {"meeting_uri": ("teams_list_chats",)},
     "teams_read_meeting": {"meeting_uri": ("teams_list_chats", "teams_create_meeting")},
     "teams_create_meeting": {
@@ -478,6 +480,7 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_delete_mail_rule": {
         "rule_ref": ("outlook_get_mailbox_settings", "outlook_create_mail_rule")
     },
+    "outlook_delete_category": {"name": ("outlook_list_categories", "outlook_create_category")},
     "outlook_list_calendar_shares": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_list_events": {"calendar_ref": ("outlook_list_calendars",)},
     "outlook_list_event_instances": {"uri": ("outlook_list_events", "outlook_read_event")},
@@ -507,6 +510,12 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "sharepoint_delete_item": {"item": _DRIVE_ITEM_SOURCES},
     "sharepoint_create_share_link": {"item": _DRIVE_ITEM_SOURCES},
     "sharepoint_invite": {"item": _DRIVE_ITEM_SOURCES},
+    "sharepoint_list_lists": {"site": ("sharepoint_search_sites",)},
+    "sharepoint_get_list": {"list": ("sharepoint_list_lists",)},
+    "sharepoint_list_items": {"list": ("sharepoint_list_lists",)},
+    "sharepoint_create_list_item": {"list": ("sharepoint_list_lists",)},
+    "sharepoint_update_list_item": {"item": ("sharepoint_list_items",)},
+    "sharepoint_delete_list_item": {"item": ("sharepoint_list_items",)},
     "onenote_read_page": {"page": ("onenote_list_pages",)},
     "onenote_append_to_page": {"page": ("onenote_list_pages", "onenote_create_page")},
     "onenote_preview_page": {"page": ("onenote_list_pages", "onenote_create_page")},
@@ -635,6 +644,8 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "sharepoint_resolve_url": frozenset({"url"}),
     "sharepoint_create_folder": frozenset({"name"}),
     "sharepoint_create_text_file": frozenset({"name", "content"}),
+    "sharepoint_create_list_item": frozenset({"fields"}),
+    "sharepoint_update_list_item": frozenset({"fields"}),
     "sharepoint_rename_item": frozenset({"name"}),
     "sharepoint_copy_item": frozenset({"name"}),
     "sharepoint_create_share_link": frozenset({"access", "audience"}),
@@ -788,7 +799,12 @@ _OPT_IN: tuple[tuple[ToolsPreset, ToolsPreset, frozenset[str]], ...] = (
         ToolsPreset.OUTLOOK_RULES,
         ToolsPreset.OUTLOOK_AUTOMATE,
         frozenset(
-            {"outlook_create_mail_rule", "outlook_update_mail_rule", "outlook_delete_mail_rule"}
+            {
+                "outlook_create_mail_rule",
+                "outlook_update_mail_rule",
+                "outlook_delete_mail_rule",
+                "outlook_delete_category",
+            }
         ),
     ),
     (
@@ -805,6 +821,11 @@ _OPT_IN: tuple[tuple[ToolsPreset, ToolsPreset, frozenset[str]], ...] = (
         ),
     ),
     (ToolsPreset.ONENOTE_DELETE, ToolsPreset.ONENOTE_WRITE, frozenset({"onenote_delete_page"})),
+    (
+        ToolsPreset.SHAREPOINT_LISTS_DELETE,
+        ToolsPreset.SHAREPOINT_LISTS_WRITE,
+        frozenset({"sharepoint_delete_list_item"}),
+    ),
 )
 
 
@@ -944,6 +965,12 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (
         ToolsPreset.TEAMS_TRANSCRIPTS,
         ("User.Read", "Chat.Read", "OnlineMeetings.Read", "OnlineMeetingTranscript.Read.All"),
+        1,
+        4,
+    ),
+    (
+        ToolsPreset.TEAMS_CALL_TRANSCRIPTS,
+        ("User.Read", "Chat.Read", "CallTranscripts.Read.All"),
         1,
         4,
     ),
@@ -1106,7 +1133,7 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ToolsPreset.OUTLOOK_RULES,
         ("User.Read", "MailboxSettings.Read", "MailboxSettings.ReadWrite", "Mail.ReadBasic"),
         0,
-        10,
+        11,
     ),
     (
         ToolsPreset.OUTLOOK_CALENDAR,
@@ -1166,8 +1193,8 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     ),
     (
         ToolsPreset.OUTLOOK_GROUP_CALENDAR,
-        ("User.Read", "Team.ReadBasic.All", "Calendars.Read"),
-        0,
+        ("User.Read", "Team.ReadBasic.All", "Group.Read.All"),
+        1,
         3,
     ),
     (ToolsPreset.OUTLOOK_CONTACTS, ("User.Read", "Contacts.Read"), 0, 3),
@@ -1182,16 +1209,29 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
     (ToolsPreset.SHAREPOINT_WRITE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 12),
     (ToolsPreset.SHAREPOINT_SHARE, ("User.Read", "Files.Read.All", "Files.ReadWrite.All"), 2, 14),
     (ToolsPreset.SHAREPOINT_SITES, ("User.Read", "Files.Read.All", "Sites.Read.All"), 2, 6),
-    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read"), 0, 9),
+    (ToolsPreset.SHAREPOINT_LISTS, ("User.Read", "Sites.Read.All"), 1, 5),
+    (
+        ToolsPreset.SHAREPOINT_LISTS_WRITE,
+        ("User.Read", "Sites.Read.All", "Sites.ReadWrite.All"),
+        2,
+        7,
+    ),
+    (
+        ToolsPreset.SHAREPOINT_LISTS_DELETE,
+        ("User.Read", "Sites.Read.All", "Sites.ReadWrite.All"),
+        2,
+        8,
+    ),
+    (ToolsPreset.ONENOTE_READ, ("User.Read", "Notes.Read", "Notes.Read.All"), 0, 9),
     (
         ToolsPreset.ONENOTE_WRITE,
-        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
+        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite", "Notes.Read.All"),
         0,
         20,
     ),
     (
         ToolsPreset.ONENOTE_DELETE,
-        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite"),
+        ("User.Read", "Notes.Read", "Notes.Create", "Notes.ReadWrite", "Notes.Read.All"),
         0,
         21,
     ),

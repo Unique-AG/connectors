@@ -1,0 +1,24 @@
+scenario: outlook_check_availability-colleague-free
+fixture: rec-tool-outlook_check_availability-colleague-free
+source: recorded
+target: graph
+recorded_at: '2026-11-02T20:59:14+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 1
+  persona addresses: 2
+  response headers dropped: 7
+  text kept: 2
+literals:
+- '2026-11-05T08:00:00'
+- '2026-11-05T18:00:00'
+- Europe/Zurich
+- persona:tom
+- ~nextThursdayT08:00:00
+- ~nextThursdayT18:00:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

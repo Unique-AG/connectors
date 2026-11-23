@@ -1,0 +1,12 @@
+{
+  "id": "AAMkAGI2RUN-calendar",
+  "name": "Calendar",
+  "owner": { "name": "Mia Wong", "address": "mia@example.invalid" },
+  "canEdit": true,
+  "canShare": true,
+  "canViewPrivateItems": true,
+  "isDefaultCalendar": true,
+  "isTallyingResponses": true,
+  "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+  "defaultOnlineMeetingProvider": "teamsForBusiness"
+}

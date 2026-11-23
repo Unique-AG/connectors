@@ -1,0 +1,24 @@
+scenario: outlook_list_mail-from-mia
+fixture: rec-tool-outlook_list_mail-from-mia
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:25:36+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 6
+  keys dropped: 2
+  persona addresses: 4
+  persona names: 3
+  response headers dropped: 14
+  text kept: 4
+literals:
+- '2020-01-01'
+- inbox
+- persona:mia
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

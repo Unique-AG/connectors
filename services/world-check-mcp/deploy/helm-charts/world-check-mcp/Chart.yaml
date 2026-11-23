@@ -1,0 +1,13 @@
+apiVersion: v2
+name: world-check-mcp
+description: >-
+  Screens people and organizations in LSEG World-Check One and returns
+  sanctions, PEP, and adverse-media results for KYC and third-party due
+  diligence.
+type: application
+version: 0.1.0
+appVersion: 0.1.0
+dependencies:
+  - name: base
+    repository: oci://ghcr.io/unique-ag/helm
+    version: 0.1.0-3aa55e

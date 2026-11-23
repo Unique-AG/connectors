@@ -1,0 +1,205 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/calendarView",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "endDateTime": "~day+2",
+      "startDateTime": "~tomorrow",
+      "$filter": "contains(subject,'Planning session')",
+      "$orderby": "start/dateTime",
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance",
+      "$top": "25"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"f3Zxuo41NeRIBj9Z1cewxkGR6mNWQC==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            },
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "Plan the work of the next sprint.",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-03T10:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "OThEPiAATVADVMGNUxhsGj5pbHElGJ-SCg6Mi7Yfzx30LcSQXi7A8yjavhDB2mBeRcKN",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": false,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "responseStatus": {
+            "response": "notResponded",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": null,
+          "showAs": "tentative",
+          "start": {
+            "dateTime": "2026-11-03T10:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "Planning session",
+          "type": "singleInstance",
+          "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FQBf9Hn0Zyvi22XtGZCe6W8lbvldIN7tGxTpFB&exvsurl=1"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/OThEPiAATVADVMGNUxhsGj5pbHElGJ-SCg6Mi7Yfzx30LcSQXi7A8yjavhDB2mBeRcKN",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance,allowNewTimeProposals"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"f3Zxuo41NeRIBj9Z1cewxkGR6mNWQC==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        },
+        {
+          "emailAddress": {
+            "address": "mia@example.test",
+            "name": "Mia Keller"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "Plan the work of the next sprint.",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-03T10:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "OThEPiAATVADVMGNUxhsGj5pbHElGJ-SCg6Mi7Yfzx30LcSQXi7A8yjavhDB2mBeRcKN",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": false,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "anna@example.test",
+          "name": "Anna Meier"
+        }
+      },
+      "responseStatus": {
+        "response": "notResponded",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "tentative",
+      "start": {
+        "dateTime": "2026-11-03T10:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "Planning session",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FQBf9Hn0Zyvi22XtGZCe6W8lbvldIN7tGxTpFB&exvsurl=1"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/OThEPiAATVADVMGNUxhsGj5pbHElGJ-SCg6Mi7Yfzx30LcSQXi7A8yjavhDB2mBeRcKN/tentativelyAccept",
+    "json": {
+      "Comment": "I may join late.",
+      "SendResponse": true
+    },
+    "status": 202
+  }
+]

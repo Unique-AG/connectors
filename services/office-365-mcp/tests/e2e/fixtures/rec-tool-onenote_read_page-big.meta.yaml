@@ -1,0 +1,22 @@
+scenario: onenote_read_page-big
+fixture: rec-tool-onenote_read_page-big
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:20:21+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 30
+  keys dropped: 6
+  page htmls scrubbed: 1
+  query parameters dropped: 4
+  response headers dropped: 27
+  text kept: 13
+  text replaced: 22
+literals:
+- Big page
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

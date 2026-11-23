@@ -16,14 +16,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import CollectedItems, graph_errors, graph_step
-from office_365_mcp.shared.attachments import AttachmentSummary, message_attachments
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     SUMMARY_FIELDS,
     MailAddress,
     MailSummary,
 )
+from office_365_mcp.shared.outlook.attachments import AttachmentSummary, message_attachments
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_read_mail"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP_MESSAGE = "mail_message"
 
@@ -44,6 +46,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _MESSAGE_FIELDS: tuple[str, ...] = (
     *SUMMARY_FIELDS,
     "ccRecipients",
+    "bccRecipients",
     "sentDateTime",
     "body",
     "uniqueBody",
@@ -108,8 +111,12 @@ class MessageHeader(BaseModel):
 
 
 class MailMessage(MailSummary):
-    cc: list[MailAddress] = Field(
-        description="The Cc recipients; Bcc is never included, because it is not obtainable."
+    cc: list[MailAddress] = Field(description="The Cc recipients.")
+    bcc: list[MailAddress] = Field(
+        description=(
+            "The Bcc recipients. Microsoft stores Bcc only for a draft or a sent message, so the "
+            "list is empty for received mail."
+        )
     )
     sent_at: str | None = Field(
         description="When the sender sent it, ISO-8601 in UTC; null if Graph recorded none."
@@ -165,7 +172,7 @@ _NO_BODY = _Body(text=None, is_the_new_part=False, is_plain_text=False)
 async def read_mail(
     client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
 ) -> MailMessage:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_MESSAGE):
             message = await (
                 graph_mailbox(client, mailbox)
@@ -197,6 +204,7 @@ def _answer(
         {
             **dict(summary),
             "cc": MailAddress.each_of(message.cc_recipients),
+            "bcc": MailAddress.each_of(message.bcc_recipients),
             "sent_at": (
                 None if message.sent_date_time is None else message.sent_date_time.isoformat()
             ),
@@ -237,7 +245,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Mail Message",
+        title="Outlook: Read a Mail Message",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

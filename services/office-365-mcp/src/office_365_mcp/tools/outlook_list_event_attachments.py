@@ -11,17 +11,25 @@ from msgraph.generated.users.item.calendars.item.events.item.attachments.attachm
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step
-from office_365_mcp.shared.attachments import (
+from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.handles import EventAttachmentHandle, event_handle
+from office_365_mcp.shared.outlook.attachments import (
     ATTACHMENT_FIELDS,
     AttachmentSummary,
     collect_attachments,
 )
-from office_365_mcp.shared.handles import EventAttachmentHandle, event_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_event_attachments"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_ATTACHMENTS = "event_attachments"
 
@@ -87,7 +95,7 @@ async def list_event_attachments(client: GraphServiceClient, *, uri: str) -> Eve
     if handle is None:
         raise ToolError(_BAD_HANDLE)
 
-    with graph_errors(TOOL_NAME), graph_step(STEP_ATTACHMENTS):
+    with graph_step(STEP_ATTACHMENTS):
         first_page = await (
             client.me.calendars.by_calendar_id(handle.calendar_id)
             .events.by_event_id(handle.event_id)
@@ -114,7 +122,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Event Attachments",
+        title="Outlook: List Event Attachments",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

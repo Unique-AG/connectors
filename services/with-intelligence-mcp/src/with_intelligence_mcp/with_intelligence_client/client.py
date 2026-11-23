@@ -4,6 +4,7 @@ from contextlib import AbstractAsyncContextManager
 from typing import ClassVar, cast
 
 import httpx
+from mcp_observability import add_log_secrets
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
 from with_intelligence_mcp.metrics import (
@@ -154,6 +155,8 @@ class WithIntelligenceClient:
         self, method: str, path: str, params: Mapping[str, QueryValue]
     ) -> httpx.Response:
         token = await self._session.get_access_token()
+        # Redacted until the enclosing tool call ends, so the failure line it writes is too.
+        add_log_secrets(token)
         subject = self._session.subject()
         metric_path = _metric_path(path)
         async with self._limit_concurrency(subject), self._http_client() as client:

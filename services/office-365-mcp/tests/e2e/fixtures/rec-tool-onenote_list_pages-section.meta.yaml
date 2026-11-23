@@ -1,0 +1,22 @@
+scenario: onenote_list_pages-section
+fixture: rec-tool-onenote_list_pages-section
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:52:31+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 137
+  keys dropped: 35
+  query parameters dropped: 13
+  response headers dropped: 54
+  text kept: 57
+  text replaced: 105
+literals:
+- Planning
+- seed-v1 Dogfood
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

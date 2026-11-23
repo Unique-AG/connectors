@@ -88,6 +88,8 @@ sharepoint:
     listId: 00000000-0000-0000-0000-000000000000
 ```
 
+The connector reads this list with the same app registration it uses for syncing, so grant the app `Read` on the site or list that holds it, as for any synced site. See [Grant Site-Specific Access](./authentication.md#4.-Grant-Site-Specific-Access).
+
 You can use [the CSV import template](./sites-to-sync-template.csv) when populating the SharePoint list for `sharepoint_list`-based configuration.
 
 ## SharePoint Base Configuration

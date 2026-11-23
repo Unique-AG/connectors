@@ -14,9 +14,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CHAT_PERMISSION
-from office_365_mcp.shared.messages import EVERYONE_SEES_IT, chat_in_question
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
@@ -24,8 +23,11 @@ from office_365_mcp.shared.seam import (
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import EVERYONE_SEES_IT, chat_in_question
 
 TOOL_NAME = "teams_remove_chat_member"
+
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
 
 STEP_READ = "chat_member"
 STEP = "remove_chat_member"
@@ -95,7 +97,7 @@ async def remove_chat_member(
     found: ConversationMember | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with suppress(GraphNotFound), graph_step(STEP_READ):
             found = await member.get()
         if found is None:
@@ -146,7 +148,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Remove a Teams Chat Member",
+        title="Teams: Remove a Chat Member",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

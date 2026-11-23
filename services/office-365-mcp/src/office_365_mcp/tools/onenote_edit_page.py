@@ -14,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
@@ -22,7 +23,6 @@ from office_365_mcp.shared.notes import (
     page_for_a_question,
     page_summary,
     patch_page,
-    write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
@@ -36,6 +36,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_edit_page"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_EDIT_CONTENT = "edit_content"
 
@@ -181,7 +183,7 @@ async def edit_page(
     summary: PageSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         if answer_pending or pre_read.audience.reaches_others or destructive:
             with not_graph():
@@ -267,7 +269,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Edit a Page",
+        title="OneNote: Edit a Page",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

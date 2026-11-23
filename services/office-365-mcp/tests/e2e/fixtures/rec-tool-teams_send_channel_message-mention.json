@@ -1,0 +1,158 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/joinedTeams",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "createdDateTime": null,
+          "description": "synthetic text 01",
+          "displayName": "synthetic text 01",
+          "id": "00000000-d034-4a82-8630-01e372765b48",
+          "isArchived": false,
+          "summary": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "webUrl": null
+        },
+        {
+          "createdDateTime": null,
+          "description": "The team of the recorder cases.",
+          "displayName": "seed-v1 team",
+          "id": "00000000-e7a0-41c6-863d-0548ee2dacdd",
+          "isArchived": false,
+          "summary": null,
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "webUrl": null
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels",
+    "headers": {
+      "prefer": "include-unknown-enum-members"
+    },
+    "query": {
+      "$filter": "membershipType eq 'standard'",
+      "$select": "id,displayName,description,createdDateTime,membershipType"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "createdDateTime": "2026-11-02T20:43:08.887Z",
+          "description": null,
+          "displayName": "seed-v1 Long channel",
+          "id": "19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2",
+          "membershipType": "standard"
+        },
+        {
+          "createdDateTime": "2026-11-02T20:43:06.2Z",
+          "description": null,
+          "displayName": "seed-v1 Posts",
+          "id": "19:1h4565avu1390i4h3f4y1s4b285754m4@thread.tacv2",
+          "membershipType": "standard"
+        },
+        {
+          "createdDateTime": "2026-10-30T13:12:50.729Z",
+          "description": "The team of the recorder cases.",
+          "displayName": "synthetic text 02",
+          "id": "19:JkJ4nGQHxur1KAlRLoboBhGtSCI6ZXFW3ACQQRUwZ-84@thread.tacv2",
+          "membershipType": "standard"
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/teams/00000000-e7a0-41c6-863d-0548ee2dacdd/channels/19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2/messages",
+    "json": {
+      "body": {
+        "content": "<p><at id=\"0\">Tom Berger</at> seed-v1 case-teams_send_channel_message-mention hello</p>",
+        "contentType": "html"
+      },
+      "mentions": [
+        {
+          "id": 0,
+          "mentionText": "Tom Berger",
+          "mentioned": {
+            "@odata.type": "#microsoft.graph.chatMessageMentionedIdentitySet",
+            "user": {
+              "displayName": "Tom Berger",
+              "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "userIdentityType": "aadUser"
+            }
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://host-01.example.test/synthetic%20text%2003/teams('00000000-e7a0-41c6-863d-0548ee2dacdd')/channels('synthetic%20text%2004')/messages('8470870308420')"
+    },
+    "response_json": {
+      "attachments": [],
+      "body": {
+        "content": "<p><at id=\"0\">Tom Berger</at> seed-v1 case-teams_send_channel_message-mention hello</p>",
+        "contentType": "html"
+      },
+      "channelIdentity": {
+        "channelId": "19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2",
+        "teamId": "00000000-e7a0-41c6-863d-0548ee2dacdd"
+      },
+      "chatId": null,
+      "createdDateTime": "2026-11-03T13:29:01.859Z",
+      "deletedDateTime": null,
+      "etag": "8470870308420",
+      "eventDetail": null,
+      "from": {
+        "application": null,
+        "device": null,
+        "user": {
+          "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+          "displayName": "synthetic text 05",
+          "id": "00000000-aa0f-4286-8305-d989485e14b5",
+          "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+          "userIdentityType": "aadUser"
+        }
+      },
+      "id": "8470870308420",
+      "importance": "normal",
+      "lastEditedDateTime": null,
+      "lastModifiedDateTime": "2026-11-03T13:29:01.859Z",
+      "locale": "en-us",
+      "mentions": [
+        {
+          "id": 0,
+          "mentionText": "Tom Berger",
+          "mentioned": {
+            "application": null,
+            "device": null,
+            "user": {
+              "@odata.type": "#microsoft.graph.teamworkUserIdentity",
+              "displayName": "Tom Berger",
+              "id": "00000000-e469-40d3-8f5b-9a7c5dac541e",
+              "tenantId": "00000000-6059-4203-883b-f15a63c61537",
+              "userIdentityType": "aadUser"
+            }
+          }
+        }
+      ],
+      "messageType": "message",
+      "reactions": [],
+      "replyToId": null,
+      "subject": null,
+      "summary": null,
+      "webUrl": "https://teams.microsoft.com/synthetic%20text%2006/synthetic%20text%2007/19:712s88k78f0921kijd0u66x1793i8f9g@thread.tacv2/8470870308420"
+    }
+  }
+]

@@ -1,0 +1,21 @@
+scenario: outlook_delete_category-created
+fixture: rec-tool-outlook_delete_category-created
+source: recorded
+target: graph
+recorded_at: '2026-11-10T10:30:04+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 9
+  keys dropped: 2
+  response headers dropped: 20
+  text kept: 3
+  text replaced: 6
+literals:
+- preset5
+- seed-v1 case-outlook_delete_category-created
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.5

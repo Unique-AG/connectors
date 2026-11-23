@@ -37,6 +37,7 @@ import { isWithinCooldown } from '~/utils/is-within-cooldown';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
+  GRAPH_MESSAGE_ATTACHMENTS_EXPAND,
   GraphMessage,
   GraphMessageFields,
   graphMessagesResponseSchema,
@@ -414,6 +415,7 @@ export class LiveCatchUpCommand {
       .api(`${graphBasePath}/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(GraphMessageFields)
+      .expand(GRAPH_MESSAGE_ATTACHMENTS_EXPAND)
       // We cannot combine a receivedDateTime filter with orderby on lastModifiedDateTime on the
       // Microsoft side (InefficientFilter). The retentionWindowInDays check is applied by processEmailCommand
       .filter(`lastModifiedDateTime ge ${lastModifiedDateTime.toISOString()}`)

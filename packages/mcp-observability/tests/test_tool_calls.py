@@ -12,11 +12,13 @@ from fastmcp import Client
 from fastmcp import FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
+from fastmcp.server.auth import AccessToken
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import ToolResult
 from mcp_configs import LoggingSettings
 
 from mcp_observability import PinoJsonFormatter
+from mcp_observability import RedactToolCallSecretsMiddleware
 from mcp_observability import ToolCallObservabilityMiddleware
 from mcp_observability import configure_logging
 from mcp_observability import metrics_text
@@ -156,3 +158,83 @@ async def test_a_cancelled_call_is_logged_as_cancelled(
     _, ended = _tool_lines(pino)
     assert ended["msg"] == "Tool call cancelled"
     assert ended["log_level"] == "info"
+
+
+async def test_the_secrets_the_consumer_extracts_are_redacted_from_what_the_call_logs(
+    pino: io.StringIO,
+) -> None:
+    caller_token = "caller-bearer-token-123"
+    server = FastMCP(
+        "kiosk",
+        middleware=[
+            RedactToolCallSecretsMiddleware(lambda _context: [caller_token]),
+            ToolCallObservabilityMiddleware(),
+        ],
+    )
+
+    @server.tool
+    async def echo() -> str:
+        logging.getLogger("tests").warning("upstream rejected %s", caller_token)
+        return "done"
+
+    async with Client(server) as connected:
+        await connected.call_tool("echo", {})
+    logging.getLogger("tests").warning("after the call %s", caller_token)
+
+    messages = [line["msg"] for line in _lines(pino)]
+    assert "upstream rejected [Redacted]" in messages
+    assert messages[-1] == f"after the call {caller_token}"
+    assert caller_token not in json.dumps(messages[:-1])
+
+
+async def test_the_caller_access_token_is_redacted_by_default(
+    pino: io.StringIO, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    caller_token = "caller-access-token-123"
+    monkeypatch.setattr(
+        "mcp_observability.redaction.get_access_token",
+        lambda: AccessToken(token=caller_token, client_id="kiosk-client", scopes=[]),
+    )
+    server = FastMCP(
+        "kiosk",
+        middleware=[RedactToolCallSecretsMiddleware(), ToolCallObservabilityMiddleware()],
+    )
+
+    @server.tool
+    async def echo() -> str:
+        logging.getLogger("tests").warning("upstream rejected %s", caller_token)
+        return "done"
+
+    async with Client(server) as connected:
+        await connected.call_tool("echo", {})
+
+    messages = [line["msg"] for line in _lines(pino)]
+    assert "upstream rejected [Redacted]" in messages
+    assert caller_token not in json.dumps(messages)
+
+
+async def test_a_call_runs_and_is_logged_when_its_secrets_cannot_be_read(
+    pino: io.StringIO,
+) -> None:
+    def unreadable(_context: object) -> list[str]:
+        raise LookupError("no access token")
+
+    server = FastMCP(
+        "kiosk",
+        middleware=[RedactToolCallSecretsMiddleware(unreadable), ToolCallObservabilityMiddleware()],
+    )
+
+    @server.tool
+    async def echo() -> str:
+        return "done"
+
+    async with Client(server) as connected:
+        result = await connected.call_tool("echo", {})
+
+    assert not result.is_error
+    tool_call_lines = [line for line in _lines(pino) if str(line["msg"]).startswith("Tool call")]
+    assert [line["msg"] for line in tool_call_lines] == ["Tool call started", "Tool call completed"]
+    assert all(
+        cast("dict[str, str]", line["log_secrets_failed"])["name"] == "LookupError"
+        for line in tool_call_lines
+    )

@@ -27,13 +27,14 @@ from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
 from office_365_mcp.graph_client import GraphForbidden, GraphNotFound, GraphUnavailable
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteOwner,
     OnenotePageHandle,
     OnenoteSectionHandle,
     onenote_page_handle,
 )
-from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary, write_state_for
+from office_365_mcp.shared.notes import OWNED_REFUSED, PageSummary
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm
 from office_365_mcp.tools import onenote_append_to_page as appender
 from office_365_mcp.tools.onenote_append_to_page import a_person_agrees, append_to_page
@@ -1328,7 +1329,6 @@ class TestHowItDeclaresItself:
         assert "end" in description
         assert "cannot" in description
         assert "onenote_read_page" in description
-        assert "onenote can show the change to everyone who opens the notebook" in description
 
     async def test_the_description_says_when_it_asks_and_when_it_does_not(
         self, transport: httpx.AsyncClient

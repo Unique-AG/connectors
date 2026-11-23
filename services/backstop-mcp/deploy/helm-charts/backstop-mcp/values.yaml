@@ -122,7 +122,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/backstop-mcp
-  tag: 2.0.0 # x-release-please-version
+  tag: 3.1.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -230,11 +230,26 @@ networkPolicy:
   enableDefaultDeny:
     ingress: true
     egress: true
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
   baseline:
     prometheus:
       namespace: system
     ephemeralPorts:
       enabled: false
+    # Each client's BACKSTOP_BASE_URL is its own <tenant>.backstopsolutions.com host.
+    egress:
+      backstop:
+        toFQDNs:
+          - matchPattern: "*.backstopsolutions.com"
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP
 
 # Alert when Backstop ignores a filter we sent (search_activities row check).
 prometheus:

@@ -1,0 +1,29 @@
+scenario: outlook_create_event-teams-meeting
+fixture: rec-tool-outlook_create_event-teams-meeting
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:33:17+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 10
+  keys dropped: 8
+  persona addresses: 4
+  persona names: 3
+  query parameters dropped: 2
+  response headers dropped: 14
+  text kept: 5
+  text replaced: 8
+literals:
+- '2026-11-03T15:00:00'
+- '2026-11-03T15:30:00'
+- Europe/Zurich
+- persona:anna
+- seed-v1 case-outlook_create_event-teams-meeting
+- ~tomorrowT15:00:00
+- ~tomorrowT15:30:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

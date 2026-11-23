@@ -18,8 +18,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     WRITE_DESTRUCTIVE,
@@ -31,6 +31,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_send_draft"
+
+PRESETS: tuple[str, ...] = ("outlook-send",)
 
 STEP_READ_DRAFT = "read_draft"
 STEP_SEND_DRAFT = "send_draft"
@@ -123,6 +125,7 @@ GRAPH_NOT_FOUND = (
 class MailSent(BaseModel):
     to: list[MailAddress] = Field(description="Who received the message.")
     cc: list[MailAddress] = Field(description="Who received a copy.")
+    bcc: list[MailAddress] = Field(description="Who received a blind copy.")
     subject: str | None = Field(description="The subject the message was sent with, or null.")
     sent_at: str = Field(description="When the send was accepted, ISO-8601 in UTC.")
 
@@ -169,7 +172,7 @@ async def send_draft(
     reached = graph_mailbox(client, mailbox)
 
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         draft = await _read(reached, handle)
         refused: str | None = _NOT_A_DRAFT
         if draft is not None and draft.is_draft is True:
@@ -235,6 +238,7 @@ def _answer(draft: Message, *, sent_at: datetime) -> MailSent:
     return MailSent(
         to=MailAddress.each_of(draft.to_recipients),
         cc=MailAddress.each_of(draft.cc_recipients),
+        bcc=MailAddress.each_of(draft.bcc_recipients),
         subject=draft.subject,
         sent_at=sent_at.isoformat(),
     )
@@ -245,7 +249,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Send a Drafted Mail Message",
+        title="Outlook: Send a Drafted Mail Message",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

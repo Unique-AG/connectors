@@ -20,6 +20,7 @@ from office_365_mcp.graph_client import (
     create_graph_transport,
     fetch_response,
     graph_errors,
+    measured_graph_operation,
     native_response,
     no_retry,
     request_with_query,
@@ -105,8 +106,7 @@ class TestTheGraphBaseUrlIsSetInOnePlace:
     ) -> None:
         """An unset transport base_url is what lets the adapter emit an absolute URL httpx never
         joins onto; the adapter's missing trailing slash keeps the join clean if it ever does."""
-        # The ignore is for the SDK leaving `request_adapter`'s generic parameter unbound.
-        base_url: str = client.request_adapter.base_url  # pyright: ignore[reportUnknownMemberType]
+        base_url: str = client.request_adapter.base_url
 
         assert str(transport.base_url) == ""
         assert base_url == GRAPH_V1
@@ -136,7 +136,9 @@ class TestThrottling:
 
 
 class TestTheTransportRunsTheSdksOwnPipeline:
-    async def test_it_is_the_sdks_default_chain_with_the_url_replacer_quietened(self) -> None:
+    async def test_it_is_the_observer_then_the_sdks_chain_with_a_quiet_url_replacer(
+        self,
+    ) -> None:
         """`_graph_middleware` inlines `GraphClientFactory.create_with_default_middleware`, which
         builds and loads the handler list in one step with no seam to swap a handler into. The cost
         is that a handler the SDK adds in a later version would quietly not be installed."""
@@ -147,10 +149,15 @@ class TestTheTransportRunsTheSdksOwnPipeline:
         ours = create_graph_transport(GraphSettings())
         try:
             expected = [
-                "_QuietUrlReplaceHandler" if name == "UrlReplaceHandler" else name
-                for name in _handler_chain(sdk)
+                "GraphCallObserver",
+                *(
+                    "_QuietUrlReplaceHandler" if name == "UrlReplaceHandler" else name
+                    for name in _handler_chain(sdk)
+                ),
             ]
-            assert expected, "the SDK's own chain came back empty, so this compares nothing"
+            assert len(expected) > 1, (
+                "the SDK's own chain came back empty, so this compares nothing"
+            )
             assert _handler_chain(ours) == expected
         finally:
             await sdk.aclose()
@@ -384,7 +391,11 @@ class TestFetchResponse:
             )
         )
 
-        with pytest.raises(GraphNotFound), graph_errors("test_fetch_response"):
+        with (
+            pytest.raises(GraphNotFound),
+            measured_graph_operation("test_fetch_response"),
+            graph_errors(),
+        ):
             await fetch_response(client, _resource_content_request(client, "res-1"))
 
     @pytest.mark.usefixtures("retry_sleeps")
@@ -399,6 +410,10 @@ class TestFetchResponse:
             )
         )
 
-        with pytest.raises(GraphThrottled) as excinfo, graph_errors("test_fetch_response"):
+        with (
+            pytest.raises(GraphThrottled) as excinfo,
+            measured_graph_operation("test_fetch_response"),
+            graph_errors(),
+        ):
             await fetch_response(client, _resource_content_request(client, "res-1"))
         assert excinfo.value.retry_after_seconds == 12

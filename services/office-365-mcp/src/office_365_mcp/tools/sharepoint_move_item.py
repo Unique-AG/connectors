@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FOLDER_HANDLE_SOURCES,
     ITEM_HANDLE_SOURCES,
@@ -30,7 +31,6 @@ from office_365_mcp.shared.handles import (
     drive_folder_handle,
     drive_item_handle,
 )
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -39,6 +39,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_move_item"
+
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
 
 STEP_MOVE = "move_item"
 
@@ -164,7 +166,7 @@ async def move_item(
     moved: MovedItem | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, moving.drive_id, moving.item_id)
         folder = await item_for_a_question(client, into.drive_id, into.item_id)
         refused = _unmovable(found, folder)
@@ -260,7 +262,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Move an Item",
+        title="SharePoint: Move an Item",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

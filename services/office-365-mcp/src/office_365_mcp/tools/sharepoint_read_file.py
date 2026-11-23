@@ -8,9 +8,11 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.tools import ToolResult
 from fastmcp.utilities.types import File
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.request_information import RequestInformation
+from mcp.types import ResourceLink
 from msgraph.generated.drives.item.items.item.content.content_request_builder import (
     ContentRequestBuilder,
 )
@@ -28,13 +30,28 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
-from office_365_mcp.shared.files import ITEM_FIELDS
+from office_365_mcp.shared.files import (
+    ITEM_FIELDS,
+    MAX_BYTES,
+    MEGABYTE,
+    UNNAMED_ITEM_LABEL,
+    browser_url,
+    is_utf8,
+)
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
 logger = logging.getLogger(__name__)
 
 TOOL_NAME = "sharepoint_read_file"
+
+PRESETS: tuple[str, ...] = (
+    "teams-files",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
 
 STEP_ITEM = "drive_item"
 STEP_CONTENT = "drive_content"
@@ -44,10 +61,6 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Files.Read.All",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "file": "sharepoint:///files/b%21SYNTHETICDRIVE0000/01SYNTHETICFILE0000"
 }
-
-MAX_BYTES = 10 * 1024 * 1024
-
-_MEGABYTE = 1024 * 1024
 
 _DEFAULT_MEDIA_TYPE = "application/octet-stream"
 
@@ -60,9 +73,13 @@ sharepoint_search_files or sharepoint_browse_folder already located. The tool \
 because a folder has no content to read.
 
 Notes:
-- This tool converts nothing itself and does not turn a document into text. A Word file comes \
-back as a Word file. Set `convert_to` to `pdf` for text you can read.
-- This tool refuses a file above {MAX_BYTES // _MEGABYTE} MB. The whole file travels in one \
+- This tool does not turn a document into text. It returns the file as an embedded resource, and a \
+Word or Excel file comes back as a Word or Excel file. You may not be able to read a file in that \
+form. A PDF may be readable, but that is not sure. If you cannot read the content, tell the user \
+so, and give the web address of the file. Never guess what the file says.
+- Next to the file, this tool returns a link that opens it in a browser. Cite the file with that \
+link, and copy it exactly: never decode its `%` escapes.
+- This tool refuses a file above {MAX_BYTES // MEGABYTE} MB. The whole file travels in one \
 message.
 """
 
@@ -97,7 +114,9 @@ _NOT_CONVERTIBLE = (
     "Microsoft 365 cannot convert this file to PDF. It reports that it does not support this "
     + "format. The handle is correct, so a different handle will not help. Call this tool again "
     + "with the same handle and without `convert_to`. This tool then returns the file in its own "
-    + "format. A second request for the conversion fails the same way."
+    + "format. You may not be able to read that format. If you cannot, tell the user so, give "
+    + "the web address of the file, and never guess the content. A second request for the "
+    + "conversion fails the same way."
 )
 
 _NO_SIZE = (
@@ -130,7 +149,7 @@ async def sharepoint_read_file(
     *,
     file: str,
     convert_to: ConvertTo | None = None,
-) -> File:
+) -> ToolResult:
     handle = drive_file_handle(file)
     if handle is None:
         raise ToolError(_NOT_A_FILE_HANDLE)
@@ -138,7 +157,9 @@ async def sharepoint_read_file(
     fetched = await _fetched(client, transport, handle, convert_to=convert_to)
     if isinstance(fetched, str):
         raise ToolError(fetched)
-    return fetched
+    content, item = fetched
+    link = _browser_link(item)
+    return ToolResult(content=[content] if link is None else [content, link])
 
 
 async def _fetched(
@@ -147,8 +168,8 @@ async def _fetched(
     handle: DriveFileHandle,
     *,
     convert_to: ConvertTo | None,
-) -> File | str:
-    with graph_errors(TOOL_NAME):
+) -> tuple[File, DriveItem] | str:
+    with graph_errors():
         with graph_step(STEP_ITEM):
             item = await _item(client, handle)
 
@@ -186,8 +207,22 @@ async def _fetched(
         if body == b"" and item.size > 0:
             return _NOTHING_CAME_BACK
         if convert_to is None:
-            return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body))
-        return FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE)
+            return FileFromGraph(body, name=item.name, mime_type=_media_type(item, body)), item
+        return (
+            FileFromGraph(body, name=_converted_name(item.name), mime_type=_PDF_MEDIA_TYPE),
+            item,
+        )
+
+
+def _browser_link(item: DriveItem) -> ResourceLink | None:
+    if item.web_url is None:
+        return None
+    return ResourceLink(
+        name=item.name or UNNAMED_ITEM_LABEL,
+        uri=browser_url(item.web_url),
+        description="Opens this file in a browser. Cite the file with this address.",
+        mime_type=item.file.mime_type if item.file is not None else None,
+    )
 
 
 async def _item(client: GraphServiceClient, handle: DriveFileHandle) -> DriveItem | None:
@@ -228,17 +263,9 @@ def _media_type(item: DriveItem, body: bytes) -> str:
     reported = item.file.mime_type if item.file is not None else None
     if reported is None:
         return _DEFAULT_MEDIA_TYPE
-    if reported.startswith("text/") and not _is_utf8(body):
+    if reported.startswith("text/") and not is_utf8(body):
         return _DEFAULT_MEDIA_TYPE
     return reported
-
-
-def _is_utf8(body: bytes) -> bool:
-    try:
-        _ = body.decode("utf-8")
-    except UnicodeDecodeError:
-        return False
-    return True
 
 
 def _is_a_folder(handle: DriveFileHandle) -> str:
@@ -256,7 +283,7 @@ def _too_large(*, size: int | None, web_url: str | None) -> str:
         f"{_megabytes(size)} MB" if size is not None else f"more than {_megabytes(MAX_BYTES)} MB"
     )
     where = (
-        "Tell the user to open the file in a browser instead, at " + web_url + "."
+        "Tell the user to open the file in a browser instead, at " + browser_url(web_url) + "."
         if web_url is not None
         else "Microsoft gave no web address for this file. Tell the user to open the file from "
         + "the site itself."
@@ -272,7 +299,7 @@ def _too_large(*, size: int | None, web_url: str | None) -> str:
 
 
 def _megabytes(size: int) -> str:
-    return f"{size / _MEGABYTE:.1f}"
+    return f"{size / MEGABYTE:.1f}"
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -280,7 +307,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read File",
+        title="SharePoint: Read File",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
@@ -303,10 +330,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Literal["pdf"] | None,
             Field(
                 description=(
-                    "The value `pdf` converts the file to PDF before this tool returns it. "
-                    + "Leave this parameter unset to get the file's own format, which is the "
-                    + "default. Microsoft converts these formats: doc, docx, dot, dotx, eml, "
-                    + "epub, htm, html, md, msg, odp, ods, and odt. It also converts these "
+                    "The value `pdf` converts the file to PDF before this tool returns it. You get "
+                    + "a PDF file, not text. Leave this parameter unset to get the file's own "
+                    + "format, which is the default. Microsoft converts these formats: doc, "
+                    + "docx, dot, dotx, eml, epub, htm, html, md, msg, odp, ods, and odt. It "
+                    + "also converts these "
                     + "formats: pps, ppsx, ppt, pptx, rtf, tif, tiff, xls, xlsm, and xlsx. A "
                     + "file that is already a PDF is not on that list, and needs no "
                     + "conversion. Conversion can still fail for a file that is on the list."
@@ -314,5 +342,5 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         client: GraphServiceClient = graph,
-    ) -> File:
+    ) -> ToolResult:
         return await sharepoint_read_file(client, transport, file=file, convert_to=convert_to)

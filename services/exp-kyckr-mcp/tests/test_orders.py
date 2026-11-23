@@ -73,6 +73,20 @@ def test_an_order_sends_its_arguments_as_the_request_body(settings: Settings) ->
     }
 
 
+def test_an_order_leaves_out_the_defaults_nobody_configured(settings: Settings) -> None:
+    bodies: list[object] = []
+
+    async def handler(request: httpx2.Request) -> httpx2.Response:
+        bodies.append(json.loads(request.content))
+        return httpx2.Response(201, json={"data": {"orderId": "9", "status": "Pending"}})
+
+    call_tool(
+        settings, handler, "create_document_order", {"kyckr_id": "GB|abc", "product_id": "p-1"}
+    )
+
+    assert bodies == [{"kyckrId": "GB|abc", "productId": "p-1"}]
+
+
 def test_an_order_reported_at_the_top_level_is_read_as_well(settings: Settings) -> None:
     async def handler(_request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(201, json={"orderId": "9", "status": "Pending"})

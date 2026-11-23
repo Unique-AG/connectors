@@ -21,6 +21,16 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_browse_folder"
 
+PRESETS: tuple[str, ...] = (
+    "teams-write-files",
+    "teams-files",
+    "sharepoint-search",
+    "sharepoint-read",
+    "sharepoint-write",
+    "sharepoint-share",
+    "sharepoint-sites",
+)
+
 STEP_MY_DRIVE = "my_drive"
 STEP_CHILDREN = "folder_children"
 
@@ -108,7 +118,7 @@ async def browse_folder(
     handle = _folder_to_browse(folder)
     top, read = (limit, limit) if order_by is None else (None, MAX_SCANNED_ITEMS)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         target = await _my_drive_root(client) if handle is None else handle
         with graph_step(STEP_CHILDREN):
             first_page = await _children(client, target, top=top)
@@ -187,7 +197,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Browse Files",
+        title="SharePoint: Browse Folder",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

@@ -6,6 +6,7 @@ If it reads the environment, it is declared in this file. No exceptions.
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
+from urllib.parse import unquote
 
 from fastmcp.server.server import Transport
 from pydantic import (
@@ -59,6 +60,12 @@ class Settings(BaseSettings):
     # Generate with: openssl rand -hex 32
     zitadel_jwt_signing_key: SecretStr = Field(
         validation_alias="ZITADEL_JWT_SIGNING_KEY"
+    )
+
+    # ── Unique API ──
+    # unique_toolkit reads it itself; declared here so logging redacts it.
+    unique_app_key: SecretStr | None = Field(
+        default=None, validation_alias="UNIQUE_APP_KEY"
     )
 
     # ── OAuth storage (see auth/storage.py) ──
@@ -177,6 +184,18 @@ class Settings(BaseSettings):
                 + ", ".join(sorted(KNOWN_MCP_TOOLS))
             )
         return frozenset(names)
+
+    def secret_values(self) -> tuple[str, ...]:
+        """Every configured secret, with the database password URL-decoded. asyncpg reads the
+        password from either the URL's userinfo or its `password` query parameter."""
+        keys = (self.zitadel_jwt_signing_key, self.encryption_key, self.unique_app_key)
+        hosts = self.database_url.hosts() if self.database_url else []
+        query = self.database_url.query_params() if self.database_url else []
+        return (
+            *(key.get_secret_value() for key in keys if key is not None),
+            *(unquote(host["password"]) for host in hosts if host["password"]),
+            *(value for name, value in query if name == "password" and value),
+        )
 
     def disabled_tool_names(self) -> frozenset[str]:
         return KNOWN_MCP_TOOLS - self.enabled_tools

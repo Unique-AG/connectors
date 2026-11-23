@@ -1,11 +1,7 @@
 import { Temporal } from 'temporal-polyfill';
+import { oneLine } from '~/utils/one-line';
 import { resolveIanaTimezone } from '~/utils/resolve-iana-timezone';
 import type { CalendarDateTime } from './map-graph-date-time';
-
-/** Collapses whitespace so a pasted multi-line subject cannot reflow an elicitation prompt. */
-export function oneLine(value: string): string {
-  return value.replaceAll(/\s+/g, ' ').trim();
-}
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 const MONTHS = [

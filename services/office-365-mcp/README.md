@@ -29,8 +29,16 @@ only table, `oauth_kv`.
 - the Graph request
 - the error messages
 
-A new tool needs one file and one line in the registry. A tool needs no base class and no
-decorator. A tool module publishes three names: `TOOL_NAME`, `GRAPH_PERMISSIONS`, and `register`.
+A new tool needs one file and two lines in the registry: its import and its place in
+`_TOOL_MODULES`. A tool needs no base class and no decorator. A tool module publishes the names
+that the `ToolModule` protocol in `tools/__init__.py` requires: `TOOL_NAME`, `PRESETS`,
+`GRAPH_PERMISSIONS`, `GRAPH_CALL_EXAMPLE`, and `register`. `PRESETS` names the presets that hold
+the tool. The registry builds the map from each preset to its tools from these names.
+`GRAPH_CALL_EXAMPLE` gives the arguments for one example call, which the tests use to call each
+tool against a stub of Microsoft Graph.
+
+A new tool also changes the generated Terraform registry. From the service directory, run
+`uv run python scripts/render-terraform-registry.py` and commit the generated file with the tool.
 
 The file `tools/__init__.py` is the central registry. Its function `resolve()` reads an operator's
 selection and returns two things:
@@ -60,23 +68,24 @@ disagree about a shared fact. The `shared/` package lists every fact they must n
   - the parser for each shape
   - the writer for each shape
   - the permission that each Teams surface reads under
-- `messages.py` owns what a Teams message is:
+- `teams/messages.py` owns what a Teams message is:
   - the shape a message is answered in
   - the sender, normalized out of every identity shape Graph answers with
   - the test for "did a person write this"
 
   One function normalizes this type. So the same message, found by one tool and read by another
   tool, is one type, not two types that must separately agree.
-- `meetings.py` owns how a meeting is reached:
+- `teams/meetings.py` owns how a meeting is reached:
   - a join URL, resolved to the meeting it identifies
   - which occurrence of a series a time window means
   - how far "newest first" holds
 - `identity.py` owns who the signed-in user is. The tool `get_me` reports this identity, and every
   other answer is correlated against it. This file stops two tools from giving two different
   answers to "who am I".
-- `seam.py` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
+- `seam/` owns the Graph client a tool receives, with its per-tool On-Behalf-Of token inside it,
   and the mapping from a Graph failure to advice. A model reads every refusal on this server as one
-  voice, so this mapping must live in one place.
+  voice, so this mapping must live in one place. The package has one module for each concern, and
+  a tool imports the names from the package, not from its modules.
 
 A fact belongs in `shared/` under one condition. Two tools each need their own copy of the fact,
 and a difference between the two copies is a bug a caller can see. Examples are:
@@ -123,9 +132,9 @@ A OneNote handle starts with `onenote:///sites/{site}/` when Graph addresses its
 documents no copy from or into a site notebook. As a result, the three copy tools refuse a site
 handle before they send a request to Graph.
 
-This layout follows seven layering rules:
+This layout follows eight layering rules:
 
-1. `shared/` imports no tool module. Only `shared/seam.py` imports FastMCP. This keeps the
+1. `shared/` imports no tool module. Only `shared/seam/` imports FastMCP. This keeps the
    framework out of the handle grammar and the rest of the shared vocabulary.
 2. `graph_client/` imports nothing from this application. It uses its own frozen `GraphSettings`
    object, instead of reading the configuration.
@@ -138,10 +147,13 @@ This layout follows seven layering rules:
 6. `shared/handles.py` is the only module that builds or parses a `teams:///`, `outlook:///`,
    `sharepoint:///`, or `onenote:///` URI. Showing the shape of a URI to a model, in a description,
    an `examples=` field, or a refusal message, is prose. It is not building or parsing a URI.
-7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`, and
-   `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
+7. A package is entered through its `__init__` file. The packages `graph_client/`, `server/`,
+   `shared/seam/`, and `tools/` each publish an `__all__` list. The `shared/` package deliberately does not. It is a
    grouping whose modules are the real units. Each consumer states which module it depends on, at
    the import line.
+8. A tool imports the neutral modules directly under `shared/` and the package of its own surface,
+   such as `shared/teams/` for a Teams tool. It never imports another surface's package, such as
+   `shared/outlook/`. The tool's `TOOL_NAME` prefix names its surface.
 
 The test file `tests/test_layering.py` enforces every rule above, and each rule has its own guard.
 When a rule has nothing real behind it, the rule has gone vacuous, and its guard fails. Examples of
@@ -168,7 +180,7 @@ The script `scripts/render-terraform-registry.py` generates
 `deploy/terraform/azure/office-365-mcp-entra-application/registry.generated.tf.json`. It imports
 the tool modules, the always-on tool, and the presets from `office_365_mcp.tools`. It also imports
 the admin-consent table from `office_365_mcp.server.manifest`, and the requestable-permission list
-from `office_365_mcp.shared.seam`. Run it with `--check` to find drift between the Python source
+from `office_365_mcp.shared.seam.permissions`. Run it with `--check` to find drift between the Python source
 and the generated Terraform file. CI uses this mode.
 
 The repo-root script `scripts/render-values-schema.sh` generates this chart's
@@ -181,7 +193,7 @@ the real, bounded risk of drift.
 
 - `NEEDS_ADMIN_CONSENT`, in `server/manifest.py`. When the manifest renders, a runtime assertion
   makes sure that every permission has an entry. No build-time check exists for it.
-- `REQUESTABLE_PERMISSIONS`, in `shared/seam.py`. Convention and tests keep it correct, not
+- `REQUESTABLE_PERMISSIONS`, in `shared/seam/permissions.py`. Convention and tests keep it correct, not
   generation.
 
 The function `_stale_promises()`, in `server/manifest.py`, reads every selected tool's description.
@@ -210,6 +222,18 @@ lines. The value comes from the first of these that exists:
 
 When the service knows `trace_id`, `request_id`, `session_id`, or `http_request_id`, these fields
 appear beside `correlation_id`. This service uses an `x-request-id` header from a gateway as-is.
+
+Each failed Microsoft Graph call writes one `graph call failed` line. The line has these fields:
+`graph_operation`, `graph_step`, `graph_remedy`, `graph_status`, `graph_code`, `graph_inner_code`,
+`graph_request_id`, and `graph_reason`. A field that Graph did not send is absent. `graph_reason` is
+the message of Graph, cut to 300 characters. The level is `warning`, or `info` for a 401, 403, or 404.
+The active span carries the same fields as attributes, except `graph_reason`: a message of Graph
+can name a person or a search term, and no filter covers a span. To find a fault on the side of Microsoft,
+search for `graph_reason`. To report it to Microsoft, give them `graph_request_id`. A metric label
+does not carry these values, because `graph_code` and `graph_reason` have no fixed set.
+
+`outlook_search_mail` also sets the span attribute `search_mail.arguments`. It lists the names of
+the arguments of the call that have a value, and never the values. It does not list `mailbox`.
 
 No secret reaches a log line. Two independent nets remove secrets, because a credential with an
 innocent-sounding field name, and an innocent-looking credential value, are two different failures:
@@ -257,17 +281,37 @@ Once the service runs, it exposes these endpoints:
 - **Admin consent**, `GET /admin/consent`. Redirects to the Microsoft admin-consent page for this
   deployment. It needs no authentication. See "Admin consent" in `docs/README.md`.
 - **Metrics**, `GET /metrics`. Prometheus, through `setup_ops`. Beside `unique_toolkit`'s own HTTP
-  series, four metrics report what this connector asked Microsoft Graph for:
-  - `graph_requests_total{operation,status}`
-  - `graph_request_duration_seconds{operation}`
+  series, eight metrics report what this connector asked Microsoft Graph and Entra for:
+  - `graph_operations_total{operation,status}`
+  - `graph_operation_duration_seconds{operation}`
+  - `graph_steps_total{operation,step,status}`
+  - `graph_step_duration_seconds{operation,step}`
   - `graph_throttled_total{operation,retried}`
   - `graph_pages_scanned{operation}`
+  - `graph_token_acquisitions_total{operation,result}`
+  - `graph_slow_operations_total{operation}`
 
-  The label `operation` is always the tool's own name, never a URL. A label taken from a Graph URL
+  `tool_outcomes_total{operation,outcome}` counts the MCP tool calls that reach
+  `GraphOperationMiddleware` by what ended them. Calls that the rate limiter rejects, and calls to a
+  tool name that the server does not register, are not counted.
+
+  `GraphOperationMiddleware` wraps each MCP tool call. It counts the call under
+  `tool_outcomes_total`, and under `graph_operations_total` when the call attempted at least one
+  Graph request. `GraphCallObserver` is the first handler in the
+  Graph SDK pipeline. It sees each Graph answer after the SDK's retries, and counts throttling under
+  `graph_throttled_total`. `GraphToken` asks Entra for the Graph token before the first Graph
+  request, and counts the result under `graph_token_acquisitions_total`. A tool can mark a
+  block of Graph calls as one named step with `graph_step`. One step can send several requests,
+  for example the pages of a list. A call outside a step has no step name and is not in
+  `graph_steps_total`. `graph_step` and `graph_errors` turn SDK errors into the `GraphFailure`
+  types.
+
+  The label `operation` is always the registered tool name, never a URL. The label `step` names one
+  Graph call inside the tool. A label taken from a Graph URL
   creates one time series for each chat, so this service does not use one. The label `status` names
   the remedy a failure needs, for example `forbidden`, `not_found`, `throttled`, or `unavailable`,
-  rather than the HTTP status code. The label `retried` states whether the SDK spent its retries on
-  the throttling, or refused the wait that Graph asked for.
+  rather than the HTTP status code. The label `retried` states whether the SDK retried the request
+  before the last throttling answer.
 - **Traces**. Off, unless an `OTEL_*` variable states where to send them.
   - `OTEL_TRACES_EXPORTER=console` prints spans to stderr.
   - `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` sends spans to a collector, and needs no other

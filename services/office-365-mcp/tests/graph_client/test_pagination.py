@@ -29,8 +29,8 @@ def chat(number: int, topic: str) -> dict[str, object]:
 
 class RecordedPages:
     """The histogram itself is asserted on in `tests/test_graph_metrics.py`, from inside a
-    `graph_errors` block: `observability` drops a count taken outside one, as every walk here
-    is."""
+    `measured_graph_operation` block: `observability` drops a count taken outside one, as every
+    walk here is."""
 
     def __init__(self) -> None:
         self.counts: list[int] = []
@@ -471,7 +471,7 @@ class TestTheBoundIsNotAnAssertion:
     async def test_the_refusal_names_the_run_and_what_graph_was_still_advertising(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
-        """`shared/seam.py` maps `GraphFailure` and nothing else onto tool advice, so the type is
+        """`shared/seam/` maps `GraphFailure` and nothing else onto tool advice, so the type is
         what makes this reach the caller as something it can act on rather than as a crash."""
         graph.get("/me/chats").mock(
             return_value=httpx.Response(

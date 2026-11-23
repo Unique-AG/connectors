@@ -20,10 +20,10 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.calendar import (
     SERIES_MASTER_FIELD,
     EventAttendee,
-    confirmation_id_for,
     event_of,
     series_reach,
 )
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.seam import (
@@ -34,6 +34,13 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_cancel_event"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_CANCEL = "cancel_event"
 
@@ -126,7 +133,7 @@ async def cancel_event(
 
     asked: InputRequiredResult | None = None
     about = confirmation_id_for(handle.uri, repr(comment))
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
         refused = _NOT_THE_ORGANIZER if event.is_organizer is False else None
         if refused is None and event.attendees:
@@ -199,7 +206,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Cancel a Calendar Event",
+        title="Outlook: Cancel a Calendar Event",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

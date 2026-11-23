@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import { NewTrace } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { SyncDelegatedAccessEventDto } from './sync-delegated-access-event';
 
 @Injectable()
@@ -53,6 +54,8 @@ export class VerifyDelegatedAccessSchedulerService implements OnModuleInit, OnMo
     this.schedulerRegistry.addCronJob('delegated-access-sync', job);
     job.start();
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.verify-delegated-access')
   public async triggerVerificationForAccounts(): Promise<void> {

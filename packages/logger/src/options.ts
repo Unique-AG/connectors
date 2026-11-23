@@ -3,7 +3,21 @@ import path from 'node:path';
 import { RequestMethod } from '@nestjs/common';
 import type { Params } from 'nestjs-pino';
 import { isPlainObject } from 'remeda';
+import { createSecretRedactor, type SecretRedactionOptions } from './redact-secrets';
 import { sanitizeError } from './sanitize-error';
+
+// pino-http hands a custom req serializer the output of pino-std-serializers, not the IncomingMessage.
+function serializeReq<T extends { url?: string; query?: unknown }>(req: T) {
+  const url = req.url ?? '';
+  const queryIndex = url.indexOf('?');
+  const pathname = queryIndex >= 0 ? url.slice(0, queryIndex) : url;
+  if (!pathname.startsWith('/auth/')) {
+    return req;
+  }
+
+  const { query: _query, ...rest } = req;
+  return { ...rest, url: pathname };
+}
 
 export const productionTarget = {
   target: 'pino/file',
@@ -14,7 +28,11 @@ export const developmentTarget = {
   target: path.resolve(__dirname, './development'),
 };
 
-export const defaultLoggerOptions: Params = {
+/**
+ * The shared logger options, with `redaction` replacing known secrets and pattern matches in
+ * every log line on top of the path-based `redact`.
+ */
+export const createLoggerOptions = (redaction: SecretRedactionOptions = {}): Params => ({
   renameContext: process.env.NODE_ENV !== 'production' ? 'caller' : undefined,
   pinoHttp: {
     enabled: true,
@@ -22,6 +40,7 @@ export const defaultLoggerOptions: Params = {
     redact: {
       paths: [
         'req.headers.authorization',
+        'req.headers.cookie',
         'req.headers.x_api_key',
         'req.headers["x-api-key"]',
         'config.headers.Authorization',
@@ -29,8 +48,12 @@ export const defaultLoggerOptions: Params = {
       ],
       censor: () => '[Redacted]',
     },
+    hooks: {
+      streamWrite: createSecretRedactor(redaction),
+    },
     serializers: {
       err: sanitizePinoError,
+      req: serializeReq,
     },
     customProps: (req: IncomingMessage) => {
       const operationName = getOperationName(req);
@@ -57,7 +80,9 @@ export const defaultLoggerOptions: Params = {
       path: 'metrics',
     },
   ],
-};
+});
+
+export const defaultLoggerOptions = createLoggerOptions();
 
 function getOperationName(req: IncomingMessage): string | undefined {
   if (!('body' in req)) {

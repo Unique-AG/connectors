@@ -15,6 +15,7 @@ describe('ManifestController', () => {
       endpoints: {
         mcp: '/mcp',
         auth: '/auth',
+        adminConsent: '/admin/consent',
         favicon: '/favicon.ico',
         manifest: '/site.webmanifest',
         icons: '/icons/',

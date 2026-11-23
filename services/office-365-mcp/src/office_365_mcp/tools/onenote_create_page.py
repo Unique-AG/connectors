@@ -8,7 +8,6 @@ from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.method import Method
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.onenote_page import OnenotePage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
@@ -19,7 +18,9 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
     request_with_query,
+    send_parsed,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
     OnenoteSectionHandle,
@@ -34,7 +35,6 @@ from office_365_mcp.shared.notes import (
     onenote_root,
     section_audience,
     web_url_of,
-    write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
@@ -47,6 +47,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_create_page"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_CREATE = "create_page"
 
@@ -247,7 +249,7 @@ async def create_page(
     refused: str | None = None
     with (
         owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
     ):
         audience = await _notebook_audience_for(client, handle)
         if answer_pending or audience.reaches_others:
@@ -257,9 +259,7 @@ async def create_page(
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_CREATE):
-                created = await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-                    request, OnenotePage, {"XXX": ODataError}
-                )
+                created = await send_parsed(client, request, OnenotePage)
 
     if asked is not None:
         return asked
@@ -316,7 +316,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Page",
+        title="OneNote: Create a Page",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

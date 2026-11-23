@@ -20,7 +20,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared import identity
-from office_365_mcp.shared.calendar import CalendarSummary, confirmation_id_for
+from office_365_mcp.shared.calendar import CalendarSummary
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, calendar_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -31,6 +32,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_delete_calendar"
+
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
 
 STEP_CALENDAR = "calendar"
 STEP_EVENTS = "calendar_events"
@@ -137,7 +140,7 @@ async def delete_calendar(
         raise ToolError(_NOT_A_CALENDAR_HANDLE)
 
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         calendar = await _calendar(client, handle.calendar_id)
         refused = _refusal(calendar, await identity.signed_in_user(client))
         if refused is None and await _holds_an_event(client, handle.calendar_id):
@@ -211,7 +214,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Calendar",
+        title="Outlook: Delete a Calendar",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

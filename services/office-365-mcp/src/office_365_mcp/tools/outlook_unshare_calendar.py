@@ -16,7 +16,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, calendar_permission_handle
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -28,6 +28,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_unshare_calendar"
+
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
 
 STEP_PERMISSION = "calendar_permission"
 STEP_CALENDAR = "calendar"
@@ -128,7 +130,7 @@ async def unshare_calendar(
     calendar = CalendarHandle(handle.calendar_id)
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_PERMISSION):
             permission = await share.get()
         assert permission is not None, "Graph answered a calendar permission read with nothing"
@@ -192,7 +194,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Stop Sharing a Calendar",
+        title="Outlook: Unshare a Calendar",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

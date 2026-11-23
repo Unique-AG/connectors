@@ -3,6 +3,12 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from mcp_configs import RateLimitSettings
+from mcp_observability import (
+    RateLimitMiddleware,
+    ToolCallObservabilityMiddleware,
+    access_token_subject,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from opentelemetry.metrics import NoOpMeterProvider
 from starlette.applications import Starlette
@@ -15,14 +21,27 @@ from unique_toolkit.monitoring import configure_tracing
 from office_365_mcp.auth import build_auth, build_oauth_storage
 from office_365_mcp.cardinality import BoundedNameMiddleware, BoundedRequestMiddleware
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig
-from office_365_mcp.graph_client import GraphSettings, create_graph_transport
+from office_365_mcp.graph_client import (
+    GRAPH_STATUSES,
+    GraphSettings,
+    create_graph_transport,
+    start_operation_series,
+)
+from office_365_mcp.graph_operations import GraphOperationMiddleware, start_tool_outcomes
 from office_365_mcp.logging import (
     HttpRequestIdMiddleware,
     MessageLogMiddleware,
     configure_logging,
 )
-from office_365_mcp.metrics import configure_metrics
-from office_365_mcp.server import admin_consent_url, ready_response, surface_manifest
+from office_365_mcp.metrics import LATENCY_BUCKETS, configure_metrics
+from office_365_mcp.server import (
+    SpendAnsweredState,
+    admin_consent_url,
+    ready_response,
+    request_state_security,
+    surface_manifest,
+)
+from office_365_mcp.server_icons import SERVER_ICONS
 from office_365_mcp.shared.seam import GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, register_tools, resolve
 from office_365_mcp.tracing import TraceContextCaptureMiddleware, TraceContextRestoreMiddleware
@@ -31,40 +50,13 @@ __all__ = ["create_app"]
 
 logger = logging.getLogger(__name__)
 
-# `prometheus_client`'s default layout plus four boundaries above it. One inbound MCP request holds
-# a tool call and every Graph call that tool made: 30 s per request times four attempts is 120 s
-# before any Retry-After wait, and a paged walk is several requests. The default's top finite bucket
-# is 10 s, so every one of those lands in `+Inf` and p95 and p99 both read 10.
-#
-# Trap: the histogram is registered once per process and the first middleware to declare it wins its
-# buckets, so this has to travel on the `setup_ops` call and cannot be corrected later.
-_HTTP_DURATION_BUCKETS = (
-    0.005,
-    0.01,
-    0.025,
-    0.05,
-    0.075,
-    0.1,
-    0.25,
-    0.5,
-    0.75,
-    1.0,
-    2.5,
-    5.0,
-    7.5,
-    10.0,
-    30.0,
-    60.0,
-    120.0,
-    300.0,
-)
-
 
 def create_app(
     config: AppConfig | None = None,
     database_config: DatabaseConfig | None = None,
     entra_config: EntraConfig | None = None,
     surface_config: SurfaceConfig | None = None,
+    rate_limit: RateLimitSettings | None = None,
 ) -> Starlette:
     """Compose the app. Every long-lived object is built once and injected."""
     config = config or AppConfig()
@@ -118,26 +110,42 @@ def create_app(
     mcp = FastMCP(
         "Office 365 MCP",
         version=config.version,
+        icons=SERVER_ICONS,
         auth=auth,
+        mask_error_details=True,
+        request_state_security=request_state_security(),
         # Earlier in this list is further out: `add_middleware` appends and the chain is built over
         # `reversed(middleware)`. The first two are ordered for that, not for tidiness.
         #
         # The name one first, because `setup_ops`' metrics middleware labels a Prometheus counter
         # with the name the *client* sent, before anything has resolved it. See `cardinality.py`.
-        # Then the advice one, outside the operations layer, so a client reads the polished refusal
-        # while that layer still logs the untranslated failure.
+        # Then the advice one, so a client reads the polished refusal. The tool-call line logs that
+        # refusal, and the Graph error stays in its cause chain.
         middleware=[
+            # Outermost FastMCP middleware: logs one line per tool call (start, complete/fail).
+            ToolCallObservabilityMiddleware(),
             BoundedNameMiddleware(),
             GraphAdviceMiddleware(graph_advice(selection)),
+            SpendAnsweredState(),
             TraceContextRestoreMiddleware(),
             # Inside the restore middleware, or its line carries the session task's stale trace.
             MessageLogMiddleware(),
+            *(
+                [RateLimitMiddleware(rate_limit, get_request_key=access_token_subject)]
+                if rate_limit is not None
+                else []
+            ),
+            GraphOperationMiddleware(),
         ],
         lifespan=lifespan,
     )
     register_tools(mcp, graph_transport, selection)
+    start_operation_series(selection.tools, statuses=GRAPH_STATUSES)
+    start_tool_outcomes(selection.tools)
 
-    ops_middleware = setup_ops(mcp, duration_buckets=_HTTP_DURATION_BUCKETS)
+    # Trap: the histogram is registered once per process and the first middleware to declare it wins
+    # its buckets, so this has to travel on the `setup_ops` call and cannot be corrected later.
+    ops_middleware = setup_ops(mcp, duration_buckets=LATENCY_BUCKETS)
 
     @mcp.custom_route("/ready", methods=["GET"])
     async def ready(_request: Request) -> JSONResponse:

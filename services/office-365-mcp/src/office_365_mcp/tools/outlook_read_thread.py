@@ -15,9 +15,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import PREVIEW_CHARACTERS, SUMMARY_FIELDS, MailSummary
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
     READ_ONLY,
@@ -26,6 +26,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_read_thread"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP_ANCHOR = "thread_anchor"
 STEP_THREAD = "thread_messages"
@@ -97,7 +99,7 @@ async def read_thread(
     client: GraphServiceClient, *, handle: MailMessageHandle, mailbox: str | None = None
 ) -> MailThread:
     reached = graph_mailbox(client, mailbox)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_ANCHOR):
             anchor = await reached.messages.by_message_id(handle.message_id).get(
                 request_configuration=_anchor_request()
@@ -189,7 +191,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read Mail Thread",
+        title="Outlook: Read Mail Thread",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

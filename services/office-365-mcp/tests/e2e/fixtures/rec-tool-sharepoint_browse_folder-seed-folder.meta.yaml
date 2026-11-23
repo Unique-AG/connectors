@@ -1,0 +1,23 @@
+scenario: sharepoint_browse_folder-seed-folder
+fixture: rec-tool-sharepoint_browse_folder-seed-folder
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:59:13+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 47
+  keys dropped: 14
+  persona addresses: 10
+  persona names: 10
+  query parameters dropped: 8
+  response headers dropped: 14
+  text kept: 23
+  text replaced: 9
+literals:
+- seed-v1 Project Plan
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

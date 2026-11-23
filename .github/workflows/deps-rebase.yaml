@@ -1,0 +1,52 @@
+name: "[Deps] Rebase"
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  request:
+    name: Request
+    if: >-
+      github.event.issue.pull_request
+      && contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association)
+      && (startsWith(github.event.comment.body, '/rebase') || startsWith(github.event.comment.body, '/recreate'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write # to start the nightly workflow for this pull request
+      contents: read # to read the repository
+      pull-requests: write # to react to the comment
+    steps:
+      - name: Start the nightly workflow for this pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ github.event.issue.number }}
+          COMMENT_ID: ${{ github.event.comment.id }}
+          COMMENT: ${{ github.event.comment.body }}
+        run: |
+          first_line=${COMMENT%%$'\n'*}
+          case "${first_line%$'\r'}" in
+            "/rebase") recreate=false ;;
+            "/recreate") recreate=true ;;
+            *) exit 0 ;;
+          esac
+          branch=$(gh pr view "$NUMBER" --json headRefName --jq .headRefName)
+          labels=$(gh pr view "$NUMBER" --json labels --jq '[.labels[].name] | join(",")')
+          case ",$labels," in
+            *,dependencies,*) ;;
+            *) exit 0 ;;
+          esac
+          case "$branch" in
+            deps/*) ;;
+            *) exit 0 ;;
+          esac
+          gh api "repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions" -f content=eyes > /dev/null
+          gh workflow run deps-nightly.yaml -f dry-run=false -f pr="$NUMBER" -f recreate="$recreate" -f comment="$COMMENT_ID"
+          gh pr view "$NUMBER" --json body --jq .body \
+            | perl -0pe 's/<!-- deps-status -->.*?<!-- \/deps-status -->\r?\n(\r?\n)?//s' \
+            | { printf '<!-- deps-status -->\n> [!NOTE]\n> Rebuilding this pull request. This note goes away when the run ends.\n<!-- /deps-status -->\n\n'; cat; } \
+            | gh pr edit "$NUMBER" --body-file -

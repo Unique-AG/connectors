@@ -431,6 +431,9 @@ Custom connector metrics use the `cfc_` prefix (Confluence Connector). Unique pl
 | Metric                                    | Type      | Labels            | Description                                              |
 |-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
 | `cfc_sync_duration_seconds`               | Histogram | `tenant`, `result` | Duration of a full synchronization cycle per tenant     |
+| `cfc_syncs_total`                         | Counter   | `tenant`, `result` | Finished sync cycles. Starts at 0 for both results, so the first sync after a pod start is counted |
+| `cfc_sync_start_timestamp_seconds`        | Gauge     | `tenant`          | Unix time the running sync cycle started. 0 while no sync runs |
+| `cfc_last_successful_sync_timestamp_seconds` | Gauge  | `tenant`          | Unix time of the last successful sync cycle. A sync with failed pages or attachments still counts as successful. Absent until the pod's first successful sync |
 | `cfc_scan_duration_seconds`               | Histogram | `tenant`          | Duration of the page discovery (scan) phase              |
 | `cfc_attachment_upload_duration_seconds`   | Histogram | `tenant`          | Duration of a single attachment upload to Unique         |
 
@@ -440,9 +443,9 @@ Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 2
 
 | Metric                                | Type    | Labels                        | Description                                                                      |
 |---------------------------------------|---------|-------------------------------|----------------------------------------------------------------------------------|
-| `cfc_pages_processed_total`           | Counter | `tenant`, `result`            | Pages ingested per sync cycle                                                    |
-| `cfc_attachments_processed_total`     | Counter | `tenant`, `result`            | Attachments ingested per sync cycle                                              |
-| `cfc_content_deleted_total`           | Counter | `tenant`, `result`            | Content items deleted from Unique                                                |
+| `cfc_pages_processed_total`           | Counter | `tenant`, `result`            | Pages processed per sync cycle. `result` is `success`, `failure` or `skipped` (missing or empty page) |
+| `cfc_attachments_processed_total`     | Counter | `tenant`, `result`            | Attachments processed per sync cycle. `result` is `success` or `failure`        |
+| `cfc_content_deleted_total`           | Counter | `tenant`, `result`            | Content items deleted from Unique. `result="failure"` counts deletions that failed |
 | `cfc_file_diff_events_total`         | Counter | `tenant`, `diff_result_type`  | File change detection events (`new`, `updated`, `deleted`, `moved`)              |
 | `cfc_orphaned_scopes_cleaned_total`   | Counter | `tenant`, `result`            | Space scopes removed after their Confluence space was removed or unlabeled       |
 | `cfc_orphaned_files_cleaned_total`    | Counter | `tenant`                      | Files removed during orphaned space cleanup                                      |
@@ -452,6 +455,7 @@ Attachment upload histogram buckets: 100ms, 200ms, 500ms, 1s, 2s, 3s, 5s, 10s, 2
 | Metric                                    | Type      | Labels            | Description                                              |
 |-------------------------------------------|-----------|-------------------|----------------------------------------------------------|
 | `cfc_cleanup_duration_seconds`            | Histogram | `tenant`, `result` | Duration of a deleted tenant content cleanup             |
+| `cfc_tenant_cleanups_total`               | Counter   | `tenant`, `result` | Finished deleted tenant cleanup runs. Starts at 0 for both results |
 | `cfc_cleanup_content_deleted_total`       | Counter   | `tenant`, `result` | Content items deleted during tenant cleanup              |
 | `cfc_cleanup_scopes_deleted_total`        | Counter   | `tenant`, `result` | Scopes deleted during tenant cleanup                     |
 
@@ -477,7 +481,7 @@ Confluence API request histogram buckets: 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s
 
 ### Grafana Dashboard
 
-A Grafana dashboard ConfigMap is available in the Helm chart. The dashboard visualizes sync durations, content throughput, attachment uploads, Confluence API performance, Unique API performance, and Node.js runtime metrics. Enable it with:
+The Helm chart creates a Grafana dashboard ConfigMap by default. Grafana's dashboard sidecar loads it from the `grafana_dashboard` label. The dashboard shows current sync health per tenant, totals for the selected time range, sync and content flow, Confluence and Unique API traffic and errors, and pod resources. Choose the folder or turn it off with:
 
 ```yaml
 grafana:
@@ -490,43 +494,40 @@ grafana:
 
 #### Default Alerts
 
-The Helm chart provides one default alert:
+The Helm chart ships these alerts under `prometheus.additionalAlerts`:
 
-| Category    | Alert Name                              | Description                                                                          |
-|-------------|-----------------------------------------|--------------------------------------------------------------------------------------|
-| `uniqueApi` | `ConfluenceConnectorUniqueAPIErrors`    | Fires when the Unique API error rate (4xx/5xx responses) exceeds the configured threshold |
+| Alert | Fires when | `for` | Severity |
+|---|---|---|---|
+| `ConfluenceConnectorUniqueAPIErrors` | More than 1% of the requests to the Unique API (GraphQL and REST) failed in the last 75 minutes | `5m` | `warning` |
+| `ConfluenceConnectorSyncFailing` | At least two syncs of a tenant in the last 3 hours, and all of them failed | `15m` | `critical` |
+| `ConfluenceConnectorSyncDegraded` | More than half of a tenant's syncs in the last 6 hours failed, and at least one in the last 3 hours succeeded | `15m` | `warning` |
+| `ConfluenceConnectorSyncStuck` | A sync has run for more than 6 hours. Later syncs of the tenant are skipped meanwhile | `5m` | `warning` |
+| `ConfluenceConnectorContentFailures` | Pages, attachments or deletions fail on every sync for 3 hours | `3h` | `warning` |
+| `ConfluenceConnectorTenantCleanupFailing` | At least two cleanup runs of a tenant with status `deleted` in the last 3 hours, and all of them failed | `15m` | `warning` |
 
-**Default alert parameters:**
+The sync alerts expect syncs that start at least hourly and finish within the interval. `SyncFailing`, `SyncDegraded` and `TenantCleanupFailing` need at least two outcomes in their window, so one failed sync, such as the first after a pod start, does not fire them. A sync that runs longer than the interval makes the scheduler skip the next start. For slower schedules or longer syncs, widen the windows so each holds at least two sync outcomes.
 
-| Parameter   | Default Value          |
-|-------------|------------------------|
-| `threshold` | `0.01` (1% error rate) |
-| `for`       | `30s`                  |
-| `severity`  | `warning`              |
+`ContentFailures` uses a 2-hour window because two hourly syncs that finish at different minutes can record their failures almost 2 hours apart. Its `for: 3h` is longer than the window, so the failures of one sync alone never fire it.
+
+Requests to Unique only happen during a sync, so the 75-minute window must be longer than the sync interval (`scanIntervalCron`). For schedules slower than hourly, override the rule's `expr` with a wider window, or the alert resolves between failing syncs.
 
 #### Alert Configuration
 
-Enable alerts and customize per-alert parameters in Helm `values.yaml`:
+Each alert is a complete rule under `prometheus.additionalAlerts`. Override any field in your values, or replace the whole rule:
 
 ```yaml
-alerts:
-  enabled: true
+prometheus:
+  additionalAlerts:
+    ConfluenceConnectorUniqueAPIErrors:
+      for: 15m
+      labels:
+        severity: critical
   defaultAlerts:
-    uniqueApi:
-      enabled: true
-      # Disable specific alerts:
-      disabled: {}
-        # ConfluenceConnectorUniqueAPIErrors: true
-      # Override alert parameters:
-      customRules: {}
-        # ConfluenceConnectorUniqueAPIErrors:
-        #   for: "15s"
-        #   severity: "critical"
-        #   threshold: 0.05
-    additionalLabels: {}
-      # environment: production
-      # team: backend
+    additionalLabels:
+      team: data-flow
 ```
+
+`defaultAlerts.additionalLabels` is added to every alert, including these.
 
 Alerts require the `monitoring.coreos.com/v1` API (Prometheus Operator) to be available in the cluster.
 
@@ -542,7 +543,7 @@ The endpoint runs three checks on every request:
 
 **Sync** -- Evaluates each active tenant's sync history from a sliding window of the last N runs (configurable via `HEALTH_SYNC_HISTORY_SIZE`). Each tenant's failure ratio is computed independently as `failures / appearances`. If any tenant exceeds `HEALTH_SYNC_TENANT_FAILURE_THRESHOLD`, the check is `down`. When no sync has completed yet (e.g. shortly after startup), this check reports `up` with `message: "No sync records yet"`. A single transient failure is absorbed by the window and does not trigger an alert. Skipped runs caused by an in-progress sync overlap are not recorded so they cannot dilute the window.
 
-Sync health is evaluated at tenant level. In the Confluence connector, each tenant owns its own cron job, configuration, credentials, and operational lifecycle, so a tenant is the smallest unit that can independently fail or recover. Per-item ingestion failures are exposed through logs and metrics; `/health.sync` answers whether each active tenant's scheduled sync is consistently succeeding.
+Sync health is evaluated at tenant level. In the Confluence connector, each tenant owns its own cron job, configuration, credentials, and operational lifecycle, so a tenant is the smallest unit that can independently fail or recover. Per-item ingestion failures are exposed through logs and metrics and do not fail the sync, because the items are retried on the next one. This holds even when every item of a sync fails: a page that always fails comes back on every sync, and it would otherwise fail every sync of a quiet tenant. `ConfluenceConnectorContentFailures` alerts on item failures. `/health.sync` answers whether each active tenant's scheduled sync is consistently succeeding.
 
 **Connectivity** -- Performs unauthenticated HTTP requests to the Atlassian API host (`https://api.atlassian.com/`, only when at least one Cloud tenant is configured) and to each unique active tenant `confluence.baseUrl`. Any HTTP response (including 401/403) proves the endpoint is reachable -- only transport-level failures (DNS, TLS, timeout, connection refused) are treated as unhealthy. Deleted tenants are excluded because they no longer talk to Confluence.
 

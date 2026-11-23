@@ -5,11 +5,12 @@ the prose that teaches a model when to reach for it, its Graph permissions, its 
 answer shape, its request and its refusals. `shared/` is what a second tool will not be free to
 disagree with it about. `graph_client/` is the transport they borrow.
 
-1. **`shared/` imports no tool module, and only `shared/seam.py` imports FastMCP.** `shared/` is
-   what two tools must not disagree about and a tool is what disagrees, so the direction is one-way.
-   FastMCP is not banned outright because the On-Behalf-Of token dependency and the `ToolError` a
-   Graph refusal becomes are types every tool must say identically; allowing them in one named file
-   keeps the framework out of the handle grammar, the message shape and the rest of the vocabulary.
+1. **`shared/` imports no tool module, and only the `shared/seam/` package imports FastMCP.**
+   `shared/` is what two tools must not disagree about and a tool is what disagrees, so the
+   direction is one-way. FastMCP is not banned outright because the On-Behalf-Of token dependency
+   and the `ToolError` a Graph refusal becomes are types every tool must say identically; allowing
+   them in one named package keeps the framework out of the handle grammar, the message shape and
+   the rest of the vocabulary.
 
 2. **`graph_client/` imports nothing of this application.** It takes its own frozen `GraphSettings`
    rather than reading config, because a transport is allowed to be *told* and not to be configured;
@@ -17,7 +18,9 @@ disagree with it about. `graph_client/` is the transport they borrow.
 
 3. **`tools/` imports `shared/`, `graph_client/` and FastMCP, and nothing else of this package.**
    Not `server/`: a tool that reached into it would have its wiring somewhere other than in itself,
-   which is the shape this layout exists to avoid.
+   which is the shape this layout exists to avoid. Not `config`, `logging` or any other module of
+   the package either: a tool is told what it needs through `shared/`, and `tools/` itself is
+   allowed only because the registry in `tools/__init__.py` names its own modules.
 
 4. **No tool module imports another tool module.** Two tool files sharing a description constant, an
    error text or a helper would re-create the tool-declaration module they exist instead of, one
@@ -62,15 +65,24 @@ disagree with it about. `graph_client/` is the transport they borrow.
    tool module is named — the list a selection is filtered over and every Graph scope sign-in asks
    for is derived from. `shared/` is deliberately not listed because it publishes no surface: its
    *modules* are the units and every consumer names which of them it depends on at the import line,
-   so an `__init__` re-exporting the lot would hide the one thing the package exists to show. A
-   package joins the list as soon as its `__init__` exports anything.
+   so an `__init__` re-exporting the lot would hide the one thing the package exists to show.
+   `shared/seam/` is listed: it is one unit, split into a module per concern, and every tool names
+   it at the import line as a whole. A package joins the list as soon as its `__init__` exports
+   anything.
 
-9. **Only `shared/seam.py` puts a question to a person.** `Context.elicit` is a capability the
-   protocol era decides: on a 2026-07-28 connection it raises before the wire and the question
-   travels as an `InputRequiredResult` instead, so a tool that called it directly would work on one
-   era and silently refuse on the other, and its unit tests, which stub `Context`, would stay green.
-   `person_confirms` in the seam is where both eras are handled, and every tool that asks goes
-   through it.
+9. **Only `shared/seam/elicitation.py` puts a question to a person.** `Context.elicit` is a
+   capability the protocol era decides: on a 2026-07-28 connection it raises before the wire and
+   the question travels as an `InputRequiredResult` instead, so a tool that called it directly would
+   work on one era and silently refuse on the other, and its unit tests, which stub `Context`, would
+   stay green. `person_confirms` in the seam is where both eras are handled, and every tool that
+   asks goes through it.
+
+10. **A tool imports the shared modules of its own surface and never those of another.** A tool
+    named `outlook_…`, `teams_…`, `sharepoint_…` or `onenote_…` may import the neutral modules
+    directly in `shared/` and its own `shared/<surface>/`, and never `shared/<other surface>/`. A
+    module goes into a surface package because only that surface's tools use it. A second surface
+    that reached into it would make it neutral without a move, and the package name would then
+    tell a reader something false.
 
 Every rule is paired with a guard that fails once the rule has nothing left to check, because a rule
 written down while it forbids nothing gets deleted for the wrong reason later, or worse, kept while
@@ -101,21 +113,27 @@ _CONFIG_MODULE = "office_365_mcp.config"
 _GRAPH_CLIENT_PREFIX = "office_365_mcp.graph_client"
 _MCP_FRAMEWORK = "fastmcp"
 
+_TOOL_DEPENDENCIES: tuple[str, ...] = (_SHARED_PREFIX, _GRAPH_CLIENT_PREFIX, _TOOLS_PREFIX)
+
+_SURFACES: tuple[str, ...] = ("outlook", "teams", "sharepoint", "onenote")
+
 # Rule 8. The rule walks `src` only, so tests stay free to reach the pieces a package composes.
 _PUBLIC_SURFACE_PACKAGES: tuple[str, ...] = (
     "office_365_mcp.graph_client",
     "office_365_mcp.server",
+    "office_365_mcp.shared.seam",
     "office_365_mcp.tools",
 )
 
-_SEAM = _SHARED / "seam.py"
+_SEAM = _SHARED / "seam"
+_ASKER = _SEAM / "elicitation.py"
 
 _HANDLE_OWNER = _SHARED / "handles.py"
 # One scheme per product, and the families each one addresses. Both halves are written out: a
 # scheme nothing lists is a grammar no rule guards, and a family nothing lists is a surface that
 # became addressable without anybody deciding it should be.
 _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
-    "teams:///": frozenset({"chats", "teams", "meetings", "transcripts"}),
+    "teams:///": frozenset({"chats", "teams", "meetings", "transcripts", "calltranscripts"}),
     "outlook:///": frozenset(
         {
             "messages",
@@ -127,7 +145,7 @@ _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
             "contacts",
         }
     ),
-    "sharepoint:///": frozenset({"files", "folders"}),
+    "sharepoint:///": frozenset({"files", "folders", "lists", "listitems"}),
     "onenote:///": frozenset({"sections", "pages", "notebooks", "sectiongroups", "operations"}),
 }
 _HANDLE_SCHEMES: tuple[str, ...] = tuple(_HANDLE_FAMILIES)
@@ -305,17 +323,26 @@ def _is_inside(directory: pathlib.Path, package: str) -> bool:
     )
 
 
+def _is_module(name: str) -> bool:
+    path = _SRC.parent.joinpath(*name.split("."))
+    return path.with_suffix(".py").is_file() or path.is_dir()
+
+
 def _internal_imports(
     source: str, directory: pathlib.Path, package: str | None = None
 ) -> list[tuple[str, int]]:
     """A file inside a package may import its own package's modules freely — that is the package
     composing itself, `tools/__init__.py` naming every tool module being the clearest case — so the
     directory the file lives in, not its name, decides."""
+    tree = ast.parse(source)
+    submodules = [
+        (member, line) for member, line in _imported_members(tree, package) if _is_module(member)
+    ]
     return [
         (module, line)
         for surface in _PUBLIC_SURFACE_PACKAGES
         if not _is_inside(directory, surface)
-        for module, line in _imported_modules(ast.parse(source), package)
+        for module, line in [*_imported_modules(tree, package), *submodules]
         if module.startswith(f"{surface}.")
     ]
 
@@ -510,6 +537,90 @@ def _registry_imports() -> set[str]:
     return found
 
 
+def _is_under(module: str, prefix: str) -> bool:
+    return module == prefix or module.startswith(f"{prefix}.")
+
+
+def _reached_modules(source: str, package: str | None = None) -> list[tuple[str, int]]:
+    """`from office_365_mcp import config` names the module `office_365_mcp`, so the member is what
+    tells which part of the package it reaches."""
+    tree = ast.parse(source)
+    return (
+        [(module, line) for module, line in _imported_modules(tree, package) if module != _PACKAGE]
+        + _whole_package_imports(tree)
+        + [
+            (member, line)
+            for member, line in _imported_members(tree, package)
+            if member.rsplit(".", 1)[0] == _PACKAGE
+        ]
+    )
+
+
+def _whole_package_imports(tree: ast.AST) -> list[tuple[str, int]]:
+    return [
+        (alias.name, node.lineno)
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import)
+        for alias in node.names
+        if alias.name == _PACKAGE
+    ]
+
+
+def _undeclared_dependencies(source: str, package: str | None = None) -> list[tuple[str, int]]:
+    return [
+        (module, line)
+        for module, line in _reached_modules(source, package)
+        if _is_under(module, _PACKAGE)
+        and not any(_is_under(module, allowed) for allowed in _TOOL_DEPENDENCIES)
+    ]
+
+
+def _surface_of(tool_name: str | None) -> str | None:
+    if tool_name is None:
+        return None
+    return next((surface for surface in _SURFACES if tool_name.startswith(f"{surface}_")), None)
+
+
+def _declared_tool_name(source: pathlib.Path) -> str | None:
+    for node in ast.parse(source.read_text()).body:
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+        elif isinstance(node, ast.AnnAssign):
+            targets = [node.target]
+        else:
+            continue
+        named = any(isinstance(target, ast.Name) and target.id == "TOOL_NAME" for target in targets)
+        if named and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return node.value.value
+    return None
+
+
+def _tool_surface(source: pathlib.Path) -> str | None:
+    return _surface_of(_declared_tool_name(source))
+
+
+def _other_surface_imports(
+    source: str, surface: str, package: str | None = None
+) -> list[tuple[str, int]]:
+    """`from office_365_mcp.shared import outlook` reaches the package as a member, so members of
+    `shared` are judged as well as the modules imported by name."""
+    tree = ast.parse(source)
+    reached = _imported_modules(tree, package) + [
+        (member, line)
+        for member, line in _imported_members(tree, package)
+        if member.rsplit(".", 1)[0] == _SHARED_PREFIX
+    ]
+    return [
+        (module, line)
+        for module, line in reached
+        if any(
+            _is_under(module, f"{_SHARED_PREFIX}.{other}")
+            for other in _SURFACES
+            if other != surface
+        )
+    ]
+
+
 def _attribute_names(source: str) -> set[str]:
     """Attribute names rather than text so that rule 7 constrains code and leaves prose alone: the
     module it guards has to be able to name the Graph `recordingContentUrl` property it deliberately
@@ -676,6 +787,80 @@ class TestTheDetectionItself:
             _TOOLS_PREFIX,
         )
 
+    def test_catches_a_tool_reaching_past_its_three_dependencies(self) -> None:
+        assert _undeclared_dependencies(
+            "from office_365_mcp.config import AppConfig\n"
+            + "from office_365_mcp import logging\n"
+            + "from office_365_mcp.server.readiness import ready_response\n"
+        ) == [
+            ("office_365_mcp.config", 1),
+            ("office_365_mcp.server.readiness", 3),
+            ("office_365_mcp.logging", 2),
+        ]
+
+    def test_catches_a_tool_importing_the_whole_package(self) -> None:
+        assert _undeclared_dependencies(
+            "import office_365_mcp\n"
+            + "import office_365_mcp as package\n"
+            + "from office_365_mcp import shared\n"
+        ) == [("office_365_mcp", 1), ("office_365_mcp", 2)]
+
+    def test_leaves_the_three_dependencies_of_a_tool_alone(self) -> None:
+        assert not _undeclared_dependencies(
+            "from office_365_mcp.shared.seam import READ_ONLY\n"
+            + "from office_365_mcp.shared import identity\n"
+            + "from office_365_mcp.graph_client import graph_step\n"
+            + "from office_365_mcp.tools import get_me\n"
+            + "from fastmcp import FastMCP\n"
+        )
+
+    def test_catches_a_tool_reaching_into_another_surface(self) -> None:
+        assert _other_surface_imports(
+            "from office_365_mcp.shared.outlook.rules import RuleDraft\n"
+            + "from office_365_mcp.shared import sharepoint\n",
+            "teams",
+        ) == [
+            ("office_365_mcp.shared.outlook.rules", 1),
+            ("office_365_mcp.shared.sharepoint", 2),
+        ]
+
+    def test_leaves_the_own_surface_and_the_neutral_modules_alone(self) -> None:
+        assert not _other_surface_imports(
+            "from office_365_mcp.shared.teams.messages import MessageSummary\n"
+            + "from office_365_mcp.shared.teams import meetings\n"
+            + "from office_365_mcp.shared.calendar import EventDraft\n"
+            + "from office_365_mcp.shared import identity\n",
+            "teams",
+        )
+
+    def test_names_the_surface_by_the_tool_name_prefix(self) -> None:
+        assert [
+            _surface_of(name)
+            for name in ("outlook_list_mail", "teams_list_chats", "sharepointish_tool", "get_me")
+        ] == ["outlook", "teams", None, None]
+
+    def test_names_the_surface_by_the_declared_tool_name_and_not_the_file_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        module = tmp_path / "teams_renamed.py"
+        _ = module.write_text('TOOL_NAME = "outlook_list_mail"\n')
+
+        assert _tool_surface(module) == "outlook"
+
+    def test_names_the_surface_of_an_annotated_tool_name(self, tmp_path: pathlib.Path) -> None:
+        module = tmp_path / "list_chats.py"
+        _ = module.write_text('TOOL_NAME: str = "teams_list_chats"\n')
+
+        assert _tool_surface(module) == "teams"
+
+    def test_names_no_surface_for_a_module_that_declares_no_tool_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        module = tmp_path / "teams_helpers.py"
+        _ = module.write_text('STEP = "chats"\n')
+
+        assert _tool_surface(module) is None
+
     def test_catches_the_violation_the_internals_rule_exists_for(self) -> None:
         reached = _internal_imports(
             "from office_365_mcp.server.readiness import ready_response", _SRC
@@ -686,6 +871,11 @@ class TestTheDetectionItself:
     def test_catches_reaching_past_the_registry_for_a_tool_file(self) -> None:
         assert _internal_imports("from office_365_mcp.tools.get_me import register", _SRC) == [
             ("office_365_mcp.tools.get_me", 1)
+        ]
+
+    def test_catches_a_submodule_named_in_the_import_list(self) -> None:
+        assert _internal_imports("from office_365_mcp.shared.seam import elicitation", _SRC) == [
+            ("office_365_mcp.shared.seam.elicitation", 1)
         ]
 
     def test_the_same_import_is_fine_inside_the_package(self) -> None:
@@ -863,16 +1053,19 @@ class TestSharedIsUpstreamOfEveryTool:
 
 class TestOnlyTheSeamSpeaksMcp:
     def test_the_seam_actually_speaks_it(self) -> None:
-        assert _SEAM.is_file(), f"no such file: {_SEAM}"
-        assert _imports_under(_SEAM.read_text(), _MCP_FRAMEWORK, _package_of(_SEAM)), (
-            f"{_SEAM.name} no longer imports FastMCP, so it is no longer the seam"
-        )
+        assert _sources(_SEAM), f"no seam modules found under {_SEAM}"
+        assert any(
+            _imports_under(source.read_text(), _MCP_FRAMEWORK, _package_of(source))
+            for source in _sources(_SEAM)
+        ), f"no module of {_SEAM.name}/ imports FastMCP, so it is no longer the seam"
 
-    @pytest.mark.parametrize("source", [s for s in _sources(_SHARED) if s != _SEAM], ids=_source_id)
+    @pytest.mark.parametrize(
+        "source", [s for s in _sources(_SHARED) if s not in _sources(_SEAM)], ids=_source_id
+    )
     def test_no_other_shared_module_imports_the_mcp_framework(self, source: pathlib.Path) -> None:
         violations = _violations(source, _MCP_FRAMEWORK)
         assert not violations, (
-            "only shared/seam.py may import FastMCP — the rest of the shared vocabulary answers "
+            "only shared/seam/ may import FastMCP — the rest of the shared vocabulary answers "
             + "with its own types and raises Graph failures, and turning either into something an "
             + "MCP client sees is the seam's job or the tool's. Return the fact (or raise) and let "
             + "the tool decide what to say:\n  "
@@ -925,6 +1118,66 @@ class TestAToolLeansOnlyOnSharedAndTheTransport:
             "a tool file must not import server/ — that is the shape it exists instead of, and a "
             + "tool that reaches into it has its wiring somewhere other than in itself. Bring it "
             + "into this file, and put anything a second tool needs into shared/:\n  "
+            + "\n  ".join(violations)
+        )
+
+    @pytest.mark.parametrize("source", _sources(_TOOLS), ids=_source_id)
+    def test_no_tool_module_imports_anything_else_of_ours(self, source: pathlib.Path) -> None:
+        violations = [
+            f"{source.relative_to(_SRC)}:{line} imports {module}"
+            for module, line in _undeclared_dependencies(source.read_text(), _package_of(source))
+        ]
+        assert not violations, (
+            "a tool file imports shared/, graph_client/ and FastMCP, and nothing else of this "
+            + "package. What a tool needs from the rest of the application reaches it through "
+            + "shared/, where every tool says it the same way:\n  "
+            + "\n  ".join(violations)
+        )
+
+
+class TestAToolStaysOnItsOwnSurface:
+    @pytest.mark.parametrize("surface", _SURFACES)
+    def test_every_surface_actually_has_tools(self, surface: str) -> None:
+        assert any(_tool_surface(source) == surface for source in _tool_modules()), (
+            f"no tool module declares a TOOL_NAME {surface}_…, so rule 10 checks nothing for it"
+        )
+
+    @pytest.mark.parametrize(
+        "surface", [surface for surface in _SURFACES if (_SHARED / surface).is_dir()]
+    )
+    def test_every_surface_package_is_used_by_its_own_tools(self, surface: str) -> None:
+        prefix = f"{_SHARED_PREFIX}.{surface}"
+        users = [
+            source
+            for source in _tool_modules()
+            if _tool_surface(source) == surface
+            and _imports_under(source.read_text(), prefix, _package_of(source))
+        ]
+        assert users, (
+            f"no {surface}_… tool imports shared/{surface}/, so the package holds nothing that "
+            + "surface needs. Move what is left to where it is used"
+        )
+
+    @pytest.mark.parametrize(
+        "source",
+        [source for source in _tool_modules() if _tool_surface(source) is not None],
+        ids=_source_id,
+    )
+    def test_no_tool_imports_the_shared_modules_of_another_surface(
+        self, source: pathlib.Path
+    ) -> None:
+        surface = _tool_surface(source)
+        assert surface is not None
+        violations = [
+            f"{source.relative_to(_SRC)}:{line} imports {module}"
+            for module, line in _other_surface_imports(
+                source.read_text(), surface, _package_of(source)
+            )
+        ]
+        assert not violations, (
+            f"a {surface}_… tool must not import the shared modules of another surface. A module "
+            + "in shared/<surface>/ is there because only that surface uses it. When a second "
+            + "surface needs it, move it up to shared/ as a neutral module:\n  "
             + "\n  ".join(violations)
         )
 
@@ -1076,26 +1329,34 @@ class TestConfigIsBuiltOnlyAtTheCompositionRoot:
 
 
 def _elicitations(source: str) -> list[int]:
-    """Every line on which `<anything>.elicit(...)` is called."""
+    """Every line on which `<anything>.elicit(...)` is called, or a question is built by hand."""
     tree = ast.parse(source)
     return sorted(
         node.lineno
         for node in ast.walk(tree)
-        if isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Attribute)
-        and node.func.attr == "elicit"
+        if isinstance(node, ast.Call) and _asks_by_hand(node.func)
     )
+
+
+def _asks_by_hand(called: ast.expr) -> bool:
+    if isinstance(called, ast.Attribute):
+        name = called.attr
+    elif isinstance(called, ast.Name):
+        name = called.id
+    else:
+        return False
+    return name in ("elicit", "InputRequiredResult") or name.startswith("ElicitRequest")
 
 
 class TestOnlyTheSeamPutsAQuestionToAPerson:
     """Rule 9."""
 
     def test_the_seam_actually_asks(self) -> None:
-        assert _SEAM.is_file(), f"no such file: {_SEAM}"
-        assert _elicitations(_SEAM.read_text()), (
-            "shared/seam.py no longer calls `.elicit(` anywhere, so this rule guards nothing; "
-            "either the confirmation moved, and the rule should follow it, or asking a person "
-            "left this service"
+        assert _ASKER.is_file(), f"no such file: {_ASKER}"
+        assert _elicitations(_ASKER.read_text()), (
+            "shared/seam/elicitation.py no longer calls `.elicit(` anywhere, so this rule guards "
+            "nothing; either the confirmation moved, and the rule should follow it, or asking a "
+            "person left this service"
         )
 
     def test_catches_the_call_the_rule_exists_for(self) -> None:
@@ -1104,16 +1365,35 @@ class TestOnlyTheSeamPutsAQuestionToAPerson:
         ) == [2]
         assert not _elicitations("async def f(ctx):\n    return ctx.elicitation\n")
 
+    def test_catches_a_question_built_by_hand(self) -> None:
+        assert _elicitations(
+            "def f(question):\n"
+            + "    return InputRequiredResult(\n"
+            + "        input_requests={'confirm': types.ElicitRequest(\n"
+            + "            params=ElicitRequestFormParams(message=question, requested_schema={})\n"
+            + "        )},\n"
+            + "    )\n"
+        ) == [2, 3, 4]
+
+    def test_leaves_an_annotation_and_a_passed_on_answer_alone(self) -> None:
+        assert not _elicitations(
+            "async def f(confirm) -> InputRequiredResult | None:\n"
+            + "    asked: InputRequiredResult | None = None\n"
+            + "    answer = await confirm('q', 'about')\n"
+            + "    return answer if isinstance(answer, InputRequiredResult) else asked\n"
+        )
+
     def test_no_other_module_asks(self) -> None:
         violations = [
             f"{_source_id(source)}:{line}"
             for source in _sources(_SRC)
-            if source != _SEAM
+            if source != _ASKER
             for line in _elicitations(source.read_text())
         ]
         assert not violations, (
-            "only shared/seam.py may call `.elicit(`: a direct call works on a handshake-era "
-            + "connection and refuses on a 2026-07-28 one, and the tests that stub Context never "
-            + "notice. Ask through `person_confirms` from shared/seam.py instead:\n  "
+            "only shared/seam/elicitation.py may call `.elicit(` or build an "
+            + "`InputRequiredResult` or an `ElicitRequest`: a direct call works on one protocol "
+            + "era and refuses on the other, and the tests that stub Context never notice. Ask "
+            + "through `person_confirms` from shared/seam/ instead:\n  "
             + "\n  ".join(violations)
         )

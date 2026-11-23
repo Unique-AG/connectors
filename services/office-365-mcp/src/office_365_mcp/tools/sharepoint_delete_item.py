@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     UNNAMED_FOLDER_LABEL,
@@ -24,7 +25,6 @@ from office_365_mcp.shared.files import (
     the_folder,
 )
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_item_handle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_delete_item"
+
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
 
 STEP_DELETE = "delete_item"
 
@@ -128,7 +130,7 @@ async def delete_item(
     about = write_state_for(TOOL_NAME, handle.drive_id, handle.item_id)
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, handle.drive_id, handle.item_id)
         if found.root is not None:
             refused = _THE_DRIVE_ROOT
@@ -199,7 +201,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete an Item",
+        title="SharePoint: Delete an Item",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

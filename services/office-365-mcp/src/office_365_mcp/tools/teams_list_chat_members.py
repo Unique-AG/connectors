@@ -8,11 +8,21 @@ from msgraph.generated.models.conversation_member import ConversationMember
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_chat_members"
+
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-chat",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-meetings-write",
+    "teams-chat-admin",
+)
 
 STEP = "chat_members"
 
@@ -98,7 +108,7 @@ class ChatMembers(BaseModel):
 
 
 async def teams_list_chat_members(client: GraphServiceClient, *, chat_id: str) -> ChatMembers:
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         page = await client.chats.by_chat_id(chat_id).members.get()
         assert page is not None, "Graph answered a chat member listing with no collection"
 
@@ -113,7 +123,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List a Chat's Members",
+        title="Teams: List a Chat's Members",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

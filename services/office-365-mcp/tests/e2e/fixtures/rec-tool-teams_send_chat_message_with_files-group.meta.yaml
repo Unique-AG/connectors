@@ -1,0 +1,31 @@
+scenario: teams_send_chat_message_with_files-group
+fixture: rec-tool-teams_send_chat_message_with_files-group
+source: recorded
+target: graph
+recorded_at: '2026-11-02T09:38:15+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 29
+  keys dropped: 13
+  persona addresses: 4
+  persona names: 2
+  query parameters dropped: 3
+  response headers dropped: 41
+  text kept: 21
+  text replaced: 11
+literals:
+- group
+- persona:anna.id
+- persona:anna.name
+- persona:tom.id
+- persona:tom.name
+- seed-v1 Meeting Notes
+- seed-v1 case-teams-chat
+- seed-v1 case-teams_send_chat_message_with_files-group notes
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

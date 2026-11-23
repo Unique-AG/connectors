@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_delete_folder"
 
+PRESETS: tuple[str, ...] = ("outlook-delete",)
+
 STEP_READ_FOLDER = "mail_folder"
 STEP_READ_DELETED_ITEMS = "destination_folder"
 STEP_MOVE = "move_folder"
@@ -138,7 +140,7 @@ async def delete_folder(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     moved: MailFolder | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ_FOLDER):
             folder = await folders.by_mail_folder_id(handle.folder_id).get(
                 request_configuration=_select(_FOLDER_FIELDS)
@@ -239,7 +241,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Mail Folder",
+        title="Outlook: Delete a Mail Folder",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )

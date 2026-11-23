@@ -25,13 +25,28 @@ from msgraph.generated.users.item.chats.chats_request_builder import ChatsReques
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, meeting_uri_for
-from office_365_mcp.shared.messages import MessageSender
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.messages import MessageSender
 from office_365_mcp.shared.window import as_utc
 
 TOOL_NAME = "teams_list_chats"
+
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-chat",
+    "teams-messages",
+    "teams-transcripts",
+    "teams-call-transcripts",
+    "teams-recordings",
+    "teams-meetings",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-meetings-write",
+    "teams-chat-admin",
+)
 
 STEP = "chats"
 
@@ -54,8 +69,8 @@ This tool lists the signed-in user's Teams chats: one-to-one chats, group chats,
 chats, newest last message first. The result shows who is in a conversation and when it was \
 last active. It also shows the last message, its sender, and whether the user read it. A \
 meeting chat reports a `meeting_uri` for its transcripts and recordings. This tool does not \
-cover channel activity. teams_browse_channel walks one channel, and teams_search_messages \
-searches message text across chats and channels.
+cover channel activity. If this deployment exposes teams_browse_channel, it walks one channel. If \
+it exposes teams_search_messages, that tool searches message text across chats and channels.
 
 Notes:
 - To find a meeting's `meeting_uri`, set `chat_type="meeting"` and, if you know it, \
@@ -241,7 +256,7 @@ async def list_recent_chats(
             top=limit,
         )
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.me.chats.get(request_configuration=configuration)
         assert first_page is not None, "Graph answered GET /me/chats with no collection"
         collected = await collect_pages(
@@ -311,7 +326,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List My Teams Chats",
+        title="Teams: List My Chats",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

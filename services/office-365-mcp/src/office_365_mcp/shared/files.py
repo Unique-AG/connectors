@@ -2,8 +2,8 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Self
-from urllib.parse import unquote
+from typing import Annotated, Self
+from urllib.parse import quote, unquote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.drives.item.items.item.drive_item_item_request_builder import (
@@ -13,7 +13,7 @@ from msgraph.generated.models.drive_item import DriveItem
 from msgraph.generated.models.identity_set import IdentitySet
 from msgraph.generated.models.item_reference import ItemReference
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_step
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_file_handle
@@ -21,6 +21,10 @@ from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import Advised
 
 STEP_DRIVE_ITEM = "drive_item"
+
+MEGABYTE = 1024 * 1024
+
+MAX_BYTES = 10 * MEGABYTE
 
 ATTACHMENT_FIELDS: tuple[str, ...] = (
     "id",
@@ -70,6 +74,16 @@ _ITEM_FOR_A_QUESTION_FIELDS: tuple[str, ...] = (*ITEM_FIELDS, "root")
 
 _ItemQuery = DriveItemItemRequestBuilder.DriveItemItemRequestBuilderGetQueryParameters
 
+_URL_CHARACTERS_TO_KEEP = ":/?#@!$&'*+,=%~"
+_STRAY_PERCENT = re.compile(r"%(?![0-9A-Fa-f]{2})")
+
+
+def browser_url(url: str) -> str:
+    return quote(_STRAY_PERCENT.sub("%25", url), safe=_URL_CHARACTERS_TO_KEEP)
+
+
+BrowserUrl = Annotated[str, AfterValidator(browser_url)]
+
 
 class DriveItemSummary(BaseModel):
     """One file or folder: what it is, where it lives, and the handle that reaches it again."""
@@ -106,10 +120,11 @@ class DriveItemSummary(BaseModel):
             + "refused rather than returned."
         )
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens this item in a browser. Always give this address to the user "
-            + "when you answer from this item or about it. It is not a download link, and this "
+            + "when you answer from this item or about it, and copy it exactly: never decode its "
+            + "`%` escapes. It is not a download link, and this "
             + "connector cannot read a file from it. Null when Graph gave no address."
         )
     )
@@ -445,3 +460,11 @@ def _reserved(found: list[str]) -> str:
 
 def _name_refusal(*problems: str) -> str:
     return " ".join((_NAME_NOT_ALLOWED, *problems, _SAME_NAME_FAILS))
+
+
+def is_utf8(body: bytes) -> bool:
+    try:
+        _ = body.decode("utf-8")
+    except UnicodeDecodeError:
+        return False
+    return True

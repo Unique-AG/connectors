@@ -1,0 +1,29 @@
+scenario: outlook_delete_event-with-attendee
+fixture: rec-tool-outlook_delete_event-with-attendee
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:33:55+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 18
+  keys dropped: 12
+  persona addresses: 6
+  persona names: 5
+  query parameters dropped: 2
+  response headers dropped: 27
+  text kept: 10
+  text replaced: 1
+literals:
+- '2026-11-03T14:00:00'
+- '2026-11-03T14:30:00'
+- Europe/Zurich
+- persona:anna
+- seed-v1 case-outlook_delete_event-with-attendee
+- ~tomorrowT14:00:00
+- ~tomorrowT14:30:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

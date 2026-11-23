@@ -1,0 +1,22 @@
+scenario: sharepoint_delete_item-brochure
+fixture: rec-tool-sharepoint_delete_item-brochure
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:20:05+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 19
+  keys dropped: 8
+  persona addresses: 4
+  persona names: 4
+  response headers dropped: 22
+  text kept: 12
+  text replaced: 3
+literals:
+- seed-v1 Brochure Proof
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

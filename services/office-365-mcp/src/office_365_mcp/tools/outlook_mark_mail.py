@@ -22,16 +22,16 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import ZONE_NAME, wall_clock
-from office_365_mcp.shared.categories import (
+from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
+from office_365_mcp.shared.mail import FlagMoment, MailImportance
+from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
     CategoryName,
     merged_categories,
     named_in_both,
 )
-from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import FlagMoment, MailImportance
-from office_365_mcp.shared.odata import spelled
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -45,6 +45,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_mark_mail"
+
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
 
 STEP_READ_MESSAGE = "mail_message"
 STEP_MARK = "mark_message"
@@ -282,7 +284,7 @@ async def mark_mail(
 
     answer: Confirmed = None
     attempts: list[_Attempt] = []
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if mailbox is not None:
             with not_graph():
                 answer = await confirm(
@@ -519,7 +521,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Mark Mail Messages",
+        title="Outlook: Mark Mail Messages",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
@@ -529,8 +531,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The messages to change: `uri` values from a search, list, read, or thread "
-                    "result."
+                    "The messages to change. Each one is the `uri` of a result of "
+                    "outlook_list_mail, outlook_search_mail, or outlook_read_thread, copied word "
+                    "for word. Never pass a `folder_id` or a `web_link`."
                 ),
             ),
         ],

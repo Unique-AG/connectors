@@ -15,7 +15,7 @@ from msgraph.generated.users.item.calendar.get_schedule.get_schedule_post_reques
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import (
     EventTime,
     WorkingHoursSummary,
@@ -28,6 +28,14 @@ from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_check_availability"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_SCHEDULE = "get_schedule"
 
@@ -205,7 +213,7 @@ async def check_availability(
         raise ToolError(_ENDS_BEFORE_STARTS)
     zone = zone_named(time_zone) or _FALLBACK_ZONE
 
-    with graph_errors(TOOL_NAME, step=STEP_SCHEDULE):
+    with graph_step(STEP_SCHEDULE):
         answered = await client.me.calendar.get_schedule.post(
             GetSchedulePostRequestBody(
                 schedules=list(trimmed),
@@ -246,7 +254,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Check Calendar Availability",
+        title="Outlook: Check Calendar Availability",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

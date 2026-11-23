@@ -1,0 +1,703 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/outlook/supportedTimeZones()",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "alias": "Dateline Standard Time",
+          "displayName": "(UTC-12:00) International Date Line West"
+        },
+        {
+          "alias": "UTC-11",
+          "displayName": "synthetic text 01"
+        },
+        {
+          "alias": "Samoa Standard Time",
+          "displayName": "synthetic text 02"
+        },
+        {
+          "alias": "Aleutian Standard Time",
+          "displayName": "synthetic text 03"
+        },
+        {
+          "alias": "Hawaiian Standard Time",
+          "displayName": "synthetic text 04"
+        },
+        {
+          "alias": "Marquesas Standard Time",
+          "displayName": "synthetic text 05"
+        },
+        {
+          "alias": "Alaskan Standard Time",
+          "displayName": "synthetic text 06"
+        },
+        {
+          "alias": "UTC-09",
+          "displayName": "synthetic text 07"
+        },
+        {
+          "alias": "British Columbia Standard Time",
+          "displayName": "synthetic text 08"
+        },
+        {
+          "alias": "Yukon Standard Time",
+          "displayName": "synthetic text 09"
+        },
+        {
+          "alias": "Pacific Standard Time (Mexico)",
+          "displayName": "synthetic text 10"
+        },
+        {
+          "alias": "UTC-08",
+          "displayName": "synthetic text 11"
+        },
+        {
+          "alias": "Pacific Standard Time",
+          "displayName": "(UTC-08:00) Pacific Time (US & Canada)"
+        },
+        {
+          "alias": "Alberta Standard Time",
+          "displayName": "synthetic text 12"
+        },
+        {
+          "alias": "US Mountain Standard Time",
+          "displayName": "synthetic text 13"
+        },
+        {
+          "alias": "Mountain Standard Time (Mexico)",
+          "displayName": "synthetic text 14"
+        },
+        {
+          "alias": "Mountain Standard Time",
+          "displayName": "(UTC-07:00) Mountain Time (US & Canada)"
+        },
+        {
+          "alias": "Eastern Standard Time (Mexico)",
+          "displayName": "synthetic text 15"
+        },
+        {
+          "alias": "Manitoba Standard Time",
+          "displayName": "synthetic text 16"
+        },
+        {
+          "alias": "Central America Standard Time",
+          "displayName": "synthetic text 17"
+        },
+        {
+          "alias": "Central Standard Time",
+          "displayName": "(UTC-06:00) Central Time (US & Canada)"
+        },
+        {
+          "alias": "Easter Island Standard Time",
+          "displayName": "synthetic text 18"
+        },
+        {
+          "alias": "Central Standard Time (Mexico)",
+          "displayName": "synthetic text 19"
+        },
+        {
+          "alias": "Canada Central Standard Time",
+          "displayName": "synthetic text 20"
+        },
+        {
+          "alias": "SA Pacific Standard Time",
+          "displayName": "synthetic text 21"
+        },
+        {
+          "alias": "Eastern Standard Time",
+          "displayName": "(UTC-05:00) Eastern Time (US & Canada)"
+        },
+        {
+          "alias": "Haiti Standard Time",
+          "displayName": "synthetic text 22"
+        },
+        {
+          "alias": "Cuba Standard Time",
+          "displayName": "synthetic text 23"
+        },
+        {
+          "alias": "US Eastern Standard Time",
+          "displayName": "synthetic text 24"
+        },
+        {
+          "alias": "Turks And Caicos Standard Time",
+          "displayName": "synthetic text 25"
+        },
+        {
+          "alias": "Venezuela Standard Time",
+          "displayName": "synthetic text 26"
+        },
+        {
+          "alias": "Magallanes Standard Time",
+          "displayName": "synthetic text 27"
+        },
+        {
+          "alias": "Paraguay Standard Time",
+          "displayName": "synthetic text 28"
+        },
+        {
+          "alias": "Atlantic Standard Time",
+          "displayName": "synthetic text 29"
+        },
+        {
+          "alias": "Central Brazilian Standard Time",
+          "displayName": "synthetic text 30"
+        },
+        {
+          "alias": "SA Western Standard Time",
+          "displayName": "synthetic text 31"
+        },
+        {
+          "alias": "Pacific SA Standard Time",
+          "displayName": "synthetic text 32"
+        },
+        {
+          "alias": "Newfoundland Standard Time",
+          "displayName": "synthetic text 33"
+        },
+        {
+          "alias": "Tocantins Standard Time",
+          "displayName": "synthetic text 34"
+        },
+        {
+          "alias": "E. South America Standard Time",
+          "displayName": "(UTC-03:00) Brasilia"
+        },
+        {
+          "alias": "SA Eastern Standard Time",
+          "displayName": "synthetic text 35"
+        },
+        {
+          "alias": "Argentina Standard Time",
+          "displayName": "synthetic text 36"
+        },
+        {
+          "alias": "Greenland Standard Time",
+          "displayName": "synthetic text 37"
+        },
+        {
+          "alias": "Montevideo Standard Time",
+          "displayName": "synthetic text 38"
+        },
+        {
+          "alias": "Saint Pierre Standard Time",
+          "displayName": "synthetic text 39"
+        },
+        {
+          "alias": "Bahia Standard Time",
+          "displayName": "synthetic text 40"
+        },
+        {
+          "alias": "UTC-02",
+          "displayName": "synthetic text 41"
+        },
+        {
+          "alias": "Mid-Atlantic Standard Time",
+          "displayName": "synthetic text 42"
+        },
+        {
+          "alias": "Azores Standard Time",
+          "displayName": "synthetic text 43"
+        },
+        {
+          "alias": "Cape Verde Standard Time",
+          "displayName": "synthetic text 44"
+        },
+        {
+          "alias": "UTC",
+          "displayName": "(UTC) Coordinated Universal Time"
+        },
+        {
+          "alias": "Morocco Standard Time",
+          "displayName": "synthetic text 45"
+        },
+        {
+          "alias": "GMT Standard Time",
+          "displayName": "(UTC+00:00) Dublin, Edinburgh, Lisbon, London"
+        },
+        {
+          "alias": "Greenwich Standard Time",
+          "displayName": "synthetic text 46"
+        },
+        {
+          "alias": "W. Europe Standard Time",
+          "displayName": "(UTC+01:00) Amsterdam, Berlin, Bern, Rome, Stockholm, Vienna"
+        },
+        {
+          "alias": "Central Europe Standard Time",
+          "displayName": "(UTC+01:00) Belgrade, Bratislava, Budapest, Ljubljana, Prague"
+        },
+        {
+          "alias": "Romance Standard Time",
+          "displayName": "(UTC+01:00) Brussels, Copenhagen, Madrid, Paris"
+        },
+        {
+          "alias": "Central European Standard Time",
+          "displayName": "synthetic text 47"
+        },
+        {
+          "alias": "W. Central Africa Standard Time",
+          "displayName": "synthetic text 48"
+        },
+        {
+          "alias": "Libya Standard Time",
+          "displayName": "synthetic text 49"
+        },
+        {
+          "alias": "Namibia Standard Time",
+          "displayName": "synthetic text 50"
+        },
+        {
+          "alias": "GTB Standard Time",
+          "displayName": "(UTC+02:00) Athens, Bucharest"
+        },
+        {
+          "alias": "Middle East Standard Time",
+          "displayName": "synthetic text 51"
+        },
+        {
+          "alias": "Egypt Standard Time",
+          "displayName": "synthetic text 52"
+        },
+        {
+          "alias": "E. Europe Standard Time",
+          "displayName": "synthetic text 53"
+        },
+        {
+          "alias": "Syria Standard Time",
+          "displayName": "synthetic text 54"
+        },
+        {
+          "alias": "West Bank Standard Time",
+          "displayName": "synthetic text 55"
+        },
+        {
+          "alias": "South Africa Standard Time",
+          "displayName": "synthetic text 56"
+        },
+        {
+          "alias": "FLE Standard Time",
+          "displayName": "(UTC+02:00) Helsinki, Kyiv, Riga, Sofia, Tallinn, Vilnius"
+        },
+        {
+          "alias": "Israel Standard Time",
+          "displayName": "synthetic text 57"
+        },
+        {
+          "alias": "South Sudan Standard Time",
+          "displayName": "synthetic text 58"
+        },
+        {
+          "alias": "Kaliningrad Standard Time",
+          "displayName": "synthetic text 59"
+        },
+        {
+          "alias": "Sudan Standard Time",
+          "displayName": "synthetic text 60"
+        },
+        {
+          "alias": "Jordan Standard Time",
+          "displayName": "synthetic text 61"
+        },
+        {
+          "alias": "Turkey Standard Time",
+          "displayName": "synthetic text 62"
+        },
+        {
+          "alias": "Belarus Standard Time",
+          "displayName": "synthetic text 63"
+        },
+        {
+          "alias": "Arabic Standard Time",
+          "displayName": "synthetic text 64"
+        },
+        {
+          "alias": "Arab Standard Time",
+          "displayName": "synthetic text 65"
+        },
+        {
+          "alias": "Russian Standard Time",
+          "displayName": "(UTC+03:00) Moscow, St. Petersburg"
+        },
+        {
+          "alias": "E. Africa Standard Time",
+          "displayName": "synthetic text 66"
+        },
+        {
+          "alias": "Volgograd Standard Time",
+          "displayName": "synthetic text 67"
+        },
+        {
+          "alias": "Astrakhan Standard Time",
+          "displayName": "synthetic text 68"
+        },
+        {
+          "alias": "Russia Time Zone 3",
+          "displayName": "synthetic text 69"
+        },
+        {
+          "alias": "Saratov Standard Time",
+          "displayName": "synthetic text 70"
+        },
+        {
+          "alias": "Iran Standard Time",
+          "displayName": "synthetic text 71"
+        },
+        {
+          "alias": "Arabian Standard Time",
+          "displayName": "(UTC+04:00) Abu Dhabi, Muscat"
+        },
+        {
+          "alias": "Azerbaijan Standard Time",
+          "displayName": "synthetic text 72"
+        },
+        {
+          "alias": "Mauritius Standard Time",
+          "displayName": "synthetic text 73"
+        },
+        {
+          "alias": "Georgian Standard Time",
+          "displayName": "synthetic text 74"
+        },
+        {
+          "alias": "Caucasus Standard Time",
+          "displayName": "synthetic text 75"
+        },
+        {
+          "alias": "Afghanistan Standard Time",
+          "displayName": "synthetic text 76"
+        },
+        {
+          "alias": "West Asia Standard Time",
+          "displayName": "synthetic text 77"
+        },
+        {
+          "alias": "Qyzylorda Standard Time",
+          "displayName": "synthetic text 78"
+        },
+        {
+          "alias": "Ekaterinburg Standard Time",
+          "displayName": "synthetic text 79"
+        },
+        {
+          "alias": "Pakistan Standard Time",
+          "displayName": "synthetic text 80"
+        },
+        {
+          "alias": "India Standard Time",
+          "displayName": "(UTC+05:30) Chennai, Kolkata, Mumbai, New Delhi"
+        },
+        {
+          "alias": "Sri Lanka Standard Time",
+          "displayName": "synthetic text 81"
+        },
+        {
+          "alias": "Nepal Standard Time",
+          "displayName": "synthetic text 82"
+        },
+        {
+          "alias": "Central Asia Standard Time",
+          "displayName": "synthetic text 83"
+        },
+        {
+          "alias": "Bangladesh Standard Time",
+          "displayName": "synthetic text 84"
+        },
+        {
+          "alias": "Omsk Standard Time",
+          "displayName": "synthetic text 85"
+        },
+        {
+          "alias": "Altai Standard Time",
+          "displayName": "synthetic text 86"
+        },
+        {
+          "alias": "N. Central Asia Standard Time",
+          "displayName": "synthetic text 87"
+        },
+        {
+          "alias": "Tomsk Standard Time",
+          "displayName": "synthetic text 88"
+        },
+        {
+          "alias": "Myanmar Standard Time",
+          "displayName": "synthetic text 89"
+        },
+        {
+          "alias": "SE Asia Standard Time",
+          "displayName": "synthetic text 90"
+        },
+        {
+          "alias": "W. Mongolia Standard Time",
+          "displayName": "synthetic text 91"
+        },
+        {
+          "alias": "North Asia Standard Time",
+          "displayName": "synthetic text 92"
+        },
+        {
+          "alias": "China Standard Time",
+          "displayName": "(UTC+08:00) Beijing, Chongqing, Hong Kong, Urumqi"
+        },
+        {
+          "alias": "North Asia East Standard Time",
+          "displayName": "synthetic text 93"
+        },
+        {
+          "alias": "Singapore Standard Time",
+          "displayName": "synthetic text 94"
+        },
+        {
+          "alias": "W. Australia Standard Time",
+          "displayName": "(UTC+08:00) Perth"
+        },
+        {
+          "alias": "Taipei Standard Time",
+          "displayName": "synthetic text 95"
+        },
+        {
+          "alias": "Ulaanbaatar Standard Time",
+          "displayName": "synthetic text 96"
+        },
+        {
+          "alias": "Transbaikal Standard Time",
+          "displayName": "synthetic text 97"
+        },
+        {
+          "alias": "North Korea Standard Time",
+          "displayName": "synthetic text 98"
+        },
+        {
+          "alias": "Aus Central W. Standard Time",
+          "displayName": "synthetic text 99"
+        },
+        {
+          "alias": "Tokyo Standard Time",
+          "displayName": "(UTC+09:00) Osaka, Sapporo, Tokyo"
+        },
+        {
+          "alias": "Korea Standard Time",
+          "displayName": "synthetic text 100"
+        },
+        {
+          "alias": "Yakutsk Standard Time",
+          "displayName": "synthetic text 101"
+        },
+        {
+          "alias": "Cen. Australia Standard Time",
+          "displayName": "synthetic text 102"
+        },
+        {
+          "alias": "AUS Central Standard Time",
+          "displayName": "synthetic text 103"
+        },
+        {
+          "alias": "E. Australia Standard Time",
+          "displayName": "synthetic text 104"
+        },
+        {
+          "alias": "AUS Eastern Standard Time",
+          "displayName": "(UTC+10:00) Canberra, Melbourne, Sydney"
+        },
+        {
+          "alias": "West Pacific Standard Time",
+          "displayName": "synthetic text 105"
+        },
+        {
+          "alias": "Tasmania Standard Time",
+          "displayName": "synthetic text 106"
+        },
+        {
+          "alias": "Vladivostok Standard Time",
+          "displayName": "synthetic text 107"
+        },
+        {
+          "alias": "Bougainville Standard Time",
+          "displayName": "synthetic text 108"
+        },
+        {
+          "alias": "Magadan Standard Time",
+          "displayName": "synthetic text 109"
+        },
+        {
+          "alias": "Sakhalin Standard Time",
+          "displayName": "synthetic text 110"
+        },
+        {
+          "alias": "Lord Howe Standard Time",
+          "displayName": "synthetic text 111"
+        },
+        {
+          "alias": "Russia Time Zone 10",
+          "displayName": "synthetic text 112"
+        },
+        {
+          "alias": "Norfolk Standard Time",
+          "displayName": "synthetic text 113"
+        },
+        {
+          "alias": "Central Pacific Standard Time",
+          "displayName": "synthetic text 114"
+        },
+        {
+          "alias": "Russia Time Zone 11",
+          "displayName": "synthetic text 115"
+        },
+        {
+          "alias": "New Zealand Standard Time",
+          "displayName": "(UTC+12:00) Auckland, Wellington"
+        },
+        {
+          "alias": "UTC+12",
+          "displayName": "synthetic text 116"
+        },
+        {
+          "alias": "Fiji Standard Time",
+          "displayName": "synthetic text 117"
+        },
+        {
+          "alias": "Kamchatka Standard Time",
+          "displayName": "synthetic text 118"
+        },
+        {
+          "alias": "Chatham Islands Standard Time",
+          "displayName": "synthetic text 119"
+        },
+        {
+          "alias": "UTC+13",
+          "displayName": "synthetic text 120"
+        },
+        {
+          "alias": "Tonga Standard Time",
+          "displayName": "synthetic text 121"
+        },
+        {
+          "alias": "Line Islands Standard Time",
+          "displayName": "synthetic text 122"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "end": {
+        "dateTime": "~tomorrow",
+        "timeZone": "India Standard Time"
+      },
+      "isAllDay": false,
+      "start": {
+        "dateTime": "~tomorrow",
+        "timeZone": "India Standard Time"
+      },
+      "subject": "seed-v1 case-outlook_create_event-zone-mumbai",
+      "transactionId": "00000000-d83c-4828-8981-887fab4e8ee3"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('CRfKCmDQDUVXALQXUyipZm9ogKXhTH-FCd5Kk4Cvmd07GjOZQj0V7atbnhTZ4uRfFUTO')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"j0Yqnk51JhINEg2A0kjryoPU9gJOlR==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [],
+      "body": {
+        "content": "synthetic text 123",
+        "contentType": "html"
+      },
+      "bodyPreview": "",
+      "categories": [],
+      "changeKey": "x4Zrxl31JvTDAj3A1zmcrzHR3tOJxB==",
+      "createdDateTime": "2026-11-02T22:29:48.2976023Z",
+      "end": {
+        "dateTime": "2026-11-03T16:15:00.0000000",
+        "timeZone": "India Standard Time"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "iCalUId": "416740546171B30828D1O6193J76D013445699533LB739ZT932UOE84267352163755170209557643HV0Z15P413N68O5Q2T57M6M8813W1918",
+      "id": "CRfKCmDQDUVXALQXUyipZm9ogKXhTH-FCd5Kk4Cvmd07GjOZQj0V7atbnhTZ4uRfFUTO",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isDraft": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "isReminderOn": true,
+      "lastModifiedDateTime": "2026-11-02T22:29:48.3972697Z",
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "locations": [],
+      "occurrenceId": null,
+      "onlineMeeting": null,
+      "onlineMeetingProvider": "unknown",
+      "onlineMeetingUrl": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "India Standard Time",
+      "originalStartTimeZone": "India Standard Time",
+      "recurrence": null,
+      "reminderMinutesBeforeStart": 15,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-03T15:30:00.0000000",
+        "timeZone": "India Standard Time"
+      },
+      "subject": "seed-v1 case-outlook_create_event-zone-mumbai",
+      "transactionId": "00000000-d83c-4828-8981-887fab4e8ee3",
+      "type": "singleInstance",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FQOl0Xb6Qxep15GqCQLf2J3wqrisBM4rLkVPAL&exvsurl=1"
+    }
+  }
+]

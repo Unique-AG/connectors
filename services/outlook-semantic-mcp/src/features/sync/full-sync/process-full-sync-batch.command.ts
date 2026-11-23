@@ -21,6 +21,7 @@ import { greatestFrom } from '~/utils/greatest-from';
 import { leastFrom } from '~/utils/least-from';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import {
+  GRAPH_MESSAGE_ATTACHMENTS_EXPAND,
   GraphMessageFields,
   graphMessagesResponseSchema,
 } from '../../process-email/dtos/microsoft-graph.dtos';
@@ -383,6 +384,7 @@ export class ProcessFullSyncBatchCommand {
       .api(`${graphBasePath}/messages`)
       .header('Prefer', 'IdType="ImmutableId"')
       .select(GraphMessageFields)
+      .expand(GRAPH_MESSAGE_ATTACHMENTS_EXPAND)
       .filter(conditions.join(' and '))
       .orderby('receivedDateTime desc')
       .top(GRAPH_PAGE_LIMIT)

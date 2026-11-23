@@ -17,7 +17,7 @@ from msgraph.generated.users.item.user_item_request_builder import UserItemReque
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.handles import MailFolderHandle, mail_folder_handle
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -27,6 +27,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_browse_folders"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP = "mail_folders"
 
@@ -68,7 +70,12 @@ _NOT_A_FOLDER_HANDLE = (
 
 
 class MailFolderSummary(BaseModel):
-    uri: str = Field(description="A handle for this folder; pass it back as `parent`.")
+    uri: str = Field(
+        description=(
+            "A handle for this folder. Pass it as `parent` to this tool to open the folder, or "
+            "as `folder_ref` to a tool that takes a folder."
+        )
+    )
     display_name: str | None = Field(description="The folder's name, or null if none.")
     total_items: int | None = Field(
         description="An upper bound on items of every kind this folder holds, or null if unset."
@@ -117,7 +124,7 @@ async def browse_folders(
     handle = _parent_folder(parent)
     reached = graph_mailbox(client, mailbox)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(
             reached, parent=handle, include_hidden=include_hidden, limit=limit
         )
@@ -173,7 +180,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Browse Mail Folders",
+        title="Outlook: Browse Mail Folders",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

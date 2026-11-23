@@ -1,0 +1,23 @@
+scenario: onenote_create_page-seed
+fixture: rec-tool-onenote_create_page-seed
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:03:18+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 128
+  keys dropped: 34
+  query parameters dropped: 10
+  response headers dropped: 72
+  text kept: 54
+  text replaced: 90
+literals:
+- <p>One paragraph.</p>
+- seed-v1 Scratch
+- seed-v1 case-onenote_create_page-seed
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

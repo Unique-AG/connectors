@@ -35,6 +35,8 @@ from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "onenote_list_pages"
 
+PRESETS: tuple[str, ...] = ("onenote-read", "onenote-write", "onenote-delete")
+
 STEP_PAGES = "pages"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
@@ -81,7 +83,9 @@ _ORDER_BY_CLAUSES: Mapping[str, str] = {
 _DESCRIPTION = """\
 Finds pages across every notebook the signed-in user can reach, inside one section, or inside the \
 notebooks of one group or one SharePoint site. `title_contains` matches the title only: Microsoft \
-Graph has no full-text search over a page's words for a work or school account. The page index can \
+Graph has no full-text search over a page's words for a work or school account. If the user asks \
+for a word that is only in the body of a page, say \
+that this cannot be searched, and offer a title search. The page index can \
 hold an empty title for days after a create, so find a new page by `created_at` or by its section \
 instead.
 
@@ -190,7 +194,7 @@ async def list_pages(
     with (
         owner_refused(group is not None or site is not None, named_owner_refused("Notes.Read")),
         owner_refused(handle is not None and handle.owner is not None, OWNED_REFUSED),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
         graph_step(STEP_PAGES),
     ):
         first_page = await _first_page(
@@ -322,7 +326,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Find Pages",
+        title="OneNote: List Pages",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

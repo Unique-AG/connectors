@@ -2,10 +2,12 @@
 from mcp_openapi.upstream import Operation
 from pydantic import TypeAdapter
 
+from architecture_demo_mcp.upstream.generated.vendor_requests import GetDailyMetaRequest
+from architecture_demo_mcp.upstream.generated.vendor_requests import GetDailyPricesRequest
 from architecture_demo_mcp.upstream.generated.vendor_responses import DailyMeta
 from architecture_demo_mcp.upstream.generated.vendor_responses import DailyPriceBar
 
-GET_DAILY_META = Operation[DailyMeta]("getDailyMeta", TypeAdapter(DailyMeta))
-GET_DAILY_PRICES = Operation[list[DailyPriceBar]](
+GET_DAILY_META = Operation[DailyMeta, GetDailyMetaRequest]("getDailyMeta", TypeAdapter(DailyMeta))
+GET_DAILY_PRICES = Operation[list[DailyPriceBar], GetDailyPricesRequest](
     "getDailyPrices", TypeAdapter(list[DailyPriceBar])
 )

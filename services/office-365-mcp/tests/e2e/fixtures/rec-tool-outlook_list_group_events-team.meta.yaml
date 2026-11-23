@@ -1,0 +1,22 @@
+scenario: outlook_list_group_events-team
+fixture: rec-tool-outlook_list_group_events-team
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:56:30+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 3
+  keys dropped: 14
+  response headers dropped: 15
+  text replaced: 2
+literals:
+- '2026-10-29'
+- '2026-10-30'
+- ~today
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

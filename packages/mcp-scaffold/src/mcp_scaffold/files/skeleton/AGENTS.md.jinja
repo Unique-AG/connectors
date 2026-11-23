@@ -14,7 +14,7 @@ serve this MCP, with `mcp-skeleton` for `<name>`.
 {{ options.description }}
 
 {% if options.upstream == "openapi" %}
-- Upstream: OpenAPI, from the vendor's spec in `upstream/openapi.yml`. `upstream/routes.py` lists the operations served as tools straight from the spec, and `operation-ids` in `[tool.mcp-openapi]` the ones our tools call through `Upstream`.
+- Upstream: OpenAPI, from the vendor's spec in `upstream/openapi.yml`. `upstream/routes.py` lists the operations served as tools straight from the spec, and `operation-ids` in `[tool.mcp-openapi]` the ones our tools call through `Upstream`. Generate an operation and its models with `uv run poe codegen` before writing either by hand; [`guides/upstream.md`](../../packages/mcp-architecture/guides/upstream.md#openapi) says when a hand-written model is allowed.
 {% elif options.upstream == "custom" %}
 - Upstream: A client of our own in `upstream/client.py`, started from the scaffold's HTTP client: one `request` for any method and path, retried by `RetrySettings`, parsing every body into a pydantic model. The `new-mcp` skill's rules for coding a client apply.
 {% else %}

@@ -2,28 +2,46 @@
 from mcp_openapi.upstream import Operation
 from pydantic import TypeAdapter
 
+from kyckr_mcp.models.vendor_requests import (
+    GetCompaniesKyckrIdDocumentsRequest,
+    GetCompaniesKyckrIdEnhancedRequest,
+    GetCompaniesKyckrIdRequest,
+    GetCompaniesRequest,
+    GetOrderRequest,
+    GetOrdersOrderIdDownloadRequest,
+    GetOrdersOrderIdRequest,
+    PostOrdersRequest,
+)
 from kyckr_mcp.models.vendor_responses import (
     GetCompaniesKyckrIdDocumentsResponse,
     GetCompaniesKyckrIdEnhancedResponse,
     GetCompaniesKyckrIdResponse,
     GetCompaniesResponse,
     GetOrderResponse,
+    GetOrdersOrderIdDownloadResponse,
     GetOrdersOrderIdResponse,
     PostOrdersResponse,
 )
 
-GET_COMPANIES = Operation[GetCompaniesResponse]("get-companies", TypeAdapter(GetCompaniesResponse))
-GET_COMPANIES_KYCKR_ID = Operation[GetCompaniesKyckrIdResponse](
+GET_COMPANIES = Operation[GetCompaniesResponse, GetCompaniesRequest](
+    "get-companies", TypeAdapter(GetCompaniesResponse)
+)
+GET_COMPANIES_KYCKR_ID = Operation[GetCompaniesKyckrIdResponse, GetCompaniesKyckrIdRequest](
     "get-companies-kyckrId", TypeAdapter(GetCompaniesKyckrIdResponse)
 )
-GET_COMPANIES_KYCKR_ID_ENHANCED = Operation[GetCompaniesKyckrIdEnhancedResponse](
-    "get-companies-kyckrId-enhanced", TypeAdapter(GetCompaniesKyckrIdEnhancedResponse)
+GET_COMPANIES_KYCKR_ID_ENHANCED = Operation[
+    GetCompaniesKyckrIdEnhancedResponse, GetCompaniesKyckrIdEnhancedRequest
+]("get-companies-kyckrId-enhanced", TypeAdapter(GetCompaniesKyckrIdEnhancedResponse))
+GET_COMPANIES_KYCKR_ID_DOCUMENTS = Operation[
+    GetCompaniesKyckrIdDocumentsResponse, GetCompaniesKyckrIdDocumentsRequest
+]("get-companies-kyckrId-documents", TypeAdapter(GetCompaniesKyckrIdDocumentsResponse))
+POST_ORDERS = Operation[PostOrdersResponse, PostOrdersRequest](
+    "post-orders", TypeAdapter(PostOrdersResponse)
 )
-GET_COMPANIES_KYCKR_ID_DOCUMENTS = Operation[GetCompaniesKyckrIdDocumentsResponse](
-    "get-companies-kyckrId-documents", TypeAdapter(GetCompaniesKyckrIdDocumentsResponse)
-)
-POST_ORDERS = Operation[PostOrdersResponse]("post-orders", TypeAdapter(PostOrdersResponse))
-GET_ORDERS_ORDER_ID = Operation[GetOrdersOrderIdResponse](
+GET_ORDERS_ORDER_ID = Operation[GetOrdersOrderIdResponse, GetOrdersOrderIdRequest](
     "get-orders-orderId", TypeAdapter(GetOrdersOrderIdResponse)
 )
-GET_ORDER = Operation[GetOrderResponse]("get-order", TypeAdapter(GetOrderResponse))
+GET_ORDERS_ORDER_ID_DOWNLOAD = Operation[
+    GetOrdersOrderIdDownloadResponse, GetOrdersOrderIdDownloadRequest
+]("get-orders-orderId-download", TypeAdapter(GetOrdersOrderIdDownloadResponse))
+GET_ORDER = Operation[GetOrderResponse, GetOrderRequest]("get-order", TypeAdapter(GetOrderResponse))

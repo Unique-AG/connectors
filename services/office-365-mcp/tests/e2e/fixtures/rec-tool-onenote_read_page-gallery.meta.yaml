@@ -1,0 +1,24 @@
+scenario: onenote_read_page-gallery
+fixture: rec-tool-onenote_read_page-gallery
+source: recorded
+target: graph
+recorded_at: '2026-10-30T13:14:01+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 157
+  keys dropped: 40
+  page htmls scrubbed: 1
+  query parameters dropped: 14
+  response headers dropped: 72
+  text kept: 66
+  text replaced: 119
+literals:
+- Gallery
+- Reading
+- seed-v1 Dogfood
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

@@ -11,13 +11,13 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteOwner, OnenoteSectionHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
     NotebookAudience,
     onenote_root,
     page_for_a_question,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
@@ -28,6 +28,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_delete_page"
+
+PRESETS: tuple[str, ...] = ("onenote-delete",)
 
 STEP_DELETE_PAGE = "delete_page"
 
@@ -123,7 +125,7 @@ async def delete_page(
     found: OnenotePage | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         found = pre_read.page
         with not_graph():
@@ -185,7 +187,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Page",
+        title="OneNote: Delete a Page",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

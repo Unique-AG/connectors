@@ -16,6 +16,7 @@ import {
 } from '~/db';
 import { NewTrace, traceEvent } from '~/features/tracing.utils';
 import { getThreshold } from '~/utils/get-threshold';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import {
   FAILED_LIVE_CATCHUP_THRESHOLD_MINUTES,
   READY_LIVE_CATCHUP_THRESHOLD_MINUTES,
@@ -91,6 +92,8 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     sharedMailboxRecheckJob.start();
   }
 
+  @LogSecretsScope()
+
   @NewTrace('cron.run-stuck-live-catch-ups-recovery')
   public async runStuckLiveCatchUpsRecovery(): Promise<void> {
     if (this.isShuttingDown) {
@@ -112,6 +115,8 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
     }
   }
 
+  @LogSecretsScope()
+
   @NewTrace('cron.run-recheck-live-catchups-for-oauth-users-which')
   public async runRecheckLiveCatchupsForOauthUsersWhich(): Promise<void> {
     if (this.isShuttingDown) {
@@ -131,6 +136,8 @@ export class LiveCatchupSchedulerService implements OnModuleInit, OnModuleDestro
       });
     }
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.run-recheck-live-catchups-for-shared-mailboxes')
   public async runRecheckLiveCatchupsForSharedMailboxes(): Promise<void> {

@@ -1,0 +1,19 @@
+scenario: get_me-profile
+fixture: rec-tool-get_me-profile
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:53:30+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 1
+  keys dropped: 1
+  persona addresses: 2
+  response headers dropped: 10
+  text replaced: 2
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

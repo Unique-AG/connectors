@@ -9,25 +9,37 @@ from typing import TypeGuard, cast
 import httpx
 import pytest
 import respx
-from fastmcp import Context
+from fastmcp import Client, Context, FastMCP
 from fastmcp.exceptions import ToolError
+from fastmcp.server.middleware import MiddlewareContext
+from fastmcp.tools.base import ToolResult
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_http.middleware import retry_handler
 from mcp.shared.exceptions import MCPError
-from mcp.types import METHOD_NOT_FOUND
+from mcp.types import (
+    METHOD_NOT_FOUND,
+    CallToolRequestParams,
+    ElicitRequest,
+    ElicitRequestFormParams,
+    InputRequiredResult,
+)
 from msgraph.generated.models.message import Message
 from msgraph.graph_service_client import GraphServiceClient
 from prometheus_client import generate_latest
 from unique_toolkit.monitoring import REGISTRY
 
+from office_365_mcp.cardinality import UNRESOLVED_NAME, BoundedNameMiddleware
 from office_365_mcp.config import AppConfig
 from office_365_mcp.graph_client import (
     GRAPH_OPERATION_DURATION_SECONDS,
     GRAPH_OPERATIONS_TOTAL,
     GRAPH_PAGES_SCANNED,
+    GRAPH_SLOW_OPERATIONS_TOTAL,
     GRAPH_STATUSES,
     GRAPH_STEP_DURATION_SECONDS,
     GRAPH_STEPS_TOTAL,
     GRAPH_THROTTLED_TOTAL,
+    GRAPH_TOKEN_ACQUISITIONS_TOTAL,
     GraphForbidden,
     GraphSettings,
     GraphThrottled,
@@ -36,13 +48,38 @@ from office_365_mcp.graph_client import (
     graph_client_for,
     graph_errors,
     graph_step,
+    measured_graph_operation,
+    no_retry,
+    start_operation_series,
+)
+from office_365_mcp.graph_client.observability import record_graph_call
+from office_365_mcp.graph_operations import (
+    TOOL_OUTCOMES_TOTAL,
+    GraphOperationMiddleware,
+    is_refusal,
+    start_tool_outcomes,
 )
 from office_365_mcp.metrics import configure_metrics
 from office_365_mcp.shared.handles import TranscriptHandle
-from office_365_mcp.tools import teams_read_transcript as transcript_reader
+from office_365_mcp.shared.seam import Confirmed, GraphToken, TokenExchangeFailed, caller
+from office_365_mcp.shared.teams import transcripts
+from office_365_mcp.shared.teams.transcripts import STEP_ATTRIBUTED
+from office_365_mcp.tools import get_me
+from office_365_mcp.tools.get_me import SignedInUser
 from office_365_mcp.tools.outlook_send_draft import a_person_agrees, send_draft
-from office_365_mcp.tools.teams_read_transcript import STEP_ATTRIBUTED, teams_read_transcript
+from office_365_mcp.tools.teams_list_call_transcripts import (
+    STEP_TRANSCRIPTS as STEP_CALL_TRANSCRIPTS,
+)
+from office_365_mcp.tools.teams_list_call_transcripts import TOOL_NAME as CALL_TRANSCRIPTS_TOOL
+from office_365_mcp.tools.teams_list_call_transcripts import teams_list_call_transcripts
 from office_365_mcp.tools.teams_read_transcript import TOOL_NAME as TRANSCRIPT_TOOL
+from office_365_mcp.tools.teams_read_transcript import teams_read_transcript
+from office_365_mcp.tools.teams_send_channel_message import STEP_SEND as STEP_CHANNEL_SEND
+from office_365_mcp.tools.teams_send_channel_message import TOOL_NAME as CHANNEL_SEND_TOOL
+from office_365_mcp.tools.teams_send_channel_message import send_channel_message
+from office_365_mcp.tools.teams_send_chat_message import STEP_SEND as STEP_CHAT_SEND
+from office_365_mcp.tools.teams_send_chat_message import TOOL_NAME as CHAT_SEND_TOOL
+from office_365_mcp.tools.teams_send_chat_message import send_chat_message
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -109,6 +146,16 @@ def _labels(rendered: str) -> Iterator[tuple[str, str]]:
         yield name.strip(), value.strip().strip('"')
 
 
+def _moves(
+    metric: str, before: dict[frozenset[tuple[str, str]], float], label: str
+) -> list[tuple[str, str, float]]:
+    return [
+        (dict(labels)["operation"], dict(labels)[label], value - before.get(labels, 0.0))
+        for labels, value in _samples(metric).items()
+        if value != before.get(labels, 0.0)
+    ]
+
+
 def _value(metric: str, **labels: str) -> float:
     wanted = frozenset(labels.items())
     matched = [value for keys, value in _samples(metric).items() if wanted <= keys]
@@ -156,7 +203,7 @@ class TestAGraphCallIsCountedAndTimed:
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="ok")
         timed = _value(f"{GRAPH_OPERATION_DURATION_SECONDS}_count", operation="get_me")
 
-        with graph_errors("get_me"):
+        with measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="ok") == before + 1
@@ -172,7 +219,7 @@ class TestAGraphCallIsCountedAndTimed:
     ) -> None:
         _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
 
-        with graph_errors("get_me"), graph_step("signed_in_user"):
+        with measured_graph_operation("get_me"), graph_errors(), graph_step("signed_in_user"):
             _ = await client.me.get()
 
         boundaries = _boundaries(histogram)
@@ -188,7 +235,7 @@ class TestAGraphCallIsCountedAndTimed:
         _ = graph.get("/me").mock(return_value=httpx.Response(403, json={}))
         before = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden")
 
-        with pytest.raises(GraphForbidden), graph_errors("get_me"):
+        with pytest.raises(GraphForbidden), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="forbidden") == before + 1
@@ -200,7 +247,7 @@ class TestAGraphCallIsCountedAndTimed:
         graph: respx.MockRouter,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        monkeypatch.setattr(transcript_reader, "MAX_TRANSCRIPT_BYTES", 64)
+        monkeypatch.setattr(transcripts, "MAX_TRANSCRIPT_BYTES", 64)
         _ = graph.get(_TRANSCRIPT_PATH).mock(
             return_value=httpx.Response(
                 200, content=b"x" * 65, headers={"Content-Type": "text/vtt"}
@@ -211,7 +258,10 @@ class TestAGraphCallIsCountedAndTimed:
             GRAPH_STEPS_TOTAL, operation=TRANSCRIPT_TOOL, step=STEP_ATTRIBUTED, status="too_large"
         )
 
-        with pytest.raises(ToolError):
+        with (
+            pytest.raises(ToolError),
+            measured_graph_operation(TRANSCRIPT_TOOL, is_refusal=is_refusal),
+        ):
             _ = await teams_read_transcript(
                 client,
                 transport,
@@ -251,7 +301,10 @@ class TestAGraphCallIsCountedAndTimed:
             assert mailbox is None
             return "Nothing was sent."
 
-        with pytest.raises(ToolError):
+        with (
+            pytest.raises(ToolError),
+            measured_graph_operation("outlook_send_draft", is_refusal=is_refusal),
+        ):
             _ = await send_draft(
                 client, confirm=declines, message_ref=f"outlook:///messages/{draft_id}"
             )
@@ -346,7 +399,7 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
             f"{GRAPH_STEP_DURATION_SECONDS}_count", operation="get_me", step="signed_in_user"
         )
 
-        with graph_errors("get_me"), graph_step("signed_in_user"):
+        with measured_graph_operation("get_me"), graph_errors(), graph_step("signed_in_user"):
             _ = await client.me.get()
 
         assert (
@@ -359,6 +412,26 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
             )
             == timed + 1
         )
+
+    async def test_a_user_with_no_call_transcripts_is_an_answered_listing_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        _ = graph.route(method="GET", url__regex=r".*/getAllTranscripts\(.*").mock(
+            return_value=httpx.Response(
+                404, json={"error": {"code": "NotFound", "message": "UnknownError"}}
+            )
+        )
+        labels = {"operation": CALL_TRANSCRIPTS_TOOL, "step": STEP_CALL_TRANSCRIPTS}
+        answered = _value(GRAPH_STEPS_TOTAL, **labels, status="ok")
+        missing = _value(GRAPH_STEPS_TOTAL, **labels, status="not_found")
+
+        with measured_graph_operation(CALL_TRANSCRIPTS_TOOL, is_refusal=is_refusal):
+            found = await teams_list_call_transcripts(client, limit=20)
+
+        assert found.status == "none_found"
+        assert _value(GRAPH_STEPS_TOTAL, **labels, status="ok") == answered + 1
+        assert _value(GRAPH_STEPS_TOTAL, **labels, status="not_found") == missing
 
     async def test_a_refused_step_a_tool_recovers_from_leaves_the_operation_counted_as_answered(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -377,7 +450,7 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
             status="forbidden",
         )
 
-        with graph_errors("teams_read_transcript"):
+        with measured_graph_operation("teams_read_transcript"), graph_errors():
             try:
                 with graph_step("transcript_attributed"):
                     _ = await client.me.get()
@@ -411,7 +484,7 @@ class TestTheOperationLabelIsANameThisCodeChose:
         chat_id = "19%3Aunbounded-cardinality%40thread.v2"
         _ = graph.get(f"/chats/{chat_id}").mock(return_value=httpx.Response(200, json={"id": "c"}))
 
-        with graph_errors("teams_list_chats"):
+        with measured_graph_operation("teams_list_chats"), graph_errors():
             _ = await client.chats.by_chat_id("19:unbounded-cardinality@thread.v2").get()
 
         families = (
@@ -442,7 +515,7 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "7"}))
         before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true")
 
-        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true") == before + 1
@@ -456,7 +529,7 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         counted = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="throttled")
         outages = _value(GRAPH_OPERATIONS_TOTAL, operation="get_me", status="unavailable")
 
-        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="true") == throttled + 1
@@ -470,9 +543,21 @@ class TestThrottlingSaysWhetherTheSdkSpentItsRetries:
         graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "600"}))
         before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false")
 
-        with pytest.raises(GraphThrottled), graph_errors("get_me"):
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
             _ = await client.me.get()
 
+        assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false") == before + 1
+
+    async def test_a_call_that_allows_no_retry_is_not_counted_as_retried(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        sent = graph.get("/me").mock(return_value=httpx.Response(429, headers={"Retry-After": "7"}))
+        before = _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false")
+
+        with pytest.raises(GraphThrottled), measured_graph_operation("get_me"), graph_errors():
+            _ = await client.me.get(request_configuration=RequestConfiguration(options=no_retry()))
+
+        assert sent.call_count == 1
         assert _value(GRAPH_THROTTLED_TOTAL, operation="get_me", retried="false") == before + 1
 
 
@@ -491,7 +576,7 @@ class TestAPagedWalkReportsWhatItRead:
         )
         before = _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats")
 
-        with graph_errors("teams_list_chats"):
+        with measured_graph_operation("teams_list_chats"), graph_errors():
             await _walk_chats(client, limit=50)
 
         assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == before + 3
@@ -510,7 +595,7 @@ class TestAPagedWalkReportsWhatItRead:
 
         steps = _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
 
-        with graph_errors("teams_list_chats"), graph_step("chats"):
+        with measured_graph_operation("teams_list_chats"), graph_errors(), graph_step("chats"):
             await _walk_chats(client, limit=50)
 
         assert _value(f"{GRAPH_PAGES_SCANNED}_sum", operation="teams_list_chats") == pages + 2
@@ -524,6 +609,125 @@ class TestAPagedWalkReportsWhatItRead:
         assert (
             _value(GRAPH_STEPS_TOTAL, operation="teams_list_chats", step="chats", status="ok")
             == steps + 1
+        )
+
+
+_TEAM_ID = "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+_CHANNEL_ID = "19:general@thread.tacv2"
+_CHAT_ID = "19:release@thread.v2"
+
+_UNANSWERED = InputRequiredResult(input_requests={}, request_state="state")
+
+
+async def _send_to_chat(client: GraphServiceClient, answer: Confirmed) -> object:
+    async def confirm(question: str, about: str) -> Confirmed:
+        assert question and about
+        return answer
+
+    with measured_graph_operation(CHAT_SEND_TOOL, is_refusal=is_refusal):
+        return await send_chat_message(
+            client, chat_id=_CHAT_ID, message="Ship it.", confirm=confirm
+        )
+
+
+async def _send_to_channel(client: GraphServiceClient, answer: Confirmed) -> object:
+    async def confirm(question: str, about: str) -> Confirmed:
+        assert question and about
+        return answer
+
+    with measured_graph_operation(CHANNEL_SEND_TOOL, is_refusal=is_refusal):
+        return await send_channel_message(
+            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, message="Ship it.", confirm=confirm
+        )
+
+
+class TestATeamsSendIsMeasuredOnlyWhereItPosts:
+    @pytest.mark.parametrize("answer", ["Nothing was sent.", _UNANSWERED])
+    async def test_a_chat_message_nobody_agreed_to_records_no_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter, answer: Confirmed
+    ) -> None:
+        posted = graph.post(url__regex=r"/chats/.+/messages$").mock(
+            return_value=httpx.Response(201, json={"id": "1700000000001"})
+        )
+        steps = _value(
+            f"{GRAPH_STEP_DURATION_SECONDS}_count", operation=CHAT_SEND_TOOL, step=STEP_CHAT_SEND
+        )
+
+        if isinstance(answer, str):
+            with pytest.raises(ToolError):
+                _ = await _send_to_chat(client, answer)
+        else:
+            assert await _send_to_chat(client, answer) is answer
+
+        assert posted.call_count == 0
+        assert (
+            _value(
+                f"{GRAPH_STEP_DURATION_SECONDS}_count",
+                operation=CHAT_SEND_TOOL,
+                step=STEP_CHAT_SEND,
+            )
+            == steps
+        ), "a send that never reached Microsoft Graph was recorded as a send step"
+
+    @pytest.mark.parametrize("answer", ["Nothing was posted.", _UNANSWERED])
+    async def test_a_channel_message_nobody_agreed_to_records_no_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter, answer: Confirmed
+    ) -> None:
+        posted = graph.post(url__regex=r"/channels/.+/messages$").mock(
+            return_value=httpx.Response(201, json={"id": "1700000000002"})
+        )
+        steps = _value(
+            f"{GRAPH_STEP_DURATION_SECONDS}_count",
+            operation=CHANNEL_SEND_TOOL,
+            step=STEP_CHANNEL_SEND,
+        )
+
+        if isinstance(answer, str):
+            with pytest.raises(ToolError):
+                _ = await _send_to_channel(client, answer)
+        else:
+            assert await _send_to_channel(client, answer) is answer
+
+        assert posted.call_count == 0
+        assert (
+            _value(
+                f"{GRAPH_STEP_DURATION_SECONDS}_count",
+                operation=CHANNEL_SEND_TOOL,
+                step=STEP_CHANNEL_SEND,
+            )
+            == steps
+        ), "a post that never reached Microsoft Graph was recorded as a send step"
+
+    async def test_a_chat_post_answered_with_no_message_is_an_answered_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(url__regex=r"/chats/.+/messages$").mock(return_value=httpx.Response(204))
+        sent = _value(GRAPH_STEPS_TOTAL, operation=CHAT_SEND_TOOL, step=STEP_CHAT_SEND, status="ok")
+
+        with pytest.raises(AssertionError, match="answered with no message"):
+            _ = await _send_to_chat(client, None)
+
+        assert (
+            _value(GRAPH_STEPS_TOTAL, operation=CHAT_SEND_TOOL, step=STEP_CHAT_SEND, status="ok")
+            == sent + 1
+        )
+
+    async def test_a_channel_post_answered_with_no_message_is_an_answered_send_step(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.post(url__regex=r"/channels/.+/messages$").mock(return_value=httpx.Response(204))
+        sent = _value(
+            GRAPH_STEPS_TOTAL, operation=CHANNEL_SEND_TOOL, step=STEP_CHANNEL_SEND, status="ok"
+        )
+
+        with pytest.raises(AssertionError, match="answered with no message"):
+            _ = await _send_to_channel(client, None)
+
+        assert (
+            _value(
+                GRAPH_STEPS_TOTAL, operation=CHANNEL_SEND_TOOL, step=STEP_CHANNEL_SEND, status="ok"
+            )
+            == sent + 1
         )
 
 
@@ -572,32 +776,423 @@ def _calls(node: ast.AST, name: str) -> TypeGuard[ast.Call]:
     return isinstance(called, ast.Attribute) and called.attr == name
 
 
-class TestEveryToolNamesItselfWhenItCallsGraph:
-    def test_the_tools_are_actually_there(self) -> None:
-        sources = _tool_sources()
-        assert len(sources) > 1, f"no tool modules found under {_TOOLS}"
-        assert any(_graph_errors_calls(_parsed(source)) for source in sources)
+class TestATokenAcquisitionIsCountedUnderTheTool:
+    @staticmethod
+    def _token(monkeypatch: pytest.MonkeyPatch, failure: Exception | None) -> GraphToken:
+        class _Exchange:
+            async def __aenter__(self) -> str:
+                if failure is not None:
+                    raise failure
+                return "token"
 
-    @pytest.mark.parametrize("source", _tool_sources(), ids=_source_id)
-    def test_every_graph_call_is_named_after_the_tool_that_makes_it(
-        self, source: pathlib.Path
-    ) -> None:
-        unnamed = [
-            call.lineno
-            for call in _graph_errors_calls(_parsed(source))
-            if [argument for argument in call.args if _names_the_tool(argument)] == []
-            and [keyword for keyword in call.keywords if _names_the_tool(keyword.value)] == []
+            async def __aexit__(self, *_: object) -> None:
+                return None
+
+        def exchange_for(_scopes: list[str]) -> _Exchange:
+            return _Exchange()
+
+        monkeypatch.setattr(caller, "EntraOBOToken", exchange_for)
+        return GraphToken("Mail.Read")
+
+    @staticmethod
+    def _counts() -> dict[frozenset[tuple[str, str]], float]:
+        return _samples(GRAPH_TOKEN_ACQUISITIONS_TOTAL)
+
+    async def test_a_token_counts_once_as_ok(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        token = self._token(monkeypatch, None)
+        before = self._counts()
+
+        with measured_graph_operation("zz_mail_tool"):
+            async with token as issued:
+                assert issued == "token"
+
+        assert _moves(GRAPH_TOKEN_ACQUISITIONS_TOTAL, before, "result") == [
+            ("zz_mail_tool", "ok", 1.0)
         ]
-        assert not unnamed, (
-            f"{source.name} calls graph_errors without its own TOOL_NAME at line(s) "
-            + f"{unnamed}. Every Graph call a tool makes is counted under `operation`, and a call "
-            + "that names nothing is counted nowhere — the tool goes missing from "
-            + f"{GRAPH_OPERATIONS_TOTAL} rather than showing up under a wrong name."
+
+    @pytest.mark.parametrize(
+        ("failure", "result"),
+        [
+            (RuntimeError("AADSTS65001: The user or administrator has not consented"), "refused"),
+            (ConnectionError("Name or service not known"), "failed"),
+        ],
+        ids=["entra-refused", "network-failed"],
+    )
+    async def test_a_failure_counts_once_under_its_result(
+        self, monkeypatch: pytest.MonkeyPatch, failure: Exception, result: str
+    ) -> None:
+        token = self._token(monkeypatch, failure)
+        before = self._counts()
+
+        with pytest.raises(TokenExchangeFailed), measured_graph_operation("zz_mail_tool"):
+            _ = await token.__aenter__()
+
+        assert _moves(GRAPH_TOKEN_ACQUISITIONS_TOTAL, before, "result") == [
+            ("zz_mail_tool", result, 1.0)
+        ]
+
+
+class TestEverySeriesAnAlertCountsStartsAtZero:
+    def test_a_registered_tool_has_every_series_before_its_first_call(self) -> None:
+        start_operation_series(["zz_never_called_tool"], statuses=GRAPH_STATUSES)
+        start_tool_outcomes(["zz_never_called_tool"])
+
+        def started(metric: str, label: str) -> dict[str, float]:
+            return {
+                dict(labels)[label]: value
+                for labels, value in _samples(metric).items()
+                if dict(labels).get("operation") == "zz_never_called_tool"
+            }
+
+        assert started(GRAPH_OPERATIONS_TOTAL, "status") == dict.fromkeys(GRAPH_STATUSES, 0.0)
+        assert started(GRAPH_THROTTLED_TOTAL, "retried") == {"true": 0.0, "false": 0.0}
+        assert [
+            value
+            for labels, value in _samples(GRAPH_SLOW_OPERATIONS_TOTAL).items()
+            if dict(labels).get("operation") == "zz_never_called_tool"
+        ] == [0.0]
+        assert started(TOOL_OUTCOMES_TOTAL, "outcome") == {
+            "ok": 0.0,
+            "asked": 0.0,
+            "cancelled": 0.0,
+            "refused": 0.0,
+            "graph": 0.0,
+            "token": 0.0,
+            "error": 0.0,
+        }
+        assert started(GRAPH_TOKEN_ACQUISITIONS_TOTAL, "result") == {
+            "ok": 0.0,
+            "refused": 0.0,
+            "failed": 0.0,
+        }
+
+
+def _probe_server(client: GraphServiceClient) -> FastMCP[None]:
+    server: FastMCP[None] = FastMCP(
+        "probe", middleware=[BoundedNameMiddleware(), GraphOperationMiddleware()]
+    )
+
+    @server.tool(name="zz_reads_me")
+    async def reads_me() -> str:
+        with graph_errors():
+            me = await client.me.get()
+        assert me is not None
+        return "read"
+
+    @server.tool(name="zz_refused_by_graph")
+    async def refused_by_graph() -> str:
+        try:
+            with graph_errors():
+                _ = await client.me.get()
+        except GraphForbidden as refusal:
+            raise ToolError("Microsoft refused") from refusal
+        return "unreachable"
+
+    @server.tool(name="zz_refused_after_graph")
+    async def refused_after_graph() -> str:
+        refused = "unreachable"
+        try:
+            with graph_errors():
+                _ = await client.me.get()
+        except GraphForbidden:
+            refused = "Microsoft refused"
+        raise ToolError(refused)
+
+    @server.tool(name="zz_never_calls_graph")
+    async def never_calls_graph() -> str:
+        raise ToolError("refused before any Graph call")
+
+    @server.tool(name="zz_refuses_with_a_cause")
+    async def refuses_with_a_cause() -> str:
+        try:
+            _ = b"\xff".decode()
+        except UnicodeDecodeError as error:
+            raise ToolError("this page cannot be read as text") from error
+        return "unreachable"
+
+    @server.tool(name="zz_recovers_then_crashes")
+    async def recovers_then_crashes() -> str:
+        try:
+            with graph_errors():
+                _ = await client.me.get()
+        except GraphForbidden:
+            pass
+        empty: dict[str, str] = {}
+        return empty["missing"]
+
+    @server.tool(name="zz_reads_then_crashes")
+    async def reads_then_crashes() -> str:
+        with graph_errors():
+            _ = await client.me.get()
+        empty: dict[str, str] = {}
+        return empty["missing"]
+
+    @server.tool(name="zz_asserts_inside_graph")
+    async def asserts_inside_graph() -> str:
+        with graph_errors():
+            me = await client.me.get()
+            assert me is None, "a connector invariant that does not hold"
+        return "unreachable"
+
+    @server.tool(name="zz_needs_an_argument")
+    async def needs_an_argument(subject: str) -> str:
+        return subject
+
+    @server.tool(name="zz_crashes_inside_a_handler")
+    async def crashes_inside_a_handler() -> str:
+        try:
+            with graph_errors():
+                _ = await client.me.get()
+        except GraphForbidden:
+            empty: dict[str, str] = {}
+            return empty["missing"]
+        return "unreachable"
+
+    @server.tool(name="zz_asks")
+    async def asks() -> InputRequiredResult:
+        return InputRequiredResult(
+            input_requests={
+                "confirmation": ElicitRequest(
+                    params=ElicitRequestFormParams(
+                        message="Send it?", requested_schema={"type": "object", "properties": {}}
+                    )
+                )
+            },
+            request_state="zz",
         )
 
+    @server.tool(name="zz_fails_from_graph")
+    async def fails_from_graph() -> str:
+        try:
+            with graph_errors():
+                _ = await client.me.get()
+        except GraphForbidden as refusal:
+            raise RuntimeError("the connector could not go on") from refusal
+        return "unreachable"
 
-def _names_the_tool(argument: ast.expr) -> bool:
-    return isinstance(argument, ast.Name) and argument.id == "TOOL_NAME"
+    @server.tool(name="zz_returns_an_error")
+    async def returns_an_error() -> ToolResult:
+        return ToolResult(content="the tool answered with an error", is_error=True)
+
+    @server.tool(name="zz_refuses_with_another_cause")
+    async def refuses_with_another_cause() -> str:
+        try:
+            with graph_errors():
+                _ = await client.me.get()
+        except GraphForbidden:
+            raise ToolError("Microsoft refused") from ValueError("parsed after the refusal")
+        return "unreachable"
+
+    @server.tool(name="zz_reads_then_builds_a_bad_answer")
+    async def reads_then_builds_a_bad_answer() -> str:
+        with graph_errors():
+            _ = await client.me.get()
+        return str(SignedInUser.model_validate({}))
+
+    @server.tool(name="zz_builds_a_bad_answer")
+    async def builds_a_bad_answer() -> str:
+        return str(SignedInUser.model_validate({}))
+
+    @server.tool(name="zz_crashes")
+    async def crashes() -> str:
+        empty: dict[str, str] = {}
+        return empty["missing"]
+
+    return server
+
+
+class TestTheServerCountsEachToolCallUnderItsRegisteredName:
+    async def test_a_call_that_reached_graph_is_counted_under_the_tool_name(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me").mock(return_value=httpx.Response(200, json=_ME))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation="zz_reads_me", status="ok")
+
+        async with Client(_probe_server(client)) as mcp:
+            _ = await mcp.call_tool("zz_reads_me", {})
+
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation="zz_reads_me", status="ok") == before + 1
+
+    @pytest.mark.parametrize("tool", ["zz_refused_by_graph", "zz_refused_after_graph"])
+    async def test_a_refusal_behind_a_graph_failure_is_counted_under_its_remedy(
+        self, client: GraphServiceClient, graph: respx.MockRouter, tool: str
+    ) -> None:
+        _ = graph.get("/me").mock(return_value=httpx.Response(403, json={}))
+        before = _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="forbidden")
+
+        async with Client(_probe_server(client)) as mcp:
+            _ = await mcp.call_tool(tool, {}, raise_on_error=False)
+
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="forbidden") == before + 1
+
+    @pytest.mark.parametrize(
+        ("tool", "graph_answer", "not_blamed"),
+        [
+            ("zz_reads_then_crashes", 200, "ok"),
+            ("zz_reads_then_builds_a_bad_answer", 200, "ok"),
+            ("zz_recovers_then_crashes", 403, "forbidden"),
+            ("zz_crashes_inside_a_handler", 403, "forbidden"),
+        ],
+    )
+    async def test_a_crash_after_graph_answered_is_counted_as_an_error_and_not_as_graph(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        tool: str,
+        graph_answer: int,
+        not_blamed: str,
+    ) -> None:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(graph_answer, json=_ME if graph_answer == 200 else {})
+        )
+        errors = _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="error")
+        blamed = _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status=not_blamed)
+
+        async with Client(_probe_server(client)) as mcp:
+            answered = await mcp.call_tool(tool, {}, raise_on_error=False)
+
+        assert answered.is_error
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="error") == errors + 1
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status=not_blamed) == blamed
+
+    async def test_a_call_that_never_reached_graph_is_not_counted(
+        self, client: GraphServiceClient
+    ) -> None:
+        async with Client(_probe_server(client)) as mcp:
+            _ = await mcp.call_tool("zz_never_calls_graph", {}, raise_on_error=False)
+            _ = await mcp.call_tool("zz_no_such_tool", {}, raise_on_error=False)
+
+        counted = {dict(labels)["operation"] for labels in _samples(GRAPH_OPERATIONS_TOTAL)}
+        assert "zz_never_calls_graph" not in counted
+        assert not {"zz_no_such_tool", UNRESOLVED_NAME} & counted
+
+
+class TestEachToolCallIsCountedUnderHowItEnded:
+    @pytest.mark.parametrize(
+        ("tool", "graph_answer", "outcome"),
+        [
+            ("zz_reads_me", 200, "ok"),
+            ("zz_refused_by_graph", 403, "graph"),
+            ("zz_refused_after_graph", 403, "refused"),
+            ("zz_crashes_inside_a_handler", 403, "error"),
+            ("zz_never_calls_graph", None, "refused"),
+            ("zz_refuses_with_a_cause", None, "refused"),
+            ("zz_crashes", None, "error"),
+            ("zz_recovers_then_crashes", 403, "error"),
+            ("zz_reads_then_crashes", 200, "error"),
+            ("zz_asserts_inside_graph", 200, "error"),
+            ("zz_needs_an_argument", None, "refused"),
+            ("zz_asks", None, "asked"),
+            ("zz_fails_from_graph", 403, "graph"),
+            ("zz_refuses_with_another_cause", 403, "graph"),
+            ("zz_returns_an_error", None, "error"),
+            ("zz_builds_a_bad_answer", None, "error"),
+            ("zz_reads_then_builds_a_bad_answer", 200, "error"),
+        ],
+    )
+    async def test_the_outcome_names_what_ended_the_call(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        tool: str,
+        graph_answer: int | None,
+        outcome: str,
+    ) -> None:
+        me = graph.get("/me").mock(
+            return_value=httpx.Response(
+                graph_answer or 200, json=_ME if graph_answer == 200 else {}
+            )
+        )
+        before = _samples(TOOL_OUTCOMES_TOTAL)
+
+        async with Client(_probe_server(client)) as mcp:
+            if outcome == "asked":
+                first = await mcp.session.call_tool(tool, {}, allow_input_required=True)
+                assert isinstance(first, InputRequiredResult), (
+                    "the question never reached the client"
+                )
+            else:
+                answered = await mcp.call_tool(tool, {}, raise_on_error=False)
+                assert answered.is_error == (outcome != "ok")
+                if tool == "zz_returns_an_error":
+                    assert [getattr(part, "text", None) for part in answered.content] == [
+                        "the tool answered with an error"
+                    ]
+
+        assert me.call_count == (0 if graph_answer is None else 1)
+
+        assert _moves(TOOL_OUTCOMES_TOTAL, before, "outcome") == [(tool, outcome, 1.0)]
+
+    async def test_an_unknown_tool_name_is_not_counted(self, client: GraphServiceClient) -> None:
+        before = _samples(TOOL_OUTCOMES_TOTAL)
+
+        async with Client(_probe_server(client)) as mcp:
+            _ = await mcp.call_tool("zz_no_such_tool", {}, raise_on_error=False)
+
+        assert _samples(TOOL_OUTCOMES_TOTAL) == before
+
+    async def test_a_refused_token_on_a_registered_tool_never_reaches_graph(
+        self, monkeypatch: pytest.MonkeyPatch, transport: httpx.AsyncClient, graph: respx.MockRouter
+    ) -> None:
+        class _Refused:
+            async def __aenter__(self) -> str:
+                raise RuntimeError("AADSTS65001: The user or administrator has not consented")
+
+            async def __aexit__(self, *_: object) -> None:
+                return None
+
+        def exchange_for(_scopes: list[str]) -> _Refused:
+            return _Refused()
+
+        monkeypatch.setattr(caller, "EntraOBOToken", exchange_for)
+        me = graph.get("/me")
+        server: FastMCP[None] = FastMCP(
+            "probe", middleware=[BoundedNameMiddleware(), GraphOperationMiddleware()]
+        )
+        get_me.register(server, transport)
+        refused = _value(GRAPH_TOKEN_ACQUISITIONS_TOTAL, operation="get_me", result="refused")
+        before = _samples(TOOL_OUTCOMES_TOTAL)
+
+        async with Client(server) as mcp:
+            _ = await mcp.call_tool("get_me", {}, raise_on_error=False)
+
+        assert me.call_count == 0
+        assert (
+            _value(GRAPH_TOKEN_ACQUISITIONS_TOTAL, operation="get_me", result="refused")
+            == refused + 1
+        )
+        assert _moves(TOOL_OUTCOMES_TOTAL, before, "outcome") == [("get_me", "token", 1.0)]
+
+
+class TestACancelledCallIsCounted:
+    async def test_a_cancelled_call_is_counted_and_still_cancels(self) -> None:
+        async def cancelled(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
+            raise asyncio.CancelledError(context.method)
+
+        context = MiddlewareContext(
+            message=CallToolRequestParams(name="zz_cancelled_tool", arguments={}),
+            method="tools/call",
+        )
+        before = _samples(TOOL_OUTCOMES_TOTAL)
+
+        with pytest.raises(asyncio.CancelledError):
+            _ = await GraphOperationMiddleware().on_call_tool(context, cancelled)
+
+        assert _moves(TOOL_OUTCOMES_TOTAL, before, "outcome") == [
+            ("zz_cancelled_tool", "cancelled", 1.0)
+        ]
+
+
+class TestASlowOperationIsCounted:
+    @pytest.mark.parametrize(("seconds", "counted"), [(60.5, 1), (60.0, 0), (59.0, 0)])
+    def test_only_an_operation_past_sixty_seconds_counts(
+        self, seconds: float, counted: int
+    ) -> None:
+        before = _value(GRAPH_SLOW_OPERATIONS_TOTAL, operation="zz_slow_tool")
+
+        record_graph_call("zz_slow_tool", status="ok", seconds=seconds)
+
+        assert _value(GRAPH_SLOW_OPERATIONS_TOTAL, operation="zz_slow_tool") == before + counted
 
 
 class TestNoOperationNameIsTakenFromData:
@@ -613,37 +1208,6 @@ class TestNoOperationNameIsTakenFromData:
             "every measured Graph call is under tools/, so this asserts nothing the tools-only "
             + "rule did not — find the caller that moved before narrowing the glob back"
         )
-
-    @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)
-    def test_the_operation_is_a_name_this_code_chose(self, source: pathlib.Path) -> None:
-        module = _parsed(source)
-        chosen = frozenset(_module_level_strings(module))
-        derived = [
-            (call.lineno, ast.unparse(named))
-            for call in _graph_errors_calls(module)
-            if (named := _operation_named(call)) is not None
-            and not _is_chosen_in_code(named, chosen)
-        ]
-        assert not derived, (
-            f"{_source_id(source)} passes graph_errors an operation it did not choose in code, at "
-            + f"(line, expression) {derived}. `operation` is a Prometheus label: a URL, a path, or "
-            + "anything read off an argument is a new time series per chat, per message and per "
-            + f"meeting, and an unbounded label set on {GRAPH_OPERATIONS_TOTAL} takes the "
-            + "Prometheus down rather than showing up as a bad dashboard. Pass a constant this "
-            + "module binds "
-            + "at its top level, the way every tool passes its own TOOL_NAME."
-        )
-
-
-def _operation_named(call: ast.Call) -> ast.expr | None:
-    if call.args:
-        return call.args[0]
-    for keyword in call.keywords:
-        if keyword.arg == "operation":
-            return keyword.value
-        if keyword.arg is None:
-            return keyword.value
-    return None
 
 
 def _module_level_strings(module: ast.Module) -> dict[str, str]:
@@ -689,6 +1253,16 @@ GRAPH_STEPS = frozenset(
         "signed_in_user",
         "file_search",
         "site_search",
+        "site_by_url",
+        "site_drives",
+        "site_lists",
+        "list_columns",
+        "read_list",
+        "list_items",
+        "list_item",
+        "create_list_item",
+        "update_list_item",
+        "delete_list_item",
         "my_drive",
         "my_drives",
         "folder_children",
@@ -706,6 +1280,9 @@ GRAPH_STEPS = frozenset(
         "chats",
         "chat",
         "chat_messages",
+        "chat_call_events",
+        "call_transcripts",
+        "home_tenant",
         "chat_members",
         "joined_teams",
         "team",
@@ -757,6 +1334,7 @@ GRAPH_STEPS = frozenset(
         "mail_categories",
         "categories",
         "create_category",
+        "delete_category",
         "time_zones",
         "mark_message",
         "move_message",
@@ -868,8 +1446,8 @@ class TestNoStepNameIsTakenFromData:
         }
         assert outside_tools, (
             "every step is declared under tools/, so the modules that own a shared Graph call "
-            + "(shared/identity.py, shared/meetings.py) have stopped naming their own — find where "
-            + "their step went before assuming this rule still covers them"
+            + "(shared/identity.py, shared/teams/meetings.py) have stopped naming their own — find "
+            + "where their step went before assuming this rule still covers them"
         )
 
     @pytest.mark.parametrize("source", _source_modules(), ids=_source_id)
@@ -999,6 +1577,8 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
             GRAPH_PAGES_SCANNED,
             GRAPH_STEPS_TOTAL,
             GRAPH_STEP_DURATION_SECONDS,
+            GRAPH_TOKEN_ACQUISITIONS_TOTAL,
+            GRAPH_SLOW_OPERATIONS_TOTAL,
         }
         queried = _queried_graph_metrics()
         assert queried <= exported, (
@@ -1017,6 +1597,8 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
             GRAPH_PAGES_SCANNED,
             GRAPH_STEPS_TOTAL,
             GRAPH_STEP_DURATION_SECONDS,
+            GRAPH_TOKEN_ACQUISITIONS_TOTAL,
+            GRAPH_SLOW_OPERATIONS_TOTAL,
         } - queried
         assert not unplotted, (
             f"{sorted(unplotted)} is recorded on every call and shown to nobody. Either add the "
@@ -1024,9 +1606,14 @@ class TestTheDashboardAsksForMetricsThisServiceEmits:
         )
 
 
+_HISTOGRAMS = frozenset(
+    {GRAPH_OPERATION_DURATION_SECONDS, GRAPH_STEP_DURATION_SECONDS, GRAPH_PAGES_SCANNED}
+)
+
+
 def _instrument(sample: str) -> str:
     for suffix in _PROMETHEUS_SUFFIXES:
-        if sample.endswith(suffix):
+        if sample.endswith(suffix) and sample[: -len(suffix)] in _HISTOGRAMS:
             return sample[: -len(suffix)]
     return sample
 

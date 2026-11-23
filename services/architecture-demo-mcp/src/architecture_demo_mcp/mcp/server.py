@@ -10,6 +10,12 @@ from fastmcp import FastMCP
 from fastmcp.server.auth import AuthProvider
 from fastmcp.server.providers import FileSystemProvider
 import httpx2
+from mcp_configs import RateLimitSettings
+from mcp_observability import access_token_subject
+from mcp_observability import RateLimitMiddleware
+from mcp_observability import RedactToolCallSecretsMiddleware
+from mcp_observability import ToolCallObservabilityMiddleware
+from mcp_observability import validate_trace_declarations
 
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import open_upstream
@@ -35,6 +41,7 @@ def create_server(
     transport: httpx2.AsyncBaseTransport | None = None,
     *,
     auth: AuthProvider | None = None,
+    rate_limit: RateLimitSettings | None = None,
 ) -> FastMCP:
     """Build the server. `open_persistence` opens every store, so the tests can open their own."""
     http = upstream_http(upstream, transport)
@@ -47,6 +54,11 @@ def create_server(
         ):
             yield {"upstream": upstream_resource, "persistence": persistence_resource}
 
+    rate_limiting = (
+        [RateLimitMiddleware(rate_limit, get_request_key=access_token_subject)]
+        if rate_limit is not None
+        else []
+    )
     mcp = FastMCP(
         name="Architecture Demo MCP",
         version=version("architecture-demo-mcp"),
@@ -56,9 +68,17 @@ def create_server(
         mask_error_details=True,
         lifespan=lifespan,
         auth=auth,
+        # Redaction outermost, so the caller's access token is redacted from the tool-call lines.
+        # The tool-call lines replace FastMCP's per-call lines, which can quote the input.
+        middleware=[
+            RedactToolCallSecretsMiddleware(),
+            ToolCallObservabilityMiddleware(),
+            *rate_limiting,
+        ],
     )
     mcp.add_provider(upstream_tools(http))
     tools = FileSystemProvider(Path(__file__).parent / "tools")
     assert not tools.failed_files, f"tool files failed to load: {dict(tools.failed_files)}"
     mcp.add_provider(tools)
+    validate_trace_declarations()
     return mcp

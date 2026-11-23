@@ -12,18 +12,20 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CHAT_PERMISSION
 from office_365_mcp.shared.identity import Person, person_in_question, user_bind
-from office_365_mcp.shared.messages import EVERYONE_SEES_IT, chat_in_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import EVERYONE_SEES_IT, chat_in_question
 
 TOOL_NAME = "teams_add_chat_member"
+
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
 
 STEP = "add_chat_member"
 
@@ -92,7 +94,7 @@ async def add_chat_member(
     share_history: bool,
     confirm: Confirm,
 ) -> AddedChatMember | InputRequiredResult:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         chat = await chat_in_question(client, chat_id)
         with not_graph():
             answer = await confirm(
@@ -141,7 +143,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Add a Teams Chat Member",
+        title="Teams: Add a Chat Member",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

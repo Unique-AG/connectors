@@ -1,0 +1,295 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox",
+    "query": {
+      "$select": "displayName,totalItemCount,unreadItemCount"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "displayName": "Inbox",
+      "id": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+      "totalItemCount": 35,
+      "unreadItemCount": 22
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders/inbox/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=1",
+      "value": [
+        {
+          "@odata.etag": "W/\"RjVPCLQKEVUncYikYaqxFUHmViKj/BqxGBVyIfqz\"",
+          "@odata.type": "#microsoft.graph.eventMessageRequest",
+          "bodyPreview": "Walk through the roadmap for the next quarter.",
+          "categories": [],
+          "flag": {
+            "flagStatus": "notFlagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": false,
+          "id": "CBnBCfOGAGOZRQCSTkipVr6veQLdGJ-TDz9Vq4Fkjn96HmKGNv4K8dpmdxLJ42xw9jUX",
+          "importance": "normal",
+          "isDraft": false,
+          "isRead": false,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-29T14:52:38Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "Roadmap check",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=GXgFZzIQGCGJTSCEGydcJd6wbFMpJS%2FKZo5Oc4Yfpu80DaLWVq6O1ipkxpMQ55hm0nIH&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/mailFolders('inbox')/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$orderby": "receivedDateTime desc",
+      "$select": "id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo",
+      "$top": "1",
+      "$skip": "1"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('inbox')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=2",
+      "value": [
+        {
+          "@odata.etag": "W/\"BZLGZBRPEOSzbOxoRshjUFAjUoKf/PbiPIArroyQ\"",
+          "bodyPreview": "Accepted. I attach the final numbers. Please check line 7 before Thursday.",
+          "categories": ["seed-v1", "Finance"],
+          "flag": {
+            "flagStatus": "flagged"
+          },
+          "from": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "hasAttachments": true,
+          "id": "UVsTDiJFUPIYQUGJVhueFs0rwRVuSL-VXg7Qf8Gswu94PmVGQa3B8fgvapZL0C73yPLW",
+          "importance": "high",
+          "isDraft": false,
+          "isRead": true,
+          "parentFolderId": "AAMkMRsoSNF8HLS2PKJiFTpnPDE7UV06Umg6KWJ2QBAhMCRsM8LnUIOnRVWAPMSsksxIXCebADmnT6w0KCZ8AHXsdFkjJoabRNVcDpBr-PrePUXIRVYSUFW=",
+          "receivedDateTime": "2026-10-25T10:05:00Z",
+          "replyTo": [],
+          "sender": {
+            "emailAddress": {
+              "address": "anna@example.test",
+              "name": "Anna Meier"
+            }
+          },
+          "subject": "RE: Q3 budget review",
+          "toRecipients": [
+            {
+              "emailAddress": {
+                "address": "mia@example.test",
+                "name": "Mia Keller"
+              }
+            }
+          ],
+          "webLink": "https://outlook.office365.com/owa/?ItemID=BTnWQrMHCJDYPWKARukpDr6phUDsUP%2FMPn7Uf7Mnyt80McKQHp0A5wxhfjRU3H03iLJO&exvsurl=1&viewmodel=ReadMessageItem"
+        }
+      ]
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/messages",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>First text.</p>",
+        "contentType": "html"
+      },
+      "ccRecipients": [],
+      "subject": "seed-v1 case-outlook_update_draft-basic",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test"
+          }
+        }
+      ]
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/messages('QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"BHIEZZLMGCIulDwfAgceVRCfNkKl/WrqPUXbMxAr\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>First text.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "First text.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "WEGBQNMENOEugEerLpcrEJCmNrTl/TsfZRWnUgKg",
+      "conversationId": "AAQkAIzgBAM1LLG9IXNqLQavGJZ4DD45Yne2QPF7NXFsAVAjX8DkCTPSKLO-AGrEovBJa8YJsthP2WR=",
+      "createdDateTime": "2026-10-29T15:13:41Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "hasAttachments": false,
+      "id": "QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+      "importance": "normal",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-10-29T15:13:41Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-10-29T15:13:41Z",
+      "replyTo": [],
+      "sentDateTime": "2026-10-29T15:13:41Z",
+      "subject": "seed-v1 case-outlook_update_draft-basic",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=GKvAYcSUBYUUKIMKUzmaAe5uuESbIC%2FWTp9Uy8Kgnz03PpNVBt5Q1guthyFN89qMIzGI&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "isDraft,subject,toRecipients,ccRecipients"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"BHIEZZLMGCIulDwfAgceVRCfNkKl/WrqPUXbMxAr\"",
+      "ccRecipients": [],
+      "id": "QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+      "isDraft": true,
+      "subject": "seed-v1 case-outlook_update_draft-basic",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          }
+        }
+      ]
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/messages/QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.message",
+      "body": {
+        "content": "<p>Second text.</p>",
+        "contentType": "html"
+      },
+      "importance": "high",
+      "subject": "seed-v1 case-outlook_update_draft-basic changed"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"CCWVKDOAJGWgaGkyEeplKFXtSzRn/QayAMApKgCm\"",
+      "bccRecipients": [],
+      "body": {
+        "content": "<html><head>\r\n<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"></head><body><p>Second text.</p></body></html>",
+        "contentType": "html"
+      },
+      "bodyPreview": "Second text.",
+      "categories": [],
+      "ccRecipients": [],
+      "changeKey": "LGOCWTSITUAhrUssDtvwYWOnTyGj/NhyFFQzLhJa",
+      "conversationId": "AAQkAIzgBAM1LLG9IXNqLQavGJZ4DD45Yne2QPF7NXFsAVAjX8DkCTPSKLO-AGrEovBJa8YJsthP2WR=",
+      "createdDateTime": "2026-10-29T15:13:41Z",
+      "flag": {
+        "flagStatus": "notFlagged"
+      },
+      "hasAttachments": false,
+      "id": "QDkMFpSJAAWDGMXXQbhrFv8frBQoRY-EEr3As3Vxya24IqZREr7J1lppvzDR59lWImJS",
+      "importance": "high",
+      "isDraft": true,
+      "isRead": true,
+      "lastModifiedDateTime": "2026-10-29T15:13:41Z",
+      "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
+      "receivedDateTime": "2026-10-29T15:13:41Z",
+      "replyTo": [],
+      "sentDateTime": "2026-10-29T15:13:41Z",
+      "subject": "seed-v1 case-outlook_update_draft-basic changed",
+      "toRecipients": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          }
+        }
+      ],
+      "webLink": "https://outlook.office365.com/owa/?ItemID=GKvAYcSUBYUUKIMKUzmaAe5uuESbIC%2FWTp9Uy8Kgnz03PpNVBt5Q1guthyFN89qMIzGI&exvsurl=1&viewmodel=ReadMessageItem"
+    }
+  }
+]

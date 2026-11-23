@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
 import { NewTrace } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { SEARCH_CONFIG } from '../search.config';
 import { SearchCursorRepository } from './search-cursor.repository';
 
@@ -35,6 +36,8 @@ export class SearchCursorCleanupSchedulerService implements OnModuleInit, OnModu
       this.logger.error({ msg: 'Error stopping search cursor cleanup cron job', err });
     }
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.search-cursor-cleanup')
   public async runCleanup(): Promise<void> {

@@ -1,0 +1,68 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/outlook/masterCategories",
+    "json": {
+      "color": "preset5",
+      "displayName": "seed-v1 case-outlook_delete_category-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/MasterCategories('00000000-038e-4045-856f-6d8ed818121c')"
+    },
+    "response_json": {
+      "color": "preset5",
+      "displayName": "seed-v1 case-outlook_delete_category-created",
+      "id": "00000000-038e-4045-856f-6d8ed818121c"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/outlook/masterCategories",
+    "query": {
+      "$select": "id,displayName"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "displayName": "synthetic text 01",
+          "id": "00000000-1778-4b5f-81c9-82bdcafa9d36"
+        },
+        {
+          "displayName": "synthetic text 02",
+          "id": "00000000-dd53-45d3-8be1-e8095699e012"
+        },
+        {
+          "displayName": "synthetic text 03",
+          "id": "00000000-1002-4bb9-8fa0-1558bdd96cf0"
+        },
+        {
+          "displayName": "synthetic text 04",
+          "id": "00000000-b772-4ba7-8f51-5035ce048628"
+        },
+        {
+          "displayName": "synthetic text 05",
+          "id": "00000000-c318-4505-8606-d8a1a04a9539"
+        },
+        {
+          "displayName": "synthetic text 06",
+          "id": "00000000-f1cc-46f8-810a-7b98bf48b975"
+        },
+        {
+          "displayName": "seed-v1 case-outlook_delete_category-created",
+          "id": "00000000-038e-4045-856f-6d8ed818121c"
+        }
+      ]
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1.0/me/outlook/masterCategories/00000000-038e-4045-856f-6d8ed818121c",
+    "status": 204
+  }
+]

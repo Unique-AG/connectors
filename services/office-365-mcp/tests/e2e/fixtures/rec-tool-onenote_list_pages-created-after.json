@@ -1,0 +1,94 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/onenote/pages",
+    "query": {
+      "$expand": "parentSection,parentNotebook",
+      "$filter": "createdDateTime ge ~yesterday",
+      "$orderby": "createdDateTime desc",
+      "$select": "id,title,createdDateTime,lastModifiedDateTime,links,createdByAppId",
+      "$top": "10"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "preference-applied": "odata.include-annotations=*"
+    },
+    "response_json": {
+      "value": [
+        {
+          "createdByAppId": "RBHMU-00000000-2CE7-4CFD-8583-FEC34DB3BE6C",
+          "createdDateTime": "2026-11-02T20:44:53Z",
+          "id": "8-7005w44a155603ur01540905306o25f8!41-00000000-5d58-4d20-82c2-9abfd58e5c72",
+          "lastModifiedDateTime": "2026-11-02T20:44:53Z",
+          "links": {
+            "oneNoteClientUrl": {
+              "href": "synthetic text 01"
+            },
+            "oneNoteWebUrl": {
+              "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2002/seed-v1%20Dogfood%20Notes"
+            }
+          },
+          "parentNotebook": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 03"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:10Z",
+            "displayName": "seed-v1 Dogfood Notes",
+            "id": "3-00000000-45a9-48e2-8006-05461aaf4186",
+            "isDefault": false,
+            "isShared": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 03"
+              }
+            },
+            "lastModifiedDateTime": "2026-10-29T14:27:10Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 04"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2002/seed-v1%20Dogfood%20Notes"
+              }
+            },
+            "sectionGroupsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sectionGroups",
+            "sectionsUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186/sections",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/notebooks/3-00000000-45a9-48e2-8006-05461aaf4186",
+            "userRole": "Owner"
+          },
+          "parentSection": {
+            "createdBy": {
+              "user": {
+                "displayName": "synthetic text 03"
+              }
+            },
+            "createdDateTime": "2026-10-29T14:27:15Z",
+            "displayName": "seed-v1 Planning",
+            "id": "8-00000000-5d58-4d20-82c2-9abfd58e5c72",
+            "isDefault": false,
+            "lastModifiedBy": {
+              "user": {
+                "displayName": "synthetic text 03"
+              }
+            },
+            "lastModifiedDateTime": "2026-11-02T20:44:55Z",
+            "links": {
+              "oneNoteClientUrl": {
+                "href": "synthetic text 05"
+              },
+              "oneNoteWebUrl": {
+                "href": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents/synthetic%20text%2002/seed-v1%20Dogfood%20Notes"
+              }
+            },
+            "pagesUrl": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sections/8-00000000-5d58-4d20-82c2-9abfd58e5c72/pages",
+            "self": "https://graph.microsoft.com/v1.0/users/00000000-aa0f-4286-8305-d989485e14b5/onenote/sections/8-00000000-5d58-4d20-82c2-9abfd58e5c72"
+          },
+          "title": ""
+        }
+      ]
+    }
+  }
+]

@@ -1,8 +1,11 @@
 import { Smeared } from '@unique-ag/utils';
+import { errors } from 'undici';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ZodError } from 'zod';
 import type { ConfluenceConfig } from '../../config';
 import type { ConfluencePage } from '../../confluence-api';
 import { ConfluenceApiClient, ContentType } from '../../confluence-api';
+import { HttpStatusError } from '../../utils/http-util';
 import { ConfluenceContentFetcher } from '../confluence-content-fetcher';
 import type { DiscoveredPage } from '../sync.types';
 
@@ -183,21 +186,82 @@ describe('ConfluenceContentFetcher', () => {
     expect(result?.metadata?.confluenceLabels).toEqual(['alpha', 'zebra']);
   });
 
-  it('continues processing after getPageById error', async () => {
-    const apiClient = {
-      getPageById: vi.fn().mockRejectedValue(new Error('request failed')),
-    };
+  it('rethrows a failed request and logs its status code without the response body', async () => {
+    const requestError = new HttpStatusError(
+      500,
+      'Error response from https://confluence.example.com: 500 secret page content',
+    );
+    const apiClient = { getPageById: vi.fn().mockRejectedValue(requestError) };
 
     const fetcher = createFetcher(apiClient);
-    const result = await fetcher.fetchPageContent(makeDiscoveredPage('fail'));
 
-    expect(result).toBeNull();
-    expect(mockLogger.error).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pageId: 'fail',
-        err: expect.objectContaining({ message: 'request failed' }),
-        msg: 'Failed to fetch page, possibly deleted in the meantime',
-      }),
+    await expect(fetcher.fetchPageContent(makeDiscoveredPage('fail'))).rejects.toBe(requestError);
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      pageId: 'fail',
+      title: new Smeared('Page fail', false),
+      errorName: 'HttpStatusError',
+      statusCode: 500,
+      msg: 'Failed to fetch page',
+    });
+  });
+
+  it('rethrows a network error and logs its name and code without the message', async () => {
+    const networkError = Object.assign(new Error('connect ECONNRESET 10.0.0.1:443 secret detail'), {
+      code: 'ECONNRESET',
+    });
+    const apiClient = { getPageById: vi.fn().mockRejectedValue(networkError) };
+    const fetcher = createFetcher(apiClient);
+
+    await expect(fetcher.fetchPageContent(makeDiscoveredPage('reset'))).rejects.toBe(networkError);
+
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      pageId: 'reset',
+      title: new Smeared('Page reset', false),
+      errorName: 'Error',
+      errorCode: 'ECONNRESET',
+      msg: 'Failed to fetch page',
+    });
+  });
+
+  it('logs the status code when undici gives up retrying a 503', async () => {
+    const retryError = new errors.RequestRetryError('Request failed: secret detail', 503, {});
+    const apiClient = { getPageById: vi.fn().mockRejectedValue(retryError) };
+    const fetcher = createFetcher(apiClient);
+
+    await expect(fetcher.fetchPageContent(makeDiscoveredPage('busy'))).rejects.toBe(retryError);
+
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      pageId: 'busy',
+      title: new Smeared('Page busy', false),
+      errorName: 'RequestRetryError',
+      statusCode: 503,
+      errorCode: 'UND_ERR_REQ_RETRY',
+      msg: 'Failed to fetch page',
+    });
+  });
+
+  it('rethrows an unexpected response and logs where it failed validation', async () => {
+    const validationError = new ZodError([
+      {
+        code: 'invalid_type',
+        expected: 'object',
+        path: ['results', 0, 'body', 'storage'],
+        message: 'Invalid input: expected object, received undefined',
+      },
+    ]);
+    const apiClient = { getPageById: vi.fn().mockRejectedValue(validationError) };
+
+    const fetcher = createFetcher(apiClient);
+
+    await expect(fetcher.fetchPageContent(makeDiscoveredPage('invalid'))).rejects.toBe(
+      validationError,
     );
+    expect(mockLogger.error).toHaveBeenCalledWith({
+      pageId: 'invalid',
+      title: new Smeared('Page invalid', false),
+      errorName: 'ZodError',
+      issues: [{ code: 'invalid_type', path: 'results.0.body.storage' }],
+      msg: 'Failed to fetch page',
+    });
   });
 });

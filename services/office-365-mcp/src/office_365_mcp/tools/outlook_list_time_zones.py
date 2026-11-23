@@ -5,7 +5,6 @@ import httpx
 from fastmcp import FastMCP
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.time_zone_information import TimeZoneInformation
 from msgraph.generated.users.item.outlook.supported_time_zones.supported_time_zones_get_response import (  # noqa: E501
     SupportedTimeZonesGetResponse,
@@ -13,11 +12,27 @@ from msgraph.generated.users.item.outlook.supported_time_zones.supported_time_zo
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import (
+    MAX_SCANNED_ITEMS,
+    collect_pages,
+    graph_step,
+    send_parsed,
+)
 from office_365_mcp.shared import identity
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_time_zones"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-mailbox",
+    "outlook-automate",
+    "outlook-rules",
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP = "time_zones"
 
@@ -39,9 +54,9 @@ Notes:
 - A tool that lists or reads events, event occurrences, or reminders takes only IANA names in \
 `time_zone`. This tool lists Windows names by default. For a tool that takes only IANA names, \
 set `standard` to `iana`.
-- If this deployment exposes outlook_check_availability, that tool also takes only IANA names. A \
-tool that creates or changes an event sends the zone name to Microsoft as written. Microsoft \
-documents that it can refuse some zone names there.
+- If this deployment exposes outlook_check_availability or outlook_suggest_meeting_times, those \
+tools also take only IANA names. A tool that creates or changes an event sends the zone name to \
+Microsoft as written. Microsoft documents that it can refuse some zone names there.
 - Find the row that matches the place that the user named. Do not guess a zone name. An \
 `Etc/GMT+N` name is N hours behind UTC, not ahead of it.
 """
@@ -86,7 +101,7 @@ class TimeZones(BaseModel):
 async def list_time_zones(
     client: GraphServiceClient, *, standard: Standard = "windows"
 ) -> TimeZones:
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await _first_page(client, standard)
         assert first_page is not None, "Graph answered a time zone listing with no collection"
         collected = await collect_pages(first_page, client, limit=MAX_SCANNED_ITEMS)
@@ -109,9 +124,7 @@ async def _first_page(
     )
     request = RequestInformation(Method.GET, template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, SupportedTimeZonesGetResponse, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, SupportedTimeZonesGetResponse)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -119,7 +132,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Time Zones",
+        title="Outlook: List Time Zones",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

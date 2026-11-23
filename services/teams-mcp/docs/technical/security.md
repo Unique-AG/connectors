@@ -81,6 +81,20 @@ MCP access and refresh tokens use a different approach:
 - Hash comparison is sufficient for validation
 - Reduces attack surface (no decryption key needed)
 
+## Log Redaction
+
+Every log line has the secrets this deployment is configured with replaced by `[Redacted]`: the HMAC
+secret, the Microsoft client and webhook secrets, the encryption key in its hex and base64 forms, the
+database and RabbitMQ passwords, and the Unique app key.
+
+The Microsoft and MCP tokens a request or a RabbitMQ handler reads are redacted too, but only from the
+lines logged while that request or handler runs: an HTTP request is covered by the request redaction
+middleware, and each `@RabbitSubscribe` handler by `@LogSecretsScope()`
+(`src/utils/log-secrets.ts`). The error handler that logs a failed RabbitMQ message
+(`src/amqp/amqp.utils.ts`) runs after the handler has returned, so it redacts the deployment's
+secrets but not a token the handler read. A new handler needs `@LogSecretsScope()` below its
+`@RabbitSubscribe`.
+
 ## OAuth 2.1 with PKCE
 
 The MCP OAuth implementation follows [OAuth 2.1](https://oauth.net/2.1/) with mandatory PKCE. This diagram shows the **MCP OAuth flow** where the server issues **opaque JWT tokens** to the client after the Microsoft OAuth flow completes on the server.

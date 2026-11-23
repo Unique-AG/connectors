@@ -6,11 +6,7 @@
 from functools import partial
 
 {% endif %}
-{% if options.opens_upstream %}
-from mcp_configs import LoggingSettings, ServerSettings, from_environment
-{% else %}
-from mcp_configs import LoggingSettings, ServerSettings
-{% endif %}
+from mcp_configs import {{ ["LoggingSettings", options.auth and "RateLimitSettings", "ServerSettings", options.opens_upstream and "from_environment"] | select | join(", ") }}
 
 {% if options.auth %}
 from mcp_skeleton.mcp import AuthSettings, create_server, run_server
@@ -34,7 +30,10 @@ def main() -> None:
 {% if options.auth %}
     server_settings = ServerSettings()
     server = create_server(
-        {{ settings }}, auth=AuthSettings(), base_url=server_settings.base_url
+        {{ settings }},
+        auth=AuthSettings(),
+        rate_limit=RateLimitSettings(),
+        base_url=server_settings.base_url,
     )
     run_server(server, server_settings)
 {% else %}

@@ -1,0 +1,21 @@
+scenario: outlook_list_calendar_groups-all
+fixture: rec-tool-outlook_list_calendar_groups-all
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:56:11+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 19
+  keys dropped: 8
+  persona addresses: 5
+  persona names: 3
+  response headers dropped: 38
+  text kept: 6
+  text replaced: 5
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

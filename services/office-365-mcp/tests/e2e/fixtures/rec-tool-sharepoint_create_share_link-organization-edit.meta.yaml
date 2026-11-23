@@ -1,0 +1,26 @@
+scenario: sharepoint_create_share_link-organization-edit
+fixture: rec-tool-sharepoint_create_share_link-organization-edit
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:27:58+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 48
+  keys dropped: 18
+  persona addresses: 8
+  persona names: 8
+  response headers dropped: 48
+  text kept: 19
+  text replaced: 14
+literals:
+- edit
+- organization
+- seed-v1 Project Plan
+- seed-v1 case text
+- seed-v1 case-sharepoint_create_share_link-organization-edit.txt
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

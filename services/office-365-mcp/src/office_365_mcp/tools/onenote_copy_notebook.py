@@ -22,6 +22,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, onenote_notebook_handle
 from office_365_mcp.shared.notes import (
     COPY_HANDLE_OWNERS,
@@ -31,7 +32,6 @@ from office_365_mcp.shared.notes import (
     in_a_site,
     notebook_audience,
     onenote_root,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -43,6 +43,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_copy_notebook"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_COPY_NOTEBOOK = "copy_notebook"
 
@@ -165,7 +167,7 @@ async def copy_notebook(
             to_group is not None,
             _OWNER_REFUSED if handle.owner is None else _BOTH_GROUPS_REFUSED,
         ),
-        graph_errors(TOOL_NAME),
+        graph_errors(),
     ):
         if answer_pending or to_group is not None:
             source = await notebook_audience(client, handle.notebook_id, owner=handle.owner)
@@ -198,8 +200,8 @@ async def _copy(
     builder = root.notebooks.by_notebook_id(handle.notebook_id).copy_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_notebook_body.CopyNotebookPostRequestBody(group_id=to_group, rename_as=new_name),
     )
@@ -212,7 +214,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy a Notebook",
+        title="OneNote: Copy a Notebook",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

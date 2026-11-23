@@ -15,6 +15,8 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "get_me"
 
+PRESETS: tuple[str, ...] = ()
+
 GRAPH_PERMISSIONS: tuple[str, ...] = (identity.GRAPH_PERMISSION,)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
@@ -25,8 +27,8 @@ given name, surname, email, sign-in name, job title, office location, telephone 
 preferred language. This tool applies when a request depends on who "I", "me", or "my" refers to.
 
 Notes:
-- This tool describes only the caller. Resolve the address of somebody else with a directory or \
-contacts lookup instead.
+- This tool describes only the caller. To look up somebody else, use a directory or contacts \
+lookup tool of this deployment. If it has none, tell the user.
 """
 
 
@@ -124,12 +126,8 @@ class SignedInUser(BaseModel):
 
 
 async def get_signed_in_user(client: GraphServiceClient) -> SignedInUser:
-    """Return the caller's profile.
-
-    `graph_errors` takes no `step=` here: the Graph call lives in `shared/identity.py`, which opens
-    its own `graph_step`.
-    """
-    with graph_errors(TOOL_NAME):
+    """Return the caller's profile."""
+    with graph_errors():
         return SignedInUser.from_user(await identity.signed_in_user(client))
 
 

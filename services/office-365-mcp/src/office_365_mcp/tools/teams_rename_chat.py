@@ -9,21 +9,23 @@ from msgraph.generated.models.chat import Chat
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
-from office_365_mcp.shared.messages import (
-    CHAT_TOPIC_MAX_CHARACTERS,
-    CHAT_TOPIC_PATTERN,
-    EVERYONE_SEES_IT,
-)
+from office_365_mcp.graph_client import graph_step, not_graph
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.messages import (
+    CHAT_TOPIC_MAX_CHARACTERS,
+    CHAT_TOPIC_PATTERN,
+    EVERYONE_SEES_IT,
+)
 
 TOOL_NAME = "teams_rename_chat"
+
+PRESETS: tuple[str, ...] = ("teams-chat-admin",)
 
 STEP = "rename_chat"
 
@@ -70,7 +72,7 @@ async def rename_chat(
     client: GraphServiceClient, *, chat_id: str, topic: str, confirm: Confirm
 ) -> RenamedChat | InputRequiredResult:
     renamed: Chat | None = None
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         with not_graph():
             answer = await confirm(_question(chat_id, topic), _about(chat_id, topic))
         asked = answer if isinstance(answer, InputRequiredResult) else None
@@ -106,7 +108,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Rename a Teams Chat",
+        title="Teams: Rename a Chat",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

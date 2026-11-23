@@ -33,7 +33,7 @@ tool of our own replaces it. A spec given as a URL is recorded as `spec-source`,
 | `--spec` | The vendor's OpenAPI 3.0 spec, a path or an http(s) URL, JSON or YAML. `openapi` needs it |
 | `--persistence` | One or more of `postgres` (SQLAlchemy, asyncpg, Alembic, the chart's database) and `redis`, e.g. `--persistence postgres redis`. Leave it out for an MCP that stores nothing |
 | `--auth` | `credentials`: each user signs in on the MCP's `/sign-in` page with their own credentials for the upstream, kept encrypted in Postgres, and every call reaches the upstream as them. Needs an `--upstream` and `--persistence postgres`. Leave it out for an MCP that starts without sign-in |
-| `--no-release` | skip release-please and the release re-run list |
+| `--no-release` | skip release-please and the dev build and release re-run lists |
 
 A `custom` upstream starts as `upstream/client.py`: one `request(method, path, adapter)` that
 parses every body into a pydantic model, retried by mcp-openapi's `RetryAfterPolicy` built from
@@ -84,7 +84,7 @@ needs belongs in their code, put it in one of those packages instead.
 ## Versions
 
 - The `service*` dependency groups here are the versions a new MCP pins from PyPI, one group
-  per choice. They are not installed with the scaffold. Dependabot bumps them with every service
+  per choice. They are not installed with the scaffold. The nightly dependency job bumps them with every service
   in one pull request per dependency, so the next MCP starts current.
 - A shared package from `packages/` is pinned at the version in its own `pyproject.toml`.
 

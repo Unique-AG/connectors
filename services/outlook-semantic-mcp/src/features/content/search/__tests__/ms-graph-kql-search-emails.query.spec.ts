@@ -433,6 +433,49 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     });
   });
 
+  describe('isDraft', () => {
+    it.each([true, false])('exposes the Graph isDraft flag %s', async (isDraft) => {
+      const mockPost = makeSuccessPost({ [OWN_EMAIL]: [makeMessage('msg-1', { isDraft })] });
+      const { instance } = createQuery({ mockPost });
+
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'test' }]);
+
+      expect(results[0]?.isDraft).toBe(isDraft);
+      expect(results[0]?.openEmailParams.bodyContentType).toBe(isDraft ? 'html' : undefined);
+      expect(results[0]?.openEmailParams).toMatchObject({
+        id: 'msg-1',
+        idIsImmutable: false,
+      });
+    });
+
+    it('includes the shared mailbox on a delegated draft', async () => {
+      const mockPost = makeSuccessPost({
+        [DELEGATED_EMAIL]: [makeMessage('draft-1', { isDraft: true })],
+      });
+      const { instance } = createQuery({
+        mockBuildResult: {
+          requests: [
+            makeRequest({ mailbox: DELEGATED_EMAIL, kqlQuery: 'test', isDelegated: true }),
+          ],
+          skippedFolders: [],
+        },
+        mockPost,
+      });
+
+      const { results } = await instance.run(testUserId, [
+        { kqlQuery: 'test', mailbox: DELEGATED_EMAIL },
+      ]);
+
+      expect(results[0]?.openEmailParams).toMatchObject({
+        id: 'draft-1',
+        mailbox: DELEGATED_EMAIL,
+        parentFolderId: 'folder-draft-1',
+        idIsImmutable: false,
+        bodyContentType: 'html',
+      });
+    });
+  });
+
   describe('replyToParams', () => {
     it('marks draft messages as not replyable', async () => {
       const mockPost = makeSuccessPost({

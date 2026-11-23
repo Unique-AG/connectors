@@ -12,8 +12,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
 from office_365_mcp.shared.handles import MailRuleHandle, mail_rule_handle
-from office_365_mcp.shared.prose import cut_for_a_question
-from office_365_mcp.shared.rules import (
+from office_365_mcp.shared.outlook.rules import (
     READ_ONLY_RULE,
     MailRule,
     RuleActions,
@@ -23,6 +22,7 @@ from office_365_mcp.shared.rules import (
     read_rule,
     rule_of,
 )
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -32,6 +32,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_delete_mail_rule"
+
+PRESETS: tuple[str, ...] = ("outlook-rules",)
 
 STEP_DELETE = "delete_mail_rule"
 
@@ -121,7 +123,7 @@ async def delete_mail_rule(
 
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         rule = await read_rule(client, handle)
         if rule.is_read_only:
             refused = f"{_NOTHING_DELETED} {READ_ONLY_RULE}"
@@ -167,7 +169,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Mail Rule",
+        title="Outlook: Delete a Mail Rule",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

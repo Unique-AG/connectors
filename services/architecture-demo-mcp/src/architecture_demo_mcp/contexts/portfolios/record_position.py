@@ -10,6 +10,8 @@ from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.persistence import Position
 from architecture_demo_mcp.persistence import save_position
 from architecture_demo_mcp.upstream import GET_DAILY_META
+from architecture_demo_mcp.upstream import GetDailyMetaPath
+from architecture_demo_mcp.upstream import GetDailyMetaRequest
 from architecture_demo_mcp.upstream import Upstream
 from architecture_demo_mcp.upstream import UpstreamError
 
@@ -22,7 +24,9 @@ async def record_position(
     Only a ticker Tiingo has prices for is held, since no other could ever be valued.
     """
     try:
-        meta = await upstream.call(GET_DAILY_META, ticker=position.ticker)
+        meta = await upstream.call(
+            GET_DAILY_META, GetDailyMetaRequest(path=GetDailyMetaPath(ticker=position.ticker))
+        )
     except UpstreamError as error:
         if error.status_code != HTTPStatus.NOT_FOUND:
             raise

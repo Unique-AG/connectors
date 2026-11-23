@@ -75,22 +75,31 @@ def _http_url(url: str) -> str | None:
 
 
 def generate_operations(options: Options, target: Path) -> Path:
-    """Run the codegen, and export the `Operation` constants it writes from `upstream`.
+    """Run the codegen, and export the `Operation` constants and the request models it writes
+    from `upstream`, since a context imports the layer and not its files.
 
     Returns the `upstream/__init__.py` it writes, which is the scaffold's own, unlike the codegen's
     output."""
     run([["uv", "sync"], ["uv", "run", "mcp-openapi-codegen"]], target)
     upstream = target / "src" / options.package / "upstream"
+    generated = upstream / "generated"
     constants = [
         name.id
-        for node in ast.parse((upstream / "generated" / "operations.py").read_text()).body
+        for node in ast.parse((generated / "operations.py").read_text()).body
         if isinstance(node, ast.Assign)
         for name in node.targets
         if isinstance(name, ast.Name)
     ]
+    requests = sorted(
+        node.name
+        for node in ast.parse((generated / "vendor_requests.py").read_text()).body
+        if isinstance(node, ast.ClassDef)
+    )
     exported = ["open_upstream", "Upstream", "upstream_http", "upstream_tools"]
     credentials = ["verify_credentials"] if options.auth else []
-    names = sorted([*exported, *constants, *credentials, "UpstreamError", "UpstreamSettings"])
+    names = sorted(
+        [*exported, *constants, *requests, *credentials, "UpstreamError", "UpstreamSettings"]
+    )
     imports = [
         f"from {options.package}.upstream.client import {', '.join(sorted(exported))}",
         *(
@@ -99,6 +108,14 @@ def generate_operations(options: Options, target: Path) -> Path:
             else []
         ),
         f"from {options.package}.upstream.generated.operations import {', '.join(constants)}",
+        *(
+            [
+                f"from {options.package}.upstream.generated.vendor_requests import "
+                f"{', '.join(requests)}"
+            ]
+            if requests
+            else []
+        ),
         f"from {options.package}.upstream.settings import UpstreamSettings",
     ]
     (upstream / "__init__.py").write_text(

@@ -1,0 +1,24 @@
+scenario: outlook_create_contact-person
+fixture: rec-tool-outlook_create_contact-person
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:07:43+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 5
+  keys dropped: 8
+  response headers dropped: 7
+  text kept: 10
+literals:
+- +41 44 555 01 03
+- Buyer
+- Lakeside Demo AG
+- Nora
+- Weber
+- seed-v1 case-outlook_create_contact-person
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

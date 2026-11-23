@@ -22,6 +22,14 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_calendar_groups"
 
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
+
 STEP_GROUPS = "calendar_groups"
 
 STEP_CALENDARS = "calendars"
@@ -84,7 +92,7 @@ class CalendarGroups(BaseModel):
 
 
 async def list_calendar_groups(client: GraphServiceClient) -> CalendarGroups:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         user = await identity.signed_in_user(client)
         with graph_step(STEP_GROUPS):
             first_page = await client.me.calendar_groups.get()
@@ -119,7 +127,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Calendar Groups",
+        title="Outlook: List Calendar Groups",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

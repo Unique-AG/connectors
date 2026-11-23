@@ -1,0 +1,847 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendar",
+    "query": {
+      "$select": "id,name,owner,canEdit,canShare,canViewPrivateItems,isDefaultCalendar,isTallyingResponses,allowedOnlineMeetingProviders,defaultOnlineMeetingProvider"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "allowedOnlineMeetingProviders": ["teamsForBusiness"],
+      "canEdit": true,
+      "canShare": true,
+      "canViewPrivateItems": true,
+      "defaultOnlineMeetingProvider": "teamsForBusiness",
+      "id": "AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=",
+      "isDefaultCalendar": true,
+      "isTallyingResponses": true,
+      "name": "Calendar",
+      "owner": {
+        "address": "mia@example.test",
+        "name": "Mia Keller"
+      }
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/events",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "categories": ["seed-v1"],
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test"
+          },
+          "@odata.type": "#microsoft.graph.attendee",
+          "type": "required"
+        }
+      ],
+      "end": {
+        "dateTime": "~nextTuesday",
+        "timeZone": "Europe/Zurich"
+      },
+      "isAllDay": false,
+      "recurrence": {
+        "pattern": {
+          "daysOfWeek": ["tuesday"],
+          "firstDayOfWeek": "sunday",
+          "interval": 1,
+          "type": "weekly"
+        },
+        "range": {
+          "numberOfOccurrences": 8,
+          "startDate": "~nextTuesday",
+          "type": "numbered"
+        }
+      },
+      "start": {
+        "dateTime": "~nextTuesday",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_update_event-occurrence",
+      "transactionId": "00000000-35bf-4bdc-8c49-b04a2902414a"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/events('AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "body": {
+        "content": "synthetic text 01",
+        "contentType": "html"
+      },
+      "bodyPreview": "",
+      "categories": ["seed-v1"],
+      "changeKey": "p8Zyud08CdRBAf0D1lijdkNA5mBQAv==",
+      "createdDateTime": "2026-11-02T22:35:04.5256383Z",
+      "end": {
+        "dateTime": "2026-11-03T09:30:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "iCalUId": "110845336089F65335R1H6326C83K28883674275187KH8976S2ZMA97207464010771466474229498M67I51C4R476LN348912L5150TF3578B",
+      "id": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isDraft": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "isReminderOn": true,
+      "lastModifiedDateTime": "2026-11-02T22:35:04.979933Z",
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "locations": [],
+      "occurrenceId": null,
+      "onlineMeeting": null,
+      "onlineMeetingProvider": "unknown",
+      "onlineMeetingUrl": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "Europe/Zurich",
+      "originalStartTimeZone": "Europe/Zurich",
+      "recurrence": {
+        "pattern": {
+          "dayOfMonth": 0,
+          "daysOfWeek": ["tuesday"],
+          "firstDayOfWeek": "sunday",
+          "index": "first",
+          "interval": 1,
+          "month": 0,
+          "type": "weekly"
+        },
+        "range": {
+          "endDate": "0001-01-01",
+          "numberOfOccurrences": 8,
+          "recurrenceTimeZone": "Europe/Zurich",
+          "startDate": "2026-11-03",
+          "type": "numbered"
+        }
+      },
+      "reminderMinutesBeforeStart": 15,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-03T09:00:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_update_event-occurrence",
+      "transactionId": "00000000-35bf-4bdc-8c49-b04a2902414a",
+      "type": "seriesMaster",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FJOm7Dk5Larh05LuENJn1P4qbrxfOU2dNmoqHM&exvsurl=1"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-03T08:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": null,
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-03T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "seed-v1 case-outlook_update_event-occurrence",
+      "type": "seriesMaster",
+      "webLink": "https://outlook.office365.com/owa/?itemid=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FJOm7Dk5Larh05LuENJn1P4qbrxfOU2dNmoqHM&exvsurl=1"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF/instances",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "endDateTime": "~day+51",
+      "startDateTime": "~nextTuesday",
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-03T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "BEiVSWQNIG82YYzwrZDtBTWHRM7CDgYdXqXLc2oGwgItkVlXNBfI9e0JCOPMsu2K5MB4iF7SMI9H81qIKFV=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-11-03T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=BEiVSWQNIG82YYzwrZDtBTWHRM7CDgYdXqXLc2oGwgItkVlXNBfI9e0JCOPMsu2K5MB4iF7SMI9H81qIKFV%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-10T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "BKzCEZJKUA1_eBLHhUKmENMYXE9TVcEuShVSv4vAamXfbXtHHSwV9e0TQBRJns4E0TX0pE6RQW4B36wQQCS=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-11-10T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=RMwLRPVHUO7%2BsNEIaATyOCMPBQ1IWjNiPjNJw2lGrzOozEcDGDaC3n9QUCVQng0G3MT2vF6BMG5J91dEIUK%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-17T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-11-17T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-11-24T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "ZRuMWBMJRL4WdiLYTKQtUCWTAA4LXdYwQtKYm6iBcaLoiPmQRLfF6k2GPMJSvi0H8AP3sY8HHT3U87tKXMP=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-11-24T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=ZRuMWBMJRL4WdiLYTKQtUCWTAA4LXdYwQtKYm6iBcaLoiPmQRLfF6k2GPMJSvi0H8AP3sY8HHT3U87tKXMP%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-12-01T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "UYkUNKIONF3FWmovvNMuUFCNIT1HUjLxHyYPk1zYqyJixNuSMXbH4u3GEMOAkb7N0AI0eN5JSG0X01oQZUT=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-12-01T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=UYkUNKIONF3FWmovvNMuUFCNIT1HUjLxHyYPk1zYqyJixNuSMXbH4u3GEMOAkb7N0AI0eN5JSG0X01oQZUT%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-12-08T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "QQtSMNEZCD1JeuBNhDCqORQKDM2FJdGyHqIPq9bGreTtuBoUBJrX6w2IWKOJil6B2OB6dF2ZAO2S08nOOBG=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-12-08T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=QQtSMNEZCD1JeuBNhDCqORQKDM2FJdGyHqIPq9bGreTtuBoUBJrX6w2IWKOJil6B2OB6dF2ZAO2S08nOOBG%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-12-15T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "WKwJRFIHWH4eCqt5CEYaJGBEQT4HMyCnUfFAu4eAuxHdyXjBAZzF3k9OKSLBzt1J0FZ0uS2XGC8Z73hSXRT=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-12-15T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=WKwJRFIHWH4eCqt5CEYaJGBEQT4HMyCnUfFAu4eAuxHdyXjBAZzF3k9OKSLBzt1J0FZ0uS2XGC8Z73hSXRT%3D&exvsurl=1"
+        },
+        {
+          "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+          "attendees": [
+            {
+              "emailAddress": {
+                "address": "anna@example.test",
+                "name": "Anna Meier"
+              },
+              "status": {
+                "response": "none",
+                "time": "0001-01-01T00:00:00Z"
+              },
+              "type": "required"
+            }
+          ],
+          "bodyPreview": "",
+          "categories": ["seed-v1"],
+          "end": {
+            "dateTime": "2026-12-22T08:30:00.0000000",
+            "timeZone": "UTC"
+          },
+          "id": "ZVzRRXFNVN6cvqDfUFKnXGMKPQ4HQyErRgBSp7nRllJwhMsOIVgR9g9TOYWEen1T3AE2aH4ROT3X18xYVVE=",
+          "importance": "normal",
+          "isAllDay": false,
+          "isCancelled": false,
+          "isOnlineMeeting": false,
+          "isOrganizer": true,
+          "location": {
+            "displayName": "",
+            "locationType": "default"
+          },
+          "onlineMeeting": null,
+          "organizer": {
+            "emailAddress": {
+              "address": "mia@example.test",
+              "name": "Mia Keller"
+            }
+          },
+          "responseStatus": {
+            "response": "organizer",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "sensitivity": "normal",
+          "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+          "showAs": "busy",
+          "start": {
+            "dateTime": "2026-12-22T08:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "subject": "seed-v1 case-outlook_update_event-occurrence",
+          "type": "occurrence",
+          "webLink": "https://outlook.office365.com/owa/?itemid=ZVzRRXFNVN6cvqDfUFKnXGMKPQ4HQyErRgBSp7nRllJwhMsOIVgR9g9TOYWEen1T3AE2aH4ROT3X18xYVVE%3D&exvsurl=1"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM=",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "id,subject,bodyPreview,start,end,isAllDay,isCancelled,type,seriesMasterId,sensitivity,showAs,location,isOnlineMeeting,onlineMeeting,organizer,isOrganizer,responseStatus,attendees,webLink,categories,importance"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i5Jxdb39DrDOKp4Q3agftrYH3xQYJh==\"",
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "bodyPreview": "",
+      "categories": ["seed-v1"],
+      "end": {
+        "dateTime": "2026-11-17T08:30:00.0000000",
+        "timeZone": "UTC"
+      },
+      "id": "KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM=",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "onlineMeeting": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-17T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "subject": "seed-v1 case-outlook_update_event-occurrence",
+      "type": "occurrence",
+      "webLink": "https://outlook.office365.com/owa/?itemid=KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM%3D&exvsurl=1"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/calendars/AAMkGWntAWI9IZP7JLZhOGlhWWH0HX36Qqv5EGB3INObUIGtA9WcKSNBWARXJAIfcrnMRQffVTaeZ0j8FIT9AbXyoDykEpghYJMjFpMe-TprTNFIGSIQQLJqyFkhCxnsWAQpTpQj-IbzTFQFilKZYZG=/events/KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM=",
+    "json": {
+      "@odata.type": "#microsoft.graph.event",
+      "end": {
+        "dateTime": "~nextTuesday+14",
+        "timeZone": "Europe/Zurich"
+      },
+      "start": {
+        "dateTime": "~nextTuesday+14",
+        "timeZone": "Europe/Zurich"
+      }
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i6Hvut93YbWXTp7Z1ksfbuNA7rDTLh==\"",
+      "allowNewTimeProposals": true,
+      "attendees": [
+        {
+          "emailAddress": {
+            "address": "anna@example.test",
+            "name": "Anna Meier"
+          },
+          "status": {
+            "response": "none",
+            "time": "0001-01-01T00:00:00Z"
+          },
+          "type": "required"
+        }
+      ],
+      "body": {
+        "content": "synthetic text 01",
+        "contentType": "html"
+      },
+      "bodyPreview": "",
+      "categories": ["seed-v1"],
+      "changeKey": "j8Efob95BdRHLt2I6dkkcuMD2aYRBh==",
+      "createdDateTime": "2026-11-02T22:35:05.548586Z",
+      "end": {
+        "dateTime": "2026-11-17T10:30:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "hasAttachments": false,
+      "hideAttendees": false,
+      "iCalUId": "581939034433E02806F2Z5945P21P07199KH2Z17056JI3684R0YDK21307808803042724917506626V31T85S6K815QR170557U6936SQ8535I",
+      "id": "KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM=",
+      "importance": "normal",
+      "isAllDay": false,
+      "isCancelled": false,
+      "isDraft": false,
+      "isOnlineMeeting": false,
+      "isOrganizer": true,
+      "isReminderOn": true,
+      "lastModifiedDateTime": "2026-11-02T22:35:06.1725792Z",
+      "location": {
+        "displayName": "",
+        "locationType": "default"
+      },
+      "locations": [],
+      "occurrenceId": "RPP.KLsNCnONKQRQHCNDBybaNc4tvFIgEK-KOk1Yl3Bnnw59RdZBIh3F8rkixfLQ0zJbzfKN.3493-93-33",
+      "onlineMeeting": null,
+      "onlineMeetingProvider": "unknown",
+      "onlineMeetingUrl": null,
+      "organizer": {
+        "emailAddress": {
+          "address": "mia@example.test",
+          "name": "Mia Keller"
+        }
+      },
+      "originalEndTimeZone": "Europe/Zurich",
+      "originalStartTimeZone": "Europe/Zurich",
+      "recurrence": null,
+      "reminderMinutesBeforeStart": 15,
+      "responseRequested": true,
+      "responseStatus": {
+        "response": "organizer",
+        "time": "0001-01-01T00:00:00Z"
+      },
+      "sensitivity": "normal",
+      "seriesMasterId": "AHvPKfYOTXLUPCOUKecsAl0ahZHmXI-PNc7Kl1Qafd93AnVQVv7Z0wwlnoWV1gDmmiKF",
+      "showAs": "busy",
+      "start": {
+        "dateTime": "2026-11-17T10:00:00.0000000",
+        "timeZone": "Europe/Zurich"
+      },
+      "subject": "seed-v1 case-outlook_update_event-occurrence",
+      "transactionId": "00000000-35bf-4bdc-8c49-b04a2902414a",
+      "type": "exception",
+      "webLink": "https://outlook.office365.com/owa/?itemid=KDvKIRWVQU4BNudnWSLyUXOQXW3FYoQqUlCXu4lAzqKdjAeEDTfT1t1HWYPOjn2A7BX0qL1FSF5Y38bZFPM%3D&exvsurl=1"
+    }
+  }
+]

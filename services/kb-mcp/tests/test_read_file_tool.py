@@ -7,7 +7,12 @@ import httpx
 import pytest
 from unique_toolkit.content.schemas import Content, ContentChunk
 
-from kb_mcp.common.references import MIME_TYPE_JSON, MIME_TYPE_PDF, MIME_TYPE_TEXT_PLAIN
+from kb_mcp.common.references import (
+    MIME_TYPE_JSON,
+    MIME_TYPE_PDF,
+    MIME_TYPE_TEXT_PLAIN,
+    UNEXPECTED_ERROR_MESSAGE,
+)
 from kb_mcp.tools.read_file import ReadFileToolConfig, read_file
 from kb_mcp.tools.read_file.tool import _download_with_retry
 
@@ -618,7 +623,7 @@ async def test_identity_refusal_surfaces_as_tool_error(monkeypatch):
     result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
 
     assert result.is_error is True
-    assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio

@@ -1,0 +1,380 @@
+name: "[Deps] Nightly"
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # every night at 02:00 UTC
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: "Write the plan to the job summary and open no pull request"
+        type: boolean
+        default: true
+      pr:
+        description: "Handle only this pull request number, and open no other pull request"
+        type: string
+        default: ""
+      recreate:
+        description: "With a pull request number: rebuild it from main, and drop the commits of a person or the agent"
+        type: boolean
+        default: false
+      comment:
+        description: "With a pull request number: the id of the comment that asked for this run, to show the result on it"
+        type: string
+        default: ""
+
+permissions:
+  contents: read # to read the repository
+
+concurrency:
+  group: deps-nightly
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read # to read the repository
+      pull-requests: read # to list the open dependency pull requests
+    outputs:
+      mode: ${{ inputs.dry-run && 'plan' || 'pr' }}
+      entries: ${{ steps.plan.outputs.entries }}
+      updates: ${{ steps.plan.outputs.updates }}
+      closes: ${{ steps.plan.outputs.closes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.33"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Run the unit tests of the scripts
+        run: node --test .github/scripts/deps-nightly/*.test.mjs
+
+      - name: Restore the tag ledger
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/tag-ledger.json
+          key: deps-tag-ledger-${{ github.run_id }}
+          restore-keys: deps-tag-ledger-
+
+      - name: List the updates
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BASE_BRANCH: ${{ github.event.repository.default_branch }}
+          TAG_LEDGER: ${{ runner.temp }}/tag-ledger.json
+          PLAN_NOTE: ${{ inputs.dry-run && 'This run is a dry run. It opens no pull request.' || inputs.pr && 'This run handles one pull request only.' || 'This run opens one pull request for each entry in the first list.' }}
+          PR_NUMBER: ${{ inputs.pr }}
+          RECREATE: ${{ inputs.recreate }}
+        run: node .github/scripts/deps-nightly/plan.cli.mjs
+
+      - name: Save the tag ledger
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/tag-ledger.json
+          key: deps-tag-ledger-${{ github.run_id }}
+
+  credentials:
+    name: Credentials
+    if: ${{ !inputs.dry-run }}
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    timeout-minutes: 5
+    environment: workflow-automation # to read the credentials of the GitHub App
+    permissions: {}
+    steps:
+      - name: Create the App token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+  update:
+    name: Update ${{ matrix.entry.slug }}
+    needs: [plan, credentials]
+    if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.updates != '[]'
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    environment: workflow-automation # to read the credentials of the GitHub App
+    timeout-minutes: 5
+    permissions:
+      contents: read # this job reads no content, the App token does the write
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        entry: ${{ fromJSON(needs.plan.outputs.updates) }}
+    steps:
+      - name: Create the App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Merge main into the branch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          NUMBER: ${{ matrix.entry.number }}
+        run: |
+          if gh pr update-branch "$NUMBER"; then
+            echo "- #$NUMBER: main merged in. A person or the agent changed this pull request, so the job keeps its commits." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::#$NUMBER does not update from main. A person must resolve the conflict."
+            echo "- #$NUMBER: main did not merge in. A person must resolve the conflict." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+  close:
+    name: Close
+    needs: [plan, credentials]
+    if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.closes != '[]'
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    environment: workflow-automation # to read the credentials of the GitHub App
+    timeout-minutes: 10
+    permissions:
+      contents: read # this job reads no content, the App token does the writes
+    steps:
+      - name: Create the App token
+        id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Close the pull requests that no update targets
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          CLOSES: ${{ needs.plan.outputs.closes }}
+          REQUESTED: ${{ inputs.pr }}
+        run: |
+          gh label create superseded --color ededed --description "The nightly job closed this pull request for a newer version" || true
+          status=0
+          while read -r entry; do
+            number=$(jq -r .number <<< "$entry")
+            planned=$(jq -r .head <<< "$entry")
+            current=$(gh pr view "$number" --json headRefOid --jq .headRefOid)
+            if [ "$current" != "$planned" ]; then
+              echo "- #$number: kept. A commit came after the plan." >> "$GITHUB_STEP_SUMMARY"
+              if [ -n "$REQUESTED" ]; then
+                echo "::error::#$number got a commit after the plan, so the job kept it."
+                status=1
+              fi
+              continue
+            fi
+            gh pr edit "$number" --add-label superseded
+            gh pr close "$number" --delete-branch --comment "No update targets this pull request any more. If a new version is due, the job opens a new PR."
+            echo "- #$number: closed. No update targets it any more." >> "$GITHUB_STEP_SUMMARY"
+          done < <(jq -c '.[]' <<< "$CLOSES")
+          exit "$status"
+
+  bump:
+    name: Bump ${{ matrix.entry.slug }}
+    needs: [plan, credentials]
+    if: needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read # to read the repository, this job holds no secret because uv can run package build code
+    strategy:
+      fail-fast: false
+      matrix:
+        entry: ${{ fromJSON(needs.plan.outputs.entries) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+        with:
+          run_install: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.33"
+
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install Terraform
+        if: matrix.entry.ecosystem == 'terraform'
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.13.4
+          terraform_wrapper: false
+
+      - name: Make the update
+        id: bump
+        env:
+          ENTRY: ${{ toJSON(matrix.entry) }}
+        run: node .github/scripts/deps-nightly/bump.cli.mjs
+
+      - name: Keep the patch
+        if: steps.bump.outputs.changed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: patch-${{ matrix.entry.slug }}
+          path: ${{ runner.temp }}/patch/changes.patch
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    name: Publish ${{ matrix.entry.slug }}
+    needs: [plan, bump, credentials]
+    if: always() && needs.credentials.result == 'success' && needs.plan.outputs.mode == 'pr' && needs.plan.outputs.entries != '[]'
+    runs-on: gh-static-ip-slim # the GitHub App accepts only fixed IP addresses
+    environment: workflow-automation # to read the credentials of the GitHub App
+    timeout-minutes: 10
+    permissions:
+      contents: read # to read the repository, the App token does the writes
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        entry: ${{ fromJSON(needs.plan.outputs.entries) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26"
+
+      - name: Fetch the patch
+        id: patch
+        continue-on-error: true
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: patch-${{ matrix.entry.slug }}
+          path: ${{ runner.temp }}/patch
+
+      - name: Check and apply the patch
+        if: steps.patch.outcome == 'success'
+        env:
+          ENTRY: ${{ toJSON(matrix.entry) }}
+          PATCH_DIR: ${{ runner.temp }}/patch
+          PR_DIR: ${{ runner.temp }}/pr
+        run: node .github/scripts/deps-nightly/publish.cli.mjs
+
+      - name: Create the App token
+        id: app-token
+        if: steps.patch.outcome == 'success'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.GH_APP_WORKFLOW_AUTOMATION_CLIENT_ID }}
+          private-key: ${{ secrets.GH_APP_WORKFLOW_AUTOMATION_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      - name: Push the branch and open the pull request
+        if: steps.patch.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          SLUG: ${{ matrix.entry.slug }}
+          ECOSYSTEM: ${{ matrix.entry.ecosystem }}
+          ACTION: ${{ matrix.entry.action }}
+          NUMBER: ${{ matrix.entry.number }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          branch="deps/$SLUG"
+          title=$(cat "$RUNNER_TEMP/pr/pr-title.txt")
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          git add -A
+          git commit -m "$title"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" push --force origin "$branch"
+
+          ecosystem_label="$ECOSYSTEM"
+          if [ "$ecosystem_label" = actions ]; then ecosystem_label=github-actions; fi
+          gh label create dependencies --color 0366d6 --description "Updates to dependencies" || true
+          gh label create "$ecosystem_label" --color 6f42c1 --description "Updates to $ecosystem_label packages" || true
+          gh label create ai-assisted --color 5319e7 --description "The AI agent handled this pull request" || true
+          gh label create human-required --color d93f0b --description "A person must finish this pull request" || true
+
+          if [ "$ACTION" = rebuild ]; then
+            gh pr edit "$NUMBER" --title "$title" --body-file "$RUNNER_TEMP/pr/pr-body.md"
+            gh pr edit "$NUMBER" --remove-label ai-assisted --remove-label human-required --remove-label dependencies
+            gh pr edit "$NUMBER" --add-label dependencies
+            url=$(gh pr view "$NUMBER" --json url --jq .url)
+          else
+            if [ "$ACTION" = replace ]; then
+              gh label create superseded --color ededed --description "The nightly job closed this pull request for a newer version" || true
+              gh pr edit "$NUMBER" --add-label superseded
+              gh pr close "$NUMBER" --comment "A newer version replaces this update. A new PR follows."
+            fi
+            url=$(gh pr create --base "$BASE" --head "$branch" --title "$title" --body-file "$RUNNER_TEMP/pr/pr-body.md" --label dependencies --label "$ecosystem_label")
+          fi
+          echo "- $url" >> "$GITHUB_STEP_SUMMARY"
+
+  finish:
+    name: Finish
+    needs: [plan, credentials, update, close, bump, publish]
+    if: always() && !inputs.dry-run && inputs.pr != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # to write the result on the pull request and on the comment that asked for the run
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NUMBER: ${{ inputs.pr }}
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+    steps:
+      - name: Update the note in the pull request description
+        env:
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          body=$(gh pr view "$NUMBER" --json body --jq .body \
+            | perl -0pe 's/<!-- deps-status -->.*?<!-- \/deps-status -->\r?\n(\r?\n)?//s')
+          if [ "$FAILED" = true ]; then
+            body=$(printf '<!-- deps-status -->\n> [!WARNING]\n> The last rebuild failed. Read the log of the run: %s\n<!-- /deps-status -->\n\n%s' "$RUN_URL" "$body")
+          fi
+          printf '%s\n' "$body" | gh pr edit "$NUMBER" --body-file -
+
+      - name: Show the result on the comment
+        if: ${{ always() && inputs.comment != '' }}
+        env:
+          COMMENT_ID: ${{ inputs.comment }}
+        run: |
+          result=rocket
+          if [ "$FAILED" = true ]; then
+            result=confused
+          fi
+          reactions="repos/$GH_REPO/issues/comments/$COMMENT_ID/reactions"
+          gh api "$reactions" --jq '.[] | select(.user.login == "github-actions[bot]") | .id' \
+            | while read -r id; do gh api -X DELETE "$reactions/$id"; done
+          gh api "$reactions" -f content="$result" > /dev/null

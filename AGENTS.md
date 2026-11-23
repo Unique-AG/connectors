@@ -2,7 +2,7 @@
 
 ## PR titles
 
-Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. The pattern is `scope = last path segment` (e.g. `packages/logger` → `logger`), with one exception: `pnpm-lock.yaml` and root `package.json` require scope `deps`.
+Before creating or updating a PR title, read `.gitcommitizen` to verify the scope matches all changed files. Use the most specific scope that covers every changed file: one service or package gives its name (e.g. `packages/logger` → `logger`), several services give `services`, several packages give `packages`, only dependency files (`package.json`, lock files, `pyproject.toml`, Dockerfiles, Terraform, workflow pins) give `deps`, `docs/**` and root `*.md` give `docs`, and `agentic/**`, `.claude/**` and `.cursor/**` give `agentic`. Use `main` only when no other scope covers every file. A title always needs a scope, because `main` matches every file.
 
 ## Environment
 - Python services (any `services/*/pyproject.toml`) are driven by `uv`, not pnpm/turbo, and their
@@ -77,6 +77,17 @@ This applies to internal preconditions, postconditions, and unreachable-state gu
 
 ## Generated Files
 - Don't create README files for generated code
+
+## Base chart bumps
+
+- Every chart in `services/*/deploy/helm-charts/` and the scaffold's skeleton chart,
+  `packages/mcp-scaffold/src/mcp_scaffold/files/skeleton/deploy/helm-charts/mcp-skeleton/`, pin
+  the same `base` version. Bump them in one pull request, or the next MCP the scaffold makes starts
+  on the old `base`.
+- Run `helm dependency update` in each service chart, then `scripts/render-values-schema.sh`.
+- The script skips the skeleton. Copy a service chart's new `Chart.lock` over the skeleton's, since
+  the dependency is the same, and regenerate its `values.schema.json` with the script's `jq` merge
+  of the base schema and the skeleton's `values.additional.schema.json`.
 
 ## Agent Skills
 

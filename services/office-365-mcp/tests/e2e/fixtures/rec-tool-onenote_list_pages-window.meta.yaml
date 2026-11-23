@@ -1,0 +1,24 @@
+scenario: onenote_list_pages-window
+fixture: rec-tool-onenote_list_pages-window
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:04:00+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 42
+  keys dropped: 7
+  query parameters dropped: 6
+  response headers dropped: 9
+  text kept: 18
+  text replaced: 30
+literals:
+- '2026-11-02'
+- '2026-11-04'
+- ~tomorrow
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

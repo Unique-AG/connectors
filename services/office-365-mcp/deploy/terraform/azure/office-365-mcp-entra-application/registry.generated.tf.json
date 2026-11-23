@@ -140,6 +140,20 @@
           ]
         },
         {
+          "name": "teams_list_call_transcripts",
+          "permissions": [
+            "User.Read",
+            "Chat.Read",
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
+          "name": "teams_read_call_transcript",
+          "permissions": [
+            "CallTranscripts.Read.All"
+          ]
+        },
+        {
           "name": "teams_list_meeting_recordings",
           "permissions": [
             "OnlineMeetings.Read",
@@ -408,6 +422,12 @@
           ]
         },
         {
+          "name": "outlook_delete_category",
+          "permissions": [
+            "MailboxSettings.ReadWrite"
+          ]
+        },
+        {
           "name": "outlook_list_time_zones",
           "permissions": [
             "User.Read"
@@ -478,7 +498,7 @@
         {
           "name": "outlook_list_group_events",
           "permissions": [
-            "Calendars.Read"
+            "Group.Read.All"
           ]
         },
         {
@@ -671,6 +691,42 @@
           ]
         },
         {
+          "name": "sharepoint_list_lists",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_get_list",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_list_items",
+          "permissions": [
+            "Sites.Read.All"
+          ]
+        },
+        {
+          "name": "sharepoint_create_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_update_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
+          "name": "sharepoint_delete_list_item",
+          "permissions": [
+            "Sites.ReadWrite.All"
+          ]
+        },
+        {
           "name": "onenote_list_notebooks",
           "permissions": [
             "Notes.Read"
@@ -727,7 +783,7 @@
         {
           "name": "onenote_list_sections",
           "permissions": [
-            "Notes.Read"
+            "Notes.Read.All"
           ]
         },
         {
@@ -813,6 +869,8 @@
         "teams_delete_message",
         "teams_list_meeting_transcripts",
         "teams_read_transcript",
+        "teams_list_call_transcripts",
+        "teams_read_call_transcript",
         "teams_list_meeting_recordings",
         "teams_read_meeting",
         "teams_create_meeting",
@@ -852,6 +910,7 @@
         "outlook_delete_mail_rule",
         "outlook_list_categories",
         "outlook_create_category",
+        "outlook_delete_category",
         "outlook_list_time_zones",
         "outlook_list_calendars",
         "outlook_list_calendar_groups",
@@ -894,6 +953,12 @@
         "sharepoint_create_share_link",
         "sharepoint_invite",
         "sharepoint_search_sites",
+        "sharepoint_list_lists",
+        "sharepoint_get_list",
+        "sharepoint_list_items",
+        "sharepoint_create_list_item",
+        "sharepoint_update_list_item",
+        "sharepoint_delete_list_item",
         "onenote_list_notebooks",
         "onenote_list_pages",
         "onenote_read_page",
@@ -938,20 +1003,19 @@
         "teams-messages": [
           "teams_list_chats",
           "teams_list_chat_messages",
+          "teams_list_message_replies",
           "teams_search_messages",
-          "teams_read_message",
-          "teams_list_message_replies"
-        ],
-        "teams-channels": [
-          "teams_list_my_teams",
-          "teams_list_channels",
-          "teams_browse_channel",
-          "teams_list_message_replies"
+          "teams_read_message"
         ],
         "teams-transcripts": [
           "teams_list_chats",
           "teams_list_meeting_transcripts",
           "teams_read_transcript"
+        ],
+        "teams-call-transcripts": [
+          "teams_list_chats",
+          "teams_list_call_transcripts",
+          "teams_read_call_transcript"
         ],
         "teams-recordings": [
           "teams_list_chats",
@@ -965,40 +1029,40 @@
         ],
         "teams-write": [
           "teams_list_chats",
+          "teams_list_chat_messages",
+          "teams_list_chat_members",
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_send_chat_message",
           "teams_send_channel_message",
-          "teams_list_chat_messages",
-          "teams_react_to_message",
-          "teams_list_chat_members"
+          "teams_react_to_message"
         ],
         "teams-write-files": [
           "teams_list_chats",
+          "teams_list_chat_messages",
+          "teams_list_chat_members",
           "teams_list_my_teams",
           "teams_list_channels",
           "teams_send_chat_message",
           "teams_send_channel_message",
-          "teams_list_chat_messages",
-          "teams_react_to_message",
-          "teams_list_chat_members",
           "teams_send_chat_message_with_files",
           "teams_send_channel_message_with_files",
+          "teams_react_to_message",
           "sharepoint_search_files",
           "sharepoint_browse_folder",
           "sharepoint_list_drives"
         ],
         "teams-edit": [
           "teams_list_chats",
+          "teams_list_chat_messages",
+          "teams_list_chat_members",
           "teams_list_my_teams",
           "teams_list_channels",
-          "teams_send_chat_message",
-          "teams_send_channel_message",
-          "teams_list_chat_messages",
-          "teams_react_to_message",
-          "teams_list_chat_members",
           "teams_browse_channel",
           "teams_list_message_replies",
+          "teams_send_chat_message",
+          "teams_send_channel_message",
+          "teams_react_to_message",
           "teams_edit_message",
           "teams_delete_message"
         ],
@@ -1018,6 +1082,12 @@
           "teams_remove_chat_member",
           "teams_rename_chat"
         ],
+        "teams-channels": [
+          "teams_list_my_teams",
+          "teams_list_channels",
+          "teams_browse_channel",
+          "teams_list_message_replies"
+        ],
         "teams-files": [
           "teams_list_my_teams",
           "teams_list_channels",
@@ -1026,6 +1096,10 @@
           "sharepoint_browse_folder",
           "sharepoint_list_drives",
           "sharepoint_read_file"
+        ],
+        "outlook-group-calendar": [
+          "teams_list_my_teams",
+          "outlook_list_group_events"
         ],
         "outlook-read": [
           "outlook_search_mail",
@@ -1077,12 +1151,12 @@
           "outlook_copy_mail",
           "outlook_create_folder",
           "outlook_rename_folder",
+          "outlook_delete_folder",
           "outlook_set_focused_override",
           "outlook_draft_mail",
           "outlook_draft_reply",
           "outlook_draft_reply_all",
-          "outlook_update_draft",
-          "outlook_delete_folder"
+          "outlook_update_draft"
         ],
         "outlook-send": [
           "outlook_search_mail",
@@ -1114,119 +1188,116 @@
         ],
         "outlook-automate": [
           "outlook_get_mailbox_settings",
-          "outlook_list_categories",
-          "outlook_list_time_zones",
           "outlook_set_automatic_reply",
           "outlook_disable_mail_rule",
-          "outlook_create_category"
+          "outlook_list_categories",
+          "outlook_create_category",
+          "outlook_list_time_zones"
         ],
         "outlook-rules": [
           "outlook_get_mailbox_settings",
-          "outlook_list_categories",
-          "outlook_list_time_zones",
           "outlook_set_automatic_reply",
           "outlook_disable_mail_rule",
-          "outlook_create_category",
           "outlook_create_mail_rule",
           "outlook_update_mail_rule",
-          "outlook_delete_mail_rule"
+          "outlook_delete_mail_rule",
+          "outlook_list_categories",
+          "outlook_create_category",
+          "outlook_delete_category",
+          "outlook_list_time_zones"
         ],
         "outlook-calendar": [
-          "outlook_list_calendars",
-          "outlook_list_events",
-          "outlook_read_event",
-          "outlook_check_availability",
-          "outlook_suggest_meeting_times",
           "outlook_list_time_zones",
-          "outlook_list_event_instances",
-          "outlook_list_reminders",
+          "outlook_list_calendars",
           "outlook_list_calendar_groups",
           "outlook_list_calendar_shares",
-          "outlook_list_event_attachments",
-          "outlook_read_event_attachment"
-        ],
-        "outlook-calendar-write": [
-          "outlook_list_calendars",
           "outlook_list_events",
-          "outlook_read_event",
-          "outlook_check_availability",
-          "outlook_suggest_meeting_times",
-          "outlook_list_time_zones",
           "outlook_list_event_instances",
-          "outlook_list_reminders",
-          "outlook_list_calendar_groups",
-          "outlook_list_calendar_shares",
+          "outlook_read_event",
           "outlook_list_event_attachments",
           "outlook_read_event_attachment",
+          "outlook_list_reminders",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times"
+        ],
+        "outlook-calendar-write": [
+          "outlook_list_time_zones",
+          "outlook_list_calendars",
+          "outlook_list_calendar_groups",
+          "outlook_list_calendar_shares",
+          "outlook_list_events",
+          "outlook_list_event_instances",
+          "outlook_read_event",
+          "outlook_list_event_attachments",
+          "outlook_read_event_attachment",
+          "outlook_list_reminders",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
           "outlook_create_event",
           "outlook_update_event",
           "outlook_cancel_event",
           "outlook_respond_to_invite"
         ],
         "outlook-calendar-manage": [
-          "outlook_list_calendars",
-          "outlook_list_events",
-          "outlook_read_event",
-          "outlook_check_availability",
-          "outlook_suggest_meeting_times",
           "outlook_list_time_zones",
-          "outlook_list_event_instances",
-          "outlook_list_reminders",
+          "outlook_list_calendars",
           "outlook_list_calendar_groups",
           "outlook_list_calendar_shares",
+          "outlook_list_events",
+          "outlook_list_event_instances",
+          "outlook_read_event",
           "outlook_list_event_attachments",
           "outlook_read_event_attachment",
+          "outlook_list_reminders",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
           "outlook_create_event",
           "outlook_update_event",
-          "outlook_cancel_event",
-          "outlook_respond_to_invite",
           "outlook_forward_event",
+          "outlook_cancel_event",
           "outlook_delete_event",
+          "outlook_respond_to_invite",
           "outlook_share_calendar",
           "outlook_unshare_calendar",
           "outlook_delete_calendar"
         ],
         "outlook-calendar-delegate": [
-          "outlook_list_calendars",
-          "outlook_list_events",
-          "outlook_read_event",
-          "outlook_check_availability",
-          "outlook_suggest_meeting_times",
           "outlook_list_time_zones",
-          "outlook_list_event_instances",
-          "outlook_list_reminders",
+          "outlook_list_calendars",
           "outlook_list_calendar_groups",
           "outlook_list_calendar_shares",
+          "outlook_list_events",
+          "outlook_list_event_instances",
+          "outlook_read_event",
           "outlook_list_event_attachments",
           "outlook_read_event_attachment",
+          "outlook_list_reminders",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
           "outlook_create_event",
+          "outlook_create_event_on_behalf",
           "outlook_update_event",
           "outlook_cancel_event",
-          "outlook_respond_to_invite",
-          "outlook_create_event_on_behalf"
+          "outlook_respond_to_invite"
         ],
         "outlook-calendar-rooms": [
-          "outlook_list_calendars",
-          "outlook_list_events",
-          "outlook_read_event",
-          "outlook_check_availability",
-          "outlook_suggest_meeting_times",
           "outlook_list_time_zones",
-          "outlook_list_event_instances",
-          "outlook_list_reminders",
+          "outlook_list_calendars",
           "outlook_list_calendar_groups",
           "outlook_list_calendar_shares",
+          "outlook_list_events",
+          "outlook_list_event_instances",
+          "outlook_read_event",
           "outlook_list_event_attachments",
           "outlook_read_event_attachment",
+          "outlook_list_reminders",
+          "outlook_check_availability",
+          "outlook_suggest_meeting_times",
+          "outlook_find_rooms",
           "outlook_create_event",
           "outlook_update_event",
           "outlook_cancel_event",
-          "outlook_respond_to_invite",
-          "outlook_find_rooms"
-        ],
-        "outlook-group-calendar": [
-          "teams_list_my_teams",
-          "outlook_list_group_events"
+          "outlook_respond_to_invite"
         ],
         "outlook-contacts": [
           "outlook_list_contacts",
@@ -1284,6 +1355,29 @@
           "sharepoint_read_file",
           "sharepoint_search_sites"
         ],
+        "sharepoint-lists": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items"
+        ],
+        "sharepoint-lists-write": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item"
+        ],
+        "sharepoint-lists-delete": [
+          "sharepoint_search_sites",
+          "sharepoint_list_lists",
+          "sharepoint_get_list",
+          "sharepoint_list_items",
+          "sharepoint_create_list_item",
+          "sharepoint_update_list_item",
+          "sharepoint_delete_list_item"
+        ],
         "onenote-read": [
           "onenote_list_notebooks",
           "onenote_list_pages",
@@ -1298,13 +1392,13 @@
           "onenote_list_notebooks",
           "onenote_list_pages",
           "onenote_read_page",
+          "onenote_create_page",
+          "onenote_append_to_page",
           "onenote_preview_page",
           "onenote_read_resource",
           "onenote_find_notebook_from_url",
           "onenote_list_recent_notebooks",
           "onenote_list_sections",
-          "onenote_create_page",
-          "onenote_append_to_page",
           "onenote_create_notebook",
           "onenote_create_section",
           "onenote_create_section_group",
@@ -1319,13 +1413,13 @@
           "onenote_list_notebooks",
           "onenote_list_pages",
           "onenote_read_page",
+          "onenote_create_page",
+          "onenote_append_to_page",
           "onenote_preview_page",
           "onenote_read_resource",
           "onenote_find_notebook_from_url",
           "onenote_list_recent_notebooks",
           "onenote_list_sections",
-          "onenote_create_page",
-          "onenote_append_to_page",
           "onenote_create_notebook",
           "onenote_create_section",
           "onenote_create_section_group",
@@ -1351,6 +1445,7 @@
         "ChannelMessage.ReadWrite",
         "OnlineMeetings.Read",
         "OnlineMeetingTranscript.Read.All",
+        "CallTranscripts.Read.All",
         "OnlineMeetingRecording.Read.All",
         "OnlineMeetingArtifact.Read.All",
         "OnlineMeetings.ReadWrite",
@@ -1369,6 +1464,7 @@
         "Calendars.Read",
         "Calendars.Read.Shared",
         "Calendars.ReadBasic",
+        "Group.Read.All",
         "Place.Read.All",
         "Calendars.ReadWrite",
         "Calendars.ReadWrite.Shared",
@@ -1376,9 +1472,11 @@
         "Contacts.ReadWrite",
         "Files.ReadWrite.All",
         "Sites.Read.All",
+        "Sites.ReadWrite.All",
         "Notes.Read",
         "Notes.Create",
-        "Notes.ReadWrite"
+        "Notes.ReadWrite",
+        "Notes.Read.All"
       ],
       "needs_admin_consent": {
         "User.Read": false,
@@ -1390,6 +1488,7 @@
         "ChannelMessage.Send": false,
         "OnlineMeetings.Read": false,
         "OnlineMeetingTranscript.Read.All": true,
+        "CallTranscripts.Read.All": true,
         "OnlineMeetingRecording.Read.All": true,
         "ChannelMessage.ReadWrite": true,
         "Chat.ReadWrite": false,
@@ -1415,10 +1514,13 @@
         "Files.Read.All": true,
         "Files.ReadWrite.All": true,
         "Sites.Read.All": true,
+        "Sites.ReadWrite.All": true,
         "Notes.Read": false,
+        "Notes.Read.All": false,
         "Notes.Create": false,
         "Notes.ReadWrite": false,
         "Place.Read.All": true,
+        "Group.Read.All": true,
         "Contacts.Read": false,
         "Contacts.ReadWrite": false
       },

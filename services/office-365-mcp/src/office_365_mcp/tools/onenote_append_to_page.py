@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
     OWNED_REFUSED,
@@ -21,7 +22,6 @@ from office_365_mcp.shared.notes import (
     page_for_a_question,
     page_summary,
     patch_page,
-    write_state_for,
 )
 from office_365_mcp.shared.prose import body_opening
 from office_365_mcp.shared.seam import (
@@ -35,6 +35,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_append_to_page"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_APPEND_CONTENT = "append_content"
 
@@ -115,7 +117,7 @@ async def append_to_page(
     summary: PageSummary | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(handle.owner is not None, OWNED_REFUSED), graph_errors():
         pre_read = await page_for_a_question(client, handle.page_id, owner=handle.owner)
         if answer_pending or pre_read.audience.reaches_others:
             with not_graph():
@@ -171,7 +173,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Append to a Page",
+        title="OneNote: Append to a Page",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

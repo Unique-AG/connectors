@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
@@ -24,7 +25,6 @@ from office_365_mcp.shared.files import (
     unusable_name,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_rename_item"
+
+PRESETS: tuple[str, ...] = ("sharepoint-write", "sharepoint-share")
 
 STEP_RENAME = "rename_item"
 
@@ -124,7 +126,7 @@ async def rename_item(
     previous_name: str | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, handle.drive_id, handle.item_id)
         previous_name = found.name
         if found.root is not None:
@@ -177,7 +179,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Rename an Item",
+        title="SharePoint: Rename an Item",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

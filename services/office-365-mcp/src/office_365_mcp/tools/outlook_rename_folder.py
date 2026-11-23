@@ -31,6 +31,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_rename_folder"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_READ_FOLDER = "mail_folder"
 STEP_RENAME = "rename_folder"
 
@@ -110,7 +112,7 @@ async def rename_folder(
 
     answer: Confirmed = None
     renamed: MailFolder | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_READ_FOLDER):
             read = await folder.get(
                 request_configuration=RequestConfiguration[_FolderQuery](
@@ -183,7 +185,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Rename a Mail Folder",
+        title="Outlook: Rename a Mail Folder",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

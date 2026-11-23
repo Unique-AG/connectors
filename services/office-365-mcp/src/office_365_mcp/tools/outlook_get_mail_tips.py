@@ -12,12 +12,14 @@ from msgraph.generated.users.item.get_mail_tips.get_mail_tips_post_request_body 
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.mail import AddressFault, one_address_each
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mail_tips"
+
+PRESETS: tuple[str, ...] = ("outlook-read", "outlook-write", "outlook-delete", "outlook-send")
 
 STEP = "mail_tips"
 
@@ -191,7 +193,7 @@ class MailTipsReport(BaseModel):
 async def get_mail_tips(client: GraphServiceClient, *, addresses: Sequence[str]) -> MailTipsReport:
     trimmed = _addresses(addresses)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         answered = await client.me.get_mail_tips.post(
             GetMailTipsPostRequestBody(
                 email_addresses=list(trimmed),
@@ -219,7 +221,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Get Mail Tips",
+        title="Outlook: Get Mail Tips",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

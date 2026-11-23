@@ -22,6 +22,7 @@ import { DEAD_EXCHANGE, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
 import { DRIZZLE, DrizzleDatabase, subscriptions } from '~/db';
 import { NewTrace, traceAttrs, traceError, traceEvent } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import {
   ChangeNotificationCollectionDto,
@@ -242,6 +243,7 @@ export class MailSubscriptionController {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   @NewTrace('amqp.lifecycle-notification')
   public async onLifecycleNotification(@RabbitPayload() payload: unknown) {
     const event = await LifecycleEventDto.parseAsync(payload);

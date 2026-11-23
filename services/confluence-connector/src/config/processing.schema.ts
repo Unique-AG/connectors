@@ -7,7 +7,7 @@ import { coercedPositiveIntSchema } from '../utils/zod.util';
 
 export const ProcessingConfigSchema = z.object({
   concurrency: coercedPositiveIntSchema
-    .prefault(DEFAULT_PROCESSING_CONCURRENCY)
+    .default(DEFAULT_PROCESSING_CONCURRENCY)
     .describe('Sets the concurrency of how many pages you want to ingest into unique at once'),
   scanIntervalCron: z
     .string()
@@ -16,7 +16,7 @@ export const ProcessingConfigSchema = z.object({
   maxItemsToScan: z
     .preprocess(
       (val) => (val === '' ? undefined : val),
-      z.coerce.number().int().positive().optional(),
+      z.coerce.number<string | undefined>().int().positive().optional(),
     )
     .describe(
       'For testing purpose. Maximum number of items (pages + attachments) to scan. Unlimited if not set',

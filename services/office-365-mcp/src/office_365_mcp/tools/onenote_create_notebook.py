@@ -1,6 +1,6 @@
 from collections.abc import Mapping
 from datetime import datetime
-from typing import Annotated, assert_never, cast
+from typing import Annotated, cast
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -12,7 +12,8 @@ from msgraph.generated.models.notebook import Notebook
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
 from office_365_mcp.shared.notes import (
     client_url_of,
@@ -21,7 +22,6 @@ from office_365_mcp.shared.notes import (
     onenote_root,
     owner_named,
     web_url_of,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_create_notebook"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_CREATE_NOTEBOOK = "create_notebook"
 
@@ -158,7 +160,7 @@ async def create_notebook(
     refused: str | None = None
     with (
         owner_refused(owner is not None, named_owner_refused("Notes.Create")),
-        graph_errors(TOOL_NAME, step=STEP_CREATE_NOTEBOOK),
+        graph_step(STEP_CREATE_NOTEBOOK),
     ):
         if answer_pending or owner is not None:
             with not_graph():
@@ -193,8 +195,6 @@ def _question(name: str, owner: OnenoteOwner | None) -> str:
                 f"Create the notebook {name!r} in the SharePoint site with the id "
                 + f"{owner.owner_id!r}? Other people with access to the site can open it."
             )
-        case _:
-            assert_never(owner.kind)
 
 
 def _answer(notebook: Notebook, owner: OnenoteOwner | None) -> CreatedNotebook:
@@ -222,7 +222,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Notebook",
+        title="OneNote: Create a Notebook",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

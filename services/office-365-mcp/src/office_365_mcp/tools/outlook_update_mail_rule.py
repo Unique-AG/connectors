@@ -13,7 +13,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailRuleHandle, mail_rule_handle
-from office_365_mcp.shared.rules import (
+from office_365_mcp.shared.outlook.rules import (
     HIDDEN_RULE_FOLDER,
     NO_RULE_ACTION,
     NOT_A_RULE_FOLDER,
@@ -43,6 +43,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_update_mail_rule"
+
+PRESETS: tuple[str, ...] = ("outlook-rules",)
 
 STEP_UPDATE = "update_mail_rule"
 
@@ -159,7 +161,7 @@ async def update_mail_rule(
 
     asked: InputRequiredResult | None = None
     written: MessageRule | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         current = await read_rule(client, handle)
         refused = _refusal(current, changes_actions=changes_actions)
         folders = await rule_folders(client, given) if refused is None else None
@@ -241,7 +243,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Update a Mail Rule",
+        title="Outlook: Update a Mail Rule",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

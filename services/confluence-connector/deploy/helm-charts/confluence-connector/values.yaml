@@ -55,7 +55,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/confluence-connector
-  tag: 3.0.4 # x-release-please-version
+  tag: 3.1.0 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -133,8 +133,8 @@ routes:
 # ── Grafana dashboard configuration ───────────────────────────────────────────
 grafana:
   dashboard:
-    # -- Enable Grafana dashboard ConfigMap creation
-    enabled: false
+    # -- Create the Grafana dashboard ConfigMap. Grafana's dashboard sidecar picks it up by the grafana_dashboard label
+    enabled: true
     # -- Grafana folder where the dashboard will be placed
     folder: connectors
 
@@ -144,20 +144,129 @@ prometheus:
     ConfluenceConnectorUniqueAPIErrors:
       alert: ConfluenceConnectorUniqueAPIErrors
       annotations:
-        summary: "Confluence Connector Unique REST API errors detected"
-        description: "The Confluence Connector is experiencing Unique REST API errors (4xx/5xx responses). Current error rate: {{ $value | humanizePercentage }}."
+        summary: "Confluence Connector Unique API errors detected"
+        description: "More than 1% of the Confluence Connector's requests to the Unique API (GraphQL and REST) failed in the last 75 minutes. Current error rate: {{ humanizePercentage $value }}."
         runbook: |
           1. Inspect application logs for specific error messages
           2. Check for recent deployments or configuration changes (both the connector and the Unique Services)
           3. Verify network connectivity between connector and Unique Services
           4. Verify service user settings and permissions within Unique
+      # 75m outlasts an hourly sync, so a failing sync keeps the alert firing until the next one.
+      # increase() misses a new error series until its second error; SyncFailing and ContentFailures
+      # catch errors that keep coming back.
+      expr: |
+        sum by (namespace) (increase(confluence_connector_unique_api_requests_total{result="error"}[75m]))
+        /
+        sum by (namespace) (increase(confluence_connector_unique_api_requests_total[75m]))
+        > 0.01
+      for: 5m
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    # The sync rules need two outcomes in their window, so one failed sync does not fire them.
+    # The windows assume hourly syncs; docs/operator/configuration.md covers slower schedules.
+    ConfluenceConnectorSyncFailing:
+      alert: ConfluenceConnectorSyncFailing
+      annotations:
+        summary: "Confluence Connector sync failing for tenant {{ $labels.tenant }}"
+        description: "Every sync of tenant {{ $labels.tenant }} in the last 3 hours failed. Nothing new from Confluence reaches Unique."
+        runbook: |
+          1. Search the connector logs for "Sync failed" with this tenantName
+          2. "Scope with id ... not found": the root folder in Unique was deleted. Create a new one and update ingestion.scopeId
+          3. "Root scope ownership mismatch" or "Failed to claim root scope ownership": another Confluence instance owns the folder
+          4. 401/403 from Confluence or Zitadel: rotate the client secret
+          5. Network errors: check NetworkPolicy, proxy and DNS
       expr: |
         (
-          sum(rate(cfc_unique_rest_api_request_duration_seconds_count{http_status_class=~"4xx|5xx"}[5m]))
+          sum by (namespace, tenant) (increase(cfc_syncs_total[3h])) > 1.5
+        )
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="success"}[3h])) > 0
+        )
+      for: 15m
+      labels:
+        severity: critical
+        alertGroup: confluence-connector
+    ConfluenceConnectorSyncDegraded:
+      alert: ConfluenceConnectorSyncDegraded
+      annotations:
+        summary: "Confluence Connector sync degraded for tenant {{ $labels.tenant }}"
+        description: "More than half of the syncs of tenant {{ $labels.tenant }} in the last 6 hours failed, but some succeeded. Current failure ratio: {{ humanizePercentage $value }}."
+        runbook: |
+          1. Search the connector logs for "Sync failed" with this tenantName
+          2. Intermittent failures usually come from timeouts or rate limits on the Confluence or Unique side
+      # The unless clause leaves a tenant without any success in 3 hours to ConfluenceConnectorSyncFailing.
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="failure"}[6h]))
           /
-          sum(rate(cfc_unique_rest_api_request_duration_seconds_count[5m]))
-        ) > 0.01
-      for: 30s
+          sum by (namespace, tenant) (increase(cfc_syncs_total[6h]))
+        ) > 0.5
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_syncs_total{result="success"}[3h])) == 0
+        )
+      for: 15m
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    ConfluenceConnectorSyncStuck:
+      alert: ConfluenceConnectorSyncStuck
+      annotations:
+        summary: "Confluence Connector sync of tenant {{ $labels.tenant }} has not finished for 6 hours"
+        description: "A sync of tenant {{ $labels.tenant }} started more than 6 hours ago and has not finished. While a sync runs, every scheduled sync of the tenant is skipped."
+        runbook: |
+          1. Check the connector logs for the last progress line of this tenant
+          2. A very large first sync can take this long. Check whether pages are still being ingested
+          3. If nothing moves, restart the pod
+      # The gauge is 0 while no sync runs, so only a running sync counts, and back-to-back syncs
+      # that each finish in time never add up to 6 hours.
+      expr: |
+        time() - max by (namespace, tenant) (cfc_sync_start_timestamp_seconds > 0) > 6 * 3600
+      for: 5m
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    ConfluenceConnectorContentFailures:
+      alert: ConfluenceConnectorContentFailures
+      annotations:
+        summary: "Confluence Connector cannot ingest or delete content for tenant {{ $labels.tenant }}"
+        description: "Pages, attachments or deletions of tenant {{ $labels.tenant }} keep failing on every sync. {{ $value | humanize }} failures in the last 2 hours."
+        runbook: |
+          1. Search the connector logs for "Failed to" with this tenantName
+          2. Find the failing pageId or attachmentId in the "Failed to fetch page", "Failed to ingest page", "Failed to ingest attachment" and "Failed to delete content" log lines
+          3. Unique ingestion errors also show in ConfluenceConnectorUniqueAPIErrors
+          4. If the same item fails on every sync (for example too large, or rejected by Unique), the alert keeps firing until that item is fixed or removed in Confluence
+      # Hourly failures can land almost 2h apart, so the 2h window holds while they recur, and for: 3h
+      # stops one bad sync from firing. The counters start at 0, so each side of + has a series.
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_pages_processed_total{result="failure"}[2h]))
+          + sum by (namespace, tenant) (increase(cfc_attachments_processed_total{result="failure"}[2h]))
+          + sum by (namespace, tenant) (increase(cfc_content_deleted_total{result="failure"}[2h]))
+        ) > 0
+      for: 3h
+      labels:
+        severity: warning
+        alertGroup: confluence-connector
+    ConfluenceConnectorTenantCleanupFailing:
+      alert: ConfluenceConnectorTenantCleanupFailing
+      annotations:
+        summary: "Confluence Connector cannot clean up deleted tenant {{ $labels.tenant }}"
+        description: "Tenant {{ $labels.tenant }} has status deleted, and every cleanup in the last 3 hours failed. Its content stays in Unique."
+        runbook: |
+          1. Search the connector logs for "cleanup" with this tenantName
+          2. Check that the service user can still manage the tenant's root folder
+      expr: |
+        (
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total[3h])) > 1.5
+        )
+        unless on (namespace, tenant)
+        (
+          sum by (namespace, tenant) (increase(cfc_tenant_cleanups_total{result="success"}[3h])) > 0
+        )
+      for: 15m
       labels:
         severity: warning
         alertGroup: confluence-connector

@@ -1,0 +1,24 @@
+{
+  "cooldownDays": 3,
+  "ignore": [
+    { "ecosystem": "npm", "name": "https-proxy-agent", "updateTypes": ["major"], "reason": "Version 8 and later is ESM only. The repo builds with moduleResolution node, so the types do not resolve." }
+  ],
+  "terraformPlatforms": ["linux_amd64", "linux_arm64", "darwin_arm64"],
+  "groups": [
+    { "name": "nestjs", "ecosystem": "npm", "patterns": ["@nestjs/*", "nestjs-*"] },
+    { "name": "opentelemetry", "ecosystem": "npm", "patterns": ["@opentelemetry/*"] },
+    { "name": "vitest", "ecosystem": "npm", "patterns": ["vitest", "@vitest/*"] },
+    { "name": "suites", "ecosystem": "npm", "patterns": ["@suites/*"] },
+    { "name": "swc", "ecosystem": "npm", "patterns": ["@swc/*"] },
+    { "name": "rollup", "ecosystem": "npm", "patterns": ["rollup", "@rollup/*"] },
+    { "name": "rolldown", "ecosystem": "npm", "patterns": ["rolldown", "@rolldown/*", "@oxc-project/*"] },
+    { "name": "esbuild", "ecosystem": "npm", "patterns": ["esbuild", "@esbuild/*"] },
+    { "name": "babel", "ecosystem": "npm", "patterns": ["@babel/*"] },
+    { "name": "biome", "ecosystem": "npm", "patterns": ["@biomejs/*"] },
+    { "name": "opentelemetry", "ecosystem": "uv", "patterns": ["opentelemetry-*"] },
+    { "name": "unique", "ecosystem": "uv", "patterns": ["unique-*"] },
+    { "name": "fastmcp", "ecosystem": "uv", "patterns": ["fastmcp", "fastmcp-slim"] },
+    { "name": "microsoft-kiota", "ecosystem": "uv", "patterns": ["microsoft-kiota-*"] },
+    { "name": "pydantic", "ecosystem": "uv", "patterns": ["pydantic", "pydantic-core"] }
+  ]
+}

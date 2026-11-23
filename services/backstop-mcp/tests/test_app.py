@@ -39,6 +39,7 @@ from backstop_mcp.features.data_hygiene import get_employment_index_factory, get
 from backstop_mcp.features.opportunities import get_opportunity_stages_service_factory
 from backstop_mcp.features.org_people_writes import get_entity_relationship_types_service_factory
 from backstop_mcp.server.tools import TOOLS
+from backstop_mcp.server_icons import SERVER_ICONS
 
 _BASE_URL = "https://api.backstopsolutions.com"
 
@@ -150,6 +151,15 @@ class TestWiring:
                 .for_current_caller()
                 .raw_request("GET", SYSTEM_INFO_PATH)
             )
+
+    @pytest.mark.asyncio
+    @pytest.mark.usefixtures("app_client")
+    async def test_initialize_advertises_the_server_icons(self) -> None:
+        server = getattr(create_app().state, "fastmcp_server", None)
+        assert isinstance(server, FastMCP)
+        async with Client(cast("FastMCP[object]", server)) as client:
+            assert client.server_info is not None
+            assert client.server_info.icons == SERVER_ICONS
 
     def test_the_factory_owns_the_settings_create_app_was_given(
         self, app_client: TestClient

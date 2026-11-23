@@ -1,0 +1,21 @@
+scenario: onenote_list_sections-team
+fixture: rec-tool-onenote_list_sections-team
+source: recorded
+target: graph
+recorded_at: '2026-11-02T20:50:47+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 38
+  keys dropped: 36
+  query parameters dropped: 2
+  response headers dropped: 53
+  text kept: 15
+  text replaced: 23
+literals:
+- seed-v1 Shared
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -12,7 +12,6 @@ from mcp_openapi.upstream import OperationClient
 from kyckr_mcp.client import create_client
 from kyckr_mcp.instructions import INSTRUCTIONS
 from kyckr_mcp.openapi.routes import CLIENT_BACKED
-from kyckr_mcp.orders import DOWNLOAD_ORDER
 from kyckr_mcp.settings import Settings
 
 SPEC = yaml.safe_load((Path(__file__).parent / "openapi" / "kyckr-openapi.yml").read_text())
@@ -25,7 +24,7 @@ def create_server(
     async def lifespan(_: FastMCP) -> AsyncIterator[dict[str, object]]:
         async with create_client(settings, transport) as http:
             api = OperationClient(SPEC, http)
-            missing = {*CLIENT_BACKED, DOWNLOAD_ORDER.operation_id} - api.operation_ids
+            missing = set(CLIENT_BACKED) - api.operation_ids
             assert not missing, f"operationIds not in the spec: {sorted(missing)}"
             yield {"api": api, "settings": settings}
 

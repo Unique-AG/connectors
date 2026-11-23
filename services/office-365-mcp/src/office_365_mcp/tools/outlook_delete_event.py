@@ -18,11 +18,11 @@ from office_365_mcp.shared.calendar import (
     SERIES_MASTER_FIELD,
     EventAttendee,
     EventTime,
-    confirmation_id_for,
     event_of,
     event_time,
     series_reach,
 )
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -33,6 +33,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_delete_event"
+
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
 
 STEP_DELETE = "delete_event"
 
@@ -131,7 +133,7 @@ async def delete_event(
 
     asked: InputRequiredResult | None = None
     about = confirmation_id_for(handle.uri, TOOL_NAME)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
         refused = _NOT_THE_ORGANIZER if event.is_organizer is not True else None
         if refused is None:
@@ -198,7 +200,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Delete a Calendar Event",
+        title="Outlook: Delete a Calendar Event",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

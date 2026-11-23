@@ -18,9 +18,9 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.calendar import confirmation_id_for
+from office_365_mcp.shared.addresses import ONE_ADDRESS
+from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import CalendarHandle, CalendarPermissionHandle, calendar_handle
-from office_365_mcp.shared.mail import ONE_ADDRESS
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -31,6 +31,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_share_calendar"
+
+PRESETS: tuple[str, ...] = ("outlook-calendar-manage",)
 
 STEP_CALENDAR = "calendar"
 STEP_SHARE = "share_calendar"
@@ -173,7 +175,7 @@ async def share_calendar(
     refused: str | None = None
     created: CalendarPermission | None = None
     about = confirmation_id_for(handle.uri, TOOL_NAME, recipient.casefold(), role)
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         with graph_step(STEP_CALENDAR):
             calendar = await target.get(
                 request_configuration=RequestConfiguration[_CalendarQuery](
@@ -232,7 +234,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Share a Calendar",
+        title="Outlook: Share a Calendar",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

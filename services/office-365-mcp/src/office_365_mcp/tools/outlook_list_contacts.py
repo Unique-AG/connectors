@@ -9,14 +9,16 @@ from msgraph.generated.users.item.contacts.contacts_request_builder import Conta
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
-from office_365_mcp.shared.contacts import SUMMARY_FIELDS, ContactSummary
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import ONE_ADDRESS
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
+from office_365_mcp.shared.addresses import ONE_ADDRESS
 from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.outlook.contacts import SUMMARY_FIELDS, ContactSummary
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_contacts"
+
+PRESETS: tuple[str, ...] = ("outlook-contacts", "outlook-contacts-write")
 
 STEP = "contacts"
 
@@ -72,7 +74,7 @@ async def list_contacts(
         raise ToolError(_NOT_ONE_ADDRESS)
 
     headers = immutable_id_headers()
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.me.contacts.get(
             request_configuration=RequestConfiguration[_ContactsQuery](
                 query_parameters=_ContactsQuery(
@@ -101,7 +103,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Contacts",
+        title="Outlook: List Contacts",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

@@ -1,0 +1,27 @@
+scenario: outlook_forward_event-hosting
+fixture: rec-tool-outlook_forward_event-hosting
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:12:50+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 20
+  keys dropped: 17
+  persona addresses: 8
+  persona names: 7
+  query parameters dropped: 3
+  response headers dropped: 35
+  text kept: 15
+literals:
+- '2026-10-29'
+- '2026-10-30'
+- Hosting review
+- Please join for the hosting part.
+- ~today
+- ~yesterday
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

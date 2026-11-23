@@ -1,0 +1,23 @@
+scenario: onenote_copy_notebook-spare
+fixture: rec-tool-onenote_copy_notebook-spare
+source: recorded
+target: graph
+recorded_at: '2026-10-30T09:59:36+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 108
+  keys dropped: 28
+  query parameters dropped: 8
+  response headers dropped: 36
+  text kept: 44
+  text replaced: 81
+literals:
+- seed-v1 Spare
+- seed-v1 case-notebook-copy 2026-10-31
+- seed-v1 case-notebook-copy ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

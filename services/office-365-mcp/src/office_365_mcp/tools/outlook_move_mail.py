@@ -16,7 +16,6 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.mail import (
     MailDestination,
     MailFault,
@@ -28,6 +27,7 @@ from office_365_mcp.shared.mail import (
     raise_when_no_message_succeeded,
     resolve_destination,
 )
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -40,6 +40,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_move_mail"
+
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
 
 STEP_MOVE = "move_message"
 
@@ -115,7 +117,9 @@ _NOT_A_MESSAGE_HANDLE = (
     + "in `uri`. One of these is not a handle. A subject line, an email address, an Outlook web "
     + "link and a bare message id are not handles. Neither is a folder or rule handle "
     + "under the same scheme. This tool makes sure that every handle is valid before any "
-    + "message moves, so nothing moved. Fix the value and call again with the whole batch."
+    + "message moves, so nothing moved. If you have no handles, call outlook_list_mail or "
+    + "outlook_search_mail and use the `uri` values. If the value is a folder handle, pass it as "
+    + "`folder_ref`. Fix the value and call again with the whole batch."
 )
 
 _HIDDEN_DESTINATION = (
@@ -201,7 +205,7 @@ async def move_mail(
 
     answer: Confirmed = None
     attempts: list[MessageAttempt[MovedMessage]] = []
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         target = await resolve_destination(reached, wanted)
         if not isinstance(target, MailFault):
             if mailbox is not None:
@@ -290,7 +294,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Move Mail to a Folder",
+        title="Outlook: Move Mail to a Folder",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE,
     )
@@ -300,7 +304,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The messages to move: `uri` values from a search, list, or thread result."
+                    "The messages to move. Each one is the `uri` of a result of outlook_list_mail, "
+                    "outlook_search_mail, or outlook_read_thread, copied word for word. Never "
+                    "pass a `folder_id` or a `web_link`."
                 ),
             ),
         ],

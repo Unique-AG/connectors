@@ -3,6 +3,7 @@ import hashlib
 import json
 import pathlib
 import re
+from collections import UserDict
 from collections.abc import Mapping
 from typing import cast
 
@@ -65,6 +66,21 @@ _UNCONSENTED = (
     + "'1f2e3d4c-5b6a-7988-9a0b-1c2d3e4f5061'. Send an interactive authorization request for "
     + "this user and resource."
 )
+
+_LICENSE_MESSAGE = (
+    "Failed to get license information for the user. Ensure user has a valid "
+    + "Office365 license assigned to them."
+)
+
+
+def _unlicensed_failure() -> GraphFailure:
+    return GraphForbidden(
+        "Microsoft Graph returned 403 (Forbidden)",
+        status=403,
+        code="Forbidden",
+        request_id=None,
+        reason=_LICENSE_MESSAGE,
+    )
 
 
 _FALLTHROUGH = "because it is a bad request, not an outage or a permission problem"
@@ -154,7 +170,7 @@ class TestTheTwoRemediesGraphCannotTellApart:
 
     async def test_the_transcript_tenant_switch_is_neither_of_those_and_says_so(self) -> None:
         """A third remedy behind the same status and outer code, and not a permission at all:
-        Graph access to Teams meeting transcripts is a tenant-wide Teams setting, off by default,
+        Graph access to Teams transcripts is a tenant-wide Teams setting, off by default,
         that no app can turn on."""
         message = await _message(
             GraphForbidden(
@@ -166,6 +182,9 @@ class TestTheTwoRemediesGraphCannotTellApart:
             )
         )
 
+        assert "Teams transcripts" in message
+        assert "Teams meeting transcripts" not in message
+        assert "do not retry" in message
         assert "Teams administrator" in message
         assert "Set-CsTeamsMeetingConfiguration" in message
         assert "sign in again will not change it" in message
@@ -342,6 +361,18 @@ class TestRetryAdvice:
 
         assert "Teams administrator" in message
         assert "Refused." not in message
+
+    async def test_an_unlicensed_reader_is_told_to_get_a_license_before_the_tools_own_words(
+        self,
+    ) -> None:
+        message = await _message(
+            _unlicensed_failure(),
+            forbidden="Refused.",
+        )
+
+        assert "license that includes the service this tool uses" in message
+        assert "Refused." not in message
+        assert "trying again later may work" in message
 
     async def test_the_403_wording_does_not_replace_the_404_advice(self) -> None:
         message = await _message(
@@ -632,16 +663,6 @@ class TestHowAWriteIsPutToAPerson:
         with pytest.raises(asyncio.CancelledError):
             _ = await _confirm_with(asyncio.CancelledError(), era)(_QUESTION, _ABOUT)
 
-    async def test_a_tool_error_from_the_client_is_passed_through_as_it_arrived(
-        self, era: str | None
-    ) -> None:
-        """A `ToolError` is already worded for a caller; re-wording it would guess."""
-        already = ToolError("the client refused the request")
-
-        refusal = await _confirm_with(already, era)(_QUESTION, _ABOUT)
-
-        assert refusal == str(already)
-
     @pytest.mark.parametrize(
         "answer",
         [
@@ -649,9 +670,8 @@ class TestHowAWriteIsPutToAPerson:
             AcceptedElicitation(data=_DECLINE),
             MCPError(METHOD_NOT_FOUND, "Method not found"),
             MCPError(REQUEST_TIMEOUT, "Request 'elicitation/create' timed out"),
-            ToolError("the client refused the request"),
         ],
-        ids=["declined", "another-answer", "cannot-ask", "no-answer", "client-error"],
+        ids=["declined", "another-answer", "cannot-ask", "no-answer"],
     )
     async def test_no_refusal_is_ever_raised(self, answer: object, era: str | None) -> None:
         refusal = await _confirm_with(answer, era)(_QUESTION, _ABOUT)
@@ -668,8 +688,6 @@ _NOT_AN_AGREEMENT: list[object] = [
     ElicitResult(action="cancel"),
     ElicitResult(action="decline", content={"value": _AGREE}),
     ElicitResult(action="cancel", content={"value": _AGREE}),
-    ElicitResult(action="accept", content={}),
-    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
     CreateMessageResult(
         role="assistant", content=TextContent(type="text", text=_AGREE), model="a-model"
     ),
@@ -680,10 +698,14 @@ _NOT_AN_AGREEMENT_IDS = [
     "cancelled",
     "declined-but-filled-in",
     "cancelled-but-filled-in",
-    "empty-content",
-    "off-schema-content",
     "another-kind-of-answer",
 ]
+
+_AN_UNREADABLE_ACCEPT: list[object] = [
+    ElicitResult(action="accept", content={}),
+    ElicitResult(action="accept", content={"value": "whatever the client felt like"}),
+]
+_AN_UNREADABLE_ACCEPT_IDS = ["empty-content", "off-schema-content"]
 
 
 def _modern(*, responses: dict[str, object] | None = None, state: str | None = None) -> Confirm:
@@ -753,6 +775,18 @@ class TestTheEraWithNoBackChannel:
         assert "did not agree" in refusal
         assert "Do not call this tool again" in refusal
 
+    @pytest.mark.parametrize("answer", _AN_UNREADABLE_ACCEPT, ids=_AN_UNREADABLE_ACCEPT_IDS)
+    async def test_an_accept_that_fails_validation_is_no_answer_and_not_a_decline(
+        self, answer: object
+    ) -> None:
+        refusal = await _answering(answer)
+
+        assert isinstance(refusal, str)
+        assert refusal.startswith(_NOTHING_HAPPENED)
+        assert "no answer" in refusal
+        assert "did not agree" not in refusal
+        assert "Do not call this tool again" in refusal
+
     @pytest.mark.parametrize("state", [None, _ANOTHER_REQUEST], ids=["no-state", "another-id"])
     async def test_an_agreement_bound_to_another_request_authorizes_nothing(
         self, state: str | None
@@ -815,24 +849,6 @@ class TestWhatTheMiddlewareLeavesAlone:
 
         assert await _middleware_message(refusal) == str(refusal)
 
-    async def test_a_refusal_for_an_unknown_tool_keeps_its_own_report(self) -> None:
-        """Unreachable while the table and the registration come from one resolved selection. The
-        alternative, an `assert`, answers a caller who could have acted on the 403."""
-        blind = GraphAdviceMiddleware({})
-        refusal = GraphForbidden("nope", status=403, code=None, request_id=None)
-        delivered = ToolError(f"Error calling tool '{_TOOL}': {refusal}")
-        delivered.__cause__ = refusal
-
-        async def refuse(context: MiddlewareContext[CallToolRequestParams]) -> ToolResult:
-            _ = context
-            raise delivered
-
-        context = MiddlewareContext(message=CallToolRequestParams(name=_TOOL, arguments={}))
-        with pytest.raises(ToolError) as raised:
-            _ = await blind.on_call_tool(context, refuse)
-
-        assert raised.value is delivered
-
 
 class _Parcel(BaseModel):
     weight: int | None = None
@@ -870,6 +886,11 @@ class TestTheAgreementBinding:
     def test_the_order_of_the_keys_of_a_mapping_does_not_change_the_id(self) -> None:
         assert confirmation_digest("tool", {"a": 1, "b": [2]}) == confirmation_digest(
             "tool", {"b": [2], "a": 1}
+        )
+
+    def test_any_mapping_or_sequence_binds_like_the_dict_or_list_it_holds(self) -> None:
+        assert confirmation_digest("tool", UserDict({"a": range(2)}), (1, 2)) == (
+            confirmation_digest("tool", {"a": [0, 1]}, [1, 2])
         )
 
     def test_the_id_is_a_sha256_of_the_canonical_parts(self) -> None:

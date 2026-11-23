@@ -21,10 +21,19 @@ from msgraph.generated.teams.item.channels.channels_request_builder import Chann
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_channels"
+
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-channels",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+    "teams-files",
+)
 
 STEP = "channels"
 
@@ -137,7 +146,7 @@ async def teams_list_channels(
         ),
         headers=headers,
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.teams.by_team_id(team_id).channels.get(
             request_configuration=configuration
         )
@@ -178,7 +187,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List a Team's Channels",
+        title="Teams: List a Team's Channels",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

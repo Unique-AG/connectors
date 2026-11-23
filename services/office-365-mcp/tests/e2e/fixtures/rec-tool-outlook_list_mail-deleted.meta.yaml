@@ -1,0 +1,24 @@
+scenario: outlook_list_mail-deleted
+fixture: rec-tool-outlook_list_mail-deleted
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:00:34+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 16
+  keys dropped: 2
+  other addresses replaced: 1
+  persona addresses: 8
+  persona names: 8
+  response headers dropped: 14
+  text kept: 7
+  text replaced: 3
+literals:
+- deleteditems
+- seed-v1
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

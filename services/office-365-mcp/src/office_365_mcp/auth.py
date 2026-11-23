@@ -42,6 +42,8 @@ _ENCRYPTION_SALT = "office-365-mcp-oauth-storage"
 # Python name for the registry to read.
 _CALLBACK_PATH = "/auth/callback"
 
+_NO_TENANT_RESTRICTION: frozenset[str] = frozenset()
+
 
 def build_oauth_storage(entra: EntraConfig, database: DatabaseConfig) -> AsyncKeyValue:
     """Trap: FastMCP's default store encrypts. Handing it a bare table silently disables at-rest
@@ -74,7 +76,11 @@ def home_tenant(claims: Mapping[str, object]) -> str | None:
 
 
 class TenantBoundJWTVerifier(JWTVerifier):
-    def __init__(self, stock: JWTVerifier) -> None:
+    _allowed_tenant_ids: frozenset[str]
+
+    def __init__(
+        self, stock: JWTVerifier, allowed_tenant_ids: frozenset[str] = _NO_TENANT_RESTRICTION
+    ) -> None:
         super().__init__(
             public_key=stock.public_key,
             jwks_uri=stock.jwks_uri,
@@ -86,18 +92,27 @@ class TenantBoundJWTVerifier(JWTVerifier):
             ssrf_safe=stock.ssrf_safe,
             http_client=stock._http_client,
         )
+        self._allowed_tenant_ids = allowed_tenant_ids
 
     @override
     async def load_access_token(self, token: str) -> AccessToken | None:
         access_token = await super().load_access_token(token)
         if access_token is None:
             return None
-        if home_tenant(access_token.claims) is None:
+        tenant = home_tenant(access_token.claims)
+        if tenant is None:
             logger.warning(
                 "Bearer token rejected for client %s: issuer %r is not tenant %r's",
                 access_token.client_id,
                 access_token.claims.get("iss"),
                 access_token.claims.get("tid"),
+            )
+            return None
+        if self._allowed_tenant_ids and tenant not in self._allowed_tenant_ids:
+            logger.warning(
+                "Bearer token rejected for client %s: tenant %r is not on the allowlist",
+                access_token.client_id,
+                tenant,
             )
             return None
         return access_token
@@ -115,7 +130,12 @@ class _Registration(TypedDict):
 
 @final
 class OrganizationsAzureProvider(AzureProvider):
-    def __init__(self, **registration: Unpack[_Registration]) -> None:
+    def __init__(
+        self,
+        *,
+        allowed_tenant_ids: frozenset[str] = _NO_TENANT_RESTRICTION,
+        **registration: Unpack[_Registration],
+    ) -> None:
         super().__init__(tenant_id=ORGANIZATIONS, **registration)
         assert self._base_authority == AzureAuthorityHosts.AZURE_PUBLIC_CLOUD, (
             "home_tenant() knows only the public cloud"
@@ -124,7 +144,7 @@ class OrganizationsAzureProvider(AzureProvider):
         assert isinstance(stock, JWTVerifier), (
             f"AzureProvider validates tokens with {type(stock).__name__}, not a JWTVerifier"
         )
-        self._token_validator = TenantBoundJWTVerifier(stock)
+        self._token_validator = TenantBoundJWTVerifier(stock, allowed_tenant_ids)
 
     @override
     async def get_obo_credential(self, user_assertion: str) -> OnBehalfOfCredential:
@@ -168,5 +188,7 @@ def build_auth(
         client_storage=client_storage,
     )
     if entra.multi_tenant:
-        return OrganizationsAzureProvider(**registration)
+        return OrganizationsAzureProvider(
+            allowed_tenant_ids=entra.allowed_tenant_ids, **registration
+        )
     return AzureProvider(tenant_id=entra.tenant_id, **registration)

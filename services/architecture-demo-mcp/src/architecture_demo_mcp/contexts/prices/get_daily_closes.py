@@ -6,6 +6,9 @@ from architecture_demo_mcp.persistence import cached_price_history
 from architecture_demo_mcp.persistence import Persistence
 from architecture_demo_mcp.upstream import DailyPriceBar
 from architecture_demo_mcp.upstream import GET_DAILY_PRICES
+from architecture_demo_mcp.upstream import GetDailyPricesPath
+from architecture_demo_mcp.upstream import GetDailyPricesQuery
+from architecture_demo_mcp.upstream import GetDailyPricesRequest
 from architecture_demo_mcp.upstream import Upstream
 
 
@@ -28,9 +31,10 @@ async def get_daily_closes(
         return cached
     bars = await upstream.call(
         GET_DAILY_PRICES,
-        ticker=ticker,
-        startDate=start_date.isoformat() if start_date else None,
-        endDate=end_date.isoformat() if end_date else None,
+        GetDailyPricesRequest(
+            path=GetDailyPricesPath(ticker=ticker),
+            query=GetDailyPricesQuery(start_date=start_date, end_date=end_date),
+        ),
     )
     closes = [close for bar in bars if (close := _daily_close(bar=bar)) is not None]
     await cache_price_history(persistence=persistence, key=key, bars=closes)

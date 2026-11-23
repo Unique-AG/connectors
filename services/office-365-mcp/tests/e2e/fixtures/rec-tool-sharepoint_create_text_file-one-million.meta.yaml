@@ -1,0 +1,26 @@
+scenario: sharepoint_create_text_file-one-million
+fixture: rec-tool-sharepoint_create_text_file-one-million
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:20:25+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 30
+  keys dropped: 11
+  persona addresses: 6
+  persona names: 6
+  response headers dropped: 25
+  text kept: 14
+  text replaced: 7
+literals:
+- seed-v1 Project Plan
+- seed-v1 case-sharepoint_create_text_file-one-million.txt
+request_size:
+  '3':
+  - 1000000
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

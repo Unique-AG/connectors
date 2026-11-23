@@ -90,6 +90,17 @@ def test_build_auth_passes_required_scopes(durable_settings):
     assert kwargs["verify_id_token"] is True
 
 
+def test_build_auth_requests_offline_access_from_zitadel(durable_settings):
+    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
+        mock_create.return_value = MagicMock()
+        build_auth(durable_settings)
+
+    _, kwargs = mock_create.call_args
+    assert "offline_access" in kwargs["extra_authorize_params"]["scope"].split()
+    assert "offline_access" in kwargs["valid_scopes"]
+    assert "offline_access" not in kwargs["required_scopes"]
+
+
 def test_build_storage_treats_decryption_errors_as_misses(durable_settings):
     store = build_storage(durable_settings)
     assert store.raise_on_decryption_error is False

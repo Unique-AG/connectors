@@ -11,11 +11,13 @@ from msgraph.generated.users.item.outlook.master_categories.master_categories_re
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors
+from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_list_categories"
+
+PRESETS: tuple[str, ...] = ("outlook-mailbox", "outlook-automate", "outlook-rules")
 
 STEP = "categories"
 
@@ -71,7 +73,7 @@ class Categories(BaseModel):
 
 
 async def list_categories(client: GraphServiceClient) -> Categories:
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.me.outlook.master_categories.get(
             request_configuration=RequestConfiguration[_CategoriesQuery](
                 query_parameters=_CategoriesQuery(select=list(_CATEGORY_FIELDS))
@@ -91,7 +93,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Categories",
+        title="Outlook: List Categories",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

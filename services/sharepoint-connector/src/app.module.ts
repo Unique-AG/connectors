@@ -1,25 +1,25 @@
-import { defaultLoggerOptions } from '@unique-ag/logger';
 import { ProbeModule } from '@unique-ag/probe';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { context, trace } from '@opentelemetry/api';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { LoggerModule } from 'nestjs-pino';
 import * as packageJson from '../package.json';
 import { ConfigDiagnosticsModule } from './config/config-diagnostics.module';
 import { healthConfig } from './config/health.config';
-import { proxyConfig } from './config/proxy.config';
+import { type ProxyConfig, proxyConfig } from './config/proxy.config';
 import {
-  AppConfig,
+  type AppConfig,
   appConfig,
   processingConfig,
+  type SharepointConfig,
   sharepointConfig,
+  type UniqueConfig,
   uniqueConfig,
 } from './config/tenant-config-loader';
 import { HealthModule } from './health/health.module';
+import { createAppLoggerOptions } from './logger-options';
 import { ProxyModule } from './proxy';
 import { SchedulerModule } from './scheduler/scheduler.module';
-import { Redacted } from './utils/redacted';
 
 @Module({
   imports: [
@@ -38,27 +38,13 @@ import { Redacted } from './utils/redacted';
     ProxyModule,
     ConfigDiagnosticsModule,
     LoggerModule.forRootAsync({
-      useFactory(appConfig: AppConfig) {
-        return {
-          ...defaultLoggerOptions,
-          pinoHttp: {
-            ...defaultLoggerOptions.pinoHttp,
-            level: appConfig.logLevel,
-            genReqId: () => {
-              const ctx = trace.getSpanContext(context.active());
-              if (!ctx) {
-                return crypto.randomUUID();
-              }
-              return ctx.traceId;
-            },
-            redact: {
-              paths: ['req.headers.authorization'],
-              censor: (value) => (value instanceof Redacted ? value : new Redacted(value)),
-            },
-          },
-        };
-      },
-      inject: [appConfig.KEY],
+      useFactory: (
+        app: AppConfig,
+        sharepoint: SharepointConfig,
+        unique: UniqueConfig,
+        proxy: ProxyConfig,
+      ) => createAppLoggerOptions(app, { sharepoint, unique, proxy }),
+      inject: [appConfig.KEY, sharepointConfig.KEY, uniqueConfig.KEY, proxyConfig.KEY],
     }),
     ProbeModule.forRoot({
       VERSION: packageJson.version,

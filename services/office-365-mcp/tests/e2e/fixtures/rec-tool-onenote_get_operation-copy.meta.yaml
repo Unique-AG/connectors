@@ -1,0 +1,24 @@
+scenario: onenote_get_operation-copy
+fixture: rec-tool-onenote_get_operation-copy
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:07:46+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 166
+  keys dropped: 46
+  query parameters dropped: 12
+  response headers dropped: 126
+  text kept: 66
+  text replaced: 110
+literals:
+- <p>Start.</p>
+- Copies
+- seed-v1 Scratch
+- seed-v1 case-onenote_get_operation-copy
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

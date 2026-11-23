@@ -2,18 +2,23 @@
 from mcp_openapi.upstream import Operation
 from pydantic import TypeAdapter
 
+from tiingo_mcp.models.vendor_requests import (
+    GetDailyPricesRequest,
+    GetFundamentalsDailyRequest,
+    GetFundamentalsStatementsRequest,
+)
 from tiingo_mcp.models.vendor_responses import (
     DailyPriceBar,
     FundamentalsDaily,
     FundamentalsStatement,
 )
 
-GET_DAILY_PRICES = Operation[list[DailyPriceBar]](
+GET_DAILY_PRICES = Operation[list[DailyPriceBar], GetDailyPricesRequest](
     "getDailyPrices", TypeAdapter(list[DailyPriceBar])
 )
-GET_FUNDAMENTALS_STATEMENTS = Operation[list[FundamentalsStatement]](
-    "getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement])
-)
-GET_FUNDAMENTALS_DAILY = Operation[list[FundamentalsDaily]](
+GET_FUNDAMENTALS_STATEMENTS = Operation[
+    list[FundamentalsStatement], GetFundamentalsStatementsRequest
+]("getFundamentalsStatements", TypeAdapter(list[FundamentalsStatement]))
+GET_FUNDAMENTALS_DAILY = Operation[list[FundamentalsDaily], GetFundamentalsDailyRequest](
     "getFundamentalsDaily", TypeAdapter(list[FundamentalsDaily])
 )

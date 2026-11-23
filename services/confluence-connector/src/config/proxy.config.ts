@@ -59,7 +59,7 @@ const tlsProxyConfigSchema = z.object({
 // empty object {} when no PROXY_* env vars are set, and prefault only triggers when the input is
 // undefined (not an empty object).
 export const ProxyConfigSchema = z.preprocess(
-  (input) => (isEmptyish(input) ? { authMode: 'none' } : input),
+  (input: Record<string, string | undefined>) => (isEmptyish(input) ? { authMode: 'none' } : input),
   z.discriminatedUnion('authMode', [
     noneProxyConfigSchema,
     noAuthProxyConfigSchema,

@@ -7,6 +7,7 @@ from mcp_configs.logging import (
     LogLevel,
 )
 from mcp_configs.postgres import AsyncpgConnectArgs, PostgresSettings, SslMode
+from mcp_configs.rate_limit import RateLimitSettings
 from mcp_configs.redis import RedisSettings
 from mcp_configs.retry import RetrySettings
 from mcp_configs.server import ServerSettings
@@ -21,6 +22,7 @@ __all__ = [
     "LogLevel",
     "LoggingSettings",
     "PostgresSettings",
+    "RateLimitSettings",
     "RedisSettings",
     "RetrySettings",
     "ServerSettings",

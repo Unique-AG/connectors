@@ -27,7 +27,7 @@ from msgraph.generated.users.item.calendars.item.events.item.event_item_request_
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import (
     SUMMARY_FIELDS,
     EventAttendee,
@@ -36,10 +36,18 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import event_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_event"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP = "calendar_event"
 
@@ -236,7 +244,7 @@ async def read_event(
     if zone is None:
         raise ToolError(_BAD_ZONE)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         event = (
             await client.me.calendars.by_calendar_id(handle.calendar_id)
             .events.by_event_id(handle.event_id)
@@ -307,7 +315,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Calendar Event",
+        title="Outlook: Read a Calendar Event",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

@@ -1,0 +1,56 @@
+# Extra OneDrive and team library data of the sharepoint family. A folder or file of `drive` sits
+# inside the OneDrive folder "seed-v1 Seed Files". Every name gets the prefix "seed-v1 ".
+# `folder` names the parent. `age_hours` sets the last change time through the upload session.
+# `share_with` invites that persona with read access. `phase` defaults to files-tree.
+folders:
+  - {name: Contracts}
+  - {name: "2026", parent: Contracts}
+  - {name: Archive, parent: Contracts}
+  - {name: Reports}
+  - {name: Ordered}
+
+files:
+  - {name: Contracts overview.txt, folder: Contracts, kind: txt, text: "Contracts overview.\nOne folder for each year.\n"}
+  - {name: Contract 2026.txt, folder: "2026", kind: txt, text: "Contract 2026. Alpine Print delivers 2000 brochures.\n"}
+  - {name: Report A.txt, folder: Reports, kind: txt, text: "Report A. Sales rose in the first quarter.\n"}
+  - {name: Report B.txt, folder: Reports, kind: txt, text: "Report B. Costs stayed flat in the second quarter.\n"}
+  - {name: Report C.docx, folder: Reports, kind: docx, paragraphs: ["Report C", "Hosting costs fell in the third quarter."], properties: {title: Report C, creator: tom, last_modified_by: tom, company: Lakeside Demo AG}}
+  - {name: Order A.txt, folder: Ordered, kind: txt, text: "Order A.\n", age_hours: 72}
+  - {name: Order B.txt, folder: Ordered, kind: txt, text: "Order B.\n", age_hours: 48}
+  - {name: Order C.txt, folder: Ordered, kind: txt, text: "Order C.\n", age_hours: 24}
+  - {name: Order D.txt, owner: anna, kind: txt, text: "Order D, last edited by Anna.\n", age_hours: 1, share_with: mia}
+  - {name: Read me first.txt, kind: txt, text: "See seed-v1 Project Plan.docx for the plan.\n"}
+  - {name: Text 2000.txt, kind: filler-text, size: 2000, label: text-2000}
+  - {name: Gallery.png, kind: png}
+  - {name: Scan 10MiB.bin, kind: filler, size: 10485760, label: scan-10mib, phase: files-big}
+  - {name: Scan over.bin, kind: filler, size: 10485761, label: scan-over, phase: files-big}
+
+# The document library of the team site, owned by Mia. The channel folder belongs to the channel
+# `channel`, which Mia creates when it is missing.
+team:
+  channel: Long channel
+  folders:
+    - {name: Team Files}
+    - {name: Team Contracts, parent: Team Files}
+    - {name: Team Drafts, parent: Team Files}
+  files:
+    - {name: Team Charter.docx, folder: Team Files, kind: docx, paragraphs: ["Team Charter", "The team keeps its files in one library."], properties: {title: Team Charter, creator: mia, last_modified_by: mia, company: Lakeside Demo AG}}
+    - {name: Team Notes.txt, folder: Team Contracts, kind: txt, text: "Team notes. The review is on Friday.\n"}
+    - {name: Team Budget.xlsx, folder: Team Drafts, kind: xlsx, rows: [[Item, Planned], [Print, "4000"]], properties: {title: Team Budget, creator: anna, last_modified_by: anna, company: Lakeside Demo AG}}
+  channel_files:
+    - {name: Channel Notes.txt, kind: txt, text: "Channel notes. The files of this channel live here.\n"}
+
+# The opt-in phase `lists`: two generic lists on the team site and a OneDrive folder of the same
+# name as a list. `columns` are Graph columnDefinition bodies. `rows` are list item fields.
+lists:
+  folder: Tasks
+  lists:
+    - name: Tasks
+      columns:
+        - {name: Status, indexed: true, choice: {choices: [Open, Closed], allowTextEntry: false, displayAs: dropDownMenu}}
+        - {name: Amount, number: {}}
+        - {name: Notes, indexed: false, text: {}}
+        - {name: Owner, personOrGroup: {allowMultipleSelection: false, chooseFromType: peopleOnly}}
+      rows:
+        - {Title: Close books, Status: Open, Amount: 12.5}
+    - {name: Issues}

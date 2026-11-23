@@ -28,6 +28,8 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_create_folder"
 
+PRESETS: tuple[str, ...] = ("outlook-write", "outlook-delete", "outlook-send")
+
 STEP_CREATE = "create_folder"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Mail.ReadWrite", "Mail.ReadWrite.Shared")
@@ -105,7 +107,7 @@ async def create_folder(
 
     answer: Confirmed = None
     created: MailFolder | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         if mailbox is not None:
             with not_graph():
                 answer = await confirm(
@@ -168,7 +170,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Mail Folder",
+        title="Outlook: Create a Mail Folder",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

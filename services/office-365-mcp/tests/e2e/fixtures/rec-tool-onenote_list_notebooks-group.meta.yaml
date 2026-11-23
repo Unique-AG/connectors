@@ -1,0 +1,21 @@
+scenario: onenote_list_notebooks-group
+fixture: rec-tool-onenote_list_notebooks-group
+source: recorded
+target: graph
+recorded_at: '2026-11-02T20:49:16+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 32
+  keys dropped: 33
+  query parameters dropped: 1
+  response headers dropped: 35
+  text kept: 12
+  text replaced: 19
+literals:
+- seed-v1 Shared
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

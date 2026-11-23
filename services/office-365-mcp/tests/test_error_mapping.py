@@ -20,6 +20,7 @@ from fastmcp.server.dependencies import AccessToken
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools.base import ToolResult
 from mcp.types import CallToolRequestParams, ElicitRequestFormParams
+from mcp_configs import RateLimitSettings
 from starlette.applications import Starlette
 
 from office_365_mcp.app import create_app
@@ -97,6 +98,7 @@ _A_REPEAT_CAN_WRITE_TWICE: frozenset[str] = frozenset(
         "outlook_update_event",
         "sharepoint_copy_item",
         "sharepoint_create_folder",
+        "sharepoint_create_list_item",
         "sharepoint_create_text_file",
         "sharepoint_invite",
         "teams_add_chat_member",
@@ -140,7 +142,7 @@ _PAGE = {
 }
 _NOTEBOOK = {"id": "NB1", "displayName": "Work", "isShared": False, "userRole": "Owner"}
 
-# The MCP middleware chain the composed app ends up with, outside-in. Two of the six belong to
+# The MCP middleware chain the composed app ends up with, outside-in. Two of them belong to
 # other packages, so the assertion is on names rather than on the types: `_McpMetrics` is
 # `unique_mcp`'s own private class, and importing it here to compare types would be reaching past
 # its front door for the sake of a name it already answers to.
@@ -149,18 +151,22 @@ _NOTEBOOK = {"id": "NB1", "displayName": "Work", "isShared": False, "userRole": 
 # before `_McpMetrics` reads it. `tests/test_app.py` holds the rule that pins the two relative to
 # each other.
 _CHAIN = (
+    "ToolCallObservabilityMiddleware",
     "BoundedNameMiddleware",
     "GraphAdviceMiddleware",
+    "SpendAnsweredState",
     "TraceContextRestoreMiddleware",
     "MessageLogMiddleware",
+    "RateLimitMiddleware",
+    "GraphOperationMiddleware",
     "DereferenceRefsMiddleware",
     "_McpMetrics",
 )
 
-# The two members of that chain that record what happened to a call — one log line, one set of
-# counters — and so the two the advice has to stay outside of. This, rather than the whole tuple
+# The members of that chain that record what happened to a call — one log line, two sets of
+# counters — and so the ones the advice has to stay outside of. This, rather than the whole tuple
 # above, is the ordering the class below is named for.
-_RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "_McpMetrics")
+_RECORDS_THE_OUTCOME = ("MessageLogMiddleware", "GraphOperationMiddleware", "_McpMetrics")
 
 _ORACLE = "worded_alone"
 
@@ -266,7 +272,17 @@ def app() -> Starlette:
     return _composed(SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}))
 
 
-def _composed(surface: SurfaceConfig) -> Starlette:
+@pytest.fixture
+def app_as_main_composes_it() -> Starlette:
+    """With the rate limit, which `main` adds and the in-memory calls, carrying no token, cannot
+    pass."""
+    return _composed(
+        SurfaceConfig.model_validate({"tools_preset": ToolsPreset.TEAMS}),
+        rate_limit=RateLimitSettings(),
+    )
+
+
+def _composed(surface: SurfaceConfig, rate_limit: RateLimitSettings | None = None) -> Starlette:
     return create_app(
         config=AppConfig.model_validate({"public_base_url": "https://office-365-mcp.example"}),
         database_config=DatabaseConfig.model_validate(
@@ -280,6 +296,7 @@ def _composed(surface: SurfaceConfig) -> Starlette:
             }
         ),
         surface_config=surface,
+        rate_limit=rate_limit,
     )
 
 
@@ -412,7 +429,9 @@ class TestWhereTheMappingSits:
         server = cast("FastMCP[None]", app.state.fastmcp_server)
         return tuple(type(middleware).__name__ for middleware in server.middleware)
 
-    def test_the_advice_is_outside_the_operations_layer(self, app: Starlette) -> None:
+    def test_the_advice_is_outside_the_operations_layer(
+        self, app_as_main_composes_it: Starlette
+    ) -> None:
         """The order is load-bearing in both directions. Outside `_McpMetrics`, a refusal is logged
         and counted as it happened, with the Graph failure still under it, and the client is handed
         the polished text; inside it, every operator-facing record of a 403 would read as the advice
@@ -422,50 +441,60 @@ class TestWhereTheMappingSits:
         the operations layer changes nothing about that, and pinning it here would make this test
         fail for a reason it does not name.
         """
-        chain = self._chain_of(app)
+        chain = self._chain_of(app_as_main_composes_it)
         recording = [chain.index(name) for name in _RECORDS_THE_OUTCOME]
 
         assert chain.index("GraphAdviceMiddleware") < min(recording), chain
 
     def test_the_names_that_ordering_is_asserted_over_are_in_the_chain(
-        self, app: Starlette
+        self, app_as_main_composes_it: Starlette
     ) -> None:
         """Guards the guard: the ordering above is asserted between names, and a name that has been
         renamed upstream orders nothing. Said here so a rename reads as a rename rather than as a
         `ValueError` raised from the middle of the assertion it invalidated."""
-        chain = self._chain_of(app)
+        chain = self._chain_of(app_as_main_composes_it)
         named = ("GraphAdviceMiddleware", *_RECORDS_THE_OUTCOME)
         missing = [name for name in named if name not in chain]
 
         assert not missing, f"{missing} is no longer in the chain, which is {chain}"
 
     def test_a_dependency_bump_that_changes_the_chain_at_all_says_so_here(
-        self, app: Starlette
+        self, app_as_main_composes_it: Starlette
     ) -> None:
         """Not an ordering rule: a tripwire, so a middleware that appears or disappears underneath
         this service is read here rather than inferred later from a metric that stopped being
-        emitted. Two of the six are not this repository's — `DereferenceRefsMiddleware` is
+        emitted. Two of them are not this repository's — `DereferenceRefsMiddleware` is
         FastMCP's, appended at construction, and `_McpMetrics` is `unique_mcp`'s, appended by
         `setup_ops`. Update this tuple deliberately when a bump moves it; the ordering above is the
         part that may not move quietly.
         """
-        assert self._chain_of(app) == _CHAIN
+        assert self._chain_of(app_as_main_composes_it) == _CHAIN
 
     @pytest.mark.usefixtures("obo", "graph")
-    async def test_the_operations_layer_logs_the_failure_untranslated(
+    async def test_the_logged_failure_keeps_the_graph_error_in_its_cause_chain(
         self, mcp_client: Client[FastMCPTransport], caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The `GraphForbidden` under the logged exception has to survive: it carries the status
-        and request id that make a production 403 traceable."""
-        with caplog.at_level(logging.ERROR, logger="unique_mcp"), pytest.raises(ToolError):
+        """The tool-call line logs the translated `ToolError`. The `GraphForbidden` in its cause
+        chain has to survive: it carries the status and request id that make a production 403
+        traceable."""
+        with (
+            caplog.at_level(logging.WARNING, logger="mcp_observability.tool_calls"),
+            pytest.raises(ToolError),
+        ):
             _ = await mcp_client.call_tool("teams_list_chats", {})
 
-        logged = [record for record in caplog.records if record.exc_info is not None]
-        assert logged, "the operations layer logged nothing about a failed call"
+        logged = [
+            record
+            for record in caplog.records
+            if record.name == "mcp_observability.tool_calls" and record.exc_info is not None
+        ]
+        assert logged, "the tool-call line logged nothing about a failed call"
         raised = logged[-1].exc_info
         assert raised is not None and raised[1] is not None
         causes = _chain(raised[1])
 
+        assert isinstance(raised[1], ToolError), raised[1]
+        assert "Ask a Microsoft 365 administrator to grant the delegated" in str(raised[1])
         assert any(isinstance(cause, GraphForbidden) for cause in causes), causes
 
 

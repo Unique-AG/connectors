@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -26,7 +27,6 @@ from office_365_mcp.shared.notes import (
     container_audience,
     onenote_root,
     web_url_of,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -38,6 +38,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_create_section"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_CREATE_SECTION = "create_section"
 
@@ -70,8 +72,10 @@ people or belongs to somebody else. A section in the user's own unshared noteboo
 without a question.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_sections does not show a section named `name`.
-- Microsoft can refuse a create under a section group with error 403. Then create under the \
-notebook, or copy a section into the group with onenote_copy_section.
+- Microsoft can refuse a create under a section group with error 403. A section under the \
+notebook is not in the group. Create it there only when the user agrees. A copy of a section \
+into the group with onenote_copy_section works only for a notebook that is not on a SharePoint \
+site.
 """
 
 _NOT_A_PARENT_HANDLE = (
@@ -93,6 +97,18 @@ GRAPH_NOT_FOUND = (
     + "notebook, which gives it a new handle: call onenote_list_notebooks or "
     + "onenote_list_sections again and take a fresh `uri` for the parent, because this same "
     + "handle fails the same way again."
+)
+
+
+GRAPH_FORBIDDEN = (
+    "Microsoft 365 refused to create this section for the signed-in user. No section was "
+    + "created. Microsoft can refuse a create under a section group while it accepts a create "
+    + "under the notebook. If `parent` is a section group, tell the user. A section under the "
+    + "notebook is not in the group, so create it there only when the user agrees. A copy of a "
+    + "section into the group with onenote_copy_section works only for a notebook that is not "
+    + "on a SharePoint site. If `parent` is a notebook, the user can lack write access to it, "
+    + "or a policy of the tenant can refuse the write. Tell the user. A call with the same "
+    + "arguments fails the same way."
 )
 
 
@@ -162,7 +178,7 @@ async def create_section(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
-    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors():
         container = await container_audience(client, handle)
         if answer_pending or container.notebook.reaches_others:
             with not_graph():
@@ -236,7 +252,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Section",
+        title="OneNote: Create a Section",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

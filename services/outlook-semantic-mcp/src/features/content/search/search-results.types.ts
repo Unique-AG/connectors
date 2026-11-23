@@ -7,10 +7,14 @@ export enum SearchBackend {
 
 export interface OpenEmailParams {
   id: string;
-  idType: SearchBackend;
   mailbox?: string;
   parentFolderId?: string;
   idIsImmutable?: boolean;
+  // html for a draft, so the edit reads the live body. Absent means plain text.
+  bodyContentType?: 'html';
+  // Set when semantic search matched this email. open_email loads these chunks in addition to the Graph body.
+  uniqueContentId?: string;
+  chunkIds?: string[];
 }
 
 export interface ReplyToParams {
@@ -21,13 +25,14 @@ export interface ReplyToParams {
 
 export interface SearchEmailResult {
   uniqueContentId?: string;
-  msGraphMessageId?: string;
+  msGraphMessageId: string;
   folderId: string;
   title: string;
   from: string;
   sourceMailbox: Nullish<string>;
   outlookWebLink: string;
   receivedDateTime: string | null;
+  isDraft: boolean;
   text: string;
   uniqueContentUrl: string | undefined;
   backend: SearchBackend;

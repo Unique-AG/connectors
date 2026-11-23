@@ -13,10 +13,10 @@ These are all the scopes a Teams MCP server requests. Only one of them, `Channel
 | `offline_access` | Delegated | `7427e0e9-2fba-42fe-b0c0-848c9e6a8182` | No | Refresh tokens for long-lived sessions |
 | `ChannelMessage.Send` | Delegated | `ebf0f66e-9fb1-49e4-a278-222f76911cf4` | No | `send_channel_message` |
 | `ChatMessage.Send` | Delegated | `116b7235-2ffd-4103-963e-baec9c8e5c8b` | No | `send_chat_message` |
-| `Chat.ReadBasic` | Delegated | `9547fcb5-d03f-419d-9948-5928bbf71b0f` | No | `list_chats` |
+| `Chat.ReadBasic` | Delegated | `9547fcb5-d03f-419d-9948-5928bbf71b0f` | No | `list_chats`, `search_messages` (chat names) |
 | `Chat.Read` | Delegated | `f501c180-9344-439a-bca0-6cbf209fd270` | No | `get_chat_messages`, `search_messages` |
-| `Team.ReadBasic.All` | Delegated | `2280dda6-0bfd-44ee-a2f4-cb867cfc4c1e` | No | `list_teams` |
-| `Channel.ReadBasic.All` | Delegated | `3aeca27b-ee3a-4c2b-8ded-80376e2134a4` | No | `list_channels` |
+| `Team.ReadBasic.All` | Delegated | `2280dda6-0bfd-44ee-a2f4-cb867cfc4c1e` | No | `list_teams`, `search_messages` (team names) |
+| `Channel.ReadBasic.All` | Delegated | `3aeca27b-ee3a-4c2b-8ded-80376e2134a4` | No | `list_channels`, `search_messages` (channel names) |
 | `ChannelMessage.Read.All` | Delegated | `767156cb-16ae-4d10-8f8b-41b657c8c8c8` | **Yes** | `get_channel_messages`, `search_messages` |
 
 No meeting, transcript, or recording scope is requested. The server reads and sends chat and channel messages, and nothing else.
@@ -120,7 +120,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | List the user's chats with basic metadata (topic, members, chat type) |
-| **Used For** | `list_chats` tool, which returns chat ids plus distinguishing metadata (topic, members, creation and last-message dates) used to pick the right chat id |
+| **Used For** | `list_chats` tool, which returns chat ids plus distinguishing metadata (topic, members, creation and last-message dates) used to pick the right chat id; `search_messages` tool to name the chat each hit was posted in |
 | **Why Not Less** | No narrower permission exists for listing chats |
 | **Why Not `Chat.Read`** | `Chat.ReadBasic` is sufficient for listing chats; `Chat.Read` is only needed for reading message content |
 
@@ -138,7 +138,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | List all Teams the user is a member of |
-| **Used For** | `list_teams` tool, which returns team ids plus `isArchived` status to disambiguate same-named teams |
+| **Used For** | `list_teams` tool, which returns team ids plus `isArchived` status to disambiguate same-named teams; `search_messages` tool to name the team of each channel hit |
 | **Why Not Less** | No narrower permission exists for listing joined teams |
 | **Why Not `Team.Read.All`** | `Team.ReadBasic.All` is sufficient for listing teams with the metadata needed for id-based targeting |
 
@@ -147,7 +147,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | Aspect | Detail |
 |--------|--------|
 | **Purpose** | List channels in a Team |
-| **Used For** | `list_channels` tool, which returns channel ids plus `createdDateTime` and `membershipType` used to pick the right channel id |
+| **Used For** | `list_channels` tool, which returns channel ids plus `createdDateTime` and `membershipType` used to pick the right channel id; `search_messages` tool to name the channel each hit was posted in |
 | **Why Not Less** | No narrower permission exists for listing channels |
 | **Why Not `Channel.Read.All`** | `Channel.ReadBasic.All` is sufficient for listing channels with the metadata needed for id-based targeting |
 

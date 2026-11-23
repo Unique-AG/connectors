@@ -10,13 +10,21 @@ from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
-from office_365_mcp.shared.messages import TeamsMessage, unknown_enum_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.messages import TeamsMessage, unknown_enum_headers
 from office_365_mcp.shared.window import closes_at, opens_at
 
 TOOL_NAME = "teams_list_chat_messages"
+
+PRESETS: tuple[str, ...] = (
+    "teams",
+    "teams-messages",
+    "teams-write",
+    "teams-write-files",
+    "teams-edit",
+)
 
 STEP = "chat_messages"
 
@@ -37,6 +45,13 @@ accepts. teams_browse_channel is the sibling tool for a channel, and teams_searc
 message by its text.
 
 Notes:
+- A file that someone posted shows in `attachments`. Its `url` is the web address of the file. To \
+read the file, give that `url` to a tool of this deployment that opens a SharePoint web address. \
+If none exists, or if it fails, search for the file by the `name` of the attachment with a tool of \
+this deployment that searches files. Use a result only if its name is the `name` of the \
+attachment and it is the only result with that name. If there is no such tool, no result fits, \
+or several results share the name, tell the user and ask which file. Never guess what the file \
+says.
 - To read further back, pass the oldest `created_at` as `sent_before`. The messages from that same \
 second appear again at the top of the list.
 - One call is one request, because a given chat allows this whole connector about one request a \
@@ -74,7 +89,7 @@ async def list_chat_messages(
         ),
         headers=unknown_enum_headers(),
     )
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         page = await client.chats.by_chat_id(chat_id).messages.get(
             request_configuration=configuration
         )
@@ -108,7 +123,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Messages in a Teams Chat",
+        title="Teams: List Messages in a Chat",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

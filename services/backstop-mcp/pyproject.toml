@@ -1,26 +1,26 @@
 [project]
 name = "backstop-mcp"
-version = "2.0.0"
+version = "3.1.0"
 description = "Backstop CRM FastMCP server with OAuth credential bridging"
 requires-python = ">=3.14"
 dependencies = [
-    "fastmcp==4.1.4",
+    "fastmcp==4.1.6",
     "uvicorn[standard]==0.54.0",
-    "pydantic[email]==2.14.1",
-    "pydantic-settings==2.16.1",
+    "pydantic[email]==2.14.4",
+    "pydantic-settings==2.16.3",
     "python-dotenv==1.2.4",
     "httpx==0.28.1",
-    "opentelemetry-api==1.45.1",
-    "opentelemetry-sdk==1.45.1",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
     "opentelemetry-exporter-prometheus==0.66b1",
-    "opentelemetry-instrumentation-asgi==0.66b1",
-    "sqlalchemy[asyncio]==2.1.6",
+    "opentelemetry-instrumentation-asgi==0.66b2",
+    "sqlalchemy[asyncio]==2.1.9",
     "asyncpg==0.32.0",
     "alembic==1.20.1",
     "cryptography==50.0.2",
     "jinja2==3.1.6",
     "tenacity==9.2.1",
-    "markdownify==1.2.3",
+    "markdownify==1.2.4",
     "beautifulsoup4==4.15.0",
     "starlette==1.10.0",
     "mcp==2.3.0",
@@ -45,9 +45,9 @@ packages = ["src/backstop_mcp"]
 [dependency-groups]
 dev = [
     "pytest==9.2.0",
-    "pytest-asyncio==1.4.1",
+    "pytest-asyncio==1.5.0",
     "hatchling==1.33.0",
-    "ruff==0.17.3",
+    "ruff==0.17.6",
     "basedpyright==1.40.2",
     "respx==0.23.1",
     "testcontainers[postgres]==4.15.0",

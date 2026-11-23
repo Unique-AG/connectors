@@ -1,0 +1,18 @@
+scenario: outlook_get_mailbox_settings-preferences
+fixture: rec-tool-outlook_get_mailbox_settings-preferences
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:32:54+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 7
+  response headers dropped: 7
+  text replaced: 2
+literals:
+- preferences
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

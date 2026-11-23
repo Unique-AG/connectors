@@ -1,5 +1,86 @@
 # Changelog
 
+## [5.0.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.2...outlook-semantic-mcp@5.0.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** serve the first-use pair on a refresh replay inside a 10s grace window ([#1802](https://github.com/Unique-AG/connectors/issues/1802)) ([0fe880a](https://github.com/Unique-AG/connectors/commit/0fe880a90ba41b238f715ea9a592c93dd2f56d82))
+
+## [5.0.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.1...outlook-semantic-mcp@5.0.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** stop rate-limiting OAuth discovery, serve the default OAuth paths, add a rate-limit kill switch ([#1778](https://github.com/Unique-AG/connectors/issues/1778)) ([67df6eb](https://github.com/Unique-AG/connectors/commit/67df6eb8e4cdc78331de1f60cca8ad069bb64239))
+* **outlook-semantic-mcp:** follow a calendar nextLink without adding query options again ([#1729](https://github.com/Unique-AG/connectors/issues/1729)) ([93f4ce5](https://github.com/Unique-AG/connectors/commit/93f4ce549217cb9933856418ca406d334fa785c7))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+
+## [5.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.0...outlook-semantic-mcp@5.0.1) (2026-11-12)
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.12.0 to 5.13.0 ([#1572](https://github.com/Unique-AG/connectors/issues/1572)) ([697230b](https://github.com/Unique-AG/connectors/commit/697230b664bd3098f2a4902e2ae66c5cc028c478))
+* **deps:** bump node from 26.13.0-trixie@6d2c7d5d074b to 26.13.0-trixie@438603bbb5cd ([#1580](https://github.com/Unique-AG/connectors/issues/1580)) ([2e26f6b](https://github.com/Unique-AG/connectors/commit/2e26f6b75e6692aa38e4f7e423d758547c87c72b))
+* **deps:** bump node to 26.13.1 security release ([#1642](https://github.com/Unique-AG/connectors/issues/1642)) ([407761d](https://github.com/Unique-AG/connectors/commit/407761d268c76b3a57f755f245fd7e08bb674278))
+* **deps:** bump temporal-polyfill from 1.0.6 to 1.0.8 ([#1560](https://github.com/Unique-AG/connectors/issues/1560)) ([4afdb8e](https://github.com/Unique-AG/connectors/commit/4afdb8e811bddaf6e870c1dff67907be70280822))
+* **main:** bump @proventuslabs/nestjs-zod from 2.0.0 to 2.2.0 ([#1390](https://github.com/Unique-AG/connectors/issues/1390)) ([023787c](https://github.com/Unique-AG/connectors/commit/023787cc8c364d1c192d06192a1541940fa77b9e))
+
+## [5.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.2...outlook-semantic-mcp@5.0.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp:** edit existing drafts and their attachments ([#1323](https://github.com/Unique-AG/connectors/issues/1323))
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp,office-365-mcp:** reject sign-ins from Entra tenants not on the allowlist ([#1357](https://github.com/Unique-AG/connectors/issues/1357))
+
+### Features
+
+* **backstop-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,teams-mcp,with-intelligence-mcp:** advertise the new server icon in serverInfo ([#1377](https://github.com/Unique-AG/connectors/issues/1377)) ([19e8a00](https://github.com/Unique-AG/connectors/commit/19e8a009ff76826a0d606c241197cea432cfcebe))
+* **ci,main:** gate releases, scan images nightly, and update dependencies nightly ([#1305](https://github.com/Unique-AG/connectors/issues/1305)) ([b3b274c](https://github.com/Unique-AG/connectors/commit/b3b274cf0ab3cecc3a1dece3eff5c116d24d9418))
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** ask the user to approve each MCP client before signing in with Entra ([#1337](https://github.com/Unique-AG/connectors/issues/1337)) ([1f64988](https://github.com/Unique-AG/connectors/commit/1f649887cef2388a2d34d1499ac43c60bd1f7ff5))
+* **mcp-server-module,mcp-observability:** rate-limit MCP tool calls per user ([#1358](https://github.com/Unique-AG/connectors/issues/1358)) ([bbe4bc0](https://github.com/Unique-AG/connectors/commit/bbe4bc07bde6b67cecee762e25a16cfeac6cc67a))
+* **outlook-semantic-mcp,teams-mcp:** advertise the server icon in serverInfo ([#1255](https://github.com/Unique-AG/connectors/issues/1255)) ([a7b78ab](https://github.com/Unique-AG/connectors/commit/a7b78ab5163598a25dd17d7ec443d2de79cc4fbb))
+* **outlook-semantic-mcp:** edit existing drafts and their attachments ([#1323](https://github.com/Unique-AG/connectors/issues/1323)) ([359633c](https://github.com/Unique-AG/connectors/commit/359633cea7621620b1e3501944b201d2a40f0526))
+* **outlook-semantic-mcp:** redact the deployment's secrets and each caller's tokens from every log line ([#1332](https://github.com/Unique-AG/connectors/issues/1332)) ([79cc681](https://github.com/Unique-AG/connectors/commit/79cc681ff42d8c39f50f77e3b5b6e858fedbda94))
+* **teams-mcp,outlook-semantic-mcp,recordings-and-transcripts:** redirect tenant admins to Entra admin consent at /admin/consent ([#1529](https://github.com/Unique-AG/connectors/issues/1529)) ([9a4e045](https://github.com/Unique-AG/connectors/commit/9a4e04557276de01d761569717dec596b3287071))
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,main,mcp-scaffold,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** run migrations as argo cd sync hooks after the database ([#1360](https://github.com/Unique-AG/connectors/issues/1360)) ([5264f9f](https://github.com/Unique-AG/connectors/commit/5264f9f14505bbc57d01fe676946daaf63e261f3))
+* deny egress to RFC1918 and link-local ranges in every MCP chart ([#1353](https://github.com/Unique-AG/connectors/issues/1353)) ([5949e66](https://github.com/Unique-AG/connectors/commit/5949e6698615dfd7de48116cd09c0550467485f1))
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp,deps:** revoke the token family when a refresh token is replayed ([#1336](https://github.com/Unique-AG/connectors/issues/1336)) ([e2fd728](https://github.com/Unique-AG/connectors/commit/e2fd728fa81516a64a6235621221a44413440147))
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp,office-365-mcp:** reject sign-ins from Entra tenants not on the allowlist ([#1357](https://github.com/Unique-AG/connectors/issues/1357)) ([4cc5936](https://github.com/Unique-AG/connectors/commit/4cc5936fda54b507ab3183ef0f2c7e6dec109abc))
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** make the throttler limit per real client IP and register the auth throttler ([#1350](https://github.com/Unique-AG/connectors/issues/1350)) ([aeab994](https://github.com/Unique-AG/connectors/commit/aeab9947cfbf375af18eb4e957e323dedc9bc50b))
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** store HMAC-SHA256 hashes of MCP tokens instead of plaintext ([#1356](https://github.com/Unique-AG/connectors/issues/1356)) ([a85577d](https://github.com/Unique-AG/connectors/commit/a85577d02e573c03fc38ea71d49d546cce925c9f))
+* **teams-mcp,outlook-semantic-mcp,kb-mcp,backstop-mcp,with-intelligence-mcp,kyckr-mcp,temenos-mcp:** mark upstream content as untrusted in tool descriptions ([#1355](https://github.com/Unique-AG/connectors/issues/1355)) ([8aeef96](https://github.com/Unique-AG/connectors/commit/8aeef9675771f2f121e2dafae722d8bfdc4b294b))
+* **teams-mcp,outlook-semantic-mcp:** disable world ingress on ephemeral ports ([#1343](https://github.com/Unique-AG/connectors/issues/1343)) ([4963d0c](https://github.com/Unique-AG/connectors/commit/4963d0cdf39336bfb7e3bab78ae78842f5a233f5))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.11.0 to 5.12.0 ([#1395](https://github.com/Unique-AG/connectors/issues/1395)) ([582a096](https://github.com/Unique-AG/connectors/commit/582a09693c5656b9b016ea8e42a1317f0fd090de))
+* **deps:** bump node from 26.12.1-trixie@a98e6fda54fd to 26.13.0-trixie@6d2c7d5d074b ([#1430](https://github.com/Unique-AG/connectors/issues/1430)) ([72e4fc2](https://github.com/Unique-AG/connectors/commit/72e4fc26b28c855225a14e83c57ce575f8d77ff4))
+
+## [4.1.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.1...outlook-semantic-mcp@4.1.2) (2026-10-29)
+
+
+### Bug Fixes
+
+* **architecture-demo-mcp,backstop-mcp,confluence-connector,hello-mcp,kb-mcp,office-365-mcp,outlook-semantic-mcp,sharepoint-connector,teams-mcp,with-intelligence-mcp:** bump base chart for network policy sync-wave ordering ([#1307](https://github.com/Unique-AG/connectors/issues/1307)) ([8e9eba5](https://github.com/Unique-AG/connectors/commit/8e9eba588c9052ef87a356a0bd9c575170848ca2))
+
+
+### Dependencies
+
+* bump markdown-it from 15.0.2 to 15.0.3 ([#1254](https://github.com/Unique-AG/connectors/issues/1254)) ([60781e8](https://github.com/Unique-AG/connectors/commit/60781e847d8da7ee3ea9b519f6a066601f25c9a1))
+* **main:** refresh dependencies and drop unneeded overrides ([#1322](https://github.com/Unique-AG/connectors/issues/1322)) ([a4f2390](https://github.com/Unique-AG/connectors/commit/a4f239000fc35b5809f6c7b50c920ac3c8419ef9))
+
 ## [4.1.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@4.1.0...outlook-semantic-mcp@4.1.1) (2026-10-22)
 
 

@@ -10,12 +10,12 @@ from kiota_abstractions.default_query_parameters import QueryParameters
 from kiota_abstractions.method import Method
 from kiota_abstractions.request_information import RequestInformation
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.o_data_errors.o_data_error import ODataError
 from msgraph.generated.models.section_group import SectionGroup
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph, send_parsed
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -26,7 +26,6 @@ from office_365_mcp.shared.notes import (
     ContainerAudience,
     container_audience,
     onenote_root,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -38,6 +37,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_create_section_group"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_CREATE_SECTION_GROUP = "create_section_group"
 
@@ -148,7 +149,7 @@ async def create_section_group(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned_notebook = isinstance(handle, OnenoteNotebookHandle) and handle.owner is not None
-    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned_notebook, OWNED_REFUSED), graph_errors():
         container = await container_audience(client, handle)
         if answer_pending or container.notebook.reaches_others:
             with not_graph():
@@ -197,15 +198,13 @@ async def _post_section_group(
     nested = root.section_groups.by_section_group_id(handle.section_group_id).section_groups
     request = RequestInformation(Method.POST, nested.url_template, dict(nested.path_parameters))
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         SectionGroup(display_name=name),
     )
     request.add_request_options(no_retry())
-    return await client.request_adapter.send_async(  # pyright: ignore[reportUnknownMemberType]
-        request, SectionGroup, {"XXX": ODataError}
-    )
+    return await send_parsed(client, request, SectionGroup)
 
 
 def _answer(
@@ -227,7 +226,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Section Group",
+        title="OneNote: Create a Section Group",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

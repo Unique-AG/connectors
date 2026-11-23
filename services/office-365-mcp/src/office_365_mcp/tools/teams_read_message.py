@@ -15,10 +15,12 @@ from office_365_mcp.shared.handles import (
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.messages import TeamsMessage, get_message
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, narrowed_to
+from office_365_mcp.shared.teams.messages import TeamsMessage, get_message
 
 TOOL_NAME = "teams_read_message"
+
+PRESETS: tuple[str, ...] = ("teams", "teams-messages")
 
 GRAPH_PERMISSIONS: tuple[str, ...] = (CHAT_PERMISSION, CHANNEL_PERMISSION)
 
@@ -30,7 +32,10 @@ GRAPH_CALL_NARROWS_TO: tuple[str, ...] = (CHAT_PERMISSION,)
 
 _DESCRIPTION = (
     "Reads one Teams message in full — text, sender, mentions, attachments, reactions, and "
-    "edit or delete status — from a handle another tool produced."
+    "edit or delete status — from a handle another tool produced. A file that someone posted "
+    "shows in `attachments`. Its `url` is the web address of the file. To read the file, give "
+    "that `url` to a tool of this deployment that opens a SharePoint web address. If none exists, "
+    "tell the user. Never guess what the file says."
 )
 
 GRAPH_NOT_FOUND = (
@@ -42,13 +47,12 @@ GRAPH_NOT_FOUND = (
     + "no other route to the text. One well-formed handle always fails this way: a reply in a "
     + "channel thread is addressed under the post it answers. teams_list_message_replies reads the "
     + "replies of one post. It needs the handle of the post that the reply answers. "
-    + "teams_browse_channel reads only the replies of the posts on the first page of the channel. "
+    + "teams_browse_channel reads only the replies of the posts on the page it returns. "
     + "A search hit that is a reply does not name its post, so teams_browse_channel is its only "
-    + "route. teams_browse_channel does not use the cursor from Microsoft to read an older part "
-    + "of a thread. It does not use the cursor to read older posts either. This is because a given "
-    + "channel allows this whole connector about one request a second, across "
-    + "the whole tenant. Browse that channel once. If the reply is not in what comes back, "
-    + "there is no route to its full text, and a second browse returns the same window. Report "
+    + "route. A given channel allows this whole connector about one request a second, across "
+    + "the whole tenant. Browse that channel once. If the reply is not in what comes back, read "
+    + "at most one more page with `page_token`. If the reply is still not there, there is no "
+    + "route to its full text, and a page read again returns the same window. Report "
     + "the search snippet with its sender and date. Say that this tool did not retrieve the "
     + "full text. Then stop looking."
 )
@@ -60,7 +64,7 @@ _HANDLE_SOURCES = (
 
 
 async def teams_read_message(client: GraphServiceClient, *, handle: MessageHandle) -> TeamsMessage:
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         message = await get_message(client, handle)
 
     assert message is not None, "Graph answered a message read with no message"
@@ -72,7 +76,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Read a Teams Message",
+        title="Teams: Read a Message",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

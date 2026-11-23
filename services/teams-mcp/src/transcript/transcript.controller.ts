@@ -17,6 +17,7 @@ import { TraceService } from 'nestjs-otel';
 import { serializeError } from 'serialize-error-cjs';
 import { DEAD_EXCHANGE, INGESTION_CHANNEL, MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { wrapErrorHandlerOTEL } from '~/amqp/amqp.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { normalizeError } from '~/utils/normalize-error';
 import { ValidationCallInterceptor } from '~/utils/validation-call.interceptor';
 import { SubscriptionCreateService } from './subscription-create.service';
@@ -212,6 +213,7 @@ export class TranscriptController {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   public async onLifecycleNotification(
     // @RabbitPayload(new ZodValidationPipe(LifecycleEventDto)) event: LifecycleEventDto,
     @RabbitPayload() payload: unknown,
@@ -252,6 +254,7 @@ export class TranscriptController {
     },
     errorHandler: wrapErrorHandlerOTEL(defaultNackErrorHandler),
   })
+  @LogSecretsScope()
   public async onChangeNotification(
     // @RabbitPayload(new ZodValidationPipe(ChangeEventDto)) event: ChangeEventDto,
     @RabbitPayload() payload: unknown,

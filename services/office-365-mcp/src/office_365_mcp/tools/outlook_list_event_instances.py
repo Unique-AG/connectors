@@ -23,11 +23,19 @@ from office_365_mcp.shared.calendar import (
     zone_named,
 )
 from office_365_mcp.shared.handles import EventHandle, event_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_event_instances"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar",
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_EVENTS = "calendar_events"
 
@@ -178,7 +186,7 @@ async def list_event_instances(
         raise ToolError(_ENDS_BEFORE_STARTS)
     opens, closes = window_bounds(starts_on, ends_on, zone=zone)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(client, calendar_id=handle.calendar_id, event_id=handle.event_id)
         collected = (
             await _instances_of(client, handle, opens=opens, closes=closes, limit=limit)
@@ -240,7 +248,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Event Instances",
+        title="Outlook: List Event Instances",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

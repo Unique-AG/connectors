@@ -79,4 +79,4 @@ uv run basedpyright
 Same path as other connectors Python services: Dockerfile under `deploy/`, Helm
 chart under `deploy/helm-charts/kb-mcp`, release-please + CD template.
 Secrets are injected via `envVars` (Argo overlay), not baked into chart defaults.
-Exposure uses Gateway API routes (no custom Ingress), matching `hello-mcp`.
+Exposure uses Gateway API routes (no custom Ingress).

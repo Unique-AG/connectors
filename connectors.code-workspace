@@ -11,9 +11,9 @@
     { "path": "services/backstop-mcp" },
     { "path": "services/exp-kyckr-mcp" },
     { "path": "services/exp-tiingo-mcp" },
-    { "path": "services/hello-mcp" },
     { "path": "services/kb-mcp" },
     { "path": "services/office-365-mcp" },
+    { "path": "services/polixis-mcp" },
     { "path": "services/with-intelligence-mcp" }
   ],
   "settings": {

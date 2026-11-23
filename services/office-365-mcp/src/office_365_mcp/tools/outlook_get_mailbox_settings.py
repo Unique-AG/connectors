@@ -33,10 +33,12 @@ from office_365_mcp.graph_client import (
 )
 from office_365_mcp.shared.calendar import WorkingHoursSummary
 from office_365_mcp.shared.handles import MailFolderHandle
-from office_365_mcp.shared.rules import MailRule
+from office_365_mcp.shared.outlook.rules import MailRule
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_get_mailbox_settings"
+
+PRESETS: tuple[str, ...] = ("outlook-mailbox", "outlook-automate", "outlook-rules")
 
 STEP_SETTINGS = "mailbox_settings"
 STEP_RULES = "mail_rules"
@@ -241,7 +243,7 @@ async def get_mailbox_settings(
     wants_settings = wants_replies or wants_preferences
     settings_select = None if wants_preferences else _REPLY_FIELDS
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         rules = await _inbox_rules(client) if wants_rules else None
         settings = await _mailbox_settings(client, settings_select) if wants_settings else None
         categories = await _categories(client) if wants_categories else None
@@ -342,7 +344,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Get Mailbox Settings",
+        title="Outlook: Get Mailbox Settings",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

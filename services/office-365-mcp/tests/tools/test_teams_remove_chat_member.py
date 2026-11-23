@@ -32,6 +32,8 @@ from office_365_mcp.tools.teams_remove_chat_member import (
     a_person_agrees,
     remove_chat_member,
 )
+from tests.tools.scenarios.support import Person, call, serve
+from tests.tools.teams_recordings import new_group_chat, rows, uncalled, was_sent
 
 from .conftest import OTHER_USER_ID, SIGNED_IN_USER_ID
 
@@ -707,3 +709,27 @@ class TestHowItDeclaresItself:
         described = cast("str", properties["membership_id"]["description"])
         assert "teams_list_chat_members" in described
         assert "It is not the `user_id` of the member." in described
+
+
+class TestAgainstAnswersRecordedFromGraph:
+    async def test_it_removes_a_member_of_a_new_chat_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        routes = serve(graph, "rec-tool-teams_remove_chat_member-tom")
+        chat_id = (await new_group_chat())["chat_id"]
+        members = rows(await call("teams_list_chat_members", chat_id=chat_id), "members")
+        tom = next(member for member in members if member["display_name"] == "Tom Berger")
+        mia = Person()
+
+        removed = await call(
+            "teams_remove_chat_member",
+            person=mia,
+            chat_id=chat_id,
+            membership_id=tom["membership_id"],
+        )
+
+        assert removed["chat_id"] == chat_id
+        assert removed["membership_id"] == tom["membership_id"]
+        assert "Tom Berger" in mia.asked[0] and "seed-v1 case-teams-chat" in mia.asked[0]
+        assert was_sent(routes, "DELETE", f"/members/{tom['membership_id']}")
+        assert uncalled(routes) == []

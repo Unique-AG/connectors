@@ -7,8 +7,8 @@ LookbackDays = Annotated[int, Field(ge=1, le=366)]
 Ticker = Annotated[str, Field(min_length=1, description="Ticker of the asset, for example AAPL.")]
 
 
-def since(lookback_days: int) -> str:
-    return (date.today() - timedelta(days=lookback_days)).isoformat()
+def since(lookback_days: int) -> date:
+    return date.today() - timedelta(days=lookback_days)
 
 
 def _parse_tiingo_date(value: object) -> object:

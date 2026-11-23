@@ -20,12 +20,13 @@ from mcp.types.version import LATEST_MODERN_VERSION
 from msgraph.graph_service_client import GraphServiceClient
 
 from office_365_mcp.graph_client import GraphFailure, GraphForbidden, GraphNotFound
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
     onenote_notebook_handle,
 )
-from office_365_mcp.shared.notes import named_owner_refused, write_state_for
+from office_365_mcp.shared.notes import named_owner_refused
 from office_365_mcp.shared.seam import WRITE_ADDITIVE, Advised, Confirm, GraphAdviceMiddleware
 from office_365_mcp.tools import graph_advice, resolve
 from office_365_mcp.tools import onenote_create_notebook as creator
@@ -872,7 +873,6 @@ class TestHowItDeclaresItself:
         group = properties["group"]
         assert cast("list[Mapping[str, object]]", group["anyOf"])[0]["minLength"] == 1
         described = cast("str", group["description"])
-        assert "A team id is a group id." in described
         assert "Ask the user for it, or copy a team id from an earlier result." in described
         assert "teams_list_my_teams" not in described
         assert "Omit it to create the notebook in the user's own OneNote." in described
@@ -900,9 +900,7 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, Mapping[str, object]]", parameters["properties"])
 
         described = cast("str", properties["name"]["description"])
-        assert "unique in the OneNote of its owner" in described
         assert "at most 128 characters long" in described
-        assert "Microsoft refuses a bad name and creates nothing." in described
         assert "Read it from the answer" not in described
         assert 15 <= len(described.split()) <= 60
 

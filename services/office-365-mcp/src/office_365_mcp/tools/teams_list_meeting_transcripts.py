@@ -33,7 +33,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import MeetingHandle, TranscriptHandle, meeting_handle
-from office_365_mcp.shared.meetings import (
+from office_365_mcp.shared.odata import odata_literal
+from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
+from office_365_mcp.shared.teams.meetings import (
     MAX_ARTIFACT_SCAN,
     MEETING_PERMISSION,
     TRANSCRIPT_PERMISSION,
@@ -41,15 +43,15 @@ from office_365_mcp.shared.meetings import (
     resolve_meeting,
     settled,
 )
-from office_365_mcp.shared.odata import odata_literal
-from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "teams_list_meeting_transcripts"
+
+PRESETS: tuple[str, ...] = ("teams", "teams-transcripts", "teams-meetings")
 
 STEP_TRANSCRIPTS = "transcripts"
 
 # `tests/test_layering.py` rule 4 forbids importing teams_read_transcript, so the transcript
-# permission lives in `shared/meetings.py`. Entra redeems both under one token or neither.
+# permission lives in `shared/teams/meetings.py`. Entra redeems both under one token or neither.
 GRAPH_PERMISSIONS: tuple[str, ...] = (MEETING_PERMISSION, TRANSCRIPT_PERMISSION)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
@@ -87,11 +89,12 @@ Notes:
 """
 
 _NOT_A_MEETING_HANDLE = (
-    "teams_list_meeting_transcripts takes teams:///meetings/{join_web_url} from teams_list_chats, "
-    + "not this. "
-    + "Call teams_list_chats and use its `meeting_uri`. A `teams:///transcripts/...` handle is "
-    + "teams_read_transcript's. This tool is what produces it. Retrying this value will fail "
-    + "identically."
+    "teams_list_meeting_transcripts takes teams:///meetings/{join_web_url}, and this is not one. "
+    + "The handle comes from the `meeting_uri` of teams_list_chats. For a meeting with no chat, "
+    + "it is `teams:///meetings/` plus the `join_url` of the calendar event. Percent-encode "
+    + "every character of the `join_url` that is not a letter or a digit, also `/`, `:`, `?` "
+    + "and `%`. A `teams:///transcripts/...` handle is teams_read_transcript's. This tool is "
+    + "what produces it. Retrying this value will fail identically."
 )
 
 
@@ -203,7 +206,7 @@ async def teams_list_meeting_transcripts(
     """Transcripts of the meeting `handle` addresses. At most two Graph requests: resolve, list."""
     assert limit >= 1, f"limit must be at least 1, got {limit}"
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         meeting = await resolve_meeting(client, handle)
         if meeting is None or meeting.id is None:
             return MeetingTranscripts(
@@ -284,7 +287,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List a Meeting's Transcripts",
+        title="Teams: List a Meeting's Transcripts",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )
@@ -294,8 +297,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The meeting handle from teams_list_chats: `teams:///meetings/{join_web_url}`. "
-                    + "Copy it verbatim. A `teams:///transcripts/...` handle is not valid here."
+                    "The meeting handle, `teams:///meetings/{join_web_url}`. teams_list_chats "
+                    + "gives it for a meeting chat. For a meeting with no chat, write "
+                    + "`teams:///meetings/` and then the `join_url` of the calendar event. "
+                    + "Percent-encode every character of the `join_url` that is not a letter or "
+                    + "a digit, also `/`, `:`, `?` and `%`. A `teams:///transcripts/...` handle "
+                    + "is not valid here."
                 ),
             ),
         ],

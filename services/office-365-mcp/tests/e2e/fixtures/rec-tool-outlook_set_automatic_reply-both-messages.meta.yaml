@@ -1,0 +1,27 @@
+scenario: outlook_set_automatic_reply-both-messages
+fixture: rec-tool-outlook_set_automatic_reply-both-messages
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:17:19+00:00'
+scrub_version: 1.0.0
+replacements:
+  keys dropped: 25
+  response headers dropped: 35
+  text kept: 14
+literals:
+- '2026-11-02T00:00:00'
+- '2026-11-03T18:00:00'
+- disabled
+- none
+- replies
+- scheduled
+- 'seed-v1 case-outlook_set_automatic_reply-both-messages: away, inside.'
+- 'seed-v1 case-outlook_set_automatic_reply-both-messages: away, outside.'
+- ~todayT00:00:00
+- ~tomorrowT18:00:00
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

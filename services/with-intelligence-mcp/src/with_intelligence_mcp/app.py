@@ -3,6 +3,14 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from fastmcp import FastMCP
+from mcp_configs import RateLimitSettings
+from mcp_observability import (
+    RateLimitMiddleware,
+    RedactRequestSecretsMiddleware,
+    RedactToolCallSecretsMiddleware,
+    ToolCallObservabilityMiddleware,
+    access_token_subject,
+)
 from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -16,6 +24,8 @@ from with_intelligence_mcp.dependencies import (
     get_app_config,
     get_auth_config,
     get_auth_provider,
+    get_database_config,
+    get_encryption_key,
     get_engine,
     get_session_factory,
 )
@@ -24,6 +34,7 @@ from with_intelligence_mcp.logging import configure_logging
 from with_intelligence_mcp.metrics import configure_metrics
 from with_intelligence_mcp.server.instructions import INSTRUCTIONS
 from with_intelligence_mcp.server.tools import TOOLS
+from with_intelligence_mcp.server_icons import SERVER_ICONS
 from with_intelligence_mcp.teardown import close_singletons
 
 logger = logging.getLogger(__name__)
@@ -34,7 +45,10 @@ def create_app() -> Starlette:
     config = get_app_config()
     auth_config = get_auth_config()
 
-    configure_logging(config)
+    configure_logging(
+        encryption_key=get_encryption_key(),
+        database_url=get_database_config().connection_url,
+    )
     configure_metrics(config)
 
     engine = get_engine()
@@ -54,9 +68,17 @@ def create_app() -> Starlette:
     mcp = FastMCP(
         "With Intelligence MCP",
         version=config.version,
+        icons=SERVER_ICONS,
         auth=auth_provider,
         lifespan=lifespan,
         instructions=INSTRUCTIONS,
+        # Redaction first, so the tool-call lines are redacted too.
+        middleware=[
+            RedactToolCallSecretsMiddleware(),
+            ToolCallObservabilityMiddleware(),
+            RateLimitMiddleware(RateLimitSettings(), get_request_key=access_token_subject),
+        ],
+        mask_error_details=True,
     )
     for fn in TOOLS:
         mcp.add_tool(fn)
@@ -76,7 +98,14 @@ def create_app() -> Starlette:
     async def login_post(request: Request) -> Response:
         return await auth_provider.handle_login_post(request)
 
-    return mcp.http_app(middleware=[Middleware(OpenTelemetryMiddleware), ops_middleware])
+    return mcp.http_app(
+        middleware=[
+            # First, so every line logged after it has the bearer token redacted.
+            Middleware(RedactRequestSecretsMiddleware),
+            Middleware(OpenTelemetryMiddleware),
+            ops_middleware,
+        ]
+    )
 
 
 async def _ready_response(engine: AsyncEngine) -> JSONResponse:

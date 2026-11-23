@@ -26,6 +26,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
     OnenoteSectionHandle,
@@ -43,7 +44,6 @@ from office_365_mcp.shared.notes import (
     in_a_site,
     onenote_root,
     section_container,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -55,6 +55,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_copy_page"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_COPY_PAGE = "copy_page"
 STEP_PAGE = "page"
@@ -179,7 +181,7 @@ async def copy_page(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned = handle.owner is not None or section_handle.owner is not None
-    with owner_refused(owned, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned, OWNED_REFUSED), graph_errors():
         container = await section_container(
             client, section_handle.section_id, owner=section_handle.owner
         )
@@ -224,8 +226,8 @@ async def _copy(
     builder = root.pages.by_onenote_page_id(handle.page_id).copy_to_section
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_to_section_body.CopyToSectionPostRequestBody(
             id=destination.section_id, group_id=group_id_of(destination.owner)
@@ -240,7 +242,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy a Page",
+        title="OneNote: Copy a Page",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

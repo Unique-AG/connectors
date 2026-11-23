@@ -1,0 +1,45 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/drives",
+    "query": {
+      "$select": "id,name,driveType,webUrl,description,owner"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "description": "",
+          "driveType": "business",
+          "id": "b!oB4UKtbhgJM1dlzaFrrvV8ZJTU3SVHXDiTDO4t3CSqTw9s5HDORSNLRDoZz1I_Q_",
+          "name": "synthetic text 01",
+          "owner": {
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/Documents"
+        },
+        {
+          "description": "synthetic text 02",
+          "driveType": "business",
+          "id": "b!cQ6OQagpeLL2xqyeTnefX7ESYZ5ZLKJVbTLX0h1KGvSR86JSChPoHWJLkYEn2xaD",
+          "name": "synthetic text 03",
+          "owner": {
+            "user": {
+              "displayName": "Mia Keller",
+              "email": "mia@example.test",
+              "id": "00000000-aa0f-4286-8305-d989485e14b5"
+            }
+          },
+          "webUrl": "https://contoso-my.sharepoint.com/personal/mia_example_test/synthetic%20text%2004/synthetic%20text%2003"
+        }
+      ]
+    }
+  }
+]

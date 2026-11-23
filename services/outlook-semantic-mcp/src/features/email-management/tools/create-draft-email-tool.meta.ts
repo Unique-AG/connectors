@@ -106,6 +106,9 @@ export const META = createMeta({
     User: "Send a quick note to Maria letting her know the contract is signed"
     Action: search for Maria's email address first, then recipientsData={ type="draft", toRecipients=[{email: "maria@resolved.com"}], subject inferred }
 
+    ### Changing a Draft That Already Exists
+    \`draft_email\` only creates drafts. When the user wants to change a draft — one you created earlier or one they wrote in Outlook — do not create another. Open it with \`open_email\`: pass \`openEmailParams\` from \`search_emails\` (a draft requests HTML), or \`{ id: draftId, idIsImmutable, bodyContentType: "html" }\` with the values this tool returned (plus \`mailbox\` if you passed one) when you just created it. Then use \`update_draft_email\` (send the HTML in \`text\` back; do not rewrite it as Markdown or from \`chunks\`), \`add_attachments_to_draft_email\`, or \`remove_attachments_from_draft_email\`.
+
     ### Body Formatting
     The \`content\` field is **Markdown**. It is converted to HTML on the server before being sent to Outlook, so use Markdown syntax for all formatting — do **not** write raw HTML tags (\`<br>\`, \`<p>\`, \`<strong>\`, etc.); they will be shown as literal text.
 

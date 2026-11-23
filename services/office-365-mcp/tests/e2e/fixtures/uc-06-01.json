@@ -1,0 +1,13 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/chats",
+    "query": {
+      "$expand": "members,lastMessagePreview",
+      "$orderby": "lastMessagePreview/createdDateTime desc",
+      "$top": "50"
+    },
+    "status": 200,
+    "body": "me.chats.json"
+  }
+]

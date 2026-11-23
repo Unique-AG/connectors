@@ -77,10 +77,10 @@ export class TenantDeleteService {
       const result: DeleteResult =
         totalFailures > 0 ? { status: 'failure', failures: totalFailures } : { status: 'success' };
 
-      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), result.status);
+      this.metrics.recordCleanupResult(elapsedSeconds(startTime), result.status);
       return result;
     } catch (error) {
-      this.metrics.recordCleanupDuration(elapsedSeconds(startTime), 'failure');
+      this.metrics.recordCleanupResult(elapsedSeconds(startTime), 'failure');
       throw error;
     } finally {
       tenant.isScanning = false;

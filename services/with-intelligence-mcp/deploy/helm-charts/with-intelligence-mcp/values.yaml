@@ -22,7 +22,7 @@ envVars: []
 image:
   registry: ghcr.io
   repository: unique-ag/connectors/services/with-intelligence-mcp
-  tag: 0.2.0 # x-release-please-version
+  tag: 0.2.1 # x-release-please-version
   pullPolicy: IfNotPresent
 
 ports:
@@ -120,8 +120,22 @@ networkPolicy:
   enableDefaultDeny:
     ingress: true
     egress: true
+  egressDeny:
+    - toCIDR:
+        - 169.254.169.254/32
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
   baseline:
     prometheus:
       namespace: system
     ephemeralPorts:
       enabled: false
+    egress:
+      withIntelligence:
+        toFQDNs:
+          - matchName: api.withintelligence.com
+        toPorts:
+          - ports:
+              - port: "443"
+                protocol: TCP

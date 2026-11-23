@@ -1,0 +1,27 @@
+scenario: outlook_move_mail-restore-deleted
+fixture: rec-tool-outlook_move_mail-restore-deleted
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:16:58+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 47
+  keys dropped: 20
+  other addresses replaced: 1
+  persona addresses: 13
+  persona names: 12
+  response headers dropped: 35
+  text kept: 25
+  text replaced: 3
+literals:
+- A draft that goes to Deleted Items by mistake.
+- deleteditems
+- inbox
+- persona:tom
+- seed-v1 case-outlook_move_mail-restore-deleted
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

@@ -7,12 +7,13 @@ from dotenv import find_dotenv, load_dotenv
 load_dotenv(find_dotenv(usecwd=True))
 
 import uvicorn  # noqa: E402
+from mcp_configs import RateLimitSettings  # noqa: E402
 
 from office_365_mcp.app import create_app  # noqa: E402
 from office_365_mcp.config import AppConfig  # noqa: E402
 
 _config = AppConfig()
-app = create_app(config=_config)
+app = create_app(config=_config, rate_limit=RateLimitSettings())
 
 
 def main() -> None:

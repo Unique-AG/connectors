@@ -20,6 +20,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.addresses import repeated_address
 from office_365_mcp.shared.calendar import (
     HIDE_ATTENDEES_CHANGE_FIELD,
     IMPORTANCE_CHANGE_FIELD,
@@ -41,7 +42,6 @@ from office_365_mcp.shared.calendar import (
     EventSummary,
     ShowAs,
     calendar_of,
-    confirmation_id_for,
     event_of,
     event_patch_body,
     invited_attendee,
@@ -52,14 +52,15 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
-from office_365_mcp.shared.categories import (
+from office_365_mcp.shared.confirmation import confirmation_id_for
+from office_365_mcp.shared.handles import event_handle
+from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
     CategoryName,
     merged_categories,
     named_in_both,
 )
-from office_365_mcp.shared.handles import event_handle
-from office_365_mcp.shared.mail import AddressFault, one_address_each, repeated_address
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -68,6 +69,13 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "outlook_update_event"
+
+PRESETS: tuple[str, ...] = (
+    "outlook-calendar-write",
+    "outlook-calendar-manage",
+    "outlook-calendar-delegate",
+    "outlook-calendar-rooms",
+)
 
 STEP_UPDATE = "update_event"
 
@@ -359,12 +367,12 @@ async def update_event(
 
     updated: Event | None = None
     asked: InputRequiredResult | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         event = await event_of(
             client,
             calendar_id=handle.calendar_id,
             event_id=handle.event_id,
-            html_body=body_html is not None,
+            html_body=body_html is not None or online_meeting,
         )
         patch = EventPatch(
             subject=subject,
@@ -524,7 +532,15 @@ def _no_teams_meeting_here(calendar: Calendar) -> str | None:
     return None if allowed is None else _no_teams_meeting(allowed)
 
 
+def _is_blank(stored_body: str) -> bool:
+    element = _BODY_ELEMENT.search(stored_body)
+    inner = stored_body if element is None else element.group(1)
+    return not _squeezed(re.sub(r"<[^>]*>", " ", inner)) and "<img" not in inner.lower()
+
+
 def _patched(patch: EventPatch, *, before: Event) -> Event:
+    if patch.online_meeting and patch.body_html is None and _is_blank(_stored_body(before)):
+        patch = replace(patch, body_html="")
     if patch.attendees is None:
         return event_patch_body(patch)
     rooms = resource_addresses(before)
@@ -631,7 +647,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Update a Calendar Event",
+        title="Outlook: Update a Calendar Event",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

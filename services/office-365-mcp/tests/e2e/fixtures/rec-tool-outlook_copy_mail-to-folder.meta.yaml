@@ -1,0 +1,23 @@
+scenario: outlook_copy_mail-to-folder
+fixture: rec-tool-outlook_copy_mail-to-folder
+source: recorded
+target: graph
+recorded_at: '2026-10-29T15:07:13+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 24
+  keys dropped: 15
+  persona addresses: 10
+  persona names: 10
+  response headers dropped: 42
+  text kept: 15
+literals:
+- inbox
+- seed-v1
+- seed-v1 case-outlook_copy_mail-to-folder
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

@@ -30,9 +30,9 @@ from office_365_mcp.graph_client import (
     GraphNotFound,
     GraphUnavailable,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import FOLDER_HANDLE_SOURCES, NAME_RULES, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Advised,
@@ -832,7 +832,7 @@ class TestHowItDeclaresItself:
         assert annotations.destructive_hint is WRITE_ADDITIVE["destructiveHint"]
         assert annotations.idempotent_hint is WRITE_ADDITIVE["idempotentHint"]
         assert annotations.open_world_hint is WRITE_ADDITIVE["openWorldHint"]
-        assert tool.title == "Create a Text File"
+        assert tool.title == "SharePoint: Create a Text File"
 
     async def test_it_takes_folder_name_and_content_and_no_others(
         self, transport: httpx.AsyncClient
@@ -850,7 +850,6 @@ class TestHowItDeclaresItself:
             assert "contentEncoding" not in spec
             assert "contentMediaType" not in spec
             assert "format" not in spec
-        assert "as plain text" in cast("str", _properties(parameters)["content"]["description"])
 
     async def test_the_content_schema_caps_the_text(self, transport: httpx.AsyncClient) -> None:
         parameters, _tool = await _registered(transport)

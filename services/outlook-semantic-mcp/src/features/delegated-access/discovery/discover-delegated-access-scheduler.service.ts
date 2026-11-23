@@ -5,6 +5,7 @@ import { CronJob } from 'cron';
 import { MAIN_EXCHANGE } from '~/amqp/amqp.constants';
 import { DelegatedAccessConfig, delegatedAccessConfig } from '~/config/delegated-access.config';
 import { NewTrace } from '~/features/tracing.utils';
+import { LogSecretsScope } from '~/utils/log-secrets';
 import { DiscoverDelegatedAccessEventDto } from './discover-delegated-access-event.dto';
 
 @Injectable()
@@ -54,6 +55,8 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
     this.schedulerRegistry.addCronJob('delegated-access-discovery', job);
     job.start();
   }
+
+  @LogSecretsScope()
 
   @NewTrace('cron.discover-delegated-access')
   public async triggerDiscovery(): Promise<void> {

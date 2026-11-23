@@ -2,7 +2,8 @@ import { type Client } from '@microsoft/microsoft-graph-client';
 import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { type MsChatMessage } from './chat.dtos';
+import { ChannelService } from './channel.service';
+import { type MsChat, type MsChatMessage } from './chat.dtos';
 import { ChatService } from './chat.service';
 import { SearchService } from './search.service';
 
@@ -59,6 +60,29 @@ const hydratedMessage: MsChatMessage = {
   attachments: [],
 };
 
+const mockChat: MsChat = {
+  id: '19:chat-1@thread.v2',
+  chatType: 'group',
+  topic: 'Q3 Planning',
+  createdDateTime: '2024-01-10T08:00:00Z',
+  lastMessageAt: '2024-06-20T13:50:00Z',
+  lastMessagePreview: 'Deploy is green.',
+  members: [{ userId: 'user-1', displayName: 'Carol Lee', email: null }],
+};
+
+const mockTeams = [
+  { id: 'team-1', displayName: 'Finance', description: null, isArchived: false },
+  { id: 'team-2', displayName: 'Engineering', description: null, isArchived: false },
+];
+
+const mockChannel = {
+  id: '19:channel-1@thread.tacv2',
+  displayName: 'General',
+  description: null,
+  createdDateTime: null,
+  membershipType: 'standard',
+};
+
 const searchResponse = (hits: unknown[], moreResultsAvailable = false) => ({
   value: [{ hitsContainers: [{ hits, total: hits.length, moreResultsAvailable }] }],
 });
@@ -71,15 +95,28 @@ async function buildHarness() {
 
   const getChatMessageById = vi.fn().mockResolvedValue(hydratedMessage);
   const getChannelMessageById = vi.fn().mockResolvedValue(hydratedMessage);
+  const getChat = vi.fn().mockResolvedValue(mockChat);
+  const getChannel = vi.fn().mockResolvedValue(mockChannel);
+  const listTeams = vi.fn().mockResolvedValue(mockTeams);
 
   const { unit } = await TestBed.solitary(SearchService)
     .mock(GraphClientFactory)
     .impl(() => ({ createClientForUser: () => graphClient }))
     .mock(ChatService)
-    .impl(() => ({ getChatMessageById, getChannelMessageById }))
+    .impl(() => ({ getChatMessageById, getChannelMessageById, getChat }))
+    .mock(ChannelService)
+    .impl(() => ({ getChannel, listTeams }))
     .compile();
 
-  return { unit, post, getChatMessageById, getChannelMessageById };
+  return {
+    unit,
+    post,
+    getChatMessageById,
+    getChannelMessageById,
+    getChat,
+    getChannel,
+    listTeams,
+  };
 }
 
 type SearchHarness = Awaited<ReturnType<typeof buildHarness>>;
@@ -89,9 +126,140 @@ describe('SearchService', () => {
   let post: SearchHarness['post'];
   let getChatMessageById: SearchHarness['getChatMessageById'];
   let getChannelMessageById: SearchHarness['getChannelMessageById'];
+  let getChat: SearchHarness['getChat'];
+  let getChannel: SearchHarness['getChannel'];
+  let listTeams: SearchHarness['listTeams'];
 
   beforeEach(async () => {
-    ({ unit, post, getChatMessageById, getChannelMessageById } = await buildHarness());
+    ({ unit, post, getChatMessageById, getChannelMessageById, getChat, getChannel, listTeams } =
+      await buildHarness());
+  });
+
+  describe('container names', () => {
+    it('names a chat hit by its topic', async () => {
+      post.mockResolvedValue(searchResponse([chatHit]));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(getChat).toHaveBeenCalledWith(userProfileId, '19:chat-1@thread.v2');
+      expect(result.messages[0]).toMatchObject({
+        chatName: 'Q3 Planning',
+        teamName: null,
+        channelName: null,
+      });
+    });
+
+    it("names a chat without a topic by its members' names", async () => {
+      post.mockResolvedValue(searchResponse([chatHit]));
+      getChat.mockResolvedValue({
+        ...mockChat,
+        topic: null,
+        members: [
+          { userId: 'user-1', displayName: 'Carol Lee', email: null },
+          { userId: 'user-2', displayName: null, email: null },
+          { userId: 'user-3', displayName: 'Dave Ops', email: null },
+        ],
+      });
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]?.chatName).toBe('Carol Lee, Dave Ops');
+    });
+
+    it('names a channel hit by its team and channel', async () => {
+      post.mockResolvedValue(searchResponse([channelHit]));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(getChannel).toHaveBeenCalledWith(userProfileId, 'team-1', '19:channel-1@thread.tacv2');
+      expect(result.messages[0]).toMatchObject({
+        chatName: null,
+        teamName: 'Finance',
+        channelName: 'General',
+      });
+    });
+
+    it('looks up each distinct container once', async () => {
+      post.mockResolvedValue(
+        searchResponse([
+          chatHit,
+          { ...chatHit, hitId: 'hit-3', resource: { ...chatHit.resource, id: 'msg-3' } },
+          channelHit,
+          { ...channelHit, hitId: 'hit-4', resource: { ...channelHit.resource, id: 'msg-4' } },
+        ]),
+      );
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(getChat).toHaveBeenCalledTimes(1);
+      expect(getChannel).toHaveBeenCalledTimes(1);
+      expect(listTeams).toHaveBeenCalledTimes(1);
+      expect(result.messages.map((row) => row.chatName ?? row.channelName)).toEqual([
+        'Q3 Planning',
+        'Q3 Planning',
+        'General',
+        'General',
+      ]);
+    });
+
+    it('skips the team lookup when no hit is in a channel', async () => {
+      post.mockResolvedValue(searchResponse([chatHit]));
+
+      await unit.searchMessages(userProfileId, searchParams);
+
+      expect(listTeams).not.toHaveBeenCalled();
+      expect(getChannel).not.toHaveBeenCalled();
+    });
+
+    it('skips a queued name lookup once the budget is spent, and still returns the page', async () => {
+      const hitsInFourChats = [1, 2, 3, 4].map((n) => ({
+        ...chatHit,
+        hitId: `hit-${n}`,
+        resource: { ...chatHit.resource, id: `msg-${n}`, chatId: `19:chat-${n}@thread.v2` },
+      }));
+      post.mockResolvedValue(searchResponse(hitsInFourChats));
+      getChat.mockReturnValue(new Promise(() => {}));
+
+      vi.useFakeTimers();
+      try {
+        const pending = unit.searchMessages(userProfileId, searchParams);
+        await vi.advanceTimersByTimeAsync(20_000);
+        const result = await pending;
+
+        expect(getChat).not.toHaveBeenCalledWith(userProfileId, '19:chat-4@thread.v2');
+        expect(result.messages.map((row) => row.chatName)).toEqual([null, null, null, null]);
+        expect(result.messages.every((row) => row.message === hydratedMessage)).toBe(true);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('leaves a name null when its lookup fails, without failing the row', async () => {
+      post.mockResolvedValue(searchResponse([chatHit, channelHit]));
+      getChat.mockRejectedValue(new Error('Forbidden'));
+      listTeams.mockRejectedValue(new Error('Forbidden'));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]).toMatchObject({ chatName: null, message: hydratedMessage });
+      expect(result.messages[1]).toMatchObject({ teamName: null, channelName: 'General' });
+    });
+
+    it('looks up no name for a hit that names no container', async () => {
+      post.mockResolvedValue(
+        searchResponse([{ hitId: 'hit-5', summary: 'orphan', resource: { id: 'msg-5' } }]),
+      );
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(getChat).not.toHaveBeenCalled();
+      expect(getChannel).not.toHaveBeenCalled();
+      expect(result.messages[0]).toMatchObject({
+        chatName: null,
+        teamName: null,
+        channelName: null,
+      });
+    });
   });
 
   describe('sender resolution', () => {

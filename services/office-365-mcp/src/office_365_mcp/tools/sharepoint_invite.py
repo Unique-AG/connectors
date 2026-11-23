@@ -21,16 +21,17 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.addresses import ONE_ADDRESS, repeated_address
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     ITEM_HANDLE_SOURCES,
+    BrowserUrl,
     display_name,
     item_access_refused,
     item_for_a_question,
     item_label,
 )
 from office_365_mcp.shared.handles import DriveFileHandle, DriveFolderHandle, drive_item_handle
-from office_365_mcp.shared.mail import ONE_ADDRESS, repeated_address
-from office_365_mcp.shared.notes import write_state_for
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -40,6 +41,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "sharepoint_invite"
+
+PRESETS: tuple[str, ...] = ("sharepoint-share",)
 
 STEP_INVITE = "invite"
 
@@ -76,7 +79,9 @@ _NO_REASON_FROM_GRAPH = "Microsoft reported an error for this person and gave no
 _DESCRIPTION = """\
 Shares one file or folder in OneDrive or SharePoint with the people that the user names. Each \
 person gets read access or write access to the item. By default, this tool sends each of them the \
-invitation immediately, and nothing here can recall it. No tool here can remove the access. \
+invitation immediately, and nothing here can recall it. No tool here can remove the access. To \
+take it back, tell \
+the user to remove it in OneDrive or SharePoint. Never delete or move the item. \
 sharepoint_create_share_link is the tool for a link that names no person.
 
 Notes:
@@ -130,8 +135,9 @@ def _repeated(address: str) -> str:
 class InvitedRecipient(BaseModel):
     email: str | None = Field(
         description=(
-            "The address that Microsoft recorded for the invitation of this person. Null when "
-            + "Graph recorded no address for this row."
+            "The address of this person. It comes from the invitation that Microsoft recorded. "
+            + "For a person in the organization, it comes from the identity that Microsoft holds. "
+            + "Null when Graph gave no address for this row."
         )
     )
     display_name: str | None = Field(
@@ -156,9 +162,8 @@ class InvitedRecipient(BaseModel):
 
     @classmethod
     def from_permission(cls, permission: Permission) -> Self:
-        invitation = permission.invitation
         return cls(
-            email=None if invitation is None else invitation.email,
+            email=_address_of(permission),
             display_name=display_name(permission.granted_to_v2)
             or display_name(permission.granted_to),
             roles=list(permission.roles or []),
@@ -173,7 +178,7 @@ class Invitation(BaseModel):
             + "sharepoint_read_file for a file, or to sharepoint_browse_folder for a folder."
         )
     )
-    web_url: str | None = Field(
+    web_url: BrowserUrl | None = Field(
         description=(
             "The address that opens the shared item in a browser. Always give this address to "
             + "the user when you report this invitation. Null when Graph gave no address."
@@ -215,7 +220,7 @@ async def invite(
     invited: InvitePostResponse | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         found = await item_for_a_question(client, handle.drive_id, handle.item_id)
         with not_graph():
             answer = await confirm(_question(found, addresses, role, message, notify), about)
@@ -296,6 +301,17 @@ def _error_of(permission: Permission) -> str | None:
     return reason if isinstance(reason, str) and reason else _NO_REASON_FROM_GRAPH
 
 
+def _address_of(permission: Permission) -> str | None:
+    if permission.invitation is not None and permission.invitation.email:
+        return permission.invitation.email
+    for identity in (permission.granted_to_v2, permission.granted_to):
+        user = None if identity is None else identity.user
+        address = None if user is None else user.additional_data.get("email")
+        if isinstance(address, str) and address:
+            return address
+    return None
+
+
 def a_person_agrees(ctx: Context) -> Confirm:
     return person_confirms(
         ctx, agree=_SHARE, decline=_DO_NOT_SHARE, nothing_happened=_NOTHING_SHARED
@@ -307,7 +323,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Invite People to an Item",
+        title="SharePoint: Invite People to an Item",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

@@ -16,8 +16,10 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
-from office_365_mcp.shared.categories import named_in_both
-from office_365_mcp.shared.contacts import (
+from office_365_mcp.shared.handles import contact_handle
+from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.outlook.categories import named_in_both
+from office_365_mcp.shared.outlook.contacts import (
     COMPANY_NAME_FIELD,
     GIVEN_NAME_FIELD,
     JOB_TITLE_FIELD,
@@ -28,12 +30,12 @@ from office_365_mcp.shared.contacts import (
     not_one_address,
     repeated_entry,
 )
-from office_365_mcp.shared.handles import contact_handle
-from office_365_mcp.shared.immutable_ids import immutable_id_headers
-from office_365_mcp.shared.mail import AddressFault, one_address_each
+from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, graph_client_for_caller
 
 TOOL_NAME = "outlook_update_contact"
+
+PRESETS: tuple[str, ...] = ("outlook-contacts-write",)
 
 STEP_READ_CONTACT = "contact"
 STEP_UPDATE = "update_contact"
@@ -154,7 +156,7 @@ async def update_contact(
     checked = _checked(change)
     contact = client.me.contacts.by_contact_id(handle.contact_id)
 
-    with graph_errors(TOOL_NAME):
+    with graph_errors():
         current = await _current_lists(contact) if checked.changes_a_list else Contact()
         with graph_step(STEP_UPDATE):
             updated = await contact.patch(
@@ -266,7 +268,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Update a Contact",
+        title="Outlook: Update a Contact",
         description=_DESCRIPTION,
         annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )

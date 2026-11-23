@@ -1,0 +1,21 @@
+scenario: onenote_create_notebook-new
+fixture: rec-tool-onenote_create_notebook-new
+source: recorded
+target: graph
+recorded_at: '2026-10-30T10:02:43+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 11
+  keys dropped: 1
+  response headers dropped: 9
+  text kept: 2
+  text replaced: 5
+literals:
+- seed-v1 case-onenote_create_notebook-new 2026-10-31
+- seed-v1 case-onenote_create_notebook-new ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

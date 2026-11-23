@@ -1,0 +1,26 @@
+scenario: outlook_forward_event-received
+fixture: rec-tool-outlook_forward_event-received
+source: recorded
+target: graph
+recorded_at: '2026-11-02T22:34:31+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 14
+  keys dropped: 11
+  persona addresses: 8
+  persona names: 7
+  query parameters dropped: 2
+  response headers dropped: 28
+  text kept: 10
+literals:
+- '2026-11-03'
+- Offsite forward target
+- Please look after the transport.
+- persona:tom
+- ~tomorrow
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

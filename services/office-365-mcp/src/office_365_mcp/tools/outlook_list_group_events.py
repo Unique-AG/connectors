@@ -14,7 +14,7 @@ from msgraph.generated.models.event import Event
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import collect_pages, graph_errors
+from office_365_mcp.graph_client import collect_pages, graph_step
 from office_365_mcp.shared.calendar import EventTime, event_time, window_bounds, zone_named
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.odata import spelled
@@ -23,9 +23,11 @@ from office_365_mcp.shared.window import runs_backwards
 
 TOOL_NAME = "outlook_list_group_events"
 
+PRESETS: tuple[str, ...] = ("outlook-group-calendar",)
+
 STEP = "calendar_events"
 
-GRAPH_PERMISSIONS: tuple[str, ...] = ("Calendars.Read",)
+GRAPH_PERMISSIONS: tuple[str, ...] = ("Group.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "group_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
@@ -258,7 +260,7 @@ async def list_group_events(
         raise ToolError(_ENDS_BEFORE_STARTS)
     opens, closes = window_bounds(starts_on, ends_on, zone=zone)
 
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         first_page = await client.groups.by_group_id(group_id).calendar_view.get(
             request_configuration=RequestConfiguration[_EventsQuery](
                 query_parameters=_EventsQuery(
@@ -283,7 +285,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="List Group Calendar Events",
+        title="Outlook: List Group Calendar Events",
         description=_DESCRIPTION,
         annotations=READ_ONLY,
     )

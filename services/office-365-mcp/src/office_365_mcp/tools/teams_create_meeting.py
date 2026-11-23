@@ -18,16 +18,9 @@ from msgraph.generated.users.item.online_meetings.create_or_get import (
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import meeting_uri_for
 from office_365_mcp.shared.identity import Person
-from office_365_mcp.shared.meetings import (
-    attendee_ids,
-    distinct_people,
-    meeting_participants,
-    meeting_times,
-    named_people,
-)
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_IDEMPOTENT,
@@ -35,8 +28,17 @@ from office_365_mcp.shared.seam import (
     graph_client_for_caller,
     person_confirms,
 )
+from office_365_mcp.shared.teams.meetings import (
+    attendee_ids,
+    distinct_people,
+    meeting_participants,
+    meeting_times,
+    named_people,
+)
 
 TOOL_NAME = "teams_create_meeting"
+
+PRESETS: tuple[str, ...] = ("teams-meetings-write",)
 
 STEP = "create_meeting"
 
@@ -140,7 +142,7 @@ async def create_meeting(
     created: OnlineMeeting | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
-    with graph_errors(TOOL_NAME, step=STEP):
+    with graph_step(STEP):
         with not_graph():
             answer = await confirm(_question(draft), external_id)
         asked = answer if isinstance(answer, InputRequiredResult) else None
@@ -227,7 +229,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Create a Teams Meeting",
+        title="Teams: Create a Meeting",
         description=_DESCRIPTION,
         annotations=WRITE_IDEMPOTENT,
     )

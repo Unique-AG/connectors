@@ -29,6 +29,7 @@ from office_365_mcp.graph_client import (
     no_retry,
     not_graph,
 )
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteSectionGroupHandle,
@@ -48,7 +49,6 @@ from office_365_mcp.shared.notes import (
     group_id_of,
     in_a_site,
     onenote_root,
-    write_state_for,
 )
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -60,6 +60,8 @@ from office_365_mcp.shared.seam import (
 )
 
 TOOL_NAME = "onenote_copy_section"
+
+PRESETS: tuple[str, ...] = ("onenote-write", "onenote-delete")
 
 STEP_SECTION = "section"
 STEP_COPY_SECTION = "copy_section"
@@ -236,7 +238,7 @@ async def copy_section(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     owned = handle.owner is not None or destination.owner is not None
-    with owner_refused(owned, OWNED_REFUSED), graph_errors(TOOL_NAME):
+    with owner_refused(owned, OWNED_REFUSED), graph_errors():
         container = await container_audience(client, destination)
         audience = container.notebook
         if answer_pending or audience.reaches_others:
@@ -285,8 +287,8 @@ async def _copy_to_notebook(
     builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_notebook
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_to_notebook_body.CopyToNotebookPostRequestBody(
             id=destination.notebook_id, group_id=group_id_of(destination.owner), rename_as=new_name
@@ -306,8 +308,8 @@ async def _copy_to_section_group(
     builder = root.sections.by_onenote_section_id(handle.section_id).copy_to_section_group
     request = RequestInformation(Method.POST, builder.url_template, builder.path_parameters)
     request.headers.try_add("Accept", "application/json")
-    request.set_content_from_parsable(  # pyright: ignore[reportUnknownMemberType]
-        client.request_adapter,  # pyright: ignore[reportUnknownMemberType]
+    request.set_content_from_parsable(
+        client.request_adapter,
         "application/json",
         _copy_to_section_group_body.CopyToSectionGroupPostRequestBody(
             id=destination.section_group_id,
@@ -324,7 +326,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Copy a Section",
+        title="OneNote: Copy a Section",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

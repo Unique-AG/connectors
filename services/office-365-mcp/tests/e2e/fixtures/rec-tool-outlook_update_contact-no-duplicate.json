@@ -1,0 +1,128 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/contacts",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.contact",
+      "businessPhones": ["+41 44 555 01 03"],
+      "displayName": "seed-v1 case-outlook_update_contact-no-duplicate",
+      "givenName": "Rita",
+      "surname": "Vogel"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "location": "https://graph.microsoft.com/v1.0/users('00000000-aa0f-4286-8305-d989485e14b5')/contacts('HOeRCgOFKDKKLTPYIyyrLi5ivVEtWC-XEy1Zq7Sjjv85XgUWTk3E3fcfqdIT8bEABnOQ')",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"YZCFHNHFSKYaxZpsKxraYPEaIdTr/ShqAZIst/SS\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 03"],
+      "categories": [],
+      "changeKey": "CNVSODJNWGGxyRngMxonQSAhNoNm/OypXJOxb/LQ",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:19:07Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-no-duplicate",
+      "emailAddresses": [],
+      "givenName": "Rita",
+      "homeAddress": {},
+      "homePhones": [],
+      "id": "HOeRCgOFKDKKLTPYIyyrLi5ivVEtWC-XEy1Zq7Sjjv85XgUWTk3E3fcfqdIT8bEABnOQ",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:19:07Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": null,
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Vogel",
+      "title": null
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/contacts/HOeRCgOFKDKKLTPYIyyrLi5ivVEtWC-XEy1Zq7Sjjv85XgUWTk3E3fcfqdIT8bEABnOQ",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "query": {
+      "$select": "emailAddresses,businessPhones,homePhones"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"YZCFHNHFSKYaxZpsKxraYPEaIdTr/ShqAZIst/SS\"",
+      "businessPhones": ["+41 44 555 01 03"],
+      "emailAddresses": [],
+      "homePhones": [],
+      "id": "HOeRCgOFKDKKLTPYIyyrLi5ivVEtWC-XEy1Zq7Sjjv85XgUWTk3E3fcfqdIT8bEABnOQ"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/contacts/HOeRCgOFKDKKLTPYIyyrLi5ivVEtWC-XEy1Zq7Sjjv85XgUWTk3E3fcfqdIT8bEABnOQ",
+    "headers": {
+      "prefer": "IdType=\"ImmutableId\""
+    },
+    "json": {
+      "@odata.type": "#microsoft.graph.contact",
+      "businessPhones": ["+41 44 555 01 03"]
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json; odata.metadata=minimal; odata.streaming=true; IEEE754Compatible=false; charset=utf-8",
+      "preference-applied": "IdType=ImmutableId"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"SRJJNYILROVpaUokPordLKAjWeOi/GrlVDRoq/IG\"",
+      "assistantName": null,
+      "birthday": null,
+      "businessAddress": {},
+      "businessPhones": ["+41 44 555 01 03"],
+      "categories": [],
+      "changeKey": "YNNHTYBFJJDtwBooSdgnPXRoHsYc/LfcSQDrl/NI",
+      "children": [],
+      "companyName": null,
+      "createdDateTime": "2026-11-02T21:19:07Z",
+      "department": null,
+      "displayName": "seed-v1 case-outlook_update_contact-no-duplicate",
+      "emailAddresses": [],
+      "givenName": "Rita",
+      "homeAddress": {},
+      "homePhones": [],
+      "id": "HOeRCgOFKDKKLTPYIyyrLi5ivVEtWC-XEy1Zq7Sjjv85XgUWTk3E3fcfqdIT8bEABnOQ",
+      "imAddresses": [],
+      "jobTitle": null,
+      "lastModifiedDateTime": "2026-11-02T21:19:08Z",
+      "manager": null,
+      "middleName": null,
+      "mobilePhone": null,
+      "nickName": null,
+      "officeLocation": null,
+      "otherAddress": {},
+      "parentFolderId": "AAMkSJxvJVI7XWR9GSRvJEytUZZ7UJ49Xql0YFX1MPLsOMSqR3AlFMDvDEKFYZWnhjxJGYdvPUkgD3w7GUR4SWIoqUyhShwlIXJpPuTo-IumRVB79_xDHAW=",
+      "personalNotes": "",
+      "profession": null,
+      "spouseName": null,
+      "surname": "Vogel",
+      "title": null
+    }
+  }
+]

@@ -10,6 +10,7 @@ from mcp_configs import (
     ErrorDetailsPolicy,
     LoggingSettings,
     LogLevel,
+    RateLimitSettings,
     RedisSettings,
     RetrySettings,
     ServerSettings,
@@ -218,6 +219,7 @@ def test_elicitation_asks_for_everything_by_default() -> None:
     assert settings.for_data_modification is Toggle.ENABLED
     assert settings.for_data_removal is Toggle.ENABLED
     assert settings.timeout_before_cancel_seconds == 120
+    assert settings.request_state_keys == []
 
 
 def test_elicitation_reads_each_toggle(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -229,6 +231,25 @@ def test_elicitation_reads_each_toggle(monkeypatch: pytest.MonkeyPatch) -> None:
     assert settings.for_data_modification is Toggle.DISABLED
     assert settings.for_data_removal is Toggle.ENABLED
     assert settings.timeout_before_cancel_seconds == 45
+
+
+def test_elicitation_reads_the_request_state_keys_in_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ELICITATION_REQUEST_STATE_KEYS", f'["{"n" * 32}", "{"o" * 32}"]')
+
+    settings = ElicitationSettings()
+
+    assert [key.get_secret_value() for key in settings.request_state_keys] == ["n" * 32, "o" * 32]
+
+
+def test_elicitation_rejects_a_request_state_key_under_32_characters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ELICITATION_REQUEST_STATE_KEYS", '["short"]')
+
+    with pytest.raises(ValidationError):
+        ElicitationSettings()
 
 
 def test_elicitation_rejects_a_toggle_that_is_not_enabled_or_disabled(
@@ -326,3 +347,38 @@ def test_server_settings_reject_a_base_url_that_is_not_a_public_https_origin(
 ) -> None:
     with pytest.raises(ValidationError, match=message):
         ServerSettings(mcp_base_url=AnyHttpUrl(url))
+
+
+def test_rate_limit_defaults_to_60_tool_calls_a_minute() -> None:
+    settings = RateLimitSettings()
+
+    assert (settings.tool_calls_per_window, settings.window_seconds) == (60, 60)
+
+
+def test_rate_limit_reads_the_limit_and_window_from_the_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "120")
+    monkeypatch.setenv("MCP_RATE_LIMIT_WINDOW_SECONDS", "30")
+
+    settings = RateLimitSettings()
+
+    assert (settings.tool_calls_per_window, settings.window_seconds) == (120, 30)
+
+
+@pytest.mark.parametrize(
+    ("name", "value"),
+    [
+        ("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "0"),
+        ("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "-1"),
+        ("MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW", "sixty"),
+        ("MCP_RATE_LIMIT_WINDOW_SECONDS", "0"),
+    ],
+)
+def test_rate_limit_rejects_a_value_that_cannot_limit(
+    monkeypatch: pytest.MonkeyPatch, name: str, value: str
+) -> None:
+    monkeypatch.setenv(name, value)
+
+    with pytest.raises(ValidationError):
+        RateLimitSettings()

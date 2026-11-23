@@ -55,7 +55,7 @@ The tools layer exposes capabilities to AI clients over the Model Context Protoc
 Tools fall into these categories:
 
 - **Email search** — Queries the Unique knowledge base (no live Graph API call per search)
-- **Draft creation** — Creates drafts in the user's Outlook Drafts folder via Graph API
+- **Draft creation and editing** — Creates drafts in the user's Outlook Drafts folder via Graph API, and edits existing drafts (subject, body, recipients, attachments) after checking they are still drafts
 - **Contact lookup** — Searches the user's Microsoft contacts directory via Graph API
 - **Mailbox utilities** — Lists folders and categories via Graph API for search filtering
 - **Connection management** — Checks webhook status, reconnects, or removes the mailbox connection

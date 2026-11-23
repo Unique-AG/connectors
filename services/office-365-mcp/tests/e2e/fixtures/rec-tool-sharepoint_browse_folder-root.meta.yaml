@@ -1,0 +1,21 @@
+scenario: sharepoint_browse_folder-root
+fixture: rec-tool-sharepoint_browse_folder-root
+source: recorded
+target: graph
+recorded_at: '2026-10-29T14:59:05+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 62
+  keys dropped: 2
+  persona addresses: 12
+  persona names: 12
+  response headers dropped: 18
+  text kept: 4
+  text replaced: 26
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.3

@@ -11,7 +11,7 @@ through one shared HTTP client.
 ```mermaid
 flowchart LR
     subgraph Pod["backstop-mcp pod"]
-        MW["HTTP middleware<br/>bearer auth, body limit,<br/>tracing, metrics, 401 rewrite"]
+        MW["HTTP middleware<br/>bearer auth, log redaction, body limit,<br/>tracing, metrics, 401 rewrite"]
         Auth["OAuth server<br/>+ login form"]
         Tools["Tools<br/>(features/*/tools)"]
         Q["Queries / commands"]
@@ -96,13 +96,15 @@ one shape (`queries/`, `commands/`, `responses`, `tools/`), each part present on
 
 FastMCP places its own request-context and bearer-token middlewares outermost: every request carrying
 a bearer token is hashed and looked up there, before any of the app's own middleware runs. The app
-then adds four, outermost first:
+then adds five, outermost first:
 
-1. **Request body limit**, 4 MiB, the same cap as the MCP SDK's streamable HTTP transport. It also
+1. **Log redaction.** `RedactRequestSecretsMiddleware` redacts the request's bearer token from every
+   line logged while the request is handled.
+2. **Request body limit**, 4 MiB, the same cap as the MCP SDK's streamable HTTP transport. It also
    bounds the unauthenticated login POST.
-2. **OpenTelemetry ASGI** instrumentation.
-3. **HTTP request metrics** from `mcp_observability.setup_ops`.
-4. **Session-revoked rewrite.** When a tool call confirms the user's Backstop credential is dead,
+3. **OpenTelemetry ASGI** instrumentation.
+4. **HTTP request metrics** from `mcp_observability.setup_ops`.
+5. **Session-revoked rewrite.** When a tool call confirms the user's Backstop credential is dead,
    this turns the in-flight `200` into `401` so the client reconnects at once. See
    [Authentication: When Backstop rejects the credential](../operator/authentication.md#When-Backstop-rejects-the-credential).
 
@@ -299,10 +301,12 @@ pydantic's own, so a model must never be keyed by a name or another value.
 `ERROR_DETAILS_POLICY=disclose` keeps the message and full stack at ERROR. It is separate from
 `LOGS_DIAGNOSTICS_DATA_POLICY`, so reading an error does not also disclose every login.
 
-`ToolCallObservabilityMiddleware`, the outermost FastMCP middleware, logs `Tool call started`
-and exactly one of `Tool call completed`, `Tool call failed` or `Tool call cancelled` per call,
-with `tool`, `argument_names`, `subject` (our internal user id), `duration_ms` and the values the
-tool's `@trace_arguments` declared. A failure is logged at its level: WARNING when the caller or
+`RedactToolCallSecretsMiddleware`, the outermost FastMCP middleware, wraps
+`ToolCallObservabilityMiddleware` and redacts the caller's access token from every line logged
+while the tool runs, the tool-call lines included. `ToolCallObservabilityMiddleware` logs
+`Tool call started` and exactly one of `Tool call completed`, `Tool call failed` or
+`Tool call cancelled` per call, with `tool`, `argument_names`, `subject` (our internal user id),
+`duration_ms` and the values the tool's `@trace_arguments` declared. A failure is logged at its level: WARNING when the caller or
 Backstop caused it, ERROR when a developer has to act; an exception class declares its own level
 with `DeclaresFailureLevel`. An invalid argument is named in `failed_fields` without its value.
 FastMCP's own per-call failure lines and `setup_ops`'s per-call line for a tool are dropped,

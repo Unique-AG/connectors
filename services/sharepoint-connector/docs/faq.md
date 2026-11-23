@@ -63,7 +63,6 @@ If this is **not** set to "Everyone", the connector cannot read group members. I
 
 1. Set group visibility to "Everyone"
 2. Add the app principal as a group member/owner
-3. Grant Full Control to the app principal
 
 ### How do public and private SharePoint sites affect `Everyone` permissions?
 

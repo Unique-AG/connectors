@@ -1,0 +1,23 @@
+scenario: outlook_search_mail-newsletters
+fixture: rec-tool-outlook_search_mail-newsletters
+source: recorded
+target: graph
+recorded_at: '2026-11-02T21:05:24+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 43
+  keys dropped: 2
+  persona addresses: 16
+  persona names: 16
+  response headers dropped: 14
+  text kept: 18
+  text replaced: 1
+literals:
+- Newsletter
+- newsletter
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

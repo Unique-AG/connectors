@@ -23,7 +23,7 @@ which the type check rejects, since it cannot see that the environment gives the
 | `RetrySettings` | `UPSTREAM_RETRY_MAX_ATTEMPTS`, `UPSTREAM_RETRY_MAX_WAIT_SECONDS`, `UPSTREAM_RETRY_STATUSES` | 5 attempts, at most 30 s apart, on 429 and 503. A `POST` or `PATCH` is sent again only on a 429. |
 | `LoggingSettings` | `LOG_LEVEL`, `LOGS_DIAGNOSTICS_DATA_POLICY` | `INFO`; identifying values concealed as `sha256:<hex>` |
 | `TracingSettings` | `OTEL_TRACES_EXPORTER`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` or `OTEL_EXPORTER_OTLP_ENDPOINT`, and the Node services' `ENABLE_OPENTELEMETRY` with `OTEL_SPAN_PROCESSOR` | off; an OTLP endpoint alone turns on OTLP |
-| `ElicitationSettings` | `ELICITATION_FOR_DISAMBIGUATION`, `ELICITATION_FOR_DATA_MODIFICATION`, `ELICITATION_FOR_DATA_REMOVAL` (`enabled` or `disabled`), `ELICITATION_TIMEOUT_BEFORE_CANCEL_SECONDS` | all enabled; 120 s |
+| `ElicitationSettings` | `ELICITATION_FOR_DISAMBIGUATION`, `ELICITATION_FOR_DATA_MODIFICATION`, `ELICITATION_FOR_DATA_REMOVAL` (`enabled` or `disabled`), `ELICITATION_TIMEOUT_BEFORE_CANCEL_SECONDS`, `ELICITATION_REQUEST_STATE_KEYS` (a JSON list of secrets of at least 32 characters, shared by every replica) | all enabled; 120 s; no keys, so each process seals under its own |
 
 The Postgres names are the ones the base Helm chart injects, and the Zitadel names match
 `unique_mcp.auth.zitadel.ZitadelOIDCProxySettings`. A service with a second upstream reads its

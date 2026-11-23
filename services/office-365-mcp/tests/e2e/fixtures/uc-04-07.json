@@ -1,0 +1,10 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/messages/AAMkAGI2RUN-draft-0001=",
+    "headers": { "prefer": "IdType=\"ImmutableId\"" },
+    "query": { "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey" },
+    "status": 200,
+    "body": "me.messages.draft.json"
+  }
+]

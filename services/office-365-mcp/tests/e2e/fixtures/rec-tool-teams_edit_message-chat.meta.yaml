@@ -1,0 +1,27 @@
+scenario: teams_edit_message-chat
+fixture: rec-tool-teams_edit_message-chat
+source: recorded
+target: graph
+recorded_at: '2026-11-03T13:42:12+00:00'
+scrub_version: 1.0.0
+replacements:
+  hosts replaced: 1
+  ids mapped: 350
+  keys dropped: 87
+  other addresses replaced: 4
+  persona addresses: 56
+  persona names: 54
+  query parameters dropped: 25
+  response headers dropped: 47
+  text kept: 17
+  text replaced: 102
+literals:
+- seed-v1 case-teams-send
+- seed-v1 case-teams_edit_message-chat after
+- seed-v1 case-teams_edit_message-chat before
+sdk_versions:
+  msgraph-sdk: 1.62.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.14.2
+  httpx: 0.28.1
+  fastmcp: 4.1.4

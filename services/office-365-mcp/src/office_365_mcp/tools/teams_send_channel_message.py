@@ -12,9 +12,15 @@ from msgraph.generated.models.chat_message_importance import ChatMessageImportan
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, no_retry, not_graph
+from office_365_mcp.graph_client import graph_step, no_retry
 from office_365_mcp.shared.handles import MessageHandle
-from office_365_mcp.shared.messages import (
+from office_365_mcp.shared.seam import (
+    WRITE_ADDITIVE,
+    Confirm,
+    graph_client_for_caller,
+    person_confirms,
+)
+from office_365_mcp.shared.teams.messages import (
     CHANNEL_ID_FIELD,
     CHANNEL_IMPORTANCE_FIELD,
     CHANNEL_POST,
@@ -27,18 +33,15 @@ from office_365_mcp.shared.messages import (
     Mention,
     TeamsMessage,
     outgoing_message,
+    post_once_agreed,
     send_binding,
     send_question,
     subject_on_a_reply,
 )
-from office_365_mcp.shared.seam import (
-    WRITE_ADDITIVE,
-    Confirm,
-    graph_client_for_caller,
-    person_confirms,
-)
 
 TOOL_NAME = "teams_send_channel_message"
+
+PRESETS: tuple[str, ...] = ("teams-write", "teams-write-files", "teams-edit")
 
 STEP_SEND = "send_channel_message"
 STEP_REPLY = "reply_channel_message"
@@ -100,28 +103,19 @@ async def send_channel_message(
         subject=subject,
         importance=importance,
     )
-    sent: ChatMessage | None = None
-    asked: InputRequiredResult | None = None
-    measured = (
-        graph_errors(TOOL_NAME, step=STEP_SEND)
-        if reply_to_id is None
-        else graph_errors(TOOL_NAME, step=STEP_REPLY)
-    )
-    with measured:
-        with not_graph():
-            answer = await confirm(question, about)
-        asked = answer if isinstance(answer, InputRequiredResult) else None
-        refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            outgoing = outgoing_message(
-                message,
-                mentions=mentions,
-                importance=None if importance is None else ChatMessageImportance(importance),
-                subject=subject,
-            )
-            messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
-            configuration = RequestConfiguration[QueryParameters](options=no_retry())
-            sent = await (
+
+    async def post() -> ChatMessage | None:
+        outgoing = outgoing_message(
+            message,
+            mentions=mentions,
+            importance=None if importance is None else ChatMessageImportance(importance),
+            subject=subject,
+        )
+        messages = client.teams.by_team_id(team_id).channels.by_channel_id(channel_id).messages
+        configuration = RequestConfiguration[QueryParameters](options=no_retry())
+        measured = graph_step(STEP_SEND) if reply_to_id is None else graph_step(STEP_REPLY)
+        with measured:
+            return await (
                 messages.post(outgoing, request_configuration=configuration)
                 if reply_to_id is None
                 else messages.by_chat_message_id(reply_to_id).replies.post(
@@ -129,16 +123,18 @@ async def send_channel_message(
                 )
             )
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert sent is not None, "a post that nothing refused answered with no message"
-    assert sent.id is not None, "Graph accepted a channel message post but returned no id"
+    outcome = await post_once_agreed(confirm, question, about, post)
+
+    if isinstance(outcome, InputRequiredResult):
+        return outcome
+    if isinstance(outcome, str):
+        raise ToolError(outcome)
+    assert outcome is not None, "a post that nothing refused answered with no message"
+    assert outcome.id is not None, "Graph accepted a channel message post but returned no id"
     return TeamsMessage.from_message(
-        sent,
+        outcome,
         handle=MessageHandle(
-            sent.id, team_id=team_id, channel_id=channel_id, reply_to_id=reply_to_id
+            outcome.id, team_id=team_id, channel_id=channel_id, reply_to_id=reply_to_id
         ),
     )
 
@@ -157,7 +153,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Send a Teams Channel Message",
+        title="Teams: Send a Channel Message",
         description=_DESCRIPTION,
         annotations=WRITE_ADDITIVE,
     )

@@ -24,5 +24,5 @@ export const META = createMeta({
 
   Before answering, tell the user when the results are incomplete: they are complete only when every entry in \`pages\` is \`complete\`.
 
-  Results carry only partial content in \`text\`. To read an email in full, call \`open_email\` with the result's \`openEmailParams\`.`,
+  Results carry only partial content in \`text\`. To read an email in full, call \`open_email\` with the result's \`openEmailParams\`, passed through unchanged. A draft's object requests the HTML body. \`uniqueContentId\` and \`chunkIds\` add the matched ingested passages.`,
 });

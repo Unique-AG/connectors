@@ -30,6 +30,7 @@ export class GraphClientFactory {
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly signInTenantId: string;
+  private readonly allowedTenantIds: string[];
   private readonly scopes: string[];
 
   public constructor(
@@ -50,6 +51,7 @@ export class GraphClientFactory {
       infer: true,
     }).value;
     this.signInTenantId = this.configService.get('microsoft.signInTenantId', { infer: true });
+    this.allowedTenantIds = this.configService.get('microsoft.allowedTenantIds', { infer: true });
     this.scopes = getScopes();
   }
 
@@ -86,6 +88,7 @@ export class GraphClientFactory {
         clientId: this.clientId,
         clientSecret: this.clientSecret,
         signInTenantId: this.signInTenantId,
+        allowedTenantIds: this.allowedTenantIds,
         scopes: this.scopes,
       },
       {
