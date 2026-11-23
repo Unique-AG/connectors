@@ -192,8 +192,8 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     expect(await pod.tokenService.validateRefreshToken(resultA?.refresh_token ?? '')).toEqual(
       expect.objectContaining({ generation: 1 }),
     );
-    // The loser's own pair was removed; only the used token and the winner's pair remain.
-    expect(await db.select().from(schema.tokens)).toHaveLength(3);
+    // The loser's own pair was removed: the initial pair and the winner's pair remain.
+    expect(await db.select().from(schema.tokens)).toHaveLength(4);
   });
 
   it('serves the loser the pair the winner stored when the loser lost the redeem', async () => {
