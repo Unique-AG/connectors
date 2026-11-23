@@ -1227,7 +1227,8 @@ Notebooks, sections, and pages.
 - Copy a page, a section, or a notebook, and poll the copy.
 
 **Note:** Microsoft Graph cannot set the indent level of a page. A new page is at the top level of
-its section. To make it a subpage, the user does it in the OneNote app, as
+its section. To make it a subpage, the user moves it directly below its parent in the OneNote app
+and makes it a subpage there, as
 [Create a subpage in OneNote](https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote) tells.
 
 **Tools added by this preset**

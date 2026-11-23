@@ -9667,7 +9667,7 @@ What happens:
 #### Not supported yet in working with notes in onenote
 
 - The assistant can find a note by its title only, and not by words in its body.
-- The assistant cannot make a page a subpage. A new page is at the top level of its section. Mia makes it a subpage in the OneNote app, as the Microsoft help page tells, and the assistant gives her that page.
+- The assistant cannot make a page a subpage. A new page is at the top level of its section. Mia moves it directly below its parent in the OneNote app and makes it a subpage there, as the Microsoft help page tells, and the assistant gives her that page.
 
 ## Across sources
 
