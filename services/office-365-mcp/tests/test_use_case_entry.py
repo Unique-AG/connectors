@@ -2,9 +2,11 @@ import pathlib
 import re
 from collections.abc import Mapping, Sequence
 from typing import cast
+from urllib.parse import urlparse
 
 import pytest
 import yaml
+from markdown_it import MarkdownIt
 
 from office_365_mcp.tools import PRESETS
 
@@ -89,9 +91,22 @@ class TestTheUseCaseTable:
         assert consent == (_ADMIN_CONSENT if any(consenting[p] for p in presets) else "No")
 
 
+def _link_destinations(markdown: str) -> list[str]:
+    tokens = MarkdownIt("commonmark").enable("table").parse(markdown)
+    return [
+        str(child.attrs["href"])
+        for token in tokens
+        for child in token.children or []
+        if child.type == "link_open"
+    ]
+
+
 class TestTheReadmeForConfluence:
     def test_it_links_to_unpublished_pages_by_url(self) -> None:
         unpublished = (_SERVICE_ROOT / "docs" / ".mdignore").read_text(encoding="utf-8").split()
-        without_urls = re.sub(r"https://[^\s)>\]]+", "", _README)
-        relative = [name for name in unpublished if name in without_urls]
+        relative = [
+            href
+            for href in _link_destinations(_README)
+            if not urlparse(href).scheme and urlparse(href).path.split("/")[-1] in unpublished
+        ]
         assert relative == [], f"md2conf cannot resolve these links: {relative}"
