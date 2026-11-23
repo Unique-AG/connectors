@@ -11,6 +11,8 @@ async def get_enhanced_profile(
 ) -> GetCompaniesKyckrIdEnhancedResponse:
     request = GetCompaniesKyckrIdEnhancedRequest(
         path=GetCompaniesKyckrIdEnhancedPath(kyckr_id=kyckr_id),
-        query=GetCompaniesKyckrIdEnhancedQuery(customer_reference=customer_reference),
+        query=GetCompaniesKyckrIdEnhancedQuery(
+            customer_reference=customer_reference, show_directorships=None
+        ),
     )
     return await upstream.call(GET_COMPANIES_KYCKR_ID_ENHANCED, request)

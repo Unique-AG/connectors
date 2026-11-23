@@ -291,8 +291,8 @@ class LegalEntity(BaseModel):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(
-        ...,
+    type: str | None = Field(
+        None,
         description="Type of legal entity. 'Other' is used when the source data does not specify a person or organisation.",
     )
     id_number: str | None = Field(
@@ -403,7 +403,7 @@ class OtherUBO(LegalEntity):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Type of UBO")
+    type: str | None = Field(None, description="Type of UBO")
     nature_of_control: list[str] | None = Field(
         None, alias="natureOfControl", description="List of nature of control of UBO"
     )
@@ -429,8 +429,8 @@ class PersonDetails(LegalEntity):
     nationality: str | None = Field(None, description="Nationality")
     place_of_birth: Address | None = Field(None, alias="placeOfBirth")
     place_of_residence: Address | None = Field(None, alias="placeOfResidence")
-    type: str = Field(
-        ...,
+    type: str | None = Field(
+        None,
         description="Type of legal entity. 'Other' is used when the source data does not specify a person or organisation.",
     )
 
@@ -514,7 +514,7 @@ class ShareholderPersonDetails(LegalEntity):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Person type shareholder")
+    type: str | None = Field(None, description="Person type shareholder")
 
 
 class GetOrdersOrderIdDownloadResponse(BaseModel):
@@ -653,7 +653,7 @@ class CorporationDetails(LegalEntity):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Corporation type shareholder")
+    type: str | None = Field(None, description="Corporation type shareholder")
     registration_number: str | None = Field(
         None, alias="registrationNumber", description="Company registration number in home registry"
     )
@@ -673,7 +673,7 @@ class CorporationUBO(CorporationDetails):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Corporation type")
+    type: str | None = Field(None, description="Corporation type")
     nature_of_control: list[str] | None = Field(
         None, alias="natureOfControl", description="Nature of control"
     )
@@ -705,7 +705,7 @@ class IndividualRepresentative(PersonDetails):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Person type representative")
+    type: str | None = Field(None, description="Person type representative")
     role: Role | None = None
     start_date: NormalizedDate | None = Field(None, alias="startDate")
     end_date: NormalizedDate | None = Field(None, alias="endDate")
@@ -724,7 +724,7 @@ class IndividualUBO(PersonDetails):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Person type UBO")
+    type: str | None = Field(None, description="Person type UBO")
     nature_of_control: list[str] | None = Field(
         None, alias="natureOfControl", description="List of nature of control of UBO"
     )
@@ -799,7 +799,7 @@ class OtherRepresentative(LegalEntity):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Type of representative")
+    type: str | None = Field(None, description="Type of representative")
     role: Role | None = None
     start_date: NormalizedDate | None = Field(None, alias="startDate")
     end_date: NormalizedDate | None = Field(None, alias="endDate")
@@ -982,7 +982,7 @@ class CorporationRepresentative(CorporationDetails):
     model_config = ConfigDict(
         extra="allow",
     )
-    type: str = Field(..., description="Corporation type representative")
+    type: str | None = Field(None, description="Corporation type representative")
     nature_of_control: list[str] | None = Field(
         None, alias="natureOfControl", description="Nature of control of representative"
     )

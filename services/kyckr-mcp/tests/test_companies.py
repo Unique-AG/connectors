@@ -160,3 +160,45 @@ async def test_a_company_call_sends_the_configured_customer_reference(
 
     assert kyckr.requests[0].url.params["customerReference"] == "ref-1"
     assert structured(result) == {"success": True, **body}
+
+
+async def test_the_enhanced_profile_sends_only_the_customer_reference_as_a_query_parameter(
+    call_tool_with: CallToolWith, kyckr: FakeKyckr
+) -> None:
+    call_tool = call_tool_with(default_customer_reference="ref-1")
+    kyckr.answers({"data": {"companyName": "Acme"}})
+
+    await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
+
+    params = kyckr.requests[0].url.params
+    assert dict(params) == {"customerReference": "ref-1"}
+
+
+async def test_an_enhanced_profile_keeps_a_representative_and_an_owner_without_a_type(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    data = {
+        "companyName": "Acme",
+        "representatives": {"individuals": [{"name": "Person A", "isActive": True}]},
+        "ultimateBeneficialOwners": {"corporations": [{"name": "Holding B"}]},
+    }
+    kyckr.answers({"data": data})
+
+    result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
+
+    assert result.structured_content == {"success": True, "data": data}
+
+
+async def test_an_enhanced_profile_keeps_a_shareholder_individual_and_corporation_without_a_type(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    holders = {
+        "individuals": [{"name": "Person A"}],
+        "corporations": [{"name": "Holding B"}],
+    }
+    data = {"companyName": "Acme", "capital": [{"shareholdings": [{"shareholders": holders}]}]}
+    kyckr.answers({"data": data})
+
+    result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
+
+    assert result.structured_content == {"success": True, "data": data}

@@ -1,6 +1,7 @@
 # mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
 # Kyckr Companies V2 OpenAPI spec, vendored from https://developer.kyckr.com/openapi/company_v2.yaml.
 # Lines marked `patched` differ from the published file because the API answers differently.
+# A `patched` marker on the line after a removed `required: - type` makes that `type` optional.
 openapi: 3.0.3
 info:
   title: Kyckr Companies V2 API
@@ -1371,9 +1372,7 @@ components:
     LegalEntity:
       title: Legal Entity
       type: object
-      required:
-        - type
-      properties:
+      properties: # patched: type is optional, the API sometimes leaves it out
         type:
           type: string
           enum:
@@ -1396,9 +1395,7 @@ components:
         - $ref: '#/components/schemas/LegalEntity'
         - title: Individual Details
           type: object
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             birthdate:
               allOf:
                 - $ref: '#/components/schemas/NormalizedDate'
@@ -1433,9 +1430,7 @@ components:
         - $ref: '#/components/schemas/LegalEntity'
         - title: Registration Details
           type: object
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             type:
               type: string
               description: Corporation type shareholder
@@ -1484,9 +1479,7 @@ components:
         - $ref: '#/components/schemas/PersonDetails'
         - title: Representative Details
           type: object
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             type:
               type: string
               description: Person type representative
@@ -1524,9 +1517,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/CorporationDetails'
         - type: object
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             type:
               type: string
               description: Corporation type representative
@@ -1580,9 +1571,7 @@ components:
         - $ref: '#/components/schemas/LegalEntity'
         - title: Representative Details
           type: object
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             type:
               type: string
               description: Type of representative
@@ -2187,9 +2176,7 @@ components:
         - $ref: '#/components/schemas/CorporationDetails'
         - type: object
           description: Details of a corporate entity identified as an Ultimate Beneficial Owner from official beneficial ownership registers
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             type:
               type: string
               description: Corporation type
@@ -2223,9 +2210,7 @@ components:
         - $ref: '#/components/schemas/PersonDetails'
         - type: object
           description: Details of an individual identified as an Ultimate Beneficial Owner from official beneficial ownership registers
-          required:
-            - type
-          properties:
+          properties: # patched: type is optional, the API sometimes leaves it out
             type:
               type: string
               description: Person type UBO
@@ -2257,9 +2242,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/LegalEntity'
         - type: object
-          required:
-            - type
-          description: Details of an individual identified as an Ultimate Beneficial Owner from official beneficial ownership registers
+          description: Details of an individual identified as an Ultimate Beneficial Owner from official beneficial ownership registers  # patched: type is optional, the API sometimes leaves it out
           properties:
             type:
               type: string
