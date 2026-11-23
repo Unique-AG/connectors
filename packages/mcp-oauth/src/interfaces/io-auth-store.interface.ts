@@ -24,6 +24,8 @@ export interface RefreshTokenMetadata {
   generation?: number | null;
   /** Set once the token has been exchanged; a used token presented again is a replay. */
   usedAt?: Date | null;
+  /** The pair issued when the token was redeemed, sealed under the token; see successor-cipher. */
+  successor?: string | null;
 }
 
 /** What a profile-wide revocation swept away, so callers can log the blast radius. */
@@ -69,12 +71,6 @@ export interface IOAuthStore {
    * redemptions exactly one succeeds.
    */
   redeemRefreshToken(token: string, successor: string): Promise<boolean>;
-  /**
-   * Atomically claims the one replay a used refresh token is allowed, provided it was redeemed
-   * at or after `usedAfter`. Returns the sealed successor stored by the redeem; undefined when
-   * the token is unknown, unused, redeemed too long ago, or already replayed.
-   */
-  claimRefreshTokenReplay(token: string, usedAfter: Date): Promise<string | undefined>;
 
   // Refresh token family management for reuse detection
   revokeTokenFamily(familyId: string): Promise<void>;

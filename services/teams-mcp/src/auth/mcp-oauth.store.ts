@@ -15,7 +15,7 @@ import {
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
-import { and, eq, gte, isNull, lt } from 'drizzle-orm';
+import { and, eq, isNull, lt } from 'drizzle-orm';
 import { serializeError } from 'serialize-error-cjs';
 import { typeid } from 'typeid-js';
 import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
@@ -351,6 +351,7 @@ export class McpOAuthStore implements IOAuthStore {
         familyId: tokens.familyId,
         generation: tokens.generation,
         usedAt: tokens.usedAt,
+        successor: tokens.successor,
       })
       .from(tokens)
       .where(and(eq(tokens.token, this.hashToken(token)), eq(tokens.type, 'REFRESH')));
@@ -378,26 +379,6 @@ export class McpOAuthStore implements IOAuthStore {
       .returning({ id: tokens.id });
 
     return redeemed.length > 0;
-  }
-
-  public async claimRefreshTokenReplay(
-    token: string,
-    usedAfter: Date,
-  ): Promise<string | undefined> {
-    const [claimed] = await this.drizzle
-      .update(tokens)
-      .set({ replayedAt: new Date() })
-      .where(
-        and(
-          eq(tokens.token, this.hashToken(token)),
-          eq(tokens.type, 'REFRESH'),
-          gte(tokens.usedAt, usedAfter),
-          isNull(tokens.replayedAt),
-        ),
-      )
-      .returning({ successor: tokens.successor });
-
-    return claimed?.successor ?? undefined;
   }
 
   public async revokeAllTokensForUserProfile(userProfileId: string): Promise<RevokedTokens> {

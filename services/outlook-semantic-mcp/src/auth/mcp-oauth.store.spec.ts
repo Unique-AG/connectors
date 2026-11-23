@@ -718,37 +718,6 @@ describe('McpOAuthStore', () => {
       expect(result).toBe(false);
     });
 
-    it('claims the first replay of a recently used refresh token and returns its successor', async () => {
-      mockDrizzle.__nextUpdateReturningRows = [{ successor: 'sealed-successor' }];
-      const unit = new McpOAuthStore(
-        mockDrizzle as unknown as DrizzleDatabase,
-        mockEncryption,
-        mockCache as unknown as Cache,
-        mockAmqpConnection as unknown as AmqpConnection,
-        TEST_HMAC_SECRET,
-      );
-
-      const result = await unit.claimRefreshTokenReplay('refresh-token', new Date());
-
-      expect(result).toBe('sealed-successor');
-      expect(mockDrizzle.update).toHaveBeenCalled();
-    });
-
-    it('does not claim a replay twice, or for a token redeemed before the window', async () => {
-      mockDrizzle.__nextUpdateReturningRows = [];
-      const unit = new McpOAuthStore(
-        mockDrizzle as unknown as DrizzleDatabase,
-        mockEncryption,
-        mockCache as unknown as Cache,
-        mockAmqpConnection as unknown as AmqpConnection,
-        TEST_HMAC_SECRET,
-      );
-
-      const result = await unit.claimRefreshTokenReplay('refresh-token', new Date());
-
-      expect(result).toBeUndefined();
-    });
-
     it('reads refresh tokens from the database, never from the cache', async () => {
       const usedAt = new Date();
       mockDrizzle.__nextSelectRows = [{ clientId: 'client-a', usedAt }];

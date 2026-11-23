@@ -253,7 +253,7 @@ export class OpaqueTokenService {
 
   /**
    * A retry or a concurrent replica presents a token redeemed moments ago. Inside the grace window
-   * the same client gets the pair issued to the first use, once; anything else is a replay.
+   * the same client gets the pair issued to the first use; anything else is a replay.
    */
   private async serveReplay(
     refreshToken: string,
@@ -270,11 +270,9 @@ export class OpaqueTokenService {
       return null;
     }
 
-    const sealed = await this.store.claimRefreshTokenReplay(
-      refreshToken,
-      new Date(Date.now() - this.REFRESH_REPLAY_GRACE_MS),
-    );
-    const tokenPair = sealed ? openSuccessor<TokenPair>(refreshToken, sealed) : undefined;
+    const tokenPair = metadata.successor
+      ? openSuccessor<TokenPair>(refreshToken, metadata.successor)
+      : undefined;
     if (!tokenPair) {
       await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
       return null;

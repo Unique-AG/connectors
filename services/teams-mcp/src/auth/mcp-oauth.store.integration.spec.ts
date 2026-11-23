@@ -109,18 +109,19 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     );
   });
 
-  it('revokes the family when a used refresh token is replayed a second time', async () => {
+  it('serves the same pair on every replay inside the grace window', async () => {
     const pod = createPod(db);
     const initial = await issueInitialTokens(pod.tokenService);
     const rotated = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
-    await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
 
+    const second = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
     const third = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
 
-    expect(third).toBeNull();
-    expect(await pod.tokenService.validateRefreshToken(rotated?.refresh_token ?? '')).toBeNull();
-    expect(await pod.tokenService.validateAccessToken(rotated?.access_token ?? '')).toBeNull();
-    expect(await db.select().from(schema.tokens)).toEqual([]);
+    expect(second).toEqual(rotated);
+    expect(third).toEqual(rotated);
+    expect(await pod.tokenService.validateRefreshToken(rotated?.refresh_token ?? '')).toEqual(
+      expect.objectContaining({ generation: 1 }),
+    );
   });
 
   it('revokes the family when a used refresh token is replayed after the grace window', async () => {
@@ -173,35 +174,6 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     ]);
 
     expect(results.filter(Boolean)).toHaveLength(1);
-  });
-
-  it('lets exactly one of two concurrent replay claims of the same token succeed', async () => {
-    const podA = createPod(db);
-    const podB = createPod(db);
-    const initial = await issueInitialTokens(podA.tokenService);
-    await podA.store.redeemRefreshToken(initial.refresh_token, 'successor');
-    const usedAfter = new Date(Date.now() - 10_000);
-
-    const results = await Promise.all([
-      podA.store.claimRefreshTokenReplay(initial.refresh_token, usedAfter),
-      podB.store.claimRefreshTokenReplay(initial.refresh_token, usedAfter),
-    ]);
-
-    expect(results.filter(Boolean)).toEqual(['successor']);
-  });
-
-  it('does not claim a replay of a token redeemed before the window', async () => {
-    const pod = createPod(db);
-    const initial = await issueInitialTokens(pod.tokenService);
-    await pod.store.redeemRefreshToken(initial.refresh_token, 'successor');
-    await ageRedeemedToken(initial.refresh_token, 60_000);
-
-    const claimed = await pod.store.claimRefreshTokenReplay(
-      initial.refresh_token,
-      new Date(Date.now() - 10_000),
-    );
-
-    expect(claimed).toBeUndefined();
   });
 
   it('serves both of two concurrent refreshes the same pair', async () => {

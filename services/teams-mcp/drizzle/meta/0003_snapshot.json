@@ -1,5 +1,5 @@
 {
-  "id": "1e5f8ef6-ed6e-4eff-a8f5-1a17e2926355",
+  "id": "28d77dc1-d53a-4c71-afcd-1eaaf20dd7e1",
   "prevId": "911c8782-e9f7-4619-94ef-ceca17c2f4a9",
   "version": "7",
   "dialect": "postgresql",
@@ -406,12 +406,6 @@
         },
         "used_at": {
           "name": "used_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "replayed_at": {
-          "name": "replayed_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false

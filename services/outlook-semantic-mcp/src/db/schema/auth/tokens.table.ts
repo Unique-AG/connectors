@@ -23,7 +23,6 @@ export const tokens = pgTable(
     familyId: varchar(`family_id`),
     generation: integer(`generation`),
     usedAt: timestamp(`used_at`),
-    replayedAt: timestamp(`replayed_at`),
     successor: text(`successor`),
     userProfileId: varchar(`user_profile_id`)
       .notNull()
