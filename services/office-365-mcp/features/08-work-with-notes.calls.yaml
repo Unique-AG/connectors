@@ -1112,7 +1112,7 @@ uc-08-76:
     kind: graph
     tool: onenote_create_page
     text: Microsoft Graph has the page level as a read-only property, and no create or update call sets it.
-    user: The assistant cannot make a page a subpage. A new page is at the top level of its section. Mia moves it directly below its parent in the OneNote app and makes it a subpage there, as the Microsoft help page tells, and the assistant gives her that page.
+    user: The assistant cannot make a page a subpage. It can create the page at the top level of the section. Then Mia moves the page directly below its parent in the OneNote app and makes it a subpage there, as the Microsoft help page tells. The assistant gives her that help page.
   provenance: drafted
   asks_user: false
   chain: []
