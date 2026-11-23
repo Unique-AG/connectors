@@ -1,0 +1,4 @@
+- Read the `autosync` column of the status table. If it is `false`, a person syncs the app by hand after the merge.
+- Sync single-tenant clusters in the staggered order of the Deployment Overview page. The most critical clients go last.
+- If the impact report shows a Terraform change, merge the infrastructure PR first.
+- After the sync, tell Customer Success and update the Cluster Overview page.
