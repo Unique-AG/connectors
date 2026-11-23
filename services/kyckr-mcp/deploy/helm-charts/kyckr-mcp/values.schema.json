@@ -2235,11 +2235,11 @@
             },
             "defaultCustomerReference": {
               "type": "string",
-              "description": "UPSTREAM_DEFAULT_CUSTOMER_REFERENCE: sent to Kyckr for usage reconciliation when a call names none."
+              "description": "UPSTREAM_DEFAULT_CUSTOMER_REFERENCE: a deployment default, sent to Kyckr on profile, document list and order calls for usage reconciliation. No tool takes it as an argument."
             },
             "defaultContactEmail": {
               "type": "string",
-              "description": "UPSTREAM_DEFAULT_CONTACT_EMAIL: the contact on a document order when a call names none."
+              "description": "UPSTREAM_DEFAULT_CONTACT_EMAIL: a deployment default, the contact on every document order. No tool takes it as an argument."
             }
           },
           "required": [

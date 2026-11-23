@@ -64,8 +64,8 @@ The overlay must set `app.publicBaseUrl`, `zitadel.baseUrl` and `kyckr.apiUrl`: 
 | `zitadel.orgId` | `ZITADEL_ORG_ID` | Restricts sign-in to one organisation. See below. |
 | `kyckr.apiUrl` | `UPSTREAM_API_URL` | Mandatory, with no default, so no deployment calls the test API by accident. Production is `https://api.kyckr.com/v2`, test is `https://test-api.kyckr.com/v2`. The app rejects every scheme but https, since the Kyckr key goes to this origin. |
 | `kyckr.timeoutSeconds` | `UPSTREAM_TIMEOUT_SECONDS` | Pinned at 30. At most 120. |
-| `kyckr.defaultCustomerReference` | `UPSTREAM_DEFAULT_CUSTOMER_REFERENCE` | Sent to Kyckr for usage reconciliation when a call gives none. |
-| `kyckr.defaultContactEmail` | `UPSTREAM_DEFAULT_CONTACT_EMAIL` | The contact on a document order when a call gives none. |
+| `kyckr.defaultCustomerReference` | `UPSTREAM_DEFAULT_CUSTOMER_REFERENCE` | A deployment default, sent to Kyckr on profile, document list and order calls for usage reconciliation. No tool takes it as an argument. |
+| `kyckr.defaultContactEmail` | `UPSTREAM_DEFAULT_CONTACT_EMAIL` | A deployment default, the contact on every document order. No tool takes it as an argument. |
 | `rateLimit.toolCallsPerWindow` | `MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW` | Pinned at 60. Tool calls per signed-in user and window. |
 | `rateLimit.windowSeconds` | `MCP_RATE_LIMIT_WINDOW_SECONDS` | Pinned at 60. |
 
