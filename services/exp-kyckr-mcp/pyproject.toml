@@ -9,7 +9,7 @@ dependencies = [
     "httpx2==2.16.2",
     "mcp-openapi==0.1.0",
     "mcp-types==2.3.0",
-    "pydantic==2.14.3",
+    "pydantic==2.14.4",
     "pydantic-settings==2.16.3",
     "pyyaml==6.0.3",
     "starlette==1.10.0",
