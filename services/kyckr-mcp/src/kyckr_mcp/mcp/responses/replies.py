@@ -25,7 +25,13 @@ class Reply(BaseModel):
 
     success: bool = Field(description="False when the call to Kyckr failed.")
     statusCode: int | None = Field(  # noqa: N815 (Kyckr's wire name)
-        None, description="The HTTP status Kyckr answered a failed call with."
+        None,
+        description=(
+            "The HTTP status Kyckr answered a failed call with. 400 is a bad parameter, 401 a "
+            "problem with the server's Kyckr credential, 403 a feature the account lacks, 404 an "
+            "unknown id, 405 an enhanced profile not available for that jurisdiction, 410 an "
+            "order that is gone for good (do not retry) and 429 a rate limit."
+        ),
     )
     message: str | None = Field(None, description="Why the call failed.")
     correlationId: str | None = Field(  # noqa: N815 (Kyckr's wire name)
