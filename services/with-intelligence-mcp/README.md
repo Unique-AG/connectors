@@ -93,7 +93,8 @@ Postgres is required: OAuth token validation reads it on every request.
 Registration is open, so the redirect URI is what keeps an authorization code with the client the
 user meant. A client is refused with `invalid_redirect_uri` unless every redirect URI it registers
 is loopback `http`/`https` (`localhost`, `127.0.0.1`, `[::1]`, any port), `https` on a host in
-`AUTH_ALLOWED_REDIRECT_HOSTS`, or a scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES`. Fragments, userinfo,
+`AUTH_ALLOWED_REDIRECT_HOSTS`, or a scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES`. An `https` URI on an
+allowed host must use port 443 or no port. Fragments, userinfo,
 and `javascript:`, `data:`, `file:` and similar schemes are always refused. The login form names the
 host the user is sent to after signing in.
 

@@ -43,6 +43,7 @@ _POLICY = RedirectUriPolicy()
         "https://cloud.arcade.dev/api/v1/oauth/callback",
         "https://oauth.n8n.cloud/oauth2/callback",
         "https://CLAUDE.AI./api/mcp/auth_callback",
+        "https://claude.ai:443/api/mcp/auth_callback",
         "cursor://anysphere.cursor-mcp/oauth/callback",
     ],
 )
@@ -59,10 +60,26 @@ def test_allows_supported_client_callbacks(redirect_uri: str) -> None:
         "http://127.0.0.1:8787/callback",
         "http://[::1]:51234/callback",
         "https://localhost:8443/callback",
+        "https://127.0.0.1:80/callback",
     ],
 )
 def test_allows_loopback_on_any_port(redirect_uri: str) -> None:
     assert _POLICY.rejection_reason(redirect_uri) is None
+
+
+@pytest.mark.parametrize(
+    ("redirect_uri", "reason"),
+    [
+        ("https://claude.ai:8443/api/mcp/auth_callback", "uses port 8443, which is not 443"),
+        ("https://claude.ai:80/api/mcp/auth_callback", "uses port 80, which is not 443"),
+        ("https://claude.ai:99999/api/mcp/auth_callback", "is not a valid URL"),
+        ("https://claude.ai:abc/api/mcp/auth_callback", "is not a valid URL"),
+    ],
+)
+def test_rejects_allowlisted_https_host_on_a_port_other_than_443(
+    redirect_uri: str, reason: str
+) -> None:
+    assert _POLICY.rejection_reason(redirect_uri) == reason
 
 
 @pytest.mark.parametrize(
@@ -75,6 +92,10 @@ def test_allows_loopback_on_any_port(redirect_uri: str) -> None:
         (
             "https://claude.ai.attacker.example/cb",
             "has host claude.ai.attacker.example, which is not on the allowlist",
+        ),
+        (
+            "https://attacker.example:8443/callback",
+            "has host attacker.example, which is not on the allowlist",
         ),
         (
             "http://claude.ai/api/mcp/auth_callback",

@@ -107,6 +107,9 @@ on this server's genuine login page. The registration is refused with `400` and
 | `https` on an allowed host | The default list below plus `AUTH_EXTRA_REDIRECT_HOSTS`, or exactly `AUTH_ALLOWED_REDIRECT_HOSTS` when that is set | Hosted clients, and a deployment's own chat host |
 | A scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES` | Default `cursor` | Cursor (`cursor://anysphere.cursor-mcp/oauth/callback`) |
 
+An `https` redirect URI on an allowed host must use port 443 or no port. Any other port is refused,
+and only loopback keeps any port.
+
 ### Unique chat and admin
 
 Unique chat and admin are the clients that sign in on this server today. They register

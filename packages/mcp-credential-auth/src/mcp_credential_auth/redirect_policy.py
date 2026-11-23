@@ -40,6 +40,7 @@ DEFAULT_ALLOWED_REDIRECT_SCHEMES: tuple[str, ...] = ("cursor",)
 
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
 _WEB_SCHEMES = frozenset({"http", "https"})
+_HTTPS_PORT = 443
 
 # Schemes a browser executes or reads locally instead of handing to an app. Refused even when an
 # operator lists them, since a redirect there is never a callback.
@@ -119,8 +120,8 @@ class RedirectUriPolicy:
     they own, and a victim who signs in on our genuine login page hands them the code.
 
     Accepted: `http` or `https` on a loopback host with any port (RFC 8252 §7.3, native clients),
-    `https` on an allowlisted host, and allowlisted private-use schemes. Everything else, and any
-    URI with a fragment (RFC 6749 §3.1.2) or userinfo, is refused.
+    `https` on an allowlisted host on port 443 or none, and allowlisted private-use schemes.
+    Everything else, and any URI with a fragment (RFC 6749 §3.1.2) or userinfo, is refused.
     """
 
     _allowed_hosts: frozenset[str]
@@ -165,9 +166,15 @@ class RedirectUriPolicy:
                 return None
             if scheme == "http":
                 return "uses http on a host other than localhost, 127.0.0.1 or [::1]"
-            if normalized in self._allowed_hosts:
-                return None
-            return f"has host {normalized or '(none)'}, which is not on the allowlist"
+            if normalized not in self._allowed_hosts:
+                return f"has host {normalized or '(none)'}, which is not on the allowlist"
+            try:
+                port = parts.port
+            except ValueError:
+                return "is not a valid URL"
+            if port not in (None, _HTTPS_PORT):
+                return f"uses port {port}, which is not {_HTTPS_PORT}"
+            return None
 
         if scheme in self._allowed_schemes:
             return None
