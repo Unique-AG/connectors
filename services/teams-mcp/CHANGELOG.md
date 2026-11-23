@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.2...teams-mcp@0.5.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** serve the first-use pair on a refresh replay inside a 10s grace window ([#1802](https://github.com/Unique-AG/connectors/issues/1802)) ([0fe880a](https://github.com/Unique-AG/connectors/commit/0fe880a90ba41b238f715ea9a592c93dd2f56d82))
+
+
+### Dependencies
+
+* **deps:** bump @testcontainers/postgresql from 12.2.1 to 12.2.2 ([#1841](https://github.com/Unique-AG/connectors/issues/1841)) ([58b6930](https://github.com/Unique-AG/connectors/commit/58b693082f9bc783a63698af0dde8987df57b26f))
+
 ## [0.5.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.1...teams-mcp@0.5.2) (2026-11-20)
 
 
