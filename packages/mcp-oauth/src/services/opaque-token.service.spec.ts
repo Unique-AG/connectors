@@ -1,6 +1,6 @@
 import { type Mocked, TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { IOAuthStore } from '../interfaces/io-auth-store.interface';
+import type { IOAuthStore, RefreshTokenMetadata } from '../interfaces/io-auth-store.interface';
 import {
   MCP_OAUTH_MODULE_OPTIONS_RESOLVED_TOKEN,
   type McpOAuthModuleOptions,
@@ -217,11 +217,19 @@ describe('OpaqueTokenService', () => {
       expect(store.revokeTokenFamily).toHaveBeenCalledWith('tkfam_123');
     });
 
+    const unusedRow = { ...mockRefreshMetadata, generation: 2 };
+    const usedRow = (token: string, pair: TokenPair, usedAt = new Date()) => ({
+      ...mockRefreshMetadata,
+      usedAt,
+      successor: sealSuccessor(token, pair),
+    });
+    const rowsByToken = (rows: Record<string, RefreshTokenMetadata | undefined>) =>
+      store.getRefreshToken.mockImplementation(async (token) => rows[token]);
+
     it('serves the pair issued to the first use when a used token is replayed inside the grace window', async () => {
-      store.getRefreshToken.mockResolvedValue({
-        ...mockRefreshMetadata,
-        usedAt: new Date(),
-        successor: sealSuccessor('used-token', firstUsePair),
+      rowsByToken({
+        'used-token': usedRow('used-token', firstUsePair),
+        [firstUsePair.refresh_token]: unusedRow,
       });
 
       const result = await service.refreshAccessToken('used-token', 'client-123');
@@ -233,10 +241,9 @@ describe('OpaqueTokenService', () => {
     });
 
     it('serves the same pair on every replay inside the grace window', async () => {
-      store.getRefreshToken.mockResolvedValue({
-        ...mockRefreshMetadata,
-        usedAt: new Date(),
-        successor: sealSuccessor('used-token', firstUsePair),
+      rowsByToken({
+        'used-token': usedRow('used-token', firstUsePair),
+        [firstUsePair.refresh_token]: unusedRow,
       });
 
       const first = await service.refreshAccessToken('used-token', 'client-123');
@@ -245,6 +252,51 @@ describe('OpaqueTokenService', () => {
       expect(first).toEqual(firstUsePair);
       expect(second).toEqual(firstUsePair);
       expect(store.revokeTokenFamily).not.toHaveBeenCalled();
+    });
+
+    it('follows a successor that was rotated meanwhile and serves the live pair', async () => {
+      const secondPair: TokenPair = { ...firstUsePair, access_token: 'a2', refresh_token: 'r2' };
+      const thirdPair: TokenPair = { ...firstUsePair, access_token: 'a3', refresh_token: 'r3' };
+      rowsByToken({
+        'used-token': usedRow('used-token', firstUsePair),
+        [firstUsePair.refresh_token]: usedRow(firstUsePair.refresh_token, secondPair),
+        r2: usedRow('r2', thirdPair),
+        r3: unusedRow,
+      });
+
+      const result = await service.refreshAccessToken('used-token', 'client-123');
+
+      expect(result).toEqual(thirdPair);
+      expect(store.revokeTokenFamily).not.toHaveBeenCalled();
+    });
+
+    it('revokes the token family when a rotated successor is itself outside the grace window', async () => {
+      const secondPair: TokenPair = { ...firstUsePair, access_token: 'a2', refresh_token: 'r2' };
+      rowsByToken({
+        'used-token': usedRow('used-token', firstUsePair),
+        [firstUsePair.refresh_token]: usedRow(
+          firstUsePair.refresh_token,
+          secondPair,
+          new Date(Date.now() - 60_000),
+        ),
+        r2: unusedRow,
+      });
+      store.revokeTokenFamily.mockResolvedValue(undefined);
+
+      const result = await service.refreshAccessToken('used-token', 'client-123');
+
+      expect(result).toBeNull();
+      expect(store.revokeTokenFamily).toHaveBeenCalledWith('tkfam_123');
+    });
+
+    it('revokes the token family when the successor row is gone', async () => {
+      rowsByToken({ 'used-token': usedRow('used-token', firstUsePair) });
+      store.revokeTokenFamily.mockResolvedValue(undefined);
+
+      const result = await service.refreshAccessToken('used-token', 'client-123');
+
+      expect(result).toBeNull();
+      expect(store.revokeTokenFamily).toHaveBeenCalledWith('tkfam_123');
     });
 
     it('revokes the token family when a used token carries no successor', async () => {
@@ -258,10 +310,9 @@ describe('OpaqueTokenService', () => {
     });
 
     it('revokes the token family when the stored successor cannot be opened', async () => {
-      store.getRefreshToken.mockResolvedValue({
-        ...mockRefreshMetadata,
-        usedAt: new Date(),
-        successor: sealSuccessor('other-token', firstUsePair),
+      rowsByToken({
+        'used-token': usedRow('other-token', firstUsePair),
+        [firstUsePair.refresh_token]: unusedRow,
       });
       store.revokeTokenFamily.mockResolvedValue(undefined);
 
@@ -272,10 +323,10 @@ describe('OpaqueTokenService', () => {
     });
 
     it('serves the pair the winner got and discards its own when a concurrent request redeemed the token first', async () => {
-      store.getRefreshToken.mockResolvedValueOnce(mockRefreshMetadata).mockResolvedValue({
-        ...mockRefreshMetadata,
-        usedAt: new Date(),
-        successor: sealSuccessor('refresh-token', firstUsePair),
+      store.getRefreshToken.mockResolvedValueOnce(mockRefreshMetadata);
+      rowsByToken({
+        'refresh-token': usedRow('refresh-token', firstUsePair),
+        [firstUsePair.refresh_token]: unusedRow,
       });
       store.redeemRefreshToken.mockResolvedValue(false);
 

@@ -124,6 +124,21 @@ describe('McpOAuthStore against Postgres: refresh token reuse', () => {
     );
   });
 
+  it('serves the live pair when the replayed token was rotated twice inside the grace window', async () => {
+    const pod = createPod(db);
+    const initial = await issueInitialTokens(pod.tokenService);
+    const first = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+    const second = await pod.tokenService.refreshAccessToken(first?.refresh_token ?? '', CLIENT_ID);
+
+    const replayed = await pod.tokenService.refreshAccessToken(initial.refresh_token, CLIENT_ID);
+
+    expect(second).not.toBeNull();
+    expect(replayed).toEqual(second);
+    expect(await pod.tokenService.validateRefreshToken(second?.refresh_token ?? '')).toEqual(
+      expect.objectContaining({ generation: 2 }),
+    );
+  });
+
   it('revokes the family when a used refresh token is replayed after the grace window', async () => {
     const pod = createPod(db);
     const initial = await issueInitialTokens(pod.tokenService);

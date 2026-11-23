@@ -253,39 +253,57 @@ export class OpaqueTokenService {
 
   /**
    * A retry or a concurrent replica presents a token redeemed moments ago. Inside the grace window
-   * the same client gets the pair issued to the first use; anything else is a replay.
+   * the same client gets the pair that replaced it; when that pair was itself rotated meanwhile,
+   * the chain is followed to the pair that is live, so a replay never hands out a spent token.
    */
   private async serveReplay(
     refreshToken: string,
     metadata: RefreshTokenMetadata,
     clientId: string,
   ): Promise<TokenPair | null> {
-    const { familyId, usedAt } = metadata;
+    const { familyId } = metadata;
     assert.ok(familyId, 'Refresh token has no family');
-    assert.ok(usedAt, 'Refresh token has not been redeemed');
 
-    const msSinceUsedAt = Date.now() - usedAt.getTime();
-    if (metadata.clientId !== clientId || msSinceUsedAt > this.REFRESH_REPLAY_GRACE_MS) {
-      await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
-      return null;
+    let presented = refreshToken;
+    let current = metadata;
+    let hops = 0;
+    while (true) {
+      const { usedAt } = current;
+      assert.ok(usedAt, 'Refresh token has not been redeemed');
+
+      const msSinceUsedAt = Date.now() - usedAt.getTime();
+      if (current.clientId !== clientId || msSinceUsedAt > this.REFRESH_REPLAY_GRACE_MS) {
+        await this.revokeReplayedRefreshToken(presented, familyId, current.clientId);
+        return null;
+      }
+
+      const tokenPair = current.successor
+        ? openSuccessor<TokenPair>(presented, current.successor)
+        : undefined;
+      const successor = tokenPair
+        ? await this.store.getRefreshToken(tokenPair.refresh_token)
+        : undefined;
+      if (!tokenPair || !successor) {
+        await this.revokeReplayedRefreshToken(presented, familyId, current.clientId);
+        return null;
+      }
+
+      if (!successor.usedAt) {
+        this.logger.warn({
+          msg: 'Refresh token replayed inside the grace window; serving the pair that replaced it',
+          tokenPrefix: refreshToken.substring(0, 8),
+          familyId,
+          clientId,
+          msSinceUsedAt: Date.now() - usedAt.getTime(),
+          hops,
+        });
+        return tokenPair;
+      }
+
+      presented = tokenPair.refresh_token;
+      current = successor;
+      hops += 1;
     }
-
-    const tokenPair = metadata.successor
-      ? openSuccessor<TokenPair>(refreshToken, metadata.successor)
-      : undefined;
-    if (!tokenPair) {
-      await this.revokeReplayedRefreshToken(refreshToken, familyId, metadata.clientId);
-      return null;
-    }
-
-    this.logger.warn({
-      msg: 'Refresh token replayed inside the grace window; serving the pair issued to its first use',
-      tokenPrefix: refreshToken.substring(0, 8),
-      familyId,
-      clientId,
-      msSinceUsedAt,
-    });
-    return tokenPair;
   }
 
   private async findUnexpiredRefreshToken(
