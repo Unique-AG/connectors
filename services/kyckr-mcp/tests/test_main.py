@@ -5,6 +5,7 @@ from typing import cast
 
 from fastmcp import FastMCP
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
+import httpx2
 from mcp_observability import RateLimitMiddleware
 from mcp_observability import RedactRequestSecretsMiddleware
 from mcp_observability import RedactToolCallSecretsMiddleware
@@ -12,6 +13,8 @@ import pytest
 from starlette.middleware import Middleware
 
 from kyckr_mcp.main import main
+from kyckr_mcp.upstream import upstream_http
+from tests.offline_server import fake_upstream_settings
 
 UPSTREAM_API_KEY = "kyckr-api-key-0123"
 ZITADEL_CLIENT_SECRET = "zitadel-client-secret-0123"
@@ -44,6 +47,16 @@ def root_handlers() -> Iterator[None]:
     root.handlers = []
     yield
     root.handlers = handlers
+
+
+@pytest.fixture(autouse=True)
+def library_log_levels() -> Iterator[None]:
+    """`main()` sets the level of the libraries' loggers, which would leak into later tests."""
+    names = ("httpx", "httpx2", "httpcore", "sse_starlette")
+    levels = {name: logging.getLogger(name).level for name in names}
+    yield
+    for name, level in levels.items():
+        logging.getLogger(name).setLevel(level)
 
 
 type Runs = list[tuple[FastMCP, dict[str, object]]]
@@ -82,6 +95,49 @@ def test_redacts_every_secret_the_deployment_configures(
     ]
     (line,) = [line for line in lines if line["context"] == "kyckr_mcp.tests"]
     assert line["msg"] == "secrets " + " ".join(["[Redacted]"] * 4)
+
+
+async def failed_call_log_lines(
+    capsys: pytest.CaptureFixture[str],
+) -> tuple[str, list[dict[str, object]]]:
+    """Runs `main()`, makes one failed call to Kyckr with a search term, and returns the log."""
+    main()
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(500, json={}))
+
+    async with upstream_http(fake_upstream_settings(), transport) as client:
+        await client.get("/companies", params={"name": "Acme Placeholder"})
+
+    err = capsys.readouterr().err
+    return err, [cast(dict[str, object], json.loads(line)) for line in err.splitlines()]
+
+
+def httpx_lines(lines: list[dict[str, object]]) -> list[dict[str, object]]:
+    return [line for line in lines if str(line["context"]).startswith("httpx")]
+
+
+@pytest.mark.usefixtures("served")
+async def test_logs_the_failed_call_to_kyckr_but_not_its_url_at_info(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    err, lines = await failed_call_log_lines(capsys)
+
+    assert httpx_lines(lines) == []
+    assert "Acme Placeholder" not in err
+    (warning,) = [line for line in lines if line["msg"] == "Kyckr answered with an error"]
+    assert warning["status"] == 500
+
+
+@pytest.mark.usefixtures("served")
+async def test_the_library_log_levels_setting_brings_the_url_line_back(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setenv("LIBRARY_LOG_LEVELS", '{"httpx2":"INFO"}')
+
+    _, lines = await failed_call_log_lines(capsys)
+
+    (request,) = httpx_lines(lines)
+    assert request["context"] == "httpx2"
+    assert "/companies?name=Acme+Placeholder" in str(request["msg"])
 
 
 def test_redacts_the_callers_token_around_every_request_and_tool_call(served: Runs) -> None:

@@ -6,19 +6,24 @@ from pydantic import Field
 from pydantic import model_serializer
 from pydantic import SerializerFunctionWrapHandler
 
+_EXACT_FLOAT_LIMIT = 2**53
 
-def _without_none(value: object) -> object:
+
+def _tidy(value: object) -> object:
+    """Drops None and turns a whole float below 2**53 into an int, as the old service printed it."""
     if isinstance(value, dict):
         fields = cast(dict[str, object], value)
-        return {key: _without_none(item) for key, item in fields.items() if item is not None}
+        return {key: _tidy(item) for key, item in fields.items() if item is not None}
     if isinstance(value, list):
-        return [_without_none(item) for item in cast(list[object], value)]
+        return [_tidy(item) for item in cast(list[object], value)]
+    if isinstance(value, float) and value.is_integer() and abs(value) < _EXACT_FLOAT_LIMIT:
+        return int(value)
     return value
 
 
 class Reply(BaseModel):
     """What every tool answers with. Kyckr's own top-level fields, such as `cost` and `links`,
-    come along as they are, and empty fields are left out.
+    come along as they are, empty fields are left out, and a whole number stays a whole number.
     """
 
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="allow")
@@ -43,7 +48,7 @@ class Reply(BaseModel):
     @model_serializer(mode="wrap")
     def _omit_empty_fields(self, handler: SerializerFunctionWrapHandler):  # noqa: ANN202
         # No return annotation: one would replace the output schema FastMCP publishes.
-        return _without_none(cast(object, handler(self)))  # noqa: TC006
+        return _tidy(cast(object, handler(self)))  # noqa: TC006
 
 
 def answer[R: Reply](reply: type[R], response: BaseModel) -> R:

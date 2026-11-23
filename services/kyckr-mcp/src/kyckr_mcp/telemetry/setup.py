@@ -4,6 +4,7 @@ from importlib.metadata import version
 
 from fastmcp import FastMCP
 from mcp_configs import LoggingSettings
+from mcp_configs import LogLevel
 from mcp_configs import TracingSettings
 from mcp_observability import configure_logging
 from mcp_observability import configure_tracing
@@ -25,8 +26,12 @@ def init_telemetry(settings: LoggingSettings, *, secrets: tuple[str, ...]) -> No
         service_version=version(SERVICE_NAME),
         error_details_policy=settings.error_details_policy,
     )
+    # httpx2 logs each request URL, search terms included, at INFO. LIBRARY_LOG_LEVELS wins.
+    levels = {"httpx2": LogLevel.WARNING, **settings.library_log_levels}
     configure_logging(
-        settings, own_loggers=("kyckr_mcp",), redaction=SecretRedaction(secrets=secrets)
+        settings.model_copy(update={"library_log_levels": levels}),
+        own_loggers=("kyckr_mcp",),
+        redaction=SecretRedaction(secrets=secrets),
     )
 
 
