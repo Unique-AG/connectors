@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetReverseRepoPositionMovementsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -18,7 +19,8 @@ export type GetReverseRepoPositionMovementsInput = z.infer<
 export const GetReverseRepoPositionMovementsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -45,7 +47,7 @@ export class GetReverseRepoPositionMovementsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>(
+      const response = await this.client.get<unknown>(
         '/holdings/instruments/reverseRepurchaseAgreements/positionMovements',
         {
           recordId: input.recordId,
@@ -54,7 +56,7 @@ export class GetReverseRepoPositionMovementsQuery {
           depositoryId: input.depositoryId,
         },
       );
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Reverse repo position movement') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

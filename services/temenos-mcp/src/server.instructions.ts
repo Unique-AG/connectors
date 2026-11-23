@@ -4,6 +4,7 @@ export const serverInstructions = `
 ### Data availability
 - Only ODS (Operational Data Store) endpoints are available. ADS (Analytics Data Store) endpoints are not deployed and will return errors.
 - All parameters are optional filters. Omit them to retrieve the full dataset for a given endpoint.
+- Every tool returns each record as \`{ title, record }\`: \`record\` is the Temenos record unchanged and \`title\` names it (record type, id and name). The Temenos paging header, when present, is under \`header\`.
 
 ### Holdings
 - Use \`get_expiring_limits\` or \`get_review_limits\` for credit limit monitoring. Filter by date to narrow to a specific day.

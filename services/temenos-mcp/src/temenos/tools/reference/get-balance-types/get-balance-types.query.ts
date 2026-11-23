@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetBalanceTypesInputSchema = z.object({});
 
@@ -11,7 +12,8 @@ export type GetBalanceTypesInput = z.infer<typeof GetBalanceTypesInputSchema>;
 export const GetBalanceTypesOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -34,8 +36,8 @@ export class GetBalanceTypesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/balanceTypes', undefined);
-      return { success: true, data };
+      const response = await this.client.get<unknown>('/reference/balanceTypes', undefined);
+      return { success: true, ...toTitledRecords(response, 'Balance type') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

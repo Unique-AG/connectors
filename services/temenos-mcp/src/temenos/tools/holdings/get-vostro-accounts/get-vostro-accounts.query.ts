@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetVostroAccountsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -16,7 +17,8 @@ export type GetVostroAccountsInput = z.infer<typeof GetVostroAccountsInputSchema
 export const GetVostroAccountsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -39,13 +41,13 @@ export class GetVostroAccountsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/accounts/vostro/', {
+      const response = await this.client.get<unknown>('/holdings/accounts/vostro/', {
         recordId: input.recordId,
         customerId: input.customerId,
         productName: input.productName,
         currencyId: input.currencyId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Vostro account') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetExpiringLimitsInputSchema = z.object({
   expiryDate: z
@@ -20,7 +21,8 @@ export type GetExpiringLimitsInput = z.infer<typeof GetExpiringLimitsInputSchema
 export const GetExpiringLimitsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -43,11 +45,11 @@ export class GetExpiringLimitsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/limits/expiringLimits', {
+      const response = await this.client.get<unknown>('/holdings/limits/expiringLimits', {
         expiryDate: input.expiryDate,
         approvalDate: input.approvalDate,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Limit') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

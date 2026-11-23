@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetInterestConditionsInputSchema = z.object({});
 
@@ -11,7 +12,8 @@ export type GetInterestConditionsInput = z.infer<typeof GetInterestConditionsInp
 export const GetInterestConditionsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -34,8 +36,8 @@ export class GetInterestConditionsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/product/interestConditions', undefined);
-      return { success: true, data };
+      const response = await this.client.get<unknown>('/product/interestConditions', undefined);
+      return { success: true, ...toTitledRecords(response, 'Interest condition') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

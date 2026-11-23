@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetCategoriesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -13,7 +14,8 @@ export type GetCategoriesInput = z.infer<typeof GetCategoriesInputSchema>;
 export const GetCategoriesOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -36,10 +38,10 @@ export class GetCategoriesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/categories', {
+      const response = await this.client.get<unknown>('/reference/categories', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Category') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

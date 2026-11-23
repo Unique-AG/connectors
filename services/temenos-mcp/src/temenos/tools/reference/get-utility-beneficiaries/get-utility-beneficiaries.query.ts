@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetUtilityBeneficiariesInputSchema = z.object({
   productName: z.string().optional().describe('Product name for this account'),
@@ -33,7 +34,8 @@ export type GetUtilityBeneficiariesInput = z.infer<typeof GetUtilityBeneficiarie
 export const GetUtilityBeneficiariesOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -56,18 +58,21 @@ export class GetUtilityBeneficiariesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/beneficiaries/utilityBeneficiaries', {
-        productName: input.productName,
-        recordId: input.recordId,
-        beneficiaryAccountId: input.beneficiaryAccountId,
-        bankSortCode: input.bankSortCode,
-        transactionType: input.transactionType,
-        paymentProduct: input.paymentProduct,
-        companyName: input.companyName,
-        beneficiaryIBAN: input.beneficiaryIBAN,
-        owningCustomerId: input.owningCustomerId,
-      });
-      return { success: true, data };
+      const response = await this.client.get<unknown>(
+        '/reference/beneficiaries/utilityBeneficiaries',
+        {
+          productName: input.productName,
+          recordId: input.recordId,
+          beneficiaryAccountId: input.beneficiaryAccountId,
+          bankSortCode: input.bankSortCode,
+          transactionType: input.transactionType,
+          paymentProduct: input.paymentProduct,
+          companyName: input.companyName,
+          beneficiaryIBAN: input.beneficiaryIBAN,
+          owningCustomerId: input.owningCustomerId,
+        },
+      );
+      return { success: true, ...toTitledRecords(response, 'Utility beneficiary') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

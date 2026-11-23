@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetUsFdicClasscodesInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -13,7 +14,8 @@ export type GetUsFdicClasscodesInput = z.infer<typeof GetUsFdicClasscodesInputSc
 export const GetUsFdicClasscodesOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -36,10 +38,10 @@ export class GetUsFdicClasscodesQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/reference/us/fdicClasscodes', {
+      const response = await this.client.get<unknown>('/reference/us/fdicClasscodes', {
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'FDIC class code') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

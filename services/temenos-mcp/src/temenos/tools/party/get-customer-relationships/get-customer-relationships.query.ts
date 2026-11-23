@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetCustomerRelationshipsInputSchema = z.object({
   customerRelationGroupId: z.string().optional().describe('Key to the customer relationship group'),
@@ -19,7 +20,8 @@ export type GetCustomerRelationshipsInput = z.infer<typeof GetCustomerRelationsh
 export const GetCustomerRelationshipsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -42,13 +44,13 @@ export class GetCustomerRelationshipsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/party/customers/relationships', {
+      const response = await this.client.get<unknown>('/party/customers/relationships', {
         customerRelationGroupId: input.customerRelationGroupId,
         partyId: input.partyId,
         relationPartyId: input.relationPartyId,
         recordId: input.recordId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Customer relationship') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

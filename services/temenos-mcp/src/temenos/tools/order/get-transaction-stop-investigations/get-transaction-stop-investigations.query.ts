@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetTransactionStopInvestigationsInputSchema = z.object({});
 
@@ -13,7 +14,8 @@ export type GetTransactionStopInvestigationsInput = z.infer<
 export const GetTransactionStopInvestigationsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -38,11 +40,11 @@ export class GetTransactionStopInvestigationsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>(
+      const response = await this.client.get<unknown>(
         '/order/transactionStops/investigations',
         undefined,
       );
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Transaction stop investigation') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {

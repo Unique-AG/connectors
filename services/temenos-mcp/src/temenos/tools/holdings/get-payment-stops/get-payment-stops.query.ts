@@ -3,6 +3,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { Metrics } from '../../../metrics';
 import { TemenosApiError, TemenosHttpClient } from '../../../temenos-http.client';
+import { TemenosHeaderSchema, TitledRecordsSchema, toTitledRecords } from '../../../titled-records';
 
 export const GetPaymentStopsInputSchema = z.object({
   recordId: z.string().optional().describe('Unique identifier of an entity'),
@@ -18,7 +19,8 @@ export type GetPaymentStopsInput = z.infer<typeof GetPaymentStopsInputSchema>;
 export const GetPaymentStopsOutputSchema = z
   .object({
     success: z.boolean(),
-    data: z.unknown().optional(),
+    data: TitledRecordsSchema.optional(),
+    header: TemenosHeaderSchema.optional(),
     statusCode: z.number().optional(),
     message: z.string().optional(),
   })
@@ -41,12 +43,12 @@ export class GetPaymentStopsQuery {
     const start = Date.now();
     let result: 'success' | 'error' = 'success';
     try {
-      const data = await this.client.get<unknown>('/holdings/paymentStops', {
+      const response = await this.client.get<unknown>('/holdings/paymentStops', {
         recordId: input.recordId,
         customerId: input.customerId,
         stopTypeId: input.stopTypeId,
       });
-      return { success: true, data };
+      return { success: true, ...toTitledRecords(response, 'Payment stop') };
     } catch (err) {
       result = 'error';
       if (err instanceof TemenosApiError) {
