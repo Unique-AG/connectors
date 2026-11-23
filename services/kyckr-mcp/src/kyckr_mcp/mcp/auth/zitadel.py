@@ -56,8 +56,8 @@ class IdTokenVerifier(TokenVerifier):
 def create_auth(
     *, zitadel: ZitadelSettings, server: ServerSettings, store: AsyncKeyValue
 ) -> OIDCProxy:
-    """Signs users in with Zitadel. Requires only identity scopes: Zitadel drops `mcp:*` scopes,
-    and no client can register the org scope, so the org is checked on the id token instead.
+    """Signs users in with Zitadel. Clients register with identity scopes only. With an org id the
+    proxy also asks Zitadel for the org scope, which refuses other orgs, and checks the id token.
     """
     signing_key = zitadel.jwt_signing_key.get_secret_value()
     return create_zitadel_oidc_proxy(

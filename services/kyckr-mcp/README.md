@@ -81,7 +81,7 @@ The chart also sets `HOST`, `MCP_AUTH_MODE=zitadel` and `DB_SSL_ROOT_CERT` (the 
 
 Users sign in with Zitadel through the OIDC proxy of `unique_mcp`. The Zitadel application needs the redirect URI `<MCP_BASE_URL>/auth/callback`.
 
-With `ZITADEL_ORG_ID` set, the MCP reads `urn:zitadel:iam:user:resourceowner:id` from the verified id token and refuses any other organisation with a 401. If the claim is missing from the id token, every sign-in is refused. Verify in Zitadel which application setting puts it there (possibly "User Info inside ID Token") and check one sign-in before you set `ZITADEL_ORG_ID`.
+With `ZITADEL_ORG_ID` set, the MCP asks Zitadel for the org scope `urn:zitadel:iam:org:id:<org>` when it sends the user to sign in, so Zitadel can refuse a user of another organisation at login. The MCP also reads `urn:zitadel:iam:user:resourceowner:id` from the verified id token and refuses any other organisation with a 401. If the claim is missing from the id token, every sign-in is refused. Verify in Zitadel which application setting puts it there (possibly "User Info inside ID Token") and check one sign-in before you set `ZITADEL_ORG_ID`.
 
 ## Delivering and rotating the Kyckr key
 
