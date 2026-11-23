@@ -1127,7 +1127,7 @@
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get the World-Check record for a match: its names and categories.\n\nPass the match's referenceId, not its resultId.",
+    "description": "Get the World-Check record for a match: its names, categories, and the first public source page LSEG cites for it, if any.\n\nPass the match's referenceId, not its resultId.",
     "inputSchema": {
       "additionalProperties": false,
       "properties": {
@@ -1156,6 +1156,17 @@
           "description": "Entity type, INDIVIDUAL or ORGANISATION.",
           "type": "string"
         },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Primary name of the record."
+        },
         "names": {
           "description": "Names on the record, primary first.",
           "items": {
@@ -1166,9 +1177,22 @@
         "reference_id": {
           "description": "World-Check record reference ID.",
           "type": "string"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "First public source page LSEG cites for the record, or null when it has none."
         }
       },
       "required": [
+        "name",
+        "url",
         "reference_id",
         "entity_type",
         "names",
