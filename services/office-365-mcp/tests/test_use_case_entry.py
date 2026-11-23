@@ -92,10 +92,6 @@ class TestTheUseCaseTable:
 class TestTheReadmeForConfluence:
     def test_it_links_to_unpublished_pages_by_url(self) -> None:
         unpublished = (_SERVICE_ROOT / "docs" / ".mdignore").read_text(encoding="utf-8").split()
-        links: list[str] = re.findall(r"\]\(\s*([^)#\s]+)", _README)
-        relative = [
-            link
-            for link in links
-            if not link.startswith("https://") and link.split("/")[-1] in unpublished
-        ]
+        without_urls = re.sub(r"https://[^\s)>\]]+", "", _README)
+        relative = [name for name in unpublished if name in without_urls]
         assert relative == [], f"md2conf cannot resolve these links: {relative}"
