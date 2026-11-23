@@ -47,8 +47,13 @@ def _task(
     return task | extra
 
 
-def _list_is(graph: respx.MockRouter, *, shared: bool, name: str = "Tasks") -> None:
-    listed = {"id": LIST_ID, "displayName": name, "isShared": shared}
+_SOME_TASK = _task(TASK_ID, "Book the venue")
+
+
+def _list_is(graph: respx.MockRouter, *, shared: bool | None, name: str = "Tasks") -> None:
+    listed: dict[str, object] = {"id": LIST_ID, "displayName": name}
+    if shared is not None:
+        listed["isShared"] = shared
     _ = graph.get(ONE_LIST).mock(return_value=httpx.Response(200, json=listed))
 
 
@@ -209,11 +214,12 @@ class TestChangingTasks:
         done = _task(TASK_ID, "Send the Q3 report", status="completed")
         _list_is(graph, shared=False)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=done))
+        person = Person()
 
-        answer = await call("outlook_complete_task", uri=TASK)
+        answer = await call("outlook_complete_task", uri=TASK, person=person)
 
         assert _sent(route) == {"status": "completed"}
-        assert answer["status"] == "completed"
+        assert (answer["status"], person.asked) == ("completed", [])
 
     async def test_a_task_is_reopened_and_its_due_date_is_removed(
         self, graph: respx.MockRouter
@@ -222,12 +228,18 @@ class TestChangingTasks:
         _list_is(graph, shared=False)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=reopened))
 
+        person = Person()
+
         answer = await call(
-            "outlook_update_task", uri=TASK, status="not_started", clear_due_date=True
+            "outlook_update_task",
+            uri=TASK,
+            status="not_started",
+            clear_due_date=True,
+            person=person,
         )
 
         assert _sent(route) == {"status": "notStarted", "dueDateTime": None}
-        assert (answer["status"], answer["due_date"]) == ("not_started", None)
+        assert (answer["status"], answer["due_date"], person.asked) == ("not_started", None, [])
 
 
 class TestASharedList:
@@ -251,9 +263,7 @@ class TestASharedList:
         self, graph: respx.MockRouter
     ) -> None:
         _list_is(graph, shared=True, name="Team launch")
-        route = graph.patch(ONE_TASK).mock(
-            return_value=httpx.Response(200, json=_task(TASK_ID, "x"))
-        )
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
 
         with pytest.raises(ToolError, match="Nothing was changed"):
             _ = await call("outlook_complete_task", uri=TASK, person=Person(approval="no"))
@@ -276,6 +286,19 @@ class TestASharedList:
         assert answer.structured_content is not None
         [question] = person.asked
         assert "'Team launch'" in question
+        assert route.call_count == 1
+
+    async def test_a_list_that_does_not_say_whether_it_is_shared_is_asked_about(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=None, name="Team launch")
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
+        person = Person()
+
+        _ = await call("outlook_complete_task", uri=TASK, person=person)
+
+        [question] = person.asked
+        assert "did not report as private" in question
         assert route.call_count == 1
 
 
@@ -317,8 +340,20 @@ class TestRefusals:
         _list_is(graph, shared=False)
         _ = graph.patch(ONE_TASK).mock(return_value=httpx.Response(404, json=missing))
 
-        with pytest.raises(ToolError, match="Find it again with outlook_list_tasks"):
+        with pytest.raises(ToolError, match="find it again with outlook_list_tasks"):
             _ = await call("outlook_complete_task", uri=TASK)
+
+    async def test_a_task_in_a_list_that_is_gone_sends_the_assistant_back_to_the_lists(
+        self, graph: respx.MockRouter
+    ) -> None:
+        missing = {"error": {"code": "ErrorItemNotFound", "message": "The object was not found."}}
+        _ = graph.get(ONE_LIST).mock(return_value=httpx.Response(404, json=missing))
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
+
+        with pytest.raises(ToolError, match="call outlook_list_task_lists again instead"):
+            _ = await call("outlook_update_task", uri=TASK, priority="high")
+
+        assert route.call_count == 0
 
     async def test_a_list_handle_is_refused_where_a_task_belongs(
         self, graph: respx.MockRouter

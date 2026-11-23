@@ -130,7 +130,7 @@ async def create_task(
     refused: str | None = None
     with graph_errors():
         audience = await list_audience(client, handle.list_id)
-        if answer_pending or audience.is_shared:
+        if answer_pending or audience.reaches_others:
             with not_graph():
                 answer = await confirm(
                     f"Create the task {title!r} {shared_list_reason(audience)}?", about

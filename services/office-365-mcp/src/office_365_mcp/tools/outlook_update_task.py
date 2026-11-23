@@ -66,8 +66,9 @@ _AGAIN = "If you call this tool again with the same arguments, the call will fai
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task, and nothing was changed. The handle is well formed, "
     + "so this is not a bad argument. The task was most likely deleted, or moved to another "
-    + "list, which gives it a new handle. Find it again with outlook_list_tasks and take a fresh "
-    + f"`uri`. {_AGAIN}"
+    + "list, which gives it a new handle: find it again with outlook_list_tasks and take a fresh "
+    + "`uri`. If its list was deleted or is no longer shared with the user, call "
+    + f"outlook_list_task_lists again instead. {_AGAIN}"
 )
 
 _DESCRIPTION = """\
@@ -157,7 +158,7 @@ async def update_task(
     refused: str | None = None
     with graph_errors():
         audience = await list_audience(client, handle.list_id)
-        if answer_pending or audience.is_shared:
+        if answer_pending or audience.reaches_others:
             with not_graph():
                 answer = await confirm(f"Change a task {shared_list_reason(audience)}?", about)
             asked = answer if isinstance(answer, InputRequiredResult) else None

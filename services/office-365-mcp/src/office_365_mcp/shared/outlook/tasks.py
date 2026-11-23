@@ -130,7 +130,11 @@ def day_of(moment: DateTimeTimeZone | None, *, zone: ZoneInfo) -> date | None:
 @dataclass(frozen=True, slots=True)
 class ListAudience:
     name: str
-    is_shared: bool
+    is_shared: bool | None
+
+    @property
+    def reaches_others(self) -> bool:
+        return self.is_shared is not False
 
 
 async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudience:
@@ -141,15 +145,14 @@ async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudienc
             )
         )
     assert found is not None, "Graph answered a task list read with no list"
-    return ListAudience(name=found.display_name or "", is_shared=found.is_shared is True)
+    return ListAudience(name=found.display_name or "", is_shared=found.is_shared)
 
 
 def shared_list_reason(audience: ListAudience) -> str:
-    return (
-        f"in the list {audience.name!r}, which other people share. They see the change"
-        if audience.name
-        else "in a list that other people share. They see the change"
-    )
+    named = f"the list {audience.name!r}" if audience.name else "a list"
+    if audience.is_shared is None:
+        return f"in {named}, which Microsoft 365 did not report as private. Others can see it"
+    return f"in {named}, which other people share. They see the change"
 
 
 def html_body(markdown: str) -> ItemBody:
