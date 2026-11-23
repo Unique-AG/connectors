@@ -67,6 +67,10 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | `update_event` | Patches an existing event; attendees are notified immediately |
 | `cancel_event` | Cancels an event and notifies attendees (not a silent delete) |
 
+### Citations
+
+`search_emails` and `fetch_next_search_pages` return their emails under `results`, and `search_calendar_events` its events under `events`, each with a `title` (the subject, or `(no subject)` when it has none) and its Outlook link (`outlookWebLink` for an email, `webLink` for an event). `open_email` returns the email's `title` and `webLink` at the top level. Conduct (`unique-cli mcp`) cites each email and event by that title and link. An event without a `webLink` is not cited. The tools send the module's default content, one JSON text item of the result, so Unique AI does not cite them.
+
 ---
 
 ## Email Search
@@ -249,7 +253,7 @@ Semantic `isRead` and `flagStatus` are ingested metadata, refreshed by live catc
     msGraphMessageId: string;     // Microsoft Graph message ID, the same as openEmailParams.id. Present for results of both backends.
     backend: "Unique" | "MsGraph"; // which backend returned this result
     folderId: string;              // internal folder ID — do not display to users
-    title: string;                 // email subject
+    title: string;                 // email subject, or "(no subject)"
     from: string;                  // sender email address
     receivedDateTime?: string | null; // ISO 8601
     text: string;                  // "## Semantically Matched Content" and/or "## Preview" — never the full body
@@ -356,6 +360,8 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
   success: boolean;
   status?: string;
   message?: string;
+  title?: string | null;       // email subject, or "(no subject)"
+  webLink?: string | null;     // opens the email in Outlook on the web; null when no link could be built
   emailData?: {
     id: string;
     title: string | null;
@@ -372,6 +378,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 - Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
 - When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
 - When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
+- `webLink` is the Outlook on the web link of the email. For a shared or delegated mailbox it is the classic OWA link built from the message RestId (see `BuildWebLinksCommand`), because the link Graph returns for those mailboxes does not always open. Link the subject to it when it is set; otherwise show the subject as plain text.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.
 
@@ -938,6 +945,7 @@ Results are capped. Where a filter runs relative to that cap decides what an emp
   success: boolean;
   message: string;
   events?: Array<{
+    title: string;                // subject, or "(no subject)"
     subject: string | null;
     body: string;                 // plain-text agenda; may be truncated — see bodyTruncated
     bodyTruncated: boolean;

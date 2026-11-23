@@ -19,7 +19,7 @@ const SearchEmailResultSchema = z.object({
     .describe(
       'ID of the folder containing this email. Internal identifier — do not display to the user.',
     ),
-  title: z.string().describe('Subject line of the email.'),
+  title: z.string().describe('Subject line of the email, or "(no subject)" when it has none.'),
   from: z.string().describe('Sender email address.'),
   receivedDateTime: z
     .string()
