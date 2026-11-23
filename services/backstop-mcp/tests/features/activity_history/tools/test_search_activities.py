@@ -36,6 +36,7 @@ _URL = f"{BASE_URL}/entity-activities"
 _TOOL_LOGGER = "backstop_mcp.features.activity_history.tools.search_activities"
 _PARTY_ID = "354566359"
 _SEARCH_CONFIG = SearchConfig(result_size=100)
+_NO_UI_LINKS = BuildEntityLinkUtil(ui_base_url=None)
 
 
 def _page(*rows: dict[str, object], total: int | None = None) -> httpx.Response:
@@ -103,6 +104,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -136,7 +138,7 @@ class TestSearchActivities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_url_is_off_by_default_and_arrives_when_selected(
+    async def test_url_is_on_by_default_and_drops_out_of_a_custom_list(
         self, client: BackstopClient
     ) -> None:
         respx.post(_URL).mock(
@@ -160,19 +162,19 @@ class TestSearchActivities:
                 SearchActivitiesResolvedResponse,
             )
 
-        default_rows = object_list(tool_payload(await run(None))["rows"])
-        assert "url" not in object_dict(default_rows[0])
-
         email_url = (
             "https://tenant.example.test/backstop/crm/collaboration/"
             + "DisplayEmailMessage.action?summaryId=2&showControls=true"
         )
-        selected = object_list(tool_payload(await run(["type", "url"]))["rows"])
-        assert [object_dict(row).get("url") for row in selected] == [
+        default_rows = object_list(tool_payload(await run(None))["rows"])
+        assert object_dict(default_rows[0])["title"] == "Catch-up"
+        assert [object_dict(row).get("url") for row in default_rows] == [
             "https://tenant.example.test/backstop/activities.jsp/meetings/1",
             email_url,
             "https://tenant.example.test/backstop/activities.jsp/notes/3",
         ]
+        custom_rows = object_list(tool_payload(await run(["type"]))["rows"])
+        assert all("url" not in object_dict(row) for row in custom_rows)
 
     @pytest.mark.asyncio
     @respx.mock
@@ -187,6 +189,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -209,6 +212,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesUnavailableResponse,
         )
@@ -236,6 +240,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesUnavailableResponse,
         )
@@ -256,6 +261,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     @pytest.mark.asyncio
@@ -289,6 +295,7 @@ class TestSearchActivities:
                     resolve_party_query=make_resolve_party_query(client),
                     search_activities_query=make_search_activities_query(client),
                     search_config=_SEARCH_CONFIG,
+                    build_entity_link_util=_NO_UI_LINKS,
                 ),
                 SearchActivitiesUnavailableResponse,
             )
@@ -311,6 +318,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     @pytest.mark.asyncio
@@ -330,6 +338,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -359,6 +368,7 @@ class TestSearchActivities:
             resolve_party_query=make_resolve_party_query(client),
             search_activities_query=make_search_activities_query(client),
             search_config=_SEARCH_CONFIG,
+            build_entity_link_util=_NO_UI_LINKS,
         )
 
         attributes = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
@@ -400,6 +410,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -426,6 +437,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     @pytest.mark.asyncio
@@ -441,6 +453,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -466,6 +479,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -497,6 +511,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -536,6 +551,7 @@ class TestSearchActivities:
                     resolve_party_query=make_resolve_party_query(client),
                     search_activities_query=make_search_activities_query(client),
                     search_config=SearchConfig(result_size=2),
+                    build_entity_link_util=_NO_UI_LINKS,
                 ),
                 SearchActivitiesResolvedResponse,
             )
@@ -571,6 +587,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=SearchConfig(result_size=2),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -594,6 +611,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=SearchConfig(result_size=2),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -608,6 +626,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=SearchConfig(result_size=2),
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     @pytest.mark.asyncio
@@ -624,6 +643,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     @pytest.mark.asyncio
@@ -648,6 +668,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=SearchConfig(result_size=2),
+                build_entity_link_util=_NO_UI_LINKS,
             ),
             SearchActivitiesResolvedResponse,
         )
@@ -671,6 +692,7 @@ class TestSearchActivities:
             resolve_party_query=make_resolve_party_query(client),
             search_activities_query=make_search_activities_query(client),
             search_config=_SEARCH_CONFIG,
+            build_entity_link_util=_NO_UI_LINKS,
         )
 
         filters = object_dict(object_dict(recorded_json_bodies(route)[0]["data"])["attributes"])
@@ -688,6 +710,7 @@ class TestSearchActivities:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
     def test_from_fetch_marks_a_mid_scan_failure_as_partial(self) -> None:
@@ -736,6 +759,7 @@ class TestObservability:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
         [record] = _tool_records(caplog)
@@ -759,6 +783,7 @@ class TestObservability:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
         [record] = _tool_records(caplog)
@@ -784,6 +809,7 @@ class TestObservability:
                 resolve_party_query=make_resolve_party_query(client),
                 search_activities_query=make_search_activities_query(client),
                 search_config=_SEARCH_CONFIG,
+                build_entity_link_util=_NO_UI_LINKS,
             )
 
         assert declared == {

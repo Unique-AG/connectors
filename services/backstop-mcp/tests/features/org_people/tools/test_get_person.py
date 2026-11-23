@@ -36,7 +36,12 @@ from tests.features.party_resolver.helpers import (
     resource,
 )
 from tests.helpers import build_employment_index_factory, custom_fields_service
-from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+from tests.server.tools.helpers import (
+    object_dict,
+    object_list,
+    tool_model,
+    tool_payload,
+)
 
 _INDEX = build_employment_index_factory()
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
@@ -117,6 +122,40 @@ def _person_document(
 
 
 class TestGetPerson:
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_resolved_person_carries_its_name_and_canonical_url_at_the_top(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(f"{BASE_URL}/people/p9").mock(
+            return_value=httpx.Response(200, json=_person_document())
+        )
+        respx.get(f"{BASE_URL}/entity-relationship-types").mock(
+            return_value=httpx.Response(200, json={"data": [], "links": {}})
+        )
+
+        result = tool_model(
+            await get_person(
+                ctx_never_elicit(),
+                party_id="p9",
+                search_type="people",
+                resolve_party_query=make_resolve_party_query(client),
+                get_person_query=make_get_person_query(
+                    client, custom_fields=_catalog(client), employment_index_factory=_INDEX
+                ),
+                build_entity_link_util=BuildEntityLinkUtil(
+                    ui_base_url="https://tenant.example.test"
+                ),
+            ),
+            PersonResolvedResponse,
+        )
+
+        payload = tool_payload(result)
+        assert payload["name"] == "Jane Doe"
+        assert payload["url"] == (
+            "https://tenant.example.test/backstop/crm/ManagePerson.action?display=&party_id=p9"
+        )
+
     @pytest.mark.asyncio
     @respx.mock
     async def test_unique_search_fetches_person_and_employment_links(

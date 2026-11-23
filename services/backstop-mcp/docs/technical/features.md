@@ -169,8 +169,12 @@ Link answers back to the Backstop web app, and understand links users paste in.
 
 - Most records carry a `url` to their Backstop page when the deployment has a UI address
   [configured](../operator/configuration.md#CRM-links); without one, no link is guessed. Search
-  rows include the link only when asked for, and emails have none.
+  rows include it unless a custom `fields` list leaves it out, and emails in
+  `get_activity_history` have none.
 - A pasted link is turned into the record id and the tool to call next.
+- The read tools that return people, organizations, deals, activities, tasks, products or
+  investors name each record by its name or title and link it to its CRM page, so Conduct
+  cites it as a source.
 
 Code: [`ui_links`](https://github.com/Unique-AG/connectors/tree/main/services/backstop-mcp/src/backstop_mcp/features/ui_links).
 

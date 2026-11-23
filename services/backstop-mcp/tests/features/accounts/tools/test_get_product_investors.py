@@ -20,7 +20,12 @@ from backstop_mcp.server.tools import TOOLS
 from tests.features.accounts.conftest import make_get_product_investors_query
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_params, resource
-from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
+from tests.server.tools.helpers import (
+    object_dict,
+    object_list,
+    tool_model,
+    tool_payload,
+)
 
 _MAX_VALUED_ACCOUNTS = 50
 
@@ -200,6 +205,65 @@ class TestGetProductInvestors:
         investor_payload = object_dict(object_list(tool_payload(result)["investors"])[0])
         assert "latest_value_totals" not in investor_payload
         assert "custom_field_values" not in payload
+
+    @pytest.mark.asyncio
+    @respx.mock
+    async def test_each_investor_carries_its_name_and_the_crm_page_of_its_kind(
+        self, client: BackstopClient
+    ) -> None:
+        respx.get(_PRODUCT_URL).mock(return_value=_product_document(_ngup()))
+        respx.get(_ACCOUNTS_URL).mock(
+            return_value=_accounts_page(
+                _account("1", owner_id="o1", name="Tailspin NGUP"),
+                _account("2", owner_id="p1", name="West NGUP"),
+                _account("3", owner_id="c1", name="Unknown NGUP"),
+                included=[
+                    _owner("o1", name="Tailspin Investments"),
+                    resource(
+                        "p1",
+                        "contacts",
+                        name="West, Ann",
+                        specificResource={"resourceType": "people", "resourceId": "p1"},
+                    ),
+                    resource("c1", "contacts", name="Fabrikam Trust"),
+                ],
+            )
+        )
+
+        result = tool_model(
+            await get_product_investors(
+                ctx_never_elicit(),
+                products=[_PRODUCT_ID],
+                client=client,
+                get_product_investors_query=make_get_product_investors_query(
+                    client,
+                    max_valued_accounts=_MAX_VALUED_ACCOUNTS,
+                    ui_base_url="https://tenant.example.test",
+                ),
+            ),
+            ProductInvestorsResolvedResponse,
+        )
+
+        investors = [
+            object_dict(investor) for investor in object_list(tool_payload(result)["investors"])
+        ]
+        assert [
+            (investor["name"], investor["resource_type"], investor.get("url"))
+            for investor in investors
+        ] == [
+            (
+                "Tailspin Investments",
+                "organizations",
+                "https://tenant.example.test/backstop/crm/ManageOrganization.action"
+                + "?display=&party_id=o1",
+            ),
+            (
+                "West, Ann",
+                "people",
+                "https://tenant.example.test/backstop/crm/ManagePerson.action?display=&party_id=p1",
+            ),
+            ("Fabrikam Trust", "contacts", None),
+        ]
 
     @pytest.mark.asyncio
     @respx.mock
