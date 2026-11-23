@@ -8,12 +8,14 @@ import type { AuthorizationCode, OAuthClient } from '../interfaces/oauth-client.
 import type { OAuthSession, OAuthUserProfile } from '../interfaces/oauth-provider.interface';
 import type { PassportUser } from '../services/oauth-strategy.service';
 
+type StoredRefreshToken = RefreshTokenMetadata & { successor?: string; replayedAt?: Date };
+
 export class MockOAuthStore implements IOAuthStore {
   private clients = new Map<string, OAuthClient>();
   private sessions = new Map<string, OAuthSession>();
   private authCodes = new Map<string, AuthorizationCode>();
   private accessTokens = new Map<string, AccessTokenMetadata>();
-  private refreshTokens = new Map<string, RefreshTokenMetadata>();
+  private refreshTokens = new Map<string, StoredRefreshToken>();
   private userProfiles = new Map<
     string,
     OAuthUserProfile & { profile_id: string; provider: string }
@@ -94,20 +96,37 @@ export class MockOAuthStore implements IOAuthStore {
   }
 
   public async getRefreshToken(token: string): Promise<RefreshTokenMetadata | undefined> {
-    return this.refreshTokens.get(token);
+    const stored = this.refreshTokens.get(token);
+    if (!stored) {
+      return undefined;
+    }
+    const { successor: _successor, replayedAt: _replayedAt, ...metadata } = stored;
+    return metadata;
   }
 
   public async removeRefreshToken(token: string): Promise<void> {
     this.refreshTokens.delete(token);
   }
 
-  public async redeemRefreshToken(token: string): Promise<boolean> {
+  public async redeemRefreshToken(token: string, successor: string): Promise<boolean> {
     const metadata = this.refreshTokens.get(token);
     if (!metadata || metadata.usedAt) {
       return false;
     }
-    this.refreshTokens.set(token, { ...metadata, usedAt: new Date() });
+    this.refreshTokens.set(token, { ...metadata, usedAt: new Date(), successor });
     return true;
+  }
+
+  public async claimRefreshTokenReplay(
+    token: string,
+    usedAfter: Date,
+  ): Promise<string | undefined> {
+    const metadata = this.refreshTokens.get(token);
+    if (!metadata?.usedAt || metadata.usedAt < usedAfter || metadata.replayedAt) {
+      return undefined;
+    }
+    this.refreshTokens.set(token, { ...metadata, replayedAt: new Date() });
+    return metadata.successor;
   }
 
   public async revokeTokenFamily(familyId: string): Promise<void> {

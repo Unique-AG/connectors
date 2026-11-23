@@ -15,7 +15,7 @@ import {
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { Logger } from '@nestjs/common';
 import { Cache } from 'cache-manager';
-import { and, eq, isNull, lt } from 'drizzle-orm';
+import { and, eq, gte, isNull, lt } from 'drizzle-orm';
 import { typeid } from 'typeid-js';
 import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
 import { DrizzleDatabase } from '../db/drizzle.module';
@@ -359,10 +359,10 @@ export class McpOAuthStore implements IOAuthStore {
       .where(and(eq(tokens.token, this.hashToken(token)), eq(tokens.type, 'REFRESH')));
   }
 
-  public async redeemRefreshToken(token: string): Promise<boolean> {
+  public async redeemRefreshToken(token: string, successor: string): Promise<boolean> {
     const redeemed = await this.drizzle
       .update(tokens)
-      .set({ usedAt: new Date() })
+      .set({ usedAt: new Date(), successor })
       .where(
         and(
           eq(tokens.token, this.hashToken(token)),
@@ -373,6 +373,26 @@ export class McpOAuthStore implements IOAuthStore {
       .returning({ id: tokens.id });
 
     return redeemed.length > 0;
+  }
+
+  public async claimRefreshTokenReplay(
+    token: string,
+    usedAfter: Date,
+  ): Promise<string | undefined> {
+    const [claimed] = await this.drizzle
+      .update(tokens)
+      .set({ replayedAt: new Date() })
+      .where(
+        and(
+          eq(tokens.token, this.hashToken(token)),
+          eq(tokens.type, 'REFRESH'),
+          gte(tokens.usedAt, usedAfter),
+          isNull(tokens.replayedAt),
+        ),
+      )
+      .returning({ successor: tokens.successor });
+
+    return claimed?.successor ?? undefined;
   }
 
   public async revokeAllTokensForUserProfile(userProfileId: string): Promise<RevokedTokens> {

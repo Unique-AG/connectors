@@ -1,5 +1,5 @@
 import { relations } from 'drizzle-orm';
-import { index, integer, pgEnum, pgTable, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { index, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../../timestamps.columns';
 import { userProfiles } from '../user-profiles.table';
@@ -23,6 +23,8 @@ export const tokens = pgTable(
     familyId: varchar(),
     generation: integer(),
     usedAt: timestamp(),
+    replayedAt: timestamp(),
+    successor: text(),
     userProfileId: varchar()
       .notNull()
       .references(() => userProfiles.id, { onDelete: 'cascade', onUpdate: 'cascade' }),

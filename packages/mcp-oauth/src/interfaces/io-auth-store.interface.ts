@@ -64,10 +64,17 @@ export interface IOAuthStore {
   getRefreshToken(token: string): Promise<RefreshTokenMetadata | undefined>;
   removeRefreshToken(token: string): Promise<void>;
   /**
-   * Atomically marks an unused refresh token as used. Returns false when it was already used or
-   * no longer exists, so of several concurrent redemptions exactly one succeeds.
+   * Atomically marks an unused refresh token as used and stores the sealed successor pair with
+   * it. Returns false when it was already used or no longer exists, so of several concurrent
+   * redemptions exactly one succeeds.
    */
-  redeemRefreshToken(token: string): Promise<boolean>;
+  redeemRefreshToken(token: string, successor: string): Promise<boolean>;
+  /**
+   * Atomically claims the one replay a used refresh token is allowed, provided it was redeemed
+   * at or after `usedAfter`. Returns the sealed successor stored by the redeem; undefined when
+   * the token is unknown, unused, redeemed too long ago, or already replayed.
+   */
+  claimRefreshTokenReplay(token: string, usedAfter: Date): Promise<string | undefined>;
 
   // Refresh token family management for reuse detection
   revokeTokenFamily(familyId: string): Promise<void>;

@@ -22,6 +22,13 @@
       "when": 1793707472735,
       "tag": "0002_truncate_tokens_and_auth_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795424860156,
+      "tag": "0003_refresh_replay_successor",
+      "breakpoints": true
     }
   ]
 }
