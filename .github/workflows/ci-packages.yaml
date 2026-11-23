@@ -5,6 +5,7 @@ on:
   # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
   # Only `paths` decides when the workflow runs.
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "packages/**"
       - "!packages/mcp-credential-auth/**"
@@ -22,6 +23,7 @@ concurrency:
 
 jobs:
   validate:
+    if: github.event.pull_request.draft != true
     permissions:
       contents: read # to read the repository
     runs-on: ubuntu-24.04

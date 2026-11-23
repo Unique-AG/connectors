@@ -5,7 +5,7 @@ on:
   # A `branches: [main]` filter skips this workflow for all pull requests in a stack except the first.
   # Only `paths` decides when the workflow runs.
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "services/**"
       - "packages/**"
@@ -39,10 +39,12 @@ concurrency:
 jobs:
   detect-changes:
     name: Detect changes (Node)
+    if: github.event.pull_request.draft != true
     runs-on: ubuntu-slim
     timeout-minutes: 5
     outputs:
       services: ${{ steps.build-matrix.outputs.services }}
+      deploy-services: ${{ steps.build-matrix.outputs.deploy-services }}
       packages-changed: ${{ steps.filter.outputs.packages }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -126,6 +128,12 @@ jobs:
             services='[]'
           fi
           echo "services=$services" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$WORKFLOW_CHANGED" = "true" ]; then
+            deploy_services="$services"
+          else
+            deploy_services=$(echo "${SERVICES_FILES:-[]}" | jq -c '[.[] | split("/") | select(.[0] == "services" and .[2] == "deploy") | .[1]] | unique')
+          fi
+          echo "deploy-services=$deploy_services" >> "$GITHUB_OUTPUT"
           echo "Services to validate: $services"
 
   syncpack:
@@ -167,3 +175,4 @@ jobs:
     with:
       service-name: ${{ matrix.service }}
       service-path: services/${{ matrix.service }}
+      validate-deploy: ${{ contains(fromJson(needs.detect-changes.outputs.deploy-services), matrix.service) }}
