@@ -107,8 +107,9 @@ a question.
 section of the default notebook.
 - Microsoft Graph cannot set the indent level of a page, so the new page is always at the top \
 level of its section. If the user wants a subpage, tell them to do two steps in OneNote. \
-First, drag the page in the page list to directly below the page that must be its parent. Then \
-right-click the page and select Make Subpage.
+First, move the page in the page list to directly below the page that must be its parent. Then \
+make it a subpage: on a computer, right-click the page and select Make Subpage. On an iPad or an \
+iPhone, tap Edit, select the page, and tap the indent control.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
 days.
