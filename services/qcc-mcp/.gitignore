@@ -1,0 +1,10 @@
+# credentials — never commit
+.env
+secrets.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+dist/
+*.egg-info/
