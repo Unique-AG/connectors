@@ -1,6 +1,7 @@
 import functools
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import AsyncGenerator, Mapping, Sequence
+from contextlib import asynccontextmanager
 from typing import cast
 
 import httpx
@@ -10,7 +11,7 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 
-from tests.e2e.test_scenarios import build_server
+from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.tools.scenarios.support import Person, call
 
 LIST_ID = "AAMkSYNTHETIClist0001"
@@ -20,6 +21,7 @@ TASK = f"outlook:///tasks/{LIST_ID}/{TASK_ID}"
 LISTS = "/me/todo/lists"
 TASKS = f"/me/todo/lists/{LIST_ID}/tasks"
 ONE_TASK = f"{TASKS}/{TASK_ID}"
+ONE_LIST = f"/me/todo/lists/{LIST_ID}"
 ZURICH = "Europe/Zurich"
 
 
@@ -43,6 +45,11 @@ def _task(
     if due_utc is not None:
         task["dueDateTime"] = {"dateTime": due_utc, "timeZone": "UTC"}
     return task | extra
+
+
+def _list_is(graph: respx.MockRouter, *, shared: bool, name: str = "Tasks") -> None:
+    listed = {"id": LIST_ID, "displayName": name, "isShared": shared}
+    _ = graph.get(ONE_LIST).mock(return_value=httpx.Response(200, json=listed))
 
 
 def _rows(answer: Mapping[str, object], key: str) -> Sequence[Mapping[str, object]]:
@@ -171,6 +178,7 @@ class TestChangingTasks:
         self, graph: respx.MockRouter
     ) -> None:
         created = _task(TASK_ID, "Send the Q3 report", due_utc="2026-11-26T23:00:00.0000000")
+        _list_is(graph, shared=False)
         route = graph.post(TASKS).mock(return_value=httpx.Response(201, json=created))
         person = Person()
 
@@ -199,6 +207,7 @@ class TestChangingTasks:
 
     async def test_a_task_is_completed(self, graph: respx.MockRouter) -> None:
         done = _task(TASK_ID, "Send the Q3 report", status="completed")
+        _list_is(graph, shared=False)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=done))
 
         answer = await call("outlook_complete_task", uri=TASK)
@@ -210,6 +219,7 @@ class TestChangingTasks:
         self, graph: respx.MockRouter
     ) -> None:
         reopened = _task(TASK_ID, "Send the Q3 report")
+        _list_is(graph, shared=False)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=reopened))
 
         answer = await call(
@@ -218,6 +228,55 @@ class TestChangingTasks:
 
         assert _sent(route) == {"status": "notStarted", "dueDateTime": None}
         assert (answer["status"], answer["due_date"]) == ("not_started", None)
+
+
+class TestASharedList:
+    async def test_a_task_goes_into_a_shared_list_only_after_the_person_agrees(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=True, name="Team launch")
+        created = _task(TASK_ID, "Book the venue")
+        route = graph.post(TASKS).mock(return_value=httpx.Response(201, json=created))
+        person = Person()
+
+        _ = await call(
+            "outlook_create_task", task_list=TASK_LIST, title="Book the venue", person=person
+        )
+
+        [question] = person.asked
+        assert "'Book the venue'" in question and "'Team launch'" in question
+        assert route.call_count == 1
+
+    async def test_a_declined_completion_in_a_shared_list_changes_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=True, name="Team launch")
+        route = graph.patch(ONE_TASK).mock(
+            return_value=httpx.Response(200, json=_task(TASK_ID, "x"))
+        )
+
+        with pytest.raises(ToolError, match="Nothing was changed"):
+            _ = await call("outlook_complete_task", uri=TASK, person=Person(approval="no"))
+
+        assert route.call_count == 0
+
+    async def test_a_change_in_a_shared_list_is_asked_in_the_newer_protocol_too(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=True, name="Team launch")
+        changed = _task(TASK_ID, "Book the venue", importance="high")
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=changed))
+        person = Person()
+
+        async with _modern_client(person) as client:
+            answer = await client.call_tool(
+                "outlook_update_task", {"uri": TASK, "priority": "high"}
+            )
+
+        assert answer.structured_content is not None
+        [question] = person.asked
+        assert "'Team launch'" in question
+        assert route.call_count == 1
 
 
 class TestRefusals:
@@ -255,6 +314,7 @@ class TestRefusals:
         self, graph: respx.MockRouter
     ) -> None:
         missing = {"error": {"code": "ErrorItemNotFound", "message": "The object was not found."}}
+        _list_is(graph, shared=False)
         _ = graph.patch(ONE_TASK).mock(return_value=httpx.Response(404, json=missing))
 
         with pytest.raises(ToolError, match="Find it again with outlook_list_tasks"):
@@ -296,6 +356,14 @@ _TASK_TOOLS = (
     "outlook_update_task",
     "outlook_complete_task",
 )
+
+
+@asynccontextmanager
+async def _modern_client(person: Person) -> AsyncGenerator[Client[FastMCPTransport]]:
+    with pytest.MonkeyPatch.context() as patch:
+        patch_obo(patch)
+        async with Client(FastMCPTransport(_server()), elicitation_handler=person) as client:
+            yield client
 
 
 @functools.cache

@@ -110,9 +110,6 @@ _NEVER_ASKS = frozenset(
         "outlook_set_focused_override",
         "outlook_disable_mail_rule",
         "outlook_update_contact",
-        "outlook_create_task",
-        "outlook_update_task",
-        "outlook_complete_task",
     }
 )
 

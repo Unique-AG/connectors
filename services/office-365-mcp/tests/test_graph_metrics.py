@@ -1344,6 +1344,7 @@ GRAPH_STEPS = frozenset(
         "create_contact",
         "update_contact",
         "task_lists",
+        "task_list",
         "tasks",
         "task",
         "create_task",

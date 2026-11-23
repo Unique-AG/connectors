@@ -4,16 +4,18 @@ from datetime import date
 from typing import Annotated
 
 import httpx
-from fastmcp import FastMCP
+from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
+from mcp.types import InputRequiredResult
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import zone_named
+from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
     BODY_FIELD,
@@ -31,8 +33,16 @@ from office_365_mcp.shared.outlook.tasks import (
     graph_importance,
     graph_status,
     html_body,
+    list_audience,
+    shared_list_reason,
 )
-from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, graph_client_for_caller
+from office_365_mcp.shared.seam import (
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Confirm,
+    answer_pending,
+    graph_client_for_caller,
+    person_confirms,
+)
 
 TOOL_NAME = "outlook_update_task"
 
@@ -48,6 +58,8 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 }
 
 _NOTHING_CHANGED = "Nothing was changed."
+_CHANGE = "change"
+_DO_NOT_CHANGE = "do not change"
 
 _AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
@@ -61,14 +73,14 @@ GRAPH_NOT_FOUND = (
 _DESCRIPTION = """\
 Changes one Microsoft To Do task of the signed-in user, given the `uri` of an outlook_list_tasks \
 row. This tool changes only the fields that the call gives, and keeps the other fields as they \
-are. There is no draft and no review step. The task is in the user's own To Do, so this tool does \
-not ask anybody to agree. outlook_complete_task marks a task done.
+are. There is no draft and no review step. outlook_complete_task marks a task done.
 
 Notes:
 - `notes` replaces the whole notes of the task. To add to them, read the task with \
 outlook_read_task first and send the old notes with the new words.
 - To reopen a completed task, pass `status="not_started"`.
-- In a list that is shared, every person who shares it sees the change.
+- This tool asks the user to agree before it changes a task in a list that other people share, \
+because they see the change. A task in the user's own unshared list changes without a question.
 - This call is safe to repeat after a timeout.
 """
 
@@ -104,7 +116,9 @@ async def update_task(
     uri: str,
     change: TaskChange,
     time_zone: str = DEFAULT_TIME_ZONE,
-) -> TaskDetail:
+    confirm: Confirm,
+    answer_pending: bool = False,
+) -> TaskDetail | InputRequiredResult:
     handle = task_handle(uri)
     if handle is None:
         raise ToolError(bad_task_handle(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
@@ -126,16 +140,45 @@ async def update_task(
     if change.clear_due_date:
         body.additional_data["dueDateTime"] = None
 
-    with graph_errors(), graph_step(STEP_UPDATE):
-        updated = (
-            await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-            .tasks.by_todo_task_id(handle.task_id)
-            .patch(
-                body,
-                request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
-            )
-        )
+    about = write_state_for(
+        STEP_UPDATE,
+        handle.uri,
+        change.title or "",
+        change.notes or "",
+        "" if change.due_date is None else change.due_date.isoformat(),
+        str(change.clear_due_date),
+        change.priority or "",
+        change.status or "",
+        time_zone,
+    )
 
+    updated: TodoTask | None = None
+    asked: InputRequiredResult | None = None
+    refused: str | None = None
+    with graph_errors():
+        audience = await list_audience(client, handle.list_id)
+        if answer_pending or audience.is_shared:
+            with not_graph():
+                answer = await confirm(f"Change a task {shared_list_reason(audience)}?", about)
+            asked = answer if isinstance(answer, InputRequiredResult) else None
+            refused = answer if isinstance(answer, str) else None
+        if refused is None and asked is None:
+            with graph_step(STEP_UPDATE):
+                updated = (
+                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                    .tasks.by_todo_task_id(handle.task_id)
+                    .patch(
+                        body,
+                        request_configuration=RequestConfiguration[QueryParameters](
+                            options=no_retry()
+                        ),
+                    )
+                )
+
+    if asked is not None:
+        return asked
+    if refused is not None:
+        raise ToolError(refused)
     assert updated is not None, "Graph answered a task update with no task"
     return TaskDetail.from_full_task(updated, list_id=handle.list_id, zone=zone)
 
@@ -160,6 +203,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        ctx: Context,
         title: Annotated[
             str | None, Field(min_length=1, pattern=r"\S", description=TITLE_FIELD)
         ] = None,
@@ -185,7 +229,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             DEFAULT_TIME_ZONE
         ),
         client: GraphServiceClient = graph,
-    ) -> TaskDetail:
+    ) -> TaskDetail | InputRequiredResult:
         return await update_task(
             client,
             uri=uri,
@@ -198,4 +242,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 status=status,
             ),
             time_zone=time_zone,
+            confirm=person_confirms(
+                ctx, agree=_CHANGE, decline=_DO_NOT_CHANGE, nothing_happened=_NOTHING_CHANGED
+            ),
+            answer_pending=answer_pending(ctx),
         )

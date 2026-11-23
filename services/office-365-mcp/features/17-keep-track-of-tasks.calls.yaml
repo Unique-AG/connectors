@@ -186,3 +186,32 @@ uc-17-15:
   provenance: drafted
   asks_user: false
   chain: []
+
+uc-17-16:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_task_goes_into_a_shared_list_only_after_the_person_agrees"
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_change_in_a_shared_list_is_asked_in_the_newer_protocol_too"
+  ask: "Add Book the venue to Team launch."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Book the venue}
+      uses: {task_list: uri of Team launch}
+
+uc-17-17:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_declined_completion_in_a_shared_list_changes_nothing"
+  ask: "Mark Book the venue as done."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Book the venue}
+      uses: {task_list: uri of Team launch}
+    - tool: outlook_complete_task
+      uses: {uri: uri of the task}

@@ -1,7 +1,9 @@
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time
 from typing import Annotated, Literal, Self
 from zoneinfo import ZoneInfo
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
 from msgraph.generated.models.importance import Importance
@@ -10,13 +12,22 @@ from msgraph.generated.models.task_status import TaskStatus
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.generated.models.todo_task_list import TodoTaskList
 from msgraph.generated.models.wellknown_list_name import WellknownListName
+from msgraph.generated.users.item.todo.lists.item.todo_task_list_item_request_builder import (
+    TodoTaskListItemRequestBuilder,
+)
+from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
+from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.handles import TaskHandle, TaskListHandle
 from office_365_mcp.shared.markdown import markdown_to_html
 
 DEFAULT_TIME_ZONE = "UTC"
+
+STEP_TASK_LIST = "task_list"
+
+_ListQuery = TodoTaskListItemRequestBuilder.TodoTaskListItemRequestBuilderGetQueryParameters
 
 Status = Literal["not_started", "in_progress", "completed", "waiting_on_others", "deferred"]
 Priority = Literal["low", "normal", "high"]
@@ -114,6 +125,31 @@ def day_of(moment: DateTimeTimeZone | None, *, zone: ZoneInfo) -> date | None:
     except ValueError:
         return None
     return naive.replace(tzinfo=stated).astimezone(zone).date()
+
+
+@dataclass(frozen=True, slots=True)
+class ListAudience:
+    name: str
+    is_shared: bool
+
+
+async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudience:
+    with graph_step(STEP_TASK_LIST):
+        found = await client.me.todo.lists.by_todo_task_list_id(list_id).get(
+            request_configuration=RequestConfiguration[_ListQuery](
+                query_parameters=_ListQuery(select=["id", "displayName", "isShared"])
+            )
+        )
+    assert found is not None, "Graph answered a task list read with no list"
+    return ListAudience(name=found.display_name or "", is_shared=found.is_shared is True)
+
+
+def shared_list_reason(audience: ListAudience) -> str:
+    return (
+        f"in the list {audience.name!r}, which other people share. They see the change"
+        if audience.name
+        else "in a list that other people share. They see the change"
+    )
 
 
 def html_body(markdown: str) -> ItemBody:

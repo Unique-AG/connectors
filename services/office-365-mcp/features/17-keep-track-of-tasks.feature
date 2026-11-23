@@ -52,6 +52,21 @@ Feature: Keeping track of tasks
       When Mia asks her assistant to reopen it and to remove the due date
       Then the task is open again and has no due date
 
+  Rule: A change in a list that other people share needs Mia's approval
+
+    @happy @uc-17-16
+    Scenario: A task goes into a shared list after Mia approves
+      Given Anna shares the list "Team launch" with Mia
+      When Mia asks her assistant to add "Book the venue" to "Team launch"
+      Then Mia is asked to approve the new task in "Team launch" first
+      And after she approves, "Team launch" holds "Book the venue"
+
+    @unhappy @uc-17-17
+    Scenario: A declined change in a shared list changes nothing
+      Given Anna shares the list "Team launch" with Mia, and it holds the open task "Book the venue"
+      When Mia asks her assistant to mark "Book the venue" as done, and she declines the approval
+      Then "Book the venue" stays open
+
   Rule: Mia is told why a task cannot be found or changed
 
     @unhappy @uc-17-08

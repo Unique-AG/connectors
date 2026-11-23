@@ -5240,6 +5240,34 @@ What happens:
 
 - The task is open again and has no due date.
 
+#### A change in a list that other people share needs Mia's approval
+
+**A task goes into a shared list after Mia approves**
+
+Ask your assistant: "Add Book the venue to Team launch."
+
+Tests: 2
+
+Situation: Anna shares the list "Team launch" with Mia.
+
+What happens:
+
+- Mia is asked to approve the new task in "Team launch" first.
+- After she approves, "Team launch" holds "Book the venue".
+
+**A declined change in a shared list changes nothing**
+
+Ask your assistant: "Mark Book the venue as done."
+
+Tests: 1
+
+Situation: Anna shares the list "Team launch" with Mia, and it holds the open task "Book the venue".
+
+What happens:
+
+- "Book the venue" stays open.
+- The assistant asks Mia to approve first.
+
 #### Mia is told why a task cannot be found or changed
 
 **A list name is not taken as a list**

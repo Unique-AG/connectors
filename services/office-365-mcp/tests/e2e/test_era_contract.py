@@ -37,6 +37,7 @@ _TOOLS = HERE.parents[1] / "src" / "office_365_mcp" / "tools"
 _SCENARIO_14 = "tests/tools/scenarios/test_14_share_and_delegate_calendars.py"
 _SCENARIO_04 = "tests/tools/scenarios/test_04_draft_and_send_mail.py"
 _SURFACE = "tests/tools/test_outlook_{}_surface.py"
+_SCENARIO_17 = "tests/tools/scenarios/test_17_keep_track_of_tasks.py"
 _NEVER_ASKS_IN_A_CASE = {
     "outlook_share_calendar": _SCENARIO_14,
     "outlook_unshare_calendar": _SCENARIO_14,
@@ -46,6 +47,9 @@ _NEVER_ASKS_IN_A_CASE = {
     "outlook_move_mail": _SURFACE.format("mark_and_move_mail"),
     "outlook_draft_reply_all": _SCENARIO_04,
     "outlook_update_draft": _SCENARIO_04,
+    "outlook_create_task": _SCENARIO_17,
+    "outlook_update_task": _SCENARIO_17,
+    "outlook_complete_task": _SCENARIO_17,
     **{
         tool: f"tests/tools/test_{tool}.py"
         for tool in (
