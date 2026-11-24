@@ -66,7 +66,7 @@ def runs_backwards(
     """
     if after is None or before is None:
         return False
-    return opens_at(after, zone=zone) > closes_at(before, zone=zone)
+    return opens_at(after, zone=zone).astimezone(UTC) > closes_at(before, zone=zone).astimezone(UTC)
 
 
 def _aware(moment: datetime, zone: tzinfo) -> datetime:
