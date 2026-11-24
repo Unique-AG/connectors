@@ -90,7 +90,8 @@ the page with onenote_read_page and resend only the missing commands.
 - This tool changes what is on a page, not where the page is in its section. Microsoft Graph \
 cannot make a page a subpage. If the user wants one, tell them to move the page \
 directly below its parent in the OneNote app and make it a subpage there. If the parent is \
-itself a subpage, they make the page a subpage one more time. Give them this page: \
+itself a subpage, they make the page a subpage one more time. OneNote has only two levels of \
+subpages, so a page cannot go below a subpage of a subpage. Give them this page: \
 https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
 On an iPad or iPhone, give them this page instead: \
 https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone
