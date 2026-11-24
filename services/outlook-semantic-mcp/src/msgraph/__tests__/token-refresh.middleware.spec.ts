@@ -1,6 +1,16 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Mock TokenProvider and read the private logger */
-import type { Context, Middleware } from '@microsoft/microsoft-graph-client';
+import {
+  isUpstreamCredentialRevokedError,
+  UpstreamCredentialRevokedError,
+} from '@unique-ag/mcp-oauth';
+import {
+  Client,
+  type Context,
+  GraphError,
+  type Middleware,
+} from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { isTokenExpiredError } from '../../utils/is-token-expired-error';
 import { TokenRefreshCoolingDownError } from '../token.provider';
 import { TokenRefreshMiddleware } from '../token-refresh.middleware';
 
@@ -118,6 +128,23 @@ describe('TokenRefreshMiddleware', () => {
     expect(context.response?.status).toBe(401);
     expect(next.execute).toHaveBeenCalledTimes(1);
     expect((unit as any).logger.error).not.toHaveBeenCalled();
+  });
+
+  it('keeps a revoked grant recognisable after the Graph SDK wraps it', async () => {
+    respondWith(expiredTokenResponse());
+    tokenProvider.refreshAccessToken.mockRejectedValue(
+      new UpstreamCredentialRevokedError('AADSTS70000: Provided grant is invalid or malformed.'),
+    );
+    const client = Client.initWithMiddleware({ middleware: unit });
+
+    const error = await client
+      .api('/users/jane.doe@contoso.example/messages')
+      .get()
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(GraphError);
+    expect(isUpstreamCredentialRevokedError(error)).toBe(true);
+    expect(isTokenExpiredError(error)).toBe(true);
   });
 
   it('does not refresh when Graph does not answer 401', async () => {
