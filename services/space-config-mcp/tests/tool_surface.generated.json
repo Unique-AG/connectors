@@ -453,6 +453,7 @@
       "properties": {
         "config_json": {
           "description": "JSON string previously returned by export_space_config. Auto-snapshots current state before applying.",
+          "maxLength": 1000000,
           "type": "string"
         }
       },

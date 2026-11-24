@@ -541,6 +541,11 @@ async def get_magic_table_config(
     """
     user_id, company_id = caller
     effective_space_id = target_space_id or space_id
+    if target_space_id is not None:
+        try:
+            await upstream.get_space(user_id, company_id, target_space_id)
+        except Exception as exc:
+            raise ToolError("target_space_id not found or not accessible.") from exc
     try:
         return await contexts.get_magic_table_config(
             upstream=upstream,
@@ -660,6 +665,11 @@ async def update_magic_table_config(  # noqa: PLR0913
     """
     user_id, company_id = caller
     effective_space_id = target_space_id or space_id
+    if target_space_id is not None:
+        try:
+            await upstream.get_space(user_id, company_id, target_space_id)
+        except Exception as exc:
+            raise ToolError("target_space_id not found or not accessible.") from exc
 
     module_patch: RfpModuleConfig | None = None
     if any(

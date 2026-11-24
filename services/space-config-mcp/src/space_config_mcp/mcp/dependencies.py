@@ -50,10 +50,11 @@ async def get_caller() -> tuple[str, str]:
             if uid and isinstance(uid, str) and cid and isinstance(cid, str):
                 return uid, cid
 
-    uid = os.environ.get("UNIQUE_AUTH_USER_ID")
-    cid = os.environ.get("UNIQUE_AUTH_COMPANY_ID")
-    if uid and cid:
-        return uid, cid
+    if os.environ.get("ALLOW_EPHEMERAL_OAUTH_STORAGE", "").lower() == "true":
+        uid = os.environ.get("UNIQUE_AUTH_USER_ID")
+        cid = os.environ.get("UNIQUE_AUTH_COMPANY_ID")
+        if uid and cid:
+            return uid, cid
 
     raise ToolError(
         "Cannot resolve caller identity: no _meta auth keys and "
@@ -88,9 +89,10 @@ async def get_space_id(
                     raise ToolError("Space not found or not accessible.") from exc
                 return aid
 
-    aid = os.environ.get("UNIQUE_AUTH_ASSISTANT_ID")
-    if aid:
-        return aid
+    if os.environ.get("ALLOW_EPHEMERAL_OAUTH_STORAGE", "").lower() == "true":
+        aid = os.environ.get("UNIQUE_AUTH_ASSISTANT_ID")
+        if aid:
+            return aid
 
     raise ToolError(
         "Cannot resolve space ID: no _meta assistant-id key and "

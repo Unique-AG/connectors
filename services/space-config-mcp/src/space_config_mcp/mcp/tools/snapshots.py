@@ -199,10 +199,11 @@ async def import_space_config(
     config_json: Annotated[
         str,
         Field(
+            max_length=1_000_000,
             description=(
                 "JSON string previously returned by export_space_config. "
                 "Auto-snapshots current state before applying."
-            )
+            ),
         ),
     ],
     upstream: Upstream = Depends(get_upstream),
@@ -212,11 +213,14 @@ async def import_space_config(
 ) -> dict[str, object]:
     """Apply a previously exported JSON config to the current space, auto-snapshotting first."""
     user_id, company_id = caller
-    return await contexts.import_space_config(
-        upstream=upstream,
-        persistence=persistence,
-        user_id=user_id,
-        company_id=company_id,
-        space_id=space_id,
-        config_json=config_json,
-    )
+    try:
+        return await contexts.import_space_config(
+            upstream=upstream,
+            persistence=persistence,
+            user_id=user_id,
+            company_id=company_id,
+            space_id=space_id,
+            config_json=config_json,
+        )
+    except SpaceConfigError as exc:
+        raise ToolError(str(exc)) from exc

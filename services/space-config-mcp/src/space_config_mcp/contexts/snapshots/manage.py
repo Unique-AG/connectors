@@ -5,12 +5,32 @@ import logging
 from typing import cast, Literal
 import uuid
 
+from pydantic import ValidationError
 import unique_sdk
 
 from space_config_mcp.persistence import Persistence
+from space_config_mcp.shared import ConductConfig
+from space_config_mcp.shared import SpaceConfigError
+from space_config_mcp.shared import TranslationConfig
 from space_config_mcp.upstream import Upstream
 
 _LOGGER = logging.getLogger(__name__)
+
+_KNOWN_MODULE_NAMES = {"SwappableIntelligence", "TranslatorV2"}
+
+
+def _validate_module_config(module_name: str, raw_config: dict[str, object]) -> None:
+    """Raise ToolError if a known module's config fails Pydantic validation."""
+    try:
+        if module_name == "SwappableIntelligence":
+            ConductConfig.model_validate(raw_config)
+        elif module_name == "TranslatorV2":
+            nested = cast(dict[str, object], raw_config.get("TranslationConfig") or {})
+            TranslationConfig.model_validate(nested)
+    except ValidationError as exc:
+        raise SpaceConfigError(
+            f"Module {module_name!r} configuration in snapshot failed validation: {exc}"
+        ) from exc
 
 
 async def snapshot_space(
@@ -161,8 +181,11 @@ async def revert_space(
                 continue
             mod_obj = cast(dict[str, object], mod_raw)
             mod_id = mod_obj.get("id")
+            mod_name = mod_obj.get("name")
             mod_config = mod_obj.get("configuration")
             if isinstance(mod_id, str) and isinstance(mod_config, dict):
+                if isinstance(mod_name, str):
+                    _validate_module_config(mod_name, cast(dict[str, object], mod_config))
                 await upstream.modify_module(
                     user_id,
                     company_id,
@@ -275,6 +298,7 @@ async def import_space_config(
             mod_name = mod_obj.get("name")
             mod_config = mod_obj.get("configuration")
             if isinstance(mod_name, str) and isinstance(mod_config, dict):
+                _validate_module_config(mod_name, cast(dict[str, object], mod_config))
                 target_id = target_by_name.get(mod_name)
                 if target_id:
                     await upstream.modify_module(
