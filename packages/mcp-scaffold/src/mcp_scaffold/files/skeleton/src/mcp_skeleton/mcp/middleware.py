@@ -35,6 +35,8 @@ def http_middleware(mcp: FastMCP, settings: ServerSettings) -> list[Middleware]:
                 "Authorization",
                 "Content-Type",
                 "Mcp-Protocol-Version",
+                "Mcp-Method",
+                "Mcp-Name",
                 "Mcp-Session-Id",
             ],
             # A browser client reads the auth pointer of a 401 from WWW-Authenticate.
