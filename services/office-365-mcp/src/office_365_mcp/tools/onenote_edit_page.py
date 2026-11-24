@@ -89,6 +89,7 @@ belongs to somebody else. A set in the user's own unshared notebook runs without
 the page with onenote_read_page and resend only the missing commands.
 - This tool changes what is on a page, not where the page is in its section. Microsoft Graph \
 cannot make a page a subpage. If the user wants one, tell them to move the page \
+into the section of its parent if it is in another section. Then they move it \
 directly below its parent in the OneNote app and make it a subpage there. If the parent is \
 itself a subpage, they make the page a subpage one more time. OneNote has only two levels of \
 subpages, so a page cannot go below a subpage of a subpage. If OneNote sorts the pages of the \
