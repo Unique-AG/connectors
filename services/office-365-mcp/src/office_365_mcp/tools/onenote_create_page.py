@@ -106,7 +106,8 @@ a question.
 - Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
 section of the default notebook.
 - Microsoft Graph cannot set the indent level of a page, so the new page is always at the top \
-level of its section. If the user wants a subpage, tell them to move the page \
+level of its section. If the user wants a subpage, create the page in the section of its \
+parent. Then tell them to move the page \
 directly below its parent in the OneNote app and make it a subpage there. If the parent is \
 itself a subpage, they make the page a subpage one more time. OneNote has only two levels of \
 subpages, so a page cannot go below a subpage of a subpage. If OneNote sorts the pages of the \
