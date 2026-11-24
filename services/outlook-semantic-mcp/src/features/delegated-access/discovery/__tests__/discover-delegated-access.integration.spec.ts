@@ -131,6 +131,9 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
   const discoveryState = () =>
     persistentCacheService.get(DISCOVER_DELEGATED_ACCESS_CACHE_KEY, 'DelegatedAccessDiscovery');
 
+  // What the scheduler publishes: a new cycle requested now.
+  const newCycleRequest = () => ({ newCycleRequestedAt: Date.now() });
+
   const processedDelegates = () =>
     graphClientFactory.createClientForUser.mock.calls.map(([delegateUserId]) => delegateUserId);
 
@@ -140,7 +143,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     const carol = await insertUser('carol');
     const startedAt = Date.now();
 
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     expect(await accessPairs()).toEqual(
       [
@@ -164,7 +167,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     const alice = await insertUser('alice');
     const bob = await insertUser('bob');
     const carol = await insertUser('carol');
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     graphAnswer = async (delegateUserId) => {
       if (delegateUserId === alice.id) {
@@ -172,7 +175,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
       }
       return { value: [] };
     };
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     expect(await accessPairs()).toContain(pair(alice, bob));
     expect(await accessPairs()).toContain(pair(alice, carol));
@@ -185,7 +188,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
 
     graphAnswer = accessGranted;
     graphClientFactory.createClientForUser.mockClear();
-    await command.run({ newCycle: false });
+    await command.run({});
 
     expect(processedDelegates()).toEqual([alice.id]);
     expect((await discoveredAt(alice))?.getTime()).toBeGreaterThanOrEqual(cycleStartedAt);
@@ -202,7 +205,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
       return { value: [] };
     };
 
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     expect(await discoveredAt(alice)).toBeNull();
     expect(await discoveredAt(bob)).not.toBeNull();
@@ -212,7 +215,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
   it("clears a delegate's records when its Microsoft grant is permanently invalid", async () => {
     const alice = await insertUser('alice');
     const bob = await insertUser('bob');
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     graphAnswer = async (delegateUserId) => {
       if (delegateUserId === alice.id) {
@@ -220,7 +223,26 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
       }
       return { value: [] };
     };
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
+
+    expect(await accessPairs()).toEqual([pair(bob, alice)]);
+  });
+
+  it("clears a delegate's records when its revoked grant arrives as the Graph SDK's GraphError", async () => {
+    const alice = await insertUser('alice');
+    const bob = await insertUser('bob');
+    await command.run(newCycleRequest());
+
+    // The SDK rethrows a middleware's error as its own GraphError, keeping the name as `code`.
+    graphAnswer = async (delegateUserId) => {
+      if (delegateUserId === alice.id) {
+        throw Object.assign(new GraphError(-1, 'Re-authentication required'), {
+          code: 'UpstreamCredentialRevokedError',
+        });
+      }
+      return { value: [] };
+    };
+    await command.run(newCycleRequest());
 
     expect(await accessPairs()).toEqual([pair(bob, alice)]);
   });
@@ -231,7 +253,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     });
     const bob = await insertUser('bob');
 
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     expect(processedDelegates()).toEqual([bob.id]);
     const cycleStartedAt = new Date((await discoveryState())?.payload.cycleStartedAt ?? 0);
@@ -244,7 +266,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     await expect(command.hasPendingDelegates(cycleStartedAt)).resolves.toBe(true);
 
     graphClientFactory.createClientForUser.mockClear();
-    await command.run({ newCycle: false });
+    await command.run({});
 
     expect(processedDelegates()).toEqual([alice.id]);
   });
@@ -252,27 +274,27 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
   it('processes no delegate again until a new cycle starts', async () => {
     const alice = await insertUser('alice');
     const bob = await insertUser('bob');
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     graphClientFactory.createClientForUser.mockClear();
-    await command.run({ newCycle: false });
+    await command.run({});
     expect(processedDelegates()).toEqual([]);
 
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
     expect(processedDelegates().sort()).toEqual([alice.id, bob.id].sort());
   });
 
   it('picks up a user who connected after the cycle started', async () => {
     await insertUser('alice');
     await insertUser('bob');
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
     const cycleStartedAt = new Date((await discoveryState())?.payload.cycleStartedAt ?? 0);
 
     const dave = await insertUser('dave');
     await expect(command.hasPendingDelegates(cycleStartedAt)).resolves.toBe(true);
 
     graphClientFactory.createClientForUser.mockClear();
-    await command.run({ newCycle: false });
+    await command.run({});
 
     expect(processedDelegates()).toEqual([dave.id]);
   });
@@ -286,7 +308,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     });
     await insertUser('signed-out', { accessToken: null, refreshToken: null });
 
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
 
     expect(processedDelegates()).toEqual([alice.id]);
     expect(await accessPairs()).toEqual([pair(alice, shared)]);
@@ -295,7 +317,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
   it('keeps a new cycle requested while another run is in progress', async () => {
     await insertUser('alice');
     await insertUser('bob');
-    await command.run({ newCycle: true });
+    await command.run(newCycleRequest());
     const previousCycle = (await discoveryState())?.payload.cycleStartedAt;
     assert.ok(previousCycle);
 
@@ -309,13 +331,45 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
       },
     });
 
-    const decision = await command.decide({ newCycle: true });
+    const decision = await command.decide(newCycleRequest());
 
     expect(decision.action).toBe('skip');
     const requestedCycle = (await discoveryState())?.payload.cycleStartedAt;
     assert.ok(requestedCycle);
     expect(requestedCycle).toBeGreaterThan(previousCycle);
     await expect(command.hasPendingDelegates(new Date(requestedCycle))).resolves.toBe(true);
+  });
+
+  it('continues the cycle when the scheduled request is redelivered after the run was killed', async () => {
+    const alice = await insertUser('alice');
+    const bob = await insertUser('bob');
+    const carol = await insertUser('carol');
+    const scheduledRequest = newCycleRequest();
+
+    // The run starts the cycle, finishes alice and is killed: its progress goes stale.
+    await command.decide(scheduledRequest);
+    const cycleStartedAt = (await discoveryState())?.payload.cycleStartedAt;
+    assert.ok(cycleStartedAt);
+    await db
+      .update(schema.userProfiles)
+      .set({ delegatedAccessDiscoveredAt: new Date() })
+      .where(eq(schema.userProfiles.id, alice.id));
+    await persistentCacheService.set(DISCOVER_DELEGATED_ACCESS_CACHE_KEY, {
+      dataType: 'DelegatedAccessDiscovery',
+      payload: {
+        state: 'running',
+        cycleStartedAt,
+        lastProgressRegisteredAt: Date.now() - 11 * 60_000,
+      },
+    });
+
+    // RabbitMQ redelivers the unacknowledged request to the restarted pod.
+    await command.run(scheduledRequest);
+
+    expect(processedDelegates().sort()).toEqual([bob.id, carol.id].sort());
+    expect((await discoveryState())?.payload).toEqual(
+      expect.objectContaining({ state: 'ready', cycleStartedAt }),
+    );
   });
 
   it('continues from a discovery state written before cycles were tracked', async () => {
@@ -335,7 +389,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
       },
     } as any);
 
-    await command.run({ newCycle: false });
+    await command.run({});
 
     expect(processedDelegates().sort()).toEqual([alice.id, bob.id].sort());
     expect((await discoveryState())?.payload).toEqual(
