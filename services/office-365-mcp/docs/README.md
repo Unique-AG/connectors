@@ -628,10 +628,13 @@ Messages, folders, drafts, and sending.
 | `outlook_create_folder` | 🟠 Add | 🤝 Shared mailbox | Creates one mail folder, at the top level or inside another folder. |
 | `outlook_rename_folder` | 🟠 Add | 🤝 Shared mailbox | Renames one mail folder. Refused for a folder that every mailbox has, such as Inbox. |
 | `outlook_set_focused_override` | 🟠 Add | — | Sets the inbox tab, Focused or Other, for all future mail from one sender. |
-| `outlook_draft_mail` | 🟠 Add | 🤝 Shared mailbox | Composes a new message into Drafts. It cannot send it and cannot add files. |
+| `outlook_draft_mail` | 🟠 Add | 🤝 Shared mailbox | Composes a new message into Drafts, in Markdown or in HTML. It cannot send it and cannot add files. |
 | `outlook_draft_reply` | 🟠 Add | 🤝 Shared mailbox | Composes a reply or a forward into Drafts. The text goes above the quoted original message. A forward keeps the attachments of the original. |
 | `outlook_draft_reply_all` | 🟠 Add | 🤝 Shared mailbox | Composes a reply to everyone on one message into Drafts. |
 | `outlook_update_draft` | 🔴 Change | 🤝 Shared mailbox | Changes the subject, text, recipients, importance, or categories of one draft. |
+
+The four drafting tools take the text as Markdown by default. With `body_format` set to `html`, they send the
+HTML to Microsoft as it is. In a shared mailbox, the approval question lists every link in the text.
 
 **What it needs**
 
@@ -675,7 +678,7 @@ Messages, folders, drafts, and sending.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. |
+| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. The approval question lists every link in the draft. |
 
 **What it needs**
 
@@ -818,7 +821,7 @@ Calendars, events, availability, rooms, and sharing.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_create_event` | 🟠 Add | 🤝 The event has attendees, a room, or a location | Creates one event on your own calendar and sends the invitations. Supports series and rooms. |
+| `outlook_create_event` | 🟠 Add | 🤝 The event has attendees, a room, or a location | Creates one event on your own calendar and sends the invitations. Supports series and rooms. Takes the body as Markdown or as HTML. |
 | `outlook_update_event` | 🟠 Add | 🤝 The event has attendees, or the change sets a location | Changes one event that you organize: time, location, body, attendees, and more. |
 | `outlook_cancel_event` | 🔴 Change | 🤝 The event has attendees | Cancels one event that you organize. Mails a cancellation to the attendees. |
 | `outlook_respond_to_invite` | 🟠 Add | 🤝 When it sends a response | Accepts, declines, or tentatively accepts an invitation that you received. |
@@ -872,7 +875,7 @@ Calendars, events, availability, rooms, and sharing.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. |
+| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. Takes the body as Markdown or as HTML. |
 
 **What it needs**
 

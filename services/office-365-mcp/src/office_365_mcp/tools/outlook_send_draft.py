@@ -8,6 +8,8 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.body_type import BodyType
+from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
 from msgraph.generated.users.item.messages.item.message_item_request_builder import (
     MessageItemRequestBuilder,
@@ -19,6 +21,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import MailAddress
+from office_365_mcp.shared.markdown import links_in_body
 from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import (
     MAILBOX_FIELD,
@@ -57,6 +60,7 @@ _DRAFT_FIELDS: tuple[str, ...] = (
     "subject",
     "isDraft",
     "changeKey",
+    "body",
 )
 
 _MessageQuery = MessageItemRequestBuilder.MessageItemRequestBuilderGetQueryParameters
@@ -153,7 +157,8 @@ def a_person_agrees(ctx: Context) -> _Confirm:
         identity = f" as {mailbox}" if mailbox is not None else ""
         question = (
             f"Send the draft {draft.subject or '(no subject)'!r} to "
-            f"{', '.join(everyone) or 'nobody'}{identity}? Sending cannot be undone."
+            f"{', '.join(everyone) or 'nobody'}{identity}?{_links_in(draft.body)} "
+            "Sending cannot be undone."
         )
         assert draft.change_key is not None, (
             "Graph answered the draft read with no changeKey, "
@@ -163,6 +168,12 @@ def a_person_agrees(ctx: Context) -> _Confirm:
         return await confirm(question, about)
 
     return asked
+
+
+def _links_in(body: ItemBody | None) -> str:
+    if body is None or body.content_type != BodyType.Html or not body.content:
+        return ""
+    return links_in_body(body.content)
 
 
 async def send_draft(

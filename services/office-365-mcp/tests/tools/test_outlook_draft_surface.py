@@ -28,7 +28,12 @@ from starlette.applications import Starlette
 from office_365_mcp.app import create_app
 from office_365_mcp.config import AppConfig, DatabaseConfig, EntraConfig, SurfaceConfig, ToolsPreset
 from office_365_mcp.shared.handles import MailMessageHandle
-from office_365_mcp.tools import outlook_draft_mail, outlook_draft_reply
+from office_365_mcp.tools import (
+    outlook_draft_mail,
+    outlook_draft_reply,
+    outlook_draft_reply_all,
+    outlook_update_draft,
+)
 
 GRAPH_V1 = "https://graph.microsoft.com/v1.0"
 
@@ -358,3 +363,43 @@ class TestTheWholeConfirmationOverARealClient:
         assert [one["emailAddress"]["address"] for one in copied] == ["pam@example.invalid"]
         assert sent["importance"] == "high"
         assert sent["categories"] == ["Finance"]
+
+    async def test_an_agreed_html_draft_in_a_shared_mailbox_writes_the_body_unchanged(
+        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
+    ) -> None:
+        arguments = {
+            **_MAIL_ARGUMENTS,
+            "body": '<p style="color:red">Ship it</p><script>alert(1)</script>',
+            "body_format": "html",
+            "mailbox": _SHARED_MAILBOX,
+        }
+
+        result = await an_agreeing_client.call_tool(outlook_draft_mail.TOOL_NAME, arguments)
+
+        assert result.structured_content is not None, "the agreed draft answered nothing"
+        (posted,) = [call for call in _made(graph) if call.request.method == "POST"]
+        assert _object(_body_of(posted)["body"]) == {
+            "contentType": "html",
+            "content": '<p style="color:red">Ship it</p><script>alert(1)</script>',
+        }
+
+
+@pytest.mark.parametrize(
+    "tool",
+    [
+        outlook_draft_mail.TOOL_NAME,
+        outlook_draft_reply.TOOL_NAME,
+        outlook_draft_reply_all.TOOL_NAME,
+        outlook_update_draft.TOOL_NAME,
+    ],
+)
+async def test_the_schema_offers_markdown_or_html_with_markdown_as_the_default(
+    an_agreeing_client: Client[FastMCPTransport], tool: str
+) -> None:
+    (listed,) = [one for one in await an_agreeing_client.list_tools() if one.name == tool]
+    schema = cast("Mapping[str, object]", listed.input_schema)
+    body_format = _object(_object(schema["properties"])["body_format"])
+
+    assert body_format["enum"] == ["markdown", "html"]
+    assert body_format["default"] == "markdown"
+    assert "body_format" not in cast("Sequence[str]", schema.get("required", []))

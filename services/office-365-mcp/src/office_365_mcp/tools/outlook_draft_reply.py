@@ -29,7 +29,12 @@ from office_365_mcp.shared.mail import (
     copied_and_marked,
     one_address_each,
 )
-from office_365_mcp.shared.markdown import markdown_to_html
+from office_365_mcp.shared.markdown import (
+    BODY_FORMAT_FIELD,
+    BodyFormat,
+    body_to_html,
+    links_in_body,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -279,6 +284,7 @@ async def draft_reply(
                             mailbox,
                             mode=mode,
                             subject=original.subject,
+                            body_html=body_html,
                             addressed=addressed,
                             cc=copied,
                             bcc=blind,
@@ -383,6 +389,7 @@ def _question(
     *,
     mode: MailReplyMode,
     subject: str | None,
+    body_html: str,
     addressed: Sequence[str],
     cc: Sequence[str],
     bcc: Sequence[str],
@@ -397,6 +404,7 @@ def _question(
         + "That mailbox is not the signed-in user's own. "
         + f"The draft is addressed to {', '.join(addressed) or _CHOSEN_BY_MICROSOFT}."
         + copied_and_marked(cc, bcc=bcc, importance=importance, categories=categories)
+        + links_in_body(body_html)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
     )
@@ -533,10 +541,14 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "What to say, as Markdown. This tool turns it into HTML and puts it above "
-                    + "the quoted original message."
+                    "What to say, in the format that `body_format` gives. This tool turns "
+                    + "Markdown into HTML and puts the text above the quoted original message."
                 ),
             ),
+        ],
+        body_format: Annotated[
+            BodyFormat,
+            Field(default="markdown", description=BODY_FORMAT_FIELD),
         ],
         to: Annotated[
             list[str],
@@ -605,7 +617,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             message_ref=message_ref,
             mode=mode,
-            body_html=markdown_to_html(body),
+            body_html=body_to_html(body, body_format),
             confirm=a_person_agrees(ctx),
             to=to,
             cc=cc,

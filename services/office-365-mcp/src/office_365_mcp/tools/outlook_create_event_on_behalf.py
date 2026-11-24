@@ -80,7 +80,12 @@ from office_365_mcp.shared.calendar import (
 )
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each
-from office_365_mcp.shared.markdown import markdown_to_html
+from office_365_mcp.shared.markdown import (
+    BODY_FORMAT_FIELD,
+    BodyFormat,
+    body_to_html,
+    links_in_body,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import CategoryName, merged_categories
 from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
@@ -553,6 +558,7 @@ def _question(calendar: Calendar, draft: EventDraft) -> str:
         + f"{draft.starts_at} to {draft.ends_at} {draft.time_zone}"
         + (f", {details}" if details else "")
         + f"? {invitations}"
+        + links_in_body(draft.body_html or "")
     )
 
 
@@ -740,14 +746,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "This is the event body, as Markdown. This tool turns it into HTML, because "
-                    + "Microsoft stores and renders the body as HTML. Write a URL out in full, "
-                    + "and do not hide it behind other words. There is no way to attach anything "
-                    + "to this event. Do not write a sentence that promises an attached file. "
-                    + "Omit this parameter for no body at all."
+                    "This is the event body, in the format that `body_format` gives. This tool "
+                    + "turns Markdown into HTML, because Microsoft stores and renders the body "
+                    + "as HTML. Write a URL out in full, and do not hide it behind other words. "
+                    + "There is no way to attach anything to this event. Do not write a sentence "
+                    + "that promises an attached file. Omit this parameter for no body at all."
                 ),
             ),
         ] = None,
+        body_format: Annotated[BodyFormat, Field(description=BODY_FORMAT_FIELD)] = "markdown",
         location: Annotated[
             str | None,
             Field(
@@ -816,7 +823,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             time_zone=time_zone,
             attendees=attendees,
             optional_attendees=optional_attendees,
-            body_html=None if body is None else markdown_to_html(body),
+            body_html=None if body is None else body_to_html(body, body_format),
             location=location,
             all_day=all_day,
             online_meeting=online_meeting,

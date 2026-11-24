@@ -357,8 +357,8 @@ class TestNothingIsSentWithoutApproval:
         self, graph: respx.MockRouter
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_get_mail_tips-anna-away")
-        routes = serve(graph, "rec-tool-outlook_send_draft-persona")
-        draft = answer_of("rec-tool-outlook_send_draft-persona", "GET", "/me/messages/")
+        routes = serve(graph, "rec-tool-outlook_send_draft-seed-draft")
+        draft = answer_of("rec-tool-outlook_send_draft-seed-draft", "GET", "/me/messages/")
         person = Person()
 
         tips = await call("outlook_get_mail_tips", addresses=[_ANNA])
@@ -1465,6 +1465,106 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
 
         assert "with no subject" in person.asked[0]
         assert "an address that Microsoft chooses" in person.asked[0]
+
+
+_STYLED = '<p style="color:red">Ship it</p><script>alert(1)</script>'
+_LINKED = {
+    "markdown": "See [the plan](https://plan.example).",
+    "html": '<p>See <a href="https://plan.example">the plan</a>.</p>',
+}
+
+
+class TestAStyledBodyReachesMicrosoftUnchanged:
+    async def test_a_new_draft_sends_the_html_unchanged(self, graph: respx.MockRouter) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_mail-basic")
+
+        _ = await call(
+            "outlook_draft_mail",
+            to=[_ANNA],
+            subject="Contract",
+            body=_STYLED,
+            body_format="html",
+        )
+
+        assert sent_json(graph, "POST", "/me/messages")["body"] == {
+            "contentType": "html",
+            "content": _STYLED,
+        }
+
+    async def test_a_reply_sends_the_html_unchanged(self, graph: respx.MockRouter) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
+
+        _ = await call(
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="reply",
+            body=_STYLED,
+            body_format="html",
+        )
+
+        assert sent_json(graph, "POST", "/createReply") == {"Comment": _STYLED}
+
+    async def test_a_reply_to_everyone_sends_the_html_unchanged(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
+
+        _ = await call(
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body=_STYLED, body_format="html"
+        )
+
+        assert sent_json(graph, "PATCH", "")["body"] == {
+            "contentType": "html",
+            "content": _STYLED,
+        }
+
+    async def test_a_changed_draft_sends_the_html_unchanged(self, graph: respx.MockRouter) -> None:
+        _ = _a_draft_addressed_to_anna(graph)
+
+        _ = await call(
+            "outlook_update_draft", message_ref=_Q3_MESSAGE, body=_STYLED, body_format="html"
+        )
+
+        assert sent_json(graph, "PATCH", "")["body"] == {
+            "contentType": "html",
+            "content": _STYLED,
+        }
+
+    async def test_a_body_format_without_a_body_leaves_the_body_of_the_draft_alone(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _a_draft_addressed_to_anna(graph)
+
+        _ = await call(
+            "outlook_update_draft", message_ref=_Q3_MESSAGE, subject="New", body_format="html"
+        )
+
+        assert "body" not in sent_json(graph, "PATCH", "")
+
+    @pytest.mark.parametrize("body_format", ["markdown", "html"])
+    @pytest.mark.parametrize("tool", _DRAFT_TOOLS)
+    async def test_the_question_for_a_shared_mailbox_names_every_link_target(
+        self, graph: respx.MockRouter, tool: str, body_format: str
+    ) -> None:
+        if tool == "outlook_draft_mail":
+            _ = serve_as(graph, "rec-tool-outlook_draft_mail-basic", _SHARED)
+            arguments: dict[str, object] = {"to": [_ANNA], "subject": "Hello"}
+        else:
+            _a_shared_mailbox_that_holds(graph, tool)
+            arguments, _opening = _draft_shared(tool)
+        person = Person()
+
+        _ = await invoke_as(
+            tool,
+            arguments
+            | {"body": _LINKED[body_format], "body_format": body_format, "mailbox": _SHARED},
+            person=person,
+        )
+
+        (question,) = person.asked
+        told = "It links to 'https://plan.example'."
+        assert told in question, question
+        assert question.index(told) < question.index("Nothing is sent."), question
 
 
 class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:

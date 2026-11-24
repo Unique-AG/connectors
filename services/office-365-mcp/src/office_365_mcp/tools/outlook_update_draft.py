@@ -24,7 +24,12 @@ from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_
 from office_365_mcp.shared.addresses import repeated_address
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
-from office_365_mcp.shared.markdown import markdown_to_html
+from office_365_mcp.shared.markdown import (
+    BODY_FORMAT_FIELD,
+    BodyFormat,
+    body_to_html,
+    links_in_body,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -395,7 +400,9 @@ def _changes(change: DraftChange) -> str:
         + (
             ""
             if change.body_html is None
-            else f"The new text opens {body_opening(change.body_html)!r}. "
+            else f"The new text opens {body_opening(change.body_html)!r}."
+            + links_in_body(change.body_html)
+            + " "
         )
         + ("" if change.importance is None else f"The new importance is {change.importance}. ")
         + _categories(change.categories)
@@ -491,11 +498,19 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The new text of the draft, as Markdown. This tool turns it into HTML. It "
-                    + "replaces the whole body."
+                    "The new text of the draft, in the format that `body_format` gives. This "
+                    + "tool turns Markdown into HTML. It replaces the whole body."
                 ),
             ),
         ] = None,
+        body_format: Annotated[
+            BodyFormat,
+            Field(
+                description=(
+                    BODY_FORMAT_FIELD + " This argument has an effect only when `body` is given."
+                )
+            ),
+        ] = "markdown",
         to: Annotated[
             list[str] | None,
             Field(
@@ -557,7 +572,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             message_ref=message_ref,
             change=DraftChange(
                 subject=subject,
-                body_html=None if body is None else markdown_to_html(body),
+                body_html=None if body is None else body_to_html(body, body_format),
                 to=to,
                 cc=cc,
                 bcc=bcc,

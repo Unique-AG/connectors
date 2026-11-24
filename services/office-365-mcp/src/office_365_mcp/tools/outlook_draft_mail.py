@@ -26,7 +26,12 @@ from office_365_mcp.shared.mail import (
     copied_and_marked,
     one_address_each,
 )
-from office_365_mcp.shared.markdown import markdown_to_html
+from office_365_mcp.shared.markdown import (
+    BODY_FORMAT_FIELD,
+    BodyFormat,
+    body_to_html,
+    links_in_body,
+)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -185,6 +190,7 @@ async def draft_mail(
             _question(
                 mailbox,
                 subject=subject,
+                body_html=body_html,
                 to=primary,
                 cc=copied,
                 bcc=blind,
@@ -247,6 +253,7 @@ def _question(
     mailbox: str,
     *,
     subject: str,
+    body_html: str,
     to: Sequence[str],
     cc: Sequence[str],
     bcc: Sequence[str],
@@ -259,6 +266,7 @@ def _question(
         + f"The draft has the subject {cut_for_a_question(subject)!r}. "
         + f"It is addressed to {', '.join(to)}."
         + copied_and_marked(cc, bcc=bcc, importance=importance, categories=categories)
+        + links_in_body(body_html)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
     )
@@ -327,8 +335,15 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
-                description="The message body, as Markdown. This tool turns it into HTML.",
+                description=(
+                    "The message body, in the format that `body_format` gives. This tool "
+                    + "turns Markdown into HTML."
+                ),
             ),
+        ],
+        body_format: Annotated[
+            BodyFormat,
+            Field(default="markdown", description=BODY_FORMAT_FIELD),
         ],
         cc: Annotated[
             list[str],
@@ -379,7 +394,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             to=to,
             subject=subject,
-            body_html=markdown_to_html(body),
+            body_html=body_to_html(body, body_format),
             confirm=a_person_agrees(ctx),
             cc=cc,
             bcc=bcc,

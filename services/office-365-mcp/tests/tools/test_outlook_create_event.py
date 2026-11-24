@@ -2367,6 +2367,7 @@ class TestTheSchemaItPublishes:
             "attendees",
             "optional_attendees",
             "body",
+            "body_format",
             "location",
             "all_day",
             "online_meeting",

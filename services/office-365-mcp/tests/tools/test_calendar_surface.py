@@ -225,6 +225,11 @@ _CALENDAR_TOOLS: tuple[tuple[str, Mapping[str, object]], ...] = (
 
 _ONE_ATTENDEE = "grace@example.invalid"
 
+_STYLED_HTML = (
+    '<p style="color: #c00">Hi <a href="https://a.example/x">docs</a></p>'
+    + "<script>alert(1)</script>"
+)
+
 _INVITING: Mapping[str, object] = {
     **outlook_create_event.GRAPH_CALL_EXAMPLE,
     "attendees": [_ONE_ATTENDEE],
@@ -360,6 +365,101 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
                 "<p>Agenda:</p>\n<ul>\n<li><strong>Budget</strong></li>\n<li>Hiring</li>\n</ul>"
             ),
         }
+
+    @pytest.mark.parametrize(("name", "arguments"), _THE_TWO_CREATES)
+    async def test_an_html_body_reaches_graph_unchanged(
+        self,
+        every_calendar_tool: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        name: str,
+        arguments: Mapping[str, object],
+    ) -> None:
+        styled = {**arguments, "body": _STYLED_HTML, "body_format": "html"}
+
+        _ = await every_calendar_tool.call_tool(name, styled)
+
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+        assert sent["body"] == {"contentType": "html", "content": _STYLED_HTML}
+
+    @pytest.mark.parametrize(("name", "arguments"), _THE_TWO_CREATES)
+    async def test_a_body_with_no_format_is_read_as_markdown(
+        self,
+        every_calendar_tool: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        name: str,
+        arguments: Mapping[str, object],
+    ) -> None:
+        _ = await every_calendar_tool.call_tool(name, {**arguments, "body": "**Budget** <b>x</b>"})
+
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+        assert sent["body"] == {
+            "contentType": "html",
+            "content": "<p><strong>Budget</strong> &lt;b&gt;x&lt;/b&gt;</p>",
+        }
+
+    @pytest.mark.parametrize(("name", "arguments"), _THE_TWO_CREATES)
+    @pytest.mark.parametrize(
+        ("body", "body_format"),
+        [
+            (_STYLED_HTML, "html"),
+            ("See [docs](https://a.example/x) and <https://b.example/y>.", "markdown"),
+        ],
+    )
+    async def test_the_question_names_every_link_target_of_the_body(
+        self,
+        app: Starlette,
+        graph: respx.MockRouter,
+        name: str,
+        arguments: Mapping[str, object],
+        body: str,
+        body_format: str,
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(
+            message: str,
+            _response_type: type | None,
+            _params: ElicitRequestParams,
+            _context: object,
+        ) -> str:
+            asked.append(message)
+            return _AGREES
+
+        server = cast("FastMCP[None]", app.state.fastmcp_server)
+        async with Client(FastMCPTransport(server), elicitation_handler=capturing) as client:
+            _ = await client.call_tool(
+                name, {**arguments, "body": body, "body_format": body_format}
+            )
+
+        expected = (
+            "It links to 'https://a.example/x'."
+            if body_format == "html"
+            else "It links to 'https://a.example/x', 'https://b.example/y'."
+        )
+        assert len(asked) == 1
+        assert asked[0].endswith(expected), asked[0]
+        assert [call for call in _made(graph) if call.request.method == "POST"], (
+            "the agreed create posted nothing"
+        )
+
+    @pytest.mark.parametrize(
+        "name", [outlook_create_event.TOOL_NAME, outlook_create_event_on_behalf.TOOL_NAME]
+    )
+    async def test_the_body_format_is_an_enum_that_defaults_to_markdown(
+        self, every_calendar_tool: Client[FastMCPTransport], name: str
+    ) -> None:
+        listed = {tool.name: tool for tool in await every_calendar_tool.list_tools()}
+
+        properties = _object(_object(listed[name].input_schema)["properties"])
+        body_format = _object(properties["body_format"])
+
+        assert body_format["enum"] == ["markdown", "html"]
+        assert body_format["default"] == "markdown"
+        assert "body_format" not in cast(
+            "Sequence[str]", _object(listed[name].input_schema).get("required", [])
+        )
 
     async def test_an_agreed_room_booking_posts_the_room_as_a_resource_with_its_options(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
