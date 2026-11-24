@@ -1,0 +1,19 @@
+scenario: outlook_read_task-repeat
+fixture: rec-tool-outlook_read_task-repeat
+source: recorded
+target: graph
+recorded_at: '2026-11-24T15:05:10+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 13
+  keys dropped: 3
+  response headers dropped: 25
+  text kept: 11
+literals:
+- Water the office plants
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

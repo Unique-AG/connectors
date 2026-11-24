@@ -157,11 +157,14 @@ The onenote family has two more phases. `onenote-group` runs as Mia. It makes th
 `onenote` first. `cleanup --phases` deletes the pages of these two phases. Graph cannot delete a
 notebook or a section, so they stay.
 
-The To Do family has one phase, `todo`. It runs as Mia, in the default of `apply`, and needs the
-permission Tasks.ReadWrite. Its data is in `corpus/outlook-tasks.yaml`.
+The To Do family has two phases. `todo` runs as Mia, in the default of `apply`, and needs the
+permission Tasks.ReadWrite. `todo-files` is opt-in and adds the two Word files. On the dogfood
+tenant, Graph answers 500 to each file that it adds to a task, and the upload session answers 404.
+Its data is in `corpus/outlook-tasks.yaml`.
 
 - It makes the list `seed-v1 Launch plan` with six tasks: a task with a due date, a completed
-  task, a task with two steps, a task with a link, and two tasks with one Word file each.
+  task, a task with two steps, a task with a link, and two tasks that get one Word file each in
+  the phase `todo-files`.
 - It adds two tasks to the built-in Tasks list: a task with a reminder, and a task that repeats
   each week on the weekday of its due date.
 - Each task has the category `seed-v1`. Each name of a list, task, step, link or file starts with
@@ -217,7 +220,7 @@ switches off an automatic reply whose text holds `seed-v1 case-`.
 | Events | 9 (Mia 8, Tom 1), no attendees |
 | OneDrive files | 5 (Mia 4, Anna 1) |
 | Mail attachments | 3, and 4 more in the phase `mail-attach` |
-| To Do | 1 list with 6 tasks, 2 steps, 1 link and 2 files; 2 tasks in the built-in Tasks list |
+| To Do | 1 list with 6 tasks, 2 steps and 1 link, and 2 files in the opt-in phase `todo-files`; 2 tasks in the built-in Tasks list |
 
 The corpus has these quirks on purpose: a mail with no subject, an empty body, an HTML-only body,
 flags, attachments, a draft, mail received yesterday, events in Windows time zones, one all-day

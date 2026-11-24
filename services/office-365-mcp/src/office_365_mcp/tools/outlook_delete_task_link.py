@@ -5,11 +5,7 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from mcp.types import InputRequiredResult
-from msgraph.generated.users.item.todo.lists.item.tasks.item.todo_task_item_request_builder import (  # noqa: E501
-    TodoTaskItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -40,7 +36,6 @@ _EXAMPLE_HANDLE = TaskPartHandle(
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"link": _EXAMPLE_HANDLE.uri}
 
-_TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
 
 _NOTHING_DELETED = "The link was not deleted."
 _AGREE = "delete the link"
@@ -108,11 +103,7 @@ async def delete_task_link(
         assert resource is not None, "Graph answered a task link read with no link"
         title = resource.display_name
         with graph_step(STEP_TASK):
-            owner = await task.get(
-                request_configuration=RequestConfiguration[_TaskQuery](
-                    query_parameters=_TaskQuery(select=["id", "title"])
-                )
-            )
+            owner = await task.get()
         assert owner is not None, "Graph answered a task read with no task"
         question = _question(title, owner.title)
         with not_graph():

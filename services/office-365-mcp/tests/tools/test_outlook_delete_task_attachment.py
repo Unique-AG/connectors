@@ -75,7 +75,7 @@ class TestWhatItSendsToGraph:
             ("DELETE", f"/v1.0{_ONE_FILE}"),
         ]
         assert made[0].request.url.params["$select"] == "id,name"
-        assert made[1].request.url.params["$select"] == "id,title"
+        assert "$select" not in made[1].request.url.params
         assert (answer.name, answer.deleted) == ("Agenda.pdf", True)
 
     async def test_a_file_that_is_gone_after_the_read_is_reported_as_deleted(

@@ -8,9 +8,6 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.users.item.todo.lists.item.tasks.item.todo_task_item_request_builder import (  # noqa: E501
-    TodoTaskItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -52,7 +49,6 @@ _NOTHING_DELETED = "The task was not deleted."
 
 _AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
-_TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task, and nothing was deleted. The handle is well formed, "
@@ -105,11 +101,7 @@ async def delete_task(
             task = (
                 await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
                 .tasks.by_todo_task_id(handle.task_id)
-                .get(
-                    request_configuration=RequestConfiguration[_TaskQuery](
-                        query_parameters=_TaskQuery(select=["id", "title"])
-                    )
-                )
+                .get()
             )
         assert task is not None, "Graph answered a task read with no task"
         question = _question(task.title, audience)

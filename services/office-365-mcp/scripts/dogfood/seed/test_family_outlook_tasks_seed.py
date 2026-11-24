@@ -22,12 +22,12 @@ PHASES = {"todo"}
 CORPUS = outlook_tasks._corpus()  # pyright: ignore[reportPrivateUsage]
 
 
-def plan() -> list[Step]:
-    return outlook_tasks.steps(CTX, "mia", PHASES)
+def plan(phases: set[str] = PHASES) -> list[Step]:
+    return outlook_tasks.steps(CTX, "mia", phases)
 
 
-def creates() -> dict[str, Step]:
-    return {str(step.key): step for step in plan() if step.kind == "create"}
+def creates(phases: set[str] = PHASES) -> dict[str, Step]:
+    return {str(step.key): step for step in plan(phases) if step.kind == "create"}
 
 
 class TodoFake(FakeGraph):
@@ -114,7 +114,9 @@ def test_the_seed_list_holds_a_due_a_completed_a_stepped_a_linked_and_two_filed_
         ("seed-v1 Check the logo", False),
         ("seed-v1 Check the dates", True),
     ]
-    filed = [s for s in creates().values() if s.path.endswith("/attachments")]
+    assert not [s for s in creates().values() if s.path.endswith("/attachments")]
+    with_files = creates({*PHASES, outlook_tasks.FILES_PHASE})
+    filed = [s for s in with_files.values() if s.path.endswith("/attachments")]
     assert [s.body["name"] for s in filed] == [
         "seed-v1 Launch brief.docx",
         "seed-v1 Old brief.docx",

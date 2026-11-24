@@ -1,0 +1,168 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_delete_task_step-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"n3Ykbh66QrGMNu1G5xfbmgFR+kEUWv==\"",
+      "displayName": "seed-v1 case-outlook_delete_task_step-created",
+      "id": "AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"f3Iyod63HcXXIi9D3otaebKQ+dTKVc==\"",
+      "displayName": "seed-v1 case-outlook_delete_task_step-created",
+      "id": "AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=/tasks",
+    "json": {
+      "title": "seed-v1 case-outlook_tasks task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"z3Geio21XpTBNl8G0sntuoON+rEMLb==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-24T15:09:50.0157316Z",
+      "hasAttachments": false,
+      "id": "AAMkUHhlFVD9FBF9ATNeFWkbSYS6JV69Wbm0HMW8IPYmSPZxU5HtDPXNJTYKMCRfqucXGLwpKJkvM0h6PQL3RuFqyXlsQcmpEGLdBtFh-RnsXFM9JoOcOULirUalKinaGVIbUkBg-KubSVR2PklrJDP=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:09:50.1495525Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_tasks task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"f3Iyod63HcXXIi9D3otaebKQ+dTKVc==\"",
+      "displayName": "seed-v1 case-outlook_delete_task_step-created",
+      "id": "AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=/tasks/AAMkUHhlFVD9FBF9ATNeFWkbSYS6JV69Wbm0HMW8IPYmSPZxU5HtDPXNJTYKMCRfqucXGLwpKJkvM0h6PQL3RuFqyXlsQcmpEGLdBtFh-RnsXFM9JoOcOULirUalKinaGVIbUkBg-KubSVR2PklrJDP=/checklistItems",
+    "json": {
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "isChecked": false
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "createdDateTime": "2026-11-24T15:09:50.4207679Z",
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "id": "00000000-0b6d-4246-832c-f64ce7414740",
+      "isChecked": false
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"f3Iyod63HcXXIi9D3otaebKQ+dTKVc==\"",
+      "displayName": "seed-v1 case-outlook_delete_task_step-created",
+      "id": "AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=/tasks/AAMkUHhlFVD9FBF9ATNeFWkbSYS6JV69Wbm0HMW8IPYmSPZxU5HtDPXNJTYKMCRfqucXGLwpKJkvM0h6PQL3RuFqyXlsQcmpEGLdBtFh-RnsXFM9JoOcOULirUalKinaGVIbUkBg-KubSVR2PklrJDP=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"n8Giqg80BwTQJo3O6hvnjlFV+sDKbu==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "checklistItems": [
+        {
+          "createdDateTime": "2026-11-24T15:09:50.4207679Z",
+          "displayName": "seed-v1 case-outlook_tasks step",
+          "id": "00000000-0b6d-4246-832c-f64ce7414740",
+          "isChecked": false
+        }
+      ],
+      "createdDateTime": "2026-11-24T15:09:50.0157316Z",
+      "hasAttachments": false,
+      "id": "AAMkUHhlFVD9FBF9ATNeFWkbSYS6JV69Wbm0HMW8IPYmSPZxU5HtDPXNJTYKMCRfqucXGLwpKJkvM0h6PQL3RuFqyXlsQcmpEGLdBtFh-RnsXFM9JoOcOULirUalKinaGVIbUkBg-KubSVR2PklrJDP=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:09:50.4762057Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_tasks task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=/tasks/AAMkUHhlFVD9FBF9ATNeFWkbSYS6JV69Wbm0HMW8IPYmSPZxU5HtDPXNJTYKMCRfqucXGLwpKJkvM0h6PQL3RuFqyXlsQcmpEGLdBtFh-RnsXFM9JoOcOULirUalKinaGVIbUkBg-KubSVR2PklrJDP=/checklistItems/00000000-0b6d-4246-832c-f64ce7414740",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "createdDateTime": "2026-11-24T15:09:50.4207679Z",
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "id": "00000000-0b6d-4246-832c-f64ce7414740",
+      "isChecked": false
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1.0/me/todo/lists/AAMkUXviLFN6LAR1SEFgVTxyZRD3LI67Gdw2HYN3HWDgVYQbO2SmRPKsBHKEYNSrcjrLFOhvEUomA6l4UHS4QHKaaMybHrboAAYoWdFi-RytCWP9LdQrOKQ=/tasks/AAMkUHhlFVD9FBF9ATNeFWkbSYS6JV69Wbm0HMW8IPYmSPZxU5HtDPXNJTYKMCRfqucXGLwpKJkvM0h6PQL3RuFqyXlsQcmpEGLdBtFh-RnsXFM9JoOcOULirUalKinaGVIbUkBg-KubSVR2PklrJDP=/checklistItems/00000000-0b6d-4246-832c-f64ce7414740",
+    "status": 204
+  }
+]

@@ -100,9 +100,7 @@ class TestWhatItSendsToGraph:
             ("GET", f"/v1.0{_PATH}"),
             ("DELETE", f"/v1.0{_PATH}"),
         ]
-        assert made[0].request.url.params["$select"] == (
-            "id,displayName,isShared,isOwner,wellknownListName"
-        )
+        assert "$select" not in made[0].request.url.params
         assert (answer.uri, answer.name, answer.deleted) == (_URI, "Launch", True)
 
     async def test_a_list_that_is_gone_after_the_read_is_reported_as_deleted(

@@ -10,9 +10,6 @@ from mcp.types import InputRequiredResult
 from msgraph.generated.users.item.todo.lists.item.tasks.item.attachments.item.attachment_base_item_request_builder import (  # noqa: E501
     AttachmentBaseItemRequestBuilder,
 )
-from msgraph.generated.users.item.todo.lists.item.tasks.item.todo_task_item_request_builder import (  # noqa: E501
-    TodoTaskItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -49,7 +46,6 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"attachment": _EXAMPLE_HANDLE.uri}
 _AttachmentQuery = (
     AttachmentBaseItemRequestBuilder.AttachmentBaseItemRequestBuilderGetQueryParameters
 )
-_TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
 
 _NOTHING_DELETED = "The file was not deleted."
 _AGREE = "delete the file"
@@ -122,11 +118,7 @@ async def delete_task_attachment(
         assert described is not None, "Graph answered a task attachment read with no attachment"
         name = described.name
         with graph_step(STEP_TASK):
-            owner = await task.get(
-                request_configuration=RequestConfiguration[_TaskQuery](
-                    query_parameters=_TaskQuery(select=["id", "title"])
-                )
-            )
+            owner = await task.get()
         assert owner is not None, "Graph answered a task read with no task"
         question = _question(name, owner.title)
         with not_graph():

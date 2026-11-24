@@ -5,13 +5,9 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.todo_task_list import TodoTaskList
 from msgraph.generated.models.wellknown_list_name import WellknownListName
-from msgraph.generated.users.item.todo.lists.item.todo_task_list_item_request_builder import (
-    TodoTaskListItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -53,9 +49,6 @@ GRAPH_NOT_FOUND = (
     + "same handle fails the same way, so do not retry it."
 )
 
-_LIST_FIELDS: tuple[str, ...] = ("id", "displayName", "isShared", "isOwner", "wellknownListName")
-
-_ListQuery = TodoTaskListItemRequestBuilder.TodoTaskListItemRequestBuilderGetQueryParameters
 
 _DESCRIPTION = """\
 Deletes one Microsoft To Do task list of the signed-in user and every task in it, given the \
@@ -138,11 +131,7 @@ async def delete_task_list(
 
 async def _task_list(client: GraphServiceClient, list_id: str) -> TodoTaskList:
     with graph_step(STEP_TASK_LIST):
-        found = await client.me.todo.lists.by_todo_task_list_id(list_id).get(
-            request_configuration=RequestConfiguration[_ListQuery](
-                query_parameters=_ListQuery(select=list(_LIST_FIELDS))
-            )
-        )
+        found = await client.me.todo.lists.by_todo_task_list_id(list_id).get()
     assert found is not None, "Graph answered a task list read with no list"
     return found
 

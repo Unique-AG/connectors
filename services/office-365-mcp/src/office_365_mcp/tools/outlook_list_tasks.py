@@ -19,7 +19,6 @@ from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.handles import task_list_handle
 from office_365_mcp.shared.outlook.tasks import (
     DEFAULT_TIME_ZONE,
-    SUMMARY_FIELDS,
     TIME_ZONE_FIELD,
     TaskSummary,
     bad_zone,
@@ -133,9 +132,7 @@ async def list_tasks(
     with graph_errors(), graph_step(STEP):
         first_page = await client.me.todo.lists.by_todo_task_list_id(handle.list_id).tasks.get(
             request_configuration=RequestConfiguration[_TasksQuery](
-                query_parameters=_TasksQuery(
-                    filter=_STATUS_FILTER[show], select=list(SUMMARY_FIELDS), top=_PAGE_SIZE
-                )
+                query_parameters=_TasksQuery(filter=_STATUS_FILTER[show], top=_PAGE_SIZE)
             )
         )
         assert first_page is not None, "Graph answered a task listing with no collection"

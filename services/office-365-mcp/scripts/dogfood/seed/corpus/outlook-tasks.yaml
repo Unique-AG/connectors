@@ -22,8 +22,8 @@ lists:
         notes: The site shows the launch plan.
         links:
           - title: Launch site
-            url: https://contoso.sharepoint.com/sites/launch
-            application: Dogfood
+            url: https://outlook.office365.com/owa/mail
+            application: Outlook
       - title: Print the launch brief
         notes: Print ten copies of the brief.
         attachments:

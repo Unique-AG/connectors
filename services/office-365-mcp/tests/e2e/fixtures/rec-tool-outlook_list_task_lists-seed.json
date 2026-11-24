@@ -1,0 +1,33 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists",
+    "query": {
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"g3Ftsq77EsKUXd4Q0ituicUJ+z8lhX==\"",
+          "displayName": "Tasks",
+          "id": "AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "defaultList"
+        },
+        {
+          "@odata.etag": "W/\"j7Noyy28IlEQMy8X8atghpOR+rBWyu==\"",
+          "displayName": "seed-v1 Launch plan",
+          "id": "AAMkKKtbGXB8XYC5PXMkQRwqSHP3LK15Ctm4IHJ7VWEwMSWrX8WwMJLbFXQMYKHpdxbRSLvoQVgkO6a3PQJ9AKNajNqbWonsOCEjGjWk-CbnRLY1MlJVFTH=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "none"
+        }
+      ]
+    }
+  }
+]

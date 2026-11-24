@@ -86,9 +86,7 @@ class TestWhatItSendsToGraph:
             ("GET", f"/v1.0{_PATH}"),
             ("PATCH", f"/v1.0{_PATH}"),
         ]
-        assert made[0].request.url.params["$select"] == (
-            "id,displayName,isShared,isOwner,wellknownListName"
-        )
+        assert "$select" not in made[0].request.url.params
         assert json.loads(made[1].request.content) == {"displayName": "Q4 launch"}
         assert (answer.uri, answer.name) == (_URI, "Q4 launch")
 

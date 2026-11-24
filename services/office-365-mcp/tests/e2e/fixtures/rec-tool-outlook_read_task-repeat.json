@@ -1,0 +1,160 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists",
+    "query": {
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"g3Ftsq77EsKUXd4Q0ituicUJ+z8lhX==\"",
+          "displayName": "Tasks",
+          "id": "AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "defaultList"
+        },
+        {
+          "@odata.etag": "W/\"j7Noyy28IlEQMy8X8atghpOR+rBWyu==\"",
+          "displayName": "seed-v1 Launch plan",
+          "id": "AAMkKKtbGXB8XYC5PXMkQRwqSHP3LK15Ctm4IHJ7VWEwMSWrX8WwMJLbFXQMYKHpdxbRSLvoQVgkO6a3PQJ9AKNajNqbWonsOCEjGjWk-CbnRLY1MlJVFTH=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "none"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=/tasks",
+    "query": {
+      "$filter": "status ne 'completed'",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"f2Njnr55QyUPLv2P4bznxdKN+yEYoy==\"",
+          "body": {
+            "content": "The plants need water once a week.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-24T15:03:13.0555611Z",
+          "dueDateTime": {
+            "dateTime": "2026-11-27T00:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "hasAttachments": false,
+          "id": "AAMkKEpoZCM0CZN7KPKgEFbtBIO2VM04Azf3RHE4EDRyAEDuK2VgQOHVUYKVDAZpafmGGWftYFmlJ8y2JPO4JuVeeWavBeywSTWcEaNb-JhyQJG0qaijMXXfkRpbWfdqCQBgDqQh-DbaVWD8DrHuUBF=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-24T15:03:13.1733915Z",
+          "recurrence": {
+            "pattern": {
+              "dayOfMonth": 0,
+              "daysOfWeek": ["friday"],
+              "firstDayOfWeek": "sunday",
+              "index": "first",
+              "interval": 1,
+              "month": 0,
+              "type": "weekly"
+            },
+            "range": {
+              "endDate": "0001-01-01",
+              "numberOfOccurrences": 0,
+              "recurrenceTimeZone": "UTC",
+              "startDate": "2026-11-27",
+              "type": "noEnd"
+            }
+          },
+          "status": "notStarted",
+          "title": "seed-v1 Water the office plants"
+        },
+        {
+          "@odata.etag": "W/\"y2Ajey32JvQQPa3A6ejmwoBU+qEQuY==\"",
+          "body": {
+            "content": "The permit ends at the end of the month.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-24T15:03:12.808057Z",
+          "dueDateTime": {
+            "dateTime": "2026-12-08T00:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "hasAttachments": false,
+          "id": "AAMkNUwrGLM4DBN6LAAwIHghGZE2DK59Mcb7GYF1ELAjZLRpK3IgGQYFDMWAOQVegpgGVDdyYZgtJ6k9WFO7CiCfqOrfPpugTTEuEnWp-RqzMXP4iaxxLJThsChqVmeqQPYpZqMb-MgyIHL9QoQiLXY=",
+          "importance": "normal",
+          "isReminderOn": true,
+          "lastModifiedDateTime": "2026-11-24T15:03:12.9258403Z",
+          "reminderDateTime": {
+            "dateTime": "2026-12-07T09:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "status": "notStarted",
+          "title": "seed-v1 Renew the parking permit"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=/tasks/AAMkKEpoZCM0CZN7KPKgEFbtBIO2VM04Azf3RHE4EDRyAEDuK2VgQOHVUYKVDAZpafmGGWftYFmlJ8y2JPO4JuVeeWavBeywSTWcEaNb-JhyQJG0qaijMXXfkRpbWfdqCQBgDqQh-DbaVWD8DrHuUBF=",
+    "query": {
+      "$expand": "checklistItems,linkedResources"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"f2Njnr55QyUPLv2P4bznxdKN+yEYoy==\"",
+      "body": {
+        "content": "The plants need water once a week.",
+        "contentType": "text"
+      },
+      "categories": ["seed-v1"],
+      "createdDateTime": "2026-11-24T15:03:13.0555611Z",
+      "dueDateTime": {
+        "dateTime": "2026-11-27T00:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkKEpoZCM0CZN7KPKgEFbtBIO2VM04Azf3RHE4EDRyAEDuK2VgQOHVUYKVDAZpafmGGWftYFmlJ8y2JPO4JuVeeWavBeywSTWcEaNb-JhyQJG0qaijMXXfkRpbWfdqCQBgDqQh-DbaVWD8DrHuUBF=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:03:13.1733915Z",
+      "recurrence": {
+        "pattern": {
+          "dayOfMonth": 0,
+          "daysOfWeek": ["friday"],
+          "firstDayOfWeek": "sunday",
+          "index": "first",
+          "interval": 1,
+          "month": 0,
+          "type": "weekly"
+        },
+        "range": {
+          "endDate": "0001-01-01",
+          "numberOfOccurrences": 0,
+          "recurrenceTimeZone": "UTC",
+          "startDate": "2026-11-27",
+          "type": "noEnd"
+        }
+      },
+      "status": "notStarted",
+      "title": "seed-v1 Water the office plants"
+    }
+  }
+]

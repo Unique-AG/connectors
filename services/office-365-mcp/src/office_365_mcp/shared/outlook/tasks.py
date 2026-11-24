@@ -3,7 +3,6 @@ from datetime import UTC, date, datetime, time
 from typing import Annotated, ClassVar, Literal, Self
 from zoneinfo import ZoneInfo
 
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.checklist_item import ChecklistItem
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
@@ -21,9 +20,6 @@ from msgraph.generated.models.task_status import TaskStatus
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.generated.models.todo_task_list import TodoTaskList
 from msgraph.generated.models.wellknown_list_name import WellknownListName
-from msgraph.generated.users.item.todo.lists.item.todo_task_list_item_request_builder import (
-    TodoTaskListItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -36,7 +32,6 @@ DEFAULT_TIME_ZONE = "UTC"
 
 STEP_TASK_LIST = "task_list"
 
-_ListQuery = TodoTaskListItemRequestBuilder.TodoTaskListItemRequestBuilderGetQueryParameters
 
 Status = Literal["not_started", "in_progress", "completed", "waiting_on_others", "deferred"]
 Priority = Literal["low", "normal", "high"]
@@ -62,22 +57,6 @@ _KIND_OF: dict[WellknownListName, Literal["tasks", "flagged_email"]] = {
     WellknownListName.FlaggedEmails: "flagged_email",
 }
 
-SUMMARY_FIELDS: tuple[str, ...] = (
-    "id",
-    "title",
-    "status",
-    "importance",
-    "dueDateTime",
-    "completedDateTime",
-    "createdDateTime",
-    "lastModifiedDateTime",
-    "categories",
-    "startDateTime",
-    "reminderDateTime",
-    "isReminderOn",
-    "recurrence",
-    "hasAttachments",
-)
 
 TIME_ZONE_FIELD = (
     "The zone that due dates use, as an IANA name such as `Europe/Zurich`, `America/New_York`, or "
@@ -297,11 +276,7 @@ class ListAudience:
 
 async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudience:
     with graph_step(STEP_TASK_LIST):
-        found = await client.me.todo.lists.by_todo_task_list_id(list_id).get(
-            request_configuration=RequestConfiguration[_ListQuery](
-                query_parameters=_ListQuery(select=["id", "displayName", "isShared"])
-            )
-        )
+        found = await client.me.todo.lists.by_todo_task_list_id(list_id).get()
     assert found is not None, "Graph answered a task list read with no list"
     return ListAudience(name=found.display_name or "", is_shared=found.is_shared)
 

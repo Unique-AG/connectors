@@ -1,0 +1,130 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_update_task-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"p4Unib29MfTFFl6M0qclnqNO+nRyiz==\"",
+      "displayName": "seed-v1 case-outlook_update_task-created",
+      "id": "AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"p4Unib29MfTFFl6M0qclnqNO+nRyiz==\"",
+      "displayName": "seed-v1 case-outlook_update_task-created",
+      "id": "AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=/tasks",
+    "json": {
+      "dueDateTime": {
+        "dateTime": "~nextFriday",
+        "timeZone": "UTC"
+      },
+      "title": "seed-v1 case-outlook_update_task task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"g8Kvfe28OcBBLa0V2cazvoCY+xYubY==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-24T15:11:48.043948Z",
+      "dueDateTime": {
+        "dateTime": "2026-11-27T00:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkTDdrBKY7TAQ8BGNlYYvpUAM6WR26Ygh0JWX2IJXrMEFkK5RmYKBPJJCIEIWrrbjELXgoLMdoX1t5BYN8RiGnjLcgEnaaYZUbDlLx-EnbIHF3FcIiGNRdyBdfEdojIIDoXbWt-TqeTME0RyF8PSV=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:11:48.1995478Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_update_task task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"v7Vdbt41JdWLFy5Z4lirokHU+yJwko==\"",
+      "displayName": "seed-v1 case-outlook_update_task-created",
+      "id": "AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/todo/lists/AAMkHVqsAFV7LMD2TDEmRGjiZPS5JT09Zsv6FQT0BUXfXZUzL6ScRDGjRNNIUVNnzwkQARybLHywS3m5UDH3AVSfvDfcHeyqTEAqUhOb-FnnNNG9SiNhKDV=/tasks/AAMkTDdrBKY7TAQ8BGNlYYvpUAM6WR26Ygh0JWX2IJXrMEFkK5RmYKBPJJCIEIWrrbjELXgoLMdoX1t5BYN8RiGnjLcgEnaaYZUbDlLx-EnbIHF3FcIiGNRdyBdfEdojIIDoXbWt-TqeTME0RyF8PSV=",
+    "json": {
+      "body": {
+        "content": "<p>The slides need the new logo.</p>",
+        "contentType": "html"
+      },
+      "dueDateTime": {
+        "dateTime": "~nextMonday+7",
+        "timeZone": "UTC"
+      },
+      "importance": "low",
+      "title": "seed-v1 case-outlook_update_task task renamed"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"q2Mhjp42FaFDHq7S1txbdtDA+wArvm==\"",
+      "body": {
+        "content": "The slides need the new logo.\r\n",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-24T15:11:48.043948Z",
+      "dueDateTime": {
+        "dateTime": "2026-12-07T00:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkTDdrBKY7TAQ8BGNlYYvpUAM6WR26Ygh0JWX2IJXrMEFkK5RmYKBPJJCIEIWrrbjELXgoLMdoX1t5BYN8RiGnjLcgEnaaYZUbDlLx-EnbIHF3FcIiGNRdyBdfEdojIIDoXbWt-TqeTME0RyF8PSV=",
+      "importance": "low",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:11:48.552001Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_update_task task renamed"
+    }
+  }
+]

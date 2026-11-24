@@ -1,0 +1,25 @@
+scenario: outlook_update_task-repeat
+fixture: rec-tool-outlook_update_task-repeat
+source: recorded
+target: graph
+recorded_at: '2026-11-24T15:12:25+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 19
+  keys dropped: 6
+  response headers dropped: 54
+  text kept: 12
+literals:
+- '2026-11-27'
+- monday
+- seed-v1 case-outlook_update_task task
+- seed-v1 case-outlook_update_task task weekly
+- seed-v1 case-outlook_update_task-repeat
+- week
+- ~nextFriday
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

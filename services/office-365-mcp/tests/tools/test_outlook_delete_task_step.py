@@ -110,8 +110,8 @@ class TestWhatItSendsToGraph:
             ("GET", f"/v1.0{_STEP_PATH}"),
             ("DELETE", f"/v1.0{_STEP_PATH}"),
         ]
-        assert made[1].request.url.params["$select"] == "id,title"
-        assert made[2].request.url.params["$select"] == "id,displayName"
+        assert "$select" not in made[1].request.url.params
+        assert "$select" not in made[2].request.url.params
         assert (answer.text, answer.deleted) == ("Book the room", True)
 
     async def test_a_step_that_is_gone_after_the_read_is_reported_as_deleted(

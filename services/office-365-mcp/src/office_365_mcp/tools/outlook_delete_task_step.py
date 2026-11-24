@@ -8,12 +8,6 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.users.item.todo.lists.item.tasks.item.checklist_items.item.checklist_item_item_request_builder import (  # noqa: E501
-    ChecklistItemItemRequestBuilder,
-)
-from msgraph.generated.users.item.todo.lists.item.tasks.item.todo_task_item_request_builder import (  # noqa: E501
-    TodoTaskItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -60,8 +54,6 @@ _NOTHING_DELETED = "The step was not deleted."
 
 _AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
-_TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
-_StepQuery = ChecklistItemItemRequestBuilder.ChecklistItemItemRequestBuilderGetQueryParameters
 
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this step, and nothing was deleted. The handle is well formed, "
@@ -114,18 +106,10 @@ async def delete_task_step(
         ).tasks.by_todo_task_id(handle.task_id)
         step_builder = task_builder.checklist_items.by_checklist_item_id(handle.part_id)
         with graph_step(STEP_TASK):
-            task = await task_builder.get(
-                request_configuration=RequestConfiguration[_TaskQuery](
-                    query_parameters=_TaskQuery(select=["id", "title"])
-                )
-            )
+            task = await task_builder.get()
         assert task is not None, "Graph answered a task read with no task"
         with graph_step(STEP_READ):
-            item = await step_builder.get(
-                request_configuration=RequestConfiguration[_StepQuery](
-                    query_parameters=_StepQuery(select=["id", "displayName"])
-                )
-            )
+            item = await step_builder.get()
         assert item is not None, "Graph answered a checklist item read with no item"
         question = _question(item.display_name, task.title, audience)
         about = confirmation_digest(TOOL_NAME, handle.uri, question)

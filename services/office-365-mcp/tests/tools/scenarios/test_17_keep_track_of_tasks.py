@@ -167,6 +167,7 @@ class TestFindingTasks:
         )
         assert answer["capped"] is False
         assert route.calls.last.request.url.params["$filter"] == "status ne 'completed'"
+        assert "$select" not in route.calls.last.request.url.params
 
     async def test_a_task_due_on_a_day_matches_a_moment_later_that_day(
         self, graph: respx.MockRouter

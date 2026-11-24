@@ -15,11 +15,12 @@ TAG = "seed-v1"
 CASE = f"{TAG} case-"
 OWNER = "mia"
 PHASE = "todo"
-PHASES: tuple[str, ...] = (PHASE,)
+FILES_PHASE = "todo-files"
+PHASES: tuple[str, ...] = (PHASE, FILES_PHASE)
+OPT_IN: tuple[str, ...] = (FILES_PHASE,)
 LISTS = "/me/todo/lists"
 DEFAULT_LIST = "defaultList"
 DEFAULT_KEY = f"{PHASE}:{DEFAULT_LIST}"
-LIST_FIELDS = "id,displayName,wellknownListName"
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "outlook-tasks.yaml"
 WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
@@ -43,8 +44,11 @@ def _ref(key: str) -> str:
     return "{" + key + "}"
 
 
-def _lookup(path: str, fields: str, lookup: str = "named", key: str | None = None) -> Step:
-    return Step(PHASE, "lookup", "GET", path, (("$select", fields),), key=key, lookup=lookup)
+def _lookup(
+    path: str, fields: str | None = None, lookup: str = "named", key: str | None = None
+) -> Step:
+    query = () if fields is None else (("$select", fields),)
+    return Step(PHASE, "lookup", "GET", path, query, key=key, lookup=lookup)
 
 
 def _moment(day: dt.date, time: str) -> dict[str, str]:
@@ -111,12 +115,12 @@ def _attachment_body(attachment: Spec) -> dict[str, str]:
     }
 
 
-def _task_steps(tasks_path: str, task: Spec, anchor: dt.date) -> list[Step]:
+def _task_steps(tasks_path: str, task: Spec, anchor: dt.date, *, files: bool) -> list[Step]:
     key = _key(task["title"])
     path = f"{tasks_path}/{_ref(key)}"
     found = [Step(PHASE, "create", "POST", tasks_path, body=task_body(task, anchor), key=key)]
     if task.get("steps"):
-        found.append(_lookup(f"{path}/checklistItems", "id,displayName"))
+        found.append(_lookup(f"{path}/checklistItems"))
         found += [
             Step(
                 PHASE,
@@ -128,11 +132,11 @@ def _task_steps(tasks_path: str, task: Spec, anchor: dt.date) -> list[Step]:
             )
             for one in task["steps"]
         ]
-    if task.get("attachments"):
+    if files and task.get("attachments"):
         found.append(_lookup(f"{path}/attachments", "id,name", "attachments", key))
         found += [
             Step(
-                PHASE,
+                FILES_PHASE,
                 "create",
                 "POST",
                 f"{path}/attachments",
@@ -149,8 +153,8 @@ def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
         return []
     corpus = _corpus()
     found = [
-        _lookup(LISTS, LIST_FIELDS),
-        _lookup(LISTS, LIST_FIELDS, "default-list", DEFAULT_KEY),
+        _lookup(LISTS),
+        _lookup(LISTS, None, "default-list", DEFAULT_KEY),
     ]
     for one in corpus["lists"]:
         key = _key(one["name"])
@@ -159,26 +163,26 @@ def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
             Step(
                 PHASE, "create", "POST", LISTS, body={"displayName": _named(one["name"])}, key=key
             ),
-            _lookup(tasks, "id,title"),
+            _lookup(tasks),
         ]
         for task in one["tasks"]:
-            found += _task_steps(tasks, task, ctx.anchor)
+            found += _task_steps(tasks, task, ctx.anchor, files=FILES_PHASE in phases)
     tasks = f"{LISTS}/{_ref(DEFAULT_KEY)}/tasks"
-    found.append(_lookup(tasks, "id,title"))
+    found.append(_lookup(tasks))
     for task in corpus["default_tasks"]:
-        found += _task_steps(tasks, task, ctx.anchor)
+        found += _task_steps(tasks, task, ctx.anchor, files=FILES_PHASE in phases)
     return found
 
 
 def _tasks(graph: Graph, list_id: str) -> Iterator[dict[str, Any]]:
-    return graph.get_all(f"{LISTS}/{list_id}/tasks", {"$select": "id,title"})
+    return graph.get_all(f"{LISTS}/{list_id}/tasks", {})
 
 
 def sweep(graph: Graph, owner: str) -> Iterator[tuple[str, str]]:
     if owner != OWNER:
         return
     seeded = {_named(one["name"]) for one in _corpus()["lists"]}
-    for found in graph.get_all(LISTS, {"$select": LIST_FIELDS}):
+    for found in graph.get_all(LISTS, {}):
         name = str(found.get("displayName") or "")
         if CASE in name:
             yield "DELETE", f"{LISTS}/{found['id']}"
@@ -196,7 +200,7 @@ def cleanup(
     corpus = _corpus()
     seeded = {_named(one["name"]) for one in corpus["lists"]}
     titles = {_named(task["title"]) for task in corpus["default_tasks"]}
-    for found in graph.get_all(LISTS, {"$select": LIST_FIELDS}):
+    for found in graph.get_all(LISTS, {}):
         if found.get("displayName") in seeded:
             yield "DELETE", f"{LISTS}/{found['id']}", None
         elif found.get("wellknownListName") == DEFAULT_LIST:

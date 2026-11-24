@@ -1,0 +1,135 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_update_task_step-checked"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"y2Fsdm23ExCIGb2F9nvvamMU+vLcsR==\"",
+      "displayName": "seed-v1 case-outlook_update_task_step-checked",
+      "id": "AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"y2Fsdm23ExCIGb2F9nvvamMU+vLcsR==\"",
+      "displayName": "seed-v1 case-outlook_update_task_step-checked",
+      "id": "AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=/tasks",
+    "json": {
+      "title": "seed-v1 case-outlook_tasks task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"v7Sogx20GkGENh3K7hhvayPF+nKpcZ==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-24T15:12:58.7825287Z",
+      "hasAttachments": false,
+      "id": "AAMkJPzmPUR2BNS9MFAgTHgeGDP4US39Ltp5KSQ3SUHuAUKqE6ZjIUNGISEUJUFansdKXUzvLStcM5g5FVO0ZfKjvHinFytaEYIhDiXz-EwdYRK2EnSgODVtcTizBckfMUHgOiFn-GgiLLI7Zq7ARBW=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:12:58.8981725Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_tasks task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"y2Fsdm23ExCIGb2F9nvvamMU+vLcsR==\"",
+      "displayName": "seed-v1 case-outlook_update_task_step-checked",
+      "id": "AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=/tasks/AAMkJPzmPUR2BNS9MFAgTHgeGDP4US39Ltp5KSQ3SUHuAUKqE6ZjIUNGISEUJUFansdKXUzvLStcM5g5FVO0ZfKjvHinFytaEYIhDiXz-EwdYRK2EnSgODVtcTizBckfMUHgOiFn-GgiLLI7Zq7ARBW=/checklistItems",
+    "json": {
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "isChecked": false
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "createdDateTime": "2026-11-24T15:12:59.127334Z",
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "id": "00000000-0b8a-4c57-8b00-865a50d82c0f",
+      "isChecked": false
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"y2Fsdm23ExCIGb2F9nvvamMU+vLcsR==\"",
+      "displayName": "seed-v1 case-outlook_update_task_step-checked",
+      "id": "AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/todo/lists/AAMkBXzcQDT6ZTI3PSQmDAggOEC4VX44Ice3JIL7WVZvMGVbY4GkDVAiFCFUALLexpxTWWtgWMmfQ2q3HUP6VHPspOwoUbzaCAXsKmLc-OcgZGL4DuNwRML=/tasks/AAMkJPzmPUR2BNS9MFAgTHgeGDP4US39Ltp5KSQ3SUHuAUKqE6ZjIUNGISEUJUFansdKXUzvLStcM5g5FVO0ZfKjvHinFytaEYIhDiXz-EwdYRK2EnSgODVtcTizBckfMUHgOiFn-GgiLLI7Zq7ARBW=/checklistItems/00000000-0b8a-4c57-8b00-865a50d82c0f",
+    "json": {
+      "isChecked": true
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "checkedDateTime": "2026-11-24T15:12:59Z",
+      "createdDateTime": "2026-11-24T15:12:59Z",
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "id": "00000000-0b8a-4c57-8b00-865a50d82c0f",
+      "isChecked": true
+    }
+  }
+]

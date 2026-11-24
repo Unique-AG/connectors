@@ -100,7 +100,7 @@ class TestWhatItSendsToGraph:
             ("GET", f"/v1.0{_TASK_PATH}"),
             ("DELETE", f"/v1.0{_TASK_PATH}"),
         ]
-        assert made[1].request.url.params["$select"] == "id,title"
+        assert "$select" not in made[1].request.url.params
         assert (answer.title, answer.deleted) == ("Buy milk", True)
 
     async def test_a_task_that_is_gone_after_the_read_is_reported_as_deleted(

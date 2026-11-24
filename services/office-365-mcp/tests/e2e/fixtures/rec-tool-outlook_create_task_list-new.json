@@ -1,0 +1,22 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_create_task_list-new"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i7Wuyc62QaEUPr8F8frouoNJ+fXFOI==\"",
+      "displayName": "seed-v1 case-outlook_create_task_list-new",
+      "id": "AAMkPXckTON1GDD5IHPzQUemPRU8RL55Ogq3JRT3UGYuDQPaC5VqUHSkDAVBNBCxggbLKNbbGXdcS9n6VSL6ZLMyvNksBqcwRKPnTyJp-RwxNDA4EbQeXMZ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  }
+]

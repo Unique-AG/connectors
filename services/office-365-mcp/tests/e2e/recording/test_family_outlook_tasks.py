@@ -96,8 +96,8 @@ def test_a_case_passes_the_guard_plan_and_names_each_item_that_it_creates(case_i
 
 def test_only_the_attachment_delete_consumes_seed_data_and_it_reseeds_the_to_do_phase() -> None:
     consuming = {case_id: plan.reseed for case_id, plan in CASES.items() if plan.destructive}
-    assert consuming == {"outlook_delete_task_attachment-old-brief": ("todo",)}
-    assert "todo" in SEED_PHASES
+    assert consuming == {"outlook_delete_task_attachment-old-brief": ("todo", "todo-files")}
+    assert {"todo", "todo-files"} <= set(SEED_PHASES)
 
 
 def test_a_task_write_needs_a_task_that_the_run_created() -> None:

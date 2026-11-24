@@ -1,0 +1,101 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_add_task_step-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"r5Ftuu56AhKNIa1H5ttpjgYJ+eGR4X==\"",
+      "displayName": "seed-v1 case-outlook_add_task_step-created",
+      "id": "AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i1Jndi88VoJDKc3I4jtjgzZH+lNS0D==\"",
+      "displayName": "seed-v1 case-outlook_add_task_step-created",
+      "id": "AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=/tasks",
+    "json": {
+      "title": "seed-v1 case-outlook_tasks task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"z5Gmqk45UdWLFr1N3fhhzfMZ+gQF7I==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-24T15:06:10.7717655Z",
+      "hasAttachments": false,
+      "id": "AAMkOClvLRC1QMN3MXCcZQehUMO3XD39Aev1TST7KTRwASVpK0PcFJYMCGOZJCHfriqSRTykSRscJ2p3OLY6LhOqtAnhKlbxBZUgOdTv-VnnYWH6RkNUUNEuyCrzObktWWHyTsEi-BdyRSP0YziuWUI=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-24T15:06:10.8985214Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_tasks task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"i1Jndi88VoJDKc3I4jtjgzZH+lNS0D==\"",
+      "displayName": "seed-v1 case-outlook_add_task_step-created",
+      "id": "AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkVUnrBDR9ENR0OURbHJiuXQA4LN43Ula5RJI7UTBeQPDzY8OfOEYiPGJMDTBxdeeKSDvfUDzzO8l7TBF9UKOzbHwiOvlmKTGfBbEx-FvdKLI6VfAQPQX=/tasks/AAMkOClvLRC1QMN3MXCcZQehUMO3XD39Aev1TST7KTRwASVpK0PcFJYMCGOZJCHfriqSRTykSRscJ2p3OLY6LhOqtAnhKlbxBZUgOdTv-VnnYWH6RkNUUNEuyCrzObktWWHyTsEi-BdyRSP0YziuWUI=/checklistItems",
+    "json": {
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "isChecked": false
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "createdDateTime": "2026-11-24T15:06:11.150547Z",
+      "displayName": "seed-v1 case-outlook_tasks step",
+      "id": "00000000-04e5-432b-82a8-89bdcf5a256a",
+      "isChecked": false
+    }
+  }
+]

@@ -1,0 +1,57 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_rename_task_list-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"t4Nwyi28ViBJTe8J7twhknNX+vYcYo==\"",
+      "displayName": "seed-v1 case-outlook_rename_task_list-created",
+      "id": "AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"t4Nwyi28ViBJTe8J7twhknNX+vYcYo==\"",
+      "displayName": "seed-v1 case-outlook_rename_task_list-created",
+      "id": "AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/todo/lists/AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+    "json": {
+      "displayName": "seed-v1 case-outlook_rename_task_list-created renamed"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"x6Wvie28EwFEPc7W3ucdjrXH+qVnwf==\"",
+      "displayName": "seed-v1 case-outlook_rename_task_list-created renamed",
+      "id": "AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  }
+]
