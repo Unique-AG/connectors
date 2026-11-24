@@ -2193,7 +2193,8 @@
             "publicBaseUrl": {
               "type": "string",
               "minLength": 1,
-              "description": "MCP_BASE_URL: the public https origin. Mandatory: the overlay sets it. Must match routes.hostname."
+              "description": "MCP_BASE_URL: the public https origin, with no path, query or userinfo. Mandatory: the overlay sets it. Must match routes.hostname.",
+              "pattern": "^(https://([^/?#@\\s{]|\\{\\{[^}]*\\}\\})+/?|\\{\\{.*\\}\\})$"
             }
           },
           "required": [
@@ -2239,7 +2240,8 @@
             },
             "defaultContactEmail": {
               "type": "string",
-              "description": "UPSTREAM_DEFAULT_CONTACT_EMAIL: a deployment default, the contact on every document order. No tool takes it as an argument."
+              "description": "UPSTREAM_DEFAULT_CONTACT_EMAIL: a deployment default, the contact on every document order. No tool takes it as an argument.",
+              "pattern": "^$|^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
             }
           },
           "required": [
@@ -2265,6 +2267,11 @@
           "additionalProperties": false
         }
       },
+      "required": [
+        "app",
+        "zitadel",
+        "kyckr"
+      ],
       "additionalProperties": false
     }
   },

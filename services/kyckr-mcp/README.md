@@ -92,6 +92,8 @@ In the Unique QA overlay pattern, an ExternalSecret writes the secrets into a Ku
 ```yaml
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
+metadata:
+  name: kyckr-mcp-secrets
 spec:
   target:
     name: kyckr-mcp-secrets

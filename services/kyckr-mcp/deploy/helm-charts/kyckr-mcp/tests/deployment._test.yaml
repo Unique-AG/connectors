@@ -134,6 +134,106 @@ tests:
       - failedTemplate:
           errorPattern: does not match pattern
 
+  - it: fails the schema when the app group is null
+    set:
+      mcpConfig:
+        app: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'app'
+
+  - it: fails the schema when the zitadel group is null
+    set:
+      mcpConfig:
+        zitadel: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'zitadel'
+
+  - it: fails the schema when the kyckr group is null
+    set:
+      mcpConfig:
+        kyckr: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'kyckr'
+
+  - it: rejects a public URL with a path
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com/mcp
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects a public URL that is not https
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: http://kyckr-mcp.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: accepts a bare public origin, with a port or a trailing slash
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com:8443/
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_BASE_URL, value: "https://kyckr-mcp.example.com:8443/" }
+
+  - it: accepts a templated public URL
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://{{ .Release.Name }}.example.com
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_BASE_URL, value: "https://RELEASE-NAME.example.com" }
+
+  - it: rejects a contact email that is not an address
+    set:
+      mcpConfig:
+        kyckr:
+          defaultContactEmail: ops.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: accepts a contact email address
+    set:
+      mcpConfig:
+        kyckr:
+          defaultContactEmail: ops@example.com
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_DEFAULT_CONTACT_EMAIL, value: ops@example.com }
+
+  - it: leaves the contact email empty by default
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_DEFAULT_CONTACT_EMAIL }
+          any: true
+
   - it: runs one replica and restarts the pods when a secret changes
     documentSelector:
       path: kind
