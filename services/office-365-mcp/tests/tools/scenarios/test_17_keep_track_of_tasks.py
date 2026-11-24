@@ -184,6 +184,20 @@ class TestFindingTasks:
 
         assert [row["title"] for row in _rows(answer, "tasks")] == titles
 
+    async def test_a_due_date_in_a_windows_zone_keeps_its_day(
+        self, graph: respx.MockRouter
+    ) -> None:
+        windows_due = {
+            "dateTime": "2026-11-27T00:00:00.0000000",
+            "timeZone": "W. Europe Standard Time",
+        }
+        tasks = [_task("T1", "Send the Q3 report", dueDateTime=windows_due)]
+        _ = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
+
+        answer = await call("outlook_list_tasks", task_list=TASK_LIST, time_zone=ZURICH)
+
+        assert [row["due_date"] for row in _rows(answer, "tasks")] == ["2026-11-27"]
+
     async def test_completed_tasks_are_listed_by_a_word_of_their_title(
         self, graph: respx.MockRouter
     ) -> None:

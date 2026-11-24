@@ -117,13 +117,13 @@ def due_moment(day: date, *, zone: ZoneInfo) -> DateTimeTimeZone:
 def day_of(moment: DateTimeTimeZone | None, *, zone: ZoneInfo) -> date | None:
     if moment is None or moment.date_time is None:
         return None
-    stated = zone_named(moment.time_zone or "UTC")
-    if stated is None:
-        return None
     try:
         naive = datetime.fromisoformat(moment.date_time)
     except ValueError:
         return None
+    stated = zone_named(moment.time_zone or "UTC")
+    if stated is None:
+        return naive.date()
     return naive.replace(tzinfo=stated).astimezone(zone).date()
 
 
