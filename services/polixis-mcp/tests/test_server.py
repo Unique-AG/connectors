@@ -84,6 +84,8 @@ def test_cors_preflight_allows_the_mcp_request_headers(client: TestClient) -> No
     response = client.options("/mcp", headers=headers)
 
     assert response.status_code == 200
+    allowed = response.headers["access-control-allow-headers"].split(", ")
+    assert {"Mcp-Method", "Mcp-Name"} <= set(allowed)
 
 
 def test_a_server_without_auth_refuses_to_serve_beyond_loopback(
