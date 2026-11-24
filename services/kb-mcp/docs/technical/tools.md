@@ -10,8 +10,9 @@ Each tool also carries an admin configuration, normally set from inside the Uniq
 than an environment variable; see
 [Configuration: Admin Configuration](../operator/configuration.md#Admin-Configuration) for where
 that setting actually lives. Only the admin `metadata_filter` and folder allowlist are a floor a
-caller can't widen, see [Permissions](./permissions.md). Numeric ones are usually defaults a
-caller may raise or lower per call (`limit`, `score_threshold`, `max_tokens_per_call`);
+caller can't widen, see [Permissions](./permissions.md). Explicit environment limits are ceilings:
+callers may lower them per call but cannot raise them. When unset, numeric defaults remain
+caller-adjustable (`limit`, `score_threshold`, `max_tokens_per_call`);
 `content_metadata`'s `limit` is the exception, clamped to the admin ceiling `max_values_per_field`.
 
 ## How the Calling LLM Picks Arguments
@@ -52,7 +53,8 @@ just keyword matches, and returns them as citation-ready chunks.
 | `search_string` | The natural-language question or phrase to search for |
 | `folder_ids`, `include_subfolders` | Restrict to folders; subfolders included by default |
 | `metadata_filter` | UniqueQL narrowing, AND-ed with the admin filter |
-| `limit`, `score_threshold` | Override the admin defaults for this call |
+| `limit` | Override the admin default, up to any explicit environment ceiling |
+| `score_threshold` | Override the admin default for this call |
 
 `KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY` (default `8`) bounds the parallel scope lookups used to
 build citation links.
@@ -134,10 +136,10 @@ views over the same visible-file snapshot.
 Returns file content by `content_id`, as surfaced by `content_tree` or `search`.
 
 `max_tokens_per_call` (admin default `8000`) bounds one response. Larger files are split into
-virtual pages of that size, selected with `start_page` and `end_page`. A caller may raise or
-lower it, since it is a default the caller can override; if the file still doesn't fit in one call
-and no page range was given, the call returns an error instead of silently truncating, naming the
-file's total token/page count so the caller can pick a range.
+virtual pages of that size, selected with `start_page` and `end_page`. An explicit environment
+value is a hard ceiling; otherwise a caller may raise or lower the default. If the file still
+doesn't fit in one call and no page range was given, the call returns an error instead of silently
+truncating, naming the file's total token/page count so the caller can pick a range.
 
 ## Related Documentation
 

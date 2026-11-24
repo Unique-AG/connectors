@@ -30,10 +30,10 @@ class ContentTreeToolConfig(BaseModel):
             }
         ),
     ] = Field(default=None)
-    default_limit: int = 50
+    default_limit: int = Field(default=50, gt=0)
     # Its own default: 50 is a sensible page of search hits but would gut a
     # tree, which today renders uncapped.
-    default_tree_limit: int = 1000
+    default_tree_limit: int = Field(default=1000, gt=0)
     default_min_score: float = 0.6
     default_match_on: MatchTarget = "both"
     default_case_sensitive: bool = False

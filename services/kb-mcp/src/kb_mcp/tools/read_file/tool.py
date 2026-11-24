@@ -20,7 +20,6 @@ from unique_mcp import (
     ConfigSchemaMeta,
     ContextRequirements,
     MetaKeys,
-    get_tool_config,
     get_unique_settings_async,
     merge_tool_meta,
 )
@@ -40,6 +39,11 @@ from kb_mcp.common.references import (
     UNEXPECTED_ERROR_MESSAGE,
     file_reference_url,
     markdown_citation_link,
+)
+from kb_mcp.common.tool_config import (
+    ResolvedToolConfig,
+    get_kb_tool_config,
+    unwrap_tool_config,
 )
 from kb_mcp.settings import get_settings
 from kb_mcp.tools.read_file.config import ReadFileToolConfig
@@ -96,6 +100,8 @@ def _render_chunked(
     start_page: int | None,
     end_page: int | None,
     max_tokens_per_call: int,
+    *,
+    enforce_token_limit: bool = False,
 ) -> tuple[bool, str]:
     """Return ``(is_error, text)``."""
     if not chunks:
@@ -136,15 +142,13 @@ def _render_chunked(
         )
 
     text = _render_with_page_markers(selected)
-    # Single-page requests always succeed even if one page exceeds the token cap.
-    if s < e:
-        selected_tokens = count_tokens(text)
-        if selected_tokens > max_tokens_per_call:
-            return True, (
-                f"pages {s}-{e} span ~{selected_tokens} tokens, over the "
-                f"{max_tokens_per_call}-token per-call limit; request a "
-                "narrower range (a single page is always allowed)."
-            )
+    selected_tokens = count_tokens(text)
+    if selected_tokens > max_tokens_per_call and (s < e or enforce_token_limit):
+        return True, (
+            f"pages {s}-{e} span ~{selected_tokens} tokens, over the "
+            f"{max_tokens_per_call}-token per-call limit; request a "
+            "narrower range."
+        )
     return False, text
 
 
@@ -271,7 +275,9 @@ async def read_file(
             ),
         ),
     ] = None,
-    config: ReadFileToolConfig = Depends(get_tool_config(ReadFileToolConfig)),
+    config: ResolvedToolConfig[ReadFileToolConfig] | ReadFileToolConfig = Depends(
+        get_kb_tool_config(ReadFileToolConfig)
+    ),
 ) -> ToolResult:
     """Read a specific knowledge-base file's text content. Requires
     `content_id` (from a prior content_tree 'list'/'search' call).
@@ -342,12 +348,29 @@ async def read_file(
                 is_error=True,
             )
 
-        effective_max_tokens = max_tokens_per_call or config.max_tokens_per_call
+        resolved_config, env_policy = unwrap_tool_config(config)
+        effective_max_tokens = (
+            max_tokens_per_call or resolved_config.max_tokens_per_call
+        )
+        if (
+            env_policy is not None
+            and "max_tokens_per_call" in env_policy.model_fields_set
+        ):
+            effective_max_tokens = min(
+                effective_max_tokens, env_policy.max_tokens_per_call
+            )
 
         if is_chunked:
             chunks = sort_content_chunks(list(content.chunks))
             is_error, text = _render_chunked(
-                chunks, start_page, end_page, effective_max_tokens
+                chunks,
+                start_page,
+                end_page,
+                effective_max_tokens,
+                enforce_token_limit=(
+                    env_policy is not None
+                    and "max_tokens_per_call" in env_policy.model_fields_set
+                ),
             )
         else:
             try:
