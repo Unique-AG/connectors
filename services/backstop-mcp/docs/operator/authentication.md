@@ -104,7 +104,7 @@ on this server's genuine login page. The registration is refused with `400` and
 | Redirect URI | Accepted | Used by |
 |---|---|---|
 | `http` or `https` on `localhost`, `127.0.0.1` or `[::1]`, any port | Always | Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Cursor, Windsurf, Zed, MCP Inspector |
-| `https` on an allowed host | The default list below plus `AUTH_EXTRA_REDIRECT_HOSTS`, or exactly `AUTH_ALLOWED_REDIRECT_HOSTS` when that is set | Hosted clients, and a deployment's own chat host |
+| `https` on an allowed host | `AUTH_ALLOWED_REDIRECT_HOSTS`, which defaults to the list below, plus `AUTH_EXTRA_REDIRECT_HOSTS` | Hosted clients, and a deployment's own chat host |
 | A scheme in `AUTH_ALLOWED_REDIRECT_SCHEMES` | Default `cursor` | Cursor (`cursor://anysphere.cursor-mcp/oauth/callback`) |
 
 An `https` redirect URI on an allowed host must use port 443 or no port. Any other port is refused,
@@ -120,10 +120,17 @@ cannot be taken from `PUBLIC_BASE_URL`.
 
 That host is not in the default list. Add it without copying the list:
 `AUTH_EXTRA_REDIRECT_HOSTS` (Helm: `mcpConfig.auth.extraRedirectHosts` on backstop,
-`env.AUTH_EXTRA_REDIRECT_HOSTS` on with-intelligence). Those hosts are appended to the default.
-`AUTH_ALLOWED_REDIRECT_HOSTS`, when set, is the whole list, and the server refuses to start if
-`AUTH_EXTRA_REDIRECT_HOSTS` is set next to it. A value that names only the chat host in
-`AUTH_ALLOWED_REDIRECT_HOSTS` drops every client below.
+`env.AUTH_EXTRA_REDIRECT_HOSTS` on with-intelligence). Those hosts are appended to the allowlist in
+effect. `AUTH_ALLOWED_REDIRECT_HOSTS`, when set, replaces the default as the whole list. A value
+that names only the chat host in `AUTH_ALLOWED_REDIRECT_HOSTS` drops every client below.
+
+The default is in the code (`DEFAULT_ALLOWED_REDIRECT_HOSTS` in `mcp-credential-auth`), and the
+backstop and with-intelligence charts ship the same list in their `values.yaml`, which a test keeps
+equal. A client that every deployment needs belongs in all three. An overlay changes the list for
+one deployment. Helm replaces a list instead of merging it, so the overlay names every host. Setting
+`mcpConfig.auth.allowedRedirectHosts` (backstop) or `env.AUTH_ALLOWED_REDIRECT_HOSTS`
+(with-intelligence) to `null` returns to the default in the code. The server reads the list at
+startup, so a change takes a rollout.
 
 Hosts seen on `/authorize` in the 30 days before this restriction:
 

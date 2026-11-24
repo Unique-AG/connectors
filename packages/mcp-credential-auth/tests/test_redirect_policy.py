@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 import pytest
-from pydantic import ValidationError
 from pydantic_settings import SettingsConfigDict
 
 from mcp_credential_auth.redirect_policy import (
@@ -184,14 +183,30 @@ def test_settings_append_extra_hosts_to_the_default_once(
     )
 
 
-def test_settings_refuse_extra_hosts_next_to_a_full_list(
+def test_settings_append_extra_hosts_to_a_full_list_once(
     clean_redirect_env: pytest.MonkeyPatch,
 ) -> None:
-    clean_redirect_env.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "only.example")
+    clean_redirect_env.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "only.example, chat.customer.example")
+    clean_redirect_env.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "Chat.Customer.Example.,other.example")
+
+    settings = _AuthSettings()
+
+    assert settings.allowed_redirect_hosts == (
+        "only.example",
+        "chat.customer.example",
+        "other.example",
+    )
+
+
+def test_settings_append_extra_hosts_to_an_empty_list(
+    clean_redirect_env: pytest.MonkeyPatch,
+) -> None:
+    clean_redirect_env.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", "")
     clean_redirect_env.setenv("AUTH_EXTRA_REDIRECT_HOSTS", "chat.customer.example")
 
-    with pytest.raises(ValidationError, match="allowed_redirect_hosts is the whole allowlist"):
-        _ = _AuthSettings()
+    settings = _AuthSettings()
+
+    assert settings.allowed_redirect_hosts == ("chat.customer.example",)
 
 
 def test_custom_allowlist_replaces_the_default() -> None:

@@ -102,14 +102,13 @@ Unique chat and admin are not in the default. They register
 `https://<chat-host>/chat/mcp/oauth/callback` and `https://<chat-host>/admin/mcp/oauth/callback`.
 `<chat-host>` is the Unique app, not this server: unique prod is `next.unique.app`, qa is
 `next.qa.unique.app`, uat01 is `uat1.unique.app`. A single tenant's own host is added the same
-way. Set `AUTH_EXTRA_REDIRECT_HOSTS` to that host. It is appended to the default.
-`AUTH_ALLOWED_REDIRECT_HOSTS`, when set, is the whole list, and the server refuses to start if
-`AUTH_EXTRA_REDIRECT_HOSTS` is set next to it.
+way. Set `AUTH_EXTRA_REDIRECT_HOSTS` to that host. It is appended to the allowlist in effect.
+`AUTH_ALLOWED_REDIRECT_HOSTS`, when set, replaces the default as the whole list.
 
 | Variable | Default | Why |
 |---|---|---|
 | `AUTH_ALLOWED_REDIRECT_HOSTS` | Hosted MCP clients | Setting it replaces the default with exactly this list |
-| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the default, such as a single tenant's chat host |
+| `AUTH_EXTRA_REDIRECT_HOSTS` | empty | Hosts appended to the allowlist in effect, such as a single tenant's chat host |
 | `AUTH_ALLOWED_REDIRECT_SCHEMES` | `cursor` | Cursor registers `cursor://anysphere.cursor-mcp/oauth/callback` |
 
 The default hosts, with the client each one belongs to and its source, are listed in backstop-mcp's
@@ -120,9 +119,10 @@ Loopback already covers Claude Code, Codex CLI, Gemini CLI, Goose, VS Code, Curs
 and MCP Inspector. Mistral Le Chat, Glean and self-hosted clients (Open WebUI, LibreChat, n8n on
 the customer's own domain) have no shared host; add the host the registration log rejects.
 
-The host and scheme lists are comma-separated. The Helm chart leaves them unset, so the default
-applies; set them under `env` only to change it. A client registered before the check keeps only the
-redirect URIs the lists still accept.
+The host and scheme lists are comma-separated. The Helm chart sets both under `env` to the default,
+and a test keeps that copy equal to the one in the code. An overlay that sets either replaces it, so
+it names every host, and `null` returns to the default in the code. A client registered before the
+check keeps only the redirect URIs the lists still accept.
 
 ## Migrations
 

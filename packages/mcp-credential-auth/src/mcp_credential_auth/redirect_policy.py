@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, NoDecode
 
 # Callback hosts of the hosted MCP clients we support. The Unique chat host is not here: it
 # differs per tenant. Sources are in services/backstop-mcp/docs/operator/authentication.md.
+# The backstop and with-intelligence charts ship a copy that a test in each service keeps equal.
 DEFAULT_ALLOWED_REDIRECT_HOSTS: tuple[str, ...] = (
     "claude.ai",
     "claude.com",
@@ -65,9 +66,10 @@ def _extend_allowlist(base: Iterable[str], extra: Iterable[str]) -> tuple[str, .
 class RedirectAllowlistSettings(BaseSettings):
     """The redirect allowlist fields of a service's `AuthConfig`, read from its environment.
 
-    Left unset, `allowed_redirect_hosts` is the default plus `extra_redirect_hosts`, which is how a
-    single tenant adds its chat host. Set, it is the whole list, so setting both is refused.
-    Values are comma-separated; `NoDecode` keeps pydantic-settings from JSON-decoding them.
+    Left unset, `allowed_redirect_hosts` is the default; set, it replaces the default as the whole
+    list. `extra_redirect_hosts` is appended to whichever list is in effect, which is how a single
+    tenant adds its chat host. Values are comma-separated; `NoDecode` keeps pydantic-settings from
+    JSON-decoding them.
     """
 
     allowed_redirect_hosts: Annotated[tuple[str, ...], NoDecode] = DEFAULT_ALLOWED_REDIRECT_HOSTS
@@ -90,16 +92,10 @@ class RedirectAllowlistSettings(BaseSettings):
 
     @model_validator(mode="after")
     def _append_extra_redirect_hosts(self) -> Self:
-        if not self.extra_redirect_hosts:
-            return self
-        if "allowed_redirect_hosts" in self.model_fields_set:
-            raise ValueError(
-                "allowed_redirect_hosts is the whole allowlist once set; "
-                + "list the extra_redirect_hosts in it instead"
+        if self.extra_redirect_hosts:
+            self.allowed_redirect_hosts = _extend_allowlist(
+                self.allowed_redirect_hosts, self.extra_redirect_hosts
             )
-        self.allowed_redirect_hosts = _extend_allowlist(
-            DEFAULT_ALLOWED_REDIRECT_HOSTS, self.extra_redirect_hosts
-        )
         return self
 
 

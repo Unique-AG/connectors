@@ -24,16 +24,42 @@ mcpConfig:
     relationshipTypeMarkers: null
     formerRelationshipTypeIds: null
     formerRelationshipTypeMarkers: null
-  # Where a dynamically registered OAuth client may send the browser after login. null leaves the
-  # variable unset, so the app's default list of hosted clients applies. Loopback http on any port
-  # is always accepted.
+  # Where a dynamically registered OAuth client may send the browser after login. The two lists
+  # below are the app's default, which a test keeps equal to the one in code. A list set in an
+  # overlay replaces one of them, since Helm does not merge lists; null leaves the variable unset,
+  # so the app's own default applies. Loopback http on any port is always accepted.
   auth:
-    # AUTH_ALLOWED_REDIRECT_HOSTS. A list replaces the app default and is the whole allowlist.
-    allowedRedirectHosts: null
-    # AUTH_ALLOWED_REDIRECT_SCHEMES. A list replaces the app default, [cursor].
-    allowedRedirectSchemes: null
-    # AUTH_EXTRA_REDIRECT_HOSTS. Appended to the app default, such as a single tenant's chat host.
-    # Cannot be combined with allowedRedirectHosts.
+    # AUTH_ALLOWED_REDIRECT_HOSTS. A list is the whole allowlist.
+    allowedRedirectHosts:
+      - claude.ai
+      - claude.com
+      - chatgpt.com
+      - cursor.com
+      - www.cursor.com
+      - vscode.dev
+      - insiders.vscode.dev
+      - grok.com
+      - www.perplexity.ai
+      - enterprise.perplexity.ai
+      - app.dust.tt
+      - dust.tt
+      - eu.dust.tt
+      - console.mistral.ai
+      - api.devin.ai
+      - teams.microsoft.com
+      - global.consent.azure-apim.net
+      - replit.com
+      - lovable.app
+      - lovable.dev
+      - api.v0.dev
+      - app.langdock.com
+      - cloud.arcade.dev
+      - oauth.n8n.cloud
+    # AUTH_ALLOWED_REDIRECT_SCHEMES.
+    allowedRedirectSchemes:
+      - cursor
+    # AUTH_EXTRA_REDIRECT_HOSTS. Appended to allowedRedirectHosts, whichever list is in effect,
+    # such as a single tenant's chat host.
     extraRedirectHosts: []
   # BACKSTOP_MCP_TENANT_GUIDANCE, rendered as JSON. The chart ships tenant-neutral.
   tenantGuidance: {}

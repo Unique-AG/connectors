@@ -1,8 +1,16 @@
 """Config parsing, and the failures it turns into startup errors."""
 
 import ssl
+from collections.abc import Mapping
+from pathlib import Path
+from typing import cast
 
 import pytest
+import yaml
+from mcp_credential_auth.redirect_policy import (
+    DEFAULT_ALLOWED_REDIRECT_HOSTS,
+    DEFAULT_ALLOWED_REDIRECT_SCHEMES,
+)
 from pydantic import ValidationError
 
 from with_intelligence_mcp.config import (
@@ -179,3 +187,25 @@ class TestAuthConfig:
         assert config.allowed_redirect_hosts[-1] == "chat.customer.example"
         assert "claude.ai" in config.allowed_redirect_hosts
         assert config.allowed_redirect_schemes == ()
+
+    def test_the_chart_ships_the_default_redirect_allowlist(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        chart_values = (
+            Path(__file__).parents[1] / "deploy/helm-charts/with-intelligence-mcp/values.yaml"
+        )
+        values = cast(
+            "Mapping[str, Mapping[str, str]]",
+            yaml.safe_load(chart_values.read_text(encoding="utf-8")),
+        )
+        chart_env = values["env"]
+        monkeypatch.delenv("AUTH_EXTRA_REDIRECT_HOSTS", raising=False)
+        monkeypatch.setenv("AUTH_ALLOWED_REDIRECT_HOSTS", chart_env["AUTH_ALLOWED_REDIRECT_HOSTS"])
+        monkeypatch.setenv(
+            "AUTH_ALLOWED_REDIRECT_SCHEMES", chart_env["AUTH_ALLOWED_REDIRECT_SCHEMES"]
+        )
+
+        config = AuthConfig()
+
+        assert sorted(config.allowed_redirect_hosts) == sorted(DEFAULT_ALLOWED_REDIRECT_HOSTS)
+        assert sorted(config.allowed_redirect_schemes) == sorted(DEFAULT_ALLOWED_REDIRECT_SCHEMES)
