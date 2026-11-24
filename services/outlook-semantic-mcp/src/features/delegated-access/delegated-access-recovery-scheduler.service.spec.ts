@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DelegatedAccessRecoverySchedulerService } from './delegated-access-recovery-scheduler.service';
+import { DISCOVER_DELEGATED_ACCESS_CACHE_KEY } from './discovery/discover-delegated-access.command';
 
 const NOW = new Date('2026-11-24T00:40:00.000Z');
 const CYCLE_STARTED_AT = new Date('2026-11-24T00:00:00.000Z');
@@ -105,6 +106,37 @@ describe('DelegatedAccessRecoverySchedulerService', () => {
 
     expect(discoverCommand.hasPendingDelegates).not.toHaveBeenCalled();
     expect(amqp.publish).not.toHaveBeenCalled();
+  });
+
+  it('still recovers verification when the pending-delegates query fails', async () => {
+    const granular = new DelegatedAccessRecoverySchedulerService(
+      { addCronJob: vi.fn(), getCronJob: vi.fn() } as any,
+      amqp as any,
+      { scan: 'granular_access', recoveryCronSchedule: '*/30 * * * *' } as any,
+      persistentCacheService as any,
+      discoverCommand as any,
+    );
+    persistentCacheService.get.mockImplementation(async (key: string) =>
+      key === DISCOVER_DELEGATED_ACCESS_CACHE_KEY
+        ? discoveryState({
+            state: 'ready',
+            cycleStartedAt: CYCLE_STARTED_AT.getTime(),
+            lastProgressRegisteredAt: CYCLE_STARTED_AT.getTime(),
+          })
+        : {
+            dataType: 'DelegatedAccessVerification',
+            payload: { state: 'failed', lastProgressRegisteredAt: CYCLE_STARTED_AT.getTime() },
+          },
+    );
+    discoverCommand.hasPendingDelegates.mockRejectedValue(new Error('connection reset'));
+
+    await granular.runRecovery();
+
+    expect(amqp.publish).toHaveBeenCalledWith(
+      expect.any(String),
+      'unique.outlook-semantic-mcp.delegated-access.sync',
+      expect.objectContaining({ type: 'unique.outlook-semantic-mcp.delegated-access.sync' }),
+    );
   });
 
   it('does nothing before the first discovery has run', async () => {

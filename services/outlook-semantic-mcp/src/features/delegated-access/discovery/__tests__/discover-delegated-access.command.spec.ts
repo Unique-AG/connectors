@@ -17,6 +17,7 @@ const EMAIL_A = 'user-a@example.com';
 const EMAIL_B = 'user-b@example.com';
 const EMAIL_C = 'user-c@example.com';
 const CYCLE_STARTED_AT = new Date('2026-11-24T00:00:00.000Z');
+const RUN_ID = 'run-under-test';
 
 // ---------------------------------------------------------------------------
 // Mock factories
@@ -117,6 +118,7 @@ function createCommand({
     vi.spyOn(command, 'decide').mockResolvedValue({
       action: 'proceed',
       cycleStartedAt: CYCLE_STARTED_AT,
+      runId: RUN_ID,
     });
   }
   return command;
@@ -550,13 +552,106 @@ describe('DiscoverDelegatedAccessCommand', () => {
     await finalStateUpdate?.({
       currentValue: {
         dataType: 'DelegatedAccessDiscovery',
-        payload: { state: 'running', cycleStartedAt: 1, lastProgressRegisteredAt: 1 },
+        payload: {
+          state: 'running',
+          runId: RUN_ID,
+          cycleStartedAt: 1,
+          lastProgressRegisteredAt: 1,
+        },
       },
       update,
     });
     expect(update).toHaveBeenCalledWith(
       expect.objectContaining({ payload: expect.objectContaining({ state: 'ready' }) }),
     );
+  });
+
+  it('leaves the state alone when another run took over after this one went stale', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
+    const persistentCacheService = createMockPersistentCacheService();
+    const update = vi.fn();
+    persistentCacheService.setWith.mockImplementation((_key, fn) =>
+      fn({
+        currentValue: {
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            state: 'running',
+            runId: 'newer-run',
+            cycleStartedAt: 1,
+            lastProgressRegisteredAt: 1,
+          },
+        },
+        update,
+      }),
+    );
+    const command = createCommand({ graphApi, db, persistentCacheService });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
+
+    await command.run({ newCycleRequestedAt: Date.now() });
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('keeps going with the next delegate when stamping one fails', async () => {
+    graphApi.get.mockResolvedValue(undefined);
+    const db = createMockDb();
+    db.__updateWhere.mockRejectedValueOnce(new Error('connection reset'));
+    const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
+
+    await command.run({ newCycleRequestedAt: Date.now() });
+
+    expect(db.__updateWhere).toHaveBeenCalledTimes(2); // A failed, B still stamped
+    expect(db.__insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('stamps the time the owner checks started, not when they finished', async () => {
+    const checksStart = new Date('2026-11-24T12:00:00.000Z');
+    vi.useFakeTimers({ now: checksStart, toFake: ['Date'] });
+    try {
+      graphApi.get.mockImplementation(async () => {
+        vi.setSystemTime(new Date(checksStart.getTime() + 60_000));
+        return undefined;
+      });
+      const db = createMockDb();
+      const command = createCommand({ graphApi, db });
+      mockFetchBatchForUsers(command, [
+        { userProfileId: USER_ID_A, email: EMAIL_A },
+        { userProfileId: USER_ID_B, email: EMAIL_B },
+      ]);
+
+      await command.run({ newCycleRequestedAt: Date.now() });
+
+      expect(db.__updateSet).toHaveBeenNthCalledWith(1, {
+        delegatedAccessDiscoveredAt: checksStart,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('leaves a delegate pending when one of its owner checks failed', async () => {
+    graphApi.get
+      .mockRejectedValueOnce(makeGraphError(500)) // A→B fails (only rate limits are retried)
+      .mockResolvedValue(undefined); // B→A succeeds
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+    ]);
+
+    await command.run({ newCycleRequestedAt: Date.now() });
+
+    expect(db.__updateSet).toHaveBeenCalledOnce(); // only B is marked discovered
+    expect(db.__delete).not.toHaveBeenCalled();
   });
 
   it('fetches only the delegates the cycle has not discovered yet', async () => {
@@ -625,11 +720,16 @@ describe('DiscoverDelegatedAccessCommand', () => {
     it('starts the first cycle now', async () => {
       const { decision, create } = await decideWith(null, {});
 
-      expect(decision).toEqual({ action: 'proceed', cycleStartedAt: now });
+      expect(decision).toEqual({
+        action: 'proceed',
+        cycleStartedAt: now,
+        runId: expect.any(String),
+      });
       expect(create).toHaveBeenCalledWith({
         dataType: 'DelegatedAccessDiscovery',
         payload: {
           state: 'running',
+          runId: expect.any(String),
           cycleStartedAt: now.getTime(),
           lastProgressRegisteredAt: now.getTime(),
         },
@@ -646,7 +746,11 @@ describe('DiscoverDelegatedAccessCommand', () => {
         { newCycleRequestedAt: now.getTime() },
       );
 
-      expect(decision).toEqual({ action: 'proceed', cycleStartedAt: now });
+      expect(decision).toEqual({
+        action: 'proceed',
+        cycleStartedAt: now,
+        runId: expect.any(String),
+      });
     });
 
     it('continues the current cycle otherwise', async () => {
@@ -659,11 +763,16 @@ describe('DiscoverDelegatedAccessCommand', () => {
         {},
       );
 
-      expect(decision).toEqual({ action: 'proceed', cycleStartedAt: new Date(previousCycle) });
+      expect(decision).toEqual({
+        action: 'proceed',
+        cycleStartedAt: new Date(previousCycle),
+        runId: expect.any(String),
+      });
       expect(update).toHaveBeenCalledWith({
         dataType: 'DelegatedAccessDiscovery',
         payload: {
           state: 'running',
+          runId: expect.any(String),
           cycleStartedAt: previousCycle,
           lastProgressRegisteredAt: now.getTime(),
         },
@@ -711,11 +820,16 @@ describe('DiscoverDelegatedAccessCommand', () => {
         newCycleRequestedAt: previousCycle - 1_000,
       });
 
-      expect(decision).toEqual({ action: 'proceed', cycleStartedAt: new Date(previousCycle) });
+      expect(decision).toEqual({
+        action: 'proceed',
+        cycleStartedAt: new Date(previousCycle),
+        runId: expect.any(String),
+      });
       expect(update).toHaveBeenCalledWith({
         dataType: 'DelegatedAccessDiscovery',
         payload: {
           state: 'running',
+          runId: expect.any(String),
           cycleStartedAt: previousCycle,
           lastProgressRegisteredAt: now.getTime(),
         },
@@ -746,7 +860,11 @@ describe('DiscoverDelegatedAccessCommand', () => {
         {},
       );
 
-      expect(decision).toEqual({ action: 'proceed', cycleStartedAt: new Date(previousCycle) });
+      expect(decision).toEqual({
+        action: 'proceed',
+        cycleStartedAt: new Date(previousCycle),
+        runId: expect.any(String),
+      });
     });
 
     it('starts the cycle now for a state written before cycles were tracked', async () => {
@@ -759,7 +877,11 @@ describe('DiscoverDelegatedAccessCommand', () => {
         {},
       );
 
-      expect(decision).toEqual({ action: 'proceed', cycleStartedAt: now });
+      expect(decision).toEqual({
+        action: 'proceed',
+        cycleStartedAt: now,
+        runId: expect.any(String),
+      });
     });
   });
 });

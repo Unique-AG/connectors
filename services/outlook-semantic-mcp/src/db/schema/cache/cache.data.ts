@@ -17,6 +17,8 @@ const DelegatedAccessDiscoveryCache = z.object({
     state: z.enum(['running', 'failed', 'ready']),
     // Unset on a payload written before cycles were tracked, which reruns every delegate.
     cycleStartedAt: z.number().nullish(),
+    // The run that holds the claim; its heartbeat and final write must still match it.
+    runId: z.string().nullish(),
     lastProgressRegisteredAt: z.number(),
   }),
 });

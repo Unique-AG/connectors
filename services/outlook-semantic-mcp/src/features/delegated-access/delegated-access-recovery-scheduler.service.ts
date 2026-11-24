@@ -82,10 +82,19 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
       return;
     }
 
-    await this.recoverDiscovery();
+    // Each job recovers on its own, so a failure in one does not hold the other back.
+    await this.recoverIsolated('discovery', () => this.recoverDiscovery());
 
     if (this.config.scan === 'granular_access') {
-      await this.recoverVerification();
+      await this.recoverIsolated('verification', () => this.recoverVerification());
+    }
+  }
+
+  private async recoverIsolated(job: string, recover: () => Promise<void>): Promise<void> {
+    try {
+      await recover();
+    } catch (err) {
+      this.logger.error({ msg: `Delegated access ${job} recovery failed`, err });
     }
   }
 
