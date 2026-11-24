@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import assert from 'node:assert';
 import { createLoggerOptions, runWithLogSecrets } from '@unique-ag/logger';
+import { UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { and, eq } from 'drizzle-orm';
 import pino from 'pino';
 import type { Dispatcher } from 'undici';
@@ -44,6 +45,8 @@ describe('TokenProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFetch.mockReset();
+    // The revoke only clears a row that still holds the grant it refreshed
+    mockDependencies.drizzle.__nextUpdateReturningRows = [{ id: 'user-profile-123' }];
   });
 
   describe('getAccessToken', () => {
@@ -244,6 +247,32 @@ describe('TokenProvider', () => {
       );
       expect(mockDependencies.drizzle.update).toHaveBeenCalled();
       expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');
+    });
+
+    it('keeps a grant that a new sign-in stored while Microsoft rejected the old one', async () => {
+      const onPermanentAuthFailure = vi.fn().mockResolvedValue(undefined);
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+      mockDependencies.drizzle.__nextUpdateReturningRows = [];
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(JSON.stringify({ error: 'invalid_grant' })),
+      } as never);
+
+      const unit = new TokenProvider(mockConfig, {
+        ...mockDependencies,
+        onPermanentAuthFailure,
+      } as any);
+
+      const refresh = unit.refreshAccessToken('user-profile-123');
+      await expect(refresh).rejects.toThrow('the grant was replaced by a new sign-in');
+      await expect(refresh).rejects.not.toBeInstanceOf(UpstreamCredentialRevokedError);
+      expect(onPermanentAuthFailure).not.toHaveBeenCalled();
     });
 
     it('clears Graph tokens and revokes the MCP session on invalid_client (AADSTS7000215)', async () => {
@@ -611,6 +640,24 @@ describe('TokenProvider', () => {
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      const [update] = mockDependencies.drizzle.update.mock.results;
+      expect(update?.value.where).toHaveBeenCalledWith(
+        and(
+          eq(userProfiles.id, 'user-profile-123'),
+          eq(userProfiles.refreshToken, 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4='),
+        ),
+      );
+    });
+
+    it('stores refreshed tokens only on the grant it refreshed', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ access_token: 'new-access-token' }),
+      } as never);
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).resolves.toBe('new-access-token');
       const [update] = mockDependencies.drizzle.update.mock.results;
       expect(update?.value.where).toHaveBeenCalledWith(
         and(

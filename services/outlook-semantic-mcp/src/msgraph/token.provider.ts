@@ -100,11 +100,8 @@ export class TokenProvider implements AuthenticationProvider {
   }
 
   /**
-   * Every TokenProvider in the process shares one refresh per user, so a burst of 401s for the
-   * same user calls Microsoft once. Pass the access token Graph rejected so a request that lost the
-   * race reuses the token another request already stored instead of refreshing again. The reuse
-   * stays outside the shared refresh: a request whose token is the stored one must not receive
-   * that same token back from a request that only reused it.
+   * One refresh per user across the process. A request whose rejected token was already replaced
+   * reuses the stored one.
    */
   public async refreshAccessToken(
     userProfileId: string,
@@ -211,18 +208,12 @@ export class TokenProvider implements AuthenticationProvider {
       }
       const oauthError = parseOAuthError(body);
 
-      // Errors handled:
-      // - isPermanentUpstreamOAuthError: invalid_grant, interaction_required, consent_required
-      //   (user revoked consent or the refresh grant expired)
-      // - isAppLevelOAuthError: invalid_client, unauthorized_client
-      //   Error triggered by: Entra app registration change — e.g. the client secret was
-      //   rotated, or the secret ID was configured instead of the secret value
-      //   (AADSTS7000215). Clear stored tokens so we do not retry the same refresh forever.
+      // Neither a dead grant nor a broken app registration succeeds on retry, so the tokens go.
       if (
         isPermanentUpstreamOAuthError(oauthError.error) ||
         isAppLevelOAuthError(oauthError.error)
       ) {
-        return await this.revokeUpstreamCredential(userProfileId, {
+        return await this.revokeUpstreamCredential(userProfile, {
           reason: oauthError.error_description,
           failureCode: `http_${response.status}_${oauthError.error}`,
           aadstsCodes: oauthError.error_codes,
@@ -252,7 +243,7 @@ export class TokenProvider implements AuthenticationProvider {
 
     const tenant = authorizeTenant(tokenData.access_token, this.allowedTenantIds);
     if (!tenant.allowed) {
-      return await this.revokeUpstreamCredential(userProfileId, {
+      return await this.revokeUpstreamCredential(userProfile, {
         reason: tenant.reason,
         failureCode: 'tenant_not_allowed',
       });
@@ -271,7 +262,8 @@ export class TokenProvider implements AuthenticationProvider {
         refreshToken: encryptedRefreshToken,
         ...CLEARED_TOKEN_REFRESH_BACKOFF,
       })
-      .where(eq(userProfiles.id, userProfileId));
+      // A sign-in that stored a new grant meanwhile keeps it; the token refreshed here still works.
+      .where(isSameGrant(userProfile));
 
     this.logger.debug({
       msg: 'Successfully refreshed Microsoft Graph API access token',
@@ -282,11 +274,7 @@ export class TokenProvider implements AuthenticationProvider {
     return tokenData.access_token;
   }
 
-  /**
-   * Backs off before the next refresh attempt: Microsoft's Retry-After when it sends one,
-   * otherwise 1, 2, 4… minutes per consecutive failure, capped at 30 minutes. It only records the
-   * failure on the grant it tried: a sign-in that stored a new grant meanwhile keeps its reset.
-   */
+  /** Backs off by Retry-After, else 1, 2, 4… minutes capped at 30, on the grant it tried only. */
   private async recordTransientFailure(
     userProfile: UserProfile,
     {
@@ -318,12 +306,7 @@ export class TokenProvider implements AuthenticationProvider {
         tokenRefreshFailureCode: failureCode,
         tokenRefreshRetryAt: retryAt,
       })
-      .where(
-        and(
-          eq(userProfiles.id, userProfile.id),
-          eq(userProfiles.refreshToken, userProfile.refreshToken ?? ''),
-        ),
-      );
+      .where(isSameGrant(userProfile));
 
     this.logger.error({
       msg: 'Failed to refresh Microsoft Graph API access token for user',
@@ -340,22 +323,33 @@ export class TokenProvider implements AuthenticationProvider {
   }
 
   private async revokeUpstreamCredential(
-    userProfileId: string,
+    userProfile: UserProfile,
     {
       reason,
       failureCode,
       aadstsCodes,
     }: { reason?: string; failureCode: string; aadstsCodes?: number[] },
   ): Promise<never> {
-    await this.drizzle
+    const cleared = await this.drizzle
       .update(userProfiles)
       .set({ accessToken: null, refreshToken: null })
-      .where(eq(userProfiles.id, userProfileId));
+      .where(isSameGrant(userProfile))
+      .returning({ id: userProfiles.id });
 
-    await this.onPermanentAuthFailure?.(userProfileId);
+    if (!cleared.length) {
+      this.logger.warn({
+        msg: 'Microsoft rejected a grant that a new sign-in has since replaced; kept the new grant and the MCP session',
+        userProfileId: userProfile.id,
+        failureCode,
+        aadstsCodes,
+      });
+      throw new Error('Token refresh failed: the grant was replaced by a new sign-in');
+    }
+
+    await this.onPermanentAuthFailure?.(userProfile.id);
     this.logger.warn({
       msg: 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
-      userProfileId,
+      userProfileId: userProfile.id,
       failureCode,
       aadstsCodes,
     });
@@ -369,6 +363,13 @@ const MAX_REFRESH_BACKOFF_MS = 30 * 60_000;
 const inFlightRefreshes = new Map<string, Promise<string>>();
 
 type UserProfile = typeof userProfiles.$inferSelect;
+
+// Matches the row only while it still holds the refresh token this refresh read.
+const isSameGrant = (userProfile: UserProfile) =>
+  and(
+    eq(userProfiles.id, userProfile.id),
+    eq(userProfiles.refreshToken, userProfile.refreshToken ?? ''),
+  );
 
 export class TokenRefreshCoolingDownError extends Error {
   public constructor(public readonly retryAt: Date) {
