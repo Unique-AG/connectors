@@ -11,10 +11,10 @@ dependencies = [
     "mcp-types==2.3.0",
     "pydantic==2.14.4",
     "pydantic-settings==2.16.3",
-    "pyyaml==6.0.3",
+    "pyyaml==6.0.4",
     "starlette==1.10.0",
-    "unique-mcp==2026.46.4",
-    "unique-toolkit==2026.46.4",
+    "unique-mcp==2026.48.0",
+    "unique-toolkit==2026.48.0",
 ]
 
 [project.scripts]
