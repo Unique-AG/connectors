@@ -657,11 +657,28 @@ describe('DiscoverDelegatedAccessCommand', () => {
           cycleStartedAt: previousCycle,
           lastProgressRegisteredAt: now.getTime() - 60_000,
         }),
-        { newCycle: true },
+        { newCycle: false },
       );
 
       expect(decision).toEqual(expect.objectContaining({ action: 'skip' }));
       expect(update).not.toHaveBeenCalled();
+    });
+
+    it('keeps a new cycle asked for while another run is making progress', async () => {
+      const runInProgress = {
+        state: 'running',
+        cycleStartedAt: previousCycle,
+        lastProgressRegisteredAt: now.getTime() - 60_000,
+      };
+      const { decision, update } = await decideWith(discoveryState(runInProgress), {
+        newCycle: true,
+      });
+
+      expect(decision).toEqual(expect.objectContaining({ action: 'skip' }));
+      expect(update).toHaveBeenCalledWith({
+        dataType: 'DelegatedAccessDiscovery',
+        payload: { ...runInProgress, cycleStartedAt: now.getTime() },
+      });
     });
 
     it('takes over a run that stopped making progress', async () => {

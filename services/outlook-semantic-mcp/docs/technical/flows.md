@@ -254,7 +254,7 @@ sequenceDiagram
 - The verification job (`granular_access` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
 - In Mode B (`microsoft_graph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
 - A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted. A restarted discovery continues its cycle with the delegates it has not finished.
-- The recovery scheduler also reruns discovery for the delegates the current cycle has not finished, such as one that failed or a user who connected after the cycle started. It skips a delegate while its token refresh is backing off.
+- The recovery scheduler also reruns discovery for the delegates the current cycle has not finished, such as one that failed or a user who connected after the cycle started. It skips a delegate while its token refresh is backing off. If a run is still in progress when the next scheduled run fires, the new cycle starts once that run has finished.
 
 ## Email Draft Creation Flow
 

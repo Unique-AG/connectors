@@ -294,6 +294,14 @@ export class DiscoverDelegatedAccessCommand {
         const noProgressThresholdMs =
           DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES * 60_000;
         if (state === 'running' && now - lastProgressRegisteredAt < noProgressThresholdMs) {
+          if (newCycle) {
+            // The running run finishes the cycle it started with. Once it ends, the recovery cron
+            // finds every delegate pending against the new start, so the new cycle is not lost.
+            await update({
+              dataType: 'DelegatedAccessDiscovery',
+              payload: { ...currentValue.payload, cycleStartedAt: now },
+            });
+          }
           return {
             action: 'skip',
             reason: `Skipped running discovery for delegated permissions, another discovery in progress`,
