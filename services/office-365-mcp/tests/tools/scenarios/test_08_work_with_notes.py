@@ -321,6 +321,7 @@ class TestCapturingNotes:
             assert "create-a-subpage-in-onenote-for-ipad-or-iphone" in description
             assert "only two levels of subpages" in description
             assert "include_level_and_order=true" in description
+            assert "they do this twice" in description
 
     async def test_a_task_list_is_appended_and_nothing_else_is_sent(
         self, graph: respx.MockRouter

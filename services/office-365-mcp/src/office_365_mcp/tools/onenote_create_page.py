@@ -110,8 +110,9 @@ level of its section. If the user wants a subpage, first read the `level` of the
 onenote_list_pages and `include_level_and_order=true`. OneNote has only two levels of subpages, \
 so a parent at `level` 2 cannot take a subpage: tell the user before you create anything. \
 Otherwise create the page in the section of the parent. Then tell the user to move the page \
-directly below the parent in the OneNote app and make it a subpage there. In OneNote for the \
-web, they right-click the page and select Make Subpage. For the desktop app, give them this page: \
+directly below the parent in the OneNote app and make it a subpage there. If the parent is at \
+`level` 1, they do this twice. In OneNote for the web, they right-click the page and select Make \
+Subpage. For the desktop app, give them this page: \
 https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
 On an iPad or iPhone, give them this page instead: \
 https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone
