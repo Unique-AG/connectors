@@ -193,7 +193,16 @@ export class DiscoverDelegatedAccessCommand {
       await this.db
         .update(userProfiles)
         .set({ delegatedAccessDiscoveredAt: checksStartedAt })
-        .where(eq(userProfiles.id, delegateUserId));
+        .where(
+          and(
+            eq(userProfiles.id, delegateUserId),
+            // A stale run that finishes late must not move back a newer run's stamp.
+            or(
+              isNull(userProfiles.delegatedAccessDiscoveredAt),
+              lt(userProfiles.delegatedAccessDiscoveredAt, checksStartedAt),
+            ),
+          ),
+        );
       return 'discovered';
     } catch (error) {
       if (isUpstreamCredentialRevokedError(error)) {
@@ -249,7 +258,9 @@ export class DiscoverDelegatedAccessCommand {
     });
 
     while (ownersBatch.length) {
-      const batchResults = await Promise.all(
+      // Every check settles first, so an ordinary 401 that rejects early cannot hide a revoked
+      // grant that another check reports.
+      const settled = await Promise.allSettled(
         ownersBatch.map(
           ({ userProfileId: ownerUserId, email: ownerEmail, source: ownerSource }) => {
             return withRetryAttempts<{ status: 'success' } | { status: 'failed'; error: unknown }>({
@@ -279,6 +290,11 @@ export class DiscoverDelegatedAccessCommand {
           },
         ),
       );
+      const rejections = settled.flatMap((r) => (r.status === 'rejected' ? [r.reason] : []));
+      if (rejections.length) {
+        throw rejections.find(isUpstreamCredentialRevokedError) ?? rejections[0];
+      }
+      const batchResults = settled.flatMap((r) => (r.status === 'fulfilled' ? [r.value] : []));
 
       const successCount = batchResults.filter((r) => r.status === 'success').length;
       const failedCount = batchResults.filter((r) => r.status === 'failed').length;

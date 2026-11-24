@@ -249,6 +249,33 @@ describe('TokenProvider', () => {
       expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');
     });
 
+    it('still reports the revoked grant when revoking the MCP session fails', async () => {
+      const onPermanentAuthFailure = vi
+        .fn()
+        .mockRejectedValue(new Error('token store unavailable'));
+      mockDependencies.drizzle.__nextQueryUserProfile = {
+        id: 'user-profile-123',
+        refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      };
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+        headers: new Headers(),
+        text: vi.fn().mockResolvedValue(JSON.stringify({ error: 'invalid_grant' })),
+      } as never);
+
+      const unit = new TokenProvider(mockConfig, {
+        ...mockDependencies,
+        onPermanentAuthFailure,
+      } as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+      expect(onPermanentAuthFailure).toHaveBeenCalledWith('user-profile-123');
+    });
+
     it('keeps a grant that a new sign-in stored while Microsoft rejected the old one', async () => {
       const onPermanentAuthFailure = vi.fn().mockResolvedValue(undefined);
       mockDependencies.drizzle.__nextQueryUserProfile = {

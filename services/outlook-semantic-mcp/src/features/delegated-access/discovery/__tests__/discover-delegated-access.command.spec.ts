@@ -536,6 +536,44 @@ describe('DiscoverDelegatedAccessCommand', () => {
     expect(db.__updateSet).toHaveBeenCalledOnce(); // only B is marked discovered
   });
 
+  it("clears a delegate's records when an ordinary 401 rejects before another owner check reports the revoked grant", async () => {
+    graphApi.get
+      .mockRejectedValueOnce(makeGraphError(401)) // A→B
+      .mockRejectedValueOnce(new UpstreamCredentialRevokedError('invalid_grant')) // A→C
+      .mockResolvedValue(undefined);
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+      { userProfileId: USER_ID_C, email: EMAIL_C },
+    ]);
+
+    await command.run({ newCycleRequestedAt: Date.now() });
+
+    expect(db.__delete).toHaveBeenCalledOnce();
+    expect(db.__updateSet).toHaveBeenCalledTimes(2); // only B and C are marked discovered
+  });
+
+  it("keeps a delegate's records when its owner checks only return ordinary 401s", async () => {
+    graphApi.get
+      .mockRejectedValueOnce(makeGraphError(401)) // A→B
+      .mockRejectedValueOnce(makeGraphError(401)) // A→C
+      .mockResolvedValue(undefined);
+    const db = createMockDb();
+    const command = createCommand({ graphApi, db });
+    mockFetchBatchForUsers(command, [
+      { userProfileId: USER_ID_A, email: EMAIL_A },
+      { userProfileId: USER_ID_B, email: EMAIL_B },
+      { userProfileId: USER_ID_C, email: EMAIL_C },
+    ]);
+
+    await command.run({ newCycleRequestedAt: Date.now() });
+
+    expect(db.__delete).not.toHaveBeenCalled();
+    expect(db.__updateSet).toHaveBeenCalledTimes(2); // A stays pending
+  });
+
   it('ends the run ready when a delegate fails', async () => {
     graphApi.get.mockRejectedValue(makeGraphError(401));
     const persistentCacheService = createMockPersistentCacheService();

@@ -346,7 +346,16 @@ export class TokenProvider implements AuthenticationProvider {
       throw new Error('Token refresh failed: the grant was replaced by a new sign-in');
     }
 
-    await this.onPermanentAuthFailure?.(userProfile.id);
+    // The Graph tokens are gone either way, so callers still learn the grant is revoked and clean up.
+    try {
+      await this.onPermanentAuthFailure?.(userProfile.id);
+    } catch (err) {
+      this.logger.error({
+        msg: 'Failed to revoke the MCP session of a user whose Microsoft grant is permanently invalid',
+        userProfileId: userProfile.id,
+        err,
+      });
+    }
     this.logger.warn({
       msg: 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
       userProfileId: userProfile.id,
