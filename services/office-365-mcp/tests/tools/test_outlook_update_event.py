@@ -940,6 +940,7 @@ class TestWhatItRefuses:
             + "Microsoft holds an all-day event at midnight on both ends"
         )
         assert "NOTHING WAS CHANGED" in str(refused.value)
+        assert "set `all_day` to false to make it a timed event" in str(refused.value)
         assert len(graph.calls) == 0
 
     async def test_a_timed_change_off_midnight_is_not_refused(

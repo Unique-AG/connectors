@@ -181,9 +181,9 @@ def _not_midnight(starts_at: str, ends_at: str) -> str:
         + 'Microsoft holds an all-day event at midnight on both ends: "If true, regardless of '
         + "whether it's a single-day or multi-day event, start, and endtime must be set to "
         + 'midnight and be in the same time zone". NOTHING WAS CHANGED. Give midnight in both '
-        + "times, with `ends_at` the midnight AFTER the last day the event covers, or leave "
-        + "`all_day` off and keep it a timed event at the hours the user named. Retrying these "
-        + "values will fail identically."
+        + "times, with `ends_at` the midnight AFTER the last day the event covers, or set "
+        + "`all_day` to false to make it a timed event at the hours the user named. Retrying "
+        + "these values will fail identically."
     )
 
 
