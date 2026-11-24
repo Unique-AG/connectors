@@ -1,5 +1,6 @@
 """Prometheus metrics in a registry of their own, which `/metrics` serves."""
 
+import logging
 import time
 from collections.abc import Sequence
 from typing import cast
@@ -19,6 +20,7 @@ from starlette.types import Scope
 from starlette.types import Send
 
 REGISTRY = CollectorRegistry()
+_log = logging.getLogger("mcp_observability")
 
 
 class MetricNamespace:
@@ -88,7 +90,8 @@ def _route_label(entry_scope: Scope) -> str:
                 return cast(str, getattr(route, "path_format", _UNMATCHED))
             if match is Match.PARTIAL and partial is None:
                 partial = route
-    except Exception:
+    except Exception as error:
+        _log.warning("HTTP metric route label lookup failed", exc_info=error)
         return _UNMATCHED
     return cast(str, getattr(partial, "path_format", _UNMATCHED))
 
