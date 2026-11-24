@@ -163,6 +163,26 @@ def test_an_app_mounted_twice_is_labelled_with_the_mount_the_request_took() -> N
     assert total(REQUESTS, path="/v2/{path}") - v2_before == 2
 
 
+def test_a_path_that_breaks_route_matching_still_counts_as_unmatched(client: TestClient) -> None:
+    before = total(REQUESTS, path="unmatched", status_code="500")
+
+    client.get("/orders/" + "9" * 4301)
+
+    assert total(REQUESTS, path="unmatched", status_code="500") - before == 1
+
+
+def test_an_instrumented_app_mounted_in_another_is_labelled_by_its_own_routes() -> None:
+    inner = Starlette(
+        routes=[Route("/gadgets/{gadget_id:int}", ok)],
+        middleware=[Middleware(HttpMetricsMiddleware, excluded_paths=frozenset())],
+    )
+    outer = Starlette(routes=[Mount("/api", app=inner)])
+
+    TestClient(outer).get("/api/gadgets/7")
+
+    assert "/gadgets/{gadget_id}" in paths(REQUESTS)
+
+
 def test_a_request_settles_the_in_flight_gauge(client: TestClient) -> None:
     before = in_flight()
 

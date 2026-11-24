@@ -76,16 +76,20 @@ _duration = Histogram(
 _UNMATCHED = "unmatched"
 
 
-def _route_label(entry_scope: Scope, router: Router | None) -> str:
-    """The template of the route the router took, matched again on the scope as it entered because
-    routing rewrites `root_path`. A mount gives its own `/prefix/{path}`."""
+def _route_label(entry_scope: Scope) -> str:
+    """The template of the route the app's router took, matched again on the scope as it entered
+    because routing rewrites `root_path`. A mount gives its own `/prefix/{path}`."""
+    router = cast(Router | None, getattr(entry_scope.get("app"), "router", None))
     partial: BaseRoute | None = None
-    for route in router.routes if router else ():
-        match, _ = route.matches(entry_scope)
-        if match is Match.FULL:
-            return cast(str, getattr(route, "path_format", _UNMATCHED))
-        if match is Match.PARTIAL and partial is None:
-            partial = route
+    try:
+        for route in router.routes if router else ():
+            match, _ = route.matches(entry_scope)
+            if match is Match.FULL:
+                return cast(str, getattr(route, "path_format", _UNMATCHED))
+            if match is Match.PARTIAL and partial is None:
+                partial = route
+    except Exception:
+        return _UNMATCHED
     return cast(str, getattr(partial, "path_format", _UNMATCHED))
 
 
@@ -118,6 +122,6 @@ class HttpMetricsMiddleware:
             await self._app(scope, receive, send_with_status)
         finally:
             _in_progress.labels(method=method).dec()
-            route = _route_label(entry_scope, cast(Router | None, scope.get("router")))
+            route = _route_label(entry_scope)
             _duration.labels(method=method, path=route).observe(time.perf_counter() - start)
             _requests.labels(method=method, path=route, status_code=status_code).inc()
