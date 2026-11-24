@@ -97,22 +97,32 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
     if (this.isStuck(cached, DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES)) {
       this.logger.warn({
         msg: 'Detected stuck delegated access discovery, triggering recovery',
-        state: cached?.dataType === 'DelegatedAccessDiscovery' ? cached.payload.state : undefined,
+        state: cached?.payload.state,
       });
-    } else if (
-      cached?.dataType === 'DelegatedAccessDiscovery' &&
-      cached.payload.state === 'ready' &&
-      (await this.discoverDelegatedAccessCommand.hasPendingDelegates(
-        new Date(cached.payload.cycleStartedAt ?? Date.now()),
-      ))
-    ) {
-      this.logger.log({
-        msg: 'Delegated access discovery has delegates left in this cycle, rerunning them',
-      });
-    } else {
+      await this.continueDiscoveryCycle();
       return;
     }
 
+    if (await this.hasPendingDelegates(cached)) {
+      this.logger.log({
+        msg: 'Delegated access discovery has delegates left in this cycle, rerunning them',
+      });
+      await this.continueDiscoveryCycle();
+    }
+  }
+
+  private async hasPendingDelegates(
+    cached: DelegatedAccessDiscoveryCacheType | null,
+  ): Promise<boolean> {
+    if (cached?.payload.state !== 'ready') {
+      return false;
+    }
+    // A cache entry written before cycles were tracked has no start, so every delegate is pending.
+    const cycleStartedAt = new Date(cached.payload.cycleStartedAt ?? Date.now());
+    return this.discoverDelegatedAccessCommand.hasPendingDelegates(cycleStartedAt);
+  }
+
+  private async continueDiscoveryCycle(): Promise<void> {
     const event = DiscoverDelegatedAccessEventDto.parse({
       type: 'unique.outlook-semantic-mcp.delegated-access.discover',
       payload: { newCycle: false },
