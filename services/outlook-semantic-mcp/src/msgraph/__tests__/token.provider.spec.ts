@@ -539,6 +539,19 @@ describe('TokenProvider', () => {
       ]);
     });
 
+    it('waits until a Retry-After given as an HTTP date', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue(
+        failedResponse(503, {}, { 'Retry-After': minutesFromNow(5).toUTCString() }),
+      );
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({ tokenRefreshRetryAt: minutesFromNow(5) }),
+      ]);
+    });
+
     it('waits a Retry-After longer than 30 minutes in full', async () => {
       mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
       mockFetch.mockResolvedValue(failedResponse(503, {}, { 'Retry-After': '3600' }));

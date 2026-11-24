@@ -17,6 +17,7 @@ import { z } from 'zod';
 import { authorizeTenant, microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import { CLEARED_TOKEN_REFRESH_BACKOFF, userProfiles } from '../db/schema';
+import { parseRetryAfterMs } from '../utils/parse-retry-after-ms';
 import { isAppLevelOAuthError } from './is-app-level-oauth-error';
 
 const TokenRefreshResponseSchema = z.object({
@@ -390,11 +391,6 @@ const parseOAuthError = (body: string): z.infer<typeof OAuthErrorSchema> => {
   } catch {
     return {};
   }
-};
-
-const parseRetryAfterMs = (retryAfter: string | null): number | null => {
-  const seconds = Number.parseInt(retryAfter ?? '', 10);
-  return Number.isNaN(seconds) ? null : seconds * 1000;
 };
 
 const networkFailureCode = (error: unknown): string => {
