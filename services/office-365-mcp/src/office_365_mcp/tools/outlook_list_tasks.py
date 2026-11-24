@@ -26,7 +26,7 @@ from office_365_mcp.shared.outlook.tasks import (
     day_of,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_tasks"
 
@@ -214,7 +214,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         due_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "List only the tasks due on or after this point. A date, such as "
@@ -227,7 +227,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         due_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "List only the tasks due on or before this point. It takes the same two "

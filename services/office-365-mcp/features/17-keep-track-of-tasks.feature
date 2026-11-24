@@ -65,7 +65,8 @@ Feature: Keeping track of tasks
     Scenario: A declined change in a shared list changes nothing
       Given Anna shares the list "Team launch" with Mia, and it holds the open task "Book the venue"
       When Mia asks her assistant to mark "Book the venue" as done, and she declines the approval
-      Then "Book the venue" stays open
+      Then Mia is asked to approve the change first
+      And she declines, so "Book the venue" stays open
 
     @happy @uc-17-18
     Scenario: A list that Microsoft 365 does not report as private is asked about
@@ -80,14 +81,14 @@ Feature: Keeping track of tasks
     Scenario: A list name is not taken as a list
       Given Mia has the list "Tasks"
       When the assistant tries to add a task with the name "Tasks" in place of the handle of the list
-      Then no task is created
+      Then no task is created, because "Tasks" is the name of a list and not its handle
       And the assistant is told to take the handle from the list of task lists
 
     @unhappy @uc-17-09
     Scenario: A task handle is required to read a task
       Given Mia has the list "Tasks"
       When the assistant tries to read the handle of the list as a task
-      Then nothing is read
+      Then nothing is read, because the assistant gave a list handle where a task handle belongs
       And the assistant is told that a list handle is not a task handle
 
     @unhappy @uc-17-10
@@ -106,7 +107,7 @@ Feature: Keeping track of tasks
     Scenario: A Windows zone name is refused
       Given Mia works in Zurich
       When the assistant names the zone "W. Europe Standard Time" to list her tasks
-      Then nothing is read
+      Then nothing is read, because "W. Europe Standard Time" is a Windows zone name
       And the assistant is told to name an IANA zone such as "Europe/Zurich"
 
     @unhappy @uc-17-13

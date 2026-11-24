@@ -1571,7 +1571,7 @@ cluster.
 
 ## Reference: every tool
 
-This reference lists all 135 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 136 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 

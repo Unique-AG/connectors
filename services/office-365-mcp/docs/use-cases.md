@@ -5265,8 +5265,8 @@ Situation: Anna shares the list "Team launch" with Mia, and it holds the open ta
 
 What happens:
 
-- "Book the venue" stays open.
-- The assistant asks Mia to approve first.
+- Mia is asked to approve the change first.
+- She declines, so "Book the venue" stays open.
 
 **A list that Microsoft 365 does not report as private is asked about**
 
@@ -5293,7 +5293,7 @@ Situation: Mia has the list "Tasks".
 
 What happens:
 
-- No task is created.
+- No task is created, because "Tasks" is the name of a list and not its handle.
 - The assistant is told to take the handle from the list of task lists.
 
 **A task handle is required to read a task**
@@ -5306,7 +5306,7 @@ Situation: Mia has the list "Tasks".
 
 What happens:
 
-- Nothing is read.
+- Nothing is read, because the assistant gave a list handle where a task handle belongs.
 - The assistant is told that a list handle is not a task handle.
 
 **An update that changes nothing is refused**
@@ -5343,7 +5343,7 @@ Situation: Mia works in Zurich.
 
 What happens:
 
-- Nothing is read.
+- Nothing is read, because "W. Europe Standard Time" is a Windows zone name.
 - The assistant is told to name an IANA zone such as "Europe/Zurich".
 
 **A deleted task sends the assistant back to the list**

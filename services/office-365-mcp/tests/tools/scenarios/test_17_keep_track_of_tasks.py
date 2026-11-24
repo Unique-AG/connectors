@@ -25,6 +25,7 @@ TASKS = f"/me/todo/lists/{LIST_ID}/tasks"
 ONE_TASK = f"{TASKS}/{TASK_ID}"
 ONE_LIST = f"/me/todo/lists/{LIST_ID}"
 ZURICH = "Europe/Zurich"
+_EARLY_MIDNIGHT = "2026-11-23T00:00:00+14:00"
 
 
 def _task(
@@ -155,6 +156,33 @@ class TestFindingTasks:
         assert [(row["title"], row["due_date"]) for row in _rows(answer, "tasks")] == [
             ("Send the Q3 report", "2026-11-23")
         ]
+
+    @pytest.mark.parametrize(
+        ("bound", "titles"),
+        [
+            ("due_before", ["Book the venue"]),
+            ("due_after", ["Send the Q3 report", "Book the venue"]),
+        ],
+    )
+    async def test_a_midnight_moment_with_an_offset_keeps_its_instant(
+        self, graph: respx.MockRouter, bound: str, titles: list[str]
+    ) -> None:
+        tasks = [
+            _task("T1", "Send the Q3 report", due_utc="2026-11-22T23:00:00.0000000"),
+            _task("T2", "Book the venue", due_utc="2026-11-21T23:00:00.0000000"),
+        ]
+        _ = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
+
+        answer = await call(
+            "outlook_list_tasks",
+            task_list=TASK_LIST,
+            show="any",
+            time_zone=ZURICH,
+            due_after=_EARLY_MIDNIGHT if bound == "due_after" else None,
+            due_before=_EARLY_MIDNIGHT if bound == "due_before" else None,
+        )
+
+        assert [row["title"] for row in _rows(answer, "tasks")] == titles
 
     async def test_completed_tasks_are_listed_by_a_word_of_their_title(
         self, graph: respx.MockRouter
