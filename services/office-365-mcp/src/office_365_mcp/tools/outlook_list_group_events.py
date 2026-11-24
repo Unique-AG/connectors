@@ -19,7 +19,7 @@ from office_365_mcp.shared.calendar import EventTime, event_time, window_bounds,
 from office_365_mcp.shared.mail import MailAddress
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.window import runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, runs_backwards
 
 TOOL_NAME = "outlook_list_group_events"
 
@@ -302,7 +302,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         starts_on: Annotated[
-            date | datetime,
+            DayOrMoment,
             Field(
                 description=(
                     "Where the window opens. This bound is inside the window. A date, such as "
@@ -313,7 +313,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         ends_on: Annotated[
-            date | datetime,
+            DayOrMoment,
             Field(
                 description=(
                     "Where the window closes. This bound is inside the window, in the same forms "

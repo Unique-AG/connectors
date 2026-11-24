@@ -25,7 +25,7 @@ from office_365_mcp.shared.calendar import (
 from office_365_mcp.shared.handles import EventHandle, event_handle
 from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.window import runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, runs_backwards
 
 TOOL_NAME = "outlook_list_event_instances"
 
@@ -267,7 +267,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         starts_on: Annotated[
-            date | datetime,
+            DayOrMoment,
             Field(
                 description=(
                     "This is where the window opens, and this bound is inside the window. A "
@@ -278,7 +278,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         ends_on: Annotated[
-            date | datetime,
+            DayOrMoment,
             Field(
                 description=(
                     "This is where the window closes, and this bound is inside the window. It "

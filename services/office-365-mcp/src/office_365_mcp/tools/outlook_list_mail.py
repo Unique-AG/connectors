@@ -37,7 +37,7 @@ from office_365_mcp.shared.seam import (
     graph_client_for_caller,
     graph_mailbox,
 )
-from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_list_mail"
 
@@ -377,11 +377,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(description="Keeps only messages that are unread."),
         ] = False,
         received_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(description="Only messages received at or after this date or moment (UTC)."),
         ] = None,
         received_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Only messages received at or before this date or moment (UTC), inclusive."
