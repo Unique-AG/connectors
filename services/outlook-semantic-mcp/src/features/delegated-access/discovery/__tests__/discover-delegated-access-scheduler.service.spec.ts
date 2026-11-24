@@ -52,7 +52,7 @@ describe('DiscoverDelegatedAccessSchedulerService', () => {
         'unique.outlook-semantic-mcp.delegated-access.discover',
         expect.objectContaining({
           type: 'unique.outlook-semantic-mcp.delegated-access.discover',
-          payload: { newCycle: true },
+          payload: { newCycleRequestedAt: expect.any(Number) },
         }),
       );
     });

@@ -125,7 +125,7 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
   private async continueDiscoveryCycle(): Promise<void> {
     const event = DiscoverDelegatedAccessEventDto.parse({
       type: 'unique.outlook-semantic-mcp.delegated-access.discover',
-      payload: { newCycle: false },
+      payload: {},
     });
     await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
   }

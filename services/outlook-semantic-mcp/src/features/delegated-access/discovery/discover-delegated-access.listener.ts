@@ -34,8 +34,10 @@ export class DiscoverDelegatedAccessListener {
     this.logger.log({
       msg: 'Delegated access discovery event received',
       type: event.type,
-      newCycle: event.payload.newCycle,
+      newCycleRequestedAt: event.payload.newCycleRequestedAt,
     });
-    await this.discoverDelegatedAccessCommand.run({ newCycle: event.payload.newCycle });
+    await this.discoverDelegatedAccessCommand.run({
+      newCycleRequestedAt: event.payload.newCycleRequestedAt,
+    });
   }
 }

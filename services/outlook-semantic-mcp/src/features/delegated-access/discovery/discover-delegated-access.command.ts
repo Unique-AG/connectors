@@ -50,7 +50,7 @@ export class DiscoverDelegatedAccessCommand {
   ) {}
 
   @NewTrace('discover-delegated-access')
-  public async run({ newCycle }: { newCycle: boolean }): Promise<void> {
+  public async run({ newCycleRequestedAt }: { newCycleRequestedAt?: number }): Promise<void> {
     if (this.config.scan === 'disabled') {
       this.logger.log({
         msg: `Skipped running delegated access discovery. Reason: delegated access is disabled`,
@@ -58,7 +58,7 @@ export class DiscoverDelegatedAccessCommand {
       return;
     }
     await this.metrics.measureDiscoverRun(async () => {
-      const decision = await this.decide({ newCycle });
+      const decision = await this.decide({ newCycleRequestedAt });
       if (decision.action === 'skip') {
         this.logger.log({
           msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
@@ -271,9 +271,9 @@ export class DiscoverDelegatedAccessCommand {
    */
   @Span()
   public async decide({
-    newCycle,
+    newCycleRequestedAt,
   }: {
-    newCycle: boolean;
+    newCycleRequestedAt?: number;
   }): Promise<DiscoverDelegatedAccessDecision> {
     return this.persistentCacheService.setWith(
       DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
@@ -290,11 +290,18 @@ export class DiscoverDelegatedAccessCommand {
 
         assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
         const { state, lastProgressRegisteredAt, cycleStartedAt } = currentValue.payload;
+        // RabbitMQ redelivers the request a killed run was processing. It was made before the cycle
+        // it started, so it continues that cycle instead of starting another one.
+        const startsNewCycle =
+          newCycleRequestedAt !== undefined &&
+          (cycleStartedAt === undefined ||
+            cycleStartedAt === null ||
+            newCycleRequestedAt > cycleStartedAt);
 
         const noProgressThresholdMs =
           DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES * 60_000;
         if (state === 'running' && now - lastProgressRegisteredAt < noProgressThresholdMs) {
-          if (newCycle) {
+          if (startsNewCycle) {
             // The running run finishes the cycle it started with. Once it ends, the recovery cron
             // finds every delegate pending against the new start, so the new cycle is not lost.
             await update({
@@ -308,7 +315,7 @@ export class DiscoverDelegatedAccessCommand {
           };
         }
 
-        const nextCycleStartedAt = newCycle ? now : (cycleStartedAt ?? now);
+        const nextCycleStartedAt = startsNewCycle ? now : (cycleStartedAt ?? now);
         await update({
           dataType: 'DelegatedAccessDiscovery',
           payload: {

@@ -37,7 +37,7 @@ describe('DelegatedAccessRecoverySchedulerService', () => {
   const publishedDiscoveryEvent = () =>
     expect.objectContaining({
       type: 'unique.outlook-semantic-mcp.delegated-access.discover',
-      payload: { newCycle: false },
+      payload: {},
     });
 
   it('resumes a failed discovery within its cycle', async () => {
