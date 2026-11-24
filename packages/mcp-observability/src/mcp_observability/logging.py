@@ -25,10 +25,11 @@ from mcp_observability.redaction import SecretRedactor
 from mcp_observability.redaction import failed_line
 from mcp_observability.stacktrace import scrub_stacktrace
 
-# httpx logs every request URL, query string included, at INFO. sse-starlette logs each outbound
-# event body, which is the tool result, at DEBUG.
+# httpx and httpx2 log every request URL, query string included, at INFO. sse-starlette logs each
+# outbound event body, which is the tool result, at DEBUG.
 _DEFAULT_LIBRARY_LOG_LEVELS: dict[str, LogLevel] = {
     "httpx": LogLevel.WARNING,
+    "httpx2": LogLevel.WARNING,
     "httpcore": LogLevel.WARNING,
     "sse_starlette": LogLevel.INFO,
 }
