@@ -1,10 +1,12 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Test mock */
 import assert from 'node:assert';
 import { createLoggerOptions, runWithLogSecrets } from '@unique-ag/logger';
+import { and, eq } from 'drizzle-orm';
 import pino from 'pino';
 import type { Dispatcher } from 'undici';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../../__mocks__';
+import { userProfiles } from '../../db/schema';
 
 vi.mock('undici', () => ({
   fetch: vi.fn(),
@@ -362,6 +364,38 @@ describe('TokenProvider', () => {
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
+    it('refreshes for a request whose token is the stored one while another reuses it', async () => {
+      const results = await Promise.all([
+        new TokenProvider(mockConfig, mockDependencies as any).refreshAccessToken(
+          'user-profile-123',
+          'older-access-token',
+        ),
+        new TokenProvider(mockConfig, mockDependencies as any).refreshAccessToken(
+          'user-profile-123',
+          'stored-access-token',
+        ),
+      ]);
+
+      expect(results).toEqual(['stored-access-token', 'new-access-token']);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares one refresh between requests that both rejected the stored token', async () => {
+      const results = await Promise.all([
+        new TokenProvider(mockConfig, mockDependencies as any).refreshAccessToken(
+          'user-profile-123',
+          'stored-access-token',
+        ),
+        new TokenProvider(mockConfig, mockDependencies as any).refreshAccessToken(
+          'user-profile-123',
+          'stored-access-token',
+        ),
+      ]);
+
+      expect(results).toEqual(['new-access-token', 'new-access-token']);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
     it('refreshes when Graph rejected the stored access token', async () => {
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
@@ -503,6 +537,74 @@ describe('TokenProvider', () => {
           tokenRefreshRetryAt: minutesFromNow(5),
         }),
       ]);
+    });
+
+    it('waits a Retry-After longer than 30 minutes in full', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue(failedResponse(503, {}, { 'Retry-After': '3600' }));
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({ tokenRefreshRetryAt: minutesFromNow(60) }),
+      ]);
+    });
+
+    it('backs off when the error body cannot be read, keeping its Retry-After', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        headers: new Headers({ 'Retry-After': '300' }),
+        text: vi.fn().mockRejectedValue(new TypeError('terminated')),
+      } as never);
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        'Token refresh failed: Too Many Requests',
+      );
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({
+          tokenRefreshFailureCode: 'http_429_unreadable_body',
+          tokenRefreshRetryAt: minutesFromNow(5),
+        }),
+      ]);
+    });
+
+    it('backs off when the token body cannot be read', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: new Headers(),
+        json: vi.fn().mockRejectedValue(new TypeError('terminated')),
+      } as never);
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({
+          tokenRefreshFailureCode: 'http_200_unreadable_body',
+          tokenRefreshRetryAt: minutesFromNow(1),
+        }),
+      ]);
+    });
+
+    it('records the failure only on the grant it tried to refresh', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockRejectedValue(connectTimeout());
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      const [update] = mockDependencies.drizzle.update.mock.results;
+      expect(update?.value.where).toHaveBeenCalledWith(
+        and(
+          eq(userProfiles.id, 'user-profile-123'),
+          eq(userProfiles.refreshToken, 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4='),
+        ),
+      );
     });
 
     it("logs Microsoft's error code but not its description or trace ids", async () => {

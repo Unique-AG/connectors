@@ -10,7 +10,7 @@ import {
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { isObjectType } from 'remeda';
 import { type Dispatcher, fetch, type Response } from 'undici';
 import { z } from 'zod';
@@ -101,33 +101,21 @@ export class TokenProvider implements AuthenticationProvider {
   /**
    * Every TokenProvider in the process shares one refresh per user, so a burst of 401s for the
    * same user calls Microsoft once. Pass the access token Graph rejected so a request that lost the
-   * race reuses the token another request already stored instead of refreshing again.
+   * race reuses the token another request already stored instead of refreshing again. The reuse
+   * stays outside the shared refresh: a request whose token is the stored one must not receive
+   * that same token back from a request that only reused it.
    */
-  public refreshAccessToken(userProfileId: string, rejectedAccessToken?: string): Promise<string> {
+  public async refreshAccessToken(
+    userProfileId: string,
+    rejectedAccessToken?: string,
+  ): Promise<string> {
     const inFlight = inFlightRefreshes.get(userProfileId);
     if (inFlight) {
       return inFlight;
     }
-    const refresh = this.refreshOnce(userProfileId, rejectedAccessToken).finally(() =>
-      inFlightRefreshes.delete(userProfileId),
-    );
-    inFlightRefreshes.set(userProfileId, refresh);
-    return refresh;
-  }
-
-  private async refreshOnce(userProfileId: string, rejectedAccessToken?: string): Promise<string> {
-    const userProfile = await this.drizzle.query.userProfiles.findFirst({
-      where: eq(userProfiles.id, userProfileId),
-    });
-
-    assert.ok(userProfile?.refreshToken, `No refresh token available for user: ${userProfileId}`);
-
-    if (rejectedAccessToken && userProfile.accessToken) {
-      const storedAccessToken = this.encryptionService
-        .decryptFromString(userProfile.accessToken)
-        .toString('utf-8');
-      addLogSecrets([storedAccessToken]);
-      if (storedAccessToken !== rejectedAccessToken) {
+    if (rejectedAccessToken) {
+      const storedAccessToken = await this.readStoredAccessToken(userProfileId);
+      if (storedAccessToken && storedAccessToken !== rejectedAccessToken) {
         this.logger.debug({
           msg: 'Microsoft Graph access token was already refreshed, reusing the stored one',
           userProfileId,
@@ -135,6 +123,38 @@ export class TokenProvider implements AuthenticationProvider {
         return storedAccessToken;
       }
     }
+    // Another request may have started the refresh while the stored token was read.
+    const startedMeanwhile = inFlightRefreshes.get(userProfileId);
+    if (startedMeanwhile) {
+      return startedMeanwhile;
+    }
+    const refresh = this.refreshOnce(userProfileId).finally(() =>
+      inFlightRefreshes.delete(userProfileId),
+    );
+    inFlightRefreshes.set(userProfileId, refresh);
+    return refresh;
+  }
+
+  private async readStoredAccessToken(userProfileId: string): Promise<string | undefined> {
+    const userProfile = await this.drizzle.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId),
+    });
+    if (!userProfile?.accessToken) {
+      return undefined;
+    }
+    const accessToken = this.encryptionService
+      .decryptFromString(userProfile.accessToken)
+      .toString('utf-8');
+    addLogSecrets([accessToken]);
+    return accessToken;
+  }
+
+  private async refreshOnce(userProfileId: string): Promise<string> {
+    const userProfile = await this.drizzle.query.userProfiles.findFirst({
+      where: eq(userProfiles.id, userProfileId),
+    });
+
+    assert.ok(userProfile?.refreshToken, `No refresh token available for user: ${userProfileId}`);
 
     if (userProfile.tokenRefreshRetryAt && userProfile.tokenRefreshRetryAt > new Date()) {
       throw new TokenRefreshCoolingDownError(userProfile.tokenRefreshRetryAt);
@@ -170,8 +190,25 @@ export class TokenProvider implements AuthenticationProvider {
       });
     }
 
+    // The connection can drop after the status and headers arrived, so a body that cannot be read
+    // backs off like any other transient failure, keeping the status and Retry-After.
+    const retryAfterMs = () => parseRetryAfterMs(response.headers.get('retry-after'));
+    const unreadableBody = (cause: unknown) =>
+      this.recordTransientFailure(userProfile, {
+        failureCode: `http_${response.status}_unreadable_body`,
+        retryAfterMs: retryAfterMs(),
+        message: `Token refresh failed: ${response.statusText}`,
+        cause,
+      });
+
     if (!response.ok) {
-      const oauthError = parseOAuthError(await response.text());
+      let body: string;
+      try {
+        body = await response.text();
+      } catch (err) {
+        return await unreadableBody(err);
+      }
+      const oauthError = parseOAuthError(body);
 
       // Errors handled:
       // - isPermanentUpstreamOAuthError: invalid_grant, interaction_required, consent_required
@@ -196,12 +233,17 @@ export class TokenProvider implements AuthenticationProvider {
           ? `http_${response.status}_${oauthError.error}`
           : `http_${response.status}`,
         aadstsCodes: oauthError.error_codes,
-        retryAfterMs: parseRetryAfterMs(response.headers.get('retry-after')),
+        retryAfterMs: retryAfterMs(),
         message: `Token refresh failed: ${response.statusText}`,
       });
     }
 
-    const tokenData = TokenRefreshResponseSchema.parse(await response.json());
+    let tokenData: z.infer<typeof TokenRefreshResponseSchema>;
+    try {
+      tokenData = TokenRefreshResponseSchema.parse(await response.json());
+    } catch (err) {
+      return await unreadableBody(err);
+    }
     addLogSecrets([
       tokenData.access_token,
       ...(tokenData.refresh_token ? [tokenData.refresh_token] : []),
@@ -241,7 +283,8 @@ export class TokenProvider implements AuthenticationProvider {
 
   /**
    * Backs off before the next refresh attempt: Microsoft's Retry-After when it sends one,
-   * otherwise 1, 2, 4… minutes per consecutive failure, capped at 30 minutes.
+   * otherwise 1, 2, 4… minutes per consecutive failure, capped at 30 minutes. It only records the
+   * failure on the grant it tried: a sign-in that stored a new grant meanwhile keeps its reset.
    */
   private async recordTransientFailure(
     userProfile: UserProfile,
@@ -260,10 +303,9 @@ export class TokenProvider implements AuthenticationProvider {
     },
   ): Promise<never> {
     const failureCount = userProfile.tokenRefreshFailureCount + 1;
-    const backoffMs = Math.min(
-      retryAfterMs ?? MIN_REFRESH_BACKOFF_MS * 2 ** (failureCount - 1),
-      MAX_REFRESH_BACKOFF_MS,
-    );
+    const backoffMs =
+      retryAfterMs ??
+      Math.min(MIN_REFRESH_BACKOFF_MS * 2 ** (failureCount - 1), MAX_REFRESH_BACKOFF_MS);
     const failedAt = new Date();
     const retryAt = new Date(failedAt.getTime() + backoffMs);
 
@@ -275,7 +317,12 @@ export class TokenProvider implements AuthenticationProvider {
         tokenRefreshFailureCode: failureCode,
         tokenRefreshRetryAt: retryAt,
       })
-      .where(eq(userProfiles.id, userProfile.id));
+      .where(
+        and(
+          eq(userProfiles.id, userProfile.id),
+          eq(userProfiles.refreshToken, userProfile.refreshToken ?? ''),
+        ),
+      );
 
     this.logger.error({
       msg: 'Failed to refresh Microsoft Graph API access token for user',

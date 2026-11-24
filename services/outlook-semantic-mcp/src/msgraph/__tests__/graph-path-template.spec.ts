@@ -32,6 +32,23 @@ describe('toGraphPathTemplate', () => {
     ).toBe('/users/:id/messages/:id');
   });
 
+  it('replaces a Graph item id without digits', () => {
+    expect(
+      toGraphPathTemplate('https://graph.microsoft.com/v1.0/me/messages/AAMkAGJhYWFhYWFhYWFhYQ=='),
+    ).toBe('/me/messages/:id');
+  });
+
+  it('keeps dotted and $-prefixed Graph path words', () => {
+    expect(
+      toGraphPathTemplate(
+        'https://graph.microsoft.com/v1.0/me/mailFolders/AAMkAGJhYWFhYWFhYWFhYQ==/messages/microsoft.graph.delta',
+      ),
+    ).toBe('/me/mailFolders/:id/messages/microsoft.graph.delta');
+    expect(
+      toGraphPathTemplate('https://graph.microsoft.com/v1.0/me/messages/AAMk1A==/$value'),
+    ).toBe('/me/messages/:id/$value');
+  });
+
   it('reads the URL of a Request', () => {
     expect(toGraphPathTemplate(new Request('https://graph.microsoft.com/v1.0/me/events'))).toBe(
       '/me/events',

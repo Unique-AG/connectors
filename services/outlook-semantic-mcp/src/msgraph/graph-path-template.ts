@@ -1,13 +1,9 @@
-import { z } from 'zod';
+// Graph's own path words are lowerCamelCase, some dotted (`microsoft.graph.delta`) or `$`-prefixed
+// (`$value`). Every other segment, such as a mailbox address, a GUID or an item id with or without
+// digits, identifies a user or an item, so it becomes `:id`.
+const apiWord = /^\$?[a-z][a-zA-Z]*(\.[a-zA-Z]+)*$/;
 
-const uuidSchema = z.uuid();
-
-// Mailbox addresses and Graph ids in a path identify a user or an item, so they become `:id`.
-const isIdentifierSegment = (segment: string): boolean =>
-  segment.includes('@') ||
-  segment.includes('%40') ||
-  uuidSchema.safeParse(segment).success ||
-  (segment.length > 15 && /\d/.test(segment));
+const isIdentifierSegment = (segment: string): boolean => segment !== '' && !apiWord.test(segment);
 
 /** `https://graph.microsoft.com/v1.0/users/jane@contoso.com/messages/AAMk…` → `/users/:id/messages/:id` */
 export const toGraphPathTemplate = (request: RequestInfo): string => {
