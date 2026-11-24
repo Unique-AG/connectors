@@ -586,13 +586,13 @@ Messages, folders, drafts, and sending.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_search_mail` | 🟢 Read | — | Searches your mailbox, or a shared mailbox, with a KQL query. Filters by importance, flag, category, and attachments. |
+| `outlook_search_mail` | 🟢 Read | — | Searches your mailbox, or a shared mailbox, with a KQL query. Searches the whole mailbox or one folder. Filters by importance, flag, category, and attachments. |
 | `outlook_read_mail` | 🟢 Read | — | Reads one message in full. Lists its attachments and headers, but never their bytes. |
 | `outlook_list_attachments` | 🟢 Read | — | Lists the attachments of one message, with name, size, and type. |
 | `outlook_read_attachment` | 🟢 Read | — | Reads one mail attachment of 10 MB or less, with its real media type. |
 | `outlook_browse_folders` | 🟢 Read | — | Lists one level of the mail folder tree, with a handle for each folder. |
 | `outlook_find_recipient` | 🟢 Read | — | Finds the email address behind a display name. |
-| `outlook_read_thread` | 🟢 Read | — | Reads the messages of one conversation, with a short preview of each body. |
+| `outlook_read_thread` | 🟢 Read | — | Reads the messages of one conversation, with a short preview of each body. With access to some folders of a mailbox only, it reads the conversation in the folder of the message. |
 | `outlook_list_mail` | 🟢 Read | — | Lists the newest messages of one folder. Filters by importance, flag, attachments, and category. |
 | `outlook_get_mail_tips` | 🟢 Read | — | Reads the MailTips of recipients, for example an automatic reply or a full mailbox. Sends nothing. |
 | `outlook_list_focused_overrides` | 🟢 Read | — | Lists the senders that have a fixed inbox tab, Focused or Other. |
@@ -602,6 +602,16 @@ Messages, folders, drafts, and sending.
 - **Graph permissions (4):** `Mail.Read`, `Mail.Read.Shared`, `People.Read`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** None. No tool of this preset asks the user.
+
+**Access to some folders of a mailbox**
+
+The owner of a mailbox can give a delegate access to the whole mailbox (Full Access) or to some folders only, for example the Inbox. A delegate with access to some folders only gets these results:
+
+- `outlook_list_mail` lists each folder that the delegate has access to.
+- `outlook_read_mail`, `outlook_list_attachments`, and `outlook_read_attachment` read a message in such a folder.
+- `outlook_read_thread` reads the conversation in the folder of the message only.
+- `outlook_search_mail` does not work. Microsoft Graph refuses a search for a delegate without Full Access, also in a folder that the delegate has access to. The tool tells the agent to use `outlook_list_mail`.
+- To draft, the delegate needs access to the Drafts folder. To send, the delegate needs Send As or Send on Behalf.
 
 ### `outlook-write`
 
