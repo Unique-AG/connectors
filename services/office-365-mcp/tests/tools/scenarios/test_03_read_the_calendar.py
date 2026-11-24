@@ -45,7 +45,7 @@ _MICROSOFT_REFUSES = [
     ),
     pytest.param(
         {"status": 403, "body": "error.accessDenied.json"},
-        "Ask a Microsoft 365 administrator to grant the delegated permissions",
+        "Usually this calendar is not shared with the user",
         id="no-access",
     ),
 ]

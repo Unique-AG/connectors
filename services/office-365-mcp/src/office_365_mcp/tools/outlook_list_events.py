@@ -33,6 +33,7 @@ from office_365_mcp.shared.calendar import (
     SUMMARY_FIELDS,
     CalendarSummary,
     EventSummary,
+    calendar_not_shared,
     calendar_of,
     window_bounds,
     zone_named,
@@ -70,6 +71,8 @@ GRAPH_NOT_FOUND = (
     + "Retrying with the same argument will fail identically."
 )
 
+GRAPH_FORBIDDEN = calendar_not_shared("No event was listed.")
+
 MAX_PAGE_SIZE = 1000
 
 DEFAULT_TIME_ZONE = "UTC"
@@ -87,6 +90,12 @@ each recurring series into one row for each occurrence.
 Notes:
 - `ends_on` must not fall before `starts_on`. Both arguments take a date or a moment. A bare \
 date covers its whole day.
+- Omit `calendar_ref` to read the user's own calendar. It holds the user's own events and the \
+meetings that the user is invited to. It is not the calendar of another attendee. The calendar \
+of another person opens only after that person shares it and the user accepts the invitation in \
+Outlook. Then it shows in outlook_list_calendars, and you pass its `uri` as `calendar_ref`. If it \
+does not show there, `capped` is false, and this deployment runs outlook_check_availability, call \
+it for that person. It reads only free and busy time.
 """
 
 _ENDS_BEFORE_STARTS = (

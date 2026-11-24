@@ -90,6 +90,21 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "importance",
 )
 
+
+def calendar_not_shared(nothing_read: str) -> str:
+    return (
+        "Microsoft 365 refused to open this calendar for the signed-in user. "
+        + f"{nothing_read} Usually this calendar is not shared with the user: the calendar of "
+        + "another person opens only after that person shares it and the user accepts the "
+        + "invitation in Outlook. Then it shows in outlook_list_calendars. A policy of the "
+        + "organization can also refuse the request. Tell the user that you cannot open the "
+        + "calendar. If the calendar belongs to another person "
+        + "and this deployment runs outlook_check_availability, call it with the email address of "
+        + "that person to find when that person is free or busy. A call with the same arguments "
+        + "fails the same way."
+    )
+
+
 NOBODY_INVITED_BUT_A_PLACE = (
     "No person is invited. But Microsoft can send the meeting request to the mailbox of a room, "
     + "or of a bookable room that the location names."
