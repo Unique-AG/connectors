@@ -1,11 +1,12 @@
 import assert from 'node:assert';
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { createSmeared, smearEmail } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { and, eq, gt, inArray, isNotNull, notInArray, or, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, isNull, lt, lte, notInArray, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { Span } from 'nestjs-otel';
-import { isNonNullish, last } from 'remeda';
+import { last } from 'remeda';
 import { AppConfig, appConfig, DelegatedAccessConfig, delegatedAccessConfig } from '~/config';
 import {
   DRIZZLE,
@@ -20,8 +21,6 @@ import { DelegatedAccessMetricsService } from '~/features/metrics/delegated-acce
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
 import { NewTrace } from '~/features/tracing.utils';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
-import { isTokenExpiredError } from '~/utils/is-token-expired-error';
-import { Nullish } from '~/utils/nullish';
 import { makeDefaultOnErrorHandler, withRetryAttempts } from '~/utils/with-retry-attempts';
 import {
   getDelegatedAccessErrorInfo,
@@ -32,12 +31,10 @@ export const DISCOVER_DELEGATED_ACCESS_CACHE_KEY = `DiscoverDelegatedAccess`;
 export const DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES = 10;
 
 type DiscoverDelegatedAccessDecision =
-  | {
-      action: 'proceed';
-      lastProcessedDelegateId: Nullish<string>;
-      lastProcessedOwnerIdForDelegate: Nullish<string>;
-    }
+  | { action: 'proceed'; cycleStartedAt: Date }
   | { action: 'skip'; reason: string };
+
+type DelegateOutcome = 'discovered' | 'failed' | 'revoked';
 
 @Injectable()
 export class DiscoverDelegatedAccessCommand {
@@ -53,7 +50,7 @@ export class DiscoverDelegatedAccessCommand {
   ) {}
 
   @NewTrace('discover-delegated-access')
-  public async run(): Promise<void> {
+  public async run({ newCycle }: { newCycle: boolean }): Promise<void> {
     if (this.config.scan === 'disabled') {
       this.logger.log({
         msg: `Skipped running delegated access discovery. Reason: delegated access is disabled`,
@@ -61,7 +58,7 @@ export class DiscoverDelegatedAccessCommand {
       return;
     }
     await this.metrics.measureDiscoverRun(async () => {
-      const decision = await this.decide();
+      const decision = await this.decide({ newCycle });
       if (decision.action === 'skip') {
         this.logger.log({
           msg: `Skipped running delegated access discovery. Reason: ${decision.reason}`,
@@ -70,23 +67,14 @@ export class DiscoverDelegatedAccessCommand {
       }
 
       let finalState: 'ready' | 'failed';
+      let delegateOutcomes: Record<DelegateOutcome, number> | undefined;
       try {
-        await this.runDiscoveryInBatches(
-          decision.lastProcessedDelegateId,
-          decision.lastProcessedOwnerIdForDelegate,
-        );
+        delegateOutcomes = await this.runDiscoveryInBatches(decision.cycleStartedAt);
         finalState = 'ready';
       } catch (error) {
-        const currentCachedValue = await this.persistentCacheService.get(
-          DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
-          `DelegatedAccessDiscovery`,
-        );
-        const payload = currentCachedValue?.payload;
         this.logger.error({
           msg: `Failed to run delegated access discovery`,
-          lastProcessedDelegateId: payload?.lastProcessedDelegateId,
-          lastProcessedOwnerIdForDelegate: payload?.lastProcessedOwnerIdForDelegate,
-          lastProgressRegisteredAt: payload?.lastProgressRegisteredAt,
+          cycleStartedAt: decision.cycleStartedAt.toISOString(),
           err: error,
         });
         finalState = 'failed';
@@ -107,11 +95,14 @@ export class DiscoverDelegatedAccessCommand {
         },
       );
 
-      await this.logDiscoverySummary(finalState);
+      await this.logDiscoverySummary(finalState, delegateOutcomes);
     });
   }
 
-  private async logDiscoverySummary(finalState: string): Promise<void> {
+  private async logDiscoverySummary(
+    finalState: string,
+    delegateOutcomes: Record<DelegateOutcome, number> | undefined,
+  ): Promise<void> {
     try {
       const delegateProfiles = alias(userProfiles, 'delegate_profiles');
       const ownerProfiles = alias(userProfiles, 'owner_profiles');
@@ -138,6 +129,7 @@ export class DiscoverDelegatedAccessCommand {
 
       this.logger.log({
         msg: `Delegated access discovery completed, final state: ${finalState}`,
+        delegateOutcomes,
         delegatesWithAccess: rows.length,
         delegatedAccess,
       });
@@ -149,95 +141,76 @@ export class DiscoverDelegatedAccessCommand {
     }
   }
 
+  /**
+   * Processes every delegate the cycle has not discovered yet, so a run after a crash or a failed
+   * delegate picks up only what is left. One delegate failing does not stop the others.
+   */
   @Span()
   private async runDiscoveryInBatches(
-    lastProcessedDelegateId: Nullish<string>,
-    lastProcessedOwnerIdForDelegate: Nullish<string>,
-  ): Promise<void> {
-    // If we have an in-progress delegate, resume its inner loop first
-    if (isNonNullish(lastProcessedDelegateId) && isNonNullish(lastProcessedOwnerIdForDelegate)) {
-      await this.metrics.measureDiscoverUser(() =>
-        this.runDiscoveryForDelegatedUser({
-          // For some reason isNonNullish(lastProcessedDelegateId) is not enough for typescript here.
-          delegateUserId: lastProcessedDelegateId as string,
-          lastProcessedOwnerIdForDelegate: lastProcessedOwnerIdForDelegate,
-        }),
-      );
-    }
-
-    // Continue outer loop from the last processed delegate
+    cycleStartedAt: Date,
+  ): Promise<Record<DelegateOutcome, number>> {
+    const outcomes: Record<DelegateOutcome, number> = { discovered: 0, failed: 0, revoked: 0 };
     let delegatesBatch = await this.fetchBatch({
-      lastFetchedId: lastProcessedDelegateId ?? undefined,
       includeSharedMailboxes: false,
+      pendingDiscoveryBefore: cycleStartedAt,
     });
 
     while (delegatesBatch.length) {
       for (const { userProfileId: delegateUserId } of delegatesBatch) {
-        await this.metrics.measureDiscoverUser(() =>
-          this.runDiscoveryForDelegatedUser({
-            delegateUserId,
-            lastProcessedOwnerIdForDelegate: null,
-          }),
-        );
-        lastProcessedDelegateId = delegateUserId;
+        const outcome = await this.runDiscoveryForDelegatedUser(delegateUserId);
+        outcomes[outcome] += 1;
       }
 
       delegatesBatch = await this.fetchBatch({
-        lastFetchedId: lastProcessedDelegateId ?? undefined,
+        lastFetchedId: last(delegatesBatch)?.userProfileId,
         includeSharedMailboxes: false,
+        pendingDiscoveryBefore: cycleStartedAt,
       });
     }
+    return outcomes;
   }
 
   @Span()
-  private async runDiscoveryForDelegatedUser({
-    delegateUserId,
-    lastProcessedOwnerIdForDelegate,
-  }: {
-    delegateUserId: string;
-    lastProcessedOwnerIdForDelegate: Nullish<string>;
-  }): Promise<void> {
+  private async runDiscoveryForDelegatedUser(delegateUserId: string): Promise<DelegateOutcome> {
     try {
-      await this.runBatchForDelegatedUser({ delegateUserId, lastProcessedOwnerIdForDelegate });
+      await this.metrics.measureDiscoverUser(() => this.runBatchForDelegatedUser(delegateUserId));
     } catch (error) {
-      if (!isTokenExpiredError(error)) {
-        // Rate limit errors that exhausted retries (and other unexpected errors) propagate to run(),
-        // which sets finalState = 'failed'. The DelegatedAccessRecoverySchedulerService then detects
-        // the failed state and retriggers discovery.
-        throw error;
+      if (isUpstreamCredentialRevokedError(error)) {
+        // The delegate's Microsoft grant is permanently invalid (revoked consent, expired refresh
+        // token). The MCP must not expose mailboxes it can no longer authenticate against, so
+        // their access records go. They are re-discovered once the user signs in again.
+        await this.db
+          .delete(delegatedAccessAccounts)
+          .where(eq(delegatedAccessAccounts.delegateUserId, delegateUserId));
+        this.logger.warn({
+          delegateUserId,
+          msg: "Cleared delegated access records: the delegate's Microsoft grant is permanently invalid",
+        });
+        return 'revoked';
       }
 
-      // The delegate's OAuth token cannot be refreshed (revoked consent, expired refresh token).
-      // Clearing their access records is the safe choice: the MCP must not expose mailboxes it
-      // can no longer authenticate against. Entries will be re-discovered when the user
-      // re-authenticates and the next discovery run processes this delegate again.
-      await this.db
-        .delete(delegatedAccessAccounts)
-        .where(eq(delegatedAccessAccounts.delegateUserId, delegateUserId));
+      // A token refresh that is backing off, a 401 after a refresh, or rate limits that outlasted
+      // the retries. The records stay as they were and the delegate is retried later in the cycle.
       this.logger.warn({
+        msg: 'Delegated access discovery failed for delegate; kept its records and will retry it',
         delegateUserId,
-        msg: 'Cleared delegated access records: delegate token refresh failed, skipping remaining owner batches for this delegate',
+        ...getDelegatedAccessErrorInfo(error),
+        err: error,
       });
-      await this.updateProgress({
-        lastProcessedDelegateId: delegateUserId,
-        lastProcessedOwnerIdForDelegate: null,
-      });
-      return;
+      return 'failed';
     }
+
+    await this.db
+      .update(userProfiles)
+      .set({ delegatedAccessDiscoveredAt: new Date() })
+      .where(eq(userProfiles.id, delegateUserId));
+    return 'discovered';
   }
 
   @Span()
-  private async runBatchForDelegatedUser({
-    delegateUserId,
-    lastProcessedOwnerIdForDelegate,
-  }: {
-    delegateUserId: string;
-    lastProcessedOwnerIdForDelegate: Nullish<string>;
-  }): Promise<void> {
+  private async runBatchForDelegatedUser(delegateUserId: string): Promise<void> {
     const client = this.graphClientFactory.createClientForUser(delegateUserId);
-    let ownersLastFetchedId: Nullish<string> = lastProcessedOwnerIdForDelegate;
     let ownersBatch = await this.fetchBatch({
-      lastFetchedId: ownersLastFetchedId ?? undefined,
       excludedProfileIds: [delegateUserId],
       includeSharedMailboxes: true,
     });
@@ -282,122 +255,84 @@ export class DiscoverDelegatedAccessCommand {
         msg: 'Owner batch processed',
       });
 
-      ownersLastFetchedId = last(ownersBatch)?.userProfileId;
-      await this.updateProgress({
-        lastProcessedDelegateId: delegateUserId,
-        lastProcessedOwnerIdForDelegate: ownersLastFetchedId,
-      });
+      await this.updateProgress();
 
       ownersBatch = await this.fetchBatch({
-        lastFetchedId: ownersLastFetchedId ?? undefined,
+        lastFetchedId: last(ownersBatch)?.userProfileId,
         excludedProfileIds: [delegateUserId],
         includeSharedMailboxes: true,
       });
     }
-
-    // Inner loop complete for this delegate — clear the owner cursor
-    await this.updateProgress({
-      lastProcessedDelegateId: delegateUserId,
-      lastProcessedOwnerIdForDelegate: null,
-    });
   }
 
+  /**
+   * Claims the run unless another one is making progress. A new cycle moves `cycleStartedAt` to
+   * now so every delegate is pending again; otherwise the run continues the current cycle.
+   */
   @Span()
-  public async decide(): Promise<DiscoverDelegatedAccessDecision> {
+  public async decide({
+    newCycle,
+  }: {
+    newCycle: boolean;
+  }): Promise<DiscoverDelegatedAccessDecision> {
     return this.persistentCacheService.setWith(
       DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
       async ({ currentValue, create, update }): Promise<DiscoverDelegatedAccessDecision> => {
+        const now = Date.now();
+
         if (!currentValue) {
           await create({
             dataType: 'DelegatedAccessDiscovery',
-            payload: {
-              state: 'running',
-              lastProcessedDelegateId: null,
-              lastProcessedOwnerIdForDelegate: null,
-              lastProgressRegisteredAt: Date.now(),
-            },
+            payload: { state: 'running', cycleStartedAt: now, lastProgressRegisteredAt: now },
           });
-          return {
-            action: 'proceed',
-            lastProcessedDelegateId: null,
-            lastProcessedOwnerIdForDelegate: null,
-          };
+          return { action: 'proceed', cycleStartedAt: new Date(now) };
         }
 
         assert.ok(currentValue.dataType === 'DelegatedAccessDiscovery');
+        const { state, lastProgressRegisteredAt, cycleStartedAt } = currentValue.payload;
 
-        if (currentValue.payload.state === 'ready') {
-          await update({
-            dataType: 'DelegatedAccessDiscovery',
-            payload: {
-              state: 'running',
-              lastProcessedDelegateId: null,
-              lastProcessedOwnerIdForDelegate: null,
-              lastProgressRegisteredAt: Date.now(),
-            },
-          });
+        const noProgressThresholdMs =
+          DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES * 60_000;
+        if (state === 'running' && now - lastProgressRegisteredAt < noProgressThresholdMs) {
           return {
-            action: 'proceed',
-            lastProcessedDelegateId: null,
-            lastProcessedOwnerIdForDelegate: null,
+            action: 'skip',
+            reason: `Skipped running discovery for delegated permissions, another discovery in progress`,
           };
         }
 
-        if (currentValue.payload.state === 'failed') {
-          await update({
-            dataType: 'DelegatedAccessDiscovery',
-            payload: {
-              state: 'running',
-              lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-              lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
-              lastProgressRegisteredAt: Date.now(),
-            },
-          });
-          return {
-            action: 'proceed',
-            lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-            lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
-          };
-        }
-
-        const currentTime = new Date();
-        currentTime.setMinutes(
-          currentTime.getMinutes() - DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES,
-        );
-
-        if (currentValue.payload.lastProgressRegisteredAt <= currentTime.getTime()) {
-          await update({
-            dataType: 'DelegatedAccessDiscovery',
-            payload: {
-              state: 'running',
-              lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-              lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
-              lastProgressRegisteredAt: Date.now(),
-            },
-          });
-          return {
-            action: 'proceed',
-            lastProcessedDelegateId: currentValue.payload.lastProcessedDelegateId,
-            lastProcessedOwnerIdForDelegate: currentValue.payload.lastProcessedOwnerIdForDelegate,
-          };
-        }
-
-        return {
-          action: 'skip',
-          reason: `Skipped running discovery for delegated permissions, another discovery in progress`,
-        };
+        const nextCycleStartedAt = newCycle ? now : (cycleStartedAt ?? now);
+        await update({
+          dataType: 'DelegatedAccessDiscovery',
+          payload: {
+            state: 'running',
+            cycleStartedAt: nextCycleStartedAt,
+            lastProgressRegisteredAt: now,
+          },
+        });
+        return { action: 'proceed', cycleStartedAt: new Date(nextCycleStartedAt) };
       },
     );
+  }
+
+  /** Whether the current cycle still has delegates to discover whose token is not backing off. */
+  public async hasPendingDelegates(cycleStartedAt: Date): Promise<boolean> {
+    const pending = await this.fetchBatch({
+      includeSharedMailboxes: false,
+      pendingDiscoveryBefore: cycleStartedAt,
+    });
+    return pending.length > 0;
   }
 
   private async fetchBatch({
     lastFetchedId,
     excludedProfileIds,
     includeSharedMailboxes,
+    pendingDiscoveryBefore,
   }: {
     lastFetchedId?: string;
     excludedProfileIds?: string[];
     includeSharedMailboxes: boolean;
+    pendingDiscoveryBefore?: Date;
   }): Promise<{ userProfileId: string; email: string; source: UserProfileSource }[]> {
     const conditionsByMailbox = includeSharedMailboxes
       ? or(
@@ -427,6 +362,19 @@ export class DiscoverDelegatedAccessCommand {
             ? notInArray(userProfiles.id, excludedProfileIds)
             : undefined,
           conditionsByMailbox,
+          pendingDiscoveryBefore
+            ? and(
+                or(
+                  isNull(userProfiles.delegatedAccessDiscoveredAt),
+                  lt(userProfiles.delegatedAccessDiscoveredAt, pendingDiscoveryBefore),
+                ),
+                // A delegate whose token refresh is backing off would only fail again.
+                or(
+                  isNull(userProfiles.tokenRefreshRetryAt),
+                  lte(userProfiles.tokenRefreshRetryAt, new Date()),
+                ),
+              )
+            : undefined,
         ),
       )
       .orderBy(userProfiles.id)
@@ -516,12 +464,7 @@ export class DiscoverDelegatedAccessCommand {
     }
   }
 
-  private async updateProgress(
-    cursors?: Partial<{
-      lastProcessedDelegateId: string | null;
-      lastProcessedOwnerIdForDelegate: string | null;
-    }>,
-  ): Promise<void> {
+  private async updateProgress(): Promise<void> {
     await this.persistentCacheService.setWith(
       DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
       async ({ currentValue, update }): Promise<void> => {
@@ -531,7 +474,6 @@ export class DiscoverDelegatedAccessCommand {
           dataType: 'DelegatedAccessDiscovery',
           payload: {
             ...currentValue.payload,
-            ...(cursors ?? {}),
             lastProgressRegisteredAt: Date.now(),
           },
         });

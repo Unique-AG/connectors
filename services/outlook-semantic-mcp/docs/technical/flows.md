@@ -250,9 +250,11 @@ sequenceDiagram
 - Discovery iterates over all connected user pairs (delegate × owner). It probes one Graph endpoint per pair — `GET /users/{ownerEmail}/messages` in `full_access_only` mode, `GET /users/{ownerEmail}/mailFolders` in `granular_access` mode.
 - A 403 or 404 response immediately deletes the access record and all associated folder grants (cascading delete). The owner's scope is excluded from the delegate's next `search_emails` call.
 - Transient errors (429, 5xx) cause the pair to be skipped; the next scheduled run retries.
+- Each scheduled run starts a cycle that checks every connected user as a delegate. A delegate whose requests cannot complete, for example because its Microsoft token cannot be refreshed right now or rate limits outlast the retries, keeps its existing access records, and discovery moves on to the next delegate. A delegate whose Microsoft grant is permanently invalid has its access records deleted.
 - The verification job (`granular_access` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
 - In Mode B (`microsoft_graph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
-- A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted.
+- A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted. A restarted discovery continues its cycle with the delegates it has not finished.
+- The recovery scheduler also reruns discovery for the delegates the current cycle has not finished, such as one that failed or a user who connected after the cycle started. It skips a delegate while its token refresh is backing off.
 
 ## Email Draft Creation Flow
 

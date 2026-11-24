@@ -40,7 +40,7 @@ describe('DiscoverDelegatedAccessSchedulerService', () => {
   });
 
   describe('triggerDiscovery', () => {
-    it('publishes a single discovery event', async () => {
+    it('publishes a single discovery event that starts a new cycle', async () => {
       const amqp = createMockAmqp();
       const service = createService({ amqp });
 
@@ -52,7 +52,7 @@ describe('DiscoverDelegatedAccessSchedulerService', () => {
         'unique.outlook-semantic-mcp.delegated-access.discover',
         expect.objectContaining({
           type: 'unique.outlook-semantic-mcp.delegated-access.discover',
-          payload: {},
+          payload: { newCycle: true },
         }),
       );
     });

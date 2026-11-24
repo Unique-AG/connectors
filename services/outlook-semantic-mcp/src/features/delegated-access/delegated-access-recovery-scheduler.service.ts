@@ -14,6 +14,7 @@ import { PersistentCacheService } from '../persistent-cache/persistent-cache.ser
 import {
   DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
   DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES,
+  DiscoverDelegatedAccessCommand,
 } from './discovery/discover-delegated-access.command';
 import { DiscoverDelegatedAccessEventDto } from './discovery/discover-delegated-access-event.dto';
 import { SyncDelegatedAccessEventDto } from './verification/sync-delegated-access-event';
@@ -32,6 +33,7 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
     private readonly amqp: AmqpConnection,
     @Inject(delegatedAccessConfig.KEY) private readonly config: DelegatedAccessConfig,
     private readonly persistentCacheService: PersistentCacheService,
+    private readonly discoverDelegatedAccessCommand: DiscoverDelegatedAccessCommand,
   ) {}
 
   public onModuleInit() {
@@ -92,18 +94,28 @@ export class DelegatedAccessRecoverySchedulerService implements OnModuleInit, On
       DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
       `DelegatedAccessDiscovery`,
     );
-    if (!this.isStuck(cached, DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES)) {
+    if (this.isStuck(cached, DISCOVER_DELEGATED_ACCESS_NO_PROGRESS_THRESHOLD_MINUTES)) {
+      this.logger.warn({
+        msg: 'Detected stuck delegated access discovery, triggering recovery',
+        state: cached?.dataType === 'DelegatedAccessDiscovery' ? cached.payload.state : undefined,
+      });
+    } else if (
+      cached?.dataType === 'DelegatedAccessDiscovery' &&
+      cached.payload.state === 'ready' &&
+      (await this.discoverDelegatedAccessCommand.hasPendingDelegates(
+        new Date(cached.payload.cycleStartedAt ?? Date.now()),
+      ))
+    ) {
+      this.logger.log({
+        msg: 'Delegated access discovery has delegates left in this cycle, rerunning them',
+      });
+    } else {
       return;
     }
 
-    this.logger.warn({
-      msg: 'Detected stuck delegated access discovery, triggering recovery',
-      state: cached?.dataType === 'DelegatedAccessDiscovery' ? cached.payload.state : undefined,
-    });
-
     const event = DiscoverDelegatedAccessEventDto.parse({
       type: 'unique.outlook-semantic-mcp.delegated-access.discover',
-      payload: {},
+      payload: { newCycle: false },
     });
     await this.amqp.publish(MAIN_EXCHANGE.name, event.type, event);
   }
