@@ -88,12 +88,13 @@ belongs to somebody else. A set in the user's own unshared notebook runs without
 - Microsoft reports one result for the whole set. A failure can mean a partly applied set: read \
 the page with onenote_read_page and resend only the missing commands.
 - This tool changes what is on a page, not where the page is in its section. Microsoft Graph \
-cannot make a page a subpage. If the user wants one, read the `level` of the parent with \
-onenote_list_pages and `include_level_and_order=true`. OneNote has only two levels of subpages, \
-so a parent at `level` 2 cannot take a subpage: tell the user so. Otherwise tell the user to \
-move the page directly below the parent in the OneNote app and make it a subpage there. If the \
-parent is at `level` 1, they do this twice. In OneNote for the web, they right-click the page \
-and select Make Subpage. For the desktop app, give them this page: \
+cannot make a page a subpage. If the user wants one, read the `level` of the parent and of the \
+page with onenote_list_pages and `include_level_and_order=true`. OneNote has only two levels of \
+subpages, so a parent at `level` 2 cannot take a subpage: tell the user so. Otherwise tell the \
+user where the page must go in the OneNote app: into the section of the parent, directly below \
+the parent, and indented to one level below the parent. In OneNote for the web, Make Subpage and \
+Promote Subpage on the right-click menu of a page change its indent by one level. For the \
+desktop app, give them this page: \
 https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
 On an iPad or iPhone, give them this page instead: \
 https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone

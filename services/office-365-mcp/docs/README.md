@@ -1223,12 +1223,11 @@ Notebooks, sections, and pages.
 
 **Note:** Microsoft Graph cannot set the indent level of a page. A new page is at the top level of
 its section. To make it a subpage, the user moves it directly below its parent in the OneNote app
-and makes it a subpage there. If the parent is itself a subpage, the user does this twice. In
-OneNote for the web, the user right-clicks the page and selects Make Subpage. In the desktop app,
-the user follows
-[Create a subpage in OneNote](https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote).
+and indents it to one level below the parent. OneNote has only two levels of subpages, so a
+subpage of a subpage cannot take a subpage. In OneNote for the web, Make Subpage and Promote
+Subpage on the right-click menu of a page change its indent by one level. In the desktop app, the
+user follows [Create a subpage in OneNote](https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote).
 On an iPad or iPhone, the user follows [Create a subpage in OneNote for iPad or iPhone](https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone).
-OneNote has only two levels of subpages, so a subpage of a subpage cannot take a subpage.
 
 **Tools added by this preset**
 
