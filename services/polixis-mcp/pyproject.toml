@@ -21,7 +21,7 @@ dependencies = [
     "sqlalchemy[asyncio]==2.1.9",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.46.4",
+    "unique-mcp==2026.48.0",
     "uvicorn[standard]==0.54.0",
 ]
 
