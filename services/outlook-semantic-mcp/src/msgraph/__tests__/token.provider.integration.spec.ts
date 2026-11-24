@@ -152,7 +152,6 @@ describe('TokenProvider against Postgres', () => {
 
   it('backs off on every pod after a transient failure', async () => {
     mockFetch.mockRejectedValue(connectTimeout());
-    const failedAt = Date.now();
 
     await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toThrow(
       'Token refresh failed',
@@ -165,9 +164,10 @@ describe('TokenProvider against Postgres', () => {
       tokenRefreshFailureCount: 1,
       tokenRefreshFailureCode: 'network_UND_ERR_CONNECT_TIMEOUT',
     });
-    const retryInMs = (stored.tokenRefreshRetryAt?.getTime() ?? 0) - failedAt;
-    expect(retryInMs).toBeGreaterThanOrEqual(59_000);
-    expect(retryInMs).toBeLessThanOrEqual(61_000);
+    // Measured between the stored timestamps, so database and scheduling delay cannot skew it.
+    expect(
+      (stored.tokenRefreshRetryAt?.getTime() ?? 0) - (stored.tokenRefreshFailedAt?.getTime() ?? 0),
+    ).toBe(60_000);
 
     await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toBeInstanceOf(
       TokenRefreshCoolingDownError,

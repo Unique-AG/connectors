@@ -247,6 +247,58 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     expect(await accessPairs()).toEqual([pair(bob, alice)]);
   });
 
+  it('leaves a delegate pending when one of its owner checks fails, and the rerun covers it', async () => {
+    const alice = await insertUser('alice');
+    const bob = await insertUser('bob');
+    const carol = await insertUser('carol');
+    graphAnswer = async (delegateUserId, ownerEmail) => {
+      if (delegateUserId === alice.id && ownerEmail === carol.email) {
+        throw graphError(500);
+      }
+      return { value: [] };
+    };
+
+    await command.run(newCycleRequest());
+
+    expect(await discoveredAt(alice)).toBeNull();
+    expect(await discoveredAt(bob)).not.toBeNull();
+    expect(await accessPairs()).toContain(pair(alice, bob));
+
+    graphAnswer = accessGranted;
+    graphClientFactory.createClientForUser.mockClear();
+    await command.run({});
+
+    expect(processedDelegates()).toEqual([alice.id]);
+    expect(await accessPairs()).toContain(pair(alice, carol));
+  });
+
+  it('keeps the claim of the run that took over from a stale one', async () => {
+    await insertUser('alice');
+    await insertUser('bob');
+    await command.run(newCycleRequest());
+
+    // Run A claims, then stops making progress; run B takes over the claim.
+    const staleRun = await command.decide(newCycleRequest());
+    assert.ok(staleRun.action === 'proceed');
+    const claim = (await discoveryState())?.payload;
+    assert.ok(claim);
+    await persistentCacheService.set(DISCOVER_DELEGATED_ACCESS_CACHE_KEY, {
+      dataType: 'DelegatedAccessDiscovery',
+      payload: { ...claim, lastProgressRegisteredAt: Date.now() - 11 * 60_000 },
+    });
+    const takeover = await command.decide({});
+    assert.ok(takeover.action === 'proceed');
+
+    // Run A finishes late: its final write must not replace B's claim.
+    // biome-ignore lint/suspicious/noExplicitAny: Call the private claim update the way the run finalizes
+    const ownsClaim = await (command as any).updateClaim(staleRun.runId, { state: 'ready' });
+
+    expect(ownsClaim).toBe(false);
+    expect((await discoveryState())?.payload).toEqual(
+      expect.objectContaining({ state: 'running', runId: takeover.runId }),
+    );
+  });
+
   it('skips a delegate whose token refresh is backing off until the backoff has passed', async () => {
     const alice = await insertUser('alice', {
       tokenRefreshRetryAt: new Date(Date.now() + 5 * 60_000),
