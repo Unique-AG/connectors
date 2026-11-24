@@ -10,8 +10,7 @@ from prometheus_client import Gauge
 from prometheus_client import Histogram
 from prometheus_client import generate_latest
 from starlette.routing import BaseRoute
-from starlette.routing import Host
-from starlette.routing import Mount
+from starlette.routing import Match
 from starlette.routing import Router
 from starlette.types import ASGIApp
 from starlette.types import Message
@@ -77,28 +76,17 @@ _duration = Histogram(
 _UNMATCHED = "unmatched"
 
 
-def _template(routes: Sequence[BaseRoute], target: BaseRoute) -> str | None:
-    for route in routes:
-        if route is target:
-            return cast(str | None, getattr(route, "path_format", None))
-        if isinstance(route, Mount | Host):
-            inner = _template(route.routes, target)
-            if inner is not None:
-                prefix = (
-                    route.path_format.removesuffix("/{path}") if isinstance(route, Mount) else ""
-                )
-                return prefix + inner
-    return None
-
-
-def _route_label(scope: Scope) -> str:
-    """The template of the route Starlette matched, such as `/items/{id}`, or `unmatched`. Found
-    in the router tree by identity, so a mount parameter shows as `{tenant}`, never its value."""
-    route = cast(BaseRoute | None, scope.get("route"))
-    router = cast(Router | None, scope.get("router"))
-    if route is None or router is None:
-        return _UNMATCHED
-    return _template(router.routes, route) or _UNMATCHED
+def _route_label(entry_scope: Scope, router: Router | None) -> str:
+    """The template of the route the router took, matched again on the scope as it entered because
+    routing rewrites `root_path`. A mount gives its own `/prefix/{path}`."""
+    partial: BaseRoute | None = None
+    for route in router.routes if router else ():
+        match, _ = route.matches(entry_scope)
+        if match is Match.FULL:
+            return cast(str, getattr(route, "path_format", _UNMATCHED))
+        if match is Match.PARTIAL and partial is None:
+            partial = route
+    return cast(str, getattr(partial, "path_format", _UNMATCHED))
 
 
 class HttpMetricsMiddleware:
@@ -115,6 +103,7 @@ class HttpMetricsMiddleware:
             await self._app(scope, receive, send)
             return
         method = cast(str, scope.get("method", "UNKNOWN"))
+        entry_scope = {**scope}
         status_code = "500"
 
         async def send_with_status(message: Message) -> None:
@@ -129,6 +118,6 @@ class HttpMetricsMiddleware:
             await self._app(scope, receive, send_with_status)
         finally:
             _in_progress.labels(method=method).dec()
-            route = _route_label(scope)
+            route = _route_label(entry_scope, cast(Router | None, scope.get("router")))
             _duration.labels(method=method, path=route).observe(time.perf_counter() - start)
             _requests.labels(method=method, path=route, status_code=status_code).inc()

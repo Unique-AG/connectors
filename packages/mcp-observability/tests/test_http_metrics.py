@@ -87,8 +87,7 @@ def client() -> TestClient:
             Route("/probe", ok),
             Route("/crash/{crash_id}", crash),
             Mount("/shop", app=inner),
-            Mount("/raw", app=opaque_app),
-            Host("{tenant}.example.com", app=Starlette(routes=[Route("/lines/{line_id}", ok)])),
+            Host("{tenant}.example.com", app=opaque_app),
             CustomRoute(),
         ],
         middleware=[Middleware(HttpMetricsMiddleware, excluded_paths=frozenset({"/probe"}))],
@@ -134,24 +133,34 @@ def test_a_failing_handler_still_has_its_template_and_the_500(client: TestClient
     assert {"method": "GET", "path": "/crash/{crash_id}", "status_code": "500"} in series(REQUESTS)
 
 
-def test_a_route_of_a_mounted_app_is_labelled_with_the_mount_prefix_and_its_template(
-    client: TestClient,
+@pytest.mark.parametrize("path", ["/shop/lines/3", "/shop/nope/1"])
+def test_a_request_below_a_mount_is_labelled_with_the_mount_template(
+    client: TestClient, path: str
 ) -> None:
-    client.get("/shop/lines/3")
+    before = total(REQUESTS, path="/shop/{path}")
 
-    assert "/shop/lines/{line_id}" in paths(REQUESTS)
-
-
-@pytest.mark.parametrize(
-    ("path", "label"), [("/shop/nope/1", "/shop/{path}"), ("/raw/a/b", "/raw/{path}")]
-)
-def test_a_mounted_app_without_a_route_for_the_path_is_labelled_with_its_mount(
-    client: TestClient, path: str, label: str
-) -> None:
     client.get(path)
 
-    assert label in paths(REQUESTS)
+    assert total(REQUESTS, path="/shop/{path}") - before == 1
     assert path not in paths(REQUESTS)
+
+
+def test_an_app_mounted_twice_is_labelled_with_the_mount_the_request_took() -> None:
+    shared = Starlette(routes=[Route("/lines/{line_id}", ok)])
+    app = Starlette(
+        routes=[Mount("/v1", app=shared), Mount("/v2", app=shared)],
+        middleware=[Middleware(HttpMetricsMiddleware, excluded_paths=frozenset())],
+    )
+    client = TestClient(app)
+    v1_before = total(REQUESTS, path="/v1/{path}")
+    v2_before = total(REQUESTS, path="/v2/{path}")
+
+    client.get("/v1/lines/3")
+    client.get("/v2/lines/3")
+    client.get("/v2/lines/4")
+
+    assert total(REQUESTS, path="/v1/{path}") - v1_before == 1
+    assert total(REQUESTS, path="/v2/{path}") - v2_before == 2
 
 
 def test_a_request_settles_the_in_flight_gauge(client: TestClient) -> None:
@@ -164,8 +173,8 @@ def test_a_request_settles_the_in_flight_gauge(client: TestClient) -> None:
 
 @pytest.mark.parametrize(
     ("path", "headers"),
-    [("/nope", {"host": "acme.example.com"}), ("/custom", {})],
-    ids=["host route without a match", "route without path_format"],
+    [("/lines/3", {"host": "acme.example.com"}), ("/custom", {})],
+    ids=["host route", "route without path_format"],
 )
 def test_a_route_without_a_template_is_counted_as_unmatched(
     client: TestClient, path: str, headers: dict[str, str]
@@ -177,30 +186,6 @@ def test_a_route_without_a_template_is_counted_as_unmatched(
 
     assert total(REQUESTS, path="unmatched") - requests_before == 1
     assert in_flight() == in_flight_before
-
-
-def test_a_route_behind_a_host_is_labelled_with_its_template(client: TestClient) -> None:
-    client.get("/lines/3", headers={"host": "acme.example.com"})
-
-    assert "/lines/{line_id}" in paths(REQUESTS)
-    assert not [path for path in paths(REQUESTS) if "acme" in path]
-
-
-def test_a_mount_with_a_parameter_never_puts_the_client_value_in_a_label() -> None:
-    inner = Starlette(routes=[Route("/lines/{line_id}", ok)])
-    app = Starlette(
-        routes=[Mount("/{tenant}", app=inner)],
-        middleware=[Middleware(HttpMetricsMiddleware, excluded_paths=frozenset())],
-    )
-    tenant_client = TestClient(app)
-
-    for tenant in ("acme", "globex", "initech"):
-        tenant_client.get(f"/{tenant}/lines/1")
-        tenant_client.get(f"/{tenant}/nope")
-
-    labels = paths(REQUESTS)
-    assert {"/{tenant}/lines/{line_id}", "/{tenant}/{path}"} <= labels
-    assert not [label for label in labels if "acme" in label or "globex" in label]
 
 
 @pytest.mark.parametrize("sample_name", [REQUESTS, DURATIONS])
