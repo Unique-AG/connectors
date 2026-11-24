@@ -6,8 +6,11 @@ from space_config_mcp.contexts.snapshots import snapshot_space
 from space_config_mcp.persistence import Persistence
 from space_config_mcp.shared import AssistantPrompt
 from space_config_mcp.shared import McpServerParam
+from space_config_mcp.shared import SpaceConfigError
 from space_config_mcp.shared import SwitchableLanguageModel
 from space_config_mcp.upstream import Upstream
+
+_MANAGED_SETTINGS_KEYS = frozenset({"magicTableConfig"})
 
 
 async def update_space(
@@ -58,6 +61,12 @@ async def update_space(
     if chat_upload is not None:
         patch["chatUpload"] = chat_upload
     if settings is not None:
+        blocked = _MANAGED_SETTINGS_KEYS & settings.keys()
+        if blocked:
+            raise SpaceConfigError(
+                f"Use dedicated tools for these settings keys: {', '.join(sorted(blocked))}. "
+                "For magicTableConfig, use update_magic_table_config."
+            )
         space = await upstream.get_space(user_id, company_id, space_id)
         existing: dict[str, object] = cast(dict[str, object], space.settings or {})
         patch["settings"] = {**existing, **settings}

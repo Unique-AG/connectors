@@ -33,7 +33,10 @@ async def snapshot_space(
     *,
     label: Annotated[
         str,
-        Field(description="Human-readable label for this snapshot. Auto-generated if empty."),
+        Field(
+            max_length=256,
+            description="Human-readable label for this snapshot. Auto-generated if empty.",
+        ),
     ] = "",
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),

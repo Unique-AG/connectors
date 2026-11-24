@@ -41,6 +41,7 @@
             ],
             "type": "object"
           },
+          "maxItems": 200,
           "type": "array"
         }
       },
@@ -121,8 +122,12 @@
         "access_ids": {
           "description": "List of access entry IDs to remove.",
           "items": {
+            "maxLength": 128,
+            "minLength": 1,
             "type": "string"
           },
+          "maxItems": 100,
+          "minItems": 1,
           "type": "array"
         }
       },
@@ -684,6 +689,7 @@
         "label": {
           "default": "",
           "description": "Human-readable label for this snapshot. Auto-generated if empty.",
+          "maxLength": 256,
           "type": "string"
         }
       },
@@ -1534,7 +1540,7 @@
             }
           ],
           "default": null,
-          "description": "Arbitrary settings dict merged at space level."
+          "description": "Settings keys to merge at space level. Platform-managed keys (magicTableConfig) are rejected \u2014 use update_magic_table_config for those."
         },
         "switchable_language_models": {
           "anyOf": [

@@ -152,7 +152,13 @@ async def update_space(  # noqa: PLR0913
     ] = None,
     settings: Annotated[
         dict[str, object] | None,
-        Field(description="Arbitrary settings dict merged at space level."),
+        Field(
+            description=(
+                "Settings keys to merge at space level. "
+                "Platform-managed keys (magicTableConfig) are rejected — "
+                "use update_magic_table_config for those."
+            )
+        ),
     ] = None,
     assistant_prompts: Annotated[
         list[AssistantPrompt] | None,

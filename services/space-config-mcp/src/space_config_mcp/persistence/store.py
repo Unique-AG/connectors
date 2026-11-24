@@ -98,7 +98,7 @@ class Persistence:
             versioningEnabled=True,
         )
         write_url = str(initial.writeUrl)
-        async with httpx.AsyncClient() as http:
+        async with httpx.AsyncClient(follow_redirects=False) as http:
             response = await http.put(
                 write_url,
                 content=json_bytes,
@@ -232,7 +232,7 @@ class Persistence:
             f"No download URL for version {snapshot_id!r}"
         )
 
-        async with httpx.AsyncClient() as http:
+        async with httpx.AsyncClient(follow_redirects=False) as http:
             response = await http.get(download_url)
         if response.status_code != 200:
             raise SpaceConfigError(

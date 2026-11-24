@@ -262,6 +262,18 @@ the authenticated company (using the company-scoped API key). This guards agains
 The company boundary is enforced by the API key: `SPACE_CONFIG_MCP_UNIQUE_API_KEY` is scoped to
 one company, so cross-company access is not possible regardless of `_meta` values.
 
+> **High-privilege operations.**
+> `update_conduct_config` accepts `system_prompt_override` and `agent_md_instructions` — fields
+> that fully replace the agent's system prompt or inject AGENT.md content. These are the
+> highest-privilege operations this MCP exposes. The existing gate (JWT + verified space
+> ownership) is the correct authorization boundary today. If Unique adds per-action permission
+> tiers in future, these fields are the first candidates for a MANAGE-level requirement.
+>
+> `update_module_config` is an untyped escape hatch that bypasses the validated paths of
+> `update_conduct_config`, `update_translator_config`, and `update_magic_table_config`. Use it
+> only for modules that have no dedicated tool. For the three modules above, prefer their typed
+> tools to avoid unintentional overwrites of sensitive keys.
+
 ---
 
 ## Open questions / potential extensions

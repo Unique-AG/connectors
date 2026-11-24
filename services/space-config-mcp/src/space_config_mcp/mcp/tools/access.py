@@ -53,7 +53,7 @@ async def add_space_access(
     *,
     access: Annotated[
         list[AccessEntryParam],
-        Field(description="Access entries to add."),
+        Field(max_length=200, description="Access entries to add."),
     ],
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
@@ -81,8 +81,8 @@ async def add_space_access(
 async def delete_space_access(
     *,
     access_ids: Annotated[
-        list[str],
-        Field(description="List of access entry IDs to remove."),
+        list[Annotated[str, Field(min_length=1, max_length=128)]],
+        Field(min_length=1, max_length=100, description="List of access entry IDs to remove."),
     ],
     upstream: Upstream = Depends(get_upstream),
     persistence: Persistence = Depends(get_persistence),
