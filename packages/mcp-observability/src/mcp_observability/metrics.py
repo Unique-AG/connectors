@@ -9,6 +9,10 @@ from prometheus_client import Counter
 from prometheus_client import Gauge
 from prometheus_client import Histogram
 from prometheus_client import generate_latest
+from starlette.routing import BaseRoute
+from starlette.routing import Host
+from starlette.routing import Mount
+from starlette.routing import Router
 from starlette.types import ASGIApp
 from starlette.types import Message
 from starlette.types import Receive
@@ -70,6 +74,33 @@ _duration = Histogram(
 )
 
 
+_UNMATCHED = "unmatched"
+
+
+def _template(routes: Sequence[BaseRoute], target: BaseRoute) -> str | None:
+    for route in routes:
+        if route is target:
+            return cast(str | None, getattr(route, "path_format", None))
+        if isinstance(route, Mount | Host):
+            inner = _template(route.routes, target)
+            if inner is not None:
+                prefix = (
+                    route.path_format.removesuffix("/{path}") if isinstance(route, Mount) else ""
+                )
+                return prefix + inner
+    return None
+
+
+def _route_label(scope: Scope) -> str:
+    """The template of the route Starlette matched, such as `/items/{id}`, or `unmatched`. Found
+    in the router tree by identity, so a mount parameter shows as `{tenant}`, never its value."""
+    route = cast(BaseRoute | None, scope.get("route"))
+    router = cast(Router | None, scope.get("router"))
+    if route is None or router is None:
+        return _UNMATCHED
+    return _template(router.routes, route) or _UNMATCHED
+
+
 class HttpMetricsMiddleware:
     """Counts, times and tracks in flight every HTTP request but those to `excluded_paths`. A
     request whose handler raises counts as a 500."""
@@ -98,5 +129,6 @@ class HttpMetricsMiddleware:
             await self._app(scope, receive, send_with_status)
         finally:
             _in_progress.labels(method=method).dec()
-            _duration.labels(method=method, path=path).observe(time.perf_counter() - start)
-            _requests.labels(method=method, path=path, status_code=status_code).inc()
+            route = _route_label(scope)
+            _duration.labels(method=method, path=route).observe(time.perf_counter() - start)
+            _requests.labels(method=method, path=route, status_code=status_code).inc()

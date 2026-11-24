@@ -71,7 +71,9 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   logs every tool, resource and prompt call (`mcp_calls_total`, `mcp_call_duration_seconds`), and
   returns the HTTP metrics middleware (`python_http_requests_total`,
   `python_http_requests_in_progress`, `python_http_request_duration_seconds`) for the app. The
-  metric names are the ones the dashboards and alerts of every Python service read.
+  metric names are the ones the dashboards and alerts of every Python service read. The `path`
+  label is the matched route template (`/items/{id}`), or `unmatched` when no route matches, so
+  scanner traffic cannot add series.
 - `MetricNamespace(prefix)`: a metric of the MCP's own, named `<prefix>_<name>` and served at
   `/metrics`.
 
