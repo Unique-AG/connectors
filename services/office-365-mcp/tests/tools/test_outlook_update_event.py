@@ -190,6 +190,7 @@ async def _refuses(question: str, about: str) -> str | None:
 
 
 class _Options(TypedDict, total=False):
+    all_day: bool
     show_as: ShowAs
     add_categories: Sequence[str]
     remove_categories: Sequence[str]
@@ -299,6 +300,58 @@ class TestWhatItSendsToGraph:
         }
         assert _object(sent["end"]) == {"dateTime": "2026-03-02T17:00", "timeZone": "Europe/Zurich"}
         assert "subject" not in sent
+
+    async def test_an_all_day_change_reaches_graph_with_midnight_on_both_ends(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(
+            client,
+            starts_at="2026-03-02T00:00",
+            ends_at="2026-03-04T00:00",
+            time_zone="Europe/Zurich",
+            all_day=True,
+        )
+
+        assert _sent(patch) == {
+            "@odata.type": "#microsoft.graph.event",
+            "isAllDay": True,
+            "start": {"dateTime": "2026-03-02T00:00", "timeZone": "Europe/Zurich"},
+            "end": {"dateTime": "2026-03-04T00:00", "timeZone": "Europe/Zurich"},
+        }
+
+    async def test_an_all_day_event_made_timed_reaches_graph_with_its_new_hours(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event() | {"isAllDay": True})
+        patch = _updates(graph)
+
+        _ = await _update(
+            client,
+            starts_at="2026-03-02T09:00",
+            ends_at="2026-03-02T10:30",
+            time_zone="Europe/Zurich",
+            all_day=False,
+        )
+
+        assert _sent(patch) == {
+            "@odata.type": "#microsoft.graph.event",
+            "isAllDay": False,
+            "start": {"dateTime": "2026-03-02T09:00", "timeZone": "Europe/Zurich"},
+            "end": {"dateTime": "2026-03-02T10:30", "timeZone": "Europe/Zurich"},
+        }
+
+    async def test_a_time_change_without_all_day_sends_no_all_day_flag(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(
+            client, starts_at="2026-03-02T16:00", ends_at="2026-03-02T17:00", time_zone="UTC"
+        )
+
+        assert "isAllDay" not in _sent(patch)
 
     async def test_location_alone_is_sent_as_the_only_change(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -548,9 +601,61 @@ class TestThePersonBetweenTheRequestAndTheChange:
 
         question = asked[0]
         assert "Renamed" in question
+        assert "make it" not in question
         assert "Room 9" in question
         assert f"the attendee list to 1 person: {_GRACE}" in question
         assert "cannot recall" in question
+
+    @pytest.mark.parametrize(
+        ("all_day", "starts_at", "ends_at", "said"),
+        [
+            (True, "2026-03-02T00:00", "2026-03-03T00:00", "make it an all-day event"),
+            (False, "2026-03-02T09:00", "2026-03-02T10:00", "make it a timed event"),
+        ],
+    )
+    async def test_the_question_names_the_all_day_change(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        all_day: bool,
+        starts_at: str,
+        ends_at: str,
+        said: str,
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        _ = await _update(
+            client,
+            starts_at=starts_at,
+            ends_at=ends_at,
+            time_zone="UTC",
+            all_day=all_day,
+            confirm=asked,
+        )
+
+        assert said in asked.questions[0]
+
+    async def test_the_same_times_with_and_without_all_day_are_agreed_to_apart(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _reads(graph, _event(attendees=[_attendee(_ADA)]))
+        _ = _updates(graph)
+        asked = _Asked()
+
+        for all_day in (False, True):
+            _ = await _update(
+                client,
+                starts_at="2026-03-02T00:00",
+                ends_at="2026-03-03T00:00",
+                time_zone="UTC",
+                all_day=all_day,
+                confirm=asked,
+            )
+
+        first, second = asked.abouts
+        assert first != second
 
     @pytest.mark.parametrize(
         ("kind", "said"),
@@ -797,6 +902,60 @@ class TestWhatItRefuses:
             _ = await _update(client, starts_at=starts_at, ends_at=ends_at, time_zone=time_zone)
 
         assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize("all_day", [True, False])
+    async def test_all_day_without_the_time_trio_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, all_day: bool
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(client, all_day=all_day)
+
+        assert str(refused.value) == (
+            "outlook_update_event was given `all_day` without `starts_at`, `ends_at`, and "
+            + "`time_zone`. NOTHING WAS CHANGED. Microsoft stores an all-day event from midnight "
+            + "to midnight, and a timed event at the hours it is given, so a change between the "
+            + "two needs the new times. Call again with `all_day` and all three time arguments. "
+            + "For an all-day event, give midnight in both times, with `ends_at` the midnight "
+            + "after the last day that the event covers."
+        )
+        assert len(graph.calls) == 0
+
+    @pytest.mark.parametrize(
+        ("starts_at", "ends_at"),
+        [
+            ("2026-03-02T09:00", "2026-03-03T00:00"),
+            ("2026-03-02T00:00", "2026-03-02T17:00"),
+        ],
+    )
+    async def test_an_all_day_change_off_midnight_never_reaches_graph(
+        self, client: GraphServiceClient, graph: respx.MockRouter, starts_at: str, ends_at: str
+    ) -> None:
+        with pytest.raises(ToolError) as refused:
+            _ = await _update(
+                client, starts_at=starts_at, ends_at=ends_at, time_zone="UTC", all_day=True
+            )
+
+        assert str(refused.value).startswith(
+            f"outlook_update_event was given `all_day` with {starts_at!r} and {ends_at!r}, and "
+            + "Microsoft holds an all-day event at midnight on both ends"
+        )
+        assert "NOTHING WAS CHANGED" in str(refused.value)
+        assert len(graph.calls) == 0
+
+    async def test_a_timed_change_off_midnight_is_not_refused(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        patch = _ready(graph)
+
+        _ = await _update(
+            client,
+            starts_at="2026-03-02T09:00",
+            ends_at="2026-03-02T17:00",
+            time_zone="UTC",
+            all_day=False,
+        )
+
+        assert patch.call_count == 1
 
     async def test_an_end_that_is_not_after_the_start_never_reaches_graph(
         self, client: GraphServiceClient, graph: respx.MockRouter

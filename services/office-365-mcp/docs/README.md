@@ -819,7 +819,7 @@ Calendars, events, availability, rooms, and sharing.
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
 | `outlook_create_event` | 🟠 Add | 🤝 The event has attendees, a room, or a location | Creates one event on your own calendar and sends the invitations. Supports series and rooms. |
-| `outlook_update_event` | 🟠 Add | 🤝 The event has attendees, or the change sets a location | Changes one event that you organize: time, location, body, attendees, and more. |
+| `outlook_update_event` | 🟠 Add | 🤝 The event has attendees, or the change sets a location | Changes one event that you organize: time, all-day or timed, location, body, attendees, and more. |
 | `outlook_cancel_event` | 🔴 Change | 🤝 The event has attendees | Cancels one event that you organize. Mails a cancellation to the attendees. |
 | `outlook_respond_to_invite` | 🟠 Add | 🤝 When it sends a response | Accepts, declines, or tentatively accepts an invitation that you received. |
 
