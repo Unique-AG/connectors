@@ -70,6 +70,8 @@ sequenceDiagram
 - Refresh is automatic — no user intervention required.
 - If the refresh token itself is expired (~90 days of inactivity), the user must reconnect via `reconnect_inbox`.
 - The server stores the new refresh token if Microsoft rotates it; otherwise the existing refresh token is kept.
+- Requests that hit a `401` for the same user at the same time share one refresh. A request whose token another request has already replaced retries with the stored token without calling Entra ID.
+- If Entra ID cannot be reached or answers with a rate limit or a server error, the server waits before it tries again for that user: as long as the `Retry-After` header asks, or otherwise 1, 2, 4 and so on minutes after each consecutive failure, up to 30 minutes. Requests in between keep the original `401` and do not call Entra ID. The next successful refresh or a reconnect ends the wait.
 
 ## Subscription Creation and Renewal Lifecycle
 

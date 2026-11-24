@@ -3,7 +3,7 @@ import assert from 'node:assert';
 import { createLoggerOptions, runWithLogSecrets } from '@unique-ag/logger';
 import pino from 'pino';
 import type { Dispatcher } from 'undici';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockDrizzleDatabase, MockEncryptionService } from '../../__mocks__';
 
 vi.mock('undici', () => ({
@@ -11,7 +11,7 @@ vi.mock('undici', () => ({
 }));
 
 import { fetch } from 'undici';
-import { TokenProvider } from '../token.provider';
+import { TokenProvider, TokenRefreshCoolingDownError } from '../token.provider';
 
 const mockFetch = vi.mocked(fetch);
 const mockDispatcher = { kind: 'proxy-dispatcher' } as unknown as Dispatcher;
@@ -275,6 +275,7 @@ describe('TokenProvider', () => {
       const mockUserProfile = {
         id: 'user-profile-123',
         refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+        tokenRefreshFailureCount: 0,
       };
 
       mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
@@ -283,6 +284,7 @@ describe('TokenProvider', () => {
         ok: false,
         status: 400,
         statusText: 'Bad Request',
+        headers: new Headers(),
         text: vi.fn().mockResolvedValue('Invalid refresh token'),
       } as never);
 
@@ -297,6 +299,7 @@ describe('TokenProvider', () => {
       const mockUserProfile = {
         id: 'user-profile-123',
         refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+        tokenRefreshFailureCount: 0,
       };
 
       mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
@@ -307,6 +310,239 @@ describe('TokenProvider', () => {
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
         'Token refresh failed: Network error',
       );
+    });
+  });
+
+  describe('refreshAccessToken sharing', () => {
+    const storedProfile = {
+      id: 'user-profile-123',
+      accessToken: Buffer.from('stored-access-token').toString('base64'),
+      refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      tokenRefreshFailureCount: 0,
+      tokenRefreshRetryAt: null,
+    };
+
+    beforeEach(() => {
+      mockDependencies.drizzle.__nextQueryUserProfile = storedProfile;
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ access_token: 'new-access-token' }),
+      } as never);
+    });
+
+    it('calls Microsoft once for concurrent refreshes of the same user', async () => {
+      const results = await Promise.all([
+        new TokenProvider(mockConfig, mockDependencies as any).refreshAccessToken(
+          'user-profile-123',
+        ),
+        new TokenProvider(mockConfig, mockDependencies as any).refreshAccessToken(
+          'user-profile-123',
+        ),
+      ]);
+
+      expect(results).toEqual(['new-access-token', 'new-access-token']);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls Microsoft again once the shared refresh has settled', async () => {
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await unit.refreshAccessToken('user-profile-123');
+      await unit.refreshAccessToken('user-profile-123');
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('reuses the stored access token when Graph rejected an older one', async () => {
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123', 'older-access-token')).resolves.toBe(
+        'stored-access-token',
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('refreshes when Graph rejected the stored access token', async () => {
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(
+        unit.refreshAccessToken('user-profile-123', 'stored-access-token'),
+      ).resolves.toBe('new-access-token');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('refreshAccessToken backoff', () => {
+    const now = new Date('2026-11-24T00:00:00.000Z');
+    const minutesFromNow = (minutes: number) => new Date(now.getTime() + minutes * 60_000);
+
+    const savedUpdates = () =>
+      mockDependencies.drizzle.update.mock.results.map(
+        (result) => result.value.set.mock.calls[0]?.[0],
+      );
+
+    const profileWithFailures = (
+      tokenRefreshFailureCount: number,
+      tokenRefreshRetryAt: Date | null = null,
+    ) => ({
+      id: 'user-profile-123',
+      refreshToken: 'ZW5jcnlwdGVkLXJlZnJlc2gtdG9rZW4=',
+      tokenRefreshFailureCount,
+      tokenRefreshRetryAt,
+    });
+
+    const failedResponse = (status: number, body: unknown, headers: HeadersInit = {}) =>
+      ({
+        ok: false,
+        status,
+        statusText: 'Failed',
+        headers: new Headers(headers),
+        text: vi.fn().mockResolvedValue(JSON.stringify(body)),
+      }) as never;
+
+    const connectTimeout = () =>
+      Object.assign(new TypeError('fetch failed'), {
+        cause: { code: 'UND_ERR_CONNECT_TIMEOUT' },
+      });
+
+    beforeEach(() => {
+      vi.useFakeTimers({ now, toFake: ['Date'] });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('skips Microsoft while a previous failure is backing off', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(1, minutesFromNow(1));
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toBeInstanceOf(
+        TokenRefreshCoolingDownError,
+      );
+      expect(mockFetch).not.toHaveBeenCalled();
+    });
+
+    it('calls Microsoft once the backoff has passed', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(1, minutesFromNow(-1));
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ access_token: 'new-access-token' }),
+      } as never);
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).resolves.toBe('new-access-token');
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({
+          tokenRefreshFailedAt: null,
+          tokenRefreshFailureCount: 0,
+          tokenRefreshFailureCode: null,
+          tokenRefreshRetryAt: null,
+        }),
+      ]);
+    });
+
+    it('backs off one minute after a first network failure', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockRejectedValue(connectTimeout());
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        'Token refresh failed: fetch failed',
+      );
+      expect(savedUpdates()).toEqual([
+        {
+          tokenRefreshFailedAt: now,
+          tokenRefreshFailureCount: 1,
+          tokenRefreshFailureCode: 'network_UND_ERR_CONNECT_TIMEOUT',
+          tokenRefreshRetryAt: minutesFromNow(1),
+        },
+      ]);
+    });
+
+    it('doubles the backoff with each consecutive failure', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(3);
+      mockFetch.mockResolvedValue(failedResponse(503, { error: 'temporarily_unavailable' }));
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
+        'Token refresh failed: Failed',
+      );
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({
+          tokenRefreshFailureCount: 4,
+          tokenRefreshFailureCode: 'http_503_temporarily_unavailable',
+          tokenRefreshRetryAt: minutesFromNow(8),
+        }),
+      ]);
+    });
+
+    it('caps the backoff at 30 minutes', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(9);
+      mockFetch.mockResolvedValue(failedResponse(500, {}));
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({
+          tokenRefreshFailureCode: 'http_500',
+          tokenRefreshRetryAt: minutesFromNow(30),
+        }),
+      ]);
+    });
+
+    it('waits as long as the Retry-After header asks', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue(failedResponse(429, {}, { 'Retry-After': '300' }));
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      expect(savedUpdates()).toEqual([
+        expect.objectContaining({
+          tokenRefreshFailureCode: 'http_429',
+          tokenRefreshRetryAt: minutesFromNow(5),
+        }),
+      ]);
+    });
+
+    it("logs Microsoft's error code but not its description or trace ids", async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockResolvedValue(
+        failedResponse(400, {
+          error: 'invalid_scope',
+          error_description: 'AADSTS70011: scope is invalid for app 11111111-2222',
+          error_codes: [70011],
+          trace_id: 'trace-id-value',
+          correlation_id: 'correlation-id-value',
+        }),
+      );
+      const unit = new TokenProvider(mockConfig, mockDependencies as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+
+      // Private logger: the global test setup mocks Nest's Logger per instance.
+      const errorLog = (unit as any).logger.error;
+      const logged = JSON.stringify(errorLog.mock.calls);
+      expect(errorLog).toHaveBeenCalledWith(
+        expect.objectContaining({ failureCode: 'http_400_invalid_scope', aadstsCodes: [70011] }),
+      );
+      expect(logged).not.toContain('AADSTS70011:');
+      expect(logged).not.toContain('trace-id-value');
+      expect(logged).not.toContain('correlation-id-value');
+    });
+
+    it('keeps the tokens and the MCP session on a transient failure', async () => {
+      const onPermanentAuthFailure = vi.fn();
+      mockDependencies.drizzle.__nextQueryUserProfile = profileWithFailures(0);
+      mockFetch.mockRejectedValue(connectTimeout());
+      const unit = new TokenProvider(mockConfig, {
+        ...mockDependencies,
+        onPermanentAuthFailure,
+      } as any);
+
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow();
+      expect(savedUpdates()).not.toContainEqual(expect.objectContaining({ accessToken: null }));
+      expect(onPermanentAuthFailure).not.toHaveBeenCalled();
     });
   });
 

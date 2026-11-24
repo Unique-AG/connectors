@@ -430,7 +430,8 @@ export class DiscoverDelegatedAccessCommand {
         ),
       )
       .orderBy(userProfiles.id)
-      .limit(100);
+      // An owner batch is checked against Graph in parallel, so this is the discovery concurrency.
+      .limit(50);
 
     // Type casting is safe because isNotNull(userProfiles.email) ensures email is not null
     return items as { userProfileId: string; email: string; source: UserProfileSource }[];

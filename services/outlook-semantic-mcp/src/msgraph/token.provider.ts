@@ -3,7 +3,6 @@ import { AesGcmEncryptionService } from '@unique-ag/aes-gcm-encryption';
 import { addLogSecrets } from '@unique-ag/logger';
 import {
   isPermanentUpstreamOAuthError,
-  isUpstreamCredentialRevokedError,
   UpstreamCredentialRevokedError,
 } from '@unique-ag/mcp-oauth';
 import {
@@ -12,11 +11,12 @@ import {
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
-import { type Dispatcher, fetch } from 'undici';
+import { isObjectType } from 'remeda';
+import { type Dispatcher, fetch, type Response } from 'undici';
 import { z } from 'zod';
 import { authorizeTenant, microsoftOAuthTokenUrl } from '../auth/microsoft.provider';
 import { DrizzleDatabase } from '../db/drizzle.module';
-import { userProfiles } from '../db/schema';
+import { CLEARED_TOKEN_REFRESH_BACKOFF, userProfiles } from '../db/schema';
 import { isAppLevelOAuthError } from './is-app-level-oauth-error';
 
 const TokenRefreshResponseSchema = z.object({
@@ -98,21 +98,56 @@ export class TokenProvider implements AuthenticationProvider {
     return accessToken;
   }
 
-  public async refreshAccessToken(userProfileId: string): Promise<string> {
+  /**
+   * Every TokenProvider in the process shares one refresh per user, so a burst of 401s for the
+   * same user calls Microsoft once. Pass the access token Graph rejected so a request that lost the
+   * race reuses the token another request already stored instead of refreshing again.
+   */
+  public refreshAccessToken(userProfileId: string, rejectedAccessToken?: string): Promise<string> {
+    const inFlight = inFlightRefreshes.get(userProfileId);
+    if (inFlight) {
+      return inFlight;
+    }
+    const refresh = this.refreshOnce(userProfileId, rejectedAccessToken).finally(() =>
+      inFlightRefreshes.delete(userProfileId),
+    );
+    inFlightRefreshes.set(userProfileId, refresh);
+    return refresh;
+  }
+
+  private async refreshOnce(userProfileId: string, rejectedAccessToken?: string): Promise<string> {
     const userProfile = await this.drizzle.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
 
     assert.ok(userProfile?.refreshToken, `No refresh token available for user: ${userProfileId}`);
 
+    if (rejectedAccessToken && userProfile.accessToken) {
+      const storedAccessToken = this.encryptionService
+        .decryptFromString(userProfile.accessToken)
+        .toString('utf-8');
+      addLogSecrets([storedAccessToken]);
+      if (storedAccessToken !== rejectedAccessToken) {
+        this.logger.debug({
+          msg: 'Microsoft Graph access token was already refreshed, reusing the stored one',
+          userProfileId,
+        });
+        return storedAccessToken;
+      }
+    }
+
+    if (userProfile.tokenRefreshRetryAt && userProfile.tokenRefreshRetryAt > new Date()) {
+      throw new TokenRefreshCoolingDownError(userProfile.tokenRefreshRetryAt);
+    }
+
     const refreshToken = this.encryptionService
       .decryptFromString(userProfile.refreshToken)
       .toString('utf-8');
     addLogSecrets([refreshToken]);
 
+    let response: Response;
     try {
-      // Microsoft OAuth2 token refresh endpoint
-      const response = await fetch(microsoftOAuthTokenUrl(this.signInTenantId), {
+      response = await fetch(microsoftOAuthTokenUrl(this.signInTenantId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -126,105 +161,197 @@ export class TokenProvider implements AuthenticationProvider {
         }),
         dispatcher: this.dispatcher,
       });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let parsedError: { error?: string; error_description?: string } = {};
-        try {
-          parsedError = JSON.parse(errorText);
-        } catch {
-          // not JSON
-        }
-
-        this.logger.error({
-          msg: 'Microsoft Graph API rejected token refresh request',
-          status: response.status,
-          errorText,
-          userProfileId: this.userProfileId,
-          tokenRefreshFailed: true,
-          errorSource: 'microsoft_graph_api',
-        });
-
-        // Errors handled:
-        // - isPermanentUpstreamOAuthError: invalid_grant, interaction_required, consent_required
-        //   (user revoked consent or the refresh grant expired)
-        // - isAppLevelOAuthError: invalid_client, unauthorized_client
-        //   Error triggered by: Entra app registration change — e.g. the client secret was
-        //   rotated, or the secret ID was configured instead of the secret value
-        //   (AADSTS7000215). Clear stored tokens so we do not retry the same refresh forever.
-        if (
-          isPermanentUpstreamOAuthError(parsedError.error) ||
-          isAppLevelOAuthError(parsedError.error)
-        ) {
-          return await this.revokeUpstreamCredential(userProfileId, parsedError.error_description);
-        }
-
-        assert.fail(`Token refresh failed: ${response.statusText}`);
-      }
-
-      const tokenData = TokenRefreshResponseSchema.parse(await response.json());
-      addLogSecrets([
-        tokenData.access_token,
-        ...(tokenData.refresh_token ? [tokenData.refresh_token] : []),
-      ]);
-
-      const tenant = authorizeTenant(tokenData.access_token, this.allowedTenantIds);
-      if (!tenant.allowed) {
-        return await this.revokeUpstreamCredential(userProfileId, tenant.reason);
-      }
-
-      const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
-      // Keep old refresh token if new one not provided
-      const encryptedRefreshToken = tokenData.refresh_token
-        ? this.encryptionService.encryptToString(tokenData.refresh_token)
-        : userProfile.refreshToken;
-
-      // Update the stored tokens
-      await this.drizzle
-        .update(userProfiles)
-        .set({
-          accessToken: encryptedAccessToken,
-          refreshToken: encryptedRefreshToken,
-        })
-        .where(eq(userProfiles.id, userProfileId));
-
-      this.logger.debug({
-        msg: 'Successfully refreshed Microsoft Graph API access token',
-        userProfileId: this.userProfileId,
-        tokenRefreshSuccess: true,
-        action: 'token_refresh_completed',
-      });
-      return tokenData.access_token;
     } catch (err) {
-      if (isUpstreamCredentialRevokedError(err)) {
-        this.logger.warn({
-          msg: 'Microsoft grant is permanently invalid; propagating after MCP token revoke',
-          userProfileId: this.userProfileId,
-          err,
-        });
-        throw err;
-      }
-      this.logger.error({
-        msg: 'Failed to refresh Microsoft Graph API access token for user',
-        userProfileId: this.userProfileId,
-        tokenRefreshFailed: true,
-        errorSource: 'microsoft_graph_api',
-        err,
+      return await this.recordTransientFailure(userProfile, {
+        failureCode: networkFailureCode(err),
+        retryAfterMs: null,
+        message: `Token refresh failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        cause: err,
       });
-      throw new Error(
-        `Token refresh failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        { cause: err },
-      );
     }
+
+    if (!response.ok) {
+      const oauthError = parseOAuthError(await response.text());
+
+      // Errors handled:
+      // - isPermanentUpstreamOAuthError: invalid_grant, interaction_required, consent_required
+      //   (user revoked consent or the refresh grant expired)
+      // - isAppLevelOAuthError: invalid_client, unauthorized_client
+      //   Error triggered by: Entra app registration change — e.g. the client secret was
+      //   rotated, or the secret ID was configured instead of the secret value
+      //   (AADSTS7000215). Clear stored tokens so we do not retry the same refresh forever.
+      if (
+        isPermanentUpstreamOAuthError(oauthError.error) ||
+        isAppLevelOAuthError(oauthError.error)
+      ) {
+        return await this.revokeUpstreamCredential(userProfileId, {
+          reason: oauthError.error_description,
+          failureCode: `http_${response.status}_${oauthError.error}`,
+          aadstsCodes: oauthError.error_codes,
+        });
+      }
+
+      return await this.recordTransientFailure(userProfile, {
+        failureCode: oauthError.error
+          ? `http_${response.status}_${oauthError.error}`
+          : `http_${response.status}`,
+        aadstsCodes: oauthError.error_codes,
+        retryAfterMs: parseRetryAfterMs(response.headers.get('retry-after')),
+        message: `Token refresh failed: ${response.statusText}`,
+      });
+    }
+
+    const tokenData = TokenRefreshResponseSchema.parse(await response.json());
+    addLogSecrets([
+      tokenData.access_token,
+      ...(tokenData.refresh_token ? [tokenData.refresh_token] : []),
+    ]);
+
+    const tenant = authorizeTenant(tokenData.access_token, this.allowedTenantIds);
+    if (!tenant.allowed) {
+      return await this.revokeUpstreamCredential(userProfileId, {
+        reason: tenant.reason,
+        failureCode: 'tenant_not_allowed',
+      });
+    }
+
+    const encryptedAccessToken = this.encryptionService.encryptToString(tokenData.access_token);
+    // Keep old refresh token if new one not provided
+    const encryptedRefreshToken = tokenData.refresh_token
+      ? this.encryptionService.encryptToString(tokenData.refresh_token)
+      : userProfile.refreshToken;
+
+    await this.drizzle
+      .update(userProfiles)
+      .set({
+        accessToken: encryptedAccessToken,
+        refreshToken: encryptedRefreshToken,
+        ...CLEARED_TOKEN_REFRESH_BACKOFF,
+      })
+      .where(eq(userProfiles.id, userProfileId));
+
+    this.logger.debug({
+      msg: 'Successfully refreshed Microsoft Graph API access token',
+      userProfileId,
+      tokenRefreshSuccess: true,
+      action: 'token_refresh_completed',
+    });
+    return tokenData.access_token;
   }
 
-  private async revokeUpstreamCredential(userProfileId: string, reason?: string): Promise<never> {
+  /**
+   * Backs off before the next refresh attempt: Microsoft's Retry-After when it sends one,
+   * otherwise 1, 2, 4… minutes per consecutive failure, capped at 30 minutes.
+   */
+  private async recordTransientFailure(
+    userProfile: UserProfile,
+    {
+      failureCode,
+      aadstsCodes,
+      retryAfterMs,
+      message,
+      cause,
+    }: {
+      failureCode: string;
+      aadstsCodes?: number[];
+      retryAfterMs: number | null;
+      message: string;
+      cause?: unknown;
+    },
+  ): Promise<never> {
+    const failureCount = userProfile.tokenRefreshFailureCount + 1;
+    const backoffMs = Math.min(
+      retryAfterMs ?? MIN_REFRESH_BACKOFF_MS * 2 ** (failureCount - 1),
+      MAX_REFRESH_BACKOFF_MS,
+    );
+    const failedAt = new Date();
+    const retryAt = new Date(failedAt.getTime() + backoffMs);
+
+    await this.drizzle
+      .update(userProfiles)
+      .set({
+        tokenRefreshFailedAt: failedAt,
+        tokenRefreshFailureCount: failureCount,
+        tokenRefreshFailureCode: failureCode,
+        tokenRefreshRetryAt: retryAt,
+      })
+      .where(eq(userProfiles.id, userProfile.id));
+
+    this.logger.error({
+      msg: 'Failed to refresh Microsoft Graph API access token for user',
+      userProfileId: userProfile.id,
+      tokenRefreshFailed: true,
+      errorSource: 'microsoft_graph_api',
+      failureCode,
+      aadstsCodes,
+      failureCount,
+      retryAt: retryAt.toISOString(),
+      err: cause,
+    });
+    throw new Error(message, { cause });
+  }
+
+  private async revokeUpstreamCredential(
+    userProfileId: string,
+    {
+      reason,
+      failureCode,
+      aadstsCodes,
+    }: { reason?: string; failureCode: string; aadstsCodes?: number[] },
+  ): Promise<never> {
     await this.drizzle
       .update(userProfiles)
       .set({ accessToken: null, refreshToken: null })
       .where(eq(userProfiles.id, userProfileId));
 
     await this.onPermanentAuthFailure?.(userProfileId);
+    this.logger.warn({
+      msg: 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
+      userProfileId,
+      failureCode,
+      aadstsCodes,
+    });
     throw new UpstreamCredentialRevokedError(reason);
   }
 }
+
+const MIN_REFRESH_BACKOFF_MS = 60_000;
+const MAX_REFRESH_BACKOFF_MS = 30 * 60_000;
+
+const inFlightRefreshes = new Map<string, Promise<string>>();
+
+type UserProfile = typeof userProfiles.$inferSelect;
+
+export class TokenRefreshCoolingDownError extends Error {
+  public constructor(public readonly retryAt: Date) {
+    super(`Microsoft token refresh is backing off until ${retryAt.toISOString()}`);
+    this.name = 'TokenRefreshCoolingDownError';
+  }
+}
+
+// Microsoft's error body also carries trace and correlation ids, timestamps and, for
+// invalid_client, the app id; only the fields below are read so none of those reach the logs.
+const OAuthErrorSchema = z.object({
+  error: z.string().optional().catch(undefined),
+  error_description: z.string().optional().catch(undefined),
+  error_codes: z.array(z.number()).optional().catch(undefined),
+});
+
+const parseOAuthError = (body: string): z.infer<typeof OAuthErrorSchema> => {
+  try {
+    return OAuthErrorSchema.parse(JSON.parse(body));
+  } catch {
+    return {};
+  }
+};
+
+const parseRetryAfterMs = (retryAfter: string | null): number | null => {
+  const seconds = Number.parseInt(retryAfter ?? '', 10);
+  return Number.isNaN(seconds) ? null : seconds * 1000;
+};
+
+const networkFailureCode = (error: unknown): string => {
+  const cause = isObjectType(error) && 'cause' in error ? error.cause : undefined;
+  const code = isObjectType(cause) && 'code' in cause ? cause.code : undefined;
+  return `network_${typeof code === 'string' ? code : 'unknown'}`;
+};
