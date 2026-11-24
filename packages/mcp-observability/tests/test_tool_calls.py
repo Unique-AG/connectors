@@ -15,7 +15,13 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import AccessToken
 from fastmcp.server.middleware import MiddlewareContext
 from fastmcp.tools import ToolResult
+from mcp.server.auth.middleware.auth_context import auth_context_var
+from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 from mcp_configs import LoggingSettings
+from opentelemetry import trace
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from mcp_observability import PinoJsonFormatter
 from mcp_observability import RedactToolCallSecretsMiddleware
@@ -238,3 +244,32 @@ async def test_a_call_runs_and_is_logged_when_its_secrets_cannot_be_read(
         cast("dict[str, str]", line["log_secrets_failed"])["name"] == "LookupError"
         for line in tool_call_lines
     )
+
+
+async def test_a_signed_in_call_traces_the_subject_the_log_line_names(
+    pino: io.StringIO, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    monkeypatch.setattr(trace, "get_tracer_provider", lambda: provider)
+    token = AccessToken(token="t", client_id="zitadel-app", scopes=[], subject="user-42")
+    auth_context_var.set(AuthenticatedUser(token))
+    server = FastMCP("kiosk", middleware=[ToolCallObservabilityMiddleware()])
+
+    @server.tool
+    async def echo() -> str:
+        return "done"
+
+    async with Client(server) as connected:
+        await connected.call_tool("echo", {})
+
+    started, _ = _tool_lines(pino)
+    assert started["subject"] == "user-42"
+    end_users = [
+        span.attributes["enduser.id"]
+        for span in exporter.get_finished_spans()
+        if span.attributes and "enduser.id" in span.attributes
+    ]
+    assert end_users
+    assert set(end_users) == {"user-42"}

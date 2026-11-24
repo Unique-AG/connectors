@@ -6,6 +6,7 @@ import time
 from typing import override
 
 import mcp_types as mt
+from fastmcp.server import telemetry
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.server.middleware import CallNext
 from fastmcp.server.middleware import Middleware
@@ -18,6 +19,18 @@ from mcp_observability.trace_declarations import tool_call_record
 
 _log = logging.getLogger("mcp_observability.tool_calls")
 _MAX_TOOL_NAME = 64
+_fastmcp_auth_span_attributes = telemetry.get_auth_span_attributes
+
+
+def _auth_span_attributes() -> dict[str, str]:
+    """FastMCP sets `enduser.id` to the OAuth client id, which is the same for every user."""
+    attributes = _fastmcp_auth_span_attributes()
+    subject = _subject()
+    if subject is None:
+        attributes.pop("enduser.id", None)
+    else:
+        attributes["enduser.id"] = subject
+    return attributes
 
 
 class ToolCallObservabilityMiddleware(Middleware):
@@ -28,6 +41,7 @@ class ToolCallObservabilityMiddleware(Middleware):
 
     def __init__(self) -> None:
         super().__init__()
+        telemetry.get_auth_span_attributes = _auth_span_attributes
         add_filter_once("fastmcp.server.server", _FastMcpToolCallLines)
         add_filter_once("mcp_observability", _OpsToolCallLines)
 

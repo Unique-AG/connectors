@@ -66,7 +66,9 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   `Tool call started` and one of `Tool call completed`, `failed` or `cancelled` per call, with the
   values `@trace_arguments` declared, a failure at its level (an exception class can declare one
   with `DeclaresFailureLevel`) and an invalid argument as `failed_fields`. It drops FastMCP's and
-  `setup_ops`'s per-call lines for a tool, which repeat it and can quote the input.
+  `setup_ops`'s per-call lines for a tool, which repeat it and can quote the input. Creating it
+  also makes FastMCP's `enduser.id` span attribute the token's `subject`, the value of the log
+  line's `subject`, where FastMCP sets the OAuth client id.
 - `setup_ops(mcp)`: serves `/probe`, `/health` and `/metrics` from the server, counts, times and
   logs every tool, resource and prompt call (`mcp_calls_total`, `mcp_call_duration_seconds`), and
   returns the HTTP metrics middleware (`python_http_requests_total`,
