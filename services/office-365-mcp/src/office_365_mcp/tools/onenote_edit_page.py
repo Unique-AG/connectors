@@ -88,12 +88,10 @@ belongs to somebody else. A set in the user's own unshared notebook runs without
 - Microsoft reports one result for the whole set. A failure can mean a partly applied set: read \
 the page with onenote_read_page and resend only the missing commands.
 - This tool changes what is on a page, not where the page is in its section. Microsoft Graph \
-cannot make a page a subpage. If the user wants one, tell them to move the page \
-into the section of its parent if it is in another section. Then they move it \
-directly below its parent in the OneNote app and make it a subpage there. If the parent is \
-itself a subpage, they make the page a subpage one more time. OneNote has only two levels of \
-subpages, so a page cannot go below a subpage of a subpage. If OneNote sorts the pages of the \
-section, they set the sort order to None first. Give them this page: \
+cannot make a page a subpage. If the user wants one, read the `level` of the parent with \
+onenote_list_pages and `include_level_and_order=true`. OneNote has only two levels of subpages, \
+so a parent at `level` 2 cannot take a subpage: tell the user so. Otherwise tell the user to \
+make the page a subpage of that parent in the OneNote app, and give them this page: \
 https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
 On an iPad or iPhone, give them this page instead: \
 https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone

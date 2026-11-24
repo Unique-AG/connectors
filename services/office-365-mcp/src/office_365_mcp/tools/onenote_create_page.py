@@ -106,12 +106,11 @@ a question.
 - Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
 section of the default notebook.
 - Microsoft Graph cannot set the indent level of a page, so the new page is always at the top \
-level of its section. If the user wants a subpage, create the page in the section of its \
-parent. Then tell them to move the page \
-directly below its parent in the OneNote app and make it a subpage there. If the parent is \
-itself a subpage, they make the page a subpage one more time. OneNote has only two levels of \
-subpages, so a page cannot go below a subpage of a subpage. If OneNote sorts the pages of the \
-section, they set the sort order to None first. Give them this page: \
+level of its section. If the user wants a subpage, first read the `level` of the parent with \
+onenote_list_pages and `include_level_and_order=true`. OneNote has only two levels of subpages, \
+so a parent at `level` 2 cannot take a subpage: tell the user before you create anything. \
+Otherwise create the page in the section of the parent. Then tell the user to make it a subpage \
+of that parent in the OneNote app, and give them this page: \
 https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
 On an iPad or iPhone, give them this page instead: \
 https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone
