@@ -30,7 +30,7 @@ from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_
 
 TOOL_NAME = "outlook_list_tasks"
 
-PRESETS: tuple[str, ...] = ("outlook-tasks", "outlook-tasks-write")
+PRESETS: tuple[str, ...] = ("outlook-tasks", "outlook-tasks-write", "outlook-tasks-delete")
 
 STEP = "tasks"
 

@@ -1,0 +1,205 @@
+import base64
+import datetime as dt
+from collections.abc import Iterator, Mapping
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+
+import docgen
+import yaml
+from model import Context, Step
+
+if TYPE_CHECKING:
+    from seed import Graph
+
+TAG = "seed-v1"
+CASE = f"{TAG} case-"
+OWNER = "mia"
+PHASE = "todo"
+PHASES: tuple[str, ...] = (PHASE,)
+LISTS = "/me/todo/lists"
+DEFAULT_LIST = "defaultList"
+DEFAULT_KEY = f"{PHASE}:{DEFAULT_LIST}"
+LIST_FIELDS = "id,displayName,wellknownListName"
+DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+CORPUS = Path(__file__).resolve().parents[1] / "corpus" / "outlook-tasks.yaml"
+WEEKDAYS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+type Spec = Mapping[str, Any]
+
+
+def _corpus() -> Spec:
+    return cast("Spec", yaml.safe_load(CORPUS.read_text(encoding="utf-8")))
+
+
+def _named(name: str) -> str:
+    return f"{TAG} {name}"
+
+
+def _key(name: str) -> str:
+    return f"{PHASE}:{_named(name)}"
+
+
+def _ref(key: str) -> str:
+    return "{" + key + "}"
+
+
+def _lookup(path: str, fields: str, lookup: str = "named", key: str | None = None) -> Step:
+    return Step(PHASE, "lookup", "GET", path, (("$select", fields),), key=key, lookup=lookup)
+
+
+def _moment(day: dt.date, time: str) -> dict[str, str]:
+    return {"dateTime": f"{day.isoformat()}T{time}", "timeZone": "UTC"}
+
+
+def task_body(task: Spec, anchor: dt.date) -> dict[str, Any]:
+    body: dict[str, Any] = {
+        "title": _named(task["title"]),
+        "categories": [TAG],
+        "body": {"content": task["notes"], "contentType": "text"},
+    }
+    if "priority" in task:
+        body["importance"] = task["priority"]
+    if "status" in task:
+        body["status"] = task["status"]
+    if "due_days" in task:
+        due = anchor + dt.timedelta(days=task["due_days"])
+        body["dueDateTime"] = _moment(due, "00:00:00")
+        if task.get("repeat") == "weekly":
+            body["recurrence"] = {
+                "pattern": {
+                    "type": "weekly",
+                    "interval": 1,
+                    "daysOfWeek": [WEEKDAYS[due.weekday()]],
+                },
+                "range": {"type": "noEnd", "startDate": due.isoformat()},
+            }
+    if "reminder_days" in task:
+        body["isReminderOn"] = True
+        body["reminderDateTime"] = _moment(
+            anchor + dt.timedelta(days=task["reminder_days"]), "09:00:00"
+        )
+    if "links" in task:
+        body["linkedResources"] = [
+            {
+                "displayName": _named(link["title"]),
+                "webUrl": link["url"],
+                "applicationName": link["application"],
+            }
+            for link in task["links"]
+        ]
+    return body
+
+
+def attachment_bytes(attachment: Spec) -> bytes:
+    return docgen.docx(attachment["paragraphs"], {"title": _named(attachment["name"])})
+
+
+ASSETS: Mapping[str, bytes] = {
+    _named(attachment["name"]): attachment_bytes(attachment)
+    for one in _corpus()["lists"]
+    for task in one["tasks"]
+    for attachment in task.get("attachments", [])
+}
+
+
+def _attachment_body(attachment: Spec) -> dict[str, str]:
+    return {
+        "@odata.type": "#microsoft.graph.taskFileAttachment",
+        "name": _named(attachment["name"]),
+        "contentType": DOCX,
+        "contentBytes": base64.b64encode(attachment_bytes(attachment)).decode("ascii"),
+    }
+
+
+def _task_steps(tasks_path: str, task: Spec, anchor: dt.date) -> list[Step]:
+    key = _key(task["title"])
+    path = f"{tasks_path}/{_ref(key)}"
+    found = [Step(PHASE, "create", "POST", tasks_path, body=task_body(task, anchor), key=key)]
+    if task.get("steps"):
+        found.append(_lookup(f"{path}/checklistItems", "id,displayName"))
+        found += [
+            Step(
+                PHASE,
+                "create",
+                "POST",
+                f"{path}/checklistItems",
+                body={"displayName": _named(one["text"]), "isChecked": bool(one.get("checked"))},
+                key=_key(one["text"]),
+            )
+            for one in task["steps"]
+        ]
+    if task.get("attachments"):
+        found.append(_lookup(f"{path}/attachments", "id,name", "attachments", key))
+        found += [
+            Step(
+                PHASE,
+                "create",
+                "POST",
+                f"{path}/attachments",
+                body=_attachment_body(one),
+                key=f"attachment:{key}:{_named(one['name'])}",
+            )
+            for one in task["attachments"]
+        ]
+    return found
+
+
+def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
+    if owner != OWNER or PHASE not in phases:
+        return []
+    corpus = _corpus()
+    found = [
+        _lookup(LISTS, LIST_FIELDS),
+        _lookup(LISTS, LIST_FIELDS, "default-list", DEFAULT_KEY),
+    ]
+    for one in corpus["lists"]:
+        key = _key(one["name"])
+        tasks = f"{LISTS}/{_ref(key)}/tasks"
+        found += [
+            Step(
+                PHASE, "create", "POST", LISTS, body={"displayName": _named(one["name"])}, key=key
+            ),
+            _lookup(tasks, "id,title"),
+        ]
+        for task in one["tasks"]:
+            found += _task_steps(tasks, task, ctx.anchor)
+    tasks = f"{LISTS}/{_ref(DEFAULT_KEY)}/tasks"
+    found.append(_lookup(tasks, "id,title"))
+    for task in corpus["default_tasks"]:
+        found += _task_steps(tasks, task, ctx.anchor)
+    return found
+
+
+def _tasks(graph: Graph, list_id: str) -> Iterator[dict[str, Any]]:
+    return graph.get_all(f"{LISTS}/{list_id}/tasks", {"$select": "id,title"})
+
+
+def sweep(graph: Graph, owner: str) -> Iterator[tuple[str, str]]:
+    if owner != OWNER:
+        return
+    seeded = {_named(one["name"]) for one in _corpus()["lists"]}
+    for found in graph.get_all(LISTS, {"$select": LIST_FIELDS}):
+        name = str(found.get("displayName") or "")
+        if CASE in name:
+            yield "DELETE", f"{LISTS}/{found['id']}"
+        elif name in seeded or found.get("wellknownListName") == DEFAULT_LIST:
+            for task in _tasks(graph, str(found["id"])):
+                if CASE in str(task.get("title") or ""):
+                    yield "DELETE", f"{LISTS}/{found['id']}/tasks/{task['id']}"
+
+
+def cleanup(
+    graph: Graph, ctx: Context, owner: str, phases: set[str]
+) -> Iterator[tuple[str, str, None]]:
+    if owner != OWNER or PHASE not in phases:
+        return
+    corpus = _corpus()
+    seeded = {_named(one["name"]) for one in corpus["lists"]}
+    titles = {_named(task["title"]) for task in corpus["default_tasks"]}
+    for found in graph.get_all(LISTS, {"$select": LIST_FIELDS}):
+        if found.get("displayName") in seeded:
+            yield "DELETE", f"{LISTS}/{found['id']}", None
+        elif found.get("wellknownListName") == DEFAULT_LIST:
+            for task in _tasks(graph, str(found["id"])):
+                if task.get("title") in titles:
+                    yield "DELETE", f"{LISTS}/{found['id']}/tasks/{task['id']}", None

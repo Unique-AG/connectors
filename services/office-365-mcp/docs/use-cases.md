@@ -5148,7 +5148,7 @@ What happens:
 
 ### Keeping track of tasks
 
-Mia keeps her to-dos in Microsoft To Do, and Outlook shows the same tasks. Mia asks her assistant to find her tasks, to add a task, and to mark a task done.
+Mia keeps her to-dos in Microsoft To Do, and Outlook shows the same tasks. Mia asks her assistant to find her tasks, to plan them, to keep their steps, links, and files, to keep her lists in order, and to mark a task done.
 
 #### The assistant finds Mia's tasks
 
@@ -5239,6 +5239,372 @@ Situation: Mia has the completed task "Send the Q3 report" with a due date.
 What happens:
 
 - The task is open again and has no due date.
+
+#### The assistant plans a task with Mia
+
+**A task is added with a start date and a reminder**
+
+Ask your assistant: "Add Prepare the budget, starting Monday, remind me Thursday at 9."
+
+Tests: 1
+
+Situation: Mia works in Zurich.
+
+What happens:
+
+- The task starts on 23 November and To Do reminds Mia at 09:00 on 26 November.
+
+**A task repeats every week on Monday**
+
+Ask your assistant: "Add Send the weekly status, due Monday, every week on Monday."
+
+Tests: 1
+
+Situation: Mia works in Zurich.
+
+What happens:
+
+- The task repeats every week on Monday, from 23 November.
+
+**A repeating task with no due date is refused**
+
+Ask your assistant: "Add Send the weekly status, every week."
+
+Tests: 1
+
+Situation: Mia works in Zurich.
+
+What happens:
+
+- No task is created, because a series starts on its due date.
+- The assistant is told to give the due date in the same call.
+
+**A task stops repeating and its reminder is turned off**
+
+Ask your assistant: "Stop repeating Send the weekly status and turn its reminder off."
+
+Tests: 1
+
+Situation: Mia has the task "Send the weekly status" that repeats every week and has a reminder.
+
+What happens:
+
+- The task no longer repeats and has no reminder.
+
+**A task gets a category**
+
+Ask your assistant: "Put Send the Q3 report in the Finance category."
+
+Tests: 1
+
+Situation: Mia has the task "Send the Q3 report".
+
+What happens:
+
+- The task has the category "Finance".
+
+**A task waits on another person**
+
+Ask your assistant: "Mark Send the Q3 report as waiting on Anna."
+
+Tests: 1
+
+Situation: Mia has the open task "Send the Q3 report".
+
+What happens:
+
+- The task has the status waiting on others, and To Do still shows it as open.
+
+#### The assistant keeps the steps of a task
+
+**A step is added to a task**
+
+Ask your assistant: "Add the step Get the numbers from Anna to Send the Q3 report."
+
+Tests: 1
+
+Situation: Mia has the task "Send the Q3 report".
+
+What happens:
+
+- The task holds the open step "Get the numbers from Anna".
+
+**A step is checked off**
+
+Ask your assistant: "Check off Get the numbers from Anna."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the open step "Get the numbers from Anna".
+
+What happens:
+
+- The step is checked off.
+
+**A step is removed after Mia approves**
+
+Ask your assistant: "Remove the step Get the numbers from Anna."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the step "Get the numbers from Anna".
+
+What happens:
+
+- Mia is asked to approve the removal first.
+- After she approves, the task no longer holds the step.
+
+**A task is read with its steps, links, and files**
+
+Ask your assistant: "What does Send the Q3 report hold?"
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds two steps, a link to a mail, and the file "Numbers.xlsx".
+
+What happens:
+
+- The assistant answers with the two steps, the link, and the name of the file.
+
+#### The assistant keeps the links and the files of a task
+
+**A mail is linked to a task**
+
+Ask your assistant: "Link the mail Q3 numbers to Send the Q3 report."
+
+Tests: 1
+
+Situation: Mia has the mail "Q3 numbers" from Anna and the task "Send the Q3 report".
+
+What happens:
+
+- The task holds a link that opens the mail in Outlook.
+
+**A link is removed after Mia approves**
+
+Ask your assistant: "Remove the Q3 numbers link from Send the Q3 report."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the link "Q3 numbers".
+
+What happens:
+
+- Mia is asked to approve the removal first.
+- After she approves, the task no longer holds the link.
+
+**A file of a task is read**
+
+Ask your assistant: "What does Numbers.csv on Send the Q3 report say?"
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the file "Numbers.csv".
+
+What happens:
+
+- The assistant answers with the content of the file.
+
+**A file is removed from a task after Mia approves**
+
+Ask your assistant: "Remove Numbers.csv from Send the Q3 report."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the file "Numbers.csv".
+
+What happens:
+
+- Mia is asked to approve the removal first.
+- After she approves, the task no longer holds the file.
+
+#### The assistant keeps Mia's lists in order
+
+**A list is created**
+
+Ask your assistant: "Make a task list called Move to Bern."
+
+Tests: 1
+
+What happens:
+
+- Mia has the list "Move to Bern".
+
+**A list is renamed**
+
+Ask your assistant: "Rename Move to Bern to Move to Basel."
+
+Tests: 1
+
+Situation: Mia has the list "Move to Bern".
+
+What happens:
+
+- The list has the name "Move to Basel".
+
+**The built-in Tasks list is not renamed**
+
+Ask your assistant: "Rename my Tasks list to Inbox."
+
+Tests: 1
+
+Situation: Mia has the built-in Tasks list.
+
+What happens:
+
+- Nothing is changed, because To Do does not rename its built-in lists.
+
+**A list is deleted after Mia approves**
+
+Ask your assistant: "Delete the list Move to Basel."
+
+Tests: 1
+
+Situation: Mia has the list "Move to Basel" with two tasks.
+
+What happens:
+
+- Mia is asked to approve, and the question says that every task in the list goes too.
+- After she approves, the list is gone.
+
+**A task is deleted after Mia approves**
+
+Ask your assistant: "Delete the task Old report."
+
+Tests: 1
+
+Situation: Mia has the task "Old report".
+
+What happens:
+
+- Mia is asked to approve the delete first.
+- After she approves, the task is gone.
+
+**A declined delete keeps the task**
+
+Ask your assistant: "Delete the task Send the Q3 report."
+
+Tests: 1
+
+Situation: Mia has the task "Send the Q3 report".
+
+What happens:
+
+- The task stays in its list.
+- The assistant asks Mia to approve first.
+
+#### The assistant stops before a change that is wrong or not wanted
+
+**A new list is not made twice after a failure**
+
+Ask your assistant: "Make a task list called Move to Bern."
+
+Tests: 1
+
+Situation: Microsoft 365 fails while the assistant makes the list "Move to Bern".
+
+What happens:
+
+- The assistant is told to look for "Move to Bern" in the task lists before it tries again.
+
+**A declined step in a shared list adds nothing**
+
+Ask your assistant: "Add the step Call the hotel to Book the venue."
+
+Tests: 1
+
+Situation: Anna shares the list "Team launch" with Mia, and it holds the task "Book the venue".
+
+What happens:
+
+- The task holds no new step.
+- The assistant asks Mia to approve first.
+
+**A step change that names no change is refused**
+
+Ask your assistant: "Change the step Get the numbers from Anna."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the step "Get the numbers from Anna".
+
+What happens:
+
+- Nothing is changed.
+
+**A declined step removal keeps the step**
+
+Ask your assistant: "Remove the step Get the numbers from Anna."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the step "Get the numbers from Anna".
+
+What happens:
+
+- The task still holds the step.
+- The assistant asks Mia to approve first.
+
+**An address that is not a secure web address is not linked**
+
+Ask your assistant: "Link javascript:alert(1) to Send the Q3 report."
+
+Tests: 1
+
+Situation: Mia has the task "Send the Q3 report".
+
+What happens:
+
+- No link is added, because the tool links only secure web addresses.
+
+**A task handle is not taken as a link**
+
+Ask your assistant: "Remove the Q3 numbers link from Send the Q3 report."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the link "Q3 numbers".
+
+What happens:
+
+- Nothing is removed, because a task handle is not a link handle.
+
+**A file that is too large is not read**
+
+Ask your assistant: "What does Archive.zip on Send the Q3 report hold?"
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the file "Archive.zip" of 40 MB.
+
+What happens:
+
+- The file is not read, and Mia is told to open the task in To Do.
+
+**A declined file removal keeps the file**
+
+Ask your assistant: "Remove Numbers.csv from Send the Q3 report."
+
+Tests: 1
+
+Situation: The task "Send the Q3 report" holds the file "Numbers.csv".
+
+What happens:
+
+- The task still holds the file.
+- The assistant asks Mia to approve first.
+
+**The built-in Tasks list is not deleted**
+
+Ask your assistant: "Delete my Tasks list."
+
+Tests: 1
+
+Situation: Mia has the built-in Tasks list.
+
+What happens:
+
+- Nothing is deleted, because To Do does not delete its built-in lists.
 
 #### A change in a list that other people share needs Mia's approval
 
@@ -5374,6 +5740,8 @@ What happens:
 
 #### Not supported yet in keeping track of tasks
 
+- The assistant cannot attach a file to a task yet. It can link the file to the task instead.
+- The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one, but the new task loses its creation date.
 - The assistant reads only Mia's own tasks and the lists that people share with her, not the tasks of another person or of a shared mailbox.
 
 ## Teams

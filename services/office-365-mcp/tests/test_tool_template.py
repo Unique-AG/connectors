@@ -107,6 +107,7 @@ _NEVER_ASKS = frozenset(
     {
         "outlook_create_category",
         "outlook_create_contact",
+        "outlook_create_task_list",
         "outlook_set_focused_override",
         "outlook_disable_mail_rule",
         "outlook_update_contact",

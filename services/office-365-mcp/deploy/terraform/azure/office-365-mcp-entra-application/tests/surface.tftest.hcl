@@ -243,6 +243,7 @@ run "every_preset_as_a_list_resolves_every_tool" {
       "outlook-contacts-write",
       "outlook-tasks",
       "outlook-tasks-write",
+      "outlook-tasks-delete",
       "sharepoint-search",
       "sharepoint-read",
       "sharepoint-write",
@@ -730,7 +731,7 @@ run "preset_outlook_tasks" {
   }
 
   assert {
-    condition     = length(local.tools) == 4
+    condition     = length(local.tools) == 5
     error_message = "outlook-tasks resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
@@ -751,8 +752,29 @@ run "preset_outlook_tasks_write" {
   }
 
   assert {
-    condition     = length(local.tools) == 7
+    condition     = length(local.tools) == 13
     error_message = "outlook-tasks-write resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
+  }
+
+  assert {
+    condition     = length(local.admin_consent) == 0
+    error_message = "Microsoft marks the delegated Tasks.ReadWrite as AdminConsentRequired: No, and this composed ${join(",", local.admin_consent)}"
+  }
+}
+
+run "preset_outlook_tasks_delete" {
+  variables {
+    tools_preset = "outlook-tasks-delete"
+  }
+
+  assert {
+    condition     = join(",", local.permissions) == "User.Read,Tasks.Read,Tasks.ReadWrite"
+    error_message = "outlook-tasks-delete composed ${join(",", local.permissions)}"
+  }
+
+  assert {
+    condition     = length(local.tools) == 18
+    error_message = "outlook-tasks-delete resolved ${length(local.tools)} tools: ${join(",", local.tools)}"
   }
 
   assert {

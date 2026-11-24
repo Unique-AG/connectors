@@ -1,0 +1,50 @@
+# The Microsoft To Do data of Mia. Every list, task, step, link and file name gets the prefix
+# "seed-v1 ", and every task gets the category seed-v1. Graph has no call to share a To Do list,
+# so the corpus has no shared list.
+lists:
+  - name: Launch plan
+    tasks:
+      - title: Book the launch room
+        notes: The room must hold twenty people.
+        due_days: 7
+        priority: high
+      - title: Send the press note
+        notes: The press note went out on Monday.
+        status: completed
+      - title: Check the slides
+        notes: The slides need the new logo.
+        status: inProgress
+        steps:
+          - text: Check the logo
+          - text: Check the dates
+            checked: true
+      - title: Read the launch site
+        notes: The site shows the launch plan.
+        links:
+          - title: Launch site
+            url: https://contoso.sharepoint.com/sites/launch
+            application: Dogfood
+      - title: Print the launch brief
+        notes: Print ten copies of the brief.
+        attachments:
+          - name: Launch brief.docx
+            paragraphs:
+              - The launch brief has three parts.
+              - The team prints the brief on Friday.
+      - title: Remove the old brief
+        notes: The old brief is out of date.
+        attachments:
+          - name: Old brief.docx
+            paragraphs:
+              - The old brief is closed.
+
+# The tasks in the built-in Tasks list of Mia.
+default_tasks:
+  - title: Renew the parking permit
+    notes: The permit ends at the end of the month.
+    due_days: 14
+    reminder_days: 13
+  - title: Water the office plants
+    notes: The plants need water once a week.
+    due_days: 3
+    repeat: weekly

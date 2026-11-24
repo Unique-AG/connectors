@@ -1,0 +1,156 @@
+outlook_list_task_lists-seed:
+  chain:
+    - &lists {tool: outlook_list_task_lists}
+
+outlook_list_tasks-seed:
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {show: any}, bind: {task_list: "$1.task_lists[name=seed-v1 Launch plan].uri"}}
+
+outlook_list_tasks-default:
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {title_contains: seed-v1}, bind: {task_list: "$1.task_lists[kind=tasks].uri"}}
+
+outlook_read_task-steps:
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {title_contains: Check the slides}, bind: {task_list: "$1.task_lists[name=seed-v1 Launch plan].uri"}}
+    - {tool: outlook_read_task, bind: {uri: "$prev.tasks[0].uri"}}
+
+outlook_read_task-link:
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {title_contains: Read the launch site}, bind: {task_list: "$1.task_lists[name=seed-v1 Launch plan].uri"}}
+    - {tool: outlook_read_task, bind: {uri: "$prev.tasks[0].uri"}}
+
+outlook_read_task-repeat:
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {title_contains: Water the office plants}, bind: {task_list: "$1.task_lists[kind=tasks].uri"}}
+    - {tool: outlook_read_task, bind: {uri: "$prev.tasks[0].uri"}}
+
+outlook_read_task_attachment-brief:
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {title_contains: Print the launch brief}, bind: {task_list: "$1.task_lists[name=seed-v1 Launch plan].uri"}}
+    - {tool: outlook_read_task, bind: {uri: "$prev.tasks[0].uri"}}
+    - {tool: outlook_read_task_attachment, bind: {attachment: "$prev.attachments[0].uri"}}
+
+outlook_create_task_list-new:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_create_task_list-new}}
+
+outlook_rename_task_list-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_rename_task_list-created}}
+    - tool: outlook_rename_task_list
+      args: {name: seed-v1 case-outlook_rename_task_list-created renamed}
+      bind: {task_list: "$prev.uri"}
+
+outlook_delete_task_list-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_delete_task_list-created}}
+    - {tool: outlook_delete_task_list, bind: {task_list: "$prev.uri"}}
+
+outlook_create_task-full:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_create_task-full}}
+    - tool: outlook_create_task
+      args:
+        title: seed-v1 case-outlook_create_task-full task
+        notes: The room must hold twenty people.
+        due_date: "~nextMonday+4"
+        start_date: "~nextMonday"
+        reminder_at: "~nextMondayT09:00:00"
+        priority: high
+        categories: [seed-v1]
+        time_zone: Europe/Zurich
+      bind: {task_list: "$prev.uri"}
+
+outlook_update_task-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_update_task-created}}
+    - &dated
+      tool: outlook_create_task
+      args: {title: seed-v1 case-outlook_update_task task, due_date: "~nextFriday"}
+      bind: {task_list: "$prev.uri"}
+    - tool: outlook_update_task
+      args:
+        title: seed-v1 case-outlook_update_task task renamed
+        notes: The slides need the new logo.
+        due_date: "~nextMonday+7"
+        priority: low
+      bind: {uri: "$prev.uri"}
+
+outlook_update_task-repeat:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_update_task-repeat}}
+    - *dated
+    - tool: outlook_update_task
+      args:
+        title: seed-v1 case-outlook_update_task task weekly
+        repeat: {every: week, interval: 1, weekdays: [monday]}
+      bind: {uri: "$prev.uri"}
+
+outlook_set_task_status-completed:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_set_task_status-completed}}
+    - &plain
+      tool: outlook_create_task
+      args: {title: seed-v1 case-outlook_tasks task}
+      bind: {task_list: "$prev.uri"}
+    - {tool: outlook_set_task_status, args: {status: completed}, bind: {uri: "$prev.uri"}}
+
+outlook_delete_task-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_delete_task-created}}
+    - *plain
+    - {tool: outlook_delete_task, bind: {uri: "$prev.uri"}}
+
+outlook_add_task_step-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_add_task_step-created}}
+    - *plain
+    - &step {tool: outlook_add_task_step, args: {text: seed-v1 case-outlook_tasks step}, bind: {uri: "$prev.uri"}}
+
+outlook_update_task_step-checked:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_update_task_step-checked}}
+    - *plain
+    - *step
+    - {tool: outlook_update_task_step, args: {is_checked: true}, bind: {step: "$prev.uri"}}
+
+outlook_delete_task_step-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_delete_task_step-created}}
+    - *plain
+    - *step
+    - {tool: outlook_delete_task_step, bind: {step: "$prev.uri"}}
+
+outlook_add_task_link-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_add_task_link-created}}
+    - *plain
+    - &link
+      tool: outlook_add_task_link
+      args:
+        web_url: https://contoso.sharepoint.com/sites/launch
+        title: seed-v1 case-outlook_tasks link
+      bind: {uri: "$prev.uri"}
+
+outlook_delete_task_link-created:
+  chain:
+    - {tool: outlook_create_task_list, args: {name: seed-v1 case-outlook_delete_task_link-created}}
+    - *plain
+    - *link
+    - {tool: outlook_delete_task_link, bind: {link: "$prev.uri"}}
+
+outlook_delete_task_attachment-old-brief:
+  destructive: true
+  reseed: [todo]
+  chain:
+    - *lists
+    - {tool: outlook_list_tasks, args: {title_contains: Remove the old brief}, bind: {task_list: "$1.task_lists[name=seed-v1 Launch plan].uri"}}
+    - {tool: outlook_read_task, bind: {uri: "$prev.tasks[0].uri"}}
+    - {tool: outlook_delete_task_attachment, bind: {attachment: "$prev.attachments[0].uri"}}

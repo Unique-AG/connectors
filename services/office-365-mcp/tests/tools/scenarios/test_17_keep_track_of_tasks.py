@@ -14,6 +14,7 @@ from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from respx.models import Call
 
+from office_365_mcp.tools import TOOL_NAMES
 from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.tools.scenarios.support import Person, call
 
@@ -27,6 +28,27 @@ ONE_TASK = f"{TASKS}/{TASK_ID}"
 ONE_LIST = f"/me/todo/lists/{LIST_ID}"
 ZURICH = "Europe/Zurich"
 _EARLY_MIDNIGHT = "2026-11-23T00:00:00+14:00"
+STEP_ID = "STEP1"
+STEP = f"{TASK}/steps/{STEP_ID}"
+STEPS = f"{ONE_TASK}/checklistItems"
+LINK = f"{TASK}/links/LINK1"
+LINKS = f"{ONE_TASK}/linkedResources"
+FILE = f"{TASK}/attachments/FILE1"
+FILES = f"{ONE_TASK}/attachments"
+_STEP = {"id": STEP_ID, "displayName": "Get the numbers from Anna", "isChecked": False}
+_LINK = {
+    "id": "LINK1",
+    "displayName": "Q3 numbers",
+    "webUrl": "https://outlook.office365.com/owa/?ItemID=SYNTHETIC",
+    "applicationName": "Outlook",
+}
+_CSV = {
+    "@odata.type": "#microsoft.graph.taskFileAttachment",
+    "id": "FILE1",
+    "name": "Numbers.csv",
+    "contentType": "text/csv",
+    "size": 12,
+}
 
 
 def _task(
@@ -52,6 +74,10 @@ def _task(
 
 
 _SOME_TASK = _task(TASK_ID, "Book the venue")
+
+
+def _task_is(graph: respx.MockRouter, task: Mapping[str, object] = _SOME_TASK) -> None:
+    _ = graph.get(ONE_TASK).mock(return_value=httpx.Response(200, json=dict(task)))
 
 
 def _list_is(graph: respx.MockRouter, *, shared: bool | None, name: str = "Tasks") -> None:
@@ -325,6 +351,447 @@ class TestChangingTasks:
         assert (opened["status"], cleared["due_date"], person.asked) == ("not_started", None, [])
 
 
+class TestPlanningATask:
+    async def test_a_task_is_added_with_a_start_date_and_a_reminder(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=False)
+        created = _task(
+            TASK_ID,
+            "Prepare the budget",
+            startDateTime={"dateTime": "2026-11-22T23:00:00", "timeZone": "UTC"},
+            reminderDateTime={"dateTime": "2026-11-26T08:00:00", "timeZone": "UTC"},
+            isReminderOn=True,
+        )
+        route = graph.post(TASKS).mock(return_value=httpx.Response(201, json=created))
+
+        answer = await call(
+            "outlook_create_task",
+            task_list=TASK_LIST,
+            title="Prepare the budget",
+            start_date="2026-11-23",
+            reminder_at="2026-11-26T09:00:00",
+            time_zone=ZURICH,
+        )
+
+        sent = _sent(route)
+        assert (sent["startDateTime"], sent["reminderDateTime"], sent["isReminderOn"]) == (
+            {"dateTime": "2026-11-22T23:00:00", "timeZone": "UTC"},
+            {"dateTime": "2026-11-26T08:00:00", "timeZone": "UTC"},
+            True,
+        )
+        assert (answer["start_date"], answer["reminder_at"]) == (
+            "2026-11-23",
+            "2026-11-26T08:00:00Z",
+        )
+
+    async def test_a_task_repeats_every_week_on_monday(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        series = {
+            "pattern": {
+                "type": "weekly",
+                "interval": 1,
+                "daysOfWeek": ["monday"],
+                "firstDayOfWeek": "sunday",
+            },
+            "range": {"type": "noEnd", "startDate": "2026-11-23"},
+        }
+        created = _task(TASK_ID, "Send the weekly status", recurrence=series)
+        route = graph.post(TASKS).mock(return_value=httpx.Response(201, json=created))
+
+        answer = await call(
+            "outlook_create_task",
+            task_list=TASK_LIST,
+            title="Send the weekly status",
+            due_date="2026-11-23",
+            repeat={"every": "week", "weekdays": ["monday"]},
+            time_zone=ZURICH,
+        )
+
+        assert _sent(route)["recurrence"] == series
+        assert answer["repeat"] == {"every": "week", "interval": 1, "weekdays": ["monday"]}
+
+    async def test_a_repeating_task_with_no_due_date_is_refused(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="Give `due_date` in the same call"):
+            _ = await call(
+                "outlook_create_task",
+                task_list=TASK_LIST,
+                title="Send the weekly status",
+                repeat={"every": "week"},
+            )
+
+        assert graph.calls.call_count == 0
+
+    async def test_a_task_stops_repeating_and_its_reminder_is_turned_off(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=False)
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
+
+        answer = await call("outlook_update_task", uri=TASK, clear_repeat=True, clear_reminder=True)
+
+        assert _sent(route) == {"isReminderOn": False, "recurrence": None, "reminderDateTime": None}
+        assert (answer["repeat"], answer["reminder_at"]) == (None, None)
+
+    async def test_a_task_gets_a_category(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        tagged = _task(TASK_ID, "Send the Q3 report", categories=["Finance"])
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=tagged))
+
+        answer = await call("outlook_update_task", uri=TASK, categories=["Finance"])
+
+        assert _sent(route) == {"categories": ["Finance"]}
+        assert answer["categories"] == ["Finance"]
+
+    async def test_a_task_waits_on_another_person(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        waiting = _task(TASK_ID, "Send the Q3 report", status="waitingOnOthers")
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=waiting))
+
+        answer = await call("outlook_set_task_status", uri=TASK, status="waiting_on_others")
+
+        assert _sent(route) == {"status": "waitingOnOthers"}
+        assert answer["status"] == "waiting_on_others"
+
+
+class TestSteps:
+    async def test_a_step_is_added_to_a_task(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        route = graph.post(STEPS).mock(return_value=httpx.Response(201, json=_STEP))
+        person = Person()
+
+        answer = await call(
+            "outlook_add_task_step", uri=TASK, text="Get the numbers from Anna", person=person
+        )
+
+        assert _sent(route) == {"displayName": "Get the numbers from Anna", "isChecked": False}
+        assert (answer["uri"], answer["is_checked"], person.asked) == (STEP, False, [])
+
+    async def test_a_step_is_checked_off(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        checked = _STEP | {"isChecked": True, "checkedDateTime": "2026-11-24T09:00:00Z"}
+        route = graph.patch(f"{STEPS}/{STEP_ID}").mock(
+            return_value=httpx.Response(200, json=checked)
+        )
+
+        answer = await call("outlook_update_task_step", step=STEP, is_checked=True)
+
+        assert _sent(route) == {"isChecked": True}
+        assert answer["is_checked"] is True
+
+    async def test_a_step_is_removed_after_the_person_agrees(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph)
+        _ = graph.get(f"{STEPS}/{STEP_ID}").mock(return_value=httpx.Response(200, json=_STEP))
+        route = graph.delete(f"{STEPS}/{STEP_ID}").mock(return_value=httpx.Response(204))
+        person = _PersonWatchingWrites(write=route)
+
+        answer = await call("outlook_delete_task_step", step=STEP, person=person)
+
+        [question] = person.asked
+        assert "'Get the numbers from Anna'" in question
+        assert person.writes_before_each_question == [0]
+        assert (answer["deleted"], route.call_count) == (True, 1)
+
+    async def test_a_declined_step_in_a_shared_list_adds_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=True, name="Team launch")
+        route = graph.post(STEPS).mock(return_value=httpx.Response(201, json=_STEP))
+
+        with pytest.raises(ToolError, match="Nothing was changed"):
+            _ = await call(
+                "outlook_add_task_step",
+                uri=TASK,
+                text="Call the hotel",
+                person=Person(approval="no"),
+            )
+
+        assert route.call_count == 0
+
+    async def test_a_step_change_that_names_no_change_is_refused(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="there is nothing to change"):
+            _ = await call("outlook_update_task_step", step=STEP)
+
+        assert graph.calls.call_count == 0
+
+    async def test_a_declined_step_removal_keeps_the_step(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph)
+        _ = graph.get(f"{STEPS}/{STEP_ID}").mock(return_value=httpx.Response(200, json=_STEP))
+        route = graph.delete(f"{STEPS}/{STEP_ID}").mock(return_value=httpx.Response(204))
+
+        with pytest.raises(ToolError):
+            _ = await call("outlook_delete_task_step", step=STEP, person=Person(approval="no"))
+
+        assert route.call_count == 0
+
+    async def test_a_task_is_read_with_its_steps_links_and_files(
+        self, graph: respx.MockRouter
+    ) -> None:
+        held = _task(
+            TASK_ID,
+            "Send the Q3 report",
+            hasAttachments=True,
+            checklistItems=[
+                {"id": "STEP1", "displayName": "Get the numbers from Anna", "isChecked": True},
+                {"id": "STEP2", "displayName": "Check the totals", "isChecked": False},
+            ],
+            linkedResources=[
+                {
+                    "id": "LINK1",
+                    "displayName": "Q3 numbers",
+                    "webUrl": "https://outlook.office365.com/owa/?ItemID=SYNTHETIC",
+                    "applicationName": "Outlook",
+                }
+            ],
+        )
+        read = graph.get(ONE_TASK).mock(return_value=httpx.Response(200, json=held))
+        files = {
+            "value": [
+                {
+                    "@odata.type": "#microsoft.graph.taskFileAttachment",
+                    "id": "FILE1",
+                    "name": "Numbers.xlsx",
+                    "contentType": "application/vnd.ms-excel",
+                    "size": 2048,
+                }
+            ]
+        }
+        _ = graph.get(f"{ONE_TASK}/attachments").mock(return_value=httpx.Response(200, json=files))
+
+        answer = await call("outlook_read_task", uri=TASK)
+
+        assert read.calls.last.request.url.params["$expand"] == "checklistItems,linkedResources"
+        assert [(row["text"], row["is_checked"]) for row in _rows(answer, "steps")] == [
+            ("Get the numbers from Anna", True),
+            ("Check the totals", False),
+        ]
+        assert [(row["uri"], row["title"]) for row in _rows(answer, "links")] == [
+            (f"{TASK}/links/LINK1", "Q3 numbers")
+        ]
+        assert [(row["uri"], row["name"]) for row in _rows(answer, "attachments")] == [
+            (f"{TASK}/attachments/FILE1", "Numbers.xlsx")
+        ]
+
+
+class TestLinksAndFiles:
+    async def test_a_mail_is_linked_to_a_task(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        route = graph.post(LINKS).mock(return_value=httpx.Response(201, json=_LINK))
+
+        answer = await call(
+            "outlook_add_task_link",
+            uri=TASK,
+            web_url="https://outlook.office365.com/owa/?ItemID=SYNTHETIC",
+            title="Q3 numbers",
+        )
+
+        assert _sent(route) == {
+            "applicationName": "Outlook",
+            "displayName": "Q3 numbers",
+            "webUrl": "https://outlook.office365.com/owa/?ItemID=SYNTHETIC",
+        }
+        assert (answer["uri"], answer["title"]) == (LINK, "Q3 numbers")
+
+    async def test_a_link_is_removed_after_the_person_agrees(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph)
+        _ = graph.get(f"{LINKS}/LINK1").mock(return_value=httpx.Response(200, json=_LINK))
+        route = graph.delete(f"{LINKS}/LINK1").mock(return_value=httpx.Response(204))
+        person = _PersonWatchingWrites(write=route)
+
+        answer = await call("outlook_delete_task_link", link=LINK, person=person)
+
+        [question] = person.asked
+        assert "'Q3 numbers'" in question
+        assert person.writes_before_each_question == [0]
+        assert (answer["deleted"], route.call_count) == (True, 1)
+
+    async def test_a_file_of_a_task_is_read(self, graph: respx.MockRouter) -> None:
+        _ = graph.get(f"{FILES}/FILE1").mock(return_value=httpx.Response(200, json=_CSV))
+        _ = graph.get(f"{FILES}/FILE1/$value").mock(
+            return_value=httpx.Response(200, content=b"Q3,1200,1300")
+        )
+
+        with pytest.MonkeyPatch.context() as patch:
+            patch_obo(patch)
+            async with Client(FastMCPTransport(_server()), mode="legacy") as client:
+                answer = await client.call_tool(
+                    "outlook_read_task_attachment", {"attachment": FILE}
+                )
+
+        assert "Q3,1200,1300" in json.dumps([part.model_dump() for part in answer.content])
+
+    async def test_a_file_is_removed_after_the_person_agrees(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph)
+        _ = graph.get(f"{FILES}/FILE1").mock(return_value=httpx.Response(200, json=_CSV))
+        route = graph.delete(f"{FILES}/FILE1").mock(return_value=httpx.Response(204))
+        person = _PersonWatchingWrites(write=route)
+
+        answer = await call("outlook_delete_task_attachment", attachment=FILE, person=person)
+
+        [question] = person.asked
+        assert "'Numbers.csv'" in question
+        assert person.writes_before_each_question == [0]
+        assert (answer["deleted"], route.call_count) == (True, 1)
+
+    async def test_an_address_that_is_not_https_is_not_linked(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="https"):
+            _ = await call(
+                "outlook_add_task_link", uri=TASK, web_url="javascript:alert(1)", title="Q3"
+            )
+
+        assert graph.calls.call_count == 0
+
+    async def test_a_task_handle_is_not_taken_as_a_link(self, graph: respx.MockRouter) -> None:
+        with pytest.raises(ToolError, match="outlook_read_task"):
+            _ = await call("outlook_delete_task_link", link=TASK)
+
+        assert graph.calls.call_count == 0
+
+    async def test_a_file_that_is_too_large_is_not_read(self, graph: respx.MockRouter) -> None:
+        large = _CSV | {"name": "Archive.zip", "size": 40 * 1024 * 1024}
+        _ = graph.get(f"{FILES}/FILE1").mock(return_value=httpx.Response(200, json=large))
+        download = graph.get(f"{FILES}/FILE1/$value").mock(
+            return_value=httpx.Response(200, content=b"")
+        )
+
+        with pytest.raises(ToolError, match="open the task in To Do"):
+            _ = await call("outlook_read_task_attachment", attachment=FILE)
+
+        assert download.call_count == 0
+
+    async def test_a_declined_file_removal_keeps_the_file(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph)
+        _ = graph.get(f"{FILES}/FILE1").mock(return_value=httpx.Response(200, json=_CSV))
+        route = graph.delete(f"{FILES}/FILE1").mock(return_value=httpx.Response(204))
+
+        with pytest.raises(ToolError):
+            _ = await call(
+                "outlook_delete_task_attachment", attachment=FILE, person=Person(approval="no")
+            )
+
+        assert route.call_count == 0
+
+    async def test_no_tool_adds_a_file_to_a_task(self) -> None:
+        offered = {
+            f"{tool}.{argument}"
+            for tool in _TASK_TOOLS
+            for argument in await _input_properties(tool)
+            if any(word in argument for word in ("content", "bytes", "file"))
+        }
+
+        assert offered == set()
+
+
+class TestDeletingTasks:
+    async def test_a_task_is_deleted_after_the_person_agrees(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph, _task(TASK_ID, "Old report"))
+        route = graph.delete(ONE_TASK).mock(return_value=httpx.Response(204))
+        person = _PersonWatchingWrites(write=route)
+
+        answer = await call("outlook_delete_task", uri=TASK, person=person)
+
+        [question] = person.asked
+        assert "'Old report'" in question
+        assert person.writes_before_each_question == [0]
+        assert (answer["deleted"], route.call_count) == (True, 1)
+
+    async def test_a_declined_delete_keeps_the_task(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False)
+        _task_is(graph, _task(TASK_ID, "Send the Q3 report"))
+        route = graph.delete(ONE_TASK).mock(return_value=httpx.Response(204))
+
+        with pytest.raises(ToolError):
+            _ = await call("outlook_delete_task", uri=TASK, person=Person(approval="no"))
+
+        assert route.call_count == 0
+
+    async def test_no_tool_moves_a_task_to_another_list(self) -> None:
+        update = await _input_properties("outlook_update_task")
+
+        assert {"task_list", "list", "destination"} & set(update) == set()
+
+
+class TestLists:
+    async def test_a_list_is_created(self, graph: respx.MockRouter) -> None:
+        made = {"id": LIST_ID, "displayName": "Move to Bern", "isShared": False, "isOwner": True}
+        route = graph.post(LISTS).mock(return_value=httpx.Response(201, json=made))
+        person = Person()
+
+        answer = await call("outlook_create_task_list", name="Move to Bern", person=person)
+
+        assert _sent(route) == {"displayName": "Move to Bern"}
+        assert (answer["uri"], answer["name"], person.asked) == (TASK_LIST, "Move to Bern", [])
+
+    async def test_a_list_is_renamed(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False, name="Move to Bern")
+        renamed = {"id": LIST_ID, "displayName": "Move to Basel", "isShared": False}
+        route = graph.patch(ONE_LIST).mock(return_value=httpx.Response(200, json=renamed))
+        person = Person()
+
+        answer = await call(
+            "outlook_rename_task_list", task_list=TASK_LIST, name="Move to Basel", person=person
+        )
+
+        assert _sent(route) == {"displayName": "Move to Basel"}
+        assert (answer["name"], person.asked) == ("Move to Basel", [])
+
+    async def test_the_built_in_tasks_list_is_not_renamed(self, graph: respx.MockRouter) -> None:
+        built_in = {"id": LIST_ID, "displayName": "Tasks", "wellknownListName": "defaultList"}
+        _ = graph.get(ONE_LIST).mock(return_value=httpx.Response(200, json=built_in))
+        route = graph.patch(ONE_LIST).mock(return_value=httpx.Response(200, json=built_in))
+
+        with pytest.raises(ToolError, match="does not rename these lists"):
+            _ = await call("outlook_rename_task_list", task_list=TASK_LIST, name="Inbox")
+
+        assert route.call_count == 0
+
+    async def test_a_list_is_deleted_after_the_person_agrees(self, graph: respx.MockRouter) -> None:
+        _list_is(graph, shared=False, name="Move to Basel")
+        route = graph.delete(ONE_LIST).mock(return_value=httpx.Response(204))
+        person = _PersonWatchingWrites(write=route)
+
+        answer = await call("outlook_delete_task_list", task_list=TASK_LIST, person=person)
+
+        [question] = person.asked
+        assert "'Move to Basel' and every task in it" in question
+        assert person.writes_before_each_question == [0]
+        assert (answer["deleted"], route.call_count) == (True, 1)
+
+    async def test_a_new_list_is_not_made_twice_after_a_failure(
+        self, graph: respx.MockRouter
+    ) -> None:
+        route = graph.post(LISTS).mock(return_value=httpx.Response(503))
+
+        with pytest.raises(ToolError, match="outlook_list_task_lists") as raised:
+            _ = await call("outlook_create_task_list", name="Move to Bern")
+
+        assert "Do not call this tool again first" in str(raised.value)
+        assert route.call_count == 1
+
+    async def test_the_built_in_tasks_list_is_not_deleted(self, graph: respx.MockRouter) -> None:
+        built_in = {"id": LIST_ID, "displayName": "Tasks", "wellknownListName": "defaultList"}
+        _ = graph.get(ONE_LIST).mock(return_value=httpx.Response(200, json=built_in))
+        route = graph.delete(ONE_LIST).mock(return_value=httpx.Response(204))
+        person = Person()
+
+        with pytest.raises(ToolError, match="does not delete these lists"):
+            _ = await call("outlook_delete_task_list", task_list=TASK_LIST, person=person)
+
+        assert (route.call_count, person.asked) == (0, [])
+
+
 class TestASharedList:
     async def test_a_task_goes_into_a_shared_list_only_after_the_person_agrees(
         self, graph: respx.MockRouter
@@ -473,13 +940,8 @@ class TestRefusals:
         assert offered == set()
 
 
-_TASK_TOOLS = (
-    "outlook_list_task_lists",
-    "outlook_list_tasks",
-    "outlook_read_task",
-    "outlook_create_task",
-    "outlook_update_task",
-    "outlook_set_task_status",
+_TASK_TOOLS = tuple(
+    sorted(name for name in TOOL_NAMES if "task" in name and name.startswith("outlook_"))
 )
 
 

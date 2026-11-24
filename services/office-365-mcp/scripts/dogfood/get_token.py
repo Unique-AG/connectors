@@ -32,6 +32,7 @@ RECORDING_ONLY = (
     "https://graph.microsoft.com/Group.ReadWrite.All",
     "https://graph.microsoft.com/Channel.Create",
     "https://graph.microsoft.com/ChannelMember.ReadWrite.All",
+    "https://graph.microsoft.com/Tasks.ReadWrite",
 )
 CACHE_PATH = Path(
     os.environ.get("DOGFOOD_TOKEN_CACHE", "~/.cache/dogfood-graph/msal.json")

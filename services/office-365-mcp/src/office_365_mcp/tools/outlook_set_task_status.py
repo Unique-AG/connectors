@@ -36,7 +36,7 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_set_task_status"
 
-PRESETS: tuple[str, ...] = ("outlook-tasks-write",)
+PRESETS: tuple[str, ...] = ("outlook-tasks-write", "outlook-tasks-delete")
 
 STEP_SET_STATUS = "set_task_status"
 

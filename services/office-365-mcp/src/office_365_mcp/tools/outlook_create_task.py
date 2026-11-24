@@ -51,7 +51,7 @@ from office_365_mcp.shared.seam import (
 
 TOOL_NAME = "outlook_create_task"
 
-PRESETS: tuple[str, ...] = ("outlook-tasks-write",)
+PRESETS: tuple[str, ...] = ("outlook-tasks-write", "outlook-tasks-delete")
 
 STEP_CREATE = "create_task"
 

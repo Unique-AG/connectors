@@ -50,6 +50,15 @@ _NEVER_ASKS_IN_A_CASE = {
     "outlook_create_task": _SCENARIO_17,
     "outlook_update_task": _SCENARIO_17,
     "outlook_set_task_status": _SCENARIO_17,
+    "outlook_add_task_link": "tests/tools/test_outlook_add_task_link.py",
+    "outlook_add_task_step": "tests/tools/test_outlook_add_task_step.py",
+    "outlook_delete_task": "tests/tools/test_outlook_delete_task.py",
+    "outlook_delete_task_attachment": "tests/tools/test_outlook_delete_task_attachment.py",
+    "outlook_delete_task_link": "tests/tools/test_outlook_delete_task_link.py",
+    "outlook_delete_task_list": "tests/tools/test_outlook_delete_task_list.py",
+    "outlook_delete_task_step": "tests/tools/test_outlook_delete_task_step.py",
+    "outlook_rename_task_list": "tests/tools/test_outlook_rename_task_list.py",
+    "outlook_update_task_step": "tests/tools/test_outlook_update_task_step.py",
     **{
         tool: f"tests/tools/test_{tool}.py"
         for tool in (

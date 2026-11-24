@@ -889,6 +889,8 @@ def run_lookup(graph: Graph, step: Step, path: str, ctx: Context) -> dict[str, d
             key = f"attachment:{step.key}:{item.get('name')}"
         elif step.lookup == "replies":
             key = f"reply:{step.key}:{item['body']['content']}"
+        elif step.lookup == "default-list":
+            key = str(step.key) if item.get("wellknownListName") == "defaultList" else None
         else:
             key = f"file:{item.get('name')}" if step.lookup == "drive-children" else _key_of(item)
         if key:

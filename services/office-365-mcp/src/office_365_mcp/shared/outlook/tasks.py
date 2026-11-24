@@ -142,6 +142,15 @@ def bad_task_handle(tool: str, *, nothing_happened: str) -> str:
     )
 
 
+def bad_step_handle(tool: str, *, nothing_happened: str) -> str:
+    return (
+        f"{tool} takes the `uri` of a step in `step`, and this is not one. Take a `steps[].uri` "
+        + "that outlook_read_task returned, and copy it word for word. The words of a step, a task "
+        + "handle, a link handle, and a file handle are not step handles. "
+        + f"{nothing_happened} {_AGAIN}"
+    )
+
+
 def due_moment(day: date, *, zone: ZoneInfo) -> DateTimeTimeZone:
     midnight = datetime.combine(day, time(), tzinfo=zone).astimezone(UTC)
     return DateTimeTimeZone(

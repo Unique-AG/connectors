@@ -33,7 +33,7 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_task"
 
-PRESETS: tuple[str, ...] = ("outlook-tasks", "outlook-tasks-write")
+PRESETS: tuple[str, ...] = ("outlook-tasks", "outlook-tasks-write", "outlook-tasks-delete")
 
 STEP = "task"
 

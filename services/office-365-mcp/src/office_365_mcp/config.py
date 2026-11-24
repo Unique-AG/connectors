@@ -99,6 +99,7 @@ class ToolsPreset(StrEnum):
     OUTLOOK_CONTACTS_WRITE = "outlook-contacts-write"
     OUTLOOK_TASKS = "outlook-tasks"
     OUTLOOK_TASKS_WRITE = "outlook-tasks-write"
+    OUTLOOK_TASKS_DELETE = "outlook-tasks-delete"
     SHAREPOINT_SEARCH = "sharepoint-search"
     SHAREPOINT_READ = "sharepoint-read"
     SHAREPOINT_WRITE = "sharepoint-write"

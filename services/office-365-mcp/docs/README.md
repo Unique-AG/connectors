@@ -14,7 +14,7 @@ through the Microsoft Graph API.
 
 - **Reaches:** Outlook mail, calendar, contacts, and tasks. Microsoft Teams. SharePoint and OneDrive.
   OneNote. The identity of the signed-in user.
-- **Size:** 136 tools in total.
+- **Size:** 147 tools in total.
 - **Selection:** A deployment turns on a fixed subset of the tools. It picks one or more
   **presets**, which are named bundles of tools, or an exact **list** of tools.
 - **Always on:** The tool `get_me` is on in every deployment.
@@ -36,7 +36,7 @@ use case. Turn on all of them to cover the whole use case. Turn on fewer to cove
 | Scheduling and answering meetings | Find a time, book a room, send an invitation, and answer one. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-calendar-rooms` | ⚠️ Yes |
 | Sharing and delegating calendars | Share a calendar, take a share back, and work on the calendar of another person. | `outlook-read`, `outlook-calendar-manage`, `outlook-calendar-delegate`, `outlook-group-calendar`, `teams-channels` | ⚠️ Yes |
 | Managing contacts | Find, read, create, and change contacts. | `outlook-read`, `outlook-contacts-write` | No |
-| Keeping track of tasks | Find, read, add, change, and complete tasks in Microsoft To Do. | `outlook-tasks-write` | No |
+| Keeping track of tasks | Find, plan, change, complete, and delete tasks, their steps, links, and files, and the task lists in Microsoft To Do. | `outlook-tasks-delete`, `outlook-read` | No |
 | Catching up on Teams | Read chats, channel posts, replies, and meeting transcripts. | `teams`, `teams-files`, `outlook-calendar` | ⚠️ Yes |
 | Posting in Teams | Post, edit, and react in chats and channels, with files from SharePoint. | `teams-write-files`, `teams-edit` | ⚠️ Yes |
 | Running Teams chats and online meetings | Make a chat, manage its members, and set up an online meeting. | `teams-chat-admin`, `teams-meetings-write`, `outlook-read` | ⚠️ Yes |
@@ -68,10 +68,11 @@ Rules for the selection:
   folder and make a rule that files mail into it.
 - A deployment cannot combine presets with the `enabled` list. It cannot add or remove one tool of a
   preset. For a mix of tools that no presets cover, name every wanted tool in the `enabled` list.
-- Five presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`,
-  `sharepoint-lists-delete`, and `onenote-delete`. Each one is a base preset plus the tools that
-  remove an item, write an inbox rule, forward an event, or share a calendar. No other preset holds
-  these tools. A list of presets gets them only when the list names one of these five.
+- Six presets are opt-in: `outlook-delete`, `outlook-rules`, `outlook-calendar-manage`,
+  `outlook-tasks-delete`, `sharepoint-lists-delete`, and `onenote-delete`. Each one is a base preset
+  plus the tools that remove an item, write an inbox rule, forward an event, or share a calendar. No
+  other preset holds these tools. A list of presets gets them only when the list names one of these
+  six.
 
 ## Preset index
 
@@ -135,8 +136,9 @@ Each row links to the section of that preset. The count of tools does not includ
 
 | Preset | Use it to | Tools | Admin consent |
 | --- | --- | --- | --- |
-| [`outlook-tasks`](#outlook-tasks) | Read your tasks. | 3 | No |
-| [`outlook-tasks-write`](#outlook-tasks-write) | Create, change, and complete tasks. | 6 | No |
+| [`outlook-tasks`](#outlook-tasks) | Read your tasks and their files. | 4 | No |
+| [`outlook-tasks-write`](#outlook-tasks-write) | Create, change, and complete tasks, steps, links, and lists. | 12 | No |
+| [`outlook-tasks-delete`](#outlook-tasks-delete) | `outlook-tasks-write`, plus deleting tasks, lists, steps, links, and files. | 17 | No |
 
 **SharePoint and OneDrive.** Files, folders, sharing, sites, and lists.
 
@@ -993,13 +995,14 @@ when Microsoft 365 does not report the list as private.
 
 ### `outlook-tasks`
 
-**3 tools** · Admin consent: **not required**
+**4 tools** · Admin consent: **not required**
 
 **You can**
 
 - List your task lists, including the lists that people share with you.
 - List the tasks in one list, by status, by words in the title, and by due date.
-- Read one task with its notes.
+- Read one task with its notes, dates, reminder, series, steps, links, and files.
+- Read a file that is attached to a task.
 
 **Tools**
 
@@ -1007,7 +1010,8 @@ when Microsoft 365 does not report the list as private.
 | --- | --- | --- | --- |
 | `outlook_list_task_lists` | 🟢 Read | — | Lists your To Do task lists and says which ones are built in or shared. |
 | `outlook_list_tasks` | 🟢 Read | — | Lists the tasks in one list. Narrows by status, title words, and due date. |
-| `outlook_read_task` | 🟢 Read | — | Reads one task in full, including its notes. |
+| `outlook_read_task` | 🟢 Read | — | Reads one task in full: notes, dates, reminder, series, steps, links, and files. |
+| `outlook_read_task_attachment` | 🟢 Read | — | Reads one file that is attached to a task. |
 
 **What it needs**
 
@@ -1017,14 +1021,17 @@ when Microsoft 365 does not report the list as private.
 
 ### `outlook-tasks-write`
 
-**6 tools** · Admin consent: **not required** · Builds on [`outlook-tasks`](#outlook-tasks)
+**12 tools** · Admin consent: **not required** · Builds on [`outlook-tasks`](#outlook-tasks)
 
 **You can**
 
 - Do everything in `outlook-tasks`.
-- Create a task with a due date, a priority, and notes.
-- Change a task, reopen it, or remove its due date.
-- Mark a task as completed.
+- Create a task with a due date, a start date, a reminder, a series, a priority, categories, and
+  notes.
+- Change a task, or remove its due date, start date, reminder, or series.
+- Set the status of a task: complete it, reopen it, or mark it as waiting on others.
+- Add, change, and check off the steps of a task, and link a mail or a page to a task.
+- Create a task list and rename it.
 
 **Tools added by this preset**
 
@@ -1033,12 +1040,44 @@ when Microsoft 365 does not report the list as private.
 | `outlook_create_task` | 🟠 Add | 🤝 Shared list | Creates one task in a list, with a due date, a priority, and notes. |
 | `outlook_update_task` | 🔴 Change | 🤝 Shared list | Changes only the given fields of one task. Replaces the whole notes when it gets new notes. |
 | `outlook_set_task_status` | 🔴 Change | 🤝 Shared list | Sets the status of one task: completes it, reopens it, or sets another status. |
+| `outlook_add_task_step` | 🟠 Add | 🤝 Shared list | Adds one checklist step to a task. |
+| `outlook_update_task_step` | 🔴 Change | 🤝 Shared list | Changes the words of one step, or checks it off. |
+| `outlook_add_task_link` | 🟠 Add | 🤝 Shared list | Links a web address, such as a mail in Outlook, to a task. |
+| `outlook_create_task_list` | 🟠 Add | — | Creates one task list. |
+| `outlook_rename_task_list` | 🔴 Change | 🤝 Shared list | Renames one list that a person made. The built-in lists keep their names. |
 
 **What it needs**
 
 - **Graph permissions (3):** `Tasks.Read`, `Tasks.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
-- **User approval:** Asks 🤝 in some cases for `outlook_create_task`, `outlook_update_task`, `outlook_set_task_status`.
+- **User approval:** Asks 🤝 in some cases for `outlook_create_task`, `outlook_update_task`, `outlook_set_task_status`, `outlook_add_task_step`, `outlook_update_task_step`, `outlook_add_task_link`, `outlook_rename_task_list`.
+
+### `outlook-tasks-delete`
+
+**17 tools** · Admin consent: **not required** · Builds on [`outlook-tasks-write`](#outlook-tasks-write)
+
+**You can**
+
+- Do everything in `outlook-tasks-write`.
+- Delete a task, a task list with all its tasks, a step, a link, or a file of a task.
+
+**Note:** Opt-in preset. No tool of this connector can bring a deleted item back.
+
+**Tools added by this preset**
+
+| Tool | Kind | User approval | What it does |
+| --- | --- | --- | --- |
+| `outlook_delete_task` | 🔴 Change | ✋ Always | Deletes one task. |
+| `outlook_delete_task_list` | 🔴 Change | ✋ Always | Deletes one list that a person made, with every task in it. |
+| `outlook_delete_task_step` | 🔴 Change | ✋ Always | Deletes one step of a task. |
+| `outlook_delete_task_link` | 🔴 Change | ✋ Always | Deletes one link of a task. |
+| `outlook_delete_task_attachment` | 🔴 Change | ✋ Always | Deletes one file of a task. |
+
+**What it needs**
+
+- **Graph permissions (3):** `Tasks.Read`, `Tasks.ReadWrite`, `User.Read`
+- **Admin consent:** Not required.
+- **User approval:** Asks ✋ every time for `outlook_delete_task`, `outlook_delete_task_list`, `outlook_delete_task_step`, `outlook_delete_task_link`, `outlook_delete_task_attachment`. Asks 🤝 in some cases for `outlook_create_task`, `outlook_update_task`, `outlook_set_task_status`, `outlook_add_task_step`, `outlook_update_task_step`, `outlook_add_task_link`, `outlook_rename_task_list`.
 
 ## SharePoint and OneDrive presets
 
@@ -1579,7 +1618,7 @@ cluster.
 
 ## Reference: every tool
 
-This reference lists all 136 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
+This reference lists all 147 tools. Use it to build an `enabled` list, or to find the permissions of one tool.
 
 ### Identity
 
@@ -1698,9 +1737,20 @@ This reference lists all 136 tools. Use it to build an `enabled` list, or to fin
 | `outlook_list_task_lists` | 🟢 Read | `Tasks.Read` | No | — |
 | `outlook_list_tasks` | 🟢 Read | `Tasks.Read` | No | — |
 | `outlook_read_task` | 🟢 Read | `Tasks.Read` | No | — |
+| `outlook_read_task_attachment` | 🟢 Read | `Tasks.Read` | No | — |
 | `outlook_create_task` | 🟠 Write, adds | `Tasks.ReadWrite` | No | 🤝 Shared list |
 | `outlook_update_task` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
 | `outlook_set_task_status` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_delete_task` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | ✋ Always |
+| `outlook_add_task_step` | 🟠 Write, adds | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_update_task_step` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_delete_task_step` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | ✋ Always |
+| `outlook_add_task_link` | 🟠 Write, adds | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_delete_task_link` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | ✋ Always |
+| `outlook_delete_task_attachment` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | ✋ Always |
+| `outlook_create_task_list` | 🟠 Write, adds | `Tasks.ReadWrite` | No | — |
+| `outlook_rename_task_list` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_delete_task_list` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | ✋ Always |
 
 ### SharePoint and OneDrive
 
