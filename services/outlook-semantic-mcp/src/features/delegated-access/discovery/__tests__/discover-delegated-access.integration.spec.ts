@@ -247,6 +247,29 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     expect(await accessPairs()).toEqual([pair(bob, alice)]);
   });
 
+  it("clears a delegate's records when a plain 401 rejects before another owner check reports the revoked grant", async () => {
+    const alice = await insertUser('alice');
+    const bob = await insertUser('bob');
+    const carol = await insertUser('carol');
+    await command.run(newCycleRequest());
+
+    graphAnswer = async (delegateUserId, ownerEmail) => {
+      if (delegateUserId === alice.id && ownerEmail === bob.email) {
+        throw graphError(401);
+      }
+      if (delegateUserId === alice.id) {
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        throw new UpstreamCredentialRevokedError('invalid_grant');
+      }
+      return { value: [] };
+    };
+    await command.run(newCycleRequest());
+
+    expect(await accessPairs()).toEqual(
+      [pair(bob, alice), pair(bob, carol), pair(carol, alice), pair(carol, bob)].sort(),
+    );
+  });
+
   it('leaves a delegate pending when one of its owner checks fails, and the rerun covers it', async () => {
     const alice = await insertUser('alice');
     const bob = await insertUser('bob');
@@ -290,13 +313,30 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
     assert.ok(takeover.action === 'proceed');
 
     // Run A finishes late: its final write must not replace B's claim.
-    // biome-ignore lint/suspicious/noExplicitAny: Call the private claim update the way the run finalizes
     const ownsClaim = await (command as any).updateClaim(staleRun.runId, { state: 'ready' });
 
     expect(ownsClaim).toBe(false);
     expect((await discoveryState())?.payload).toEqual(
       expect.objectContaining({ state: 'running', runId: takeover.runId }),
     );
+  });
+
+  it('keeps the newer stamp when a stale run finishes the same delegate later', async () => {
+    const alice = await insertUser('alice');
+    await insertUser('bob');
+    const staleRun = await command.decide(newCycleRequest());
+    assert.ok(staleRun.action === 'proceed');
+    // Run B, which took over, already stamped alice with a time after run A started its checks.
+    const newerStamp = new Date(Date.now() + 60_000);
+    await db
+      .update(schema.userProfiles)
+      .set({ delegatedAccessDiscoveredAt: newerStamp })
+      .where(eq(schema.userProfiles.id, alice.id));
+
+    const outcome = await (command as any).runDiscoveryForDelegatedUser(alice.id, staleRun.runId);
+
+    expect(outcome).toBe('discovered');
+    expect(await discoveredAt(alice)).toEqual(newerStamp);
   });
 
   it('skips a delegate whose token refresh is backing off until the backoff has passed', async () => {
