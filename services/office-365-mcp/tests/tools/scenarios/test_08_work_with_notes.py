@@ -309,6 +309,20 @@ class TestCapturingNotes:
         )
         assert (created["section_uri"], person.asked) == (section, [])
 
+    async def test_a_page_level_is_not_offered(self) -> None:
+        async with Client(FastMCPTransport(_server()), mode="legacy") as client:
+            tools = {tool.name: tool for tool in await client.list_tools()}
+
+        for name in ("onenote_create_page", "onenote_edit_page"):
+            asked = set(cast("Mapping[str, object]", tools[name].input_schema["properties"]))
+            assert not asked & {"level", "parent_page", "subpage", "indent", "order"}
+            description = str(tools[name].description)
+            assert "create-a-subpage-in-onenote On an iPad" in description
+            assert "create-a-subpage-in-onenote-for-ipad-or-iphone" in description
+            assert "only two levels of subpages" in description
+            assert "include_level_and_order=true" in description
+            assert "to one level below the parent" in description
+
     async def test_a_task_list_is_appended_and_nothing_else_is_sent(
         self, graph: respx.MockRouter
     ) -> None:

@@ -105,6 +105,18 @@ people or belongs to somebody else. A page in the user's own unshared notebook i
 a question.
 - Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
 section of the default notebook.
+- Microsoft Graph cannot set the indent level of a page, so the new page is always at the top \
+level of its section. If the user wants a subpage, first read the `level` of the parent with \
+onenote_list_pages. Pass `include_level_and_order=true` and, as `section`, the `uri` of the \
+section of the parent from onenote_list_notebooks. OneNote has only two levels of subpages, so a \
+parent at `level` 2 cannot take a subpage: tell the user before you create anything. Otherwise \
+create the page in the section of the parent. Then tell the user to move the page directly below \
+the parent in the OneNote app and to indent it to one level below the parent. In OneNote for the \
+web, Make Subpage and Promote Subpage on the right-click menu of a page change its indent by one \
+level. For the desktop app, give them this page: \
+https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
+On an iPad or iPhone, give them this page instead: \
+https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
 days.
