@@ -71,3 +71,73 @@ class DailyPriceBar(BaseModel):
         description="The factor used to adjust prices when a company splits, reverse splits, or pays a distribution.",
     )
     volume: int | None = Field(None, description="The number of shares traded for the asset.")
+
+
+class IexTopOfBook(BaseModel):
+    ask_price: float | None = Field(
+        None, alias="askPrice", description="The current ask price. IEX entitlement required"
+    )
+    ask_size: float | None = Field(
+        None,
+        alias="askSize",
+        description="The amount of shares at the ask price. IEX entitlement required",
+    )
+    bid_price: float | None = Field(
+        None, alias="bidPrice", description="The current bid price. IEX entitlement required"
+    )
+    bid_size: float | None = Field(
+        None,
+        alias="bidSize",
+        description="The amount of shares at the bid price. IEX entitlement required",
+    )
+    high: float | None = Field(
+        None,
+        description="The high price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+    )
+    last: float | None = Field(
+        None,
+        description="Last is the last trade that was executed on IEX. IEX entitlement required",
+    )
+    last_sale_timestamp: str | None = Field(
+        None,
+        alias="lastSaleTimestamp",
+        description="The timestamp the last time the trade (last/lastSize) data was received from IEX. IEX entitlement required",
+    )
+    last_size: int | None = Field(
+        None,
+        alias="lastSize",
+        description="The amount of shares traded (volume) at the last price on IEX. IEX entitlement required",
+    )
+    low: float | None = Field(
+        None,
+        description="The low price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+    )
+    mid: float | None = Field(
+        None,
+        description='The mid price of the current timestamp when both "bidPrice" and "askPrice" are not-null. In mathematical terms: mid = (bidPrice + askPrice)/2.0 This value is calculated by Tiingo and not provided by IEX.',
+    )
+    open: float | None = Field(
+        None,
+        description="The opening price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
+    )
+    prev_close: float | None = Field(
+        None,
+        alias="prevClose",
+        description="Previous day's closing price of the security.This can be from any of the exchanges, NYSE, NASDAQ, IEX, etc.",
+    )
+    quote_timestamp: str | None = Field(
+        None,
+        alias="quoteTimestamp",
+        description="The timestamp the last time the quote (bid/ask) data was received from IEX. IEX entitlement required",
+    )
+    ticker: str | None = Field(None, description="Ticker related to the asset.")
+    timestamp: str | None = Field(None, description="The timestamp the data was last refresh on.")
+    tngo_last: float | None = Field(
+        None,
+        alias="tngoLast",
+        description="Tiingo Last is either the last price or mid price. The mid price is only used if our algo determines it is a good proxy for the last price. So if the spread is considered wide by our algo, we do not use it. Also, after the official exchange print comes in, this value changes to that value. This value is calculated by Tiingo and not provided by IEX .",
+    )
+    volume: int | None = Field(
+        None,
+        description="Volume will be IEX Volume throughout the day, but once the official closing price comes in, volume will reflect the volume done on the entire day across all exchanges. This field is available for convenience.",
+    )
