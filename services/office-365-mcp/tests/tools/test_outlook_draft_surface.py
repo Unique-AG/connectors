@@ -69,13 +69,13 @@ _ORIGINAL: Mapping[str, object] = {
 _MAIL_ARGUMENTS: Mapping[str, object] = {
     "to": ["ada@example.invalid"],
     "subject": "Invoice 4471",
-    "body": "Sending this over for review.",
+    "body_html": "<p>Sending this over for review.</p>",
 }
 
 _REPLY_ARGUMENTS: Mapping[str, object] = {
     "message_ref": MailMessageHandle(_MESSAGE_ID).uri,
     "mode": "reply",
-    "body": "Friday works.",
+    "body_html": "<p>Friday works.</p>",
 }
 
 _COPIED_AND_MARKED: Mapping[str, object] = {
@@ -239,19 +239,6 @@ class TestTheWholeConfirmationOverARealClient:
         assert result.structured_content is not None, "the agreed draft answered nothing"
         assert _writes(graph) == methods, f"an agreed draft wrote {_writes(graph)}"
 
-    async def test_the_markdown_of_the_body_reaches_graph_as_html(
-        self, an_agreeing_client: Client[FastMCPTransport], graph: respx.MockRouter
-    ) -> None:
-        arguments = {**_MAIL_ARGUMENTS, "body": "**Ship** it <b>Friday</b>."}
-
-        _ = await an_agreeing_client.call_tool(outlook_draft_mail.TOOL_NAME, arguments)
-
-        posted = next(call for call in _made(graph) if call.request.method == "POST")
-        assert _object(_body_of(posted)["body"]) == {
-            "contentType": "html",
-            "content": "<p><strong>Ship</strong> it &lt;b&gt;Friday&lt;/b&gt;.</p>",
-        }
-
     @_EACH_TOOL
     async def test_a_person_who_says_no_leaves_the_shared_mailbox_alone(
         self,
@@ -369,8 +356,7 @@ class TestTheWholeConfirmationOverARealClient:
     ) -> None:
         arguments = {
             **_MAIL_ARGUMENTS,
-            "body": '<p style="color:red">Ship it</p><script>alert(1)</script>',
-            "body_format": "html",
+            "body_html": '<p style="color:red">Ship it</p><script>alert(1)</script>',
             "mailbox": _SHARED_MAILBOX,
         }
 
@@ -393,13 +379,11 @@ class TestTheWholeConfirmationOverARealClient:
         outlook_update_draft.TOOL_NAME,
     ],
 )
-async def test_the_schema_offers_markdown_or_html_with_markdown_as_the_default(
+async def test_the_schema_takes_one_html_body_with_no_format_choice(
     an_agreeing_client: Client[FastMCPTransport], tool: str
 ) -> None:
     (listed,) = [one for one in await an_agreeing_client.list_tools() if one.name == tool]
-    schema = cast("Mapping[str, object]", listed.input_schema)
-    body_format = _object(_object(schema["properties"])["body_format"])
+    properties = _object(_object(listed.input_schema)["properties"])
 
-    assert body_format["enum"] == ["markdown", "html"]
-    assert body_format["default"] == "markdown"
-    assert "body_format" not in cast("Sequence[str]", schema.get("required", []))
+    assert "HTML fragment" in str(_object(properties["body_html"])["description"])
+    assert {"body", "body_format"}.isdisjoint(properties)

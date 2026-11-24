@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, not_graph
 from office_365_mcp.shared import identity
+from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD, links_in_body
 from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import (
     CHANNEL_PERMISSION,
@@ -19,7 +20,7 @@ from office_365_mcp.shared.handles import (
     message_handle,
     not_a_message_handle,
 )
-from office_365_mcp.shared.prose import cut_for_a_question
+from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -33,7 +34,6 @@ from office_365_mcp.shared.teams.messages import (
     OutgoingMention,
     TeamsMessage,
     get_message,
-    links_in_question,
     mention_fields,
     mention_in_question,
     mentioned_members,
@@ -70,7 +70,7 @@ GRAPH_CALL_NARROWS_TO: tuple[str, ...] = _CHAT_PERMISSIONS
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "teams:///chats/19%3Arelease%40thread.v2/messages/1770000000000",
-    "message": "Ship it Monday.",
+    "body_html": "<p>Ship it Monday.</p>",
 }
 
 _AGREE = "edit"
@@ -144,7 +144,7 @@ async def edit_message(
     client: GraphServiceClient,
     *,
     handle: MessageHandle,
-    message: str,
+    body_html: str,
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
 ) -> EditedMessage | InputRequiredResult:
@@ -162,19 +162,19 @@ async def edit_message(
         elif refused is None:
             with not_graph():
                 answer = await confirm(
-                    _question(current, message, outgoing), _about(handle, message, outgoing)
+                    _question(current, body_html, outgoing), _about(handle, body_html, outgoing)
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
             if refused is None and asked is None:
                 with graph_step(STEP_EDIT):
-                    await _edit(client, handle, _new_body(message, outgoing))
+                    await _edit(client, handle, _new_body(body_html, outgoing))
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    return EditedMessage(uri=handle.uri, text=message, mentions=list(mentions))
+    return EditedMessage(uri=handle.uri, text=body_html, mentions=list(mentions))
 
 
 async def _outgoing(
@@ -187,7 +187,7 @@ async def _outgoing(
     )
 
 
-def _question(current: TeamsMessage, message: str, mentions: Sequence[OutgoingMention]) -> str:
+def _question(current: TeamsMessage, body_html: str, mentions: Sequence[OutgoingMention]) -> str:
     named = ", ".join(mention_in_question(mention) for mention in mentions)
     mentioned = f" It mentions {named}." if mentions else ""
     attached = ", ".join(
@@ -196,21 +196,22 @@ def _question(current: TeamsMessage, message: str, mentions: Sequence[OutgoingMe
     )
     removed = f" The change can remove {attached} from the message." if attached else ""
     return (
-        f"Replace the text of {message_in_question(current)} with {cut_for_a_question(message)!r}?"
-        + f"{mentioned}{removed}{links_in_question(message)} {EVERYONE_SEES_IT}"
+        f"Replace the text of {message_in_question(current)} with "
+        + f"{body_opening(body_html)!r}?"
+        + f"{mentioned}{removed}{links_in_body(body_html)} {EVERYONE_SEES_IT}"
     )
 
 
-def _about(handle: MessageHandle, message: str, mentions: Sequence[OutgoingMention]) -> str:
-    return confirmation_id_for(handle.uri, message, *mention_fields(mentions))
+def _about(handle: MessageHandle, body_html: str, mentions: Sequence[OutgoingMention]) -> str:
+    return confirmation_id_for(handle.uri, body_html, *mention_fields(mentions))
 
 
 def _permissions(handle: MessageHandle) -> tuple[str, ...]:
     return _CHAT_PERMISSIONS if handle.chat_id is not None else _CHANNEL_PERMISSIONS
 
 
-def _new_body(message: str, mentions: Sequence[OutgoingMention]) -> ChatMessage:
-    outgoing = outgoing_message(message, mentions=mentions)
+def _new_body(body_html: str, mentions: Sequence[OutgoingMention]) -> ChatMessage:
+    outgoing = outgoing_message(body_html, mentions=mentions)
     return dataclasses.replace(outgoing, mentions=outgoing.mentions or [])
 
 
@@ -263,13 +264,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        message: Annotated[
+        body_html: Annotated[
             str,
             Field(
                 min_length=1,
                 description=(
-                    "The new text of the message, as Markdown. Give the complete text that the "
-                    + "message must show after the change."
+                    TEAMS_BODY_HTML_FIELD
+                    + " Give the complete content that the message must show after the change."
                 ),
             ),
         ],
@@ -279,8 +280,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 default=[],
                 description=(
                     "The people to @mention in the new text, one entry for each person. This tool "
-                    + "writes the mention markup itself, so `message` has no mention markup. This "
-                    + "tool puts the mentions first, in the order of this list. An empty list "
+                    + "writes the mention markup itself, so `body_html` has no mention markup. "
+                    + "This tool puts the mentions first, in the order of this list. An empty list "
                     + "sends the new text with no mention."
                 ),
             ),
@@ -295,7 +296,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await edit_message(
             client,
             handle=handle,
-            message=message,
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             mentions=mentions,
         )

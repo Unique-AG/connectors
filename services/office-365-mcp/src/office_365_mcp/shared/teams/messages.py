@@ -38,6 +38,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step, not_graph
+from office_365_mcp.shared.body_html import links_in_body
 from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.files import AttachableFile
 from office_365_mcp.shared.handles import DriveFileHandle, MessageHandle
@@ -46,7 +47,6 @@ from office_365_mcp.shared.identity import (
     member_in_question,
     person_in_question,
 )
-from office_365_mcp.shared.markdown import link_targets, markdown_to_html
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import Confirm
 
@@ -368,7 +368,7 @@ type OutgoingMention = Mention | MentionedMember
 
 
 def outgoing_message(
-    text: str,
+    body_html: str,
     *,
     mentions: Sequence[OutgoingMention] = (),
     importance: ChatMessageImportance | None = None,
@@ -379,16 +379,16 @@ def outgoing_message(
         f'<at id="{index}">{html.escape(mention.name)}</at>'
         for index, mention in enumerate(mentions)
     )
-    rendered = markdown_to_html(text)
-    if tags:
-        rendered = (
-            f"<p>{tags} {rendered.removeprefix('<p>')}"
-            if rendered.startswith("<p>")
-            else f"{tags} {rendered}"
-        )
+    mentioned = (
+        body_html
+        if not tags
+        else f"<p>{tags} {body_html.removeprefix('<p>')}"
+        if body_html.startswith("<p>")
+        else f"{tags} {body_html}"
+    )
     content = " ".join(
         (
-            rendered,
+            mentioned,
             *(f'<attachment id="{file.attachment_id}"></attachment>' for file in attachments),
         )
     )
@@ -461,13 +461,6 @@ CHAT_ID_FIELD: str = (
     + "`19:...@thread.v2`. It is not a `teams:///` handle."
 )
 
-MESSAGE_FIELD: str = (
-    "The text of the message, as Markdown. Teams shows bold, italic, strikethrough, links, "
-    + "lists, quotes, code, and tables. Do not put HTML or mention markup in this text, because "
-    + "this tool writes all the markup itself. To show a character such as `*`, `_`, or `#` as "
-    + "it is, put a backslash before it."
-)
-
 MENTIONS_FIELD: str = (
     "The people to @mention, one entry for each person. With an empty list, the message "
     + "mentions nobody."
@@ -524,14 +517,9 @@ def subject_on_a_reply(tool: str) -> str:
     )
 
 
-def links_in_question(message: str) -> str:
-    targets = link_targets(message)
-    return f" It links to {', '.join(repr(target) for target in targets)}." if targets else ""
-
-
 def send_question(
     words: SendWords,
-    message: str,
+    body_html: str,
     destination: str,
     mentions: Sequence[OutgoingMention],
     *,
@@ -553,8 +541,8 @@ def send_question(
     ]
     marked = f" with {' and '.join(details)}" if details else ""
     return (
-        f"{words.verb} {cut_for_a_question(message)!r}{marked} {destination} now?"
-        + f"{mentioned}{attached}{links_in_question(message)} {words.cannot_be_recalled}"
+        f"{words.verb} {body_opening(body_html)!r}{marked} {destination} now?"
+        + f"{mentioned}{attached}{links_in_body(body_html)} {words.cannot_be_recalled}"
     )
 
 
@@ -579,7 +567,7 @@ def mention_in_question(mention: OutgoingMention) -> str:
 
 def send_binding(
     destination: Sequence[str],
-    message: str,
+    body_html: str,
     mentions: Sequence[OutgoingMention],
     *,
     subject: str | None,
@@ -589,7 +577,7 @@ def send_binding(
 ) -> str:
     return confirmation_id_for(
         *destination,
-        message,
+        body_html,
         *mention_fields(mentions),
         repr(subject),
         repr(importance),

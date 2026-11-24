@@ -1172,7 +1172,7 @@ class TestTheQuestionToMia:
                 {
                     "team_id": "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81",
                     "channel_id": "19:general@thread.tacv2",
-                    "message": "The customer notes.",
+                    "body_html": "<p>The customer notes.</p>",
                     "attachments": [_FILE],
                 },
                 person=person,

@@ -21,14 +21,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
-from office_365_mcp.shared.markdown import (
-    BODY_FORMAT_FIELD,
-    BodyFormat,
-    body_to_html,
-    links_in_body,
-)
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -68,7 +63,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-    "body": "Thanks, Friday works for all of us.",
+    "body_html": "<p>Thanks, Friday works for all of us.</p>",
 }
 
 GRAPH_NOT_FOUND = (
@@ -484,19 +479,12 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        body: Annotated[
+        body_html: Annotated[
             str,
             Field(
                 min_length=1,
-                description=(
-                    "What to say to everyone on the message, in the format that `body_format` "
-                    + "gives. This tool turns Markdown into HTML."
-                ),
+                description=OUTLOOK_BODY_HTML_FIELD,
             ),
-        ],
-        body_format: Annotated[
-            BodyFormat,
-            Field(default="markdown", description=BODY_FORMAT_FIELD),
         ],
         cc: Annotated[
             list[str],
@@ -549,7 +537,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await draft_reply_all(
             client,
             message_ref=message_ref,
-            body_html=body_to_html(body, body_format),
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             cc=cc,
             bcc=bcc,

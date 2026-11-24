@@ -193,8 +193,12 @@ def _everything_is_readable(
     return writes(graph)
 
 
-CHAT_MESSAGE = {"chat_id": CHAT_ID, "message": "The build is green"}
-CHANNEL_POST = {"team_id": TEAM_ID, "channel_id": CHANNEL_ID, "message": "v2 ships on Friday"}
+CHAT_MESSAGE = {"chat_id": CHAT_ID, "body_html": "<p>The build is green</p>"}
+CHANNEL_POST = {
+    "team_id": TEAM_ID,
+    "channel_id": CHANNEL_ID,
+    "body_html": "<p>v2 ships on Friday</p>",
+}
 WITH_THE_DECK = {"attachments": [DECK_URI]}
 WITH_FILES = [
     ("teams_send_channel_message_with_files", CHANNEL_POST),
@@ -228,7 +232,7 @@ EVERY_PROPOSAL = [
     ),
     pytest.param(
         "teams_edit_message",
-        {"uri": MESSAGE_URI, "message": "Launch on 14 June"},
+        {"uri": MESSAGE_URI, "body_html": "<p>Launch on 14 June</p>"},
         "No message was changed.",
         id="correction",
     ),
@@ -258,7 +262,7 @@ class TestAMessageIsPostedAfterMiaApproves:
             "teams_send_chat_message",
             person=mia,
             chat_id=RECORDED_CHAT_ID,
-            message="the build is green",
+            body_html="<p>the build is green</p>",
             mentions=[{"user_id": TOM_ID, "name": "Tom Berger"}],
         )
 
@@ -293,7 +297,7 @@ class TestAMessageIsPostedAfterMiaApproves:
             mia,
             "teams_send_chat_message",
             chat_id=RECORDED_CHAT_ID,
-            message="please review the plan",
+            body_html="<p>please review the plan</p>",
             mentions=[{"user_id": PRIYA_ID, "name": "Priya Rao"}],
         )
 
@@ -311,13 +315,15 @@ class TestAMessageIsPostedAfterMiaApproves:
         routes = serve(graph, "rec-tool-teams_list_message_replies-reply")
         channel = await _seed_channel()
         mia = Person()
-        post = await call("teams_send_channel_message", person=mia, **channel, message=THREAD_POST)
+        post = await call(
+            "teams_send_channel_message", person=mia, **channel, body_html=f"<p>{THREAD_POST}</p>"
+        )
 
         reply = await call(
             "teams_send_channel_message",
             person=mia,
             **channel,
-            message=THREAD_REPLY,
+            body_html=f"<p>{THREAD_REPLY}</p>",
             reply_to_id=post["message_id"],
         )
 
@@ -344,7 +350,9 @@ class TestAMessageIsPostedAfterMiaApproves:
         channel = await _seed_channel()
         mia = Person()
 
-        sent = await call("teams_send_channel_message", person=mia, **channel, message=HELLO_TEAM)
+        sent = await call(
+            "teams_send_channel_message", person=mia, **channel, body_html=f"<p>{HELLO_TEAM}</p>"
+        )
 
         assert _uncalled(routes) == []
         assert len(mia.asked) == 1 and HELLO_TEAM in mia.asked[0]
@@ -367,7 +375,7 @@ class TestAMessageIsPostedAfterMiaApproves:
             "teams_send_channel_message_with_files",
             person=mia,
             **channel,
-            message="v2 ships on Friday",
+            body_html="<p>v2 ships on Friday</p>",
             attachments=[notes],
         )
 
@@ -397,7 +405,7 @@ class TestAMessageIsPostedAfterMiaApproves:
             "teams_send_chat_message_with_files",
             person=mia,
             chat_id=chat_id,
-            message="The build is green",
+            body_html="<p>The build is green</p>",
             attachments=[notes],
         )
 
@@ -434,14 +442,19 @@ class TestMiaChangesOnlyHerOwnMessages:
         routes = serve(graph, "rec-tool-teams_edit_message-post")
         mia = Person()
         posted = await call(
-            "teams_send_channel_message", person=mia, **await _seed_channel(), message=BEFORE
+            "teams_send_channel_message",
+            person=mia,
+            **await _seed_channel(),
+            body_html=f"<p>{BEFORE}</p>",
         )
 
-        corrected = await call("teams_edit_message", person=mia, uri=posted["uri"], message=AFTER)
+        corrected = await call(
+            "teams_edit_message", person=mia, uri=posted["uri"], body_html=f"<p>{AFTER}</p>"
+        )
 
         assert _uncalled(routes) == []
         assert f"'{BEFORE}'" in mia.asked[1] and AFTER in mia.asked[1]
-        assert corrected["text"] == AFTER
+        assert corrected["text"] == f"<p>{AFTER}</p>"
         assert corrected["uri"] == posted["uri"]
 
     async def test_it_deletes_her_own_message_after_she_approves_the_deletion(
@@ -450,7 +463,10 @@ class TestMiaChangesOnlyHerOwnMessages:
         routes = serve(graph, "rec-tool-teams_delete_message-post")
         mia = Person()
         posted = await call(
-            "teams_send_channel_message", person=mia, **await _seed_channel(), message=DOOMED
+            "teams_send_channel_message",
+            person=mia,
+            **await _seed_channel(),
+            body_html=f"<p>{DOOMED}</p>",
         )
 
         deleted = await call("teams_delete_message", person=mia, uri=posted["uri"])
@@ -465,7 +481,10 @@ class TestMiaChangesOnlyHerOwnMessages:
         routes = serve(graph, "rec-tool-teams_react_to_message-post")
         mia = Person()
         posted = await call(
-            "teams_send_channel_message", person=mia, **await _seed_channel(), message=TARGET
+            "teams_send_channel_message",
+            person=mia,
+            **await _seed_channel(),
+            body_html=f"<p>{TARGET}</p>",
         )
 
         reacted = await call(
@@ -656,7 +675,7 @@ class TestWhatTeamsCannotTake:
         [
             (
                 "teams_edit_message",
-                {"uri": MESSAGE_URI, "message": "Launch on 14 June"},
+                {"uri": MESSAGE_URI, "body_html": "<p>Launch on 14 June</p>"},
                 "is deleted",
             ),
             ("teams_delete_message", {"uri": MESSAGE_URI}, "already deleted"),
@@ -787,7 +806,7 @@ class TestAReferenceThatTheAssistantMadeUp:
     @pytest.mark.parametrize(
         ("tool", "arguments"),
         [
-            ("teams_edit_message", {"message": "Launch on 14 June"}),
+            ("teams_edit_message", {"body_html": "<p>Launch on 14 June</p>"}),
             ("teams_delete_message", {}),
             ("teams_react_to_message", {"reaction": THUMBS_UP}),
         ],
@@ -808,7 +827,7 @@ class TestWhatMiaMayChangeInAMessage:
     @pytest.mark.parametrize(
         ("tool", "arguments"),
         [
-            ("teams_edit_message", {"uri": MESSAGE_URI, "message": "Launch on 14 June"}),
+            ("teams_edit_message", {"uri": MESSAGE_URI, "body_html": "<p>Launch on 14 June</p>"}),
             ("teams_delete_message", {"uri": MESSAGE_URI}),
         ],
         ids=["correction", "deletion"],
@@ -839,7 +858,7 @@ class TestWhatMiaMayChangeInAMessage:
             mia,
             "teams_edit_message",
             uri=MESSAGE_URI,
-            message="Launch on 14 June",
+            body_html="<p>Launch on 14 June</p>",
             mentions=[{"user_id": PRIYA_ID, "name": "Priya Rao"}],
         )
 
@@ -947,13 +966,16 @@ async def _seed_chat() -> str:
 async def _post_and_reply(mia: Person, label: str) -> tuple[Row, Row]:
     channel = await _seed_channel()
     post = await call(
-        "teams_send_channel_message", person=mia, **channel, message=f"seed-v1 case-{label} post"
+        "teams_send_channel_message",
+        person=mia,
+        **channel,
+        body_html=f"<p>seed-v1 case-{label} post</p>",
     )
     reply = await call(
         "teams_send_channel_message",
         person=mia,
         **channel,
-        message=f"seed-v1 case-{label} target",
+        body_html=f"<p>seed-v1 case-{label} target</p>",
         reply_to_id=post["message_id"],
     )
     return post, reply
@@ -968,14 +990,14 @@ class TestACorrectionInTheChatOrInTheThread:
             "teams_send_chat_message",
             person=mia,
             chat_id=chat_id,
-            message="seed-v1 case-teams_edit_message-chat before",
+            body_html="<p>seed-v1 case-teams_edit_message-chat before</p>",
         )
 
         corrected = await call(
             "teams_edit_message",
             person=mia,
             uri=sent["uri"],
-            message="seed-v1 case-teams_edit_message-chat after",
+            body_html="<p>seed-v1 case-teams_edit_message-chat after</p>",
         )
 
         assert _uncalled(routes) == []
@@ -992,7 +1014,7 @@ class TestACorrectionInTheChatOrInTheThread:
             "teams_edit_message",
             person=mia,
             uri=reply["uri"],
-            message="seed-v1 case-teams_edit_message-reply after",
+            body_html="<p>seed-v1 case-teams_edit_message-reply after</p>",
         )
 
         assert _uncalled(routes) == []
@@ -1013,7 +1035,7 @@ class TestAReactionInAChatInAPostAndInAThread:
             "teams_send_chat_message",
             person=mia,
             chat_id=await _seed_chat(),
-            message="seed-v1 case-teams_react_to_message-chat-remove target",
+            body_html="<p>seed-v1 case-teams_react_to_message-chat-remove target</p>",
         )
         _ = await call("teams_react_to_message", person=mia, uri=sent["uri"], reaction=THUMBS_UP)
 
@@ -1038,7 +1060,7 @@ class TestAReactionInAChatInAPostAndInAThread:
             "teams_send_channel_message",
             person=mia,
             **await _seed_channel(),
-            message="seed-v1 case-teams_react_to_message-post-remove target",
+            body_html="<p>seed-v1 case-teams_react_to_message-post-remove target</p>",
         )
         _ = await call("teams_react_to_message", person=mia, uri=post["uri"], reaction=THUMBS_UP)
 
@@ -1083,14 +1105,14 @@ class TestAFileInAReplyAndAMentionInAPost:
             "teams_send_channel_message",
             person=mia,
             **channel,
-            message="seed-v1 case-teams_send_channel_message_with_files-reply post",
+            body_html="<p>seed-v1 case-teams_send_channel_message_with_files-reply post</p>",
         )
 
         reply = await call(
             "teams_send_channel_message_with_files",
             person=mia,
             **channel,
-            message="seed-v1 case-teams_send_channel_message_with_files-reply notes",
+            body_html="<p>seed-v1 case-teams_send_channel_message_with_files-reply notes</p>",
             attachments=[notes],
             reply_to_id=post["message_id"],
         )
@@ -1109,7 +1131,7 @@ class TestAFileInAReplyAndAMentionInAPost:
             "teams_send_channel_message",
             person=mia,
             **await _seed_channel(),
-            message="seed-v1 case-teams_send_channel_message-mention hello",
+            body_html="<p>seed-v1 case-teams_send_channel_message-mention hello</p>",
             mentions=[{"user_id": TOM_ID, "name": "Tom Berger"}],
         )
 

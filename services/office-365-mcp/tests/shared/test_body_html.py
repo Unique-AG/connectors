@@ -1,22 +1,4 @@
-from office_365_mcp.shared.markdown import body_to_html, html_link_targets, links_in_body
-
-
-class TestMarkdownBody:
-    def test_markdown_becomes_html_and_raw_html_is_escaped(self) -> None:
-        assert body_to_html("**Ship** it <b>Friday</b>.", "markdown") == (
-            "<p><strong>Ship</strong> it &lt;b&gt;Friday&lt;/b&gt;.</p>"
-        )
-
-
-class TestHtmlBody:
-    def test_passes_the_html_through_unchanged(self) -> None:
-        styled = (
-            '<table style="border-collapse: collapse"><tr><td style="color: #c00">Q3</td></tr>'
-            + '</table><img src="https://example.com/logo.png"><a href="/relative">x</a>'
-            + "<script>run()</script>"
-        )
-
-        assert body_to_html(styled, "html") == styled
+from office_365_mcp.shared.body_html import html_link_targets, links_in_body
 
 
 class TestHtmlLinkTargets:
@@ -57,13 +39,6 @@ class TestHtmlLinkTargets:
         body = '<!-- <a href="https://hidden.example">old</a> --><p>Hi</p>'
 
         assert html_link_targets(body) == ()
-
-    def test_finds_the_links_a_markdown_body_renders_to(self) -> None:
-        rendered = body_to_html(
-            "See [the plan](https://plan.example) and <https://raw.example>.", "markdown"
-        )
-
-        assert html_link_targets(rendered) == ("https://plan.example", "https://raw.example")
 
 
 class TestLinksInBody:

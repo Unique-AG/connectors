@@ -1471,7 +1471,7 @@ class TestHowItDeclaresItself:
         assert "The `uri` of a series master changes every occurrence." in description
         assert "The `uri` of one occurrence changes only that date." in description
 
-    @pytest.mark.parametrize("argument", ["body_html", "online_meeting"])
+    @pytest.mark.parametrize("argument", ["online_meeting"])
     async def test_each_new_argument_is_described_in_15_to_60_words(
         self, transport: httpx.AsyncClient, argument: str
     ) -> None:

@@ -21,6 +21,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD
 from office_365_mcp.shared.calendar import (
     HIDE_ATTENDEES_CHANGE_FIELD,
     IMPORTANCE_CHANGE_FIELD,
@@ -742,11 +743,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The new event body, as HTML. It replaces the whole body. Escape `&`, `<`, "
-                    + "and `>`. On an online meeting, the new body must keep all of the stored "
-                    + "body, and can add HTML before or after it. If it does not, this tool "
-                    + "changes nothing. The refusal quotes the stored HTML body when it has "
-                    + f"{STORED_BODY_QUOTE_LIMIT} characters or fewer."
+                    OUTLOOK_BODY_HTML_FIELD
+                    + " It replaces the whole body. On an online meeting, the new body must keep "
+                    + "all of the stored body, and can add HTML before or after it. If it does "
+                    + "not, this tool changes nothing. The refusal quotes the stored HTML body "
+                    + f"when it has {STORED_BODY_QUOTE_LIMIT} characters or fewer."
                 ),
             ),
         ] = None,
