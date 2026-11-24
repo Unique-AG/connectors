@@ -1,7 +1,8 @@
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 import httpx
 from fastmcp import Context, FastMCP
@@ -10,30 +11,41 @@ from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.todo_task import TodoTask
+from msgraph.generated.users.item.todo.lists.item.tasks.item.todo_task_item_request_builder import (  # noqa: E501
+    TodoTaskItemRequestBuilder,
+)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.confirmation import write_state_for
-from office_365_mcp.shared.handles import task_handle
+from office_365_mcp.shared.handles import TaskHandle, task_handle
 from office_365_mcp.shared.outlook.tasks import (
     BODY_FIELD,
+    CATEGORIES_FIELD,
     DEFAULT_TIME_ZONE,
     DUE_DATE_FIELD,
     PRIORITY_FIELD,
+    REMINDER_FIELD,
+    REPEAT_FIELD,
+    START_DATE_FIELD,
     TIME_ZONE_FIELD,
     TITLE_FIELD,
     Priority,
-    Status,
     TaskDetail,
+    TaskRepeat,
     bad_task_handle,
     bad_zone,
+    day_of,
     due_moment,
     graph_importance,
-    graph_status,
     html_body,
     list_audience,
+    moment_in,
+    no_due_date_to_repeat,
+    recurrence_for,
+    repeat_refusal,
     shared_list_reason,
 )
 from office_365_mcp.shared.seam import (
@@ -49,6 +61,8 @@ TOOL_NAME = "outlook_update_task"
 PRESETS: tuple[str, ...] = ("outlook-tasks-write",)
 
 STEP_UPDATE = "update_task"
+
+STEP_DUE_DATE = "task_due_date"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Tasks.ReadWrite",)
 
@@ -74,18 +88,20 @@ GRAPH_NOT_FOUND = (
 _DESCRIPTION = """\
 Changes one Microsoft To Do task of the signed-in user, given the `uri` of an outlook_list_tasks \
 row. This tool changes only the fields that the call gives, and keeps the other fields as they \
-are. There is no draft and no review step. outlook_complete_task marks a task done.
+are. There is no draft and no review step. outlook_set_task_status marks a task done or reopens \
+it.
 
 Notes:
 - `notes` replaces the whole notes of the task. To add to them, read the task with \
 outlook_read_task first. If `notes_format` is `html`, write the old notes again as Markdown, \
 without HTML tags, because `notes` shows a tag as text. Then send the old notes with the new \
 words.
-- To reopen a completed task, pass `status="not_started"`.
 - This tool asks the user to agree before it changes a task in a list that other people share, \
 because they see the change. A task in the user's own unshared list changes without a question.
 - This call is safe to repeat after a timeout.
 """
+
+_TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
 
 _NOTHING_TO_CHANGE = (
     "outlook_update_task needs at least one field to change, besides `uri`. With none of them, "
@@ -93,10 +109,37 @@ _NOTHING_TO_CHANGE = (
     + "and then call again."
 )
 
-_DUE_DATE_AND_CLEAR = (
-    "outlook_update_task takes either `due_date` or `clear_due_date`, not both: one sets a due "
-    + f"date and the other removes it. {_NOTHING_CHANGED} {_AGAIN}"
-)
+
+def _both(name: str) -> str:
+    return (
+        f"outlook_update_task takes either `{name}` or `clear_{_CLEARED[name]}`, not both: one "
+        + f"sets the value and the other removes it. {_NOTHING_CHANGED} {_AGAIN}"
+    )
+
+
+_CLEARED = {
+    "due_date": "due_date",
+    "start_date": "start_date",
+    "reminder_at": "reminder",
+    "repeat": "repeat",
+}
+
+
+async def _due_date(
+    client: GraphServiceClient, handle: TaskHandle, *, zone: ZoneInfo
+) -> date | None:
+    with graph_step(STEP_DUE_DATE):
+        task = (
+            await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+            .tasks.by_todo_task_id(handle.task_id)
+            .get(
+                request_configuration=RequestConfiguration[_TaskQuery](
+                    query_parameters=_TaskQuery(select=["id", "dueDateTime"])
+                )
+            )
+        )
+    assert task is not None, "Graph answered a task read with no task"
+    return day_of(task.due_date_time, zone=zone)
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +149,13 @@ class TaskChange:
     due_date: date | None = None
     clear_due_date: bool = False
     priority: Priority | None = None
-    status: Status | None = None
+    start_date: date | None = None
+    clear_start_date: bool = False
+    reminder_at: datetime | None = None
+    clear_reminder: bool = False
+    repeat: TaskRepeat | None = None
+    clear_repeat: bool = False
+    categories: tuple[str, ...] | None = None
 
     @property
     def is_nothing(self) -> bool:
@@ -130,18 +179,45 @@ async def update_task(
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
     if change.is_nothing:
         raise ToolError(_NOTHING_TO_CHANGE)
-    if change.due_date is not None and change.clear_due_date:
-        raise ToolError(_DUE_DATE_AND_CLEAR)
+    for given, cleared, name in (
+        (change.due_date is not None, change.clear_due_date, "due_date"),
+        (change.start_date is not None, change.clear_start_date, "start_date"),
+        (change.reminder_at is not None, change.clear_reminder, "reminder_at"),
+        (change.repeat is not None, change.clear_repeat, "repeat"),
+    ):
+        if given and cleared:
+            raise ToolError(_both(name))
+    if change.repeat is not None:
+        refusal = repeat_refusal(TOOL_NAME, change.repeat, nothing_happened=_NOTHING_CHANGED)
+        if refusal is not None:
+            raise ToolError(refusal)
+    if change.clear_due_date and change.repeat is not None:
+        raise ToolError(no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
 
     body = TodoTask(
         title=change.title,
         body=None if change.notes is None else html_body(change.notes),
         due_date_time=None if change.due_date is None else due_moment(change.due_date, zone=zone),
         importance=None if change.priority is None else graph_importance(change.priority),
-        status=None if change.status is None else graph_status(change.status),
+        start_date_time=(
+            None if change.start_date is None else due_moment(change.start_date, zone=zone)
+        ),
+        reminder_date_time=(
+            None if change.reminder_at is None else moment_in(change.reminder_at, zone=zone)
+        ),
+        is_reminder_on=True if change.reminder_at is not None else None,
+        categories=None if change.categories is None else list(change.categories),
     )
-    if change.clear_due_date:
-        body.additional_data["dueDateTime"] = None
+    for cleared, field in (
+        (change.clear_due_date, "dueDateTime"),
+        (change.clear_start_date, "startDateTime"),
+        (change.clear_reminder, "reminderDateTime"),
+        (change.clear_repeat, "recurrence"),
+    ):
+        if cleared:
+            body.additional_data[field] = None
+    if change.clear_reminder:
+        body.is_reminder_on = False
 
     about = write_state_for(
         STEP_UPDATE,
@@ -151,7 +227,13 @@ async def update_task(
         "" if change.due_date is None else change.due_date.isoformat(),
         str(change.clear_due_date),
         change.priority or "",
-        change.status or "",
+        "" if change.start_date is None else change.start_date.isoformat(),
+        str(change.clear_start_date),
+        "" if change.reminder_at is None else change.reminder_at.isoformat(),
+        str(change.clear_reminder),
+        "" if change.repeat is None else change.repeat.model_dump_json(),
+        str(change.clear_repeat),
+        "" if change.categories is None else "\n".join(change.categories),
         time_zone,
     )
 
@@ -159,12 +241,20 @@ async def update_task(
     asked: InputRequiredResult | None = None
     refused: str | None = None
     with graph_errors():
-        audience = await list_audience(client, handle.list_id)
-        if answer_pending or audience.reaches_others:
-            with not_graph():
-                answer = await confirm(f"Change a task {shared_list_reason(audience)}?", about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
+        due = change.due_date
+        if change.repeat is not None and due is None:
+            due = await _due_date(client, handle, zone=zone)
+        if change.repeat is not None and due is None:
+            refused = no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED)
+        elif change.repeat is not None and due is not None:
+            body.recurrence = recurrence_for(change.repeat, due=due)
+        if refused is None:
+            audience = await list_audience(client, handle.list_id)
+            if answer_pending or audience.reaches_others:
+                with not_graph():
+                    answer = await confirm(f"Change a task {shared_list_reason(audience)}?", about)
+                asked = answer if isinstance(answer, InputRequiredResult) else None
+                refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with graph_step(STEP_UPDATE):
                 updated = (
@@ -219,15 +309,22 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(description="True to remove the due date. It cannot go with `due_date`."),
         ] = False,
         priority: Annotated[Priority | None, Field(description=PRIORITY_FIELD)] = None,
-        status: Annotated[
-            Status | None,
-            Field(
-                description=(
-                    "Where the task stands: `not_started`, `in_progress`, `waiting_on_others`, "
-                    + "`deferred`, or `completed`. Pass `not_started` to reopen a completed task."
-                )
-            ),
-        ] = None,
+        start_date: Annotated[date | None, Field(description=START_DATE_FIELD)] = None,
+        clear_start_date: Annotated[
+            bool,
+            Field(description="True to remove the start date. It cannot go with `start_date`."),
+        ] = False,
+        reminder_at: Annotated[datetime | None, Field(description=REMINDER_FIELD)] = None,
+        clear_reminder: Annotated[
+            bool,
+            Field(description="True to turn the reminder off. It cannot go with `reminder_at`."),
+        ] = False,
+        repeat: Annotated[TaskRepeat | None, Field(description=REPEAT_FIELD)] = None,
+        clear_repeat: Annotated[
+            bool,
+            Field(description="True to stop the task from repeating. It cannot go with `repeat`."),
+        ] = False,
+        categories: Annotated[list[str] | None, Field(description=CATEGORIES_FIELD)] = None,
         time_zone: Annotated[str, Field(min_length=1, description=TIME_ZONE_FIELD)] = (
             DEFAULT_TIME_ZONE
         ),
@@ -242,7 +339,13 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 due_date=due_date,
                 clear_due_date=clear_due_date,
                 priority=priority,
-                status=status,
+                start_date=start_date,
+                clear_start_date=clear_start_date,
+                reminder_at=reminder_at,
+                clear_reminder=clear_reminder,
+                repeat=repeat,
+                clear_repeat=clear_repeat,
+                categories=None if categories is None else tuple(categories),
             ),
             time_zone=time_zone,
             confirm=person_confirms(

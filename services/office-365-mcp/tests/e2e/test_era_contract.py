@@ -49,7 +49,7 @@ _NEVER_ASKS_IN_A_CASE = {
     "outlook_update_draft": _SCENARIO_04,
     "outlook_create_task": _SCENARIO_17,
     "outlook_update_task": _SCENARIO_17,
-    "outlook_complete_task": _SCENARIO_17,
+    "outlook_set_task_status": _SCENARIO_17,
     **{
         tool: f"tests/tools/test_{tool}.py"
         for tool in (

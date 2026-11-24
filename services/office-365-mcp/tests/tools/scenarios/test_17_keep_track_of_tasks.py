@@ -12,6 +12,7 @@ from fastmcp import Client, FastMCP
 from fastmcp.client.elicitation import ElicitRequestParams, ElicitResult
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
+from respx.models import Call
 
 from tests.e2e.test_scenarios import build_server, patch_obo
 from tests.tools.scenarios.support import Person, call
@@ -79,7 +80,11 @@ def _rows(answer: Mapping[str, object], key: str) -> Sequence[Mapping[str, objec
 
 
 def _sent(route: respx.Route) -> dict[str, object]:
-    return cast("dict[str, object]", json.loads(route.calls.last.request.content))
+    return _body_of(route.calls.last)
+
+
+def _body_of(sent: Call) -> dict[str, object]:
+    return cast("dict[str, object]", json.loads(sent.request.content))
 
 
 class TestFindingTasks:
@@ -294,7 +299,7 @@ class TestChangingTasks:
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=done))
         person = Person()
 
-        answer = await call("outlook_complete_task", uri=TASK, person=person)
+        answer = await call("outlook_set_task_status", uri=TASK, status="completed", person=person)
 
         assert _sent(route) == {"status": "completed"}
         assert (answer["status"], person.asked) == ("completed", [])
@@ -305,19 +310,19 @@ class TestChangingTasks:
         reopened = _task(TASK_ID, "Send the Q3 report")
         _list_is(graph, shared=False)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=reopened))
-
         person = Person()
 
-        answer = await call(
-            "outlook_update_task",
-            uri=TASK,
-            status="not_started",
-            clear_due_date=True,
-            person=person,
+        opened = await call(
+            "outlook_set_task_status", uri=TASK, status="not_started", person=person
         )
+        cleared = await call("outlook_update_task", uri=TASK, clear_due_date=True, person=person)
 
-        assert _sent(route) == {"status": "notStarted", "dueDateTime": None}
-        assert (answer["status"], answer["due_date"], person.asked) == ("not_started", None, [])
+        sent: list[Call] = list(route.calls)
+        assert [_body_of(one) for one in sent] == [
+            {"status": "notStarted"},
+            {"dueDateTime": None},
+        ]
+        assert (opened["status"], cleared["due_date"], person.asked) == ("not_started", None, [])
 
 
 class TestASharedList:
@@ -345,7 +350,12 @@ class TestASharedList:
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
 
         with pytest.raises(ToolError, match="Nothing was changed"):
-            _ = await call("outlook_complete_task", uri=TASK, person=Person(approval="no"))
+            _ = await call(
+                "outlook_set_task_status",
+                uri=TASK,
+                status="completed",
+                person=Person(approval="no"),
+            )
 
         assert route.call_count == 0
 
@@ -375,7 +385,7 @@ class TestASharedList:
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
         person = Person()
 
-        _ = await call("outlook_complete_task", uri=TASK, person=person)
+        _ = await call("outlook_set_task_status", uri=TASK, status="completed", person=person)
 
         [question] = person.asked
         assert "did not report as private" in question
@@ -421,7 +431,7 @@ class TestRefusals:
         _ = graph.patch(ONE_TASK).mock(return_value=httpx.Response(404, json=missing))
 
         with pytest.raises(ToolError, match="find it again with outlook_list_tasks"):
-            _ = await call("outlook_complete_task", uri=TASK)
+            _ = await call("outlook_set_task_status", uri=TASK, status="completed")
 
     async def test_a_task_in_a_list_that_is_gone_sends_the_assistant_back_to_the_lists(
         self, graph: respx.MockRouter
@@ -469,7 +479,7 @@ _TASK_TOOLS = (
     "outlook_read_task",
     "outlook_create_task",
     "outlook_update_task",
-    "outlook_complete_task",
+    "outlook_set_task_status",
 )
 
 

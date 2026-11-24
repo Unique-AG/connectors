@@ -604,8 +604,10 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
     "outlook_list_tasks": ("due_after", "due_before"),
 }
 
-_A_DUE_DAY_IS_ONE_DAY_NOT_A_WINDOW: frozenset[str] = frozenset(
-    {"outlook_create_task.due_date", "outlook_update_task.due_date"}
+_ONE_DAY_OR_MOMENT_NOT_A_WINDOW: frozenset[str] = frozenset(
+    f"{tool}.{argument}"
+    for tool in ("outlook_create_task", "outlook_update_task")
+    for argument in ("due_date", "start_date", "reminder_at")
 )
 
 
@@ -704,7 +706,7 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_update_contact",
         "outlook_create_task",
         "outlook_update_task",
-        "outlook_complete_task",
+        "outlook_set_task_status",
         "onenote_create_page",
         "onenote_append_to_page",
         "onenote_create_notebook",
@@ -834,7 +836,7 @@ class TestTheToolsThisServerAdvertises:
                 if formats & {"date", "date-time"}:
                     found.add(f"{tool.name}.{name}")
 
-        assert found == recorded | _A_DUE_DAY_IS_ONE_DAY_NOT_A_WINDOW, (
+        assert found == recorded | _ONE_DAY_OR_MOMENT_NOT_A_WINDOW, (
             "a date-shaped argument is either a search window — record it in `_WINDOWED_TOOLS`, "
             + "where the test above holds it to both shapes — or it is not a window at all, in "
             + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"

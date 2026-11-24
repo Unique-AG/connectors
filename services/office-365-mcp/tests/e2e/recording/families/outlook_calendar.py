@@ -35,7 +35,7 @@ UNRECORDED: Mapping[str, str] = dict.fromkeys(
         "outlook_read_task",
         "outlook_create_task",
         "outlook_update_task",
-        "outlook_complete_task",
+        "outlook_set_task_status",
     ),
     _NO_TODO_CORPUS,
 )

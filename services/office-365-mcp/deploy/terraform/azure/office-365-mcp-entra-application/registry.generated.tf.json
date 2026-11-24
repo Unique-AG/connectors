@@ -637,7 +637,7 @@
           ]
         },
         {
-          "name": "outlook_complete_task",
+          "name": "outlook_set_task_status",
           "permissions": [
             "Tasks.ReadWrite"
           ]
@@ -980,7 +980,7 @@
         "outlook_read_task",
         "outlook_create_task",
         "outlook_update_task",
-        "outlook_complete_task",
+        "outlook_set_task_status",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_list_drives",
@@ -1362,7 +1362,7 @@
           "outlook_read_task",
           "outlook_create_task",
           "outlook_update_task",
-          "outlook_complete_task"
+          "outlook_set_task_status"
         ],
         "sharepoint-search": [
           "sharepoint_search_files",

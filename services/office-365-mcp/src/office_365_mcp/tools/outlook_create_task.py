@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 
 import httpx
@@ -18,18 +18,27 @@ from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import task_list_handle
 from office_365_mcp.shared.outlook.tasks import (
     BODY_FIELD,
+    CATEGORIES_FIELD,
     DEFAULT_TIME_ZONE,
     DUE_DATE_FIELD,
     PRIORITY_FIELD,
+    REMINDER_FIELD,
+    REPEAT_FIELD,
+    START_DATE_FIELD,
     TIME_ZONE_FIELD,
     TITLE_FIELD,
     Priority,
     TaskDetail,
+    TaskRepeat,
     bad_zone,
     due_moment,
     graph_importance,
     html_body,
     list_audience,
+    moment_in,
+    no_due_date_to_repeat,
+    recurrence_for,
+    repeat_refusal,
     shared_list_reason,
 )
 from office_365_mcp.shared.seam import (
@@ -71,7 +80,7 @@ GRAPH_NOT_FOUND = (
 _DESCRIPTION = """\
 Creates one new task in a Microsoft To Do task list of the signed-in user, given the `uri` of an \
 outlook_list_task_lists row. Outlook shows the same task. There is no draft and no review step. \
-outlook_update_task changes a task later, and outlook_complete_task marks it done.
+outlook_update_task changes a task later, and outlook_set_task_status marks it done.
 
 Notes:
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
@@ -98,6 +107,10 @@ async def create_task(
     notes: str | None = None,
     due_date: date | None = None,
     priority: Priority | None = None,
+    start_date: date | None = None,
+    reminder_at: datetime | None = None,
+    repeat: TaskRepeat | None = None,
+    categories: list[str] | None = None,
     time_zone: str = DEFAULT_TIME_ZONE,
     confirm: Confirm,
     answer_pending: bool = False,
@@ -108,11 +121,24 @@ async def create_task(
     zone = zone_named(time_zone)
     if zone is None:
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CREATED))
+    if repeat is not None:
+        refusal = repeat_refusal(TOOL_NAME, repeat, nothing_happened=_NOTHING_CREATED)
+        if refusal is not None:
+            raise ToolError(refusal)
+        if due_date is None:
+            raise ToolError(no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CREATED))
     body = TodoTask(
         title=title,
         body=None if notes is None else html_body(notes),
         due_date_time=None if due_date is None else due_moment(due_date, zone=zone),
         importance=None if priority is None else graph_importance(priority),
+        start_date_time=None if start_date is None else due_moment(start_date, zone=zone),
+        reminder_date_time=None if reminder_at is None else moment_in(reminder_at, zone=zone),
+        is_reminder_on=None if reminder_at is None else True,
+        recurrence=(
+            None if repeat is None or due_date is None else recurrence_for(repeat, due=due_date)
+        ),
+        categories=categories,
     )
 
     about = write_state_for(
@@ -122,6 +148,10 @@ async def create_task(
         notes or "",
         "" if due_date is None else due_date.isoformat(),
         priority or "",
+        "" if start_date is None else start_date.isoformat(),
+        "" if reminder_at is None else reminder_at.isoformat(),
+        "" if repeat is None else repeat.model_dump_json(),
+        "" if categories is None else "\n".join(categories),
         time_zone,
     )
 
@@ -181,6 +211,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ] = None,
         due_date: Annotated[date | None, Field(description=DUE_DATE_FIELD)] = None,
         priority: Annotated[Priority | None, Field(description=PRIORITY_FIELD)] = None,
+        start_date: Annotated[date | None, Field(description=START_DATE_FIELD)] = None,
+        reminder_at: Annotated[datetime | None, Field(description=REMINDER_FIELD)] = None,
+        repeat: Annotated[TaskRepeat | None, Field(description=REPEAT_FIELD)] = None,
+        categories: Annotated[list[str] | None, Field(description=CATEGORIES_FIELD)] = None,
         time_zone: Annotated[str, Field(min_length=1, description=TIME_ZONE_FIELD)] = (
             DEFAULT_TIME_ZONE
         ),
@@ -193,6 +227,10 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             notes=notes,
             due_date=due_date,
             priority=priority,
+            start_date=start_date,
+            reminder_at=reminder_at,
+            repeat=repeat,
+            categories=categories,
             time_zone=time_zone,
             confirm=person_confirms(
                 ctx, agree=_CREATE, decline=_DO_NOT_CREATE, nothing_happened=_NOTHING_CREATED

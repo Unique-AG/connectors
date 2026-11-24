@@ -582,14 +582,16 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "outlook_update_task": {
         "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
     },
-    "outlook_complete_task": {
+    "outlook_set_task_status": {
         "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
     },
 }
 
 
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
-    "outlook_create_task": frozenset({"title"}),
+    "outlook_create_task": frozenset({"title", "every"}),
+    "outlook_update_task": frozenset({"every"}),
+    "outlook_set_task_status": frozenset({"status"}),
     "teams_send_chat_message": frozenset({"message", "name"}),
     "teams_send_channel_message": frozenset({"message", "name"}),
     "teams_send_chat_message_with_files": frozenset({"message", "name"}),

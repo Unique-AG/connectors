@@ -1032,13 +1032,13 @@ when Microsoft 365 does not report the list as private.
 | --- | --- | --- | --- |
 | `outlook_create_task` | 🟠 Add | 🤝 Shared list | Creates one task in a list, with a due date, a priority, and notes. |
 | `outlook_update_task` | 🔴 Change | 🤝 Shared list | Changes only the given fields of one task. Replaces the whole notes when it gets new notes. |
-| `outlook_complete_task` | 🟠 Add | 🤝 Shared list | Marks one task as completed. |
+| `outlook_set_task_status` | 🔴 Change | 🤝 Shared list | Sets the status of one task: completes it, reopens it, or sets another status. |
 
 **What it needs**
 
 - **Graph permissions (3):** `Tasks.Read`, `Tasks.ReadWrite`, `User.Read`
 - **Admin consent:** Not required.
-- **User approval:** Asks 🤝 in some cases for `outlook_create_task`, `outlook_update_task`, `outlook_complete_task`.
+- **User approval:** Asks 🤝 in some cases for `outlook_create_task`, `outlook_update_task`, `outlook_set_task_status`.
 
 ## SharePoint and OneDrive presets
 
@@ -1700,7 +1700,7 @@ This reference lists all 136 tools. Use it to build an `enabled` list, or to fin
 | `outlook_read_task` | 🟢 Read | `Tasks.Read` | No | — |
 | `outlook_create_task` | 🟠 Write, adds | `Tasks.ReadWrite` | No | 🤝 Shared list |
 | `outlook_update_task` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
-| `outlook_complete_task` | 🟠 Write, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_set_task_status` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
 
 ### SharePoint and OneDrive
 

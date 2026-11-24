@@ -7,7 +7,6 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
-from msgraph.generated.models.task_status import TaskStatus
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
@@ -19,35 +18,38 @@ from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
     DEFAULT_TIME_ZONE,
     TIME_ZONE_FIELD,
+    Status,
     TaskDetail,
     bad_task_handle,
     bad_zone,
+    graph_status,
     list_audience,
     shared_list_reason,
 )
 from office_365_mcp.shared.seam import (
-    WRITE_IDEMPOTENT,
+    WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
     answer_pending,
     graph_client_for_caller,
     person_confirms,
 )
 
-TOOL_NAME = "outlook_complete_task"
+TOOL_NAME = "outlook_set_task_status"
 
 PRESETS: tuple[str, ...] = ("outlook-tasks-write",)
 
-STEP_COMPLETE = "complete_task"
+STEP_SET_STATUS = "set_task_status"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Tasks.ReadWrite",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
-    "uri": "outlook:///tasks/AAMkAGI2SYNTHETIC-list-0001%3D/AAMkAGI2SYNTHETIC-task-0001%3D"
+    "uri": "outlook:///tasks/AAMkAGI2SYNTHETIC-list-0001%3D/AAMkAGI2SYNTHETIC-task-0001%3D",
+    "status": "completed",
 }
 
 _NOTHING_CHANGED = "Nothing was changed."
-_COMPLETE = "complete"
-_DO_NOT_COMPLETE = "do not complete"
+_CHANGE = "change the status"
+_DO_NOT_CHANGE = "keep the status"
 
 _AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
@@ -60,21 +62,31 @@ GRAPH_NOT_FOUND = (
 )
 
 _DESCRIPTION = """\
-Marks one Microsoft To Do task of the signed-in user as completed, given the `uri` of an \
-outlook_list_tasks row. Outlook and To Do then show the task as done.
+Sets the status of one Microsoft To Do task of the signed-in user, given the `uri` of an \
+outlook_list_tasks row. `completed` marks the task done, and `not_started` reopens it. Outlook \
+and To Do show the new status.
 
 Notes:
-- To reopen a completed task, call outlook_update_task with `status="not_started"`.
+- When the user completes a repeating task, To Do makes the next task of the series.
 - This tool asks the user to agree before it changes a task in a list that other people share, \
 because they see the change. A task in the user's own unshared list changes without a question.
 - This call is safe to repeat after a timeout.
 """
 
+_SPOKEN: Mapping[Status, str] = {
+    "not_started": "not started",
+    "in_progress": "in progress",
+    "completed": "completed",
+    "waiting_on_others": "waiting on others",
+    "deferred": "deferred",
+}
 
-async def complete_task(
+
+async def set_task_status(
     client: GraphServiceClient,
     *,
     uri: str,
+    status: Status,
     time_zone: str = DEFAULT_TIME_ZONE,
     confirm: Confirm,
     answer_pending: bool = False,
@@ -86,7 +98,7 @@ async def complete_task(
     if zone is None:
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
 
-    about = write_state_for(STEP_COMPLETE, handle.uri)
+    about = write_state_for(STEP_SET_STATUS, handle.uri, status)
 
     updated: TodoTask | None = None
     asked: InputRequiredResult | None = None
@@ -95,17 +107,17 @@ async def complete_task(
         audience = await list_audience(client, handle.list_id)
         if answer_pending or audience.reaches_others:
             with not_graph():
-                question = f"Mark a task as completed {shared_list_reason(audience)}?"
+                question = f"Set a task to {_SPOKEN[status]} {shared_list_reason(audience)}?"
                 answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            with graph_step(STEP_COMPLETE):
+            with graph_step(STEP_SET_STATUS):
                 updated = (
                     await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
                     .tasks.by_todo_task_id(handle.task_id)
                     .patch(
-                        TodoTask(status=TaskStatus.Completed),
+                        TodoTask(status=graph_status(status)),
                         request_configuration=RequestConfiguration[QueryParameters](
                             options=no_retry()
                         ),
@@ -125,11 +137,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
 
     @mcp.tool(
         name=TOOL_NAME,
-        title="Outlook: Complete a Task",
+        title="Outlook: Set the Status of a Task",
         description=_DESCRIPTION,
-        annotations=WRITE_IDEMPOTENT,
+        annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
     )
-    async def outlook_complete_task(
+    async def outlook_set_task_status(
         uri: Annotated[
             str,
             Field(
@@ -140,18 +152,29 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
+        status: Annotated[
+            Status,
+            Field(
+                description=(
+                    "The new status: `not_started`, `in_progress`, `waiting_on_others`, "
+                    + "`deferred`, or `completed`. To Do shows `completed` as done and every "
+                    + "other status as open."
+                )
+            ),
+        ],
         ctx: Context,
         time_zone: Annotated[str, Field(min_length=1, description=TIME_ZONE_FIELD)] = (
             DEFAULT_TIME_ZONE
         ),
         client: GraphServiceClient = graph,
     ) -> TaskDetail | InputRequiredResult:
-        return await complete_task(
+        return await set_task_status(
             client,
             uri=uri,
+            status=status,
             time_zone=time_zone,
             confirm=person_confirms(
-                ctx, agree=_COMPLETE, decline=_DO_NOT_COMPLETE, nothing_happened=_NOTHING_CHANGED
+                ctx, agree=_CHANGE, decline=_DO_NOT_CHANGE, nothing_happened=_NOTHING_CHANGED
             ),
             answer_pending=answer_pending(ctx),
         )
