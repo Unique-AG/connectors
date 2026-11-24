@@ -316,7 +316,10 @@ class TestCapturingNotes:
         for name in ("onenote_create_page", "onenote_edit_page"):
             asked = set(cast("Mapping[str, object]", tools[name].input_schema["properties"]))
             assert not asked & {"level", "parent_page", "subpage", "indent", "order"}
-            assert "create-a-subpage-in-onenote" in str(tools[name].description)
+            description = str(tools[name].description)
+            assert "create-a-subpage-in-onenote On an iPad" in description
+            assert "create-a-subpage-in-onenote-for-ipad-or-iphone" in description
+            assert "a subpage one more time" in description
 
     async def test_a_task_list_is_appended_and_nothing_else_is_sent(
         self, graph: respx.MockRouter

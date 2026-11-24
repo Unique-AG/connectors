@@ -1225,6 +1225,8 @@ Notebooks, sections, and pages.
 its section. To make it a subpage, the user moves it directly below its parent in the OneNote app
 and makes it a subpage there, as
 [Create a subpage in OneNote](https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote) tells.
+If the parent is itself a subpage, the user makes the page a subpage one more time. On an iPad
+or iPhone, the user follows [Create a subpage in OneNote for iPad or iPhone](https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone).
 
 **Tools added by this preset**
 
