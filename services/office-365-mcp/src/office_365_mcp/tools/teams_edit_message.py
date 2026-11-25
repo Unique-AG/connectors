@@ -127,9 +127,10 @@ class EditedMessage(BaseModel):
     )
     body_html: str = Field(
         description=(
-            "The new HTML that this call sent, exactly as the call received it. Microsoft 365 "
-            + "answers this change with no content, so every field of this answer repeats the "
-            + "request."
+            "The `body_html` argument, exactly as the call received it. The message also starts "
+            + "with one mention for each entry of `mentions`, and this field does not show them. "
+            + "Microsoft 365 answers this change with no content, so every field of this answer "
+            + "repeats the request."
         )
     )
     mentions: list[Mention] = Field(
