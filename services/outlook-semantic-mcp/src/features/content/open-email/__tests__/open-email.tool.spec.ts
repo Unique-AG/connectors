@@ -2,12 +2,12 @@ import type { McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import type { Context } from '@unique-ag/mcp-server-module';
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { loadFeaturesConfig } from '~/config';
 import { OpenEmailTool } from '../open-email.tool';
 
 vi.mock('~/utils/extract-user-profile-id', () => ({
   extractUserProfileId: () => ({ toString: () => 'user-1' }),
 }));
-vi.mock('~/utils/backend-config.utils', () => ({ isMicrosoftGraphBackend: () => true }));
 
 const request = {} as McpAuthenticatedRequest;
 const context = {} as Context;
@@ -22,6 +22,7 @@ describe('OpenEmailTool', () => {
       { run: vi.fn() } as never,
       openEmailQuery as never,
       { run: vi.fn().mockResolvedValue(undefined) } as never,
+      loadFeaturesConfig({ MCP_BACKEND: 'microsoft_graph', DELEGATED_ACCESS_SCAN: 'disabled' }),
     );
   });
 

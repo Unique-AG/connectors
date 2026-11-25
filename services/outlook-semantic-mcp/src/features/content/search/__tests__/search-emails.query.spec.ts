@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { loadFeaturesConfig } from '~/config';
 import type { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import {
   convertUserProfileIdToTypeId,
@@ -85,6 +86,10 @@ describe('SearchEmailsQuery', () => {
       msGraphKqlQuery as unknown as MsGraphKqlSearchEmailsQuery,
       { run: vi.fn().mockResolvedValue(undefined) } as unknown as GetMailboxTimezoneQuery,
       searchCursorRepository as unknown as SearchCursorRepository,
+      loadFeaturesConfig({
+        MCP_BACKEND: 'microsoft_graph_and_unique_api',
+        DELEGATED_ACCESS_SCAN: 'disabled',
+      }),
     );
   });
 

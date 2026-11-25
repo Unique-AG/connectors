@@ -146,6 +146,13 @@
               "description": "Enables Outlook calendar tools and requests Calendars.ReadWrite.Shared. Default disabled keeps the mail-only OAuth scope set unchanged.",
               "default": "disabled"
             },
+            "tools": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "uniqueItems": true,
+              "description": "Tools to register, by name. Empty registers every tool the backend and features offer. Env var: MCP_TOOLS (JSON array)",
+              "default": []
+            },
             "delegatedAccessScan": {
               "type": "string",
               "enum": ["disabled", "full_access_only", "granular_access"],

@@ -1,4 +1,4 @@
-import { isCalendarEnabled, isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
+import { type FeaturesConfig, loadFeaturesConfig, McpBackendType } from '~/config';
 
 const EMAIL_SEARCH_INSTRUCTIONS = `
 ## Email search
@@ -43,9 +43,10 @@ export const CALENDAR_INSTRUCTIONS = `
 - If a calendar tool returns \`consentRequired\` true, ask the user to reconnect Outlook. Do not call \`reconnect_inbox\` and do not send them to /auth/authorize.
 `;
 
-export function buildServerInstructions(): string {
-  const backend = isMicrosoftGraphBackend()
-    ? MICROSOFT_GRAPH_INSTRUCTIONS
-    : MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS;
-  return isCalendarEnabled() ? `${backend}\n${CALENDAR_INSTRUCTIONS}` : backend;
+export function buildServerInstructions(features: FeaturesConfig = loadFeaturesConfig()): string {
+  const backend =
+    features.mode === McpBackendType.MicrosoftGraph
+      ? MICROSOFT_GRAPH_INSTRUCTIONS
+      : MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS;
+  return features.calendar ? `${backend}\n${CALENDAR_INSTRUCTIONS}` : backend;
 }

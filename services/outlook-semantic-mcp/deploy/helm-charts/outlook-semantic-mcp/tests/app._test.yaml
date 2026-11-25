@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: App config env injection
+templates:
+  - all.yaml
+tests:
+  - it: omits MCP_TOOLS when no tools are listed
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_TOOLS
+          any: true
+
+  - it: renders the listed tools as a JSON array in MCP_TOOLS
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+            - open_email
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_TOOLS
+            value: '["search_emails","open_email"]'

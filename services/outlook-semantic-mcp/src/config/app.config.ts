@@ -34,7 +34,6 @@ const ConfigSchema = z
     selfUrl: stringToURL().describe('The URL of the MCP Server. Used for OAuth callbacks.'),
     mcpDebugMode: mcpDebugModeSchema,
     mcpBackend: mcpBackendSchema,
-    calendarIntegration: calendarIntegrationSchema,
     directorySyncCronSchedule: z
       .string()
       .prefault('*/5 * * * *')
@@ -63,7 +62,6 @@ export const appConfig = registerConfig('app', ConfigSchema, {
     'SELF_URL',
     'MCP_DEBUG_MODE',
     'MCP_BACKEND',
-    'CALENDAR_INTEGRATION',
     'DIRECTORY_SYNC_CRON_SCHEDULE',
     'LOGS_BUFFERING',
     'LOGS_DIAGNOSTICS_DATA_POLICY',

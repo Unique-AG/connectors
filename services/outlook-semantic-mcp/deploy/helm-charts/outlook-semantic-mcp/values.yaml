@@ -314,6 +314,10 @@ mcpConfig:
     #    flipping this flag; otherwise mail token refresh fails with invalid_grant.
     #    Env var: CALENDAR_INTEGRATION
     calendarIntegration: disabled
+    # -- Tools to register, by name. Empty registers every tool the backend and features offer.
+    #    The server refuses to start on an unknown name or a tool whose feature is off, e.g.
+    #    `sync_progress` with mcpBackend microsoft_graph. Env var: MCP_TOOLS (JSON array)
+    tools: []
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'

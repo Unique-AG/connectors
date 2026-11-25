@@ -8,6 +8,10 @@
   value: {{ .app.mcpBackend | quote }}
 - name: CALENDAR_INTEGRATION
   value: {{ .app.calendarIntegration | quote }}
+{{- with .app.tools }}
+- name: MCP_TOOLS
+  value: {{ toJson . | quote }}
+{{- end }}
 {{- if .app.directorySyncCronSchedule }}
 - name: DIRECTORY_SYNC_CRON_SCHEDULE
   value: {{ .app.directorySyncCronSchedule | quote }}

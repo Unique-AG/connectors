@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { omit, sum, unique } from 'remeda';
+import { type FeaturesConfig, featuresConfig, McpBackendType } from '~/config';
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { Nullish } from '~/utils/nullish';
 import {
@@ -35,6 +35,7 @@ export class SearchEmailsQuery {
     private readonly msGraphKqlQuery: MsGraphKqlSearchEmailsQuery,
     private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
     private readonly searchCursorRepository: SearchCursorRepository,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   public async run(
@@ -42,9 +43,10 @@ export class SearchEmailsQuery {
     input: SearchEmailsToolInput,
   ): Promise<SearchEmailsOutput> {
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileId);
-    const semanticQueries = isMicrosoftGraphBackend()
-      ? []
-      : (input.uniqueSemanticSearchQueries ?? []);
+    const semanticQueries =
+      this.features.mode === McpBackendType.MicrosoftGraph
+        ? []
+        : (input.uniqueSemanticSearchQueries ?? []);
     const kqlQueries = input.msGraphKeywordSearchQueries ?? [];
 
     // Every query gets an equal share of the response budget. A semantic search uses its share as

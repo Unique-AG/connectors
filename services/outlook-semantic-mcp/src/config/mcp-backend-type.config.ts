@@ -13,7 +13,6 @@ export const AllBackendTypes = asAllOptions<McpBackendType>()([
 
 export const mcpBackendSchema = z
   .enum(AllBackendTypes)
-  .prefault(McpBackendType.MicrosoftGraphAndUniqueApi)
   .describe(
-    'Selects the search backend: MicrosoftGraphAndUniqueApi (KB ingestion) or MicrosoftGraph (direct Graph search).',
+    'Required. Selects the search backend: MicrosoftGraphAndUniqueApi (KB ingestion) or MicrosoftGraph (direct Graph search).',
   );
