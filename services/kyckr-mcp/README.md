@@ -43,7 +43,6 @@ Deliver these from a Kubernetes Secret, never through `values.yaml`, and list th
 | Variable | Notes |
 |---|---|
 | `UPSTREAM_API_KEY` | The Kyckr API key of this deployment. |
-| `ZITADEL_CLIENT_ID` | The client id of the Zitadel application of this MCP. |
 | `ZITADEL_JWT_SIGNING_KEY` | At least 32 characters, the same on every replica. It signs the tokens the MCP issues and encrypts the sign-in state in Postgres. Rotating it signs everyone out. |
 | `ZITADEL_CLIENT_SECRET` | Leave unset for a public client with PKCE. |
 
@@ -61,6 +60,7 @@ The overlay must set `app.publicBaseUrl`, `zitadel.baseUrl` and `kyckr.apiUrl`: 
 |---|---|---|
 | `app.publicBaseUrl` | `MCP_BASE_URL` | The public https origin. Must match `routes.hostname`. Mandatory. |
 | `zitadel.baseUrl` | `ZITADEL_BASE_URL` | The Zitadel issuer. Mandatory. |
+| `zitadel.clientId` | `ZITADEL_CLIENT_ID` | Mandatory in zitadel mode. The client id of the Zitadel application of this MCP. Not a secret. Or supply it through `extraEnvSecrets` or `envVars`. |
 | `zitadel.orgId` | `ZITADEL_ORG_ID` | Restricts sign-in to one organisation. See below. |
 | `kyckr.apiUrl` | `UPSTREAM_API_URL` | Mandatory, with no default, so no deployment calls the test API by accident. Production is `https://api.kyckr.com/v2`, test is `https://test-api.kyckr.com/v2`. The app rejects every scheme but https, since the Kyckr key goes to this origin. |
 | `kyckr.timeoutSeconds` | `UPSTREAM_TIMEOUT_SECONDS` | Pinned at 30. At most 120. |
@@ -107,7 +107,7 @@ spec:
           name: <secret-store-name>
 ```
 
-Add one `data` entry for each of `ZITADEL_CLIENT_ID` and `ZITADEL_JWT_SIGNING_KEY`. To rotate the key, write the new value to the store. The Secret changes when the ExternalSecret next refreshes. The Deployment carries `reloader.stakater.com/auto: "true"`, so Reloader then restarts the pods.
+Add one `data` entry for `ZITADEL_JWT_SIGNING_KEY`. To rotate the key, write the new value to the store. The Secret changes when the ExternalSecret next refreshes. The Deployment carries `reloader.stakater.com/auto: "true"`, so Reloader then restarts the pods.
 
 ## Run locally
 
