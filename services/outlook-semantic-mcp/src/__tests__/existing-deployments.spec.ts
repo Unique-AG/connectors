@@ -26,7 +26,7 @@ const CALENDAR_GRANT = [...MAIL_GRANT, 'Calendars.ReadWrite.Shared'];
 // Requested at sign-in without being registered on the app.
 const UNREGISTERED = ['openid', 'profile', 'email', 'offline_access'];
 
-// What main (8a3a707b5) registers in microsoft_graph mode, in its registration order.
+// What main registers in microsoft_graph mode, in its registration order.
 const MAIN_GRAPH_TOOLS = [
   'list_mailboxes_and_directories',
   'list_categories',

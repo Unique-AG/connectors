@@ -79,11 +79,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
 
 export type FeaturesConfig = z.output<typeof FeaturesConfigSchema>;
 
-/**
- * Reads the features from `process.env` synchronously, for code that runs when its file loads
- * (tool decorators, module registration). Injected code uses `featuresConfig` instead; both parse
- * the same schema.
- */
+// Synchronous read of the same schema, for code that runs while its file loads.
 export function loadFeaturesConfig(env: NodeJS.ProcessEnv = process.env): FeaturesConfig {
   const input = Object.fromEntries(
     Object.entries(FEATURE_ENV_KEYS).map(([field, key]) => [field, env[key]]),

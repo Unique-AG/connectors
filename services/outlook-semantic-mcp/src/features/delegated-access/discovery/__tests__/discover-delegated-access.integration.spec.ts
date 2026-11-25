@@ -7,12 +7,12 @@ import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testconta
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DrizzleDatabase } from '~/db';
 import * as schema from '~/db/schema';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
-import { stopPostgres } from '../../../../__mocks__/stop-postgres';
+import { createPostgresPool, stopPostgres } from '../../../../__mocks__/stop-postgres';
 import {
   DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
   DiscoverDelegatedAccessCommand,
@@ -44,7 +44,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer('postgres:17-alpine').start();
-    pool = new Pool({ connectionString: container.getConnectionUri() });
+    pool = createPostgresPool(container.getConnectionUri());
     db = drizzle({ client: pool, casing: 'snake_case', schema });
     await migrate(db, { migrationsFolder: path.resolve(__dirname, '../../../../../drizzle') });
   }, CONTAINER_STARTUP_TIMEOUT_MS);

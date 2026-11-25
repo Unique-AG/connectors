@@ -5,7 +5,7 @@ import { loadFeaturesConfig } from '~/config';
 import { registerBackendModule, TOOL_CLASSES } from '../backend.module';
 import { CalendarModule } from '../calendar/calendar.module';
 
-// Copied from what origin/main (8a3a707b5) registers, in its registration order.
+// What main registers, in its registration order.
 const MAIN_COMMON_TOOLS = [
   'list_mailboxes_and_directories',
   'list_categories',
@@ -65,8 +65,6 @@ const registeredToolNames = (module: DynamicModule) =>
 const register = (env: NodeJS.ProcessEnv) => registerBackendModule(loadFeaturesConfig(env));
 
 describe(registerBackendModule.name, () => {
-  // Each of main's env shapes rewritten to the new config: MCP_TOOLS lists what main registered
-  // (reversed, to show the listed order does not matter) and CALENDAR_INTEGRATION is gone.
   it.each([
     [
       'microsoft_graph_and_unique_api',
