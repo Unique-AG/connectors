@@ -20,13 +20,13 @@ import pytest
 from kyckr_mcp.mcp import create_auth
 from kyckr_mcp.mcp import http_app
 from kyckr_mcp.mcp.auth import IdTokenVerifier
-from kyckr_mcp.mcp.auth import ORG_CLAIM
 from kyckr_mcp.persistence import Persistence
 from kyckr_mcp.upstream import UpstreamSettings
 from tests.conftest import FakeKyckr
 from tests.offline_server import build_server
 
 ORG_SCOPE = "urn:zitadel:iam:org:id:org-1"
+ORG_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 SEARCH = {
     "jsonrpc": "2.0",
     "id": 1,

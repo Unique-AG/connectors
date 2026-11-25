@@ -39,19 +39,19 @@ _tracer = trace.get_tracer("kyckr_mcp")
 _log = logging.getLogger(__name__)
 
 
-def route_template(path: str) -> str:
+def _route_template(path: str) -> str:
     return next((template for pattern, template in _ROUTES if pattern.match(path)), "[unknown]")
 
 
 def _route(request: httpx2.Request) -> str:
-    return route_template(request.url.raw_path.partition(b"?")[0].decode("ascii"))
+    return _route_template(request.url.raw_path.partition(b"?")[0].decode("ascii"))
 
 
 def _mapping(value: object) -> Mapping[str, object]:
     return cast(Mapping[str, object], value) if isinstance(value, Mapping) else {}
 
 
-def credit_cost(body: object) -> float:
+def _credit_cost(body: object) -> float:
     """The top-level `cost.value` of an answer, the price of this call. A value that is not a
     finite number of at least 0 is no cost, since a counter rejects it and the call has been paid.
     """
@@ -126,4 +126,4 @@ async def record_credits(response: httpx2.Response) -> None:
         body = cast(object, response.json())
     except ValueError:
         return
-    credits_consumed.labels(tool=tool).inc(credit_cost(body))
+    credits_consumed.labels(tool=tool).inc(_credit_cost(body))

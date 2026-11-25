@@ -1,12 +1,13 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 import contextlib
-import itertools
+import json
 import logging
 import math
-from types import SimpleNamespace
+import time
 
 import httpx2
 from mcp_observability import REGISTRY
+from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
@@ -16,8 +17,6 @@ import pytest
 
 from kyckr_mcp.upstream import upstream_http
 from kyckr_mcp.upstream import UpstreamSettings
-from kyckr_mcp.upstream.recording import credit_cost
-from kyckr_mcp.upstream.recording import route_template
 from tests.conftest import CallTool
 from tests.conftest import FakeKyckr
 
@@ -90,59 +89,74 @@ def explode(request: httpx2.Request) -> httpx2.Response:
 
 
 @pytest.fixture
-def spans(monkeypatch: pytest.MonkeyPatch) -> InMemorySpanExporter:
+def spans() -> Iterator[InMemorySpanExporter]:
+    """The tracer provider is process-wide and settable once, so each test attaches an exporter
+    to it and shuts that exporter down after.
+    """
     exporter = InMemorySpanExporter()
-    provider = TracerProvider()
+    provider = trace.get_tracer_provider()
+    if not isinstance(provider, TracerProvider):
+        provider = TracerProvider()
+        trace.set_tracer_provider(provider)
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setattr("kyckr_mcp.upstream.recording._tracer", provider.get_tracer("test"))
-    return exporter
+    yield exporter
+    exporter.shutdown()
 
 
 @pytest.mark.parametrize(
     ("path", "route"),
     [
-        ("/v2/companies", "/companies"),
-        ("/v2/companies/GB%7C12345678/lite", LITE),
-        ("/v2/companies/RO%7CJ40%2F8%2F1993/lite", LITE),
-        ("/v2/companies/GB%7C12345678/enhanced", "/companies/:kyckrId/enhanced"),
-        ("/v2/companies/GB%7C12345678/documents", "/companies/:kyckrId/documents"),
-        ("/v2/orders", "/orders"),
-        ("/v2/orders/9876", "/orders/:orderId"),
-        ("/v2/orders/9876/download", "/orders/:orderId/download"),
-        ("/v2/unlisted/9876", "[unknown]"),
+        ("/companies", "/companies"),
+        ("/companies/GB%7C12345678/lite", LITE),
+        ("/companies/RO%7CJ40%2F8%2F1993/lite", LITE),
+        ("/companies/GB%7C12345678/enhanced", "/companies/:kyckrId/enhanced"),
+        ("/companies/GB%7C12345678/documents", "/companies/:kyckrId/documents"),
+        ("/orders", "/orders"),
+        ("/orders/9876", "/orders/:orderId"),
+        ("/orders/9876/download", "/orders/:orderId/download"),
+        ("/unlisted/9876", "[unknown]"),
     ],
 )
-def test_the_path_label_replaces_registry_ids_with_placeholders(path: str, route: str) -> None:
-    assert route_template(path) == route
+async def test_the_path_label_replaces_registry_ids_with_placeholders(
+    upstream_settings: UpstreamSettings, path: str, route: str
+) -> None:
+    before = requests_total("GET", route, "200")
+
+    await get(upstream_settings, answering(200), path)
+
+    assert requests_total("GET", route, "200") == before + 1
 
 
 @pytest.mark.parametrize(
     "path",
     [
-        "/v2/companies/GB%7C12345678/orders",
-        "/v2/archive/orders",
-        "/v2/orders/9876/download/more",
-        "/v2/companies/lite",
-        "/v2/companies/GB%7C1/lite/extra",
+        "/companies/GB%7C12345678/orders",
+        "/archive/orders",
+        "/orders/9876/download/more",
+        "/companies/lite",
+        "/companies/GB%7C1/lite/extra",
     ],
 )
-def test_a_lookalike_path_is_labelled_unknown(path: str) -> None:
-    assert route_template(path) == "[unknown]"
+async def test_a_lookalike_path_is_labelled_unknown(
+    upstream_settings: UpstreamSettings, path: str
+) -> None:
+    before = requests_total("GET", "[unknown]", "200")
+
+    await get(upstream_settings, answering(200), path)
+
+    assert requests_total("GET", "[unknown]", "200") == before + 1
 
 
 @pytest.mark.parametrize("value", [-1, -0.5, 0, True, False, math.nan, math.inf, "4", None])
-def test_a_cost_that_is_no_positive_number_is_no_credits(value: object) -> None:
-    assert credit_cost({"cost": {"value": value}}) == 0
-
-
-@pytest.mark.parametrize("value", [-1, True])
 async def test_a_cost_the_counter_rejects_does_not_fail_the_paid_call(
     upstream_settings: UpstreamSettings, value: object
 ) -> None:
     before = credits_of("create_document_order")
 
+    # httpx2 refuses to encode NaN and Infinity, and json.dumps writes them.
+    body = json.dumps({"cost": {"value": value}}).encode()
     response = await get(
-        upstream_settings, answering(201, {"cost": {"value": value}}), "/orders", method="POST"
+        upstream_settings, lambda _: httpx2.Response(201, content=body), "/orders", method="POST"
     )
 
     assert response is not None
@@ -173,23 +187,23 @@ async def test_a_query_string_does_not_change_the_path_label(
 
 
 async def test_the_duration_is_recorded_in_milliseconds(
-    upstream_settings: UpstreamSettings, monkeypatch: pytest.MonkeyPatch
+    upstream_settings: UpstreamSettings,
 ) -> None:
-    ticks = itertools.count(0, 0.25)
-    monkeypatch.setattr(
-        "kyckr_mcp.upstream.recording.time", SimpleNamespace(perf_counter=lambda: next(ticks))
-    )
+    def slow(_: httpx2.Request) -> httpx2.Response:
+        time.sleep(0.15)
+        return httpx2.Response(200, json={})
+
     labels = {"method": "GET", "path": "/companies/:kyckrId/documents"}
     name = "kyckr_api_request_duration_ms"
     total_before = sample(f"{name}_sum", labels)
-    in_250_before = sample(f"{name}_bucket", {**labels, "le": "250.0"})
     in_100_before = sample(f"{name}_bucket", {**labels, "le": "100.0"})
+    in_1000_before = sample(f"{name}_bucket", {**labels, "le": "1000.0"})
 
-    await get(upstream_settings, answering(200), "/companies/GB%7C1/documents")
+    await get(upstream_settings, slow, "/companies/GB%7C1/documents")
 
-    assert sample(f"{name}_sum", labels) == pytest.approx(total_before + 250)
-    assert sample(f"{name}_bucket", {**labels, "le": "250.0"}) == in_250_before + 1
+    assert 150 <= sample(f"{name}_sum", labels) - total_before < 1000
     assert sample(f"{name}_bucket", {**labels, "le": "100.0"}) == in_100_before
+    assert sample(f"{name}_bucket", {**labels, "le": "1000.0"}) == in_1000_before + 1
     assert REGISTRY.get_sample_value(f"{name}_bucket", {**labels, "le": "120000.0"}) is not None
 
 

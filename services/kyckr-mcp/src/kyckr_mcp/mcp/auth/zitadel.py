@@ -17,7 +17,7 @@ from unique_mcp.auth.zitadel.oidc_proxy import ZitadelOIDCProxySettings
 from unique_mcp.auth.zitadel.scopes import ZITADEL_DEFAULT_MCP_SCOPES
 
 # Zitadel adds it for the `urn:zitadel:iam:user:resourceowner` scope, which every sign-in asks for.
-ORG_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
+_ORG_CLAIM = "urn:zitadel:iam:user:resourceowner:id"
 _ORG_SCOPE = "urn:zitadel:iam:org:id:"
 _OFFLINE_ACCESS = "offline_access"
 _logger = logging.getLogger(__name__)
@@ -44,7 +44,7 @@ class IdTokenVerifier(TokenVerifier):
         if verified is None:
             return None
         if self._org_id is not None:
-            org = verified.claims.get(ORG_CLAIM)
+            org = verified.claims.get(_ORG_CLAIM)
             if org != self._org_id:
                 _logger.warning(
                     "Sign-in refused: %s",
