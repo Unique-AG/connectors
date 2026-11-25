@@ -9,11 +9,6 @@ export const mcpDebugModeSchema = enabledDisabledBoolean(
   'disabled',
 );
 
-export const calendarIntegrationSchema = enabledDisabledBoolean(
-  'Enables Outlook calendar tools and requests Calendars.ReadWrite.Shared on OAuth and token refresh. Default disabled so mail-only deployments keep the existing scope set.',
-  'disabled',
-);
-
 const ConfigSchema = z
   .object({
     nodeEnv: z

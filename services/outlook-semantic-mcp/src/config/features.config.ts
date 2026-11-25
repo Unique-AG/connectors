@@ -1,7 +1,7 @@
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { json } from '~/utils/zod';
-import { calendarIntegrationSchema, mcpDebugModeSchema } from './app.config';
+import { enabledDisabledBoolean, json } from '~/utils/zod';
+import { mcpDebugModeSchema } from './app.config';
 import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 import {
   FEATURE_SETTINGS,
@@ -11,6 +11,11 @@ import {
   type ToolFeature,
   type ToolName,
 } from './tool-declarations';
+
+const calendarIntegrationSchema = enabledDisabledBoolean(
+  'Enables Outlook calendar tools and requests Calendars.ReadWrite.Shared on OAuth and token refresh. Default disabled so mail-only deployments keep the existing scope set.',
+  'disabled',
+);
 
 const FeaturesEnvSchema = z.object({
   mcpBackend: mcpBackendSchema,
