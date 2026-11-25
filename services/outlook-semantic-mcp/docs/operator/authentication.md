@@ -5,7 +5,7 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Mail permissions do not require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`). `Calendars.ReadWrite.Shared` is requested only when `CALENDAR_INTEGRATION=enabled` and typically **does** require admin consent.
+All permissions are **delegated** — they act on behalf of the signed-in user. Mail permissions do not require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`). `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically **does** require admin consent.
 
 | Permission | Type | Admin Consent |
 |------------|------|---------------|
@@ -14,7 +14,7 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `Mail.ReadWrite.Shared` | Delegated | No |
 | `MailboxSettings.Read` | Delegated | No |
 | `People.Read` | Delegated | No |
-| `Calendars.ReadWrite.Shared` | Delegated | Yes — only when `CALENDAR_INTEGRATION=enabled` |
+| `Calendars.ReadWrite.Shared` | Delegated | Yes — only when a calendar tool is listed in `MCP_TOOLS` |
 | `offline_access` | Delegated | No |
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
@@ -53,7 +53,7 @@ module "outlook_semantic_mcp_app" {
   notes            = "MCP server for Outlook email access"
 
   # Optional. "enabled" registers Calendars.ReadWrite.Shared and includes it in the grant.
-  # Apply this before setting CALENDAR_INTEGRATION=enabled on the service.
+  # Apply this before listing a calendar tool in the service's MCP_TOOLS.
   calendar_integration = "disabled"
 
   redirect_uris = [
@@ -85,7 +85,7 @@ module "outlook_semantic_mcp_app" {
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
    - Add all permissions listed under [Required Permissions](#Required-Permissions)
-   - If you will enable `CALENDAR_INTEGRATION`, also add `Calendars.ReadWrite.Shared` and grant admin consent before flipping the runtime flag
+   - If you will list calendar tools in `MCP_TOOLS`, also add `Calendars.ReadWrite.Shared` and grant admin consent before listing them
 
 3. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration

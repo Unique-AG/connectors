@@ -62,67 +62,81 @@ const registeredToolNames = (module: DynamicModule) =>
     return name ? [name] : [];
   });
 
-const register = (env: NodeJS.ProcessEnv) =>
-  registerBackendModule(loadFeaturesConfig({ DELEGATED_ACCESS_SCAN: 'full_access_only', ...env }));
+const register = (env: NodeJS.ProcessEnv) => registerBackendModule(loadFeaturesConfig(env));
 
 describe(registerBackendModule.name, () => {
-  describe('with MCP_TOOLS unset', () => {
-    it.each([
-      [
-        'microsoft_graph_and_unique_api',
-        'enabled',
-        'enabled',
-        [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_DEBUG_TOOLS, ...MAIN_CALENDAR_TOOLS],
-      ],
-      [
-        'microsoft_graph_and_unique_api',
-        'enabled',
-        'disabled',
-        [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_CALENDAR_TOOLS],
-      ],
-      [
-        'microsoft_graph_and_unique_api',
-        'disabled',
-        'enabled',
-        [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_DEBUG_TOOLS],
-      ],
-      [
-        'microsoft_graph_and_unique_api',
-        'disabled',
-        'disabled',
-        [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS],
-      ],
-      ['microsoft_graph', 'enabled', 'enabled', [...MAIN_COMMON_TOOLS, ...MAIN_CALENDAR_TOOLS]],
-      ['microsoft_graph', 'enabled', 'disabled', [...MAIN_COMMON_TOOLS, ...MAIN_CALENDAR_TOOLS]],
-      ['microsoft_graph', 'disabled', 'enabled', MAIN_COMMON_TOOLS],
-      ['microsoft_graph', 'disabled', 'disabled', MAIN_COMMON_TOOLS],
-    ])(
-      'registers the tools main registers for %s, calendar %s, debug %s',
-      (backend, calendar, debug, expected) => {
-        const module = register({
-          MCP_BACKEND: backend,
-          CALENDAR_INTEGRATION: calendar,
-          MCP_DEBUG_MODE: debug,
-        });
+  // Each of main's env shapes rewritten to the new config: MCP_TOOLS lists what main registered
+  // (reversed, to show the listed order does not matter) and CALENDAR_INTEGRATION is gone.
+  it.each([
+    [
+      'microsoft_graph_and_unique_api',
+      'calendar on, debug on',
+      'enabled',
+      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_DEBUG_TOOLS, ...MAIN_CALENDAR_TOOLS],
+    ],
+    [
+      'microsoft_graph_and_unique_api',
+      'calendar on, debug off',
+      'disabled',
+      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_CALENDAR_TOOLS],
+    ],
+    [
+      'microsoft_graph_and_unique_api',
+      'calendar off, debug on',
+      'enabled',
+      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_DEBUG_TOOLS],
+    ],
+    [
+      'microsoft_graph_and_unique_api',
+      'calendar off, debug off',
+      'disabled',
+      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS],
+    ],
+    [
+      'microsoft_graph',
+      'calendar on, debug on',
+      'enabled',
+      [...MAIN_COMMON_TOOLS, ...MAIN_CALENDAR_TOOLS],
+    ],
+    [
+      'microsoft_graph',
+      'calendar on, debug off',
+      'disabled',
+      [...MAIN_COMMON_TOOLS, ...MAIN_CALENDAR_TOOLS],
+    ],
+    ['microsoft_graph', 'calendar off, debug on', 'enabled', MAIN_COMMON_TOOLS],
+    ['microsoft_graph', 'calendar off, debug off', 'disabled', MAIN_COMMON_TOOLS],
+  ])(
+    'registers what main registers for %s, %s, from the rewritten config',
+    (backend, _shape, debug, mainTools) => {
+      const module = register({
+        MCP_BACKEND: backend,
+        MCP_DEBUG_MODE: debug,
+        MCP_TOOLS: JSON.stringify([...mainTools].reverse()),
+      });
 
-        expect(registeredToolNames(module)).toEqual(expected);
-      },
-    );
-  });
+      expect(registeredToolNames(module)).toEqual(mainTools);
+    },
+  );
 
   it('registers exactly the read-only tools in microsoft_graph mode', () => {
     const module = register({
       MCP_BACKEND: 'microsoft_graph',
-      DELEGATED_ACCESS_SCAN: 'disabled',
       MCP_TOOLS: JSON.stringify(READ_ONLY_TOOLS),
     });
 
     expect(registeredToolNames(module).sort()).toEqual([...READ_ONLY_TOOLS].sort());
   });
 
-  it('imports the calendar module only with calendar on', () => {
-    const on = register({ MCP_BACKEND: 'microsoft_graph', CALENDAR_INTEGRATION: 'enabled' });
-    const off = register({ MCP_BACKEND: 'microsoft_graph', CALENDAR_INTEGRATION: 'disabled' });
+  it('imports the calendar module only when a calendar tool is listed', () => {
+    const on = register({
+      MCP_BACKEND: 'microsoft_graph',
+      MCP_TOOLS: JSON.stringify(['search_emails', 'list_calendars']),
+    });
+    const off = register({
+      MCP_BACKEND: 'microsoft_graph',
+      MCP_TOOLS: JSON.stringify(['search_emails']),
+    });
 
     expect(on.imports).toContain(CalendarModule);
     expect(off.imports).not.toContain(CalendarModule);

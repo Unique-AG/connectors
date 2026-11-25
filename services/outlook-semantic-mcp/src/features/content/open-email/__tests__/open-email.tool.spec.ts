@@ -22,7 +22,10 @@ describe('OpenEmailTool', () => {
       { run: vi.fn() } as never,
       openEmailQuery as never,
       { run: vi.fn().mockResolvedValue(undefined) } as never,
-      loadFeaturesConfig({ MCP_BACKEND: 'microsoft_graph', DELEGATED_ACCESS_SCAN: 'disabled' }),
+      loadFeaturesConfig({
+        MCP_BACKEND: 'microsoft_graph',
+        MCP_TOOLS: JSON.stringify(['open_email']),
+      }),
     );
   });
 

@@ -3,7 +3,7 @@ suite: App config env injection
 templates:
   - all.yaml
 tests:
-  - it: omits MCP_TOOLS when no tools are listed
+  - it: fails to render when no tools are listed
     values:
       - ../ci-values.yaml
     set:
@@ -13,17 +13,11 @@ tests:
           selfUrl: https://outlook-mcp.example.com
         microsoft:
           clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
     asserts:
-      - notContains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-          any: true
+      - failedTemplate:
+          errorPattern: "mcpConfig.app.tools is mandatory"
 
-  - it: renders the listed tools as a JSON array in MCP_TOOLS
+  - it: renders the listed tools as a JSON array in MCP_TOOLS and no CALENDAR_INTEGRATION
     values:
       - ../ci-values.yaml
     set:
@@ -34,7 +28,7 @@ tests:
           mcpBackend: microsoft_graph
           tools:
             - search_emails
-            - open_email
+            - list_calendars
         microsoft:
           clientId: test-client-id
     documentSelector:
@@ -45,4 +39,9 @@ tests:
           path: spec.template.spec.containers[0].env
           content:
             name: MCP_TOOLS
-            value: '["search_emails","open_email"]'
+            value: '["search_emails","list_calendars"]'
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: CALENDAR_INTEGRATION
+          any: true

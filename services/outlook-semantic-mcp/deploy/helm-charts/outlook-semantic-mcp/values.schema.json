@@ -2328,15 +2328,6 @@
               "description": "Selects the search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default). microsoft_graph: direct Graph search, no ingestion.",
               "default": "microsoft_graph_and_unique_api"
             },
-            "calendarIntegration": {
-              "type": "string",
-              "enum": [
-                "enabled",
-                "disabled"
-              ],
-              "description": "Enables Outlook calendar tools and requests Calendars.ReadWrite.Shared. Default disabled keeps the mail-only OAuth scope set unchanged.",
-              "default": "disabled"
-            },
             "tools": {
               "type": "array",
               "items": {
@@ -2344,7 +2335,7 @@
                 "minLength": 1
               },
               "uniqueItems": true,
-              "description": "Tools to register, by name. Empty registers every tool the backend and features offer. Env var: MCP_TOOLS (JSON array)",
+              "description": "Mandatory. The tools to register, by name. Listing a calendar tool turns calendar on. Env var: MCP_TOOLS (JSON array)",
               "default": []
             },
             "delegatedAccessScan": {

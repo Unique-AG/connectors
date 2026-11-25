@@ -308,13 +308,9 @@ mcpConfig:
     # -- Search backend. microsoft_graph_and_unique_api: dual backend, KB ingestion + semantic search (default).
     # microsoft_graph: direct Graph search, no ingestion, sync tools not registered.
     mcpBackend: microsoft_graph_and_unique_api
-    # -- Outlook calendar tools and Calendars.ReadWrite.Shared scope. Set to "enabled"
-    #    to register calendar tools and request the extra Graph scope on OAuth / token refresh.
-    #    Also set calendar_integration="enabled" on the Entra Terraform module before
-    #    flipping this flag; otherwise mail token refresh fails with invalid_grant.
-    #    Env var: CALENDAR_INTEGRATION
-    calendarIntegration: disabled
-    # -- Tools to register, by name. Empty registers every tool the backend and features offer.
+    # -- Mandatory. The tools to register, by name; rendering fails while it is empty.
+    #    Listing a calendar tool turns calendar on and requests Calendars.ReadWrite.Shared, so
+    #    register that permission on the Entra app first (Terraform calendar_integration="enabled").
     #    The server refuses to start on an unknown name or a tool whose feature is off, e.g.
     #    `sync_progress` with mcpBackend microsoft_graph. Env var: MCP_TOOLS (JSON array)
     tools: []

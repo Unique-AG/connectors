@@ -78,10 +78,10 @@ variable "confidential_clients" {
 variable "calendar_integration" {
   description = <<-EOT
     When 'enabled', register Calendars.ReadWrite.Shared on the Entra app and include it in
-    the consent grant. Must match CALENDAR_INTEGRATION on the running service, which uses
-    the same 'enabled' / 'disabled' vocabulary. Default 'disabled' keeps mail-only app
-    registrations unchanged. Enabling calendar still requires this apply before flipping
-    the Helm/env flag, otherwise token refresh requests a scope the app does not expose.
+    the consent grant. Must be 'enabled' when the running service's MCP_TOOLS lists a
+    calendar tool. Default 'disabled' keeps mail-only app registrations unchanged. Enabling
+    calendar still requires this apply before listing a calendar tool in MCP_TOOLS,
+    otherwise token refresh requests a scope the app does not expose.
   EOT
   type        = string
   default     = "disabled"

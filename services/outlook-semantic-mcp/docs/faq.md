@@ -73,22 +73,22 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 13 mail tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 9 mail tools in `microsoft_graph` mode, and 8 more calendar tools when `CALENDAR_INTEGRATION` is enabled. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 13 mail tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 9 mail tools in `microsoft_graph` mode, and 8 more calendar tools when a calendar tool is listed in `MCP_TOOLS`. `MCP_TOOLS` selects which of them are registered. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
 
 **What it does:**
 
 - Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters
-- Exposes 13 mail tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status, and 8 calendar tools when the calendar flag is on
+- Exposes 13 mail tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status, and 8 calendar tools when a calendar tool is listed in `MCP_TOOLS`
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Outlook account
-- 13 mail MCP tools available in their AI client immediately after connection (17 with debug mode enabled; 8 more when calendar is enabled)
+- 13 mail MCP tools available in their AI client immediately after connection (17 with debug mode enabled; 8 more when calendar tools are listed), out of those the operator lists in `MCP_TOOLS`
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
-The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 13 mail tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 9 mail tools. Calendar tools are additive behind `CALENDAR_INTEGRATION`. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
+The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 13 mail tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 9 mail tools. Calendar tools are added when a calendar tool is listed in `MCP_TOOLS`. In both modes `MCP_TOOLS` selects the registered tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
@@ -104,17 +104,17 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 | Mailbox Utilities | `list_categories`, `list_mailboxes_and_directories` |
 | Subscription Management | `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data` |
 | Sync Monitoring | `sync_progress` |
-| Calendar (`CALENDAR_INTEGRATION`) | `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event` |
+| Calendar (when listed in `MCP_TOOLS`) | `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event` |
 
-An additional 4 tools are available only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`): `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`. These are intended for development and troubleshooting and are not exposed in production deployments.
+An additional 5 debug tools can be registered only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`) and the tool is listed in `MCP_TOOLS`: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`, `admin_ops`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
-In `microsoft_graph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools are not registered.
+In `microsoft_graph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools cannot be listed in `MCP_TOOLS`; the server refuses to start if they are.
 
 **See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools) — [Calendar](./technical/tools.md#Calendar)
 
 ### Do I need to do anything after connecting?
 
-**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The 10 tools become available immediately (14 with debug mode enabled). Search results may be incomplete while the initial full sync is running.
+**Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The tools listed in `MCP_TOOLS` become available immediately. Search results may be incomplete while the initial full sync is running.
 
 **Mode B (`microsoft_graph`):** No. After granting consent, all 6 tools are available immediately. There is no ingestion pipeline — search results come from live Microsoft Graph queries.
 
@@ -597,9 +597,9 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 Calendar is the same: `Calendars.ReadWrite.Shared` is user-consentable and does **not** require admin consent by itself. Admin consent only becomes necessary if the tenant has disabled user consent for applications, or if an admin wants to pre-grant organisation-wide.
 
-What calendar *does* require is that the scope is **registered on the Entra app** (`calendar_integration = "enabled"` on the Terraform module) before you set `CALENDAR_INTEGRATION=enabled`. Flipping the runtime flag against an app registration that does not expose the scope breaks mail token refresh (`invalid_grant`) — that failure is about registration, not consent.
+What calendar *does* require is that the scope is **registered on the Entra app** (`calendar_integration = "enabled"` on the Terraform module) before you list a calendar tool in `MCP_TOOLS`. Listing one against an app registration that does not expose the scope breaks mail token refresh (`invalid_grant`) — that failure is about registration, not consent.
 
-**See also:** [Permissions](./technical/permissions.md) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
+**See also:** [Permissions](./technical/permissions.md) — [Configuration — Calendar tools](./operator/configuration.md#Calendar-tools)
 
 ### What does `consentRequired: true` on a calendar tool mean?
 
@@ -609,7 +609,7 @@ Do **not** call `reconnect_inbox` — that only renews the mail webhook. Do **no
 
 A permission error on a *delegated* mailbox is different: that is not `consentRequired`; the tool returns a mailbox-specific denial instead.
 
-**See also:** [Tools — Calendar](./technical/tools.md#Calendar) — [Configuration — CALENDAR_INTEGRATION](./operator/configuration.md#CALENDAR_INTEGRATION)
+**See also:** [Tools — Calendar](./technical/tools.md#Calendar) — [Configuration — Calendar tools](./operator/configuration.md#Calendar-tools)
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 

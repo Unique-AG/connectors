@@ -88,7 +88,7 @@ describe('SearchEmailsQuery', () => {
       searchCursorRepository as unknown as SearchCursorRepository,
       loadFeaturesConfig({
         MCP_BACKEND: 'microsoft_graph_and_unique_api',
-        DELEGATED_ACCESS_SCAN: 'disabled',
+        MCP_TOOLS: JSON.stringify(['search_emails']),
       }),
     );
   });

@@ -1,10 +1,10 @@
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
-import { enabledDisabledBoolean, json } from '~/utils/zod';
 import { mcpDebugModeSchema } from './app.config';
 import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 import {
   FEATURE_SETTINGS,
+  GROUP_REQUIRES,
   isToolName,
   TOOL_DECLARATIONS,
   TOOL_NAMES,
@@ -12,31 +12,30 @@ import {
   type ToolName,
 } from './tool-declarations';
 
-const calendarIntegrationSchema = enabledDisabledBoolean(
-  'Enables Outlook calendar tools and requests Calendars.ReadWrite.Shared on OAuth and token refresh. Default disabled so mail-only deployments keep the existing scope set.',
-  'disabled',
-);
+const TOOLS_FORMAT = 'required, a JSON array of tool names such as ["search_emails","open_email"]';
+
+const mcpToolsSchema = z
+  .string({ error: TOOLS_FORMAT })
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      ctx.addIssue({ code: 'custom', input: value, message: TOOLS_FORMAT });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.array(z.string(), { error: TOOLS_FORMAT }).nonempty({ error: 'lists no tool' }))
+  .describe('JSON array of the tools to register. Required.');
 
 const FeaturesEnvSchema = z.object({
   mcpBackend: mcpBackendSchema,
-  calendarIntegration: calendarIntegrationSchema,
   mcpDebugMode: mcpDebugModeSchema,
-  delegatedAccessScan: z
-    .string()
-    .nonempty()
-    .describe('Shared mailboxes are on unless DELEGATED_ACCESS_SCAN is "disabled".'),
-  mcpTools: json(z.array(z.string()).min(1))
-    .optional()
-    .describe(
-      'JSON array of tool names to register. Unset registers every tool the mode and features offer.',
-    ),
+  mcpTools: mcpToolsSchema,
 });
 
 const FEATURE_ENV_KEYS = {
   mcpBackend: 'MCP_BACKEND',
-  calendarIntegration: 'CALENDAR_INTEGRATION',
   mcpDebugMode: 'MCP_DEBUG_MODE',
-  delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
   mcpTools: 'MCP_TOOLS',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
@@ -44,13 +43,9 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
   const enabled: Record<ToolFeature, boolean> = {
     uniqueMode: env.mcpBackend === McpBackendType.MicrosoftGraphAndUniqueApi,
     debugMode: env.mcpDebugMode,
-    calendar: env.calendarIntegration,
   };
-  const missingFeatures = (name: ToolName) =>
-    TOOL_DECLARATIONS[name].requires.filter((feature) => !enabled[feature]);
 
-  const listed = env.mcpTools;
-  for (const name of listed ?? []) {
+  for (const name of env.mcpTools) {
     if (!isToolName(name)) {
       ctx.addIssue({
         code: 'custom',
@@ -60,7 +55,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
       });
       continue;
     }
-    const missing = missingFeatures(name);
+    const missing = GROUP_REQUIRES[TOOL_DECLARATIONS[name].group].filter((f) => !enabled[f]);
     if (missing.length > 0) {
       ctx.addIssue({
         code: 'custom',
@@ -72,17 +67,13 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
   }
 
   const tools: ReadonlySet<ToolName> = new Set(
-    TOOL_NAMES.filter((name) =>
-      listed === undefined ? missingFeatures(name).length === 0 : listed.includes(name),
-    ),
+    TOOL_NAMES.filter((name) => env.mcpTools.includes(name)),
   );
 
   return {
     mode: env.mcpBackend,
-    calendar: env.calendarIntegration,
-    sharedMailboxes: env.delegatedAccessScan !== 'disabled',
-    debug: env.mcpDebugMode,
     tools,
+    calendar: [...tools].some((name) => TOOL_DECLARATIONS[name].group === 'calendar'),
   };
 });
 

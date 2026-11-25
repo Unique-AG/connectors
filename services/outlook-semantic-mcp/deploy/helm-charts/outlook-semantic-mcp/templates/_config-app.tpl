@@ -6,12 +6,11 @@
   value: {{ .app.mcpDebugMode | quote }}
 - name: MCP_BACKEND
   value: {{ .app.mcpBackend | quote }}
-- name: CALENDAR_INTEGRATION
-  value: {{ .app.calendarIntegration | quote }}
-{{- with .app.tools }}
-- name: MCP_TOOLS
-  value: {{ toJson . | quote }}
+{{- if empty .app.tools }}
+{{- fail "mcpConfig.app.tools is mandatory: list the tools to register, e.g. [search_emails, open_email]." }}
 {{- end }}
+- name: MCP_TOOLS
+  value: {{ toJson .app.tools | quote }}
 {{- if .app.directorySyncCronSchedule }}
 - name: DIRECTORY_SYNC_CRON_SCHEDULE
   value: {{ .app.directorySyncCronSchedule | quote }}

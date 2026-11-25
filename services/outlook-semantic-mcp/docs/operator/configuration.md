@@ -9,7 +9,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 |---|---|---|
 | Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
 | Ingestion | Full sync + live catch-up | None |
-| Tools | 10 standard + 4 debug; +8 when `CALENDAR_INTEGRATION` is enabled | 6 standard; +8 when `CALENDAR_INTEGRATION` is enabled |
+| Tools | Those listed in `MCP_TOOLS`, from 10 mail, 4 sync, 5 debug and 8 calendar tools | Those listed in `MCP_TOOLS`, from 10 mail and 8 calendar tools |
 | Requires Unique KB | Yes | Yes |
 | Requires RabbitMQ | Yes | Yes |
 | Folder filtering | Supported | Not supported |
@@ -23,10 +23,10 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 
 Two values are accepted for `MCP_BACKEND`:
 
-- **`microsoft_graph_and_unique_api`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; all sync tools (`sync_progress`, `run_full_sync`, etc.) are registered. Requires the `mcpConfig.ingestion` section to be configured.
-- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not registered. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
+- **`microsoft_graph_and_unique_api`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; the sync tools (`sync_progress`, `run_full_sync`, etc.) can be listed in [`MCP_TOOLS`](#MCP_TOOLS). Requires the `mcpConfig.ingestion` section to be configured.
+- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not available; the server refuses to start when [`MCP_TOOLS`](#MCP_TOOLS) lists one. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
 
-Existing deployments that do not set this variable are unaffected — `microsoft_graph_and_unique_api` is the default.
+The Helm chart sets `microsoft_graph_and_unique_api` by default. The service itself has no default, so set `MCP_BACKEND` when running it outside the chart.
 
 ## Environment Variables
 
@@ -193,10 +193,9 @@ Set via `mcpConfig.app` in Helm values:
 |----------|----------|---------|-------------|
 | `SELF_URL` | `selfUrl` | (required) | Public URL of the MCP server, used for OAuth callbacks |
 | `PORT` | — | `9542` | HTTP port the server binds to — see [PORT](#PORT) |
-| `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Expose debug tools to all connected users. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
+| `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Adds debug data to tool responses and allows the debug tools in `MCP_TOOLS`. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
 | `MCP_BACKEND` | `mcpBackend` | (required; the chart sets `microsoft_graph_and_unique_api`) | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
-| `CALENDAR_INTEGRATION` | `calendarIntegration` | `disabled` | Enables Outlook calendar tools and requests `Calendars.ReadWrite.Shared` on OAuth and token refresh. Existing users must reconnect unless Entra admin consent already covers that scope — see [CALENDAR_INTEGRATION](#CALENDAR_INTEGRATION) |
-| `MCP_TOOLS` | `tools` | unset | JSON array of tool names to register. Unset registers every tool the backend and features offer — see [MCP_TOOLS](#MCP_TOOLS) |
+| `MCP_TOOLS` | `tools` | (required) | Non-empty JSON array of the tool names to register. Listing a calendar tool turns calendar on — see [MCP_TOOLS](#MCP_TOOLS) and [Calendar tools](#Calendar-tools) |
 | `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
@@ -303,6 +302,21 @@ mcpConfig:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpDebugMode: disabled
     mcpBackend: microsoft_graph_and_unique_api
+    tools:
+      - list_mailboxes_and_directories
+      - list_categories
+      - draft_email
+      - update_draft_email
+      - add_attachments_to_draft_email
+      - remove_attachments_from_draft_email
+      - lookup_contacts
+      - search_emails
+      - fetch_next_search_pages
+      - open_email
+      - sync_progress
+      - verify_inbox_connection
+      - delete_inbox_data
+      - reconnect_inbox
 
   delegatedAccess:
     scan: disabled
@@ -403,6 +417,17 @@ mcpConfig:
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
     mcpBackend: microsoft_graph
+    tools:
+      - list_mailboxes_and_directories
+      - list_categories
+      - draft_email
+      - update_draft_email
+      - add_attachments_to_draft_email
+      - remove_attachments_from_draft_email
+      - lookup_contacts
+      - search_emails
+      - fetch_next_search_pages
+      - open_email
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"
@@ -539,27 +564,33 @@ Required for `cluster_local` auth mode. Provide as a JSON object:
 
 #### MCP_DEBUG_MODE
 
-When set to `enabled`, exposes four additional debug tools to all connected MCP users: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while debug mode is active. Enable only during active troubleshooting and disable immediately after.
+When set to `enabled`, adds debug data to tool responses and allows five debug tools: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync` and `admin_ops`. It does not register them by itself: a debug tool is registered only when it is also listed in [`MCP_TOOLS`](#MCP_TOOLS), and debug tools also need `MCP_BACKEND=microsoft_graph_and_unique_api`. These tools are intended for troubleshooting sync issues, but because MCP tools are scoped to the authenticated user there is no way to restrict them to operators only — all users can call them while they are registered. Enable only during active troubleshooting and disable immediately after.
 
 #### MCP_TOOLS
 
-Set via `mcpConfig.app.tools`, a list the chart renders as a JSON array. Unset registers every tool the backend and features offer, as before this setting existed. Set, only the listed tools are registered, for example `["search_emails","fetch_next_search_pages","open_email"]`.
+Required. Set via `mcpConfig.app.tools`, a YAML list the chart renders as a JSON array. The chart fails to render while the list is empty. Only the listed tools are registered; there is no setting that registers every tool. For example, `["search_emails","fetch_next_search_pages","open_email"]` registers those three tools only.
 
-The server refuses to start, naming the tool, when a listed name is unknown or the tool needs a feature that is off: `sync_progress`, `verify_inbox_connection`, `delete_inbox_data` and `reconnect_inbox` need `MCP_BACKEND=microsoft_graph_and_unique_api`; the debug tools also need `MCP_DEBUG_MODE=enabled`; the calendar tools need `CALENDAR_INTEGRATION=enabled`.
+Listing at least one calendar tool turns calendar on. See [Calendar tools](#Calendar-tools).
+
+The server refuses to start, naming the tool and the setting, when:
+
+- a listed name is unknown
+- `sync_progress`, `verify_inbox_connection`, `delete_inbox_data` or `reconnect_inbox` is listed and `MCP_BACKEND` is not `microsoft_graph_and_unique_api`
+- a debug tool (`run_full_sync`, `restart_full_sync`, `pause_full_sync`, `resume_full_sync`, `admin_ops`) is listed and `MCP_DEBUG_MODE` is not `enabled`; debug tools also need `MCP_BACKEND=microsoft_graph_and_unique_api`
 
 Tool descriptions and the server instructions still mention other tools by name, including ones a deployment leaves out.
 
-#### CALENDAR_INTEGRATION
+#### Calendar tools
 
-Set via `mcpConfig.app.calendarIntegration`. Default `disabled`. When `enabled`, the service registers Outlook calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`) and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` notify other people after the user confirms. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
+The calendar tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event` and `cancel_event`. When [`MCP_TOOLS`](#MCP_TOOLS) lists at least one of them, the service registers the listed calendar tools, adds the calendar server instructions, and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. When none is listed, calendar is off. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` notify other people after the user confirms. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
-The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when `calendar_integration = "enabled"`. Runtime `getScopes()` still omits the calendar scope until `CALENDAR_INTEGRATION=enabled`.
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when `calendar_integration = "enabled"`. Runtime `getScopes()` still omits the calendar scope until `MCP_TOOLS` lists a calendar tool.
 
-Do this in order. Flipping the runtime flag before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
+Do this in order. Listing a calendar tool before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
 
 1. Apply Terraform `outlook-semantic-mcp-entra-application` with `calendar_integration = "enabled"`.
 2. Confirm the Entra app lists that delegated permission.
-3. Set `CALENDAR_INTEGRATION=enabled` (`mcpConfig.app.calendarIntegration`).
+3. Add the calendar tools to `mcpConfig.app.tools` (`MCP_TOOLS`).
 4. Existing connected users must **reconnect Outlook**, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` only renews the mail webhook; it does not re-run OAuth. The user has to start a new Outlook connection.
 5. If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox. Ask the user to reconnect Outlook (new Microsoft OAuth). Do not call `reconnect_inbox`. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect.
 

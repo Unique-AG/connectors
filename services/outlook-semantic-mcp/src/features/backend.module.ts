@@ -1,11 +1,5 @@
 import { type DynamicModule, Module, type Type } from '@nestjs/common';
-import {
-  type FeaturesConfig,
-  loadFeaturesConfig,
-  TOOL_DECLARATIONS,
-  TOOL_NAMES,
-  type ToolName,
-} from '~/config';
+import { type FeaturesConfig, loadFeaturesConfig, type ToolName, toolsInGroup } from '~/config';
 import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
@@ -89,9 +83,7 @@ export const TOOL_CLASSES: Record<ToolName, Type> = {
  * Every calendar tool, exported so the schema-harmony test runs over the real registration list
  * rather than a copy that can silently fall behind.
  */
-export const CALENDAR_TOOLS = TOOL_NAMES.filter((name) =>
-  TOOL_DECLARATIONS[name].requires.includes('calendar'),
-).map((name) => TOOL_CLASSES[name]);
+export const CALENDAR_TOOLS = toolsInGroup('calendar').map((name) => TOOL_CLASSES[name]);
 
 @Module({})
 export class BackendModule {}

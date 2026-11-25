@@ -1,44 +1,52 @@
-export type ToolFeature = 'uniqueMode' | 'debugMode' | 'calendar';
+export type ToolGroup = 'mail' | 'calendar' | 'sync' | 'debug';
+
+export type ToolFeature = 'uniqueMode' | 'debugMode';
 
 export interface ToolDeclaration {
-  readonly requires: readonly ToolFeature[];
+  readonly group: ToolGroup;
 }
+
+export const GROUP_REQUIRES: Record<ToolGroup, readonly ToolFeature[]> = {
+  mail: [],
+  calendar: [],
+  sync: ['uniqueMode'],
+  debug: ['uniqueMode', 'debugMode'],
+};
 
 export const FEATURE_SETTINGS: Record<ToolFeature, string> = {
   uniqueMode: 'MCP_BACKEND=microsoft_graph_and_unique_api',
   debugMode: 'MCP_DEBUG_MODE=enabled',
-  calendar: 'CALENDAR_INTEGRATION=enabled',
 };
 
 // Order is the registration order, which is the order clients list the tools in.
 const declarations = {
-  list_mailboxes_and_directories: { requires: [] },
-  list_categories: { requires: [] },
-  draft_email: { requires: [] },
-  update_draft_email: { requires: [] },
-  add_attachments_to_draft_email: { requires: [] },
-  remove_attachments_from_draft_email: { requires: [] },
-  lookup_contacts: { requires: [] },
-  search_emails: { requires: [] },
-  fetch_next_search_pages: { requires: [] },
-  open_email: { requires: [] },
-  sync_progress: { requires: ['uniqueMode'] },
-  verify_inbox_connection: { requires: ['uniqueMode'] },
-  delete_inbox_data: { requires: ['uniqueMode'] },
-  reconnect_inbox: { requires: ['uniqueMode'] },
-  run_full_sync: { requires: ['uniqueMode', 'debugMode'] },
-  restart_full_sync: { requires: ['uniqueMode', 'debugMode'] },
-  pause_full_sync: { requires: ['uniqueMode', 'debugMode'] },
-  resume_full_sync: { requires: ['uniqueMode', 'debugMode'] },
-  admin_ops: { requires: ['uniqueMode', 'debugMode'] },
-  list_calendars: { requires: ['calendar'] },
-  search_calendar_events: { requires: ['calendar'] },
-  check_availability: { requires: ['calendar'] },
-  suggest_meeting_times: { requires: ['calendar'] },
-  respond_to_invite: { requires: ['calendar'] },
-  create_event: { requires: ['calendar'] },
-  update_event: { requires: ['calendar'] },
-  cancel_event: { requires: ['calendar'] },
+  list_mailboxes_and_directories: { group: 'mail' },
+  list_categories: { group: 'mail' },
+  draft_email: { group: 'mail' },
+  update_draft_email: { group: 'mail' },
+  add_attachments_to_draft_email: { group: 'mail' },
+  remove_attachments_from_draft_email: { group: 'mail' },
+  lookup_contacts: { group: 'mail' },
+  search_emails: { group: 'mail' },
+  fetch_next_search_pages: { group: 'mail' },
+  open_email: { group: 'mail' },
+  sync_progress: { group: 'sync' },
+  verify_inbox_connection: { group: 'sync' },
+  delete_inbox_data: { group: 'sync' },
+  reconnect_inbox: { group: 'sync' },
+  run_full_sync: { group: 'debug' },
+  restart_full_sync: { group: 'debug' },
+  pause_full_sync: { group: 'debug' },
+  resume_full_sync: { group: 'debug' },
+  admin_ops: { group: 'debug' },
+  list_calendars: { group: 'calendar' },
+  search_calendar_events: { group: 'calendar' },
+  check_availability: { group: 'calendar' },
+  suggest_meeting_times: { group: 'calendar' },
+  respond_to_invite: { group: 'calendar' },
+  create_event: { group: 'calendar' },
+  update_event: { group: 'calendar' },
+  cancel_event: { group: 'calendar' },
 } as const satisfies Record<string, ToolDeclaration>;
 
 export type ToolName = keyof typeof declarations;
@@ -49,3 +57,6 @@ export const TOOL_NAMES = Object.keys(TOOL_DECLARATIONS) as ToolName[];
 
 export const isToolName = (name: string): name is ToolName =>
   Object.hasOwn(TOOL_DECLARATIONS, name);
+
+export const toolsInGroup = (group: ToolGroup): ToolName[] =>
+  TOOL_NAMES.filter((name) => TOOL_DECLARATIONS[name].group === group);

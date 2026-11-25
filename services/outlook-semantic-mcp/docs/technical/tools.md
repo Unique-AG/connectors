@@ -1,13 +1,13 @@
 <!-- confluence-page-id: 2061238285 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Outlook Semantic MCP Server exposes tools whose availability depends on the deployment mode (`MCP_BACKEND`) and debug settings.
+The Outlook Semantic MCP Server registers only the tools listed in [`MCP_TOOLS`](../operator/configuration.md#MCP_TOOLS). Which tools may be listed depends on the deployment mode (`MCP_BACKEND`) and debug settings.
 
 !!! warning "Mode A (`microsoft_graph_and_unique_api`) only tools"
-    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api`**. They are not registered in `microsoft_graph` mode.
+    `verify_inbox_connection`, `reconnect_inbox`, `delete_inbox_data`, and `sync_progress` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api`**. The server refuses to start in `microsoft_graph` mode if `MCP_TOOLS` lists them.
 
 !!! warning "Debug-Mode Tools"
-    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, and `restart_full_sync` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`**. They do not appear for standard deployments or in `microsoft_graph` mode. **Note:** Debug mode exposes these tools to **all** connected MCP users, not just operators. Do not leave enabled in production.
+    `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`, and `admin_ops` are **only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`**, and only when they are listed in `MCP_TOOLS`. They do not appear for standard deployments or in `microsoft_graph` mode. **Note:** Listed debug tools are exposed to **all** connected MCP users, not just operators. Do not leave debug mode enabled in production.
 
 ## Tool Overview
 
@@ -31,17 +31,17 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 | [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
-| [`list_calendars`](#list_calendars) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`search_calendar_events`](#search_calendar_events) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`check_availability`](#check_availability) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`suggest_meeting_times`](#suggest_meeting_times) | Calendar | No | Both, `CALENDAR_INTEGRATION` |
-| [`respond_to_invite`](#respond_to_invite) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`create_event`](#create_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`update_event`](#update_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
-| [`cancel_event`](#cancel_event) | Calendar | Yes | Both, `CALENDAR_INTEGRATION` |
+| [`list_calendars`](#list_calendars) | Calendar | No | Both |
+| [`search_calendar_events`](#search_calendar_events) | Calendar | No | Both |
+| [`check_availability`](#check_availability) | Calendar | No | Both |
+| [`suggest_meeting_times`](#suggest_meeting_times) | Calendar | No | Both |
+| [`respond_to_invite`](#respond_to_invite) | Calendar | Yes | Both |
+| [`create_event`](#create_event) | Calendar | Yes | Both |
+| [`update_event`](#update_event) | Calendar | Yes | Both |
+| [`cancel_event`](#cancel_event) | Calendar | Yes | Both |
 
 !!! warning "Calendar tools"
-    The eight calendar tools are registered only when `CALENDAR_INTEGRATION=enabled`. They query Microsoft Graph live (no calendar ingest). `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation. See [Calendar](#Calendar).
+    A calendar tool is registered only when it is listed in `MCP_TOOLS`. Listing any of them turns calendar on. They query Microsoft Graph live (no calendar ingest). `respond_to_invite` notifies immediately; create, update, and cancel wait for in-chat confirmation. See [Calendar](#Calendar).
 
 **Mutating** means the tool writes data to at least one of the following:
 
@@ -655,7 +655,7 @@ List all Outlook mailboxes and their folder trees available to the user.
 ## Subscription Management
 
 !!! note "Mode A (`microsoft_graph_and_unique_api`) only"
-    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. These tools are not registered in `microsoft_graph` mode because no webhook subscriptions are created.
+    `verify_inbox_connection`, `reconnect_inbox`, and `delete_inbox_data` are only available when `MCP_BACKEND=microsoft_graph_and_unique_api`. They cannot be listed in `MCP_TOOLS` in `microsoft_graph` mode because no webhook subscriptions are created.
 
 ### `verify_inbox_connection`
 
@@ -805,10 +805,10 @@ Check the current state of the full email sync and live catch-up pipeline. Call 
 
 ## Debug-Mode Tools
 
-The following four tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration. They are intended for operators diagnosing sync issues, not for end users.
+The following tools are only available when `MCP_DEBUG_MODE=enabled` is set in the server configuration and the tool is listed in `MCP_TOOLS`. They are intended for operators diagnosing sync issues, not for end users.
 
 !!! note "Mode A (`microsoft_graph_and_unique_api`) only"
-    These tools are only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`.
+    These tools are only available when `MCP_BACKEND=microsoft_graph_and_unique_api` AND `MCP_DEBUG_MODE=enabled`, and only when listed in `MCP_TOOLS`.
 
 ### `run_full_sync`
 
@@ -858,11 +858,11 @@ Restart the full sync from scratch, discarding all previous progress.
 
 ## Calendar
 
-**Available in:** Both modes, only when `CALENDAR_INTEGRATION=enabled`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
+**Available in:** Both modes, only for the calendar tools listed in `MCP_TOOLS`. Live Graph query-through — no calendar ingest, webhooks, or calendar tables. Shared-mailbox **profiles** never call these tools.
 
 `respond_to_invite` notifies the organizer immediately — there is no confirmation prompt. `create_event`, `update_event`, and `cancel_event` notify other people after in-chat confirmation. There is no draft state. Confirmation is Accept / Decline on the prompt — there is no extra checkbox. For a recurring `update_event` or `cancel_event`, the prompt also asks this occurrence or the entire series. `cancel_event` notifies attendees; it is not a silent delete.
 
-If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) and [Permissions](./permissions.md).
+If a calendar tool returns `consentRequired: true`, Graph denied calendar permission on the signed-in user's own mailbox (usually missing `Calendars.ReadWrite.Shared`). Ask the user to reconnect Outlook so they run Microsoft OAuth again. Do not call `reconnect_inbox` — that only renews the mail webhook. Do not send them to `/auth/authorize` — that is the MCP OAuth start URL for clients, not a user reconnect. See [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools) and [Permissions](./permissions.md).
 
 Do not display `calendarRef`, `eventRef`, `calendarId`, or `eventId`. Pass `calendarRef` (from `list_calendars`) and `eventRef` (from `search_calendar_events`) through unchanged — never assemble one from parts.
 
@@ -1144,4 +1144,4 @@ Shared-calendar create: `list_calendars`, then pass that `calendarRef` unchanged
 - [Flows](./flows.md) - Sequence diagrams for OAuth, sync, and draft creation flows
 - [Permissions](./permissions.md) - Microsoft Graph permissions required by these tools
 - [Features — Calendar](./features.md#Calendar) - What is supported, what is not
-- [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION) - Operator enablement and re-consent
+- [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools) - Operator enablement and re-consent
