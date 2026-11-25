@@ -3,11 +3,11 @@
   "services/teams-mcp": "0.5.3",
   "services/confluence-connector": "3.1.0",
   "services/outlook-semantic-mcp": "5.0.3",
-  "services/kyckr-mcp": "0.1.1-alpha",
   "services/kb-mcp": "0.1.9",
   "services/backstop-mcp": "3.1.0",
   "services/office-365-mcp": "0.4.0",
   "services/with-intelligence-mcp": "0.2.1",
   "services/world-check-mcp": "0.1.0",
-  "services/polixis-mcp": "0.0.1"
+  "services/polixis-mcp": "0.0.1",
+  "services/kyckr-mcp": "0.1.1"
 }

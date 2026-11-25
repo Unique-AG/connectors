@@ -2,7 +2,7 @@
 
 A NestJS-based microservice that wraps the Temenos DataHub REST API and exposes operational banking data as MCP tools. It lets an AI agent read holdings, payments, party, product, and reference data from a Temenos core-banking (T24 / DataHub ODS) backend.
 
-All tools are **read-only** (HTTP `GET`). The service follows the `kyckr-mcp` pattern: a thin HTTP client plus one tool per endpoint.
+All tools are **read-only** (HTTP `GET`). The service is a thin HTTP client plus one tool per endpoint.
 
 ## Table of Contents
 

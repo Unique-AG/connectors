@@ -1,0 +1,7 @@
+# mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
+dependencies:
+- name: base
+  repository: oci://ghcr.io/unique-ag/helm
+  version: 0.1.0-3aa55e
+digest: sha256:ef77d2cad654a83696e68bf3bfce82fc3e6e72b1055687feb6ab11a7c61cc52c
+generated: "2026-10-30T14:21:06.644902+01:00"
