@@ -21,6 +21,7 @@ from office_365_mcp.shared.seam.approved_writes import (
     Approval,
     Question,
     Refusal,
+    Unasked,
     answered,
     approved_write,
 )
@@ -63,6 +64,7 @@ __all__ = [
     "GraphAdviceMiddleware",
     "GraphToken",
     "Question",
+    "Unasked",
     "Refusal",
     "TokenExchangeFailed",
     "ToolAdvice",

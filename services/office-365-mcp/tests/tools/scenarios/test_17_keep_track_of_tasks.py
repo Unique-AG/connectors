@@ -473,6 +473,22 @@ class TestPlanningATask:
         assert _sent(route) == {"isReminderOn": False, "recurrence": None, "reminderDateTime": None}
         assert (answer["repeat"], answer["reminder_at"]) == (None, None)
 
+    async def test_a_series_on_a_private_list_is_written_only_for_the_task_that_was_read(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=False)
+        read = _task(
+            TASK_ID, "Water the plants", due_utc="2026-11-26T23:00:00", **{"@odata.etag": 'W/"7"'}
+        )
+        _ = graph.get(ONE_TASK).mock(return_value=httpx.Response(200, json=read))
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=read))
+
+        _ = await call("outlook_update_task", uri=TASK, repeat={"every": "week"}, time_zone=ZURICH)
+
+        assert route.calls.last.request.headers["if-match"] == 'W/"7"'
+        series = cast("dict[str, dict[str, str]]", _sent(route)["recurrence"])
+        assert series["range"]["startDate"] == "2026-11-27"
+
     async def test_a_task_gets_a_category(self, graph: respx.MockRouter) -> None:
         _list_is(graph, shared=False)
         tagged = _task(TASK_ID, "Send the Q3 report", categories=["Finance"])
@@ -565,9 +581,13 @@ class TestSteps:
         _ = graph.get(f"{STEPS}/{STEP_ID}").mock(return_value=httpx.Response(200, json=_STEP))
         route = graph.delete(f"{STEPS}/{STEP_ID}").mock(return_value=httpx.Response(204))
 
-        with pytest.raises(ToolError):
-            _ = await call("outlook_delete_task_step", step=STEP, person=Person(approval="no"))
+        person = Person(approval="no")
 
+        with pytest.raises(ToolError, match="The step was not deleted"):
+            _ = await call("outlook_delete_task_step", step=STEP, person=person)
+
+        [question] = person.asked
+        assert "'Get the numbers from Anna'" in question
         assert route.call_count == 0
 
     async def test_a_task_is_read_with_its_steps_links_and_files(
@@ -716,22 +736,20 @@ class TestLinksAndFiles:
         _ = graph.get(f"{FILES}/FILE1").mock(return_value=httpx.Response(200, json=_CSV))
         route = graph.delete(f"{FILES}/FILE1").mock(return_value=httpx.Response(204))
 
-        with pytest.raises(ToolError):
-            _ = await call(
-                "outlook_delete_task_attachment", attachment=FILE, person=Person(approval="no")
-            )
+        person = Person(approval="no")
 
+        with pytest.raises(ToolError, match="The file was not deleted"):
+            _ = await call("outlook_delete_task_attachment", attachment=FILE, person=person)
+
+        [question] = person.asked
+        assert "'Numbers.csv'" in question
         assert route.call_count == 0
 
     async def test_no_tool_adds_a_file_to_a_task(self) -> None:
-        offered = {
-            f"{tool}.{argument}"
-            for tool in _TASK_TOOLS
-            for argument in await _input_properties(tool)
-            if any(word in argument for word in ("content", "bytes", "file"))
-        }
+        file_tools = {tool for tool in _TASK_TOOLS if "attachment" in tool or "file" in tool}
 
-        assert offered == set()
+        assert file_tools == {"outlook_read_task_attachment", "outlook_delete_task_attachment"}
+        assert await _task_inputs() == _TASK_INPUTS
 
 
 class TestDeletingTasks:
@@ -753,15 +771,18 @@ class TestDeletingTasks:
         _task_is(graph, _task(TASK_ID, "Send the Q3 report"))
         route = graph.delete(ONE_TASK).mock(return_value=httpx.Response(204))
 
-        with pytest.raises(ToolError):
-            _ = await call("outlook_delete_task", uri=TASK, person=Person(approval="no"))
+        person = Person(approval="no")
 
+        with pytest.raises(ToolError, match="The task was not deleted"):
+            _ = await call("outlook_delete_task", uri=TASK, person=person)
+
+        [question] = person.asked
+        assert "'Send the Q3 report'" in question
         assert route.call_count == 0
 
     async def test_no_tool_moves_a_task_to_another_list(self) -> None:
-        update = await _input_properties("outlook_update_task")
-
-        assert {"task_list", "list", "destination"} & set(update) == set()
+        assert [tool for tool in TOOL_NAMES if "move" in tool and "task" in tool] == []
+        assert await _task_inputs() == _TASK_INPUTS
 
 
 class TestLists:
@@ -889,6 +910,25 @@ class TestASharedList:
         assert person.writes_before_each_question == [0]
         assert route.call_count == 1
 
+    async def test_a_new_task_in_a_shared_list_is_asked_in_the_newer_protocol_too(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=True, name="Team launch")
+        created = _task(TASK_ID, "Book the venue")
+        route = graph.post(TASKS).mock(return_value=httpx.Response(201, json=created))
+        person = _PersonWatchingWrites(write=route)
+
+        async with _modern_client(person) as client:
+            answer = await client.call_tool(
+                "outlook_create_task", {"task_list": TASK_LIST, "title": "Book the venue"}
+            )
+
+        assert answer.structured_content is not None
+        [question] = person.asked
+        assert "'Book the venue'" in question and "'Team launch'" in question
+        assert person.writes_before_each_question == [0]
+        assert route.call_count == 1
+
     async def test_a_repeating_task_that_moves_on_while_the_person_decides_is_not_completed(
         self, graph: respx.MockRouter
     ) -> None:
@@ -903,6 +943,7 @@ class TestASharedList:
         with pytest.raises(ToolError, match="The item changed while the user decided"):
             _ = await call("outlook_set_task_status", uri=TASK, status="completed")
 
+        assert route.call_count == 1
         assert route.calls.last.request.headers["if-match"] == 'W/"1"'
 
     async def test_a_list_that_does_not_say_whether_it_is_shared_is_asked_about(
@@ -992,19 +1033,53 @@ class TestRefusals:
             _ = await call("outlook_list_tasks", task_list=TASK_LIST)
 
     async def test_the_tasks_of_another_person_are_not_offered(self) -> None:
-        offered = {
-            f"{tool}.{argument}"
-            for tool in _TASK_TOOLS
-            for argument in await _input_properties(tool)
-            if any(word in argument for word in ("user", "mailbox", "owner", "person"))
-        }
-
-        assert offered == set()
+        assert await _task_inputs() == _TASK_INPUTS
 
 
 _TASK_TOOLS = tuple(
     sorted(name for name in TOOL_NAMES if "task" in name and name.startswith("outlook_"))
 )
+
+_TASK_INPUTS = frozenset(
+    {
+        "attachment",
+        "categories",
+        "clear_due_date",
+        "clear_reminder",
+        "clear_repeat",
+        "clear_start_date",
+        "due_after",
+        "due_before",
+        "due_date",
+        "is_checked",
+        "limit",
+        "link",
+        "name",
+        "notes_html",
+        "priority",
+        "reminder_at",
+        "repeat",
+        "show",
+        "start_date",
+        "status",
+        "step",
+        "task_list",
+        "text",
+        "time_zone",
+        "title",
+        "title_contains",
+        "uri",
+        "web_url",
+        "application",
+    }
+)
+
+
+async def _task_inputs() -> frozenset[str]:
+    found: set[str] = set()
+    for tool in _TASK_TOOLS:
+        found |= set(await _input_properties(tool))
+    return frozenset(found)
 
 
 @asynccontextmanager

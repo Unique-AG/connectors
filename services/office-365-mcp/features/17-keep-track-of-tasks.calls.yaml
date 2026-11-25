@@ -174,9 +174,9 @@ uc-17-14:
   provenance: drafted
   asks_user: false
   chain:
-    - tool: outlook_list_task_lists
     - tool: outlook_list_tasks
-      uses: {task_list: uri of a list that is gone}
+      uses: {task_list: uri of Team launch from an earlier answer}
+    - tool: outlook_list_task_lists
 
 uc-17-15:
   status: gap
@@ -196,7 +196,7 @@ uc-17-16:
   status: working
   tests:
     - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_task_goes_into_a_shared_list_only_after_the_person_agrees"
-    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_change_in_a_shared_list_is_asked_in_the_newer_protocol_too"
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_new_task_in_a_shared_list_is_asked_in_the_newer_protocol_too"
   ask: "Add Book the venue to Team launch."
   provenance: drafted
   asks_user: true
@@ -564,7 +564,7 @@ uc-17-40:
     kind: graph
     tool: outlook_update_task
     text: Microsoft Graph has no call that moves a To Do task to another list.
-    user: The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one. The new task loses its creation date and its attached files, because no tool adds a file to a task, so save the files before the old task is deleted.
+    user: The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one. The new task loses its creation date and its attached files, because no tool adds a file to a task. The assistant adds the steps and the links to the new task again. Save the files, check the new task, and only then delete the old one.
   provenance: drafted
   asks_user: false
   chain: []

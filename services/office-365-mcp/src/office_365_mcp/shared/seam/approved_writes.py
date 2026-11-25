@@ -30,7 +30,12 @@ class Question:
     guarded: Parsable | None = None
 
 
-type Prepare = Callable[[bool], Awaitable[Question | Refusal | None]]
+@dataclass(frozen=True, slots=True)
+class Unasked:
+    guarded: Parsable
+
+
+type Prepare = Callable[[bool], Awaitable[Question | Unasked | Refusal | None]]
 
 type Write[T] = Callable[[HeadersCollection], Awaitable[T | Refusal]]
 
@@ -86,7 +91,11 @@ async def approved_write[T](
     if isinstance(question, Refusal):
         return question
     headers = HeadersCollection()
-    if question is not None:
+    if isinstance(question, Unasked):
+        guard = _etag(question.guarded)
+        if guard is not None:
+            headers.add("If-Match", guard)
+    elif question is not None:
         about = _digest(approval, question)
         with not_graph():
             answer = await approval.confirm(question.text, about)
@@ -98,7 +107,7 @@ async def approved_write[T](
             again = await prepare(True)
             if isinstance(again, Refusal):
                 return again
-            if again is None or _digest(approval, again) != about:
+            if not isinstance(again, Question) or _digest(approval, again) != about:
                 return Refusal(_changed_meanwhile(approval.nothing_happened))
         etag = _etag(question.guarded)
         if etag is not None:

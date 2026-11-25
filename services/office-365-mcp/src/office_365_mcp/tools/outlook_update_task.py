@@ -50,6 +50,7 @@ from office_365_mcp.shared.seam import (
     Confirm,
     Question,
     Refusal,
+    Unasked,
     answer_pending,
     answered,
     approved_write,
@@ -206,11 +207,14 @@ async def update_task(
             return change.due_date
         return day_of(task.due_date_time, zone=zone)
 
-    async def prepare(must_ask: bool) -> Question | Refusal | None:
+    async def prepare(must_ask: bool) -> Question | Unasked | Refusal | None:
         nonlocal read
         audience = await list_audience(client, handle.list_id)
         if not (must_ask or audience.reaches_others):
-            return None
+            if not needs_due:
+                return None
+            read = await read_task(client, handle)
+            return Unasked(guarded=read)
         read = await read_task(client, handle)
         first = series_from(read)
         if change.repeat is not None and first is None:
@@ -223,8 +227,7 @@ async def update_task(
         return Question(question, (audience.task_list, read), guarded=read)
 
     async def write(headers: HeadersCollection) -> TaskDetail | Refusal:
-        task = read if read is not None or not needs_due else await read_task(client, handle)
-        first = series_from(task)
+        first = series_from(read)
         if change.repeat is not None and first is None:
             return no_series
         with graph_step(STEP_UPDATE):
