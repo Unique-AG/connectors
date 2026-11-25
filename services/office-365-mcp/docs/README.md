@@ -1788,7 +1788,7 @@ model then tells the user.
 | Limit | What the user sees |
 | --- | --- |
 | A user cannot view the details of a shared calendar | Each event shows the time only. The subject and the body are empty. |
-| A user asks about the calendar of a person who did not share it | No tool reads that calendar. The agent says that it cannot open the calendar. `outlook_check_availability` can give the free and busy time of that person, if the settings of that person and of the organization let the user see it. |
+| A user asks about the calendar of a person who did not share it | No tool reads that calendar. The agent says that it cannot open the calendar. `outlook_check_availability` can give the free and busy time and the working hours of that person, if the settings of that person and of the organization let the user see it. |
 | An event has a Teams meeting | A tool can add a Teams meeting to an event, but cannot remove it. A tool cannot change the existing text in the body of such an event. The user does this in Outlook. |
 
 #### Outlook contacts

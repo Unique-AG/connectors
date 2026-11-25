@@ -66,8 +66,9 @@ time. Say that you cannot read the rest of the row.
 - The calendar of another person shows here only after that person shares it and the user accepts \
 the invitation or adds the shared calendar in Outlook. If it is not here and `capped` is false, \
 you cannot read its events. If this deployment runs outlook_check_availability, call it for that \
-person. It reads only free and busy time. The user's own calendar is not the calendar of another \
-attendee.
+person. It reads the free and busy time and the working hours of that person. It reads the subject \
+and the location of an entry only if the settings of that person allow it. The user's own calendar \
+is not the calendar of another attendee.
 """
 
 

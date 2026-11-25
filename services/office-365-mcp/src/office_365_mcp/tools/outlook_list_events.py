@@ -95,7 +95,9 @@ meetings that the user is invited to. It is not the calendar of another attendee
 another person opens only after that person shares it and the user accepts the invitation or adds \
 the shared calendar in Outlook. Then it shows in outlook_list_calendars, and you pass its `uri` as \
 `calendar_ref`. If it does not show there, `capped` is false, and this deployment runs \
-outlook_check_availability, call it for that person. It reads only free and busy time.
+outlook_check_availability, call it for that person. It reads the free and busy time and the \
+working hours of that person. It reads the subject and the location of an entry only if the \
+settings of that person allow it.
 """
 
 _ENDS_BEFORE_STARTS = (
