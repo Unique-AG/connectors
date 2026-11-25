@@ -6,12 +6,18 @@ import pytest
 from fastmcp import Client
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
+from mcp.shared.exceptions import MCPError
 from mcp.types import ElicitRequestFormParams, ElicitRequestParams, ElicitResult
 from mcp.types.version import LATEST_MODERN_VERSION
 
 from tests.e2e.test_scenarios import Person, build_server, items, mapping, patch_obo
 
-__all__ = ["Says", "call_on_the_newer_protocol", "refused_on_the_newer_protocol"]
+__all__ = [
+    "Says",
+    "call_on_the_newer_protocol",
+    "refused_a_word_that_is_no_choice",
+    "refused_on_the_newer_protocol",
+]
 
 
 @dataclass
@@ -49,3 +55,10 @@ async def refused_on_the_newer_protocol(
     with pytest.raises(ToolError) as raised:
         _ = await call_on_the_newer_protocol(tool, person=person, **arguments)
     return str(raised.value)
+
+
+async def refused_a_word_that_is_no_choice(tool: str, /, **arguments: object) -> None:
+    """FastMCP 4.2 validates elicitation content in the client, so a word that is
+    no choice never reaches the server as an accepted answer."""
+    with pytest.raises(MCPError, match="is not one of"):
+        _ = await call_on_the_newer_protocol(tool, person=Says("maybe"), **arguments)

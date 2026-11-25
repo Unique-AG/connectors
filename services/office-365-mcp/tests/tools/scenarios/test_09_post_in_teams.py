@@ -18,6 +18,7 @@ from tests.tools.scenarios.support import Person, call, serve
 from tests.tools.scenarios.teams_support import (
     Says,
     call_on_the_newer_protocol,
+    refused_a_word_that_is_no_choice,
     refused_on_the_newer_protocol,
 )
 from tests.tools.teams_recordings import new_group_chat
@@ -762,9 +763,8 @@ class TestAChatProgramOfTheNewerKind:
         [
             (Person(approval="no"), NOT_AGREED),
             (Says(1), NOT_AGREED),
-            (Says("maybe"), "received no answer"),
         ],
-        ids=["declines", "the word for no", "a word that is no choice"],
+        ids=["declines", "the word for no"],
     )
     async def test_it_changes_nothing_unless_the_answer_is_the_word_for_yes(
         self,
@@ -780,6 +780,17 @@ class TestAChatProgramOfTheNewerKind:
         message = await refused_on_the_newer_protocol(tool, person=reply, **arguments)
 
         assert nothing in message and said in message
+        assert writes.call_count == 0
+
+    @pytest.mark.parametrize(("tool", "arguments", "nothing"), EVERY_PROPOSAL)
+    async def test_it_changes_nothing_when_the_chat_program_accepts_a_word_that_is_no_choice(
+        self, graph: respx.MockRouter, tool: str, arguments: Row, nothing: str
+    ) -> None:
+        _ = nothing
+        writes = _everything_is_readable(graph, _the_writes_are_answered)
+
+        await refused_a_word_that_is_no_choice(tool, **arguments)
+
         assert writes.call_count == 0
 
 
