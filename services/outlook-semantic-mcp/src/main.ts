@@ -1,4 +1,3 @@
-import './load-env';
 import { join } from 'node:path';
 import { initOpenTelemetry, runWithInstrumentation } from '@unique-ag/instrumentation';
 import { redactRequestSecrets } from '@unique-ag/logger';
