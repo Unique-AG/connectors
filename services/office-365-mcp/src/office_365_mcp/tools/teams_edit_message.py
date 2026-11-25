@@ -125,9 +125,9 @@ class EditedMessage(BaseModel):
             + "last changed."
         )
     )
-    text: str = Field(
+    body_html: str = Field(
         description=(
-            "The new text that this call sent, exactly as the call received it. Microsoft 365 "
+            "The new HTML that this call sent, exactly as the call received it. Microsoft 365 "
             + "answers this change with no content, so every field of this answer repeats the "
             + "request."
         )
@@ -174,7 +174,7 @@ async def edit_message(
         return asked
     if refused is not None:
         raise ToolError(refused)
-    return EditedMessage(uri=handle.uri, text=body_html, mentions=list(mentions))
+    return EditedMessage(uri=handle.uri, body_html=body_html, mentions=list(mentions))
 
 
 async def _outgoing(

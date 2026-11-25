@@ -454,7 +454,7 @@ class TestMiaChangesOnlyHerOwnMessages:
 
         assert _uncalled(routes) == []
         assert f"'{BEFORE}'" in mia.asked[1] and AFTER in mia.asked[1]
-        assert corrected["text"] == f"<p>{AFTER}</p>"
+        assert corrected["body_html"] == f"<p>{AFTER}</p>"
         assert corrected["uri"] == posted["uri"]
 
     async def test_it_deletes_her_own_message_after_she_approves_the_deletion(
