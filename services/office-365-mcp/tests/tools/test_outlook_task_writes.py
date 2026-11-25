@@ -331,7 +331,7 @@ _SHOWN_VALUES: Mapping[Entity, Mapping[str, Mapping[str, object]]] = {
     "file": {"file name": {"name": "Budget.xlsx"}},
 }
 
-_ETAG_GUARDED = frozenset({"outlook_set_task_status", "outlook_update_task"})
+_ETAG_GUARDED = frozenset({"outlook_set_task_status", "outlook_update_task", "outlook_delete_task"})
 
 
 def _ids(write: _Write) -> str:

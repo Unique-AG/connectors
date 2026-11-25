@@ -110,7 +110,11 @@ async def delete_todo_item(
         part = await read_task_part(client, target) if isinstance(target, TaskPartHandle) else None
         named = task.title if part is None else _name_of(part)
         shown: tuple[Parsable, ...] = (audience.task_list, task, *(() if part is None else (part,)))
-        return Question(_question(audience, task.title, part, whole_task=True), shown)
+        return Question(
+            _question(audience, task.title, part, whole_task=True),
+            shown,
+            guarded=task if part is None else None,
+        )
 
     async def write(headers: HeadersCollection) -> Removed:
         with graph_step(STEP_DELETE):
