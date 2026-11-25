@@ -33,8 +33,9 @@ class _LinkCollector(HTMLParser):
 
     @override
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        names = ("href", "o:href") if tag.startswith("v:") else ("href",)
         if tag in ("a", "area") or tag.startswith("v:"):
-            self.targets.extend(value for name, value in attrs if name == "href" and value)
+            self.targets.extend(value for name, value in attrs if name in names and value)
 
     @override
     def handle_comment(self, data: str) -> None:

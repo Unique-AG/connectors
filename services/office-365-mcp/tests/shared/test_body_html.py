@@ -28,6 +28,14 @@ class TestHtmlLinkTargets:
 
         assert html_link_targets(body) == ("https://first.example", "https://button.example")
 
+    def test_finds_the_click_target_of_a_desktop_outlook_image(self) -> None:
+        body = (
+            '<!--[if mso]><v:rect><v:imagedata o:href="https://image.example" src="a.png"/>'
+            + "</v:rect><![endif]-->"
+        )
+
+        assert html_link_targets(body) == ("https://image.example",)
+
     def test_finds_the_link_of_an_image_map_area(self) -> None:
         body = (
             '<map name="m"><area shape="rect" coords="0,0,9,9" href="https://area.example"></map>'
