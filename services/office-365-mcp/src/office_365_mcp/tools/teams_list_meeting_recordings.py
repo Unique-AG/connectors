@@ -1,10 +1,7 @@
 """`teams_list_meeting_recordings` — did a call record, how long it ran, and who can get the file.
 
-TRAP: no video ever comes back, and this connector never fetches one. Graph serves a recording as
-one MP4 byte stream, and `recordingContentUrl` opens only with this connector's own token, so
-passing it on leaks a credential or does nothing. `tests/test_layering.py` rule 7 blocks every
-module from addressing one recording, this file too. The link a person opens is the
-`callRecordingUrl` of the meeting chat's recording event, which `shared/teams/messages.py` returns.
+TRAP: `recordingContentUrl` opens only with this connector's own token, so passing it on leaks a
+credential. `tests/test_layering.py` rule 7 blocks every module from addressing one recording.
 
 Separate from `teams_list_meeting_transcripts` because Graph gates them independently, under
 `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All`, and a default tenant has
