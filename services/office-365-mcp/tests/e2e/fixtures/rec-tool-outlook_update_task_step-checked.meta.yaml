@@ -1,0 +1,21 @@
+scenario: outlook_update_task_step-checked
+fixture: rec-tool-outlook_update_task_step-checked
+source: recorded
+target: graph
+recorded_at: '2026-11-25T09:37:13+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 21
+  keys dropped: 7
+  response headers dropped: 61
+  text kept: 11
+literals:
+- seed-v1 case-outlook_tasks step
+- seed-v1 case-outlook_tasks task
+- seed-v1 case-outlook_update_task_step-checked
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

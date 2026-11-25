@@ -8,13 +8,13 @@ A scenario is `working` when the connector meets it, `partly` when a limit block
 
 | Surface | working | partly | gap | total |
 | --- | --- | --- | --- | --- |
-| Outlook | 375 | 0 | 1 | 376 |
+| Outlook | 421 | 0 | 4 | 425 |
 | Teams | 146 | 0 | 0 | 146 |
 | SharePoint | 107 | 0 | 3 | 110 |
 | OneNote | 73 | 0 | 2 | 75 |
 | Across sources | 26 | 0 | 0 | 26 |
 
-Scenarios with an executable run: 19 of 733.
+Scenarios with an executable run: 19 of 782.
 
 ## Tests by surface
 
@@ -22,13 +22,13 @@ A scenario has `tests` (node ids of pytest tests), or `no_test` (a kind and a re
 
 | Surface | tests | no test | pending | total |
 | --- | --- | --- | --- | --- |
-| Outlook | 366 | 10 | 0 | 376 |
+| Outlook | 415 | 10 | 0 | 425 |
 | Teams | 142 | 4 | 0 | 146 |
 | SharePoint | 109 | 1 | 0 | 110 |
 | OneNote | 74 | 1 | 0 | 75 |
 | Across sources | 25 | 1 | 0 | 26 |
 
-Scenarios with an executable test: 716 of 733 (17 with an explained reason, 0 pending).
+Scenarios with an executable test: 765 of 782 (17 with an explained reason, 0 pending).
 
 ## Happy and unhappy paths by surface
 
@@ -36,7 +36,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 | Surface | happy | unhappy | total |
 | --- | --- | --- | --- |
-| Outlook | 164 | 212 | 376 |
+| Outlook | 190 | 235 | 425 |
 | Teams | 53 | 93 | 146 |
 | SharePoint | 41 | 69 | 110 |
 | OneNote | 31 | 44 | 75 |
@@ -46,7 +46,7 @@ A scenario is `@unhappy` when something fails, is refused, is limited, or is hos
 
 These causes are in the connector: a tool, a parameter, a description, or a preset.
 
-### A tool is missing (4)
+### A tool is missing (5)
 
 | Id | Feature | Scenario | Status | Tool | Cause |
 | --- | --- | --- | --- | --- | --- |
@@ -54,6 +54,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | `uc-10-05` | Organizing and sharing files in OneDrive and SharePoint | The content of an existing file is replaced | gap | `sharepoint_create_text_file` | The tool creates new text files only and cannot replace a file or write a Word file. |
 | `uc-10-08` | Organizing and sharing files in OneDrive and SharePoint | Access is taken back | gap | `sharepoint_invite` | The connector does not take access back. No tool removes a permission, and the description of sharepoint_invite says so. |
 | `uc-10-10` | Organizing and sharing files in OneDrive and SharePoint | A file attached to a mail is saved in a folder | gap | `sharepoint_create_text_file` | No tool saves a mail attachment as a file, because the tool that creates files writes text only and cannot upload a binary file. |
+| `uc-17-33` | Keeping track of tasks | A file is added to a task | gap | `outlook_add_task_link` | No tool uploads the bytes of a file to a task yet. The upload of a file by reference is in UN-28971. |
 
 ## Microsoft Graph cannot do it
 
@@ -61,12 +62,14 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | --- | --- | --- | --- | --- | --- |
 | `uc-08-02` | Working with notes in OneNote | A page is found by a word that is only in its body | gap | `onenote_list_pages` | Microsoft Graph has no full-text search over the words of a page for a work or school account. |
 | `uc-08-76` | Working with notes in OneNote | A new page is made a subpage of another page | gap | `onenote_create_page` | Microsoft Graph has the page level as a read-only property, and no create or update call sets it. |
+| `uc-17-15` | Keeping track of tasks | The tasks of another person are read | gap | `outlook_list_task_lists` | Microsoft Graph reads the To Do lists of the signed-in user and the lists that other people share with that user. It has no delegated call that reads the other lists of another person or of a shared mailbox. |
+| `uc-17-40` | Keeping track of tasks | A task is moved to another list | gap | `outlook_update_task` | Microsoft Graph has no call that moves a To Do task to another list. |
 
 ## It fails in prod and the cause is not known
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 14 of 733. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 14 of 782. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |
@@ -90,7 +93,7 @@ Scenarios tagged `@deferred`: 14 of 733. Recorder cases with a `deferred` reason
 
 ## Tool coverage
 
-127 of 130 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
+144 of 147 tools have a happy and an unhappy scenario. A tool counts when it is in a step of a chain, including an optional step or one of several tools. A test fails for any other tool unless `coverage-exceptions.yaml` gives a reason.
 
 | Tool | happy | unhappy | Reason |
 | --- | --- | --- | --- |

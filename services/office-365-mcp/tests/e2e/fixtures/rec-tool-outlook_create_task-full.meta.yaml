@@ -1,0 +1,30 @@
+scenario: outlook_create_task-full
+fixture: rec-tool-outlook_create_task-full
+source: recorded
+target: graph
+recorded_at: '2026-11-25T09:30:57+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 8
+  keys dropped: 3
+  response headers dropped: 27
+  text kept: 10
+literals:
+- '2026-11-30'
+- '2026-11-30T09:00:00'
+- '2026-12-04'
+- Europe/Zurich
+- The room must hold twenty people.
+- high
+- seed-v1
+- seed-v1 case-outlook_create_task-full
+- seed-v1 case-outlook_create_task-full task
+- ~nextMonday
+- ~nextMonday+4
+- ~nextMondayT09:00:00
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

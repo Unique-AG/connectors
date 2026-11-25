@@ -1,0 +1,100 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_create_task-full"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"e2Xara45KxIHJd6Q6zvocjJB/ItLFG==\"",
+      "displayName": "seed-v1 case-outlook_create_task-full",
+      "id": "AAMkYToeWUS1EWR9VCBwGGiyDUV2FG53Kpy3OFW4RRBeHURpO6PqTQThKWDNNXKrnedFEGeoHWfzA2p5TVL3LCDxmIfqMvrhFDHdVqCi-XquLWF8DA5gKTV=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkYToeWUS1EWR9VCBwGGiyDUV2FG53Kpy3OFW4RRBeHURpO6PqTQThKWDNNXKrnedFEGeoHWfzA2p5TVL3LCDxmIfqMvrhFDHdVqCi-XquLWF8DA5gKTV=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"o7Nrdg03AlEIDw8Y6cznvgZH/WmNOF==\"",
+      "displayName": "seed-v1 case-outlook_create_task-full",
+      "id": "AAMkYToeWUS1EWR9VCBwGGiyDUV2FG53Kpy3OFW4RRBeHURpO6PqTQThKWDNNXKrnedFEGeoHWfzA2p5TVL3LCDxmIfqMvrhFDHdVqCi-XquLWF8DA5gKTV=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkYToeWUS1EWR9VCBwGGiyDUV2FG53Kpy3OFW4RRBeHURpO6PqTQThKWDNNXKrnedFEGeoHWfzA2p5TVL3LCDxmIfqMvrhFDHdVqCi-XquLWF8DA5gKTV=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "json": {
+      "body": {
+        "content": "<p>The room must hold twenty people.</p>",
+        "contentType": "html"
+      },
+      "categories": ["seed-v1"],
+      "dueDateTime": {
+        "dateTime": "~nextMonday+4",
+        "timeZone": "Europe/Zurich"
+      },
+      "importance": "high",
+      "isReminderOn": true,
+      "reminderDateTime": {
+        "dateTime": "~nextMonday",
+        "timeZone": "UTC"
+      },
+      "startDateTime": {
+        "dateTime": "~nextMonday",
+        "timeZone": "Europe/Zurich"
+      },
+      "title": "seed-v1 case-outlook_create_task-full task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"q7Irdz05QiYGDe1L2oehcxVK/LsMZz==\"",
+      "body": {
+        "content": "The room must hold twenty people.\r\n",
+        "contentType": "text"
+      },
+      "categories": ["seed-v1"],
+      "createdDateTime": "2026-11-25T09:30:57.6442263Z",
+      "dueDateTime": {
+        "dateTime": "2026-12-03T23:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkMLxdITZ4FDJ2HPDsPDkcKMR0LY17Nbm3NBS0HXRhKXQfV5McZSJQPBPTEIMztyeXKNurYDkrZ6y5GUB4YyXtyFxmBiljGJWdUxDo-TfjZSG2RP2gTRPmtSboVlmxZKZqBwSd-XmtOMK1MJTeHOT=",
+      "importance": "high",
+      "isReminderOn": true,
+      "lastModifiedDateTime": "2026-11-25T09:30:57.7657299Z",
+      "reminderDateTime": {
+        "dateTime": "2026-11-30T08:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "startDateTime": {
+        "dateTime": "2026-11-29T23:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_create_task-full task"
+    }
+  }
+]

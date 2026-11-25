@@ -41,7 +41,7 @@ from office_365_mcp.shared.seam import (
     graph_mailbox,
     owner_refused,
 )
-from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "outlook_search_mail"
 
@@ -373,11 +373,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         received_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(description="Only mail received on or after this date or moment."),
         ] = None,
         received_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(description="Only mail received on or before this date or moment."),
         ] = None,
         importance: Annotated[

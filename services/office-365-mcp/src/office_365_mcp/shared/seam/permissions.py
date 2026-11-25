@@ -46,6 +46,8 @@ REQUESTABLE_PERMISSIONS: frozenset[str] = frozenset(
         "Group.Read.All",
         "Contacts.Read",
         "Contacts.ReadWrite",
+        "Tasks.Read",
+        "Tasks.ReadWrite",
     }
 )
 

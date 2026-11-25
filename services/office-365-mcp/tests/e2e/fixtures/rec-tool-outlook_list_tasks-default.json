@@ -1,0 +1,114 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists",
+    "query": {
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"q6Paqu95IlERJv7F3npfhsEJ/ZPNRX==\"",
+          "displayName": "Tasks",
+          "id": "AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "defaultList"
+        },
+        {
+          "@odata.etag": "W/\"v4Rzir59PnQTPs6D7zyacqUJ/ZnBZd==\"",
+          "displayName": "seed-v1 Launch plan",
+          "id": "AAMkWCfyFDF0NVF4QQZkFJvmXKT2XT94Xpp6PKE8VNJbTKSzX4UjFVYuICJTARShpasAIRvqBBgbS9t9UUY0IEPbdFusViobGRYtDfRg-BdaGHB9EE3HSBV=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "none"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "query": {
+      "$filter": "status ne 'completed'",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"b3Bmyy58LbMPOb2G6hrvvqKI/DpVub==\"",
+          "body": {
+            "content": "The plants need water once a week.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T08:28:11.3269003Z",
+          "dueDateTime": {
+            "dateTime": "2026-11-28T00:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "hasAttachments": false,
+          "id": "AAMkUDleINM8ZYC4NHCfBGzhPAR4YN57Cvz2MIA2HFIhLIKuP6UqPNABHCTUOMTsejjHKRehNHsfQ0u1HOU5BtChjZovPneeZKYhZqMi-MfdDCA4gzgvNYPirPxlZjjoXYPlQnBy-ArdAKG4QX48UZD=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T08:28:11.4273188Z",
+          "recurrence": {
+            "pattern": {
+              "dayOfMonth": 0,
+              "daysOfWeek": ["saturday"],
+              "firstDayOfWeek": "sunday",
+              "index": "first",
+              "interval": 1,
+              "month": 0,
+              "type": "weekly"
+            },
+            "range": {
+              "endDate": "0001-01-01",
+              "numberOfOccurrences": 0,
+              "recurrenceTimeZone": "UTC",
+              "startDate": "2026-11-28",
+              "type": "noEnd"
+            }
+          },
+          "status": "notStarted",
+          "title": "seed-v1 Water the office plants"
+        },
+        {
+          "@odata.etag": "W/\"p7Pcrs46HsRFVl6S9uilqrSC/BhSfL==\"",
+          "body": {
+            "content": "The permit ends at the end of the month.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T08:28:11.1189559Z",
+          "dueDateTime": {
+            "dateTime": "2026-12-09T00:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "hasAttachments": false,
+          "id": "AAMkGJnfVII8RQF8RQDzRLtrUEP1AP69Nks5MST1KDOgFEJqK2AyPBWNCZNDOZFkzduVZCpvHQkzZ6e8VPR2TzUpzExxBfivNEBsBaMj-DcgOBT6jojgIKTgbPujQcvyXCAmLmRx-GkxNWZ3ZW14NNZ=",
+          "importance": "normal",
+          "isReminderOn": true,
+          "lastModifiedDateTime": "2026-11-25T08:28:11.2102482Z",
+          "reminderDateTime": {
+            "dateTime": "2026-12-08T09:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "status": "notStarted",
+          "title": "seed-v1 Renew the parking permit"
+        }
+      ]
+    }
+  }
+]

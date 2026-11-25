@@ -42,7 +42,7 @@ from office_365_mcp.shared.teams.messages import (
     MessageSender,
     TeamsMessage,
 )
-from office_365_mcp.shared.window import as_utc
+from office_365_mcp.shared.window import DayOrMoment, as_utc
 
 TOOL_NAME = "teams_search_messages"
 
@@ -371,11 +371,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(description="Only messages that @-mention this user, by Entra object id."),
         ] = None,
         sent_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(description="Only messages sent at or after this point."),
         ] = None,
         sent_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(description="Only messages sent at or before this point."),
         ] = None,
         has_attachment: Annotated[

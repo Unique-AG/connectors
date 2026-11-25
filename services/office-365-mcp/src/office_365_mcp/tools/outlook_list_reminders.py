@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
 from office_365_mcp.shared.calendar import EventTime, event_time, window_bounds, zone_named
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.window import runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, runs_backwards
 
 TOOL_NAME = "outlook_list_reminders"
 
@@ -179,7 +179,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     )
     async def outlook_list_reminders(
         starts_on: Annotated[
-            date | datetime,
+            DayOrMoment,
             Field(
                 description=(
                     "This is where the window opens. A date, such as `2026-03-02`, opens at "
@@ -191,7 +191,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ],
         ends_on: Annotated[
-            date | datetime,
+            DayOrMoment,
             Field(
                 description=(
                     "This is where the window closes, in the same forms as `starts_on`. A date "

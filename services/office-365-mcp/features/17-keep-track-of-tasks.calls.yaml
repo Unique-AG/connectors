@@ -1,0 +1,708 @@
+uc-17-01:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_the_lists_show_which_is_built_in_and_which_is_shared"
+  ask: "What task lists do I have?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+
+uc-17-02:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_open_tasks_due_this_week_are_listed_by_the_day_of_the_user"
+  ask: "What is due this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {due_after: monday, due_before: sunday, time_zone: Europe/Zurich}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-03:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_completed_tasks_are_listed_by_a_word_of_their_title"
+  ask: "Which report tasks did I complete?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {show: completed, title_contains: report}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-04:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestFindingTasks::test_a_task_is_read_with_its_notes"
+  ask: "What does my task Send the Q3 report say?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+
+uc-17-05:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestChangingTasks::test_a_task_is_created_due_at_midnight_of_the_user_and_nobody_is_asked"
+  ask: "Add Send the Q3 report to my tasks, due Friday, high priority."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Send the Q3 report, due_date: friday, priority: high, time_zone: Europe/Zurich}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-06:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestChangingTasks::test_a_task_is_completed"
+  ask: "Mark Send the Q3 report as done."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_set_task_status
+      args: {status: completed}
+      uses: {uri: uri of the task}
+
+uc-17-07:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestChangingTasks::test_a_task_is_reopened_and_its_due_date_is_removed"
+  ask: "Reopen Send the Q3 report and remove its due date."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {show: completed, title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_set_task_status
+      args: {status: not_started}
+      uses: {uri: uri of the task}
+    - tool: outlook_update_task
+      args: {clear_due_date: true}
+      uses: {uri: uri of the task}
+
+uc-17-08:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_list_name_is_refused_before_any_call"
+  ask: "Add Book the venue to my Tasks list."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_create_task
+      args: {task_list: Tasks, title: Book the venue}
+
+uc-17-09:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_list_handle_is_refused_where_a_task_belongs"
+  ask: "Read my task."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_read_task
+      args: {uri: the handle of a list}
+
+uc-17-10:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_an_update_that_changes_nothing_is_refused"
+  ask: "Change my task Send the Q3 report."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_update_task
+      uses: {uri: uri of the task}
+
+uc-17-11:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_due_date_and_its_removal_together_are_refused"
+  ask: "Set the due date of Send the Q3 report to Friday and remove it."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_update_task
+      args: {due_date: friday, clear_due_date: true}
+      uses: {uri: uri of the task}
+
+uc-17-12:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_windows_zone_name_is_refused"
+  ask: "What is due this week?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_tasks
+      args: {time_zone: W. Europe Standard Time}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-13:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_deleted_task_sends_the_assistant_back_to_the_list"
+  ask: "Mark Send the Q3 report as done."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_set_task_status
+      args: {status: completed}
+      uses: {uri: uri of a deleted task}
+
+uc-17-14:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_a_deleted_list_sends_the_assistant_back_to_the_lists"
+  ask: "What is in Team launch?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_tasks
+      uses: {task_list: uri of Team launch from an earlier answer}
+    - tool: outlook_list_task_lists
+
+uc-17-15:
+  status: gap
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestRefusals::test_the_tasks_of_another_person_are_not_offered"
+  ask: "What are Anna's tasks?"
+  blocker:
+    kind: graph
+    tool: outlook_list_task_lists
+    text: Microsoft Graph reads the To Do lists of the signed-in user and the lists that other people share with that user. It has no delegated call that reads the other lists of another person or of a shared mailbox.
+    user: The assistant reads only Mia's own tasks and the lists that people share with her, not the tasks of another person or of a shared mailbox.
+  provenance: drafted
+  asks_user: false
+  chain: []
+
+uc-17-16:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_task_goes_into_a_shared_list_only_after_the_person_agrees"
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_new_task_in_a_shared_list_is_asked_in_the_newer_protocol_too"
+  ask: "Add Book the venue to Team launch."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Book the venue}
+      uses: {task_list: uri of Team launch}
+
+uc-17-17:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_declined_completion_in_a_shared_list_changes_nothing"
+  ask: "Mark Book the venue as done."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Book the venue}
+      uses: {task_list: uri of Team launch}
+    - tool: outlook_set_task_status
+      args: {status: completed}
+      uses: {uri: uri of the task}
+
+uc-17-18:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestASharedList::test_a_list_that_does_not_say_whether_it_is_shared_is_asked_about"
+  ask: "Mark Book the venue as done."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Book the venue}
+      uses: {task_list: uri of Team launch}
+    - tool: outlook_set_task_status
+      args: {status: completed}
+      uses: {uri: uri of the task}
+
+uc-17-19:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestPlanningATask::test_a_task_is_added_with_a_start_date_and_a_reminder"
+  ask: "Add Prepare the budget, starting Monday, remind me Thursday at 9."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Prepare the budget, start_date: monday, reminder_at: thursday 09:00, time_zone: Europe/Zurich}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-20:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestPlanningATask::test_a_task_repeats_every_week_on_monday"
+  ask: "Add Send the weekly status, due Monday, every week on Monday."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Send the weekly status, due_date: monday, repeat: {every: week, weekdays: [monday]}, time_zone: Europe/Zurich}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-21:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestPlanningATask::test_a_repeating_task_with_no_due_date_is_refused"
+  ask: "Add Send the weekly status, every week."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_create_task
+      args: {title: Send the weekly status, repeat: {every: week}}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-22:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestPlanningATask::test_a_task_stops_repeating_and_its_reminder_is_turned_off"
+  ask: "Stop repeating Send the weekly status and turn its reminder off."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: weekly status}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_update_task
+      args: {clear_repeat: true, clear_reminder: true}
+      uses: {uri: uri of the task}
+
+uc-17-23:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestPlanningATask::test_a_task_gets_a_category"
+  ask: "Put Send the Q3 report in the Finance category."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_update_task
+      args: {categories: [Finance]}
+      uses: {uri: uri of the task}
+
+uc-17-24:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestPlanningATask::test_a_task_waits_on_another_person"
+  ask: "Mark Send the Q3 report as waiting on Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_set_task_status
+      args: {status: waiting_on_others}
+      uses: {uri: uri of the task}
+
+uc-17-25:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_step_is_added_to_a_task"
+  ask: "Add the step Get the numbers from Anna to Send the Q3 report."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_add_task_step
+      args: {text: Get the numbers from Anna}
+      uses: {uri: uri of the task}
+
+uc-17-26:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_step_is_checked_off"
+  ask: "Check off Get the numbers from Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_update_task_step
+      args: {is_checked: true}
+      uses: {step: uri of the step}
+
+uc-17-27:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_step_is_removed_after_the_person_agrees"
+  ask: "Remove the step Get the numbers from Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_delete_task_step
+      uses: {step: uri of the step}
+
+uc-17-28:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_task_is_read_with_its_steps_links_and_files"
+  ask: "What does Send the Q3 report hold?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+
+uc-17-29:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_mail_is_linked_to_a_task"
+  ask: "Link the mail Q3 numbers to Send the Q3 report."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_search_mail
+      args: {query: Q3 numbers}
+    - tool: outlook_read_mail
+      uses: {uri: uri of the mail}
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_add_task_link
+      args: {title: Q3 numbers}
+      uses: {uri: uri of the task, web_url: web_link of the mail}
+
+uc-17-30:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_link_is_removed_after_the_person_agrees"
+  ask: "Remove the Q3 numbers link from Send the Q3 report."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_delete_task_link
+      uses: {link: uri of the link}
+
+uc-17-31:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_file_of_a_task_is_read"
+  ask: "What does Numbers.csv on Send the Q3 report say?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_read_task_attachment
+      uses: {attachment: uri of the file}
+
+uc-17-32:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_file_is_removed_after_the_person_agrees"
+  ask: "Remove Numbers.csv from Send the Q3 report."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_delete_task_attachment
+      uses: {attachment: uri of the file}
+
+uc-17-33:
+  status: gap
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_no_tool_adds_a_file_to_a_task"
+  ask: "Attach Numbers.xlsx from my OneDrive to Send the Q3 report."
+  blocker:
+    kind: tool
+    tool: outlook_add_task_link
+    text: No tool uploads the bytes of a file to a task yet. The upload of a file by reference is in UN-28971.
+    user: The assistant cannot attach a file to a task yet. It can link the file to the task instead.
+  provenance: drafted
+  asks_user: false
+  chain: []
+
+uc-17-34:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLists::test_a_list_is_created"
+  ask: "Make a task list called Move to Bern."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_create_task_list
+      args: {name: Move to Bern}
+
+uc-17-35:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLists::test_a_list_is_renamed"
+  ask: "Rename Move to Bern to Move to Basel."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_rename_task_list
+      args: {name: Move to Basel}
+      uses: {task_list: uri of Move to Bern}
+
+uc-17-36:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLists::test_the_built_in_tasks_list_is_not_renamed"
+  ask: "Rename my Tasks list to Inbox."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_rename_task_list
+      args: {name: Inbox}
+      uses: {task_list: uri of the Tasks list}
+
+uc-17-37:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLists::test_a_list_is_deleted_after_the_person_agrees"
+  ask: "Delete the list Move to Basel."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_delete_task_list
+      uses: {task_list: uri of Move to Basel}
+
+uc-17-38:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestDeletingTasks::test_a_task_is_deleted_after_the_person_agrees"
+  ask: "Delete the task Old report."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {show: any, title_contains: Old report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_delete_task
+      uses: {uri: uri of the task}
+
+uc-17-39:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestDeletingTasks::test_a_declined_delete_keeps_the_task"
+  ask: "Delete the task Send the Q3 report."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_delete_task
+      uses: {uri: uri of the task}
+
+uc-17-40:
+  status: gap
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestDeletingTasks::test_no_tool_moves_a_task_to_another_list"
+  ask: "Move Book the venue to Team launch."
+  blocker:
+    kind: graph
+    tool: outlook_update_task
+    text: Microsoft Graph has no call that moves a To Do task to another list.
+    user: The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one. The new task loses its creation date and its attached files, because no tool adds a file to a task. The assistant adds the steps and the links to the new task again. Save the files, check the new task, and only then delete the old one.
+  provenance: drafted
+  asks_user: false
+  chain: []
+
+uc-17-41:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLists::test_a_new_list_is_not_made_twice_after_a_failure"
+  ask: "Make a task list called Move to Bern."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_create_task_list
+      args: {name: Move to Bern}
+
+uc-17-42:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_declined_step_in_a_shared_list_adds_nothing"
+  ask: "Add the step Call the hotel to Book the venue."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Book the venue}
+      uses: {task_list: uri of Team launch}
+    - tool: outlook_add_task_step
+      args: {text: Call the hotel}
+      uses: {uri: uri of the task}
+
+uc-17-43:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_step_change_that_names_no_change_is_refused"
+  ask: "Change the step Get the numbers from Anna."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_update_task_step
+      uses: {step: uri of the step}
+
+uc-17-44:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestSteps::test_a_declined_step_removal_keeps_the_step"
+  ask: "Remove the step Get the numbers from Anna."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_delete_task_step
+      uses: {step: uri of the step}
+
+uc-17-45:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_an_address_that_is_not_https_is_not_linked"
+  ask: "Link javascript:alert(1) to Send the Q3 report."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_add_task_link
+      args: {title: Q3 numbers, web_url: "javascript:alert(1)"}
+      uses: {uri: uri of the task}
+
+uc-17-46:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_task_handle_is_not_taken_as_a_link"
+  ask: "Remove the Q3 numbers link from Send the Q3 report."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_delete_task_link
+      uses: {link: uri of the task}
+
+uc-17-47:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_file_that_is_too_large_is_not_read"
+  ask: "What does Archive.zip on Send the Q3 report hold?"
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_read_task_attachment
+      uses: {attachment: uri of the file}
+
+uc-17-48:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLinksAndFiles::test_a_declined_file_removal_keeps_the_file"
+  ask: "Remove Numbers.csv from Send the Q3 report."
+  provenance: drafted
+  asks_user: true
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_list_tasks
+      args: {title_contains: Q3 report}
+      uses: {task_list: uri of the Tasks list}
+    - tool: outlook_read_task
+      uses: {uri: uri of the task}
+    - tool: outlook_delete_task_attachment
+      uses: {attachment: uri of the file}
+
+uc-17-49:
+  status: working
+  tests:
+    - "tests/tools/scenarios/test_17_keep_track_of_tasks.py::TestLists::test_the_built_in_tasks_list_is_not_deleted"
+  ask: "Delete my Tasks list."
+  provenance: drafted
+  asks_user: false
+  chain:
+    - tool: outlook_list_task_lists
+    - tool: outlook_delete_task_list
+      uses: {task_list: uri of the Tasks list}

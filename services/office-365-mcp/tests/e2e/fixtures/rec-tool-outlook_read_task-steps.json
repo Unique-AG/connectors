@@ -1,0 +1,204 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists",
+    "query": {
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"q6Paqu95IlERJv7F3npfhsEJ/ZPNRX==\"",
+          "displayName": "Tasks",
+          "id": "AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "defaultList"
+        },
+        {
+          "@odata.etag": "W/\"v4Rzir59PnQTPs6D7zyacqUJ/ZnBZd==\"",
+          "displayName": "seed-v1 Launch plan",
+          "id": "AAMkWCfyFDF0NVF4QQZkFJvmXKT2XT94Xpp6PKE8VNJbTKSzX4UjFVYuICJTARShpasAIRvqBBgbS9t9UUY0IEPbdFusViobGRYtDfRg-BdaGHB9EE3HSBV=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "none"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkWCfyFDF0NVF4QQZkFJvmXKT2XT94Xpp6PKE8VNJbTKSzX4UjFVYuICJTARShpasAIRvqBBgbS9t9UUY0IEPbdFusViobGRYtDfRg-BdaGHB9EE3HSBV=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "query": {
+      "$filter": "status ne 'completed'",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"p2Eekb25VkJYPj8P3smfkjHL/TkAhM==\"",
+          "body": {
+            "content": "The old brief is out of date.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T08:28:10.1987234Z",
+          "hasAttachments": true,
+          "id": "AAMkCDsfUGW1ZPJ4XTHbXEdnPXI5AE34Xev2XKM2XUFdTDIeN2HiKHICBEDWSGOudpjVIWiyAEwhB5t0ONK4RaPpbEydYzfmFVCuHyAj-BpuNFI2YJ9DYVTyjVagVdoaAWYhHiNo-PycTQX1CGuAESH=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T08:28:10.819794Z",
+          "status": "notStarted",
+          "title": "seed-v1 Remove the old brief"
+        },
+        {
+          "@odata.etag": "W/\"a8Qjww92PrTRBx9L0crepqNV/FbFEK==\"",
+          "body": {
+            "content": "Print ten copies of the brief.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T08:28:09.2218997Z",
+          "hasAttachments": true,
+          "id": "AAMkGRjlNCL7VHK5HEQwZHgqNOK7HW91Ycw1EMA0GQXyXVTjD9BuIGTYGAOEDGRccfkYVGegSRpiK6y1UCR3BjYmgTbvYlbdHCYxLnZy-LzoNBJ3JL9CAAXyfQojSnghMDAfBpNr-ItcATE8NSdZXPK=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T08:28:09.9109143Z",
+          "status": "notStarted",
+          "title": "seed-v1 Print the launch brief"
+        },
+        {
+          "@odata.etag": "W/\"p8Bmea90JqSDQj0T0grlnxBN/UeFJU==\"",
+          "body": {
+            "content": "The site shows the launch plan.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T08:28:09.0235485Z",
+          "hasAttachments": false,
+          "id": "AAMkGFpdWOC0EWV3XZOgEEjqYFY5UU27Rar1FUK3VZDoELLdP4FkSDCKEQGIYHKrihaVRJdmDPjhM1d1LTR6QjUkoUubVamnXLErToMm-IggFDD9SL4PYVDznZlnQnwsMHNzUnGn-PgmKPH4TVlIXCY=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T08:28:09.1317924Z",
+          "linkedResources": [
+            {
+              "applicationName": "Outlook",
+              "displayName": "seed-v1 Launch site",
+              "id": "00000000-e294-4179-8dd3-665a476018e6",
+              "webUrl": "https://outlook.office365.com/owa/mail"
+            }
+          ],
+          "status": "notStarted",
+          "title": "seed-v1 Read the launch site"
+        },
+        {
+          "@odata.etag": "W/\"c7Oifs74MfTNOy0I5weqrmAW/IeCWe==\"",
+          "body": {
+            "content": "The slides need the new logo.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "checklistItems": [
+            {
+              "createdDateTime": "2026-11-25T08:28:08Z",
+              "displayName": "seed-v1 Check the logo",
+              "id": "00000000-f8c0-4246-8942-a5e8872730e4",
+              "isChecked": false
+            },
+            {
+              "checkedDateTime": "2026-11-25T08:28:08.9021981Z",
+              "createdDateTime": "2026-11-25T08:28:08.9021746Z",
+              "displayName": "seed-v1 Check the dates",
+              "id": "00000000-ebae-49f9-80ed-1a8a297074b1",
+              "isChecked": true
+            }
+          ],
+          "createdDateTime": "2026-11-25T08:28:08.2227537Z",
+          "hasAttachments": false,
+          "id": "AAMkOOdmULQ5HTG5LXFxDTpvSWE8FE04Psa4DFI6NHBwWQQiN0UdHQDVHOICGCIxnmoMVSslRSatG4t1NMB9NwIteGvwRvriGXGjWkJl-JasIVE7MW8JRXVcuSuuVunwLUTsNkBr-BhgAZD9ERkYJJW=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T08:28:08.9512039Z",
+          "status": "inProgress",
+          "title": "seed-v1 Check the slides"
+        },
+        {
+          "@odata.etag": "W/\"z7Mnql97WeSOSp9V8kixrgJW/VzLNp==\"",
+          "body": {
+            "content": "The room must hold twenty people.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T08:28:07.8389595Z",
+          "dueDateTime": {
+            "dateTime": "2026-12-02T00:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "hasAttachments": false,
+          "id": "AAMkCKqaMPL8GUV8IDVbEMnvQBH6CN23Mur6WRK0VYIbNWFeE2RvDWCSHDXSARGuzzjQKQsyBMumS0s5DHR7HnPcsEanYdlmYWRpIvBp-RpjNKH2CP8JGBXokQbaCusmGTErGcWy-XuzIHJ0WYtQTUA=",
+          "importance": "high",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T08:28:07.9616194Z",
+          "status": "notStarted",
+          "title": "seed-v1 Book the launch room"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkWCfyFDF0NVF4QQZkFJvmXKT2XT94Xpp6PKE8VNJbTKSzX4UjFVYuICJTARShpasAIRvqBBgbS9t9UUY0IEPbdFusViobGRYtDfRg-BdaGHB9EE3HSBV=/tasks/AAMkOOdmULQ5HTG5LXFxDTpvSWE8FE04Psa4DFI6NHBwWQQiN0UdHQDVHOICGCIxnmoMVSslRSatG4t1NMB9NwIteGvwRvriGXGjWkJl-JasIVE7MW8JRXVcuSuuVunwLUTsNkBr-BhgAZD9ERkYJJW=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "query": {
+      "$expand": "checklistItems,linkedResources"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"c7Oifs74MfTNOy0I5weqrmAW/IeCWe==\"",
+      "body": {
+        "content": "The slides need the new logo.",
+        "contentType": "text"
+      },
+      "categories": ["seed-v1"],
+      "checklistItems": [
+        {
+          "createdDateTime": "2026-11-25T08:28:08Z",
+          "displayName": "seed-v1 Check the logo",
+          "id": "00000000-f8c0-4246-8942-a5e8872730e4",
+          "isChecked": false
+        },
+        {
+          "checkedDateTime": "2026-11-25T08:28:08.9021981Z",
+          "createdDateTime": "2026-11-25T08:28:08.9021746Z",
+          "displayName": "seed-v1 Check the dates",
+          "id": "00000000-ebae-49f9-80ed-1a8a297074b1",
+          "isChecked": true
+        }
+      ],
+      "createdDateTime": "2026-11-25T08:28:08.2227537Z",
+      "hasAttachments": false,
+      "id": "AAMkOOdmULQ5HTG5LXFxDTpvSWE8FE04Psa4DFI6NHBwWQQiN0UdHQDVHOICGCIxnmoMVSslRSatG4t1NMB9NwIteGvwRvriGXGjWkJl-JasIVE7MW8JRXVcuSuuVunwLUTsNkBr-BhgAZD9ERkYJJW=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T08:28:08.9512039Z",
+      "status": "inProgress",
+      "title": "seed-v1 Check the slides"
+    }
+  }
+]

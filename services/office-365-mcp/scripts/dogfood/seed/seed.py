@@ -639,6 +639,7 @@ class Graph:
         self._sleep = sleep
         self._shared = f"/v1.0/users/{shared_upn.lower()}/mailfolders" if shared_upn else None
         self._upload_url: str | None = None
+        self._token_upload_url: str | None = None
         self._known: dict[str, set[str]] = {
             "team": set(),
             "drive": set(),
@@ -781,6 +782,27 @@ class Graph:
         finally:
             self._upload_url = None
 
+    def upload_with_token(self, session: Mapping[str, Any], payload: bytes) -> None:
+        """A To Do upload session: the PUT goes to `{uploadUrl}/content` with the token, and
+        Graph answers 500 to a chunk that it stores. The caller checks that the file is there."""
+        url = str(session.get("uploadUrl", ""))
+        if not url.startswith(BASE.removesuffix("/v1.0") + "/"):
+            raise GraphError("Graph answered no Graph uploadUrl")
+        self._token_upload_url = f"{url}/content"
+        try:
+            for start in range(0, len(payload), CHUNK):
+                chunk = payload[start : start + CHUNK]
+                span = f"bytes {start}-{start + len(chunk) - 1}/{len(payload)}"
+                _ = self.request(
+                    "PUT",
+                    self._token_upload_url,
+                    body=chunk,
+                    headers={"Content-Range": span},
+                    ok_statuses=(500,),
+                )
+        finally:
+            self._token_upload_url = None
+
     def created_by_operation(self, response: httpx.Response) -> dict[str, Any]:
         """The team of a 202 answer, once its operation reports `succeeded`."""
         location = response.headers.get("location", "")
@@ -879,6 +901,9 @@ def run_lookup(graph: Graph, step: Step, path: str, ctx: Context) -> dict[str, d
                 item.get("displayName") or item.get("title") or item.get("topic") or title or ""
             )
             key = f"{step.phase}:{name}" if name.startswith(f"{TAG} ") else None
+        elif step.lookup == "within":
+            name = str(item.get("displayName") or item.get("title") or "")
+            key = f"{step.key}>{name}" if name.startswith(f"{TAG} ") else None
         elif step.lookup == "subject":
             key = f"subject:{item.get('subject')}"
         elif step.lookup == "members":
@@ -889,6 +914,8 @@ def run_lookup(graph: Graph, step: Step, path: str, ctx: Context) -> dict[str, d
             key = f"attachment:{step.key}:{item.get('name')}"
         elif step.lookup == "replies":
             key = f"reply:{step.key}:{item['body']['content']}"
+        elif step.lookup == "default-list":
+            key = str(step.key) if item.get("wellknownListName") == "defaultList" else None
         else:
             key = f"file:{item.get('name')}" if step.lookup == "drive-children" else _key_of(item)
         if key:
@@ -927,6 +954,9 @@ def apply(
         if step.kind == "upload":
             sent = graph.upload(response.json(), cast("bytes", step.payload))
             found[str(step.key)] = sent.json() if sent.content else {"id": str(step.key)}
+        elif step.kind == "upload-with-token":
+            graph.upload_with_token(response.json(), cast("bytes", step.payload))
+            found[str(step.key)] = _uploaded(graph, path, step.body)
         else:
             if step.poll:
                 answer = graph.created_by_operation(response)
@@ -938,6 +968,15 @@ def apply(
         created += 1
         out(f"created {step.key}")
     return created, skipped
+
+
+def _uploaded(graph: Graph, session_path: str, body: Mapping[str, Any]) -> dict[str, Any]:
+    name = body["attachmentInfo"]["name"]
+    listing = graph.get_all(session_path.removesuffix("/createUploadSession"), {})
+    stored = [row for row in listing if row.get("name") == name]
+    if not stored:
+        raise GraphError(f"the upload of {name} ended, and Graph lists no such file")
+    return cast("dict[str, Any]", stored[0])
 
 
 def cleanup(

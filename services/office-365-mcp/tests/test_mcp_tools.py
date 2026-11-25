@@ -624,7 +624,14 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
         "created_after",
         "created_before",
     ),
+    "outlook_list_tasks": ("due_after", "due_before"),
 }
+
+_ONE_DAY_OR_MOMENT_NOT_A_WINDOW: frozenset[str] = frozenset(
+    f"{tool}.{argument}"
+    for tool in ("outlook_create_task", "outlook_update_task")
+    for argument in ("due_date", "start_date", "reminder_at")
+)
 
 
 _MESSAGE_TOOLS: tuple[str, ...] = (
@@ -673,6 +680,7 @@ _RETURNS_A_FILE: frozenset[str] = frozenset(
     {
         "outlook_read_attachment",
         "outlook_read_event_attachment",
+        "outlook_read_task_attachment",
         "sharepoint_read_file",
         "onenote_read_resource",
     }
@@ -720,6 +728,19 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_delete_calendar",
         "outlook_create_contact",
         "outlook_update_contact",
+        "outlook_create_task",
+        "outlook_update_task",
+        "outlook_set_task_status",
+        "outlook_delete_task",
+        "outlook_add_task_step",
+        "outlook_update_task_step",
+        "outlook_delete_task_step",
+        "outlook_add_task_link",
+        "outlook_delete_task_link",
+        "outlook_delete_task_attachment",
+        "outlook_create_task_list",
+        "outlook_rename_task_list",
+        "outlook_delete_task_list",
         "onenote_create_page",
         "onenote_append_to_page",
         "onenote_create_notebook",
@@ -849,10 +870,11 @@ class TestTheToolsThisServerAdvertises:
                 if formats & {"date", "date-time"}:
                     found.add(f"{tool.name}.{name}")
 
-        assert found == recorded, (
+        assert found == recorded | _ONE_DAY_OR_MOMENT_NOT_A_WINDOW, (
             "a date-shaped argument is either a search window — record it in `_WINDOWED_TOOLS`, "
             + "where the test above holds it to both shapes — or it is not a window at all, in "
-            + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"
+            + "which case add it to `_ONE_DAY_OR_MOMENT_NOT_A_WINDOW`. Unaccounted for: "
+            + f"{sorted(found - recorded - _ONE_DAY_OR_MOMENT_NOT_A_WINDOW)}"
         )
 
     async def test_no_tool_that_takes_a_mailbox_claims_only_the_users_own(

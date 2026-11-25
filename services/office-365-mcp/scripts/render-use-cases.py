@@ -47,6 +47,7 @@ _AREA_TAGS = {
     "@outlook-mail": ("Outlook", 0),
     "@outlook-calendar": ("Outlook", 1),
     "@outlook-contacts": ("Outlook", 2),
+    "@outlook-tasks": ("Outlook", 3),
     "@teams": ("Teams", 0),
     "@sharepoint": ("SharePoint", 0),
     "@onenote": ("OneNote", 0),

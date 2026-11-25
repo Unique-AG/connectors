@@ -1,0 +1,21 @@
+scenario: outlook_set_task_status-completed
+fixture: rec-tool-outlook_set_task_status-completed
+source: recorded
+target: graph
+recorded_at: '2026-11-25T09:35:25+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 15
+  keys dropped: 5
+  response headers dropped: 45
+  text kept: 9
+literals:
+- completed
+- seed-v1 case-outlook_set_task_status-completed
+- seed-v1 case-outlook_tasks task
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

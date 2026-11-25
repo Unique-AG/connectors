@@ -31,7 +31,7 @@ from office_365_mcp.shared.notes import (
 )
 from office_365_mcp.shared.odata import odata_literal
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller, owner_refused
-from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "onenote_list_pages"
 
@@ -403,7 +403,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         modified_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Keep only the pages last changed on or after this point, inclusive. A "
@@ -415,7 +415,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         modified_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Keep only the pages last changed on or before this point, inclusive, in "
@@ -426,7 +426,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         created_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Keep only the pages created on or after this point, inclusive, in the "
@@ -437,7 +437,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         created_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Keep only the pages created on or before this point, inclusive, in the "
