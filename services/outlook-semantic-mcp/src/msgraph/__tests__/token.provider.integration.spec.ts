@@ -9,6 +9,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockEncryptionService } from '../../__mocks__';
+import { stopPostgres } from '../../__mocks__/stop-postgres';
 import type { DrizzleDatabase } from '../../db/drizzle.module';
 import * as schema from '../../db/schema';
 
@@ -57,8 +58,7 @@ describe('TokenProvider against Postgres', () => {
   }, CONTAINER_STARTUP_TIMEOUT_MS);
 
   afterAll(async () => {
-    await pool?.end();
-    await container?.stop();
+    await stopPostgres(pool, container);
   });
 
   beforeEach(async () => {

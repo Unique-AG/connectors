@@ -12,6 +12,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import type { DrizzleDatabase } from '~/db';
 import * as schema from '~/db/schema';
 import { PersistentCacheService } from '~/features/persistent-cache/persistent-cache.service';
+import { stopPostgres } from '../../../../__mocks__/stop-postgres';
 import {
   DISCOVER_DELEGATED_ACCESS_CACHE_KEY,
   DiscoverDelegatedAccessCommand,
@@ -49,8 +50,7 @@ describe('DiscoverDelegatedAccessCommand against Postgres', () => {
   }, CONTAINER_STARTUP_TIMEOUT_MS);
 
   afterAll(async () => {
-    await pool?.end();
-    await container?.stop();
+    await stopPostgres(pool, container);
   });
 
   beforeEach(async () => {
