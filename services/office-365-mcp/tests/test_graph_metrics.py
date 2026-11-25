@@ -1324,6 +1324,7 @@ GRAPH_STEPS = frozenset(
         "people_search",
         "mail_participants",
         "thread_anchor",
+        "thread_folder_messages",
         "thread_messages",
         "mail_folder",
         "folder_messages",
