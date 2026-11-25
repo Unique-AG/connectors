@@ -6,7 +6,7 @@ FREE_READ = ToolAnnotations(
     read_only_hint=True, destructive_hint=False, idempotent_hint=True, open_world_hint=True
 )
 PAID_READ = ToolAnnotations(
-    read_only_hint=True, destructive_hint=False, idempotent_hint=False, open_world_hint=True
+    read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True
 )
 PAID_ORDER = ToolAnnotations(
     read_only_hint=False, destructive_hint=False, idempotent_hint=False, open_world_hint=True
