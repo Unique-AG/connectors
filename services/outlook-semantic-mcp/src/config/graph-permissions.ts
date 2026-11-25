@@ -1,13 +1,13 @@
+import { McpBackendType } from './mcp-backend-type.config';
 import { type GraphPermission, TOOL_DECLARATIONS, type ToolName } from './tool-declarations';
 
 const OPENID_SCOPES = ['openid', 'profile', 'email'] as const;
 
-const BASE_PERMISSIONS: readonly GraphPermission[] = [
-  'User.Read',
-  'Mail.Read',
-  'People.Read',
-  'MailboxSettings.Read',
-];
+// Sign-in reads GET /me, and the folder sync reads every deployment's mail folders whatever the tools.
+const BASE_PERMISSIONS: readonly GraphPermission[] = ['User.Read', 'Mail.Read'];
+
+// Full sync, live catch-up and the mail subscription.
+const UNIQUE_MODE_PERMISSIONS: readonly GraphPermission[] = ['Mail.Read'];
 
 // With shared mailboxes on, each own mail permission brings its `.Shared` counterpart.
 const SHARED_COUNTERPARTS: Partial<Record<GraphPermission, GraphPermission>> = {
@@ -24,6 +24,7 @@ const REPLACES: Partial<Record<GraphPermission, GraphPermission>> = {
 };
 
 interface PermissionSelection {
+  readonly mode: McpBackendType;
   readonly tools: ReadonlySet<ToolName>;
   readonly sharedMailboxes: boolean;
   readonly additionalGraphPermissions: readonly GraphPermission[];
@@ -32,6 +33,9 @@ interface PermissionSelection {
 function resolveGraphPermissions(selection: PermissionSelection): GraphPermission[] {
   const own = [
     ...BASE_PERMISSIONS,
+    ...(selection.mode === McpBackendType.MicrosoftGraphAndUniqueApi
+      ? UNIQUE_MODE_PERMISSIONS
+      : []),
     ...[...selection.tools].flatMap((tool) => TOOL_DECLARATIONS[tool].permissions),
   ];
   const shared = selection.sharedMailboxes

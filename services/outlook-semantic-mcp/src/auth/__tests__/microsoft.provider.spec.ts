@@ -121,20 +121,33 @@ describe(authorizeTenant.name, () => {
   });
 });
 
+const MAIL_TOOLS = [
+  'list_mailboxes_and_directories',
+  'list_categories',
+  'draft_email',
+  'update_draft_email',
+  'add_attachments_to_draft_email',
+  'remove_attachments_from_draft_email',
+  'lookup_contacts',
+  'search_emails',
+  'fetch_next_search_pages',
+  'open_email',
+];
+
 describe(getScopes.name, () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("requests main's mail scopes for the draft tools with shared mailboxes on", () => {
+  it("requests main's mail scopes for main's mail tools with shared mailboxes on", () => {
     vi.stubEnv('DELEGATED_ACCESS_SCAN', 'full_access_only');
-    vi.stubEnv('MCP_TOOLS', JSON.stringify(['search_emails', 'draft_email']));
+    vi.stubEnv('MCP_TOOLS', JSON.stringify(MAIL_TOOLS));
     expect(getScopes()).toEqual(MAIL_ONLY_SCOPE_STRING.split(' ').sort());
   });
 
   it('adds Calendars.ReadWrite.Shared when a calendar tool is listed', () => {
     vi.stubEnv('DELEGATED_ACCESS_SCAN', 'full_access_only');
-    vi.stubEnv('MCP_TOOLS', JSON.stringify(['draft_email', 'list_calendars']));
+    vi.stubEnv('MCP_TOOLS', JSON.stringify([...MAIL_TOOLS, 'list_calendars']));
     expect(getScopes()).toEqual(
       [...MAIL_ONLY_SCOPE_STRING.split(' '), 'Calendars.ReadWrite.Shared'].sort(),
     );

@@ -9,14 +9,14 @@ The server does not request a fixed list. It computes the list from `MCP_TOOLS`,
 
 | Permission | Type | Admin Consent | Requested when | Purpose |
 |------------|------|---------------|----------------|---------|
-| `User.Read` | Delegated | No | Always | Resolve user identity and profile |
+| `User.Read` | Delegated | No | Always | Resolve user identity and profile at sign-in, and translate message ids (`translateExchangeIds`) |
 | `Mail.Read` | Delegated | No | Always, unless `Mail.ReadWrite` is requested | Read emails for sync, search and `open_email` in the user's own mailbox |
 | `Mail.ReadWrite` | Delegated | No | A draft tool is listed in `MCP_TOOLS` | Read emails like `Mail.Read`; create and edit draft emails in the user's mailbox |
 | `Mail.Read.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled`, unless `Mail.ReadWrite.Shared` is requested | Read emails in mailboxes the user has been granted delegated access to |
 | `Mail.ReadWrite.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled` and a draft tool is listed in `MCP_TOOLS` | Read emails like `Mail.Read.Shared`; create and edit drafts in those mailboxes |
 | `User.Read.All` | Delegated | Yes | `DELEGATED_ACCESS_SCAN` is not `disabled` | Resolve the addresses in `DELEGATED_ACCESS_SHARED_MAILBOX_EMAILS` through Graph `/users` |
-| `MailboxSettings.Read` | Delegated | No | Always | Read mailbox settings and folder structure |
-| `People.Read` | Delegated | No | Always | Look up contacts and people for address resolution |
+| `MailboxSettings.Read` | Delegated | No | `list_categories`, `search_emails`, `fetch_next_search_pages`, `open_email` or a calendar tool other than `list_calendars` and `respond_to_invite` is listed | Read mailbox settings and folder structure |
+| `People.Read` | Delegated | No | `lookup_contacts` is listed | Look up contacts and people for address resolution |
 | `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` | List calendars and read/write events, including calendars shared with the user |
 | `offline_access` | Delegated | No | Always | Obtain refresh tokens for background sync |
 
@@ -94,10 +94,11 @@ Each permission is the minimum required for its function. No narrower alternativ
 
 | Aspect | Detail |
 |--------|--------|
-| **Purpose** | Read mailbox configuration and folder structure settings |
-| **Used For** | Reading the user's mail folder hierarchy for directory sync and `list_folders` tool |
-| **Why Not Less** | No narrower permission covers folder structure access |
+| **Purpose** | Read the mailbox time zone and the category list |
+| **Used For** | `list_categories` (`/me/outlook/masterCategories`), and the mailbox time zone (`/me/mailboxSettings`) that `search_emails`, `fetch_next_search_pages`, `open_email` and the calendar tools use to show dates |
+| **Why Not Less** | It is the least privileged permission for both endpoints |
 | **Why Not `MailboxSettings.ReadWrite`** | The server never modifies mailbox settings |
+| **Note** | Requested when one of those tools is listed in `MCP_TOOLS` |
 
 ### `People.Read`
 
@@ -107,6 +108,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Used For** | The `lookup_contacts` tool — searching for email addresses and display names for draft recipients |
 | **Why Not Less** | This is the minimum permission for the People API |
 | **Why Not `Contacts.Read`** | `People.Read` provides the Microsoft People API which returns a richer relevance-ranked result set. `Contacts.Read` only covers the Contacts folder, not the full people graph. |
+| **Note** | Requested when `lookup_contacts` is listed in `MCP_TOOLS` |
 
 ### `Calendars.ReadWrite.Shared`
 

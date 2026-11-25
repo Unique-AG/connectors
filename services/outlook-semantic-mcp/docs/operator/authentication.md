@@ -15,8 +15,8 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `Mail.Read.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled`, unless `Mail.ReadWrite.Shared` is requested |
 | `Mail.ReadWrite.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled` and a draft tool is listed |
 | `User.Read.All` | Delegated | Yes | `DELEGATED_ACCESS_SCAN` is not `disabled` |
-| `MailboxSettings.Read` | Delegated | No | Always |
-| `People.Read` | Delegated | No | Always |
+| `MailboxSettings.Read` | Delegated | No | `list_categories`, `search_emails`, `fetch_next_search_pages`, `open_email` or a calendar tool other than `list_calendars` and `respond_to_invite` is listed |
+| `People.Read` | Delegated | No | `lookup_contacts` is listed |
 | `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` |
 | `offline_access` | Delegated | No | Always |
 

@@ -546,9 +546,14 @@ Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callb
 
 The server computes the Microsoft Graph permissions it requests from its configuration. The OAuth authorize request, token refresh and the Graph client all use the same list:
 
-1. Always: `openid`, `profile`, `email`, `offline_access`, `User.Read`, `Mail.Read`, `People.Read` and `MailboxSettings.Read`.
-2. A draft tool in [`MCP_TOOLS`](#MCP_TOOLS) (`draft_email`, `update_draft_email`, `add_attachments_to_draft_email` or `remove_attachments_from_draft_email`) adds `Mail.ReadWrite`.
-3. A calendar tool in `MCP_TOOLS` adds `Calendars.ReadWrite.Shared`. See [Calendar tools](#Calendar-tools).
+1. Always: `openid`, `profile`, `email`, `offline_access`, `User.Read` (sign-in) and `Mail.Read` (the folder sync runs for every deployment).
+2. Each tool in [`MCP_TOOLS`](#MCP_TOOLS) adds what its Microsoft Graph calls need:
+   - `draft_email`, `update_draft_email`, `add_attachments_to_draft_email` and `remove_attachments_from_draft_email`: `Mail.ReadWrite`.
+   - `lookup_contacts`: `People.Read`.
+   - `list_categories`, `search_emails`, `fetch_next_search_pages` and `open_email`: `MailboxSettings.Read` (categories and the mailbox time zone).
+   - The calendar tools: `Calendars.ReadWrite.Shared`; all but `list_calendars` and `respond_to_invite` also `MailboxSettings.Read`. See [Calendar tools](#Calendar-tools).
+   - The other tools need nothing beyond `Mail.Read`.
+3. `MCP_BACKEND=microsoft_graph_and_unique_api` needs `Mail.Read` for the sync and the mail subscription.
 4. Shared mailboxes, meaning [`DELEGATED_ACCESS_SCAN`](#DELEGATED_ACCESS_SCAN) is anything but `disabled`, add `User.Read.All` and `Mail.Read.Shared`. With a draft tool listed, they add `Mail.ReadWrite.Shared` instead of `Mail.Read.Shared`.
 5. [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS) adds the permissions it lists.
 6. A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`. A permission and its `.Shared` counterpart stay side by side.

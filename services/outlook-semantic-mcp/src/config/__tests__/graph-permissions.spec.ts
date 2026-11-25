@@ -166,6 +166,40 @@ describe(resolveScopes.name, () => {
     );
   });
 
+  describe('each permission follows the tools that need it', () => {
+    const minimal = (...tools: string[]) =>
+      scopesFor({
+        MCP_BACKEND: 'microsoft_graph',
+        DELEGATED_ACCESS_SCAN: 'disabled',
+        MCP_TOOLS: JSON.stringify(tools),
+      });
+    const SIGN_IN = ['openid', 'profile', 'email', 'offline_access', 'User.Read', 'Mail.Read'];
+
+    it('requests only the base for a tool that reads the folder cache', () => {
+      expect(minimal('list_mailboxes_and_directories')).toEqual(sorted(SIGN_IN));
+    });
+
+    it('requests People.Read only with lookup_contacts', () => {
+      expect(minimal('lookup_contacts')).toEqual(sorted([...SIGN_IN, 'People.Read']));
+      expect(minimal(...without(READ_ONLY_TOOLS, 'lookup_contacts'))).not.toContain('People.Read');
+    });
+
+    it('requests MailboxSettings.Read for the categories and the time zone of search', () => {
+      expect(minimal('list_categories')).toEqual(sorted([...SIGN_IN, 'MailboxSettings.Read']));
+      expect(minimal('open_email')).toEqual(sorted([...SIGN_IN, 'MailboxSettings.Read']));
+      expect(minimal('lookup_contacts')).not.toContain('MailboxSettings.Read');
+    });
+
+    it('requests the calendar permission and the time zone for a calendar search', () => {
+      expect(minimal('search_calendar_events')).toEqual(
+        sorted([...SIGN_IN, 'Calendars.ReadWrite.Shared', 'MailboxSettings.Read']),
+      );
+      expect(minimal('respond_to_invite')).toEqual(
+        sorted([...SIGN_IN, 'Calendars.ReadWrite.Shared']),
+      );
+    });
+  });
+
   it('is sorted, so the scope string is the same on every start', () => {
     const scopes = scopesFor({ MCP_TOOLS: JSON.stringify([...CALENDAR_TOOLS, ...MAIL_TOOLS]) });
 
