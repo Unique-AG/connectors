@@ -5,7 +5,7 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Mail permissions do not require admin consent. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically **does** require admin consent.
+All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on, or when `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` lists it. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and is user-consentable like the mail permissions.
 
 | Permission | Type | Admin Consent | Requested when |
 |------------|------|---------------|----------------|
@@ -34,7 +34,7 @@ https://<your-outlook-mcp-host>/admin/consent
 
 The link needs no sign-in. It redirects to the Microsoft admin consent page for the app registration and sign-in tenant of that deployment. After approving, you are redirected to a Unique confirmation page.
 
-The consent prompt lists the [Required Permissions](#Required-Permissions) above. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. If calendar is enabled, `Calendars.ReadWrite.Shared` typically requires admin consent.
+The consent prompt lists the [Required Permissions](#Required-Permissions) above. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. `User.Read.All`, requested with shared mailboxes on, needs admin consent.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. Unless Unique pinned your deployment to one directory, Microsoft opens the directory of the admin account you sign in with. See [Admin consent link](#Admin-consent-link).
 
@@ -92,7 +92,7 @@ module "outlook_semantic_mcp_app" {
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
    - Add the permissions your configuration requests, listed under [Required Permissions](#Required-Permissions)
-   - If you will list calendar tools in `MCP_TOOLS`, also add `Calendars.ReadWrite.Shared` and grant admin consent before listing them
+   - If you will list calendar tools in `MCP_TOOLS`, also add `Calendars.ReadWrite.Shared` before listing them
 
 3. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
@@ -273,7 +273,7 @@ For the full security context, see [Secret Management](../technical/security.md#
 
 **This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model.
 
-Because no permission in this app requires admin consent, users can complete the full consent flow independently:
+With shared mailboxes off and no `User.Read.All` in `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`, no requested permission needs admin consent, so users can complete the full consent flow independently:
 
 1. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the listed permissions
 2. **Optional admin pre-consent** — an admin can grant consent organisation-wide via Azure Portal to skip the per-user consent prompt

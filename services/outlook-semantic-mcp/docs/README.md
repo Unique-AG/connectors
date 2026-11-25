@@ -42,7 +42,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are delegated. The server requests only what its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list (see [Configuration — Requested Graph permissions](./operator/configuration.md#Requested-Graph-permissions)). Mail permissions require no admin consent. `Mail.ReadWrite` is requested only when a draft tool is listed, and the `.Shared` mail permissions only when `DELEGATED_ACCESS_SCAN` is not `disabled`. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically does require admin consent. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
+All permissions are delegated. The server requests only what its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list (see [Configuration — Requested Graph permissions](./operator/configuration.md#Requested-Graph-permissions)). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on, or when `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` lists it. `Mail.ReadWrite` is requested only when a draft tool is listed, and the `.Shared` mail permissions only when `DELEGATED_ACCESS_SCAN` is not `disabled`. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and is user-consentable like the mail permissions. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
 
 ## Features
 
