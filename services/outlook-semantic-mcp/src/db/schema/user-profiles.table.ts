@@ -60,6 +60,9 @@ export const userProfiles = pgTable(
     tokenRefreshFailureCount: integer(`token_refresh_failure_count`).notNull().default(0),
     tokenRefreshFailureCode: varchar(`token_refresh_failure_code`),
     tokenRefreshRetryAt: timestamp(`token_refresh_retry_at`),
+    // When delegated access discovery last finished checking this user's access to every other
+    // mailbox. A discovery cycle reruns every delegate discovered before the cycle started.
+    delegatedAccessDiscoveredAt: timestamp(`delegated_access_discovered_at`),
     source: userProfileSource('source').notNull().default('oauth'),
     ...timestamps,
   },
