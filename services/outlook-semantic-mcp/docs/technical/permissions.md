@@ -5,7 +5,7 @@ All permissions are **Delegated** (not Application), meaning they act on behalf 
 
 ## Permission Summary
 
-The server does not request a fixed list. It computes the list from `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`, and uses it for the OAuth authorize request, token refresh and the Graph client. See [Configuration — Requested Graph permissions](../operator/configuration.md#Requested-Graph-permissions) for the rule and example results.
+The server does not request a fixed list. It computes the list from `MCP_TOOLS` and `DELEGATED_ACCESS_SCAN`, and uses it for the OAuth authorize request, token refresh and the Graph client. See [Configuration — Requested Graph permissions](../operator/configuration.md#Requested-Graph-permissions) for the rule and example results.
 
 | Permission | Type | Admin Consent | Requested when | Purpose |
 |------------|------|---------------|----------------|---------|
@@ -20,9 +20,9 @@ The server does not request a fixed list. It computes the list from `MCP_TOOLS`,
 | `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` | List calendars and read/write events, including calendars shared with the user |
 | `offline_access` | Delegated | No | Always | Obtain refresh tokens for background sync |
 
-`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` can add any of these Graph permissions on top, for an Entra app granted more than the selection needs. A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`.
+A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`.
 
-**Only `User.Read.All` requires admin consent**, and the server requests it only with shared mailboxes on or when `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` lists it. Every other permission, calendar included, is user-consentable — see [`Calendars.ReadWrite.Shared`](https://learn.microsoft.com/en-us/graph/permissions-reference#calendarsreadwriteshared). With `DELEGATED_ACCESS_SCAN=disabled` and no `User.Read.All` in `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`, users can connect their own accounts without IT intervention, unless the tenant disables user consent.
+**Only `User.Read.All` requires admin consent**, and the server requests it only with shared mailboxes on. Every other permission, calendar included, is user-consentable — see [`Calendars.ReadWrite.Shared`](https://learn.microsoft.com/en-us/graph/permissions-reference#calendarsreadwriteshared). With `DELEGATED_ACCESS_SCAN=disabled`, users can connect their own accounts without IT intervention, unless the tenant disables user consent.
 
 Admin involvement is still needed in two cases: the tenant has disabled user consent for applications (a tenant-wide policy, not a property of these scopes), or the admin wants to pre-grant consent organisation-wide so users never see the consent screen. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. Independently of consent, `Calendars.ReadWrite.Shared` must be **registered** on the Entra app (Terraform `calendar_integration = "enabled"`) before a calendar tool is listed in `MCP_TOOLS`, otherwise token refresh requests a scope the app does not expose.
 

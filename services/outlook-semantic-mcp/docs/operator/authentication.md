@@ -5,7 +5,7 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on, or when `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` lists it. `Calendars.ReadWrite.Shared` is requested when a calendar tool is listed in `MCP_TOOLS`, and is user-consentable like the mail permissions. Any permission listed in `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` is requested as well.
+All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS` and `DELEGATED_ACCESS_SCAN` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on. `Calendars.ReadWrite.Shared` is requested when a calendar tool is listed in `MCP_TOOLS`, and is user-consentable like the mail permissions.
 
 | Permission | Type | Admin Consent | Requested when |
 |------------|------|---------------|----------------|
@@ -20,7 +20,7 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` |
 | `offline_access` | Delegated | No | Always |
 
-Register and grant at least the permissions your configuration requests. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. If the app was granted `Mail.ReadWrite` but the deployment lists no draft tool, add `Mail.ReadWrite` to [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS), or Entra asks users to consent to `Mail.Read`.
+Register and grant at least the permissions your configuration requests. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. A deployment without a draft tool requests `Mail.Read` rather than `Mail.ReadWrite`, so its app must grant `Mail.Read`. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
@@ -81,7 +81,7 @@ module "outlook_semantic_mcp_app" {
 
 > **`service_principal_configuration` (optional):** When set, the module creates a service principal and pre-grants delegated permissions tenant-wide via `azuread_service_principal_delegated_permission_grant`. Omit this variable for multi-tenant deployments where admin consent is granted by each customer tenant individually.
 
-> **Registered permissions:** The module registers a fixed list whatever the server's configuration: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. A deployment that lists no draft tool requests `Mail.Read`, and `Mail.Read.Shared` with shared mailboxes on, which the module does not register. List `Mail.ReadWrite`, and `Mail.ReadWrite.Shared` with shared mailboxes on, in [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS) to stay within the grant.
+> **Registered permissions:** The module registers a fixed list whatever the server's configuration: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. A deployment that lists no draft tool requests `Mail.Read`, and `Mail.Read.Shared` with shared mailboxes on, which the module does not register yet; add them to the app registration and grant consent.
 
 #### Option 2: Azure Portal (Manual)
 
@@ -273,7 +273,7 @@ For the full security context, see [Secret Management](../technical/security.md#
 
 **This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model.
 
-With shared mailboxes off and no `User.Read.All` in `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`, no requested permission needs admin consent, so users can complete the full consent flow independently:
+With shared mailboxes off, no requested permission needs admin consent, so users can complete the full consent flow independently:
 
 1. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the listed permissions
 2. **Optional admin pre-consent** — an admin can grant consent organisation-wide via Azure Portal to skip the per-user consent prompt

@@ -27,7 +27,6 @@ interface PermissionSelection {
   readonly mode: McpBackendType;
   readonly tools: ReadonlySet<ToolName>;
   readonly sharedMailboxes: boolean;
-  readonly additionalGraphPermissions: readonly GraphPermission[];
 }
 
 function resolveGraphPermissions(selection: PermissionSelection): GraphPermission[] {
@@ -41,7 +40,7 @@ function resolveGraphPermissions(selection: PermissionSelection): GraphPermissio
   const shared = selection.sharedMailboxes
     ? [...SHARED_MAILBOX_PERMISSIONS, ...own.flatMap((p) => SHARED_COUNTERPARTS[p] ?? [])]
     : [];
-  const requested = new Set([...own, ...shared, ...selection.additionalGraphPermissions]);
+  const requested = new Set([...own, ...shared]);
   const replaced = new Set([...requested].flatMap((p) => REPLACES[p] ?? []));
   return [...requested].filter((p) => !replaced.has(p)).sort();
 }

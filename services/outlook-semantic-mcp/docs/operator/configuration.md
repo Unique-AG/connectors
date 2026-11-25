@@ -81,7 +81,6 @@ Set via `mcpConfig.microsoft` in Helm values:
 | `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | `adminConsentRedirectUri` | `https://www.unique.ai/setup/consent-completed/entra-id` | Where Microsoft Entra sends a tenant admin after they grant admin consent through `/admin/consent`. Must be registered as a redirect URI on the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
-| `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` | `additionalGraphPermissions` | `[]` | JSON array of Graph permissions requested on top of what `MCP_TOOLS` and the features need, for an Entra app granted more than they need — see [MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS](#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS) |
 
 ### Unique API Configuration
 
@@ -555,8 +554,7 @@ The server computes the Microsoft Graph permissions it requests from its configu
    - The other tools need nothing beyond `Mail.Read`.
 3. `MCP_BACKEND=microsoft_graph_and_unique_api` needs `Mail.Read` for the sync and the mail subscription.
 4. Shared mailboxes, meaning [`DELEGATED_ACCESS_SCAN`](#DELEGATED_ACCESS_SCAN) is anything but `disabled`, add `User.Read.All` and `Mail.Read.Shared`. With a draft tool listed, they add `Mail.ReadWrite.Shared` instead of `Mail.Read.Shared`.
-5. [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS) adds the permissions it lists.
-6. A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`. A permission and its `.Shared` counterpart stay side by side.
+5. A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`. A permission and its `.Shared` counterpart stay side by side.
 
 The server sends the list sorted. Some selections and what they request:
 
@@ -567,22 +565,7 @@ The server sends the list sorted. Some selections and what they request:
 | The 10 mail tools, or the 14 with the sync tools, and `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read MailboxSettings.Read Mail.ReadWrite People.Read` |
 | `search_emails`, `fetch_next_search_pages`, `open_email`, `list_mailboxes_and_directories`, `list_categories` and `lookup_contacts`, with `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read Mail.Read People.Read MailboxSettings.Read` |
 
-Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module still registers a fixed list: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. It does not register `Mail.Read` or `Mail.Read.Shared`. A selection without a draft tool requests them. With that module, list `Mail.ReadWrite` in [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS), and `Mail.ReadWrite.Shared` too when `DELEGATED_ACCESS_SCAN` is not `disabled`.
-
-#### MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS
-
-Optional. Set via `mcpConfig.microsoft.additionalGraphPermissions`, a YAML list the chart renders as a JSON array. Defaults to empty.
-
-Lists Microsoft Graph permissions the server requests on top of the ones `MCP_TOOLS` and the features need. See [Requested Graph permissions](#Requested-Graph-permissions). Use it for an Entra app granted more than the selection needs. For example, an app granted `Mail.ReadWrite` that runs only read tools must request `Mail.ReadWrite`, or Entra asks users to consent to `Mail.Read`. A listed write permission still replaces its read permission, so `Mail.ReadWrite` here removes `Mail.Read` from the request.
-
-```yaml
-mcpConfig:
-  microsoft:
-    additionalGraphPermissions:
-      - Mail.ReadWrite
-```
-
-Allowed names are `User.Read`, `User.Read.All`, `Mail.Read`, `Mail.ReadWrite`, `Mail.Read.Shared`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read`, `People.Read` and `Calendars.ReadWrite.Shared`. The server refuses to start, naming the permission, when the list holds an unknown one.
+Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module still registers a fixed list: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. It does not register `Mail.Read` or `Mail.Read.Shared`. A selection without a draft tool requests them, so add them to an app made with that module and grant consent. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 
 ### Unique API
 

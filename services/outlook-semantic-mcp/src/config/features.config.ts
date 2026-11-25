@@ -4,9 +4,7 @@ import { mcpDebugModeSchema } from './app.config';
 import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 import {
   FEATURE_SETTINGS,
-  GRAPH_PERMISSIONS,
   GROUP_REQUIRES,
-  type GraphPermission,
   isToolName,
   TOOL_DECLARATIONS,
   TOOL_NAMES,
@@ -15,36 +13,28 @@ import {
 } from './tool-declarations';
 
 const TOOLS_FORMAT = 'required, a JSON array of tool names such as ["search_emails","open_email"]';
-const PERMISSIONS_FORMAT = 'a JSON array of Graph permission names such as ["Mail.ReadWrite"]';
 
-const jsonStringArray = (format: string) =>
-  z
-    .string({ error: format })
-    .transform((value, ctx) => {
-      try {
-        return JSON.parse(value) as unknown;
-      } catch {
-        ctx.addIssue({ code: 'custom', input: value, message: format });
-        return z.NEVER;
-      }
-    })
-    .pipe(z.array(z.string(), { error: format }));
+const mcpToolsSchema = z
+  .string({ error: TOOLS_FORMAT })
+  .transform((value, ctx) => {
+    try {
+      return JSON.parse(value) as unknown;
+    } catch {
+      ctx.addIssue({ code: 'custom', input: value, message: TOOLS_FORMAT });
+      return z.NEVER;
+    }
+  })
+  .pipe(z.array(z.string(), { error: TOOLS_FORMAT }).nonempty({ error: 'lists no tool' }))
+  .describe('JSON array of the tools to register. Required.');
 
 const FeaturesEnvSchema = z.object({
   mcpBackend: mcpBackendSchema,
   mcpDebugMode: mcpDebugModeSchema,
-  mcpTools: jsonStringArray(TOOLS_FORMAT)
-    .pipe(z.array(z.string()).nonempty({ error: 'lists no tool' }))
-    .describe('JSON array of the tools to register. Required.'),
+  mcpTools: mcpToolsSchema,
   delegatedAccessScan: z
     .string()
     .nonempty()
     .describe('Shared mailboxes are on unless DELEGATED_ACCESS_SCAN is "disabled".'),
-  additionalGraphPermissions: jsonStringArray(PERMISSIONS_FORMAT)
-    .optional()
-    .describe(
-      'JSON array of Graph permissions requested on top of what the tools and features need.',
-    ),
 });
 
 const FEATURE_ENV_KEYS = {
@@ -52,7 +42,6 @@ const FEATURE_ENV_KEYS = {
   mcpDebugMode: 'MCP_DEBUG_MODE',
   mcpTools: 'MCP_TOOLS',
   delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
-  additionalGraphPermissions: 'MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -82,18 +71,6 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     }
   }
 
-  const isGraphPermission = (name: string): name is GraphPermission =>
-    (GRAPH_PERMISSIONS as readonly string[]).includes(name);
-  const additional = env.additionalGraphPermissions ?? [];
-  for (const name of additional.filter((p) => !isGraphPermission(p))) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['additionalGraphPermissions'],
-      input: name,
-      message: `unknown permission "${name}"; known: ${GRAPH_PERMISSIONS.join(', ')}`,
-    });
-  }
-
   const tools: ReadonlySet<ToolName> = new Set(
     TOOL_NAMES.filter((name) => env.mcpTools.includes(name)),
   );
@@ -103,7 +80,6 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     tools,
     calendar: [...tools].some((name) => TOOL_DECLARATIONS[name].group === 'calendar'),
     sharedMailboxes: env.delegatedAccessScan !== 'disabled',
-    additionalGraphPermissions: additional.filter(isGraphPermission),
   };
 });
 

@@ -14,10 +14,6 @@
 - name: MICROSOFT_ALLOWED_TENANT_IDS
   value: {{ join "," . | quote }}
 {{- end }}
-{{- with .additionalGraphPermissions }}
-- name: MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS
-  value: {{ toJson . | quote }}
-{{- end }}
 {{- if .publicWebhookUrl }}
 - name: MICROSOFT_PUBLIC_WEBHOOK_URL
   value: {{ .publicWebhookUrl | quote }}

@@ -617,7 +617,7 @@ A permission error on a *delegated* mailbox is different: that is not `consentRe
 
 **Answer:** It needs it only for drafts. The server requests `Mail.ReadWrite` when a draft tool (`draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email`) is listed in `MCP_TOOLS`. Those tools create and edit messages in the user's mailbox, for example via `POST /me/messages`. Without a draft tool it requests `Mail.Read` instead. `Mail.ReadWrite` includes full read access, so `Mail.Read` is dropped when `Mail.ReadWrite` is requested.
 
-An Entra app granted `Mail.ReadWrite` whose deployment lists no draft tool can keep requesting it through [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./operator/configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS). Otherwise Entra asks users to consent to `Mail.Read`.
+An Entra app granted `Mail.ReadWrite` but not `Mail.Read`, whose deployment removes the draft tools, then asks users to consent to `Mail.Read` once.
 
 Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
 

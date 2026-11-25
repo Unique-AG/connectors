@@ -2,19 +2,16 @@ export type ToolGroup = 'mail' | 'calendar' | 'sync' | 'debug';
 
 export type ToolFeature = 'uniqueMode' | 'debugMode';
 
-export const GRAPH_PERMISSIONS = [
-  'User.Read',
-  'User.Read.All',
-  'Mail.Read',
-  'Mail.ReadWrite',
-  'Mail.Read.Shared',
-  'Mail.ReadWrite.Shared',
-  'MailboxSettings.Read',
-  'People.Read',
-  'Calendars.ReadWrite.Shared',
-] as const;
-
-export type GraphPermission = (typeof GRAPH_PERMISSIONS)[number];
+export type GraphPermission =
+  | 'User.Read'
+  | 'User.Read.All'
+  | 'Mail.Read'
+  | 'Mail.ReadWrite'
+  | 'Mail.Read.Shared'
+  | 'Mail.ReadWrite.Shared'
+  | 'MailboxSettings.Read'
+  | 'People.Read'
+  | 'Calendars.ReadWrite.Shared';
 
 export interface ToolDeclaration {
   readonly group: ToolGroup;

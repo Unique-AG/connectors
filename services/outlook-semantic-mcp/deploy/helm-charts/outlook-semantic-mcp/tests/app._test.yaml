@@ -45,25 +45,3 @@ tests:
           content:
             name: CALENDAR_INTEGRATION
           any: true
-
-  - it: renders additional Graph permissions as a JSON array
-    values:
-      - ../ci-values.yaml
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-          tools: [search_emails]
-        microsoft:
-          clientId: test-client-id
-          additionalGraphPermissions: [Mail.ReadWrite]
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS
-            value: '["Mail.ReadWrite"]'
