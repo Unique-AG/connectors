@@ -167,8 +167,8 @@ catalogs:
       specifier: 7.8.2
       version: 7.8.2
     serialize-error-cjs:
-      specifier: 0.3.0
-      version: 0.3.0
+      specifier: 0.3.1
+      version: 0.3.1
     supertest:
       specifier: 7.3.2
       version: 7.3.2
@@ -324,7 +324,7 @@ importers:
         version: 2.62.2
       serialize-error-cjs:
         specifier: 'catalog:'
-        version: 0.3.0
+        version: 0.3.1
     devDependencies:
       '@nestjs/common':
         specifier: 'catalog:'
@@ -376,7 +376,7 @@ importers:
         version: 0.2.2
       serialize-error-cjs:
         specifier: 'catalog:'
-        version: 0.3.0
+        version: 0.3.1
       typeid-js:
         specifier: 'catalog:'
         version: 1.2.0
@@ -1233,7 +1233,7 @@ importers:
         version: 7.8.2
       serialize-error-cjs:
         specifier: 'catalog:'
-        version: 0.3.0
+        version: 0.3.1
       undici:
         specifier: 'catalog:'
         version: 8.13.1
@@ -1411,7 +1411,7 @@ importers:
         version: 7.8.2
       serialize-error-cjs:
         specifier: 'catalog:'
-        version: 0.3.0
+        version: 0.3.1
       typeid-js:
         specifier: 'catalog:'
         version: 1.2.0
@@ -6050,9 +6050,8 @@ packages:
     resolution: {integrity: sha512-1gnZf7DFcoIcajTjTwjwuDjzuz4PPcY2StKPlsGAQ1+YH20IRVrBaXSWmdjowTJ6u8Rc01PoYOGHXfP1mYcZNQ==}
     engines: {node: '>= 18'}
 
-  serialize-error-cjs@0.3.0:
-    resolution: {integrity: sha512-i6sVLDdj2pk3iwGGFP/fio00jFEiPpDzqqX7PZNHU+MkqYVcyj1niB1nFHmz7PD0ddyV2lvy0TGIlRPR6lkSWg==}
-    deprecated: Upgrade to 0.3.1 or the latest release.
+  serialize-error-cjs@0.3.1:
+    resolution: {integrity: sha512-x0iceWMNsA74dh0yaKY3MjQE6oSOfJCZuW+sMxseAeX3RDlUC9iYfgB5jDM0A4qQCOA5evOYKBdQ5fP50tKhTA==}
 
   serve-static@2.2.1:
     resolution: {integrity: sha512-xRXBn0pPqQTVQiC8wyQrKs2MOlX24zQ0POGaj0kultvoOCstBQM5yvOhAVSUwOMjQtTvsPWoNCHfPGwaaQJhTw==}
@@ -8846,7 +8845,7 @@ snapshots:
       passport: 0.7.0
       reflect-metadata: 0.2.2
       rxjs: 7.8.2
-      serialize-error-cjs: 0.3.0
+      serialize-error-cjs: 0.3.1
       typeid-js: 1.2.0
       zod: 4.6.7
     transitivePeerDependencies:
@@ -11265,7 +11264,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  serialize-error-cjs@0.3.0: {}
+  serialize-error-cjs@0.3.1: {}
 
   serve-static@2.2.1:
     dependencies:
