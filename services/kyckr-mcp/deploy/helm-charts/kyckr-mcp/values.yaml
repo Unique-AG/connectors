@@ -40,6 +40,8 @@ mcpConfig:
   zitadel:
     # ZITADEL_BASE_URL, e.g. https://id.<tenant>.unique.app
     baseUrl: '{{ fail "mcpConfig.zitadel.baseUrl is mandatory. Override in your deployment values." }}'
+    # ZITADEL_CLIENT_ID, the public client id of the Zitadel application. Not a secret.
+    clientId: ""
     # ZITADEL_ORG_ID, optional. Verify in Zitadel that the id token carries the resourceowner
     # claim, or every sign-in is refused.
     orgId: ""
@@ -56,7 +58,7 @@ mcpConfig:
     windowSeconds: 60 # MCP_RATE_LIMIT_WINDOW_SECONDS
 
 # Secrets stay out of mcpConfig: set extraEnvSecrets (or envVars) with UPSTREAM_API_KEY,
-# ZITADEL_CLIENT_ID, ZITADEL_JWT_SIGNING_KEY and, if needed, ZITADEL_CLIENT_SECRET. See README.
+# ZITADEL_JWT_SIGNING_KEY and, if needed, ZITADEL_CLIENT_SECRET. See README.
 envVars: []
 
 image:

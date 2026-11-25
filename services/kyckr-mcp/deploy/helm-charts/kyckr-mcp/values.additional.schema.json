@@ -30,6 +30,10 @@
               "description": "ZITADEL_BASE_URL: the Zitadel issuer. Mandatory: the overlay sets it. Its host gets Cilium egress on port 443, so the URL is https without a port.",
               "pattern": "^(https://[^/:]+(/.*)?|\\{\\{.*\\}\\})$"
             },
+            "clientId": {
+              "type": "string",
+              "description": "ZITADEL_CLIENT_ID: the client id of the Zitadel application of this MCP. Not a secret."
+            },
             "orgId": {
               "type": "string",
               "description": "ZITADEL_ORG_ID: optional, restricts sign-in to one organisation."

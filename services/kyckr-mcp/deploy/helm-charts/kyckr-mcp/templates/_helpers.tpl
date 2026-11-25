@@ -9,6 +9,7 @@ Chart-specific helpers. Generic identity/label helpers are provided by the base 
 {{- $env := dict
   "MCP_BASE_URL" (tpl ($c.app.publicBaseUrl | default "") .)
   "ZITADEL_BASE_URL" (tpl ($c.zitadel.baseUrl | default "") .)
+  "ZITADEL_CLIENT_ID" ($c.zitadel.clientId | default "")
   "ZITADEL_ORG_ID" ($c.zitadel.orgId | default "")
   "UPSTREAM_API_URL" (tpl ($c.kyckr.apiUrl | default "") .)
   "UPSTREAM_TIMEOUT_SECONDS" ($c.kyckr.timeoutSeconds | default "")

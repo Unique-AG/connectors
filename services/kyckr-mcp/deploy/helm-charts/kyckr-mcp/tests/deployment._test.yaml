@@ -15,6 +15,7 @@ tests:
           publicBaseUrl: https://{{ .Release.Name }}.example.com
         zitadel:
           baseUrl: https://id.example.com
+          clientId: client-1@project
           orgId: "123"
         kyckr:
           apiUrl: https://api.kyckr.com/v2
@@ -34,6 +35,9 @@ tests:
       - contains:
           path: spec.template.spec.containers[0].env
           content: { name: ZITADEL_BASE_URL, value: https://id.example.com }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: ZITADEL_CLIENT_ID, value: client-1@project }
       - contains:
           path: spec.template.spec.containers[0].env
           content: { name: ZITADEL_ORG_ID, value: "123" }
