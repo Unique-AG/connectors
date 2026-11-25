@@ -48,6 +48,7 @@ from office_365_mcp.shared.outlook.categories import LIST_CATEGORIES_GUARD
 from office_365_mcp.shared.outlook.immutable_ids import immutable_id_headers
 from office_365_mcp.shared.prose import body_opening as body_opening
 from office_365_mcp.shared.prose import cut_for_a_question as cut_for_a_question
+from office_365_mcp.shared.seam import named_permissions
 from office_365_mcp.shared.window import closes_at, opens_at
 
 STEP_CALENDAR = "calendar"
@@ -89,6 +90,23 @@ SUMMARY_FIELDS: tuple[str, ...] = (
     "categories",
     "importance",
 )
+
+
+def calendar_not_shared(nothing_read: str, permissions: tuple[str, ...]) -> str:
+    return (
+        "Microsoft 365 refused to open this calendar for the signed-in user. "
+        + f"{nothing_read} Usually this calendar is not shared with the user: the calendar of "
+        + "another person opens only after that person shares it and the user accepts the "
+        + "invitation or adds the shared calendar in Outlook. Then it shows in "
+        + "outlook_list_calendars. A policy of the organization can also refuse the request. Tell "
+        + "the user that you cannot open the calendar. If the calendar belongs to another person "
+        + "and this deployment runs outlook_check_availability, call it with the email address of "
+        + "that person to find when that person is free or busy. If the calendar is the user's "
+        + "own, a Microsoft 365 administrator can make sure that this connector holds the "
+        + f"delegated permissions {named_permissions(permissions)}. A call with the same arguments "
+        + "fails the same way."
+    )
+
 
 NOBODY_INVITED_BUT_A_PLACE = (
     "No person is invited. But Microsoft can send the meeting request to the mailbox of a room, "

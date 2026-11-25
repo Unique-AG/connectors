@@ -3231,7 +3231,7 @@ Tests: 3
 Cases:
 
 - Mia's sign-in to Microsoft has expired. The assistant tells Mia to sign in again. It does not list any meeting.
-- Microsoft refuses because Mia has no access. The assistant tells Mia to ask an administrator to grant the access. It does not list any meeting.
+- Microsoft refuses because Mia has no access. The assistant tells Mia that it cannot open the calendar. It does not list any meeting.
 - Microsoft stays busy at every try and asks the assistant to wait 30 seconds each time. The assistant tells Mia to ask again after 30 seconds, and not sooner. It does not list any meeting.
 - Microsoft rejects the question and gives a reason. The assistant tells Mia the reason that Microsoft gave, and that the same question fails again. It does not list any meeting.
 

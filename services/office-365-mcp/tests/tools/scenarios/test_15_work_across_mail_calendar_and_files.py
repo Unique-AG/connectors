@@ -658,7 +658,7 @@ class TestABriefSaysWhichPartItCouldNotRead:
         routes = _fresh(graph, "outlook_list_events-today")
         _ = routes[("GET", "/me/calendar")].mock(return_value=_refused())
 
-        with pytest.raises(ToolError, match="Ask a Microsoft 365 administrator"):
+        with pytest.raises(ToolError, match="Usually this calendar is not shared with the user"):
             _ = await call("outlook_list_events", starts_on=YESTERDAY, ends_on=TODAY)
 
         assert mail["unread_items"] == 23

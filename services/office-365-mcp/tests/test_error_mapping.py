@@ -424,6 +424,30 @@ class TestEveryToolTranslatesItsOwnRefusal:
         }
 
 
+class TestACalendarThatIsNotShared:
+    @pytest.mark.usefixtures("obo", "graph")
+    @pytest.mark.parametrize("tool", ["outlook_list_events", "outlook_read_event"])
+    async def test_a_refused_calendar_read_says_the_calendar_is_not_shared(self, tool: str) -> None:
+        app = _composed(
+            SurfaceConfig.model_validate({"tools_preset": ToolsPreset.OUTLOOK_CALENDAR})
+        )
+        server = cast("FastMCP[None]", app.state.fastmcp_server)
+        example = _EVERY_REGISTERED_TOOL[tool]
+
+        async with Client(FastMCPTransport(server)) as client:
+            with pytest.raises(ToolError) as raised:
+                _ = await client.call_tool(tool, dict(example.arguments))
+
+        forbidden = _EVERY_ADVICE[tool].forbidden
+        assert forbidden is not None, f"{tool} words no 403 of its own"
+        message = str(raised.value)
+        assert message.startswith(forbidden)
+        assert "Usually this calendar is not shared with the user" in message
+        assert "outlook_check_availability" in message
+        assert "Ask a Microsoft 365 administrator to grant" not in message
+        assert "Calendars.Read and Calendars.Read.Shared" in message
+
+
 class TestWhereTheMappingSits:
     def _chain_of(self, app: Starlette) -> tuple[str, ...]:
         server = cast("FastMCP[None]", app.state.fastmcp_server)

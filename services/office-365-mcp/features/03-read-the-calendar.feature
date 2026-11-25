@@ -93,7 +93,7 @@ Feature: Reading the calendar
       Examples:
         | problem                                                                               | told                                                                   |
         | Mia's sign-in to Microsoft has expired                                                | to sign in again                                                       |
-        | Microsoft refuses because Mia has no access                                           | to ask an administrator to grant the access                            |
+        | Microsoft refuses because Mia has no access                                           | that it cannot open the calendar                                       |
         | Microsoft stays busy at every try and asks the assistant to wait 30 seconds each time | to ask again after 30 seconds, and not sooner                          |
         | Microsoft rejects the question and gives a reason                                     | the reason that Microsoft gave, and that the same question fails again |
 
