@@ -796,19 +796,11 @@ class TestLists:
         assert _sent(route) == {"displayName": "Move to Bern"}
         assert (answer["uri"], answer["name"], person.asked) == (TASK_LIST, "Move to Bern", [])
 
-    @pytest.mark.parametrize(
-        ("tool", "arguments"),
-        [
-            ("outlook_create_task_list", {"name": "   "}),
-            ("outlook_rename_task_list", {"task_list": TASK_LIST, "name": "   "}),
-        ],
-        ids=["create", "rename"],
-    )
-    async def test_a_blank_list_name_is_refused(
-        self, graph: respx.MockRouter, tool: str, arguments: dict[str, str]
-    ) -> None:
+    async def test_a_blank_list_name_is_refused(self, graph: respx.MockRouter) -> None:
         with pytest.raises(ToolError):
-            _ = await call(tool, **arguments)
+            _ = await call("outlook_create_task_list", name="   ")
+        with pytest.raises(ToolError):
+            _ = await call("outlook_rename_task_list", task_list=TASK_LIST, name="   ")
 
         assert graph.calls.call_count == 0
 

@@ -91,6 +91,14 @@ class _Delete:
         return await self.call(client, uri or self.uri, confirm, pending)
 
 
+_DELETED_ID: Mapping[Entity, str] = {
+    "list": "/AAMkSYNTHETIC-list-0001",
+    "task": "/tasks/AAMkSYNTHETIC-task-0001",
+    "step": "/checklistItems/SYNTHETIC-step-0001",
+    "link": "/linkedResources/SYNTHETIC-link-0001",
+    "file": "/attachments/SYNTHETIC-file-0001",
+}
+
 _IN_THE_LIST = "from the task 'Book the venue' in the list 'Team launch'?"
 
 DELETES = (
@@ -227,7 +235,11 @@ class TestWhatADeleteSendsToGraph:
         answer = await delete(client, _agrees, pending=True)
 
         assert [_entity_at(path) for path in reads(graph)] == list(delete.reads)
-        assert [call.request.method for call in writes(graph)] == ["DELETE"]
+        [sent] = writes(graph)
+        target = sent.request.url.path.removeprefix("/v1.0")
+        assert sent.request.method == "DELETE"
+        assert re.search(PATHS[delete.reads[-1]], target) is not None
+        assert target.endswith(_DELETED_ID[delete.reads[-1]])
         assert _named(answer, delete) == (delete.name, "deleted")
 
     @pytest.mark.parametrize(("delete", "gone"), _GONE)

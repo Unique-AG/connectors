@@ -75,8 +75,7 @@ Notes:
 - `completed` on a repeating task keeps the same `uri` for the next task of the series: the \
 answer shows that task open, with the next due date. To Do keeps the completed task as a copy. \
 A second `completed` completes the next task too. So after a timeout, do not call this tool \
-again first: read the task with outlook_read_task, and call again only if the status did not \
-change.
+again: read the task with outlook_read_task, and tell the user what it shows.
 - This tool asks the user to agree before it changes a task in a list that other people share, \
 because they see the change. A task in the user's own unshared list changes without a question.
 """
