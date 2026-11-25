@@ -20,13 +20,13 @@ The tool descriptions tell the agent to get the user's approval before it calls 
 
 ## Errors
 
-A failed Kyckr call does not raise an MCP error. The tool answers:
+A failed Kyckr call fails the tool call (`isError: true`) with a text such as:
 
-```json
-{ "success": false, "statusCode": 404, "message": "Company not found", "correlationId": "<kyckr-request-id>" }
+```text
+Kyckr answered 404: Company not found. Correlation id: <kyckr-request-id>
 ```
 
-`correlationId` is the Kyckr id of the request. Quote it to Kyckr support.
+The correlation id is the Kyckr id of the request. Quote it to Kyckr support. A call that gets no error status from Kyckr, such as a timeout, fails with `The call to Kyckr failed: <error>`.
 
 On a final `429`, one that is not retried or outlasts the retries, the message ends with `(retry after Ns)` when Kyckr sent a whole number of seconds in `Retry-After`. Only a `429` from Kyckr is retried. A `503` can come after Kyckr has charged a paid read, so it is not retried.
 
