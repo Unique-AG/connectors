@@ -22,7 +22,9 @@ export async function stopPostgres(
   if (pool) {
     const open = openClients.get(pool);
     assert.ok(open, 'stopPostgres needs a pool from createPostgresPool');
-    const allClosed = new Promise<void>((resolve) => {
+    // Checked after end(): a client still connecting when teardown starts is tracked by then.
+    await pool.end();
+    await new Promise<void>((resolve) => {
       const resolveWhenClosed = () => {
         if (open.size === 0) {
           resolve();
@@ -31,8 +33,6 @@ export async function stopPostgres(
       pool.on('remove', resolveWhenClosed);
       resolveWhenClosed();
     });
-    await pool.end();
-    await allClosed;
   }
   await container?.stop();
 }

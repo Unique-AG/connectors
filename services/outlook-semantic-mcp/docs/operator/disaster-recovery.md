@@ -221,7 +221,7 @@ The Unique Knowledge Base stores the actual ingested email content used for sema
 
 5. Live catch-up resumes automatically once ingestion is healthy — emails received during the outage will be processed through the normal webhook pipeline without additional operator action.
 
-6. Once all affected users have called `restart_full_sync`, disable debug mode in one deployment: remove the debug tools from `mcpConfig.app.tools` (keep the other tools listed) and unset `MCP_DEBUG_MODE`, then redeploy (requires a pod restart). The server refuses to start with a debug tool listed and debug mode off. Debug mode should not remain enabled in production.
+6. Once all affected users have called `restart_full_sync`, disable debug mode in one deployment: remove the debug tools from `mcpConfig.app.tools` (keep the other tools listed) and set `mcpConfig.app.mcpDebugMode` to `disabled`, then redeploy (requires a pod restart). The server refuses to start with a debug tool listed and debug mode off. Debug mode should not remain enabled in production.
 
 **See also:** [`restart_full_sync`](../technical/tools.md#restart_full_sync), [`sync_progress`](../technical/tools.md#sync_progress), [Configuration](./configuration.md#Application-Configuration)
 
