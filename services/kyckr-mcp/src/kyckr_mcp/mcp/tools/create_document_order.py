@@ -9,8 +9,6 @@ from kyckr_mcp.mcp.hints import tool_options
 from kyckr_mcp.mcp.inputs.company import KyckrId
 from kyckr_mcp.mcp.inputs.order import ProductId
 from kyckr_mcp.mcp.responses.failures import answers_failures
-from kyckr_mcp.mcp.responses.replies import answer
-from kyckr_mcp.mcp.responses.replies import Reply
 from kyckr_mcp.upstream import Upstream
 from kyckr_mcp.upstream import UpstreamSettings
 
@@ -36,7 +34,7 @@ async def create_document_order(
     *,
     upstream: Upstream = Depends(get_upstream),
     settings: UpstreamSettings = Depends(get_upstream_settings),
-) -> Reply:
+) -> contexts.OrderReply:
     """Place a paid Kyckr order for an official registry document. Every successful call
     spends credits and creates a real registry order; it is the only write-side tool.
     Required: `kyckr_id` (from `search_companies`) and `product_id` (from
@@ -49,11 +47,10 @@ async def create_document_order(
     "Pending"`, poll `get_order(data.orderId)`. Stop once `status` is `Success` or `Failed`,
     whether or not `data.documentJson` is present. Never mention download URLs.
     """
-    result = await contexts.create_document_order(
+    return await contexts.create_document_order(
         upstream=upstream,
         kyckr_id=kyckr_id,
         product_id=product_id,
         customer_reference=settings.default_customer_reference,
         contact_email=settings.default_contact_email,
     )
-    return answer(Reply, result)

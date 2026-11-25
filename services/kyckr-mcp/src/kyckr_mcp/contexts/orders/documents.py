@@ -2,15 +2,11 @@ from typing import cast
 
 from pydantic import ValidationError
 
-from kyckr_mcp.contexts.orders.models import OrderData
-from kyckr_mcp.contexts.orders.models import OrderResult
-from kyckr_mcp.upstream import BaseResponse
+from kyckr_mcp.contexts.orders.models import OrderReply
 from kyckr_mcp.upstream import GET_ORDERS_ORDER_ID_DOWNLOAD
 from kyckr_mcp.upstream import GetOrdersOrderIdDownloadPath
 from kyckr_mcp.upstream import GetOrdersOrderIdDownloadQuery
 from kyckr_mcp.upstream import GetOrdersOrderIdDownloadRequest
-from kyckr_mcp.upstream import OrderDetails
-from kyckr_mcp.upstream import PostOrdersResponse
 from kyckr_mcp.upstream import Upstream
 from kyckr_mcp.upstream import UpstreamError
 
@@ -24,43 +20,26 @@ _DOCUMENT_NOT_FETCHED_DETAIL = (
 )
 
 
-def as_order(details: OrderDetails | None) -> OrderData | None:
-    """The order without its download links."""
-    if details is None:
-        return None
-    return OrderData.model_validate(details.model_dump(by_alias=True, exclude={"links"}))
-
-
-def created_order(response: PostOrdersResponse) -> OrderData | None:
-    if response.data is not None:
-        data = response.data
-        order_id = data.order_id if data.order_id is not None else response.order_id
-        status = data.status if data.status is not None else response.status
-        return as_order(data.model_copy(update={"order_id": order_id, "status": status}))
-    if response.status is None and response.order_id is None:
-        return None
-    return OrderData.model_validate({"orderId": response.order_id, "status": response.status})
-
-
-async def order_result(
-    *,
-    upstream: Upstream,
-    response: BaseResponse,
-    order: OrderData | None,
-    order_id: str | None = None,
-) -> OrderResult:
+async def with_document(
+    *, upstream: Upstream, reply: OrderReply, order_id: str | None = None
+) -> OrderReply:
     """The order, with its JSON document once it finished. `order_id` stands in for a missing
     orderId.
     """
-    notice = None
-    if order is not None and order.status == "Success":
-        finished_id = str(order.order_id) if order.order_id is not None else order_id
-        if finished_id is not None:
-            document, notice = await _document(upstream, finished_id)
-            order = order.model_copy(update={"document_json": document})
-    fields = response.model_dump(by_alias=True, exclude={"data"})
-    details = " ".join(part for part in (fields.get("details"), notice) if part)
-    return OrderResult.model_validate({**fields, "details": details or None, "data": order})
+    order = reply.data
+    if order is None or order.status != "Success":
+        return reply
+    finished_id = str(order.order_id) if order.order_id is not None else order_id
+    if finished_id is None:
+        return reply
+    document, notice = await _document(upstream, finished_id)
+    details = " ".join(part for part in (reply.details, notice) if part)
+    return reply.model_copy(
+        update={
+            "details": details or None,
+            "data": order.model_copy(update={"document_json": document}),
+        }
+    )
 
 
 async def _document(

@@ -213,12 +213,14 @@ async def test_list_orders_reads_a_page_and_drops_the_links_of_every_order(
     }
 
 
-async def test_list_orders_also_reads_a_bare_array(call_tool: CallTool, kyckr: FakeKyckr) -> None:
+async def test_list_orders_puts_a_bare_array_under_orders(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
     kyckr.answers({"data": [{"orderId": 1, "links": {"data": "https://x.test"}}]})
 
     result = await call_tool("list_orders", {"iso_code": "gb"})
 
-    assert structured(result) == {"data": [{"orderId": 1}]}
+    assert structured(result) == {"data": {"orders": [{"orderId": 1}]}}
 
 
 async def finished_order_with_download(

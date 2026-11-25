@@ -7,8 +7,6 @@ from kyckr_mcp.mcp.hints import FREE_READ
 from kyckr_mcp.mcp.hints import tool_options
 from kyckr_mcp.mcp.inputs.order import OrderId
 from kyckr_mcp.mcp.responses.failures import answers_failures
-from kyckr_mcp.mcp.responses.replies import answer
-from kyckr_mcp.mcp.responses.replies import Reply
 from kyckr_mcp.upstream import Upstream
 
 
@@ -26,7 +24,9 @@ from kyckr_mcp.upstream import Upstream
     )
 )
 @answers_failures
-async def get_order(order_id: OrderId, upstream: Upstream = Depends(get_upstream)) -> Reply:
+async def get_order(
+    order_id: OrderId, upstream: Upstream = Depends(get_upstream)
+) -> contexts.OrderReply:
     """Retrieve a single Kyckr order by `order_id`. Free to call. Use to poll an order placed via
     `create_document_order` until `data.status` is `Success` or `Failed`. On `Success` the JSON
     view of the document is inlined under `data.documentJson`; render it to the user as a
@@ -35,5 +35,4 @@ async def get_order(order_id: OrderId, upstream: Upstream = Depends(get_upstream
     `Kyckr answered 410` as terminal: the order is no longer retrievable, do not retry. Never
     mention download URLs.
     """
-    result = await contexts.get_order(upstream=upstream, order_id=str(order_id))
-    return answer(Reply, result)
+    return await contexts.get_order(upstream=upstream, order_id=str(order_id))

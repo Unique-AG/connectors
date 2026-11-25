@@ -94,7 +94,7 @@ operation-ids = [
   "get-orders-orderId-download",
   "get-order",
 ]
-# The replies keep the fields the spec does not declare, so a new Kyckr field reaches the agent.
+# The download body declares no fields, so the orders context reads its document from the extras.
 allow-extra-fields = true
 operation-module = "mcp_openapi.upstream"
 models-module = "kyckr_mcp.upstream.generated.vendor_responses"
@@ -103,7 +103,7 @@ requests-module = "kyckr_mcp.upstream.generated.vendor_requests"
 requests-output = "src/kyckr_mcp/upstream/generated/vendor_requests.py"
 operations-output = "src/kyckr_mcp/upstream/generated/operations.py"
 
-# Download links stay out of the schema. The orders context removes them from the answer.
+# Download links stay out of the schema, and the orders context does not map them.
 [tool.mcp-openapi.fields]
 OrderDetails = [
   "orderId",

@@ -8,8 +8,6 @@ from kyckr_mcp.mcp.hints import PAID_READ
 from kyckr_mcp.mcp.hints import tool_options
 from kyckr_mcp.mcp.inputs.company import KyckrId
 from kyckr_mcp.mcp.responses.failures import answers_failures
-from kyckr_mcp.mcp.responses.replies import answer
-from kyckr_mcp.mcp.responses.replies import Reply
 from kyckr_mcp.upstream import Upstream
 from kyckr_mcp.upstream import UpstreamSettings
 
@@ -35,7 +33,7 @@ async def get_enhanced_profile(
     kyckr_id: KyckrId,
     upstream: Upstream = Depends(get_upstream),
     settings: UpstreamSettings = Depends(get_upstream_settings),
-) -> Reply:
+) -> contexts.EnhancedProfileReply:
     """Fetch a paid Enhanced company profile using a confirmed `kyckr_id`. Returns everything in
     `get_lite_profile` plus representatives, ultimate beneficial owners, share capital, contact
     details, and activity declarations. Use only when ownership or representative data is
@@ -45,9 +43,8 @@ async def get_enhanced_profile(
     profile data. When `data.status` is `Pending` the profile is not ready yet: poll `get_order`
     with `data.orderId` until it resolves.
     """
-    result = await contexts.get_enhanced_profile(
+    return await contexts.get_enhanced_profile(
         upstream=upstream,
         kyckr_id=kyckr_id,
         customer_reference=settings.default_customer_reference,
     )
-    return answer(Reply, result)

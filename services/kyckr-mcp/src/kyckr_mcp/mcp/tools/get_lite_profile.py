@@ -8,8 +8,6 @@ from kyckr_mcp.mcp.hints import PAID_READ
 from kyckr_mcp.mcp.hints import tool_options
 from kyckr_mcp.mcp.inputs.company import KyckrId
 from kyckr_mcp.mcp.responses.failures import answers_failures
-from kyckr_mcp.mcp.responses.replies import answer
-from kyckr_mcp.mcp.responses.replies import Reply
 from kyckr_mcp.upstream import Upstream
 from kyckr_mcp.upstream import UpstreamSettings
 
@@ -32,16 +30,15 @@ async def get_lite_profile(
     kyckr_id: KyckrId,
     upstream: Upstream = Depends(get_upstream),
     settings: UpstreamSettings = Depends(get_upstream_settings),
-) -> Reply:
+) -> contexts.LiteProfileReply:
     """Fetch a paid Lite company profile using a confirmed `kyckr_id`. Returns basic verified
     registry details: company name, registration number, registered address, registration and
     foundation dates, legal form, legal status, activities, and registration authority.
     Consumes credits. Does not return directors, shareholders, or beneficial owners; use
     `get_enhanced_profile` for those. For orderable filings, see `list_company_documents`.
     """
-    result = await contexts.get_lite_profile(
+    return await contexts.get_lite_profile(
         upstream=upstream,
         kyckr_id=kyckr_id,
         customer_reference=settings.default_customer_reference,
     )
-    return answer(Reply, result)

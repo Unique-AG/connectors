@@ -107,20 +107,32 @@ async def test_search_sends_the_arguments_kyckr_expects_and_answers_without_empt
     result = await call_tool("search_companies", {"company_number": " 123 ", "iso_code": "gb"})
 
     params = kyckr.requests[0].url.params
-    assert structured(result) == body
+    assert structured(result) == {
+        "correlationId": "search-correlation",
+        "details": "Success",
+        "data": [{"id": "GB|abc", "companyName": "Acme"}],
+    }
     assert params["companyNumber"] == "123"
     assert params["isoCode"] == "GB"
     assert "name" not in params
 
 
-async def test_search_keeps_fields_the_spec_does_not_declare(
+async def test_search_leaves_out_links_and_fields_the_spec_does_not_declare(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
-    kyckr.answers({"data": [{"id": "GB|abc", "newField": "kept"}]})
+    kyckr.answers(
+        {
+            "links": {"self": "https://x.test/companies"},
+            "newTopField": "dropped",
+            "data": [
+                {"id": "GB|abc", "newField": "dropped", "links": {"self": "https://x.test/abc"}}
+            ],
+        }
+    )
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result)["data"] == [{"id": "GB|abc", "newField": "kept"}]
+    assert structured(result) == {"data": [{"id": "GB|abc"}]}
 
 
 async def test_a_bad_iso_code_is_rejected(call_tool: CallTool, kyckr: FakeKyckr) -> None:

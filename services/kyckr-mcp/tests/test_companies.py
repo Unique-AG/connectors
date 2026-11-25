@@ -3,7 +3,6 @@ import pytest
 from tests.conftest import CallTool
 from tests.conftest import CallToolWith
 from tests.conftest import FakeKyckr
-from tests.conftest import structured
 from tests.conftest import tool_error
 
 
@@ -28,7 +27,54 @@ async def test_a_pending_enhanced_profile_is_answered_with_the_order_to_poll(
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"data": data}
+    assert result.structured_content == {
+        "data": {"status": "Pending", "orderId": 12345, "cost": {"type": "credit", "value": 1}}
+    }
+
+
+async def test_an_enhanced_profile_leaves_out_its_download_links(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    links = {"document": "https://x.test/document", "data": "https://x.test/data"}
+    kyckr.answers(
+        {"links": {"self": "https://x.test/self"}, "data": {"companyName": "Acme", "links": links}}
+    )
+
+    result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
+
+    assert result.structured_content == {"data": {"companyName": "Acme"}}
+
+
+async def test_a_lite_profile_answers_with_the_registry_details_it_promises(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    kyckr.answers(
+        {
+            "correlationId": "c-1",
+            "cost": {"type": "credit", "value": 1},
+            "data": {
+                "companyName": "Acme",
+                "companyNumber": "123",
+                "address": {"fullAddress": "1 High St", "identifier": "a-1"},
+                "legalStatus": {"original": "Live", "normalized": "Active"},
+                "taxNumber": "T-1",
+                "updatedDate": {"normalized": "2026-01-01"},
+            },
+        }
+    )
+
+    result = await call_tool("get_lite_profile", {"kyckr_id": "GB|abc"})
+
+    assert result.structured_content == {
+        "correlationId": "c-1",
+        "cost": {"type": "credit", "value": 1},
+        "data": {
+            "companyName": "Acme",
+            "companyNumber": "123",
+            "address": {"fullAddress": "1 High St"},
+            "legalStatus": {"original": "Live", "normalized": "Active"},
+        },
+    }
 
 
 async def test_an_enhanced_profile_that_is_not_available_fails_with_its_status(
@@ -49,18 +95,17 @@ async def test_an_enhanced_profile_that_is_not_available_fails_with_its_status(
 async def test_the_document_list_passes_the_continuation_key_and_hands_back_the_next_one(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
-    body = {
-        "data": [{"id": "p-1", "name": "Accounts", "cost": {"value": 3}}],
-        "continuationKey": "k2",
-    }
-    kyckr.answers(body)
+    document = {"id": "p-1", "name": "Accounts", "cost": {"value": 3}}
+    kyckr.answers(
+        {"data": [{**document, "documentDatapoints": {"directors": True}}], "continuationKey": "k2"}
+    )
 
     result = await call_tool(
         "list_company_documents", {"kyckr_id": "GB|abc", "continuation_key": " k1 "}
     )
 
     assert kyckr.requests[0].url.params["continuationKey"] == "k1"
-    assert result.structured_content == body
+    assert result.structured_content == {"data": [document], "continuationKey": "k2"}
 
 
 @pytest.mark.parametrize(
@@ -130,12 +175,11 @@ async def test_a_pending_order_status_in_an_enhanced_profile_fails_with_the_fiel
 async def test_a_sparse_enhanced_profile_is_a_profile_and_not_a_pending_order(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
-    data = {"companyName": "Acme", "cost": {"type": "credit", "value": 3}}
-    kyckr.answers({"data": data})
+    kyckr.answers({"data": {"companyName": "Acme", "cost": {"type": "credit", "value": 3}}})
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"data": data}
+    assert result.structured_content == {"data": {"companyName": "Acme"}}
 
 
 @pytest.mark.parametrize(
@@ -155,7 +199,7 @@ async def test_a_company_call_sends_the_configured_customer_reference(
     result = await call_tool(tool, {"kyckr_id": "GB|abc"})
 
     assert kyckr.requests[0].url.params["customerReference"] == "ref-1"
-    assert structured(result) == body
+    assert not result.is_error
 
 
 async def test_the_enhanced_profile_sends_only_the_customer_reference_as_a_query_parameter(
@@ -173,16 +217,26 @@ async def test_the_enhanced_profile_sends_only_the_customer_reference_as_a_query
 async def test_an_enhanced_profile_keeps_a_representative_and_an_owner_without_a_type(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
-    data = {
-        "companyName": "Acme",
-        "representatives": {"individuals": [{"name": "Person A", "isActive": True}]},
-        "ultimateBeneficialOwners": {"corporations": [{"name": "Holding B"}]},
-    }
-    kyckr.answers({"data": data})
+    representative = {"name": "Person A", "isActive": True, "powers": ["Signs alone"]}
+    kyckr.answers(
+        {
+            "data": {
+                "companyName": "Acme",
+                "representatives": {"individuals": [representative]},
+                "ultimateBeneficialOwners": {"corporations": [{"name": "Holding B"}]},
+            }
+        }
+    )
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"data": data}
+    assert result.structured_content == {
+        "data": {
+            "companyName": "Acme",
+            "representatives": {"individuals": [{"name": "Person A", "isActive": True}]},
+            "ultimateBeneficialOwners": {"corporations": [{"name": "Holding B"}]},
+        }
+    }
 
 
 async def test_an_enhanced_profile_keeps_a_shareholder_individual_and_corporation_without_a_type(

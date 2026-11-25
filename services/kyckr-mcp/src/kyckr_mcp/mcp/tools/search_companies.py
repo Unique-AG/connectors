@@ -10,8 +10,6 @@ from kyckr_mcp.mcp.inputs.company import CompanyNumber
 from kyckr_mcp.mcp.inputs.company import IsoCode
 from kyckr_mcp.mcp.inputs.company import Name
 from kyckr_mcp.mcp.responses.failures import answers_failures
-from kyckr_mcp.mcp.responses.replies import answer
-from kyckr_mcp.mcp.responses.replies import Reply
 from kyckr_mcp.upstream import Upstream
 
 
@@ -35,7 +33,7 @@ async def search_companies(
     iso_code: IsoCode = None,
     *,
     upstream: Upstream = Depends(get_upstream),
-) -> Reply:
+) -> contexts.CompanySearchReply:
     """Search the Kyckr company registry by name or registration number. Either `name` or
     `company_number` must be provided. Pass `iso_code` (ISO 3166 alpha-2, e.g. 'GB', 'AU') to
     search a specific jurisdiction directly. Without `iso_code`, Kyckr performs a global search
@@ -45,9 +43,8 @@ async def search_companies(
     `list_company_documents`. Free to call.
     """
     try:
-        result = await contexts.search_companies(
+        return await contexts.search_companies(
             upstream=upstream, name=name, company_number=company_number, iso_code=iso_code
         )
     except contexts.MissingSearchTermError as error:
         raise ToolError(str(error)) from error
-    return answer(Reply, result)

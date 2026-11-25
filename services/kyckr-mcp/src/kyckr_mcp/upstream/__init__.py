@@ -34,13 +34,6 @@ from kyckr_mcp.upstream.generated.vendor_requests import GetOrdersOrderIdPath
 from kyckr_mcp.upstream.generated.vendor_requests import GetOrdersOrderIdRequest
 from kyckr_mcp.upstream.generated.vendor_requests import PostOrdersBody
 from kyckr_mcp.upstream.generated.vendor_requests import PostOrdersRequest
-from kyckr_mcp.upstream.generated.vendor_responses import BaseResponse
-from kyckr_mcp.upstream.generated.vendor_responses import GetCompaniesKyckrIdDocumentsResponse
-from kyckr_mcp.upstream.generated.vendor_responses import GetCompaniesKyckrIdEnhancedResponse
-from kyckr_mcp.upstream.generated.vendor_responses import GetCompaniesKyckrIdResponse
-from kyckr_mcp.upstream.generated.vendor_responses import GetCompaniesResponse
-from kyckr_mcp.upstream.generated.vendor_responses import GetOrderResponse
-from kyckr_mcp.upstream.generated.vendor_responses import OrderDetails
 from kyckr_mcp.upstream.generated.vendor_responses import OrdersPage
 from kyckr_mcp.upstream.generated.vendor_responses import PostOrdersResponse
 from kyckr_mcp.upstream.settings import UpstreamSettings
@@ -54,31 +47,24 @@ __all__ = [
     "GET_ORDERS_ORDER_ID",
     "GET_ORDERS_ORDER_ID_DOWNLOAD",
     "POST_ORDERS",
-    "BaseResponse",
     "GetCompaniesKyckrIdDocumentsPath",
     "GetCompaniesKyckrIdDocumentsQuery",
     "GetCompaniesKyckrIdDocumentsRequest",
-    "GetCompaniesKyckrIdDocumentsResponse",
     "GetCompaniesKyckrIdEnhancedPath",
     "GetCompaniesKyckrIdEnhancedQuery",
     "GetCompaniesKyckrIdEnhancedRequest",
-    "GetCompaniesKyckrIdEnhancedResponse",
     "GetCompaniesKyckrIdPath",
     "GetCompaniesKyckrIdQuery",
     "GetCompaniesKyckrIdRequest",
-    "GetCompaniesKyckrIdResponse",
     "GetCompaniesQuery",
     "GetCompaniesRequest",
-    "GetCompaniesResponse",
     "GetOrderQuery",
     "GetOrderRequest",
-    "GetOrderResponse",
     "GetOrdersOrderIdDownloadPath",
     "GetOrdersOrderIdDownloadQuery",
     "GetOrdersOrderIdDownloadRequest",
     "GetOrdersOrderIdPath",
     "GetOrdersOrderIdRequest",
-    "OrderDetails",
     "OrdersPage",
     "PostOrdersBody",
     "PostOrdersRequest",
