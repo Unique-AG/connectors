@@ -2,23 +2,22 @@ scenario: outlook_send_draft-persona
 fixture: rec-tool-outlook_send_draft-persona
 source: recorded
 target: graph
-recorded_at: '2026-10-29T15:15:57+00:00'
+recorded_at: '2026-11-24T10:10:20+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 25
-  keys dropped: 11
-  persona addresses: 10
-  persona names: 9
-  response headers dropped: 49
-  text kept: 14
+  ids mapped: 17
+  keys dropped: 8
+  persona addresses: 4
+  persona names: 3
+  response headers dropped: 28
+  text kept: 9
 literals:
-- <p>Sent by the recorder.</p>
-- inbox
-- seed-v1
+- Sent by the recorder.
+- persona:tom
 - seed-v1 case-outlook_send_draft-persona
 sdk_versions:
-  msgraph-sdk: 1.62.0
+  msgraph-sdk: 1.65.0
   msgraph-core: 1.5.2
-  microsoft-kiota-http: 1.14.2
+  microsoft-kiota-http: 1.18.0
   httpx: 0.28.1
-  fastmcp: 4.1.3
+  fastmcp: 4.1.6

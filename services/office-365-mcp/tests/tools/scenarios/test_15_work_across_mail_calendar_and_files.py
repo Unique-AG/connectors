@@ -322,7 +322,7 @@ class TestAReplyUsesADocumentFromSharePoint:
             "outlook_draft_reply",
             message_ref=mail["uri"],
             mode="reply",
-            body="The Standard list price is 100.",
+            body_html="<p>The Standard list price is 100.</p>",
             categories=["seed-v1 case-outlook_draft_reply-reply"],
         )
 
@@ -507,7 +507,7 @@ class TestADecisionFromAChatBecomesAMailDraft:
             to=[ANNA],
             cc=[TOM],
             subject="The launch moves to 14 June",
-            body="The launch moves to 14 June.",
+            body_html="<p>The launch moves to 14 June.</p>",
         )
 
         assert _list(said, "messages")[0]["chat_id"] == chat
@@ -548,7 +548,7 @@ class TestAFileMovesBetweenMailTeamsAndSharePoint:
             "outlook_draft_mail",
             to=[ANNA],
             subject="The price list",
-            body=f"Here is the [price list]({link['share_url']}).",
+            body_html=f'<p>Here is the <a href="{link["share_url"]}">price list</a>.</p>',
         )
 
         assert asked_before == [1]
@@ -881,7 +881,7 @@ class TestActionItemsFromATranscriptBecomeAMailDraft:
             "outlook_draft_mail",
             to=[cast("str", _list(found, "candidates")[0]["address"])],
             subject="Action items of the Design review",
-            body="\n".join(f"- {item}" for item in items),
+            body_html="<ul>" + "".join(f"<li>{item}</li>" for item in items) + "</ul>",
         )
 
         assert tuple(items) == ACTION_ITEMS

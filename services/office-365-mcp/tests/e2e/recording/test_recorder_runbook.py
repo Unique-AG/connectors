@@ -581,6 +581,13 @@ class TestResume:
         assert execute(found, UPNS, calls, calls.sleeps.append, saved)["n1"]["status"] == "blocked"
 
 
+def _results_of(status: str) -> Callable[..., Mapping[str, Mapping[str, str]]]:
+    def execute(*_arguments: object) -> Mapping[str, Mapping[str, str]]:
+        return {"outlook_list_mail-inbox": {"status": status, "note": ""}}
+
+    return execute
+
+
 class TestCommandLine:
     @pytest.mark.usefixtures("fixtures")
     def test_every_mode_in_dry_run_sends_nothing_and_prints_the_report(
@@ -635,6 +642,40 @@ class TestCommandLine:
         monkeypatch.setattr(runbook, "STATE", tmp_path / "state")
         assert main(["report", "--dry-run", "--case", "outlook_list_mail-inbox"]) == 0
         assert "Would record (dry run) (1)" in capsys.readouterr().out
+
+    @pytest.mark.usefixtures("fixtures")
+    def test_an_unknown_case_stops_the_run_before_anything_is_sent(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.setattr(runbook, "STATE", tmp_path / "state")
+        assert main(["record", "--dry-run", "--case", "does-not-exist"]) == 2
+        assert "Unknown case: does-not-exist" in capsys.readouterr().err
+        assert not (tmp_path / "state").exists()
+
+    @pytest.mark.usefixtures("fixtures")
+    def test_a_chosen_case_that_is_not_recorded_fails_the_record_mode(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        monkeypatch.setattr(runbook, "STATE", tmp_path / "state")
+        monkeypatch.setenv("SEED_UPNS", ",".join(UPNS))
+        monkeypatch.setattr(runbook, "execute", _results_of("refused"))
+        assert main(["record", "--force", "--case", "outlook_list_mail-inbox"]) == 1
+        assert "Not recorded: outlook_list_mail-inbox (refused)" in capsys.readouterr().err
+
+    @pytest.mark.usefixtures("fixtures")
+    def test_a_chosen_case_that_is_recorded_passes_the_record_mode(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        monkeypatch.setattr(runbook, "STATE", tmp_path / "state")
+        monkeypatch.setenv("SEED_UPNS", ",".join(UPNS))
+        monkeypatch.setattr(runbook, "execute", _results_of("recorded"))
+        assert main(["record", "--force", "--case", "outlook_list_mail-inbox"]) == 0
 
     def test_a_live_mode_needs_the_three_users(
         self, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.body_html import ONENOTE_BODY_HTML_FIELD
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
@@ -196,11 +197,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The HTML to add after everything already on the page. A newline is not a "
-                    + "line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "
-                    + "`<table>`, `<b>` and `<i>` for structure. Microsoft removes JavaScript, "
-                    + "CSS and forms. Escape `&`, `<` and `>` where they must read as themselves. "
-                    + "No argument here attaches a file or an image."
+                    ONENOTE_BODY_HTML_FIELD
+                    + " This tool adds it after everything already on the page. No argument here "
+                    + "attaches a file or an image."
                 ),
             ),
         ],

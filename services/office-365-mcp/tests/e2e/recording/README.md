@@ -274,6 +274,28 @@ replaces an earlier blocked or refused result. `check` also runs the seed tests.
 
 The report lists the tools of `UNRECORDED` under "Not recorded", each with its reason.
 
+`record` stops with exit code 2 and sends nothing when a `--case` names no case. When you give
+`--case`, `record` exits 1 if one of those cases is not recorded.
+
+### Record chosen cases again
+
+```sh
+scripts/dogfood/rerecord.sh login
+scripts/dogfood/rerecord.sh plan CASE [CASE ...]
+scripts/dogfood/rerecord.sh run CASE [CASE ...]
+```
+
+The script reads `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `SEED_UPNS` from the file that
+`DOGFOOD_ENV` names, and from `~/.config/dogfood/env` when `DOGFOOD_ENV` is not set. You can run
+it from any directory.
+
+- `login` is the only step that needs a person. Each test user signs in once, and the cache keeps
+  the refresh tokens.
+- `plan` sends nothing. It shows what `run` will record.
+- `run` records the cases again with `--force` and the cached tokens only. Then it runs the lint
+  with `--require-identities` and the tests in `tests/e2e`, `tests/tools` and
+  `tests/test_use_cases.py`.
+
 ### The meeting
 
 Four cases need a Teams meeting that people held: `teams_list_meeting_recordings-past`,

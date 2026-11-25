@@ -120,10 +120,10 @@ teams_list_message_replies-reply:
       args: {membership_type: standard}
       bind: {team_id: "$prev.teams[display_name=seed-v1 team].team_id"}
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_list_message_replies-reply post"}
+      args: {body_html: "<p>seed-v1 case-teams_list_message_replies-reply post</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_list_message_replies-reply reply"}
+      args: {body_html: "<p>seed-v1 case-teams_list_message_replies-reply reply</p>"}
       bind:
         team_id: "$1.teams[display_name=seed-v1 team].team_id"
         channel_id: "$2.channels[0].channel_id"
@@ -138,7 +138,7 @@ teams_send_channel_message-post:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_send_channel_message-post hello team"}
+      args: {body_html: "<p>seed-v1 case-teams_send_channel_message-post hello team</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
 
 teams_send_channel_message_with_files-post:
@@ -150,7 +150,7 @@ teams_send_channel_message_with_files-post:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message_with_files
-      args: {message: "seed-v1 case-teams_send_channel_message_with_files-post notes"}
+      args: {body_html: "<p>seed-v1 case-teams_send_channel_message_with_files-post notes</p>"}
       bind:
         attachments: ["$1.files[0].uri"]
         team_id: "$2.teams[display_name=seed-v1 team].team_id"
@@ -163,10 +163,10 @@ teams_edit_message-post:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_edit_message-post before"}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-post before</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_edit_message
-      args: {message: "seed-v1 case-teams_edit_message-post after"}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-post after</p>"}
       bind: {uri: "$prev.uri"}
 
 teams_react_to_message-post:
@@ -176,7 +176,7 @@ teams_react_to_message-post:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_react_to_message-post target"}
+      args: {body_html: "<p>seed-v1 case-teams_react_to_message-post target</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_react_to_message
       args: {reaction: "\U0001f44d"}
@@ -189,7 +189,7 @@ teams_delete_message-post:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_delete_message-post doomed"}
+      args: {body_html: "<p>seed-v1 case-teams_delete_message-post doomed</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_delete_message
       bind: {uri: "$prev.uri"}
@@ -253,7 +253,7 @@ teams_send_chat_message-group:
   chain:
     - *new_chat
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_send_chat_message-group hello}
+      args: {body_html: "<p>seed-v1 case-teams_send_chat_message-group hello</p>"}
       bind: {chat_id: "$prev.chat_id"}
 
 teams_send_chat_message_with_files-group:
@@ -264,7 +264,7 @@ teams_send_chat_message_with_files-group:
       args: {query: seed-v1 Meeting Notes, limit: 1}
     - *new_chat
     - tool: teams_send_chat_message_with_files
-      args: {message: seed-v1 case-teams_send_chat_message_with_files-group notes}
+      args: {body_html: "<p>seed-v1 case-teams_send_chat_message_with_files-group notes</p>"}
       bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
 
 sharepoint_read_file-teams-attachment:
@@ -275,7 +275,7 @@ sharepoint_read_file-teams-attachment:
       args: {query: seed-v1 Meeting Notes, limit: 1}
     - *new_chat
     - tool: teams_send_chat_message_with_files
-      args: {message: seed-v1 case-sharepoint_read_file-teams-attachment notes}
+      args: {body_html: "<p>seed-v1 case-sharepoint_read_file-teams-attachment notes</p>"}
       bind: {chat_id: "$prev.chat_id", attachments: ["$1.files[0].uri"]}
     - tool: teams_list_chat_messages
       args: {limit: 5}
@@ -312,7 +312,7 @@ sharepoint_read_file-teams-attachment-other-user:
           - {user_id: persona:tom.id, name: persona:tom.name}
     - tool: teams_send_chat_message_with_files
       as: 2
-      args: {message: seed-v1 case-sharepoint_read_file-teams-attachment-other-user notes}
+      args: {body_html: "<p>seed-v1 case-sharepoint_read_file-teams-attachment-other-user notes</p>"}
       bind: {chat_id: "$prev.chat_id", attachments: ["$2.uri"]}
     - tool: teams_list_chat_messages
       args: {limit: 5}
@@ -529,7 +529,7 @@ teams_send_chat_message-mention:
     - tool: teams_list_chat_members
       bind: {chat_id: "$prev.chats[0].chat_id"}
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_send_chat_message-mention hello}
+      args: {body_html: "<p>seed-v1 case-teams_send_chat_message-mention hello</p>"}
       expect: {result: {"mentions[0].text": Anna Meier}}
       bind:
         chat_id: "$1.chats[0].chat_id"
@@ -545,7 +545,7 @@ teams_send_chat_message_with_files-existing:
       args: {query: seed-v1 Meeting Notes, limit: 1}
     - *send_chat
     - tool: teams_send_chat_message_with_files
-      args: {message: seed-v1 case-teams_send_chat_message_with_files-existing notes}
+      args: {body_html: "<p>seed-v1 case-teams_send_chat_message_with_files-existing notes</p>"}
       bind: {chat_id: "$prev.chats[0].chat_id", attachments: ["$1.files[0].uri"]}
 
 teams_react_to_message-chat:
@@ -554,7 +554,7 @@ teams_react_to_message-chat:
   chain:
     - *send_chat
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_react_to_message-chat target}
+      args: {body_html: "<p>seed-v1 case-teams_react_to_message-chat target</p>"}
       bind: {chat_id: "$prev.chats[0].chat_id"}
     - tool: teams_react_to_message
       args: {reaction: "\U0001f44d"}
@@ -566,7 +566,7 @@ teams_delete_message-chat:
   chain:
     - *send_chat
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_delete_message-chat doomed}
+      args: {body_html: "<p>seed-v1 case-teams_delete_message-chat doomed</p>"}
       bind: {chat_id: "$prev.chats[0].chat_id"}
     - tool: teams_delete_message
       bind: {uri: "$prev.uri"}
@@ -649,10 +649,10 @@ teams_edit_message-chat:
   chain:
     - *send_chat
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_edit_message-chat before}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-chat before</p>"}
       bind: {chat_id: "$prev.chats[0].chat_id"}
     - tool: teams_edit_message
-      args: {message: seed-v1 case-teams_edit_message-chat after}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-chat after</p>"}
       bind: {uri: "$prev.uri"}
 
 teams_edit_message-reply:
@@ -662,16 +662,16 @@ teams_edit_message-reply:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_edit_message-reply post"}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-reply post</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_edit_message-reply before"}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-reply before</p>"}
       bind:
         team_id: "$1.teams[display_name=seed-v1 team].team_id"
         channel_id: "$2.channels[0].channel_id"
         reply_to_id: "$prev.message_id"
     - tool: teams_edit_message
-      args: {message: "seed-v1 case-teams_edit_message-reply after"}
+      args: {body_html: "<p>seed-v1 case-teams_edit_message-reply after</p>"}
       bind: {uri: "$prev.uri"}
 
 teams_react_to_message-chat-remove:
@@ -680,7 +680,7 @@ teams_react_to_message-chat-remove:
   chain:
     - *send_chat
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_react_to_message-chat-remove target}
+      args: {body_html: "<p>seed-v1 case-teams_react_to_message-chat-remove target</p>"}
       bind: {chat_id: "$prev.chats[0].chat_id"}
     - tool: teams_react_to_message
       args: {reaction: "\U0001f44d"}
@@ -696,7 +696,7 @@ teams_react_to_message-post-remove:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_react_to_message-post-remove target"}
+      args: {body_html: "<p>seed-v1 case-teams_react_to_message-post-remove target</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_react_to_message
       args: {reaction: "\U0001f44d"}
@@ -712,10 +712,10 @@ teams_react_to_message-reply:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_react_to_message-reply post"}
+      args: {body_html: "<p>seed-v1 case-teams_react_to_message-reply post</p>"}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_react_to_message-reply target"}
+      args: {body_html: "<p>seed-v1 case-teams_react_to_message-reply target</p>"}
       bind:
         team_id: "$1.teams[display_name=seed-v1 team].team_id"
         channel_id: "$2.channels[0].channel_id"
@@ -736,10 +736,10 @@ teams_send_channel_message_with_files-reply:
     - *teams
     - *seed_channels
     - tool: teams_send_channel_message
-      args: {message: "seed-v1 case-teams_send_channel_message_with_files-reply post"}
+      args: {body_html: "<p>seed-v1 case-teams_send_channel_message_with_files-reply post</p>"}
       bind: {team_id: "$2.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
     - tool: teams_send_channel_message_with_files
-      args: {message: "seed-v1 case-teams_send_channel_message_with_files-reply notes"}
+      args: {body_html: "<p>seed-v1 case-teams_send_channel_message_with_files-reply notes</p>"}
       bind:
         attachments: ["$1.files[0].uri"]
         team_id: "$2.teams[display_name=seed-v1 team].team_id"
@@ -764,7 +764,7 @@ teams_send_channel_message-mention:
     - *seed_channels
     - tool: teams_send_channel_message
       args:
-        message: seed-v1 case-teams_send_channel_message-mention hello
+        body_html: "<p>seed-v1 case-teams_send_channel_message-mention hello</p>"
         mentions:
           - {user_id: persona:tom.id, name: persona:tom.name}
       bind: {team_id: "$1.teams[display_name=seed-v1 team].team_id", channel_id: "$prev.channels[0].channel_id"}
@@ -775,7 +775,7 @@ teams_read_message-chat-reacted:
   chain:
     - *send_chat
     - tool: teams_send_chat_message
-      args: {message: seed-v1 case-teams_read_message-chat-reacted target}
+      args: {body_html: "<p>seed-v1 case-teams_read_message-chat-reacted target</p>"}
       bind: {chat_id: "$prev.chats[0].chat_id"}
     - tool: teams_react_to_message
       args: {reaction: "\U0001f44d"}

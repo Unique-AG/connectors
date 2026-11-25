@@ -382,7 +382,7 @@ class TestRefusedRequests:
 
     def test_a_channel_post_that_names_an_outside_address_is_refused(self) -> None:
         refusal = guard().refuses_call(
-            "teams_send_channel_message", {"message": "write to a@evil.example"}
+            "teams_send_channel_message", {"body_html": "<p>write to a@evil.example</p>"}
         )
         assert refusal is not None
 

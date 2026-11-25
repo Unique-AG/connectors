@@ -10,7 +10,7 @@ uc-09-01:
     - tool: teams_list_chat_members
       uses: {chat_id: id of the chat}
     - tool: teams_send_chat_message
-      args: {message: the build is green, mentions: Anna}
+      args: {body_html: "<p>the build is green</p>", mentions: Anna}
       uses: {chat_id: id of the chat}
 
 uc-09-02:
@@ -55,7 +55,7 @@ uc-09-04:
     - tool: teams_browse_channel
       uses: {team_id: id of the team, channel_id: id of the channel}
     - tool: teams_send_channel_message
-      args: {message: "Yes, since noon"}
+      args: {body_html: "Yes, since noon"}
       uses: {team_id: id of the team, channel_id: id of the channel, reply_to_id: id of the post}
 
 uc-09-05:
@@ -85,7 +85,7 @@ uc-09-06:
     - tool: teams_list_chat_messages
       uses: {chat_id: id of the chat}
     - tool: teams_edit_message
-      args: {message: Launch on 14 June}
+      args: {body_html: "<p>Launch on 14 June</p>"}
       uses: {uri: uri of the message}
 
 uc-09-07:
@@ -114,7 +114,7 @@ uc-09-08:
     - tool: teams_list_channels
       uses: {team_id: id of the team}
     - tool: teams_send_channel_message
-      args: {message: v2 ships on Friday}
+      args: {body_html: "<p>v2 ships on Friday</p>"}
       uses: {team_id: id of the team, channel_id: id of the channel}
   note: without reply_to_id the tool makes a new top-level post.
 
@@ -192,7 +192,7 @@ uc-09-13:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:251-256: ask the user to sign in to this connector again; retrying the call unchanged fails the same way."
 
@@ -206,7 +206,7 @@ uc-09-14:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the delegated permissions ChatMessage.Send and Chat.Read; retrying will not help."
 
@@ -220,7 +220,7 @@ uc-09-15:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The failing step is teams_send_chat_message, after Mia agrees. The tool has no text of its own for a missing chat, so the default applies. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:271-278: Microsoft reports a missing chat and a chat that the user may not know about in the same way, so the assistant says that it could not find the chat and does not say that it was deleted."
 
@@ -234,7 +234,7 @@ uc-09-16:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:240-244: retry after the stated seconds, not sooner. A 503 with a wait time is not a row here: the write may have taken effect before the 503 (src/office_365_mcp/graph_client/client.py:226-229), and the advice still says to retry after the stated seconds (shared/seam/advice.py:245-249)."
 
@@ -248,7 +248,7 @@ uc-09-17:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
     - tool: teams_list_chat_messages
       uses: {chat_id: id of the chat}
@@ -264,7 +264,7 @@ uc-09-18:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:312-317: the request is bad, not an outage or a permission problem; the same call fails the same way; Microsoft's reason is passed on."
 
@@ -280,7 +280,7 @@ uc-09-19:
     - tool: teams_list_channels
       uses: {team_id: id of the team}
     - tool: teams_send_channel_message
-      args: {message: v2 ships on Friday}
+      args: {body_html: "<p>v2 ships on Friday</p>"}
       uses: {team_id: id of the team, channel_id: id of the channel}
   note: "Mia declines the question. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:73-78: nothing was changed, and the assistant says that the request was not confirmed. The tool words it as Nothing was posted (src/office_365_mcp/shared/teams/messages.py:447-449)."
 
@@ -334,7 +334,7 @@ uc-09-29:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The question cannot be shown, so asks_user is false, as in uc-04-15. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:53-61 and :96-97: the client answers METHOD_NOT_FOUND or INVALID_REQUEST to the question; nothing was sent; tell the user that their client cannot ask them to agree, and that they can do this task in the Microsoft 365 app; a second call fails the same way. This text exists only on a connection that uses the older protocol (shared/seam/elicitation.py:45-47 and :127-128); on the 2026-07-28 protocol the question travels in the result of the call and no path ends in it."
 
@@ -379,7 +379,7 @@ uc-09-25:
     - tool: teams_browse_channel
       uses: {team_id: id of the team, channel_id: id of the channel}
     - tool: teams_send_channel_message
-      args: {message: "Yes, since noon", subject: Release news}
+      args: {body_html: "Yes, since noon", subject: Release news}
       uses: {team_id: id of the team, channel_id: id of the channel, reply_to_id: id of the post}
   note: "The tool refuses before it asks Mia. Expected behaviour from src/office_365_mcp/shared/teams/messages.py:510-516 and src/office_365_mcp/tools/teams_send_channel_message.py:88-89: a subject goes only on a new post, never on a reply; to reply, omit the subject; to start a new post with a subject, omit reply_to_id."
 
@@ -573,6 +573,6 @@ uc-09-40:
   chain:
     - tool: teams_list_chats
     - tool: teams_send_chat_message
-      args: {message: the build is green}
+      args: {body_html: "<p>the build is green</p>"}
       uses: {chat_id: id of the chat}
   note: "The failing step is teams_send_chat_message, after Mia agrees. Expected behaviour from src/office_365_mcp/shared/seam/advice.py:316: the request is bad, not an outage or a permission problem; the same call fails the same way; the answer has no reason when Microsoft gave none."

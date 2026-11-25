@@ -626,7 +626,7 @@ async def _send_to_chat(client: GraphServiceClient, answer: Confirmed) -> object
 
     with measured_graph_operation(CHAT_SEND_TOOL, is_refusal=is_refusal):
         return await send_chat_message(
-            client, chat_id=_CHAT_ID, message="Ship it.", confirm=confirm
+            client, chat_id=_CHAT_ID, body_html="Ship it.", confirm=confirm
         )
 
 
@@ -637,7 +637,7 @@ async def _send_to_channel(client: GraphServiceClient, answer: Confirmed) -> obj
 
     with measured_graph_operation(CHANNEL_SEND_TOOL, is_refusal=is_refusal):
         return await send_channel_message(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, message="Ship it.", confirm=confirm
+            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, body_html="Ship it.", confirm=confirm
         )
 
 

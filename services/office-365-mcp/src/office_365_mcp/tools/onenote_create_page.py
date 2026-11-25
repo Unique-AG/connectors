@@ -20,6 +20,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.body_html import ONENOTE_BODY_HTML_FIELD
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
@@ -349,11 +350,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The page content, as HTML. Microsoft Graph refuses a request over 4 MB. "
-                    + "A newline is not a line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, "
-                    + "`<ul>`, `<ol>`, `<li>`, `<table>`, `<b>` and `<i>` for structure. Microsoft "
-                    + "removes JavaScript, CSS and forms. Escape `&`, `<` and `>` where they must "
-                    + "read as themselves."
+                    ONENOTE_BODY_HTML_FIELD + " Microsoft Graph refuses a request over 4 MB."
                 ),
             ),
         ],

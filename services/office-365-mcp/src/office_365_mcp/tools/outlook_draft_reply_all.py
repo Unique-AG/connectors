@@ -21,9 +21,9 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
-from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -63,7 +63,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-    "body": "Thanks, Friday works for all of us.",
+    "body_html": "<p>Thanks, Friday works for all of us.</p>",
 }
 
 GRAPH_NOT_FOUND = (
@@ -259,6 +259,7 @@ async def draft_reply_all(
                     _question(
                         mailbox,
                         subject=original.subject,
+                        body_html=body_html,
                         addressed=addressed,
                         copied=copied,
                         blind=blind,
@@ -350,6 +351,7 @@ def _question(
     mailbox: str,
     *,
     subject: str | None,
+    body_html: str,
     addressed: Sequence[str],
     copied: Sequence[str],
     blind: Sequence[str],
@@ -368,6 +370,7 @@ def _question(
         + (f" It is blind copied to {', '.join(blind)}." if blind else "")
         + ("" if importance is None else f" It has {importance} importance.")
         + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
+        + links_in_body(body_html)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
     )
@@ -476,14 +479,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        body: Annotated[
+        body_html: Annotated[
             str,
             Field(
                 min_length=1,
-                description=(
-                    "What to say to everyone on the message, as Markdown. This tool turns it "
-                    + "into HTML."
-                ),
+                description=OUTLOOK_BODY_HTML_FIELD,
             ),
         ],
         cc: Annotated[
@@ -537,7 +537,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await draft_reply_all(
             client,
             message_ref=message_ref,
-            body_html=markdown_to_html(body),
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             cc=cc,
             bcc=bcc,

@@ -24,7 +24,9 @@ from mcp.types import (
     InputResponse,
 )
 from mcp.types.version import LATEST_MODERN_VERSION
+from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.email_address import EmailAddress
+from msgraph.generated.models.item_body import ItemBody
 from msgraph.generated.models.message import Message
 from msgraph.generated.models.recipient import Recipient
 from msgraph.graph_service_client import GraphServiceClient
@@ -80,12 +82,14 @@ def _draft(
     subject: str | None = _SUBJECT,
     is_draft: bool | None = True,
     change_key: str | None = _CHANGE_KEY,
+    body_html: str = "<p>Please find the invoice attached.</p>",
 ) -> dict[str, object]:
     return {
         "id": _DRAFT_ID,
         "isDraft": is_draft,
         "changeKey": change_key,
         "subject": subject,
+        "body": {"contentType": "html", "content": body_html},
         "toRecipients": [dict(one) for one in (to or [_recipient("Ada Lovelace", _ADA)])],
         "ccRecipients": [dict(one) for one in cc],
         "bccRecipients": [dict(one) for one in bcc],
@@ -344,6 +348,72 @@ class TestHowTheQuestionReachesAPerson:
 
         assert len(asked) == 1
         assert "@" not in asked[0]
+
+
+def _with_body(content: str, content_type: BodyType = BodyType.Html) -> Message:
+    return Message(
+        subject=_SUBJECT,
+        change_key=_CHANGE_KEY,
+        to_recipients=_recipients(_ADA),
+        body=ItemBody(content_type=content_type, content=content),
+    )
+
+
+class TestTheLinksTheQuestionShows:
+    async def test_the_question_lists_each_link_once_in_order(self) -> None:
+        question = await _question_about(
+            _with_body(
+                '<p><a href="https://b.example.invalid/pay">Pay</a> '
+                + '<a href="https://a.example.invalid/terms">Terms</a> '
+                + '<a href="https://b.example.invalid/pay">Pay again</a></p>'
+            )
+        )
+
+        assert question.endswith(
+            "? It links to 'https://b.example.invalid/pay', 'https://a.example.invalid/terms'. "
+            + "Sending cannot be undone."
+        ), question
+
+    async def test_a_draft_with_no_links_has_no_link_text(self) -> None:
+        question = await _question_about(_with_body("<p>Please find the invoice attached.</p>"))
+
+        assert "It links to" not in question
+        assert question.endswith("? Sending cannot be undone."), question
+
+    async def test_a_link_with_a_script_scheme_that_a_person_typed_in_outlook_still_shows(
+        self,
+    ) -> None:
+        question = await _question_about(
+            _with_body('<p><a href="javascript:alert(1)">Open the invoice</a></p>')
+        )
+
+        assert "It links to 'javascript:alert(1)'." in question
+
+    async def test_a_plain_text_body_shows_no_links(self) -> None:
+        question = await _question_about(
+            _with_body("See https://a.example.invalid/terms", BodyType.Text)
+        )
+
+        assert "It links to" not in question
+
+    async def test_a_draft_with_no_body_shows_no_links(self) -> None:
+        question = await _question_about(_versioned())
+
+        assert "It links to" not in question
+
+    async def test_the_question_shows_the_links_of_the_draft_graph_returns(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _ready(
+            graph, _draft(body_html='<p><a href="https://a.example.invalid/terms">Terms</a></p>')
+        )
+
+        answer = await send_draft(
+            client, confirm=a_person_agrees(_modern_context()), message_ref=_DRAFT_REF
+        )
+
+        _key, question, _state, _agrees_with = _the_question(answer)
+        assert "It links to 'https://a.example.invalid/terms'." in question
 
 
 class _ModernRequest:
@@ -692,7 +762,7 @@ class TestWhatItAsksGraphFor:
         assert "isDraft" in selected
         assert "changeKey" in selected
 
-    async def test_the_pre_read_never_asks_for_the_body(
+    async def test_the_pre_read_selects_the_body_for_its_links(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         read = _reads(graph, _draft())
@@ -701,7 +771,8 @@ class TestWhatItAsksGraphFor:
         _ = await send_draft(client, confirm=_agrees, message_ref=_DRAFT_REF)
 
         selected = read.calls.last.request.url.params["$select"]
-        assert "body" not in selected.casefold()
+        assert "body" in selected.split(",")
+        assert "uniqueBody" not in selected
 
     async def test_both_requests_declare_the_immutable_id_space(
         self, client: GraphServiceClient, graph: respx.MockRouter

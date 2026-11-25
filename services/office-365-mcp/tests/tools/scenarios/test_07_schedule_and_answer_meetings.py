@@ -1513,7 +1513,7 @@ _BOOKING_QUESTIONS = [
         id="settings-for-the-attendees",
     ),
     pytest.param(
-        {"body": "Agenda"},
+        {"body_html": "<p>Agenda</p>"},
         "with a body of",
         id="a-body",
     ),

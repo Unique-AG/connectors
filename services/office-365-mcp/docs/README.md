@@ -20,6 +20,9 @@ through the Microsoft Graph API.
 - **Always on:** The tool `get_me` is on in every deployment.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
+- **Formatted text:** A tool that writes a mail body, an event body, a Teams message, or a OneNote
+  page takes it as HTML, in `body_html`. The server sends the HTML to Microsoft as it is. It does
+  not change Markdown or plain text into HTML.
 
 ## Start from what you want to do
 
@@ -423,7 +426,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
 | `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
 | `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
-| `teams_send_chat_message` | 🟠 Add | ✋ Always | Posts a plain-text message to a chat. Supports mentions, a subject, and an importance. |
+| `teams_send_chat_message` | 🟠 Add | ✋ Always | Posts an HTML message to a chat. Supports mentions, a subject, and an importance. |
 | `teams_send_channel_message` | 🟠 Add | ✋ Always | Posts a message to a channel, or a reply in a thread. Supports mentions, a subject, and an importance. |
 | `teams_react_to_message` | 🔴 Change | ✋ Always | Adds or removes one reaction on a chat message, a channel post, or a reply. |
 
@@ -633,6 +636,9 @@ Messages, folders, drafts, and sending.
 | `outlook_draft_reply_all` | 🟠 Add | 🤝 Shared mailbox | Composes a reply to everyone on one message into Drafts. |
 | `outlook_update_draft` | 🔴 Change | 🤝 Shared mailbox | Changes the subject, text, recipients, importance, or categories of one draft. |
 
+The four drafting tools take the text as HTML. In a shared mailbox, the approval question lists
+every link in the text.
+
 **What it needs**
 
 - **Graph permissions (6):** `Mail.Read`, `Mail.Read.Shared`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `People.Read`, `User.Read`
@@ -675,7 +681,7 @@ Messages, folders, drafts, and sending.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. |
+| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. The approval question lists every link in the draft. |
 
 **What it needs**
 
@@ -872,7 +878,7 @@ Calendars, events, availability, rooms, and sharing.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. |
+| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. The approval question lists every link in the body. |
 
 **What it needs**
 
@@ -1705,7 +1711,7 @@ messages. It stores only an OAuth token.
 | Read the replies in a channel thread | Yes, 50 replies of one post in one call | No, root posts only |
 | Read a chat further back in time | Yes, with `sent_before` | No, the newest 50 messages only |
 | Filter the list of chats by type or by topic | Yes | No |
-| Send a message with a mention, a subject, an importance, a thread reply, or Markdown formatting | Yes | No, plain text only |
+| Send a message with a mention, a subject, an importance, a thread reply, or HTML formatting | Yes | No, plain text only |
 | Send a message with a file | Yes, if the file is already in SharePoint | No |
 | Edit, delete, or react to a message | Yes, edit and delete for own messages only | No |
 | Create a chat, change its members, or rename it | Yes | No |

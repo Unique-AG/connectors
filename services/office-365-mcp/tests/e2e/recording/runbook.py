@@ -540,6 +540,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
 
+def _all_recorded(wanted: Sequence[str], results: Results) -> bool:
+    missed = [
+        f"{case} ({results.get(case, {}).get('status', 'not run')})"
+        for case in wanted
+        if results.get(case, {}).get("status") != "recorded"
+    ]
+    if missed:
+        print(f"Not recorded: {', '.join(missed)}", file=sys.stderr)
+    return not missed
+
+
 def _main(argv: Sequence[str] | None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     modes = ["login", "discover", "seed", "record", "check", "report"]
@@ -561,6 +572,9 @@ def _main(argv: Sequence[str] | None) -> int:
     wanted = cast("list[str]", arguments.case) or (list(MEETING_CASES) if step else [])
     loaded = catalogs()
     every = [resolve(case, loaded=loaded) for case, _ in case_entries()]
+    if unknown := sorted(set(wanted) - {one.scenario for one in every}):
+        print(f"Unknown case: {', '.join(unknown)}", file=sys.stderr)
+        return 2
     plans = [one for one in every if not wanted or one.scenario in wanted]
 
     def found(assume_meeting: bool = False) -> list[Run]:
@@ -606,6 +620,7 @@ def _main(argv: Sequence[str] | None) -> int:
             else:
                 STATE.mkdir(exist_ok=True)
                 results = execute(found(False), upns, shell, time.sleep, STATE / "results.json")
+                code = int(not _all_recorded(wanted, results))
         elif mode == "check":
             code = check(dry)
         else:

@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -26,7 +27,6 @@ from office_365_mcp.shared.teams.messages import (
     CHAT_SEND,
     CHAT_SUBJECT_FIELD,
     MENTIONS_FIELD,
-    MESSAGE_FIELD,
     ChatImportance,
     Mention,
     TeamsMessage,
@@ -49,12 +49,12 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_messages",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_id": "19:release@thread.v2",
-    "message": "Ship it.",
+    "body_html": "<p>Ship it.</p>",
 }
 
 _DESCRIPTION = """\
 Sends one message as the signed-in user to an existing Teams chat. The message can @mention \
-people. The mentions come first, in the order given, and the text of `message` follows them. \
+people. The mentions come first, in the order given, and the HTML of `body_html` follows them. \
 This tool sends the message immediately, and nothing here can recall it. \
 teams_send_channel_message is the tool for a channel.
 
@@ -73,7 +73,7 @@ async def send_chat_message(
     client: GraphServiceClient,
     *,
     chat_id: str,
-    message: str,
+    body_html: str,
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
     importance: ChatImportance | None = None,
@@ -90,7 +90,7 @@ async def send_chat_message(
                 with graph_step(STEP_SEND):
                     return await client.chats.by_chat_id(chat_id).messages.post(
                         outgoing_message(
-                            message,
+                            body_html,
                             mentions=members,
                             importance=None
                             if importance is None
@@ -106,13 +106,15 @@ async def send_chat_message(
                 confirm,
                 send_question(
                     CHAT_SEND,
-                    message,
+                    body_html,
                     f"to chat {chat_id!r}",
                     members,
                     subject=subject,
                     importance=importance,
                 ),
-                send_binding((chat_id,), message, members, subject=subject, importance=importance),
+                send_binding(
+                    (chat_id,), body_html, members, subject=subject, importance=importance
+                ),
                 post,
             )
 
@@ -145,7 +147,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     )
     async def teams_send_chat_message(
         chat_id: Annotated[str, Field(min_length=1, description=CHAT_ID_FIELD)],
-        message: Annotated[str, Field(min_length=1, description=MESSAGE_FIELD)],
+        body_html: Annotated[str, Field(min_length=1, description=TEAMS_BODY_HTML_FIELD)],
         mentions: Annotated[list[Mention], Field(default=[], description=MENTIONS_FIELD)],
         ctx: Context,
         importance: Annotated[
@@ -157,7 +159,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await send_chat_message(
             client,
             chat_id=chat_id,
-            message=message,
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             mentions=mentions,
             importance=importance,
