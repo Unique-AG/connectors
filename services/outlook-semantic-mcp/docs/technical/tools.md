@@ -360,7 +360,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
   success: boolean;
   status?: string;
   message?: string;
-  title?: string | null;       // email subject, or "(no subject)"
+  title?: string;              // email subject, or "(no subject)"
   webLink?: string | null;     // opens the email in Outlook on the web; null when no link could be built
   emailData?: {
     id: string;

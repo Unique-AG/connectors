@@ -85,9 +85,8 @@ const OpenEmailByIdOutputSchema = z.object({
   message: z.string().optional(),
   title: z
     .string()
-    .nullable()
     .optional()
-    .describe('Subject of the email, or "(no subject)" when it has none.'),
+    .describe(`Subject of the email, or "${NO_SUBJECT}" when it has none.`),
   webLink: z
     .string()
     .nullable()

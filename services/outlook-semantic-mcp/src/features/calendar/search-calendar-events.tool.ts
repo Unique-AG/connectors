@@ -186,7 +186,7 @@ export const SearchCalendarEventsOutputSchema = z.object({
   events: z
     .array(
       CalendarEventSchema.extend({
-        title: z.string().describe('Event subject, or "(no subject)" when it has none.'),
+        title: z.string().describe(`Event subject, or "${NO_SUBJECT}" when it has none.`),
       }),
     )
     .optional()

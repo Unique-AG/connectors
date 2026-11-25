@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { NO_SUBJECT } from '~/utils/no-subject';
 import { SEARCH_CONFIG } from './search.config';
 import { SearchBackend, SearchPageStatus } from './search-results.types';
 
@@ -19,7 +20,7 @@ const SearchEmailResultSchema = z.object({
     .describe(
       'ID of the folder containing this email. Internal identifier — do not display to the user.',
     ),
-  title: z.string().describe('Subject line of the email, or "(no subject)" when it has none.'),
+  title: z.string().describe(`Subject line of the email, or "${NO_SUBJECT}" when it has none.`),
   from: z.string().describe('Sender email address.'),
   receivedDateTime: z
     .string()

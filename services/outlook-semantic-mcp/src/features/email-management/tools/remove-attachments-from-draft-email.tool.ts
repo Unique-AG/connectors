@@ -5,6 +5,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { ConfirmSchema, confirmWrite } from '~/utils/confirm-write';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { NO_SUBJECT } from '~/utils/no-subject';
 import { oneLine } from '~/utils/one-line';
 import { ExistingDraftTargetShape } from '../draft-input.schemas';
 import { DraftAttachment, GetDraftStateQuery } from '../get-draft-state.query';
@@ -182,7 +183,7 @@ export class RemoveAttachmentsFromDraftEmailTool {
   private elicitMessage(subject: string | null, toRemove: DraftAttachment[]): string {
     const draftSubject = subject ? oneLine(subject) : '';
     return [
-      `Remove ${toRemove.length === 1 ? 'this attachment' : 'these attachments'} from the draft "${draftSubject || '(no subject)'}"?`,
+      `Remove ${toRemove.length === 1 ? 'this attachment' : 'these attachments'} from the draft "${draftSubject || NO_SUBJECT}"?`,
       ...toRemove.map(
         (attachment) =>
           `- ${oneLine(attachment.name)}${attachment.isInline ? ' (inline image)' : ''}`,
