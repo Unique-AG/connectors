@@ -263,3 +263,27 @@ class TestWhatItAdvertises:
             WRITE_DESTRUCTIVE_IDEMPOTENT
         )
         assert cast("dict[str, object]", tool.parameters)["required"] == ["step"]
+
+
+class TestTheQuestionIsBoundToTheNames:
+    async def test_a_step_renamed_while_the_person_decides_changes_the_state(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _list(graph, is_shared=True)
+        _ = graph.get(f"{_LIST_PATH}/tasks/{_TASK_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _TASK_ID, "title": "Plan the offsite"})
+        )
+        step = graph.get(_STEP_PATH)
+        states: list[str] = []
+        for name in ("Call the hotel", "Cancel the hotel booking"):
+            _ = step.mock(
+                return_value=httpx.Response(200, json={"id": _STEP_ID, "displayName": name})
+            )
+
+            async def remember(_question: str, about: str) -> InputRequiredResult:
+                states.append(about)
+                return InputRequiredResult(input_requests={}, request_state=about)
+
+            _ = await update_task_step(client, step=_STEP_URI, is_checked=True, confirm=remember)
+
+        assert states[0] != states[1]

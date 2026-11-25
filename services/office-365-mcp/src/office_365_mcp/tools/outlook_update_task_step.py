@@ -114,6 +114,7 @@ async def update_task_step(
                 )
             assert item is not None, "Graph answered a checklist item read with no item"
             named = _named(item.display_name or "", task.title or "")
+            about = write_state_for(about, item.display_name or "", task.title or "")
             with not_graph():
                 question = f"{_change(named, text, is_checked)} {shared_list_reason(audience)}?"
                 answer = await confirm(question, about)
