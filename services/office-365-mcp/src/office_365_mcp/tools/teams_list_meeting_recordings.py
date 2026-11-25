@@ -1,9 +1,7 @@
 """`teams_list_meeting_recordings` — did a call record, how long it ran, and who can get the file.
 
-TRAP: no video ever comes back, and none is reachable anywhere in this connector. Graph serves a
-recording as one MP4 byte stream, and `recordingContentUrl` opens only with this connector's own
-token, so passing it on leaks a credential or does nothing. `tests/test_layering.py` rule 7 blocks
-every module from addressing one recording, this file too.
+TRAP: `recordingContentUrl` opens only with this connector's own token, so passing it on leaks a
+credential. `tests/test_layering.py` rule 7 blocks every module from addressing one recording.
 
 Separate from `teams_list_meeting_transcripts` because Graph gates them independently, under
 `OnlineMeetingRecording.Read.All` and `OnlineMeetingTranscript.Read.All`, and a default tenant has
@@ -68,12 +66,14 @@ ContentAccess = Literal["you_are_the_organizer", "organizer_only", "unknown"]
 _DESCRIPTION = """\
 Lists a Teams meeting's recordings, newest first, from the `meeting_uri` teams_list_chats \
 reports. It reports whether a meeting was recorded, how long it ran, and who can download it. \
-This tool returns no video, and none is reachable here. teams_list_meeting_transcripts \
-reports the words instead.
+This tool returns no video. teams_list_meeting_transcripts reports the words instead.
 
 Notes:
 - Read `status` before you decide: `not_ready` means wait, not "the call was not recorded".
-- An `organizer_only` recording exists but is out of reach. Never report it as missing.\
+- An `organizer_only` recording exists but is out of reach. Never report it as missing.
+- The link that opens a recording in a browser is in the meeting chat, not here. It is the \
+`recording` of the call recording message in that chat. Read it with teams_list_chat_messages \
+if this server offers that tool. If not, tell the user to open the meeting chat in Teams.\
 """
 
 # Local, not shared with teams_list_meeting_transcripts: `tests/test_layering.py` rule 4 forbids it.

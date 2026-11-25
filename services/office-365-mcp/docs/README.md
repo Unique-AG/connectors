@@ -202,6 +202,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 - Walk the channels of a team, and read the posts and replies of a channel.
 - Search every Teams message that you can see.
 - Read the transcript of a meeting, and see whether a recording exists.
+- Get the link that opens a meeting recording in a browser, from the meeting chat.
 
 **Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder`, `teams_read_meeting`, `teams_list_call_transcripts`, and `teams_read_call_transcript`. Call transcripts are on [`teams-call-transcripts`](#teams-call-transcripts).
 
@@ -366,7 +367,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 - Find a meeting from its chat.
 - See whether a recording exists, how long it runs, and who can download it.
 
-**Note:** The preset never returns the video.
+**Note:** The preset never returns the video. The link that opens the recording is in the meeting chat. Use `teams_list_chat_messages` of the [`teams`](#teams) preset to read it.
 
 **Tools**
 
@@ -1717,7 +1718,7 @@ messages. It stores only an OAuth token.
 | Capability | office-365-mcp | teams-mcp |
 | --- | --- | --- |
 | Read a transcript in the chat | Yes, live. Microsoft erases a one-off transcript after about 60 days. | No, ingest only |
-| Read the data of a recording, or the attendance of a meeting | Yes. A recording gives metadata only. Only the organizer reads attendance. | No |
+| Read the data of a recording, or the attendance of a meeting | Yes. A recording gives its length and who can download it. The meeting chat gives the link that opens the recording in a browser. Only the organizer reads attendance. | No |
 | Read the replies in a channel thread | Yes, 50 replies of one post in one call | No, root posts only |
 | Read a chat further back in time | Yes, with `sent_before` | No, the newest 50 messages only |
 | Filter the list of chats by type or by topic | Yes | No |

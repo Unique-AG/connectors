@@ -13,6 +13,10 @@ from msgraph.generated.chats.item.messages.item.chat_message_item_request_builde
 )
 from msgraph.generated.models.aad_user_conversation_member import AadUserConversationMember
 from msgraph.generated.models.body_type import BodyType
+from msgraph.generated.models.call_recording_event_message_detail import (
+    CallRecordingEventMessageDetail,
+)
+from msgraph.generated.models.call_recording_status import CallRecordingStatus
 from msgraph.generated.models.chat_message import ChatMessage
 from msgraph.generated.models.chat_message_attachment import ChatMessageAttachment
 from msgraph.generated.models.chat_message_from_identity_set import ChatMessageFromIdentitySet
@@ -138,6 +142,16 @@ class MessageReaction(BaseModel):
         )
 
 
+class MessageRecording(BaseModel):
+    url: str = Field(
+        description=(
+            "A SharePoint link to the recording video in the organizer's OneDrive. A person "
+            + "opens it in a browser. Give the link to the user. This connector does not open it."
+        )
+    )
+    display_name: str | None = Field(description="The name of the recording file, if known.")
+
+
 BODY_IS_PLAIN_TEXT_FIELD: str = (
     "True when `body` is plain text. False means that `body` is HTML markup, or that `body` is "
     + "null. In HTML markup, each link keeps its `href` URL."
@@ -165,6 +179,12 @@ class TeamsMessage(BaseModel):
     body_is_plain_text: bool = Field(description=BODY_IS_PLAIN_TEXT_FIELD)
     event: str | None = Field(
         description="What happened, when this message is a system event; null otherwise."
+    )
+    recording: MessageRecording | None = Field(
+        description=(
+            "The link to the meeting recording, when this message is the call recording event "
+            + "that Teams sends after the recording is saved; null otherwise."
+        )
     )
     created_at: datetime | None = Field(description="When the message was sent.")
     last_edited_at: datetime | None = Field(
@@ -208,6 +228,7 @@ class TeamsMessage(BaseModel):
             and body.content is not None
             and body.content_type == BodyType.Text,
             event=event_of(message),
+            recording=recording_of(message),
             created_at=message.created_date_time,
             last_edited_at=message.last_edited_date_time,
             deleted_at=message.deleted_date_time,
@@ -298,6 +319,19 @@ def event_of(message: ChatMessage) -> str | None:
     ):
         return _UNDESCRIBED_EVENT
     return None
+
+
+def recording_of(message: ChatMessage) -> MessageRecording | None:
+    detail = message.event_detail
+    if (
+        not isinstance(detail, CallRecordingEventMessageDetail)
+        or detail.call_recording_status != CallRecordingStatus.Success
+    ):
+        return None
+    url = _present(detail.call_recording_url)
+    if url is None:
+        return None
+    return MessageRecording(url=url, display_name=_present(detail.call_recording_display_name))
 
 
 def _event_name(odata_type: str | None) -> str | None:
