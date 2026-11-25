@@ -21,6 +21,7 @@ import { MAIN_EXCHANGE } from '../amqp/amqp.constants';
 import { DrizzleDatabase } from '../db/drizzle.module';
 import {
   authorizationCodes,
+  CLEARED_TOKEN_REFRESH_BACKOFF,
   oauthClients,
   oauthSessions,
   sourceOnLoginConflict,
@@ -187,6 +188,7 @@ export class McpOAuthStore implements IOAuthStore {
       raw: profile.raw,
       accessToken: encryptedAccessToken,
       refreshToken: encryptedRefreshToken,
+      ...CLEARED_TOKEN_REFRESH_BACKOFF,
     };
 
     const [saved] = await this.drizzle

@@ -57,19 +57,42 @@ sequenceDiagram
 
     OutlookMCP->>MSGraph: API call with access token
     MSGraph->>Middleware: 401 InvalidAuthenticationToken
-    Middleware->>DB: Fetch encrypted refresh token from user_profiles
-    Middleware->>EntraID: POST /oauth2/v2.0/token (grant_type=refresh_token)
-    EntraID->>Middleware: New access token (+ possibly new refresh token)
-    Middleware->>DB: Update encrypted tokens in user_profiles
-    Middleware->>MSGraph: Retry original request with new access token
-    MSGraph->>OutlookMCP: Successful response
+    alt Another request is already refreshing this user's token
+        Middleware->>Middleware: Wait for that refresh and take its token
+        Middleware->>MSGraph: Retry original request with new access token
+    else Stored access token is no longer the rejected one
+        Middleware->>DB: Read stored access token
+        Middleware->>MSGraph: Retry original request with stored access token
+    else Refresh is backing off (token_refresh_retry_at not reached)
+        Middleware->>OutlookMCP: Original 401, Entra ID not called
+    else Refresh needed
+        Middleware->>DB: Fetch encrypted refresh token from user_profiles
+        Middleware->>EntraID: POST /oauth2/v2.0/token (grant_type=refresh_token)
+        alt New tokens
+            EntraID->>Middleware: New access token (+ possibly new refresh token)
+            Middleware->>DB: Store tokens, clear backoff
+            Middleware->>MSGraph: Retry original request with new access token
+        else Grant permanently invalid (invalid_grant, consent_required, invalid_client…)
+            EntraID->>Middleware: OAuth error
+            Middleware->>DB: Clear tokens, revoke MCP session
+            Middleware->>OutlookMCP: Error, user must reconnect
+        else Network error, 429 or 5xx
+            EntraID->>Middleware: Error or no answer
+            Middleware->>DB: Record failure code, count and token_refresh_retry_at
+            Middleware->>OutlookMCP: Original 401
+        end
+    end
+    MSGraph->>OutlookMCP: Response to the retried request
 ```
 
 **Key points:**
 
 - Refresh is automatic — no user intervention required.
 - If the refresh token itself is expired (~90 days of inactivity), the user must reconnect via `reconnect_inbox`.
+- Writes after a refresh only apply while the user's row still holds the refresh token that was refreshed. A reconnect that stored new tokens in the meantime keeps them, even if Microsoft then rejects the old ones.
 - The server stores the new refresh token if Microsoft rotates it; otherwise the existing refresh token is kept.
+- Requests that hit a `401` for the same user at the same time share one refresh. A request whose token another request has already replaced retries with the stored token without calling Entra ID.
+- If Entra ID cannot be reached or answers with a rate limit or a server error, the server waits before it tries again for that user: as long as the `Retry-After` header asks, or otherwise 1, 2, 4 and so on minutes after each consecutive failure, up to 30 minutes. Requests in between keep the original `401` and do not call Entra ID. The next successful refresh or a reconnect ends the wait.
 
 ## Subscription Creation and Renewal Lifecycle
 

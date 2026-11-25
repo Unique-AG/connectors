@@ -14,6 +14,7 @@ import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { NonNullishProps } from '~/utils/non-nullish-props';
+import { parseRetryAfterMs } from '~/utils/parse-retry-after-ms';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { sleep } from '~/utils/sleep';
@@ -404,12 +405,11 @@ export class MsGraphKqlSearchEmailsQuery {
     if (status === 429 || status >= 500) {
       const retryAfterHeader =
         subResponse.headers?.['Retry-After'] ?? subResponse.headers?.['retry-after'];
-      const seconds = retryAfterHeader ? parseInt(retryAfterHeader, 10) : Number.NaN;
       return {
         type: 'retryable',
         request,
         status,
-        retryAfterMs: Number.isNaN(seconds) ? undefined : seconds * 1000,
+        retryAfterMs: parseRetryAfterMs(retryAfterHeader) ?? undefined,
       };
     }
 

@@ -23,6 +23,22 @@ describe('UpstreamCredentialRevokedError', () => {
     expect(isUpstreamCredentialRevokedError(new Error('nope'))).toBe(false);
   });
 
+  it('identifies a revoked-grant error the Microsoft Graph SDK wrapped in its GraphError', () => {
+    const wrappedByGraphSdk = Object.assign(new Error('Re-authentication required'), {
+      name: 'GraphError',
+      code: 'UpstreamCredentialRevokedError',
+      statusCode: -1,
+    });
+    const otherGraphError = Object.assign(new Error('Forbidden'), {
+      name: 'GraphError',
+      code: 'ErrorAccessDenied',
+      statusCode: 403,
+    });
+
+    expect(isUpstreamCredentialRevokedError(wrappedByGraphSdk)).toBe(true);
+    expect(isUpstreamCredentialRevokedError(otherGraphError)).toBe(false);
+  });
+
   it('is an McpError so the MCP module emits a JSON-RPC error instead of a tool result', () => {
     const error = new UpstreamCredentialRevokedError('AADSTS50173');
 

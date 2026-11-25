@@ -1,7 +1,10 @@
 import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { Context, Middleware } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { TokenProvider } from './token.provider';
+import { isObjectType } from 'remeda';
+import { z } from 'zod';
+import { toGraphPathTemplate } from './graph-path-template';
+import { TokenProvider, TokenRefreshCoolingDownError } from './token.provider';
 
 export class TokenRefreshMiddleware implements Middleware {
   private readonly logger = new Logger(this.constructor.name);
@@ -57,6 +60,30 @@ export class TokenRefreshMiddleware implements Middleware {
     return updatedOptions;
   }
 
+  private getRejectedAccessToken(options: RequestInit | undefined): string | undefined {
+    const headers = options?.headers;
+    const authorization =
+      headers instanceof Headers
+        ? headers.get('Authorization')
+        : isObjectType(headers) &&
+            'Authorization' in headers &&
+            typeof headers.Authorization === 'string'
+          ? headers.Authorization
+          : undefined;
+    return authorization?.replace(/^Bearer /, '');
+  }
+
+  // Only the Graph error code is read; the message and innerError carry mailbox addresses,
+  // request ids and client request ids.
+  private async getGraphErrorCode(response: Response | undefined): Promise<string | undefined> {
+    try {
+      const body: unknown = await response?.clone().json();
+      return GraphErrorBodySchema.safeParse(body).data?.error.code;
+    } catch {
+      return undefined;
+    }
+  }
+
   public async execute(context: Context): Promise<void> {
     if (!this.nextMiddleware) {
       throw new Error('Next middleware not set');
@@ -78,7 +105,10 @@ export class TokenRefreshMiddleware implements Middleware {
     });
 
     try {
-      const newAccessToken = await this.tokenProvider.refreshAccessToken(this.userProfileId);
+      const newAccessToken = await this.tokenProvider.refreshAccessToken(
+        this.userProfileId,
+        this.getRejectedAccessToken(context.options),
+      );
       this.logger.debug({
         msg: 'Successfully refreshed expired Microsoft Graph access token for user',
         userProfileId: this.userProfileId,
@@ -119,6 +149,10 @@ export class TokenRefreshMiddleware implements Middleware {
           userProfileId: this.userProfileId,
           retryResult: 'failed',
           tokenRefreshWorked: false,
+          retryStatus: context.response?.status,
+          graphErrorCode: await this.getGraphErrorCode(context.response),
+          method: context.options?.method?.toUpperCase() ?? 'GET',
+          path: toGraphPathTemplate(context.request),
         });
       }
     } catch (err) {
@@ -126,6 +160,14 @@ export class TokenRefreshMiddleware implements Middleware {
       // than keeping the original 401 response.
       if (isUpstreamCredentialRevokedError(err)) {
         throw err;
+      }
+      if (err instanceof TokenRefreshCoolingDownError) {
+        this.logger.debug({
+          msg: 'Skipped Microsoft Graph token refresh while backing off after a failed refresh',
+          userProfileId: this.userProfileId,
+          retryAt: err.retryAt.toISOString(),
+        });
+        return;
       }
       this.logger.error({
         msg: 'Failed to refresh token or retry Microsoft Graph request for user',
@@ -142,3 +184,5 @@ export class TokenRefreshMiddleware implements Middleware {
     this.nextMiddleware = next;
   }
 }
+
+const GraphErrorBodySchema = z.object({ error: z.object({ code: z.string() }) });
