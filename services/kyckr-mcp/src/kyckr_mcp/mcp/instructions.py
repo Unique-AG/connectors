@@ -23,4 +23,10 @@ INSTRUCTIONS = """
 - When `data.documentJson` is absent at `Success`, relay the PDF-only message in `details`.
 - Never expose or repeat raw Kyckr download URLs or order-internal links.
 - Use `list_orders` to reconcile recent orders when an order id is not in context.
+
+### Failed calls
+- A call Kyckr refuses fails with `Kyckr answered <status>`, Kyckr's message and its correlation
+  id. 400 is a bad parameter, 401 a problem with the server's Kyckr credential, 403 a feature the
+  account lacks, 404 an unknown id, 405 an enhanced profile not available for that jurisdiction,
+  410 an order that is gone for good (do not retry) and 429 a rate limit.
 """.strip()

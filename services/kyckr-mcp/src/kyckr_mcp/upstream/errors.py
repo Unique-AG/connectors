@@ -9,15 +9,20 @@ _TOO_MANY_REQUESTS = 429
 _MAX_RETRY_DIGITS = 9
 
 
-def kyckr_error(error: UpstreamError) -> tuple[str, str | None]:
-    """Kyckr's own message and correlationId for an error status, else the error and None."""
+def kyckr_error(error: UpstreamError) -> str:
+    """What a failed Kyckr call tells the client: the status, Kyckr's own message and its
+    correlationId when Kyckr answered with an error, else the error itself.
+    """
     cause = error.__cause__
     if not isinstance(cause, httpx2.HTTPStatusError):
-        return str(error), None
+        return f"The call to Kyckr failed: {error}"
     raw = cause.response.text
     body = _parse_json(raw)
-    message = _error_message(body, cause.response.status_code, raw)
-    return message + _retry_hint(cause.response), _string_field(body, "correlationId")
+    status = cause.response.status_code
+    text = f"Kyckr answered {status}: {_error_message(body, status, raw)}"
+    text += _retry_hint(cause.response)
+    correlation_id = _string_field(body, "correlationId")
+    return f"{text}. Correlation id: {correlation_id}" if correlation_id else text
 
 
 def _retry_hint(response: httpx2.Response) -> str:

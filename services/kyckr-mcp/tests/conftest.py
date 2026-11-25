@@ -10,6 +10,7 @@ from fastmcp import FastMCP
 from fastmcp.client.client import CallToolResult
 import httpx2
 from mcp_configs import ServerSettings
+from mcp_types import TextContent
 from pydantic import AnyHttpUrl
 import pytest
 
@@ -123,6 +124,14 @@ def call_tool_with(
         return caller(build_server(changed, persistence, upstream_transport))
 
     return configured
+
+
+def tool_error(result: CallToolResult) -> str:
+    """The text of a failed call."""
+    assert result.is_error
+    (content,) = result.content
+    assert isinstance(content, TextContent)
+    return content.text
 
 
 def structured(result: CallToolResult) -> dict[str, object]:

@@ -4,6 +4,7 @@ from tests.conftest import CallTool
 from tests.conftest import CallToolWith
 from tests.conftest import FakeKyckr
 from tests.conftest import structured
+from tests.conftest import tool_error
 
 
 async def test_the_enhanced_profile_is_fetched_from_its_own_endpoint(
@@ -15,7 +16,6 @@ async def test_the_enhanced_profile_is_fetched_from_its_own_endpoint(
 
     assert kyckr.requests[0].url.raw_path.startswith(b"/v2/companies/GB%7Cabc/enhanced")
     assert result.structured_content == {
-        "success": True,
         "data": {"activities": [{"code": "63120"}]},
     }
 
@@ -28,10 +28,10 @@ async def test_a_pending_enhanced_profile_is_answered_with_the_order_to_poll(
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"success": True, "data": data}
+    assert result.structured_content == {"data": data}
 
 
-async def test_an_enhanced_profile_that_is_not_available_is_answered_with_its_status_code(
+async def test_an_enhanced_profile_that_is_not_available_fails_with_its_status(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
     kyckr.answers(
@@ -41,12 +41,9 @@ async def test_an_enhanced_profile_that_is_not_available_is_answered_with_its_st
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "XX|abc"})
 
-    assert result.structured_content == {
-        "success": False,
-        "statusCode": 405,
-        "message": "Not available for this jurisdiction",
-        "correlationId": "c-405",
-    }
+    assert tool_error(result) == (
+        "Kyckr answered 405: Not available for this jurisdiction. Correlation id: c-405"
+    )
 
 
 async def test_the_document_list_passes_the_continuation_key_and_hands_back_the_next_one(
@@ -63,7 +60,7 @@ async def test_the_document_list_passes_the_continuation_key_and_hands_back_the_
     )
 
     assert kyckr.requests[0].url.params["continuationKey"] == "k1"
-    assert result.structured_content == {"success": True, **body}
+    assert result.structured_content == body
 
 
 @pytest.mark.parametrize(
@@ -118,17 +115,16 @@ async def test_a_blank_id_is_rejected_before_any_request_is_made(
     assert kyckr.requests == []
 
 
-async def test_a_pending_order_status_in_an_enhanced_profile_is_answered_with_the_field_it_broke(
+async def test_a_pending_order_status_in_an_enhanced_profile_fails_with_the_field_it_broke(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
     kyckr.answers({"data": {"status": "Active"}})
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    content = structured(result)
-    assert content["success"] is False
-    assert "data" in str(content["message"])
-    assert "statusCode" not in content
+    error = tool_error(result)
+    assert error.startswith("The call to Kyckr failed: ")
+    assert "data" in error
 
 
 async def test_a_sparse_enhanced_profile_is_a_profile_and_not_a_pending_order(
@@ -139,7 +135,7 @@ async def test_a_sparse_enhanced_profile_is_a_profile_and_not_a_pending_order(
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"success": True, "data": data}
+    assert result.structured_content == {"data": data}
 
 
 @pytest.mark.parametrize(
@@ -159,7 +155,7 @@ async def test_a_company_call_sends_the_configured_customer_reference(
     result = await call_tool(tool, {"kyckr_id": "GB|abc"})
 
     assert kyckr.requests[0].url.params["customerReference"] == "ref-1"
-    assert structured(result) == {"success": True, **body}
+    assert structured(result) == body
 
 
 async def test_the_enhanced_profile_sends_only_the_customer_reference_as_a_query_parameter(
@@ -186,7 +182,7 @@ async def test_an_enhanced_profile_keeps_a_representative_and_an_owner_without_a
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"success": True, "data": data}
+    assert result.structured_content == {"data": data}
 
 
 async def test_an_enhanced_profile_keeps_a_shareholder_individual_and_corporation_without_a_type(
@@ -201,4 +197,4 @@ async def test_an_enhanced_profile_keeps_a_shareholder_individual_and_corporatio
 
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
-    assert result.structured_content == {"success": True, "data": data}
+    assert result.structured_content == {"data": data}

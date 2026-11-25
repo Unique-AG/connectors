@@ -9,6 +9,7 @@ import pytest
 from tests.conftest import CallTool
 from tests.conftest import FakeKyckr
 from tests.conftest import structured
+from tests.conftest import tool_error
 
 ARGUMENTS: dict[str, dict[str, object]] = {
     "search_companies": {"name": "Acme"},
@@ -106,7 +107,7 @@ async def test_search_sends_the_arguments_kyckr_expects_and_answers_without_empt
     result = await call_tool("search_companies", {"company_number": " 123 ", "iso_code": "gb"})
 
     params = kyckr.requests[0].url.params
-    assert structured(result) == {"success": True, **body}
+    assert structured(result) == body
     assert params["companyNumber"] == "123"
     assert params["isoCode"] == "GB"
     assert "name" not in params
@@ -141,30 +142,29 @@ async def test_search_needs_a_name_or_a_company_number(
     assert kyckr.requests == []
 
 
-async def test_a_shape_that_does_not_fit_the_spec_is_answered_with_the_field_it_broke(
+async def test_a_shape_that_does_not_fit_the_spec_fails_with_the_field_it_broke(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
     kyckr.answers({"data": {"id": "GB|abc"}})
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    content = structured(result)
-    assert content["success"] is False
-    assert "data" in str(content["message"])
-    assert "statusCode" not in content
+    error = tool_error(result)
+    assert error.startswith("The call to Kyckr failed: ")
+    assert "data" in error
 
 
-async def test_a_success_that_is_not_json_is_answered_as_a_failure(
+async def test_a_success_that_is_not_json_fails_the_call(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
     kyckr.handler = lambda _: httpx2.Response(200, text="<html>maintenance</html>")
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result)["success"] is False
+    assert tool_error(result).startswith("The call to Kyckr failed: ")
 
 
-async def test_a_timeout_is_answered_as_a_failure_without_a_status_code(
+async def test_a_timeout_fails_the_call_without_a_status(
     call_tool: CallTool, kyckr: FakeKyckr
 ) -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
@@ -174,25 +174,18 @@ async def test_a_timeout_is_answered_as_a_failure_without_a_status_code(
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert result.is_error is False
-    assert structured(result) == {"success": False, "message": "timed out"}
+    assert tool_error(result) == "The call to Kyckr failed: timed out"
 
 
 @pytest.mark.parametrize("tool", list(ARGUMENTS))
-async def test_every_tool_answers_a_kyckr_error_as_a_failed_reply(
+async def test_every_tool_fails_with_kyckrs_status_message_and_correlation_id(
     call_tool: CallTool, kyckr: FakeKyckr, tool: str
 ) -> None:
     kyckr.answers({"correlationId": "c-410", "data": {"detail": "Gone"}}, status=410)
 
     result = await call_tool(tool, ARGUMENTS[tool])
 
-    assert not result.is_error
-    assert structured(result) == {
-        "success": False,
-        "statusCode": 410,
-        "message": "Gone",
-        "correlationId": "c-410",
-    }
+    assert tool_error(result) == "Kyckr answered 410: Gone. Correlation id: c-410"
 
 
 @pytest.mark.parametrize(
@@ -204,18 +197,14 @@ async def test_every_tool_answers_a_kyckr_error_as_a_failed_reply(
         (httpx2.Response(500, text="x" * 300), f"{'x' * 200}..."),
     ],
 )
-async def test_an_error_without_a_kyckr_detail_is_answered_with_what_it_has(
+async def test_an_error_without_a_kyckr_detail_fails_with_what_it_has(
     call_tool: CallTool, kyckr: FakeKyckr, *, response: httpx2.Response, message: str
 ) -> None:
     kyckr.handler = lambda _: response
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result) == {
-        "success": False,
-        "statusCode": response.status_code,
-        "message": message,
-    }
+    assert tool_error(result) == f"Kyckr answered {response.status_code}: {message}"
 
 
 async def test_a_turned_away_request_is_retried(call_tool: CallTool, kyckr: FakeKyckr) -> None:
@@ -224,7 +213,7 @@ async def test_a_turned_away_request_is_retried(call_tool: CallTool, kyckr: Fake
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result) == {"success": True, "data": [{"id": "GB|abc"}]}
+    assert structured(result) == {"data": [{"id": "GB|abc"}]}
     assert len(kyckr.requests) == 2
 
 
@@ -235,12 +224,7 @@ async def test_a_rate_limit_that_outlasts_the_retries_keeps_kyckrs_message(
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result) == {
-        "success": False,
-        "statusCode": 429,
-        "message": "Rate limit",
-        "correlationId": "c-429",
-    }
+    assert tool_error(result) == "Kyckr answered 429: Rate limit. Correlation id: c-429"
     assert len(kyckr.requests) == 3
 
 
@@ -265,7 +249,7 @@ async def test_a_rate_limit_answer_names_the_seconds_kyckr_asked_for(
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result)["message"] == message
+    assert tool_error(result) == f"Kyckr answered 429: {message}"
 
 
 async def test_a_retry_after_in_non_ascii_digits_is_not_passed_on(
@@ -277,7 +261,7 @@ async def test_a_retry_after_in_non_ascii_digits_is_not_passed_on(
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result)["message"] == "Rate limit"
+    assert tool_error(result) == "Kyckr answered 429: Rate limit"
 
 
 async def test_a_retry_after_on_another_status_is_not_passed_on(
@@ -289,7 +273,7 @@ async def test_a_retry_after_on_another_status_is_not_passed_on(
 
     result = await call_tool("search_companies", {"name": "Acme"})
 
-    assert structured(result)["message"] == "busy"
+    assert tool_error(result) == "Kyckr answered 503: busy"
 
 
 async def test_a_paid_read_is_not_sent_again_on_a_503(
@@ -299,20 +283,5 @@ async def test_a_paid_read_is_not_sent_again_on_a_503(
 
     result = await call_tool("get_lite_profile", {"kyckr_id": "GB|abc"})
 
-    assert structured(result) == {
-        "success": False,
-        "statusCode": 503,
-        "message": "busy",
-        "correlationId": "c-503",
-    }
+    assert tool_error(result) == "Kyckr answered 503: busy. Correlation id: c-503"
     assert len(kyckr.requests) == 1
-
-
-async def test_a_success_field_in_kyckrs_body_does_not_override_the_reply(
-    call_tool: CallTool, kyckr: FakeKyckr
-) -> None:
-    kyckr.answers({"success": "nope", "data": [{"id": "GB|abc"}]})
-
-    result = await call_tool("search_companies", {"name": "Acme"})
-
-    assert structured(result) == {"success": True, "data": [{"id": "GB|abc"}]}

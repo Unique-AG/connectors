@@ -33,7 +33,6 @@ async def test_an_order_that_finished_inlines_its_json_document_and_drops_the_li
     result = await call_tool("create_document_order", {"kyckr_id": "GB|abc", "product_id": "a"})
 
     assert structured(result) == {
-        "success": True,
         "correlationId": "c-1",
         "details": "Success",
         "data": {
@@ -60,7 +59,7 @@ async def test_an_order_sends_its_arguments_and_the_configured_defaults_as_the_b
         "customerReference": "ref-1",
         "contactEmail": "ops@example.com",
     }
-    assert structured(result) == {"success": True, "data": {"orderId": "9", "status": "Pending"}}
+    assert structured(result) == {"data": {"orderId": "9", "status": "Pending"}}
 
 
 async def test_an_order_leaves_out_the_defaults_nobody_configured(
@@ -150,7 +149,6 @@ async def test_an_order_without_upstream_details_has_no_details(
     result = await call_tool("get_order", {"order_id": 7})
 
     assert structured(result) == {
-        "success": True,
         "data": {"orderId": 7, "status": "Success", "documentJson": {"companyName": "Acme"}},
     }
 
@@ -184,7 +182,7 @@ async def test_an_order_that_did_not_finish_does_not_fetch_a_document(
 
     result = await call_tool("get_order", {"order_id": "7"})
 
-    assert structured(result) == {"success": True, "data": {"orderId": 7, "status": status}}
+    assert structured(result) == {"data": {"orderId": 7, "status": status}}
     assert [request.url.path for request in kyckr.requests] == ["/v2/orders/7"]
 
 
@@ -207,7 +205,6 @@ async def test_list_orders_reads_a_page_and_drops_the_links_of_every_order(
     result = await call_tool("list_orders", {})
 
     assert structured(result) == {
-        "success": True,
         "data": {
             "pageNumber": 1,
             "totalCount": 2,
@@ -221,7 +218,7 @@ async def test_list_orders_also_reads_a_bare_array(call_tool: CallTool, kyckr: F
 
     result = await call_tool("list_orders", {"iso_code": "gb"})
 
-    assert structured(result) == {"success": True, "data": [{"orderId": 1}]}
+    assert structured(result) == {"data": [{"orderId": 1}]}
 
 
 async def finished_order_with_download(
@@ -252,7 +249,6 @@ async def test_a_finished_order_is_kept_when_its_download_has_no_json_document(
 
     details = reply["details"]
     assert isinstance(details, str)
-    assert reply["success"] is True
     assert reply["data"] == {"orderId": 7, "status": "Success"}
     assert "only available as a PDF" in details
 
@@ -293,7 +289,6 @@ async def test_a_finished_order_is_kept_and_asks_to_try_again_when_its_download_
 
     details = reply["details"]
     assert isinstance(details, str)
-    assert reply["success"] is True
     assert reply["data"] == {"orderId": 7, "status": "Success"}
     assert RETRY_NOTE in details
     assert "PDF" not in details
@@ -312,7 +307,6 @@ async def test_a_paid_order_is_not_lost_when_its_document_cannot_be_fetched(
 
     details = content["details"]
     assert isinstance(details, str)
-    assert content["success"] is True
     assert content["data"] == {"orderId": 55, "status": "Success"}
     assert RETRY_NOTE in details
 
@@ -333,7 +327,6 @@ async def test_an_order_without_an_id_in_its_data_is_fetched_with_the_id_that_wa
         "/v2/orders/7/download",
     ]
     assert structured(result) == {
-        "success": True,
         "data": {"status": "Success", "documentJson": {"companyName": "Acme"}},
     }
 
@@ -345,4 +338,4 @@ async def test_a_created_order_with_nothing_in_it_has_no_data(
 
     result = await call_tool("create_document_order", ORDER)
 
-    assert structured(result) == {"success": True, "correlationId": "c-1"}
+    assert structured(result) == {"correlationId": "c-1"}

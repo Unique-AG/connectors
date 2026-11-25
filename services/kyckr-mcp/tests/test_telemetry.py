@@ -489,3 +489,20 @@ async def test_the_key_and_the_ids_are_in_no_log_line(
     assert len(records) == 2
     logged = [record.getMessage() + str(record.__dict__) for record in records]
     assert not any(secret in text for text in logged for secret in SECRETS)
+
+
+async def test_a_failed_tool_call_logs_neither_the_key_nor_the_ids(
+    call_tool: CallTool, kyckr: FakeKyckr, caplog: pytest.LogCaptureFixture
+) -> None:
+    kyckr.answers({"data": {"detail": "boom"}}, status=500)
+    caplog.set_level(logging.DEBUG)
+    # As init_telemetry sets it: httpx2 logs every URL at INFO.
+    caplog.set_level(logging.WARNING, "httpx2")
+
+    result = await call_tool("get_lite_profile", {"kyckr_id": "RO|J40/8/12345678"})
+
+    assert result.is_error
+    formatter = logging.Formatter()
+    logged = [formatter.format(record) + str(record.__dict__) for record in caplog.records]
+    assert any("Tool call failed" in text for text in logged)
+    assert not any(secret in text for text in logged for secret in SECRETS)
