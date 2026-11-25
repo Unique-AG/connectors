@@ -6,8 +6,6 @@ import json
 import logging
 from collections.abc import Mapping
 from collections.abc import Sequence
-from dataclasses import dataclass
-from dataclasses import field
 from secrets import token_urlsafe
 from typing import ClassVar
 from typing import Literal
@@ -28,6 +26,7 @@ from mcp.types.version import MODERN_PROTOCOL_VERSIONS
 from mcp_configs import ElicitationSettings
 from pydantic import BaseModel
 from pydantic import ConfigDict
+from pydantic import Field
 from pydantic import ValidationError
 
 from mcp_elicitation.forms import ANSWER_FIELD
@@ -83,11 +82,10 @@ class _State(BaseModel):
     answers: dict[str, _Answer]
 
 
-@dataclass
-class _Round:
+class _Round(BaseModel):
     """What one `tools/call` knows: the answers given so far, and the question just answered."""
 
-    answers: dict[str, _Answer] = field(default_factory=dict[str, _Answer])
+    answers: dict[str, _Answer] = Field(default_factory=dict[str, _Answer])
     answered: str | None = None
     replayed: bool = False
 
@@ -247,15 +245,17 @@ class Elicitation:
         known = cast("object", await ctx.get_state(_ROUND))
         if isinstance(known, _Round):
             return known
-        this_round = _Round()
         state = _state(ctx.request_state) if ctx.input_responses is not None else None
-        if state is not None:
-            if await self._store.delete(state.nonce, collection=_COLLECTION):
-                this_round.answers = dict(state.answers)
-                this_round.answered = state.asked
-            else:
-                logger.warning("Answer refused: already used or expired")
-                this_round.replayed = True
+        if state is None:
+            this_round = _Round()
+        elif await self._store.delete(state.nonce, collection=_COLLECTION):
+            this_round = _Round(answers=dict(state.answers), answered=state.asked)
+        else:
+            logger.warning(
+                "Answer refused: already used, expired, or asked by a replica whose store this "
+                "one does not share"
+            )
+            this_round = _Round(replayed=True)
         await ctx.set_state(_ROUND, this_round, serializable=False)
         return this_round
 

@@ -86,19 +86,38 @@ async def test_an_answer_to_what_the_person_no_longer_sees_asks_again() -> None:
     assert mailbox.deleted == []
 
 
-async def test_with_shared_keys_another_replica_takes_the_answer() -> None:
+async def test_with_shared_keys_and_a_shared_store_another_replica_takes_the_answer() -> None:
     settings = ElicitationSettings(request_state_keys=SHARED_KEYS)
-    store = MemoryStore()
+    shared_store = MemoryStore()
     mailbox = Mailbox()
 
-    async with _client(mailbox, settings=settings, store=store) as first:
+    async with _client(mailbox, settings=settings, store=shared_store) as first:
         asked = await _ask(first)
-    async with _client(mailbox, settings=settings, store=store) as second:
+    async with _client(mailbox, settings=settings, store=shared_store) as second:
         result = await _answer(second, asked, "confirm")
 
     assert isinstance(result, CallToolResult)
     assert result.is_error is False
     assert mailbox.deleted == ["Newsletters"]
+
+
+async def test_with_shared_keys_but_a_store_per_replica_another_replica_refuses_the_answer() -> (
+    None
+):
+    settings = ElicitationSettings(request_state_keys=SHARED_KEYS)
+    mailbox = Mailbox()
+
+    async with _client(mailbox, settings=settings, store=MemoryStore()) as first:
+        asked = await _ask(first)
+    async with _client(mailbox, settings=settings, store=MemoryStore()) as second:
+        result = await _answer(second, asked, "confirm")
+
+    assert isinstance(result, CallToolResult)
+    assert result.is_error is True
+    [refusal] = result.content
+    assert isinstance(refusal, TextContent)
+    assert "no answer this tool can use came back" in refusal.text
+    assert mailbox.deleted == []
 
 
 async def test_without_shared_keys_another_replica_refuses_the_answer() -> None:

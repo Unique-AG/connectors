@@ -41,8 +41,10 @@ used once. A service with Postgres or Redis passes that store, which holds acros
 service without one passes a `MemoryStore`. The store must delete atomically, returning true to
 one caller only: memory, Redis and Postgres do, Firestore checks then deletes and does not.
 
-`ELICITATION_REQUEST_STATE_KEYS` lets an answer come back to any replica on 2026-07-28. Without
-it, only the process that asked can take the answer.
+`ELICITATION_REQUEST_STATE_KEYS` lets an answer come back to any replica on 2026-07-28, as long
+as every replica shares the store. Without the keys, only the process that asked can take the
+answer. A `MemoryStore` is never shared, so a service on one runs a single replica or sticky
+sessions: an answer that reaches another replica is refused, even with the keys.
 
 ## Confirm
 

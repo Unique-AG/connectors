@@ -14,6 +14,8 @@ from mcp.types import ElicitRequestFormParams
 from mcp.types import ElicitResult
 from mcp.types import InputRequiredResult
 from mcp_configs import ElicitationSettings
+from pydantic import BaseModel
+from pydantic import Field
 
 from mcp_elicitation import ASKS_CONFIRMATION
 from mcp_elicitation import Elicitation
@@ -37,12 +39,11 @@ type Content = dict[str, str | int | float | bool | list[str] | None]
 type Handler = Callable[[str, object, ElicitRequestFormParams, object], Awaitable[ElicitResult]]
 
 
-class Mailbox:
+class Mailbox(BaseModel):
     """What the tools change, so a test can tell whether one went ahead."""
 
-    def __init__(self) -> None:
-        self.rule_name: str = "Newsletters"
-        self.deleted: list[str] = []
+    rule_name: str = "Newsletters"
+    deleted: list[str] = Field(default_factory=list[str])
 
 
 def build_server(
