@@ -1,6 +1,7 @@
 """Tests for the search tool — config schema, routing logic, and references."""
 
 import inspect
+import json
 import logging
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -34,12 +35,12 @@ from kb_mcp.common.references import (
     chunk_to_text_content,
     frontend_document_url,
     is_unique_ai_client,
-    markdown_citation_link,
     reference_url,
     scope_id_from_folder_id_path,
 )
 from kb_mcp.tools.search import SearchToolConfig, search
 from kb_mcp.tools.search.tool import _effective_service_config
+from tests.conftest import CallOnWire, unique_ai_source
 
 
 def test_uniqueql_prompt_copy():
@@ -725,33 +726,7 @@ def test_reference_url_external_chunk_keeps_original_url():
     assert reference_url(chunk) == "https://example.com/doc"
 
 
-def test_markdown_citation_link_escapes_bracketed_folder_path():
-    """Primary Fix 3 fixture matching the Unique AI stringified paste."""
-    path = "[ORG]/Alpha/Audit_Report_FY2023.pdf"
-    link = markdown_citation_link(
-        path, "unique://content/cont_ioi3voailf7hr011zcp6b7eh"
-    )
-    assert link == (
-        "[\\[ORG\\]/Alpha/Audit_Report_FY2023.pdf]"
-        "(unique://content/cont_ioi3voailf7hr011zcp6b7eh)"
-    )
-    assert not link.startswith("[[")
-
-
-def test_chunk_to_text_content_escapes_brackets_in_title():
-    title = "[ORG]/Alpha/notes.txt"
-    chunk = _make_chunk(
-        "body",
-        title=title,
-        chunk_id="chunk_abcdefgehijklmnopqrstuv",
-    )
-    content = chunk_to_text_content(chunk, sequence_number=1)
-    assert content.text.startswith(
-        "[\\[ORG\\]/Alpha/notes.txt](unique://content/cont_abcdefgehijklmnopqrstuvwx)\n"
-    )
-
-
-def test_chunk_to_text_content_has_markdown_link_header_and_reference_meta():
+def test_chunk_to_text_content_is_a_titled_record_with_reference_meta():
     chunk = _make_chunk(
         "The revenue grew by 12%.",
         title="Annual Report 2025",
@@ -762,12 +737,13 @@ def test_chunk_to_text_content_has_markdown_link_header_and_reference_meta():
 
     content = chunk_to_text_content(chunk, sequence_number=3)
 
-    assert content.text.startswith(
-        "[Annual Report 2025](unique://content/cont_abcdefgehijklmnopqrstuvwx)"
-        " (pages 12-14)\n"
-    )
-    assert content.text.endswith("The revenue grew by 12%.")
-    assert "[source" not in content.text
+    assert json.loads(content.text) == {
+        "title": "Annual Report 2025",
+        "url": "unique://content/cont_abcdefgehijklmnopqrstuvwx",
+        "content_id": "cont_abcdefgehijklmnopqrstuvwx",
+        "pages": "12-14",
+        "text": "The revenue grew by 12%.",
+    }
 
     assert content.meta is not None
     reference = content.meta[REFERENCE_META_KEY]
@@ -778,6 +754,29 @@ def test_chunk_to_text_content_has_markdown_link_header_and_reference_meta():
         reference["sourceId"]
         == "cont_abcdefgehijklmnopqrstuvwx_chunk_abcdefgehijklmnopqrstuv"
     )
+    assert content.meta["text"] == "The revenue grew by 12%."
+
+
+@pytest.mark.parametrize(
+    ("start_page", "end_page", "pages"),
+    [(7, 7, "7"), (7, None, "7"), (None, None, None), (-1, -1, None)],
+)
+def test_chunk_to_text_content_names_a_single_page_or_none(
+    start_page: int | None, end_page: int | None, pages: str | None
+):
+    chunk = _make_chunk("body", start_page=start_page, end_page=end_page)
+
+    record = json.loads(chunk_to_text_content(chunk, sequence_number=1).text)
+
+    assert record.get("pages") == pages
+
+
+def test_chunk_to_text_content_titles_by_key_when_title_missing():
+    chunk = _make_chunk("body", key="notes.txt")
+
+    record = json.loads(chunk_to_text_content(chunk, sequence_number=1).text)
+
+    assert record["title"] == "notes.txt"
 
 
 def test_chunk_to_text_content_uses_frontend_url_in_text_but_unique_in_meta():
@@ -792,10 +791,10 @@ def test_chunk_to_text_content_uses_frontend_url_in_text_but_unique_in_meta():
         frontend_base_url="https://example.unique.app",
         scope_id="scope_uy3cznkuysy3gasrxx2m4ezb",
     )
-    assert (
+    assert json.loads(content.text)["url"] == (
         "https://example.unique.app/knowledge-upload/"
         "scope_uy3cznkuysy3gasrxx2m4ezb?file=cont_mvkp2iv25xy4cxccpq6i6byk"
-    ) in content.text
+    )
     assert content.meta is not None
     assert (
         content.meta[REFERENCE_META_KEY]["url"]
@@ -827,11 +826,10 @@ async def test_search_results_are_numbered_sequentially_and_include_citation_blo
         )
 
     texts = [c.text for c in result.content]  # type: ignore[union-attr]
-    assert texts[0].startswith("[")
-    assert "](unique://content/" in texts[0]
-    assert "](unique://content/" in texts[1]
-    assert "[source" not in texts[0]
+    assert [json.loads(text)["text"] for text in texts[:2]] == ["first", "second"]
     assert texts[2] == GENERIC_RESULT_CITATION_INSTRUCTION
+    metas = [c.meta for c in result.content[:2]]  # type: ignore[union-attr]
+    assert [meta[REFERENCE_META_KEY]["sequenceNumber"] for meta in metas] == [1, 2]  # type: ignore[index]
 
 
 @pytest.mark.asyncio
@@ -896,7 +894,80 @@ async def test_search_uses_frontend_deep_links_when_scopes_resolved():
             config=SearchToolConfig(),
         )
 
-    assert (
+    record = json.loads(result.content[0].text)  # type: ignore[union-attr]
+    assert record["title"] == "A.pdf"
+    assert record["url"] == (
         "https://example.unique.app/knowledge-upload/"
         "scope_uy3cznkuysy3gasrxx2m4ezb?file=cont_aaaaaaaaaaaaaaaaaaaaaaa1"
-    ) in result.content[0].text  # type: ignore[union-attr]
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_hits_reach_the_wire_as_records_with_unique_ai_references(
+    call_on_wire: CallOnWire,
+):
+    chunks = [
+        _make_chunk("first", id="cont_a", chunk_id="chunk_a", title="A.pdf"),
+        _make_chunk("second", id="cont_b", key="b.docx"),
+    ]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = MagicMock()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings(None),
+        _patch_resolve_scope_ids(),
+    ):
+        result = await call_on_wire(search, {"search_string": "query"})
+
+    *hits, instruction = result["content"]
+    assert instruction == {"type": "text", "text": GENERIC_RESULT_CITATION_INSTRUCTION}
+    assert [json.loads(item["text"]) for item in hits] == [
+        {
+            "title": "A.pdf",
+            "url": "unique://content/cont_a",
+            "content_id": "cont_a",
+            "text": "first",
+        },
+        {
+            "title": "b.docx",
+            "url": "unique://content/cont_b",
+            "content_id": "cont_b",
+            "text": "second",
+        },
+    ]
+    sources = [unique_ai_source(item) for item in hits]
+    assert [(chunk.id, chunk.text) for chunk, _ in sources] == [
+        ("cont_a", "first"),
+        ("cont_b", "second"),
+    ]
+    assert [
+        (ref.name, ref.url, ref.sequence_number, ref.source_id) for _, ref in sources
+    ] == [
+        ("A.pdf", "unique://content/cont_a", 1, "cont_a_chunk_a"),
+        ("b.docx", "unique://content/cont_b", 2, "cont_b"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_search_error_reaches_the_wire_without_a_reference(
+    call_on_wire: CallOnWire,
+):
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            side_effect=RuntimeError("KB unavailable"),
+        ),
+        _patch_identity(),
+    ):
+        result = await call_on_wire(search, {"search_string": "query"})
+
+    assert result["isError"] is True
+    assert result["content"] == [{"type": "text", "text": UNEXPECTED_ERROR_MESSAGE}]

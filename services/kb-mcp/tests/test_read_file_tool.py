@@ -1,10 +1,14 @@
 """Tests for the read_file tool — extension dispatch, size cutoff, page ranges."""
 
+import json
 import logging
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from fastmcp.tools import ToolResult
+from unique_toolkit._common.token.token_counting import count_tokens
 from unique_toolkit.content.schemas import Content, ContentChunk
 
 from kb_mcp.common.references import (
@@ -15,6 +19,7 @@ from kb_mcp.common.references import (
 )
 from kb_mcp.tools.read_file import ReadFileToolConfig, read_file
 from kb_mcp.tools.read_file.tool import _download_with_retry
+from tests.conftest import CallOnWire
 
 pytestmark = pytest.mark.ai
 
@@ -43,6 +48,10 @@ def _make_content(
     return Content(
         id="cont_abc", key=key, chunks=chunks or [], metadata=None, mime_type=mime_type
     )
+
+
+def _read(result: ToolResult) -> dict[str, Any]:
+    return json.loads(result.content[0].text)  # type: ignore[union-attr]
 
 
 def _make_chunk(text: str, order: int, start_page: int, end_page: int) -> ContentChunk:
@@ -245,7 +254,7 @@ async def test_json_mime_type_is_supported_despite_not_being_under_text():
         result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
 
     assert result.is_error is not True
-    assert '{"a": 1}' in result.content[0].text  # type: ignore[union-attr]
+    assert _read(result)["text"] == '{"a": 1}'
 
 
 @pytest.mark.asyncio
@@ -490,12 +499,12 @@ async def test_text_small_doc_returns_full_text_no_markers_no_page_language():
         )
 
     assert result.is_error is not True
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text == (
-        "[notes.md](unique://content/cont_abc)\n\n"
-        "# Title\n\nSome short markdown content."
-    )
-    assert "--- page" not in text
+    assert _read(result) == {
+        "title": "notes.md",
+        "url": "unique://content/cont_abc",
+        "content_id": "cont_abc",
+        "text": "# Title\n\nSome short markdown content.",
+    }
 
 
 @pytest.mark.asyncio
@@ -514,7 +523,7 @@ async def test_text_oversized_no_range_returns_virtual_page_error():
     assert result.is_error is True
     text = result.content[0].text  # type: ignore[union-attr]
     assert "tokens" in text
-    assert "pages of 10 tokens each" in text
+    assert "pages of up to 10 tokens each" in text
     assert "start_page/end_page" in text
 
 
@@ -534,10 +543,66 @@ async def test_text_range_given_returns_token_boundary_slice_with_prefix():
         )
 
     assert result.is_error is not True
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text.startswith("[notes.txt](unique://content/cont_abc)\n\n")
-    assert "showing tokens 0-10 of" in text
+    text = _read(result)["text"]
+    assert text.startswith("showing tokens 0-10 of")
     assert "word" in text
+
+
+@pytest.mark.asyncio
+async def test_text_whole_file_counts_escaped_quotes_and_newlines_against_the_cap():
+    body = '{"name": "Jane Example"}\n' * 50
+    escaped_tokens = count_tokens(json.dumps(body)[1:-1])
+    assert count_tokens(body) < escaped_tokens
+    content = _make_content("people.json", mime_type=MIME_TYPE_JSON)
+    with _patch_search_contents(content), _patch_download(body.encode()):
+        result = await read_file(
+            content_id="cont_abc",
+            config=ReadFileToolConfig(max_tokens_per_call=count_tokens(body)),
+        )
+
+    assert result.is_error is True
+    assert f"file has ~{escaped_tokens} tokens" in result.content[0].text  # type: ignore[union-attr]
+
+
+@pytest.mark.asyncio
+async def test_text_virtual_page_fits_the_cap_once_escaped():
+    body = '{"name": "Jane Example", "role": "Analyst"}\n' * 400
+    content = _make_content("people.json", mime_type=MIME_TYPE_JSON)
+    with _patch_search_contents(content), _patch_download(body.encode()):
+        result = await read_file(
+            content_id="cont_abc",
+            start_page=2,
+            end_page=2,
+            config=ReadFileToolConfig(max_tokens_per_call=200),
+        )
+
+    assert result.is_error is not True
+    _, page = _read(result)["text"].split("\n\n", 1)
+    # Sized from the file's average escape cost, so it lands near the cap,
+    # where a page of 200 raw tokens would carry about 230 escaped.
+    assert 190 <= count_tokens(json.dumps(page)[1:-1]) <= 205
+
+
+@pytest.mark.asyncio
+async def test_chunked_multi_page_range_counts_escaped_text_against_the_cap():
+    chunks = [
+        _make_chunk('"quoted"\n' * 20, 0, 1, 1),
+        _make_chunk('"quoted"\n' * 20, 1, 2, 2),
+    ]
+    raw_tokens = count_tokens(
+        "--- page 1 ---\n" + chunks[0].text + "\n--- page 2 ---\n" + chunks[1].text
+    )
+    content = _make_content("doc.pdf", chunks)
+    with _patch_search_contents(content):
+        result = await read_file(
+            content_id="cont_abc",
+            start_page=1,
+            end_page=2,
+            config=ReadFileToolConfig(max_tokens_per_call=raw_tokens),
+        )
+
+    assert result.is_error is True
+    assert "narrower range" in result.content[0].text  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio
@@ -627,14 +692,83 @@ async def test_identity_refusal_surfaces_as_tool_error(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_successful_read_starts_with_reference_link():
+async def test_successful_read_is_a_titled_record_with_unique_link():
     chunks = [_make_chunk("hello", 0, 1, 1)]
     content = _make_content("doc.pdf", chunks)
     with _patch_search_contents(content):
         result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
 
-    text = result.content[0].text  # type: ignore[union-attr]
-    assert text.startswith("[doc.pdf](unique://content/cont_abc)\n\n")
+    assert _read(result) == {
+        "title": "doc.pdf",
+        "url": "unique://content/cont_abc",
+        "content_id": "cont_abc",
+        "text": "--- page 1 ---\nhello",
+    }
+
+
+@pytest.mark.asyncio
+async def test_successful_read_links_to_knowledge_upload_when_frontend_configured(
+    monkeypatch,
+):
+    monkeypatch.setenv("UNIQUE_MCP_FRONTEND_BASE_URL", "https://example.unique.app")
+    content = Content(
+        id="cont_abc",
+        key="doc.pdf",
+        title="Annual Report 2025",
+        chunks=[_make_chunk("hello", 0, 1, 1)],
+        metadata={"folderIdPath": "uniquepathid://scope_root/scope_leaf"},
+    )
+    with _patch_search_contents(content):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    record = _read(result)
+    assert record["title"] == "Annual Report 2025"
+    assert (
+        record["url"]
+        == "https://example.unique.app/knowledge-upload/scope_leaf?file=cont_abc"
+    )
+
+
+@pytest.mark.parametrize(
+    ("source_url", "expected"),
+    [
+        ("https://example.com/page", "https://example.com/page"),
+        ("ftp://example.com/page", "unique://content/cont_abc"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_read_without_deep_link_cites_the_files_own_web_page(
+    source_url: str, expected: str
+):
+    content = Content(
+        id="cont_abc",
+        key="page.pdf",
+        url=source_url,
+        chunks=[_make_chunk("hello", 0, 1, 1)],
+    )
+    with _patch_search_contents(content):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert _read(result)["url"] == expected
+
+
+@pytest.mark.asyncio
+async def test_read_prefers_deep_link_over_the_files_own_web_page(monkeypatch):
+    monkeypatch.setenv("UNIQUE_MCP_FRONTEND_BASE_URL", "https://example.unique.app")
+    content = Content(
+        id="cont_abc",
+        key="page.pdf",
+        url="https://example.com/page",
+        chunks=[_make_chunk("hello", 0, 1, 1)],
+        metadata={"folderIdPath": "uniquepathid://scope_root/scope_leaf"},
+    )
+    with _patch_search_contents(content):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert (
+        _read(result)["url"]
+        == "https://example.unique.app/knowledge-upload/scope_leaf?file=cont_abc"
+    )
 
 
 @pytest.mark.parametrize(
@@ -660,3 +794,45 @@ async def test_max_tokens_per_call_uses_request_or_admin_default(
         )
 
     assert render.call_args.args[3] == expected
+
+
+@pytest.mark.asyncio
+async def test_read_reaches_the_wire_as_one_record_holding_the_file_text(
+    call_on_wire: CallOnWire,
+):
+    content = Content(
+        id="cont_abc",
+        key="people.json",
+        title="People",
+        chunks=[],
+        metadata=None,
+        mime_type=MIME_TYPE_JSON,
+    )
+    body = '[{"name": "Jane Example"}]'
+    with _patch_search_contents(content), _patch_download(body.encode()):
+        result = await call_on_wire(read_file, {"content_id": "cont_abc"})
+
+    [item] = result["content"]
+    assert "_meta" not in item
+    assert json.loads(item["text"]) == {
+        "title": "People",
+        "url": "unique://content/cont_abc",
+        "content_id": "cont_abc",
+        "text": body,
+    }
+
+
+@pytest.mark.asyncio
+async def test_missing_file_reaches_the_wire_as_an_error(
+    call_on_wire: CallOnWire,
+):
+    with patch(
+        "kb_mcp.tools.read_file.tool.search_contents_async",
+        AsyncMock(return_value=[]),
+    ):
+        result = await call_on_wire(read_file, {"content_id": "cont_missing"})
+
+    assert result["isError"] is True
+    assert result["content"] == [
+        {"type": "text", "text": "no content found for content_id=cont_missing"}
+    ]

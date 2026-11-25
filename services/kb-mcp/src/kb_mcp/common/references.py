@@ -1,36 +1,6 @@
-"""Document referencing for knowledge-base search results.
+"""Citable records, reference URLs and citation guidance for knowledge-base results.
 
-Every search result is tagged with a stable, client-agnostic reference so that
-any MCP client (Unique AI, Claude Desktop, MCP Inspector, ...) can cite the
-document it came from and — when a frontend base URL is configured — open it
-in the Unique knowledge base UI.
-
-Referencing style
------------------
-1. **URL scheme**:
-   - External (web) chunks keep their ``https://`` URL.
-   - Internal docs use
-     ``{UNIQUE_MCP_FRONTEND_BASE_URL}/knowledge-upload/{scopeId}?file={contentId}``
-     when the frontend base URL and scope id are known.
-   - Otherwise fall back to ``unique://content/{contentId}`` (resolved by the
-     Unique platform frontend).
-2. **Text layer** (generic MCP clients): each result is prefixed with a
-   ready-to-use markdown citation link
-
-       [Quarterly Report 2025.pdf](https://<identifier>.unique.app/knowledge-upload/…?file=…)
-       (pages 12-14)
-
-   so models can paste the link inline instead of inventing ``[sourceN]`` tags.
-   Surfaced via MCP ``description``, result headers, and trailing citation
-   instruction.
-3. **Structured layer** (``search`` only): each content item carries a
-   ``unique.app/reference`` entry in its ``_meta``, always using the
-   ``unique://content/{id}`` scheme for KB docs. Unique AI rehydrates these
-   into ``content_chunks`` / ``[sourceN]`` markers.
-4. **Unique-host format info** (``unique.app/tool-format-information``, i.e.
-   ``UNIQUE_AI_TOOL_FORMAT_INFORMATION``): teaches Unique AI to cite with
-   ``[sourceN]`` from tool results — not markdown deep links. MCP
-   ``description`` stays on the generic path.
+The referencing style is described in ``docs/technical/tools.md``.
 """
 
 from __future__ import annotations
@@ -42,7 +12,7 @@ from urllib.parse import quote
 
 from fastmcp.server.dependencies import get_context
 from mcp.types import TextContent
-from pydantic import Field
+from pydantic import BaseModel, Field
 from unique_toolkit.content.schemas import ContentChunk
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,17 +46,16 @@ REFERENCE_META_KEY = "unique.app/reference"
 TOOL_DESCRIPTION_CITATION_GUIDANCE = (
     "If your system prompt or the tool result instructs you to cite with "
     "'[source<number>]' markers instead, follow that guidance — it takes "
-    "precedence over everything below. Otherwise: each search result starts "
-    "with a markdown citation link of the form "
-    "'[<document name>](<document URL>)' (optional page range on the next line). "
-    "When you use information from a result, cite it inline by pasting that "
-    "exact markdown link immediately after the claim — for example "
+    "precedence over everything below. Otherwise: each search result is a JSON "
+    "object with the document's `title` and `url` (and `pages` when known). "
+    "When you use information from a result, cite it inline as the markdown "
+    "link '[<title>](<url>)' immediately after the claim — for example "
     "'Acme Corp raised a $30M Series A ([acme-corp-funding.md](https://…)).' "
     "Do NOT invent placeholders like [source1], [sourceN], or [1]. "
     "Always end your answer with a Sources section listing each cited document "
     "once as the same markdown link. Prefer https://…/knowledge-upload/…?file=… "
     "links when present — they open the document in the Unique knowledge base. "
-    "Never alter unique:// or https:// URLs from the result headers."
+    "Never alter unique:// or https:// URLs from the results."
 )
 
 # Unique-host only (`unique.app/tool-format-information`). Kept verbatim-close
@@ -125,8 +94,8 @@ SEARCH_SYSTEM_PROMPT = (
     "whenever you're looking for content about something — a topic, entity, "
     "question, or keyword — even if you don't know which file or folder it's "
     "in. Returns relevant text chunks with citations; you can fetch a chunk's "
-    "full source file afterward via read_file using the content_id in the "
-    'result header. Do not call content_tree first "to see what\'s there" — '
+    "full source file afterward via read_file using the result's content_id. "
+    'Do not call content_tree first "to see what\'s there" — '
     "search directly. Two exceptions: "
     "(1) The user is asking what documents/files exist somewhere rather than "
     "a substantive question about their content — 'which documents do we "
@@ -147,9 +116,10 @@ SEARCH_SYSTEM_PROMPT = (
 # Trailing content block, generic clients (Claude Desktop/Code, Inspector —
 # anything without Unique's chat-side [sourceN] → reference resolution).
 GENERIC_RESULT_CITATION_INSTRUCTION = (
-    "How to cite: paste the exact [<document name>](<url>) markdown links from "
-    "the result headers inline after each claim. Do not write [sourceN] or other "
-    "bracket placeholders. End with a Sources list using those same markdown links."
+    "How to cite: after each claim, add the markdown link [<title>](<url>) built "
+    "from that result's title and url, with the URL unchanged. Do not write "
+    "[sourceN] or other bracket placeholders. End with a Sources list using those "
+    "same markdown links."
 )
 
 # Same trailing block, selected instead when is_unique_ai_client() is true.
@@ -171,9 +141,9 @@ SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "'[source<number>]' markers instead, follow that guidance — it takes "
     "precedence over the rest of this. Otherwise: this server gives access "
     "to the Unique knowledge base (search, browse, and read files). When "
-    "answering using content from any of its tools, cite sources inline by "
-    "pasting the exact markdown links [document name](url) provided in "
-    "each result header. End with a Sources section listing the cited "
+    "answering using content from any of its tools, cite sources inline as "
+    "markdown links [title](url) built from each result's title and url, "
+    "with the URL unchanged. End with a Sources section listing the cited "
     "documents as those same markdown links. "
     "`search` and `content_tree` accept an optional UniqueQL "
     "`metadata_filter`. Omit it unless the user names a metadata constraint "
@@ -312,17 +282,16 @@ def file_reference_url(
     metadata: Any = None,
     owner_id: str | None = None,
     frontend_base_url: str | None = None,
+    source_url: str | None = None,
 ) -> str:
-    """Canonical URL for a whole file (content_tree listings, read_file header).
-
-    Deep link when the frontend origin and a scope id are known, else the
-    ``unique://content/{id}`` scheme the Unique platform resolves.
-    """
+    """Canonical URL for a whole file: deep link, else http(s) ``source_url``, else ``unique://``."""
     scope = scope_id_from_metadata(metadata)
     if not scope and owner_id and owner_id.startswith("scope_"):
         scope = owner_id
     if frontend_base_url and scope:
         return frontend_document_url(frontend_base_url, scope, content_id)
+    if source_url and source_url.startswith(("https://", "http://")):
+        return source_url
     return f"unique://content/{content_id}"
 
 
@@ -356,14 +325,6 @@ def reference_url(
     return f"unique://content/{chunk.id}"
 
 
-def _pages_suffix(chunk: ContentChunk) -> str:
-    if chunk.start_page is None or chunk.start_page < 0:
-        return ""
-    if chunk.end_page is not None and chunk.end_page != chunk.start_page:
-        return f" (pages {chunk.start_page}-{chunk.end_page})"
-    return f" (page {chunk.start_page})"
-
-
 def _escape_markdown_link_label(name: str) -> str:
     """Escape ``[`` / ``]`` in labels so CommonMark ``[label](url)`` stays valid.
 
@@ -377,6 +338,27 @@ def _escape_markdown_link_label(name: str) -> str:
 def markdown_citation_link(name: str, url: str) -> str:
     """Return a ready-to-paste ``[name](url)`` citation."""
     return f"[{_escape_markdown_link_label(name)}]({url})"
+
+
+class FileRecord(BaseModel):
+    """A knowledge-base file as a citable ``{title, url, content_id}`` record."""
+
+    title: str
+    url: str
+    content_id: str
+
+
+class _SearchHit(FileRecord):
+    pages: str | None = None
+    text: str
+
+
+def _pages(chunk: ContentChunk) -> str | None:
+    if chunk.start_page is None or chunk.start_page < 0:
+        return None
+    if chunk.end_page is not None and chunk.end_page != chunk.start_page:
+        return f"{chunk.start_page}-{chunk.end_page}"
+    return str(chunk.start_page)
 
 
 def chunk_to_text_content(
@@ -395,14 +377,15 @@ def chunk_to_text_content(
         frontend_base_url: Optional Unique frontend origin for deep links.
         scope_id: Optional folder/scope id (overrides metadata on the chunk).
     """
-    name = chunk.title or chunk.key or chunk.id
-    text_url = reference_url(
-        chunk, frontend_base_url=frontend_base_url, scope_id=scope_id
+    hit = _SearchHit(
+        title=chunk.title or chunk.key or chunk.id,
+        url=reference_url(
+            chunk, frontend_base_url=frontend_base_url, scope_id=scope_id
+        ),
+        content_id=chunk.id,
+        pages=_pages(chunk),
+        text=chunk.text,
     )
-    cite = markdown_citation_link(name, text_url)
-    pages = _pages_suffix(chunk)
-    header = f"{cite}{pages}" if pages else cite
-
     # Keep platform unique:// scheme on structured _meta.
     reference = chunk.to_reference(sequence_number=sequence_number)
     reference_payload = reference.model_dump(mode="json", by_alias=True)
@@ -410,7 +393,7 @@ def chunk_to_text_content(
 
     return TextContent(
         type="text",
-        text=f"{header}\n\n{chunk.text}",
+        text=hit.model_dump_json(exclude_none=True),
         _meta={
             **chunk.model_dump(mode="json"),
             REFERENCE_META_KEY: reference_payload,
