@@ -73,6 +73,21 @@ def test_cors_lets_a_browser_client_read_the_auth_and_session_headers(client: Te
     assert response.headers["access-control-expose-headers"] == "WWW-Authenticate, Mcp-Session-Id"
 
 
+def test_cors_lets_a_browser_client_send_the_routing_headers_of_a_tool_call(
+    client: TestClient,
+) -> None:
+    headers = {
+        "Host": LOCAL_HOST,
+        "Origin": "http://localhost:6274",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "mcp-method, mcp-name",
+    }
+
+    response = client.options("/mcp", headers=headers)
+
+    assert response.status_code == 200
+
+
 def test_a_server_without_auth_refuses_to_serve_beyond_loopback(
     server: FastMCP, served: list[str]
 ) -> None:
