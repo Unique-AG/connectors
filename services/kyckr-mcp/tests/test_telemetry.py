@@ -130,13 +130,6 @@ def test_a_lookalike_path_is_labelled_unknown(path: str) -> None:
     assert route_template(path) == "[unknown]"
 
 
-def test_the_credit_cost_is_read_from_the_top_level_before_data() -> None:
-    assert credit_cost({"cost": {"value": 2}}) == 2
-    assert credit_cost({"data": {"cost": {"value": 3}}}) == 3
-    assert credit_cost({"cost": {"value": 2}, "data": {"cost": {"value": 3}}}) == 2
-    assert credit_cost({"data": []}) == 0
-
-
 @pytest.mark.parametrize("value", [-1, -0.5, 0, True, False, math.nan, math.inf, "4", None])
 def test_a_cost_that_is_no_positive_number_is_no_credits(value: object) -> None:
     assert credit_cost({"cost": {"value": value}}) == 0
@@ -327,6 +320,17 @@ async def test_a_pending_answer_adds_its_cost(
     await get(upstream_settings, answering(202, body), url, method=method)
 
     assert credits_of(tool) == before + 1
+
+
+async def test_polling_an_order_does_not_count_the_cost_of_the_order_again(
+    upstream_settings: UpstreamSettings,
+) -> None:
+    body = {"data": {"status": "Pending", "cost": {"value": 4}}}
+    before = credits_of("get_order")
+
+    await get(upstream_settings, answering(200, body), "/orders/9876")
+
+    assert credits_of("get_order") == before
 
 
 async def test_an_order_answer_without_a_cost_adds_no_credits(
