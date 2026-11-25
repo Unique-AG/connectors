@@ -31,7 +31,6 @@ _NEEDS_RE_RECORDING = frozenset(
         "onenote_list_pages-team",
         "outlook_list_group_events-team",
         "outlook_respond_to_invite-accept",
-        "outlook_send_draft-persona",
         "outlook_share_calendar-anna",
         "outlook_unshare_calendar-anna",
         "teams_browse_channel-long",

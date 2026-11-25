@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_step, no_retry
+from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
@@ -26,7 +27,6 @@ from office_365_mcp.shared.teams.messages import (
     CHANNEL_POST,
     CHANNEL_SUBJECT_FIELD,
     MENTIONS_FIELD,
-    MESSAGE_FIELD,
     REPLY_TO_ID_FIELD,
     TEAM_ID_FIELD,
     ChannelImportance,
@@ -53,13 +53,13 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_browse_channel",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
     "channel_id": "19:general@thread.tacv2",
-    "message": "Ship it.",
+    "body_html": "<p>Ship it.</p>",
 }
 
 _DESCRIPTION = """\
 Posts one new message as the signed-in user to an existing channel of a Teams team. With \
 `reply_to_id`, this tool replies in the thread of an existing post. The message can @mention \
-people. The mentions come first, in the order given, and the text of `message` follows them. \
+people. The mentions come first, in the order given, and the HTML of `body_html` follows them. \
 This tool posts the message immediately, and nothing here can recall it. \
 teams_send_chat_message is the tool for a chat.
 
@@ -78,7 +78,7 @@ async def send_channel_message(
     *,
     team_id: str,
     channel_id: str,
-    message: str,
+    body_html: str,
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
     subject: str | None = None,
@@ -90,7 +90,7 @@ async def send_channel_message(
     where = "to" if reply_to_id is None else f"as a reply to post {reply_to_id!r} in"
     question = send_question(
         CHANNEL_POST,
-        message,
+        body_html,
         f"{where} channel {channel_id!r} in team {team_id!r}",
         mentions,
         subject=subject,
@@ -98,7 +98,7 @@ async def send_channel_message(
     )
     about = send_binding(
         (team_id, channel_id, repr(reply_to_id)),
-        message,
+        body_html,
         mentions,
         subject=subject,
         importance=importance,
@@ -106,7 +106,7 @@ async def send_channel_message(
 
     async def post() -> ChatMessage | None:
         outgoing = outgoing_message(
-            message,
+            body_html,
             mentions=mentions,
             importance=None if importance is None else ChatMessageImportance(importance),
             subject=subject,
@@ -160,7 +160,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     async def teams_send_channel_message(
         team_id: Annotated[str, Field(min_length=1, description=TEAM_ID_FIELD)],
         channel_id: Annotated[str, Field(min_length=1, description=CHANNEL_ID_FIELD)],
-        message: Annotated[str, Field(min_length=1, description=MESSAGE_FIELD)],
+        body_html: Annotated[str, Field(min_length=1, description=TEAMS_BODY_HTML_FIELD)],
         mentions: Annotated[list[Mention], Field(default=[], description=MENTIONS_FIELD)],
         ctx: Context,
         subject: Annotated[
@@ -178,7 +178,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             team_id=team_id,
             channel_id=channel_id,
-            message=message,
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             mentions=mentions,
             subject=subject,

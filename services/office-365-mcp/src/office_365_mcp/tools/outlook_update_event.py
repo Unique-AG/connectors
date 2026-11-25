@@ -21,6 +21,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD
 from office_365_mcp.shared.calendar import (
     HIDE_ATTENDEES_CHANGE_FIELD,
     IMPORTANCE_CHANGE_FIELD,
@@ -45,6 +46,7 @@ from office_365_mcp.shared.calendar import (
     event_of,
     event_patch_body,
     invited_attendee,
+    is_midnight,
     patch_changes,
     providers_without_teams,
     resource_addresses,
@@ -105,11 +107,11 @@ _NOTHING_HAPPENED = "Nothing was changed."
 _RETRY = " If you call this tool again with the same arguments, the call will fail the same way."
 
 _DESCRIPTION = """\
-Changes one existing event that the signed-in user organizes. This tool can change the subject, \
-the time, the location, the body, and the attendee lists. It can also change the free-busy \
-status, the categories, the importance, the sensitivity, and the reminder, or add a Teams \
-meeting. A change that reaches an attendee can mail the attendee a notice. \
-outlook_cancel_event cancels an event that the user organizes.
+Changes one event that the signed-in user organizes. This tool can change the subject, \
+the time, whether the event is all-day, the location, the body, and the attendee lists. It can \
+also change the free-busy status, the categories, the importance, the sensitivity, and the \
+reminder, or add a Teams meeting. A change that reaches an attendee can mail the attendee a \
+notice. outlook_cancel_event cancels an event.
 
 Notes:
 - Each given argument replaces that part of the event. An omitted argument keeps the stored \
@@ -143,7 +145,7 @@ _NOT_THE_ORGANIZER = (
 
 _NOTHING_TO_CHANGE = (
     "outlook_update_event was given no argument that changes anything. NOTHING WAS CHANGED. The "
-    + "arguments that change the event are `subject`, the time arguments, `location`, "
+    + "arguments that change the event are `subject`, the time arguments, `all_day`, `location`, "
     + "`body_html`, `online_meeting`, the two attendee lists, `show_as`, `add_categories`, and "
     + "`remove_categories`. The other arguments that change it are `importance`, `sensitivity`, "
     + "`is_reminder_on`, `reminder_minutes_before_start`, `hide_attendees`, and "
@@ -163,6 +165,28 @@ _TIME_TRIO_INCOMPLETE = (
     + "Microsoft reads both bounds in one zone. Give `starts_at`, `ends_at`, and `time_zone` "
     + "together, or omit every one of them to leave the time untouched."
 )
+
+_ALL_DAY_WITHOUT_TIME = (
+    "outlook_update_event was given `all_day` without `starts_at`, `ends_at`, and `time_zone`. "
+    + "NOTHING WAS CHANGED. Microsoft stores an all-day event from midnight to midnight, and a "
+    + "timed event at the hours it is given, so a change between the two needs the new times. "
+    + "Call again with `all_day` and all three time arguments. For an all-day event, give "
+    + "midnight in both times, with `ends_at` the midnight after the last day that the event "
+    + "covers."
+)
+
+
+def _not_midnight(starts_at: str, ends_at: str) -> str:
+    return (
+        f"outlook_update_event was given `all_day` with {starts_at!r} and {ends_at!r}, and "
+        + 'Microsoft holds an all-day event at midnight on both ends: "If true, regardless of '
+        + "whether it's a single-day or multi-day event, start, and endtime must be set to "
+        + 'midnight and be in the same time zone". NOTHING WAS CHANGED. Give midnight in both '
+        + "times, with `ends_at` the midnight AFTER the last day the event covers, or set "
+        + "`all_day` to false to make it a timed event at the hours the user named. Retrying "
+        + "these values will fail identically."
+    )
+
 
 _ATTENDEE_LISTS_INCOMPLETE = (
     "outlook_update_event was given `attendees` or `optional_attendees` without the other. "
@@ -300,6 +324,7 @@ async def update_event(
     starts_at: str | None = None,
     ends_at: str | None = None,
     time_zone: str | None = None,
+    all_day: bool | None = None,
     location: str | None = None,
     attendees: Sequence[str] | None = None,
     optional_attendees: Sequence[str] | None = None,
@@ -330,6 +355,7 @@ async def update_event(
                 starts_at,
                 ends_at,
                 time_zone,
+                all_day,
                 location,
                 attendees,
                 optional_attendees,
@@ -347,11 +373,13 @@ async def update_event(
         raise ToolError(_NOTHING_TO_CHANGE)
     _body_given_apart_from_meeting(body_html, online_meeting)
     _time_trio(starts_at, ends_at, time_zone)
+    if all_day is not None and starts_at is None:
+        raise ToolError(_ALL_DAY_WITHOUT_TIME)
     _attendees_given_together(attendees, optional_attendees)
     _categories_given_apart(add_categories, remove_categories)
     if starts_at is not None:
         assert ends_at is not None and time_zone is not None, "_time_trio admits no other shape"
-        _validated_span(starts_at, ends_at)
+        _validated_span(starts_at, ends_at, all_day=all_day is True)
     place = _place(location)
     required = None if attendees is None else _addresses(attendees, argument="attendees")
     optional = (
@@ -379,6 +407,7 @@ async def update_event(
             starts_at=starts_at,
             ends_at=ends_at,
             time_zone=time_zone,
+            all_day=all_day,
             location=place,
             attendees=required,
             optional_attendees=optional,
@@ -460,11 +489,13 @@ def _categories_after(
     return None if merged == list(current) else tuple(merged)
 
 
-def _validated_span(starts_at: str, ends_at: str) -> None:
+def _validated_span(starts_at: str, ends_at: str, *, all_day: bool) -> None:
     opens = _moment("starts_at", starts_at)
     closes = _moment("ends_at", ends_at)
     if closes <= opens:
         raise ToolError(_BACKWARD_TIMES)
+    if all_day and not (is_midnight(opens) and is_midnight(closes)):
+        raise ToolError(_not_midnight(starts_at, ends_at))
 
 
 def _moment(argument: str, value: str) -> datetime:
@@ -598,6 +629,7 @@ def _about(uri: str, patch: EventPatch) -> str:
                 patch.starts_at,
                 patch.ends_at,
                 patch.time_zone,
+                patch.all_day,
                 patch.location,
                 _folded(patch.attendees),
                 _folded(patch.optional_attendees),
@@ -706,6 +738,18 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description="The zone starts_at and ends_at are written in.",
             ),
         ] = None,
+        all_day: Annotated[
+            bool | None,
+            Field(
+                description=(
+                    "Set this parameter to true to make the event an all-day event, or to false "
+                    + "to make an all-day event a timed event. Give `starts_at`, `ends_at`, and "
+                    + "`time_zone` with it. Microsoft requires an all-day event to start and end "
+                    + "at midnight. Give midnight in both times, and make `ends_at` the midnight "
+                    + "after the last day that the event covers. Omit to leave it unchanged."
+                )
+            ),
+        ] = None,
         location: Annotated[
             str | None,
             Field(description="The new location. Omit to leave it unchanged."),
@@ -742,11 +786,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The new event body, as HTML. It replaces the whole body. Escape `&`, `<`, "
-                    + "and `>`. On an online meeting, the new body must keep all of the stored "
-                    + "body, and can add HTML before or after it. If it does not, this tool "
-                    + "changes nothing. The refusal quotes the stored HTML body when it has "
-                    + f"{STORED_BODY_QUOTE_LIMIT} characters or fewer."
+                    OUTLOOK_BODY_HTML_FIELD
+                    + " It replaces the whole body. On an online meeting, the new body must keep "
+                    + "all of the stored body, and can add HTML before or after it. If it does "
+                    + "not, this tool changes nothing. The refusal quotes the stored HTML body "
+                    + f"when it has {STORED_BODY_QUOTE_LIMIT} characters or fewer."
                 ),
             ),
         ] = None,
@@ -771,6 +815,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             starts_at=starts_at,
             ends_at=ends_at,
             time_zone=time_zone,
+            all_day=all_day,
             location=location,
             attendees=attendees,
             optional_attendees=optional_attendees,

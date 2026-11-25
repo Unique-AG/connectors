@@ -1321,7 +1321,7 @@ class TestTheReactionsOfAMessage:
             "teams_send_chat_message",
             person=mia,
             chat_id=_rows(chats, "chats")[0]["chat_id"],
-            message="seed-v1 case-teams_read_message-chat-reacted target",
+            body_html="<p>seed-v1 case-teams_read_message-chat-reacted target</p>",
         )
         _ = await call("teams_react_to_message", person=mia, uri=sent["uri"], reaction="\U0001f44d")
 

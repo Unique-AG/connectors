@@ -1,6 +1,6 @@
 import { GraphError } from '@microsoft/microsoft-graph-client';
 import { errors } from 'undici';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getRetryAfterMs } from '../get-retry-after-ms';
 import { GenericRateLimitError } from '../is-rate-limit-error';
 
@@ -22,6 +22,17 @@ const makeResponseError = (retryAfterSeconds?: string): errors.ResponseError =>
   }) as unknown as errors.ResponseError;
 
 describe('getRetryAfterMs', () => {
+  const now = new Date('2026-11-24T10:00:00.000Z');
+  const inFiveMinutes = new Date(now.getTime() + 300_000).toUTCString();
+
+  beforeEach(() => {
+    vi.useFakeTimers({ now, toFake: ['Date'] });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe('GraphError', () => {
     it('converts Retry-After seconds to milliseconds', () => {
       expect(getRetryAfterMs(makeGraphError('30'))).toBe(30_000);
@@ -31,8 +42,12 @@ describe('getRetryAfterMs', () => {
       expect(getRetryAfterMs(makeGraphError())).toBeNull();
     });
 
-    it('returns null when Retry-After is not a number', () => {
-      expect(getRetryAfterMs(makeGraphError('Thu, 01 Jan 2026 00:00:00 GMT'))).toBeNull();
+    it('reads a Retry-After HTTP date as the time left until it', () => {
+      expect(getRetryAfterMs(makeGraphError(inFiveMinutes))).toBe(300_000);
+    });
+
+    it('returns null when Retry-After is neither seconds nor a date', () => {
+      expect(getRetryAfterMs(makeGraphError('soon'))).toBeNull();
     });
   });
 
@@ -43,6 +58,10 @@ describe('getRetryAfterMs', () => {
 
     it('returns null when no retry-after header', () => {
       expect(getRetryAfterMs(makeResponseError())).toBeNull();
+    });
+
+    it('reads a retry-after HTTP date as the time left until it', () => {
+      expect(getRetryAfterMs(makeResponseError(inFiveMinutes))).toBe(300_000);
     });
 
     it('returns null when headers is an array', () => {

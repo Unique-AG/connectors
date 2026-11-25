@@ -9,6 +9,10 @@ from fastmcp.exceptions import ToolError
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.exchange_id_format import ExchangeIdFormat
 from msgraph.generated.models.message import Message
+from msgraph.generated.models.message_collection_response import MessageCollectionResponse
+from msgraph.generated.users.item.mail_folders.item.messages.messages_request_builder import (
+    MessagesRequestBuilder as FolderMessagesRequestBuilder,
+)
 from msgraph.generated.users.item.messages.messages_request_builder import MessagesRequestBuilder
 from msgraph.generated.users.item.translate_exchange_ids.translate_exchange_ids_post_request_body import (  # noqa: E501
     TranslateExchangeIdsPostRequestBody,
@@ -20,10 +24,12 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared import kql
+from office_365_mcp.shared.handles import mail_folder_handle
 from office_365_mcp.shared.mail import (
     SUMMARY_FIELDS,
     MailImportance,
     MailSummary,
+    WellKnownFolder,
     carries_category,
     has_flag_state,
     participants_term,
@@ -33,6 +39,7 @@ from office_365_mcp.shared.seam import (
     READ_ONLY,
     graph_client_for_caller,
     graph_mailbox,
+    owner_refused,
 )
 from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
 
@@ -57,7 +64,10 @@ keyword, sender, recipient, subject, or attachment file name. To list the newest
 folder, or only unread mail, use outlook_list_mail.
 
 Notes:
-- This tool has no `folder` or `unread_only` argument.
+- `folder` or `folder_ref` limits the search to one folder. Without them, the search covers \
+the whole mailbox.
+- Microsoft 365 searches another person's mailbox only with Full Access to it. With access to \
+some folders only, use outlook_list_mail on each folder.
 - `received_after`, `received_before`, `importance`, `has_attachments`, `flagged`, and \
 `category` narrow a search with AND. They are not criteria, so they cannot start a search alone.
 """
@@ -97,6 +107,29 @@ _NO_CRITERIA = (
     + "reaches drafts that this index does not."
 )
 
+_BOTH_FOLDERS = (
+    "outlook_search_mail searches one folder or the whole mailbox, so `folder` and `folder_ref` "
+    + "are alternatives, not a pair. `folder` names a well-known folder, such as `inbox`. "
+    + "`folder_ref` addresses any folder, by the handle outlook_browse_folders reported for it. "
+    + "Pass one of them, or neither to search the whole mailbox."
+)
+
+_NOT_A_FOLDER_HANDLE = (
+    "outlook_search_mail takes a folder handle in `folder_ref`, outlook:///folders/{id}, exactly "
+    + "as outlook_browse_folders reported it in `uri`. A folder's name is not one, nor is a "
+    + "message handle. For the Inbox and the other well-known folders use `folder` instead, which "
+    + "takes names such as `inbox` and `sentitems`."
+)
+
+NEEDS_FULL_ACCESS = (
+    "Microsoft 365 refused this search in the mailbox {mailbox!r}. Graph searches another "
+    + "person's mailbox only for a delegate with Full Access to the whole mailbox, and it "
+    + "refuses a search for a delegate with access to some folders only, even in one of those "
+    + "folders. Call outlook_list_mail with the same `mailbox` and the folder, for example "
+    + "`inbox`, and use its `from_address` and date filters. A search with the same arguments "
+    + "fails the same way."
+)
+
 _WINDOW_RUNS_BACKWARDS = (
     "outlook_search_mail searched nothing, because `received_before` falls before "
     + "`received_after` and no mailbox holds a window that runs backwards. A date covers the whole "
@@ -117,6 +150,8 @@ async def search_mail(
     has_attachments: bool | None = None,
     category: str | None = None,
     limit: int,
+    folder: WellKnownFolder | None = None,
+    folder_ref: str | None = None,
     mailbox: str | None = None,
 ) -> MailSearchResults:
     assert 1 <= limit <= MAX_RESULTS, f"limit is bounded by the schema, got {limit}"
@@ -125,6 +160,7 @@ async def search_mail(
         raise ToolError(_NO_CRITERIA)
     if runs_backwards(received_after, received_before):
         raise ToolError(_WINDOW_RUNS_BACKWARDS)
+    address = _folder_address(folder, folder_ref)
     search = " AND ".join(
         [
             asked,
@@ -146,23 +182,18 @@ async def search_mail(
                     ("flagged", flagged),
                     ("has_attachments", has_attachments),
                     ("category", category),
+                    ("folder", folder),
+                    ("folder_ref", folder_ref),
                 )
                 if value is not None
             ),
         ],
     )
 
-    with graph_errors():
+    refused = NEEDS_FULL_ACCESS.format(mailbox=mailbox)
+    with owner_refused(mailbox is not None, refused), graph_errors():
         with graph_step(STEP_SEARCH):
-            page = await reached.messages.get(
-                request_configuration=RequestConfiguration(
-                    query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
-                        search=kql.as_search_value(search),
-                        select=list(SUMMARY_FIELDS),
-                        top=limit,
-                    )
-                )
-            )
+            page = await _search_page(reached, address, kql.as_search_value(search), limit)
         found = [message for message in (page.value if page is not None else None) or []]
         kept = _narrowed(found, flagged=flagged, has_attachments=has_attachments, category=category)
         stable = await _stable_ids(reached, kept)
@@ -175,6 +206,37 @@ async def search_mail(
         ],
         more_may_exist=len(found) >= limit,
     )
+
+
+async def _search_page(
+    reached: UserItemRequestBuilder, folder: str | None, search: str, limit: int
+) -> MessageCollectionResponse | None:
+    if folder is None:
+        return await reached.messages.get(
+            request_configuration=RequestConfiguration(
+                query_parameters=MessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
+                    search=search, select=list(SUMMARY_FIELDS), top=limit
+                )
+            )
+        )
+    return await reached.mail_folders.by_mail_folder_id(folder).messages.get(
+        request_configuration=RequestConfiguration(
+            query_parameters=FolderMessagesRequestBuilder.MessagesRequestBuilderGetQueryParameters(
+                search=search, select=list(SUMMARY_FIELDS), top=limit
+            )
+        )
+    )
+
+
+def _folder_address(folder: WellKnownFolder | None, folder_ref: str | None) -> str | None:
+    if folder_ref is None:
+        return folder
+    if folder is not None:
+        raise ToolError(_BOTH_FOLDERS)
+    handle = mail_folder_handle(folder_ref)
+    if handle is None:
+        raise ToolError(_NOT_A_FOLDER_HANDLE)
+    return handle.folder_id
 
 
 async def _stable_ids(reached: UserItemRequestBuilder, found: list[Message]) -> dict[str, str]:
@@ -369,6 +431,26 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description=f"How many messages to return, at most {MAX_RESULTS}.",
             ),
         ] = 25,
+        folder: Annotated[
+            WellKnownFolder | None,
+            Field(
+                description=(
+                    "Searches only this well-known folder (`inbox`, `sentitems`, `drafts`, "
+                    "`archive`, `deleteditems`, `junkemail`, or `clutter`); alternative to "
+                    "`folder_ref`. Omit both to search the whole mailbox."
+                )
+            ),
+        ] = None,
+        folder_ref: Annotated[
+            str | None,
+            Field(
+                min_length=1,
+                description=(
+                    "Searches only this folder, as the `uri` handle from an "
+                    "outlook_browse_folders result; alternative to `folder`."
+                ),
+            ),
+        ] = None,
         mailbox: Annotated[str | None, Field(min_length=1, description=MAILBOX_FIELD)] = None,
         client: GraphServiceClient = graph,
     ) -> MailSearchResults:
@@ -389,5 +471,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             has_attachments=has_attachments,
             category=category,
             limit=limit,
+            folder=folder,
+            folder_ref=folder_ref,
             mailbox=mailbox,
         )

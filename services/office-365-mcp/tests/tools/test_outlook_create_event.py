@@ -2366,7 +2366,7 @@ class TestTheSchemaItPublishes:
             "time_zone",
             "attendees",
             "optional_attendees",
-            "body",
+            "body_html",
             "location",
             "all_day",
             "online_meeting",
@@ -2622,7 +2622,9 @@ class TestHowItDeclaresItself:
         assert "default calendar" in lowered
         assert "exposes outlook_create_event_on_behalf, use it for a calendar" in lowered
 
-        body_html = cast("str", _object(_object(parameters["properties"])["body"])["description"])
+        body_html = cast(
+            "str", _object(_object(parameters["properties"])["body_html"])["description"]
+        )
         assert "attach anything to this event" in body_html.casefold()
         assert "attached file" in body_html.casefold()
 

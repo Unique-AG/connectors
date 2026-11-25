@@ -89,6 +89,7 @@
     "@suites/unit": "catalog:",
     "@swc/cli": "catalog:",
     "@swc/core": "catalog:",
+    "@testcontainers/postgresql": "12.2.2",
     "@types/amqplib": "catalog:",
     "@types/express": "catalog:",
     "@types/markdown-it": "14.2.0",

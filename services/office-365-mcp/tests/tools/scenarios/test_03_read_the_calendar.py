@@ -45,7 +45,7 @@ _MICROSOFT_REFUSES = [
     ),
     pytest.param(
         {"status": 403, "body": "error.accessDenied.json"},
-        "Ask a Microsoft 365 administrator to grant the delegated permissions",
+        "Usually this calendar is not shared with the user",
         id="no-access",
     ),
 ]
@@ -237,6 +237,17 @@ class TestADayOrAWeek:
         own = {str(one["subject"]): one["owner_is_organizer"] for one in _list(seen, "events")}
         assert (own["Hosting review"], own["Roadmap check"]) == (True, False)
 
+    async def test_it_names_the_organizer_of_each_listed_meeting_by_name_and_address(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_list_events-today")
+
+        seen = await _day()
+
+        organizers = {str(one["subject"]): one["organizer"] for one in _list(seen, "events")}
+        assert organizers["Hosting review"] == dict(_MIA)
+        assert organizers["Roadmap check"] == dict(_ANNA)
+
     async def test_it_lists_a_day_with_nothing_on_as_empty_and_complete(
         self, graph: respx.MockRouter
     ) -> None:
@@ -314,6 +325,15 @@ class TestWhoIsComingAndWhereTheMeetingIs:
         assert _part(seen, "start")["iso"] == "2026-11-03T10:00:00+01:00"
         assert [one["name"] for one in _list(seen, "attendees")] == ["Anna Meier", "Tom Berger"]
         assert await _input_names("outlook_read_event") == {"uri", "time_zone"}
+
+    async def test_it_names_the_organizer_of_the_meeting_by_name_and_address(
+        self, graph: respx.MockRouter
+    ) -> None:
+        seen = await self._read_meeting(
+            graph, "rec-tool-outlook_read_event-answers-mixed", "Design workshop"
+        )
+
+        assert seen["organizer"] == dict(_MIA)
 
     async def test_a_meeting_deleted_after_the_listing_is_reported_as_unread_and_not_as_deleted(
         self, graph: respx.MockRouter

@@ -225,6 +225,11 @@ _CALENDAR_TOOLS: tuple[tuple[str, Mapping[str, object]], ...] = (
 
 _ONE_ATTENDEE = "grace@example.invalid"
 
+_STYLED_HTML = (
+    '<p style="color: #c00">Hi <a href="https://a.example/x">docs</a></p>'
+    + "<script>alert(1)</script>"
+)
+
 _INVITING: Mapping[str, object] = {
     **outlook_create_event.GRAPH_CALL_EXAMPLE,
     "attendees": [_ONE_ATTENDEE],
@@ -345,21 +350,75 @@ class TestTheWholeCalendarSurfaceStaysInsideIt:
         assert sent["transactionId"], "nothing told Microsoft what to dedupe a retry on"
         assert _ONE_ATTENDEE in json.dumps(sent), "the address the call named never reached Graph"
 
-    async def test_the_markdown_of_the_body_reaches_graph_as_html(
-        self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter
+    @pytest.mark.parametrize(("name", "arguments"), _THE_TWO_CREATES)
+    async def test_an_html_body_reaches_graph_unchanged(
+        self,
+        every_calendar_tool: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        name: str,
+        arguments: Mapping[str, object],
     ) -> None:
-        arguments = {**_INVITING, "body": "Agenda:\n\n- **Budget**\n- Hiring"}
-
-        _ = await every_calendar_tool.call_tool(outlook_create_event.TOOL_NAME, arguments)
+        _ = await every_calendar_tool.call_tool(name, {**arguments, "body_html": _STYLED_HTML})
 
         posted = [call for call in _made(graph) if call.request.method == "POST"]
         sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
-        assert sent["body"] == {
-            "contentType": "html",
-            "content": (
-                "<p>Agenda:</p>\n<ul>\n<li><strong>Budget</strong></li>\n<li>Hiring</li>\n</ul>"
-            ),
-        }
+        assert sent["body"] == {"contentType": "html", "content": _STYLED_HTML}
+
+    @pytest.mark.parametrize(("name", "arguments"), _THE_TWO_CREATES)
+    async def test_markdown_in_the_body_reaches_graph_unchanged(
+        self,
+        every_calendar_tool: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        name: str,
+        arguments: Mapping[str, object],
+    ) -> None:
+        _ = await every_calendar_tool.call_tool(name, {**arguments, "body_html": "**Budget**"})
+
+        posted = [call for call in _made(graph) if call.request.method == "POST"]
+        sent = cast("Mapping[str, object]", json.loads(posted[0].request.content))
+        assert sent["body"] == {"contentType": "html", "content": "**Budget**"}
+
+    @pytest.mark.parametrize(("name", "arguments"), _THE_TWO_CREATES)
+    async def test_the_question_names_every_link_target_of_the_body(
+        self,
+        app: Starlette,
+        graph: respx.MockRouter,
+        name: str,
+        arguments: Mapping[str, object],
+    ) -> None:
+        asked: list[str] = []
+
+        async def capturing(
+            message: str,
+            _response_type: type | None,
+            _params: ElicitRequestParams,
+            _context: object,
+        ) -> str:
+            asked.append(message)
+            return _AGREES
+
+        server = cast("FastMCP[None]", app.state.fastmcp_server)
+        async with Client(FastMCPTransport(server), elicitation_handler=capturing) as client:
+            _ = await client.call_tool(name, {**arguments, "body_html": _STYLED_HTML})
+
+        assert len(asked) == 1
+        assert asked[0].endswith("It links to 'https://a.example/x'."), asked[0]
+        assert [call for call in _made(graph) if call.request.method == "POST"], (
+            "the agreed create posted nothing"
+        )
+
+    @pytest.mark.parametrize(
+        "name", [outlook_create_event.TOOL_NAME, outlook_create_event_on_behalf.TOOL_NAME]
+    )
+    async def test_the_body_is_an_html_string_with_no_format_choice(
+        self, every_calendar_tool: Client[FastMCPTransport], name: str
+    ) -> None:
+        listed = {tool.name: tool for tool in await every_calendar_tool.list_tools()}
+
+        properties = _object(_object(listed[name].input_schema)["properties"])
+
+        assert "HTML fragment" in str(_object(properties["body_html"])["description"])
+        assert {"body", "body_format"}.isdisjoint(properties)
 
     async def test_an_agreed_room_booking_posts_the_room_as_a_resource_with_its_options(
         self, every_calendar_tool: Client[FastMCPTransport], graph: respx.MockRouter

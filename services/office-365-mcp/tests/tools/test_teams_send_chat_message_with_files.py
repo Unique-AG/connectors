@@ -51,7 +51,8 @@ _CHANNEL_SEND_PATH = (
     "/teams/00000000-0000-4000-8000-0000000000a1/channels/19%3Ageneral%40thread.tacv2/messages"
 )
 
-_MESSAGE = "Here is the plan."
+_SHOWN = "Here is the plan."
+_MESSAGE = "<p>Here is the plan.</p>"
 _SUBJECT = "Release plan"
 _SENT_MESSAGE_ID = "1770000000001"
 
@@ -181,7 +182,7 @@ class TestThePersonBeforeTheSend:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=_refuses,
             )
@@ -203,13 +204,13 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri, _PLAN.uri],
             confirm=capturing,
         )
 
         assert asked == [
-            f"Send {_MESSAGE!r} to chat {_CHAT_ID!r} now? It attaches 'Budget.docx', "
+            f"Send {_SHOWN!r} to chat {_CHAT_ID!r} now? It attaches 'Budget.docx', "
             + "'Plan.pptx'. This cannot be recalled once sent."
         ]
 
@@ -228,7 +229,7 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=capturing,
             mentions=[_JANE],
@@ -237,7 +238,7 @@ class TestThePersonBeforeTheSend:
         )
 
         assert asked == [
-            f"Send {_MESSAGE!r} with the subject {_SUBJECT!r} and high importance to chat "
+            f"Send {_SHOWN!r} with the subject {_SUBJECT!r} and high importance to chat "
             + f"{_CHAT_ID!r} now? It mentions the person with the Microsoft Entra object id "
             + f"{_JANE.user_id!r} (the name 'Jane Smith' comes from Microsoft 365). It attaches "
             + "'Budget.docx'. This cannot be recalled once sent."
@@ -258,7 +259,7 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=capturing,
             mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
@@ -287,7 +288,7 @@ class TestThePersonBeforeTheSend:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=capturing,
                 mentions=[_JANE],
@@ -314,7 +315,7 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri, _PLAN.uri],
             confirm=watching,
         )
@@ -352,7 +353,7 @@ class TestHowTheQuestionReachesAPerson:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=confirm,
             )
@@ -418,7 +419,7 @@ class TestTheEraWithNoBackChannel:
         answer = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=a_person_agrees(_modern_context()),
         )
@@ -435,7 +436,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=a_person_agrees(_modern_context()),
             )
@@ -444,7 +445,7 @@ class TestTheEraWithNoBackChannel:
         answer = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=a_person_agrees(
                 _modern_context(
@@ -466,7 +467,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=a_person_agrees(_modern_context()),
             )
@@ -476,7 +477,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri, _PLAN.uri],
                 confirm=a_person_agrees(
                     _modern_context(
@@ -499,7 +500,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=a_person_agrees(_modern_context()),
             )
@@ -514,7 +515,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=_answered(key, state, agrees_with),
             )
@@ -530,7 +531,7 @@ class TestTheEraWithNoBackChannel:
             client,
             team_id=_TEAM_ID,
             channel_id=_CHANNEL_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=channel_sender.a_person_agrees(_modern_context()),
         )
@@ -546,7 +547,7 @@ class TestTheEraWithNoBackChannel:
                 client,
                 team_id=_TEAM_ID,
                 channel_id=_CHANNEL_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=channel_sender.a_person_agrees(
                     _modern_context(
@@ -570,7 +571,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=a_person_agrees(_modern_context()),
                 mentions=[_JANE],
@@ -581,7 +582,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=_answered(key, state, agrees_with),
                 mentions=[Mention(user_id=_ADA.user_id, name=_JANE.name)],
@@ -599,7 +600,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=a_person_agrees(_modern_context()),
                 mentions=[_JANE],
@@ -609,7 +610,7 @@ class TestTheEraWithNoBackChannel:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=_answered(key, state, agrees_with),
             mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
@@ -633,7 +634,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri, _PLAN.uri],
             confirm=_agrees,
         )
@@ -652,7 +653,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri, _PLAN.uri],
             confirm=_agrees,
             mentions=[_JANE, _ADA],
@@ -678,7 +679,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=_agrees,
             mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
@@ -708,7 +709,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message="Q3 < Q4 & more",
+            body_html="<p>Q3 &lt; Q4 &amp; more</p>",
             attachments=[_BUDGET.uri, _PLAN.uri],
             confirm=_agrees,
             mentions=[_JANE],
@@ -745,7 +746,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=_agrees,
             importance="urgent",
@@ -773,7 +774,7 @@ class TestWhatItAsksGraphFor:
         monkeypatch.setattr(files, "graph_step", recording)
 
         _ = await send_chat_message_with_files(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, attachments=[_BUDGET.uri], confirm=_agrees
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, attachments=[_BUDGET.uri], confirm=_agrees
         )
 
         assert measured == [files.STEP_DRIVE_ITEM, sender.STEP_SEND]
@@ -800,7 +801,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=_agrees,
             mentions=[_JANE],
@@ -831,7 +832,7 @@ class TestWhatItRefusesToAttach:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri, attachment],
                 confirm=capturing,
             )
@@ -889,7 +890,7 @@ class TestWhatItRefusesToAttach:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri, _PLAN.uri],
                 confirm=capturing,
             )
@@ -912,7 +913,7 @@ class TestTheRetryItRefuses:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=_agrees,
             )
@@ -932,7 +933,7 @@ class TestTheRetryItRefuses:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=_agrees,
             )
@@ -950,7 +951,7 @@ class TestWhatItAnswers:
         answer = await send_chat_message_with_files(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             attachments=[_BUDGET.uri],
             confirm=_agrees,
         )
@@ -975,7 +976,7 @@ class TestTheFailuresItPassesOn:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=_agrees,
             )
@@ -999,7 +1000,7 @@ class TestTheFailuresItPassesOn:
             _ = await send_chat_message_with_files(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 attachments=[_BUDGET.uri],
                 confirm=capturing,
             )
@@ -1054,7 +1055,7 @@ class TestHowItDeclaresItself:
 
         assert sentence in " ".join((tool.description or "").split())
 
-    async def test_the_arguments_are_chat_id_message_attachments_and_the_optional_rest(
+    async def test_the_arguments_are_chat_id_body_html_attachments_and_the_optional_rest(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
@@ -1062,7 +1063,7 @@ class TestHowItDeclaresItself:
         properties = cast("Mapping[str, object]", parameters["properties"])
         assert set(properties) == {
             "chat_id",
-            "message",
+            "body_html",
             "attachments",
             "mentions",
             "importance",
@@ -1070,7 +1071,7 @@ class TestHowItDeclaresItself:
         }
         assert set(cast("Sequence[str]", parameters["required"])) == {
             "chat_id",
-            "message",
+            "body_html",
             "attachments",
         }
 
@@ -1146,7 +1147,7 @@ class TestTheWordsItSharesWithTheChatSendWithNoFile:
         plain = described[plain_sender.TOOL_NAME]
         with_files = described[sender.TOOL_NAME]
         shared = set(plain) & set(with_files)
-        assert shared == {"chat_id", "message", "mentions", "importance", "subject"}
+        assert shared == {"chat_id", "body_html", "mentions", "importance", "subject"}
         assert {name: with_files[name] for name in shared} == {name: plain[name] for name in shared}
 
     async def test_every_argument_of_both_tools_is_described_within_the_house_length(

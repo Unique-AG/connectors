@@ -302,7 +302,7 @@ class TestChangingTasks:
             "outlook_create_task",
             task_list=TASK_LIST,
             title="Send the Q3 report",
-            notes="Use the **numbers** from Anna.",
+            notes_html="<p>Use the <strong>numbers</strong> from Anna.</p>",
             due_date="2026-11-27",
             priority="high",
             time_zone=ZURICH,

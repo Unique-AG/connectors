@@ -23,10 +23,10 @@ from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import TaskHandle, task_handle
 from office_365_mcp.shared.outlook.tasks import (
-    BODY_FIELD,
     CATEGORIES_FIELD,
     DEFAULT_TIME_ZONE,
     DUE_DATE_FIELD,
+    NOTES_HTML_FIELD,
     PRIORITY_FIELD,
     REMINDER_FIELD,
     REPEAT_FIELD,
@@ -97,10 +97,8 @@ are. There is no draft and no review step. outlook_set_task_status marks a task 
 it.
 
 Notes:
-- `notes` replaces the whole notes of the task. To add to them, read the task with \
-outlook_read_task first. If `notes_format` is `html`, write the old notes again as Markdown, \
-without HTML tags, because `notes` shows a tag as text. Then send the old notes with the new \
-words.
+- `notes_html` replaces the whole notes of the task. To add to them, read the task with \
+outlook_read_task first, and send its `notes` with the new words.
 - This tool asks the user to agree before it changes a task in a list that other people share, \
 because they see the change. A task in the user's own unshared list changes without a question.
 - This call is safe to repeat after a timeout.
@@ -118,7 +116,11 @@ _NOTHING_TO_CHANGE = (
 def _changes(change: TaskChange, *, series_from: date | None) -> str:
     parts = [
         *([f"title {cut_for_a_question(change.title)!r}"] if change.title else []),
-        *([f"notes that open with {body_opening(change.notes)!r}"] if change.notes else []),
+        *(
+            [f"notes that open with {body_opening(change.notes_html)!r}"]
+            if change.notes_html
+            else []
+        ),
         *([f"due {change.due_date}"] if change.due_date else []),
         *(["no due date"] if change.clear_due_date else []),
         *([f"start {change.start_date}"] if change.start_date else []),
@@ -183,7 +185,7 @@ async def _due_date(
 @dataclass(frozen=True, slots=True)
 class TaskChange:
     title: str | None = None
-    notes: str | None = None
+    notes_html: str | None = None
     due_date: date | None = None
     clear_due_date: bool = False
     priority: Priority | None = None
@@ -239,7 +241,7 @@ async def update_task(
 
     body = TodoTask(
         title=change.title,
-        body=None if change.notes is None else html_body(change.notes),
+        body=None if change.notes_html is None else html_body(change.notes_html),
         due_date_time=None if change.due_date is None else due_moment(change.due_date, zone=zone),
         importance=None if change.priority is None else graph_importance(change.priority),
         start_date_time=(
@@ -266,7 +268,7 @@ async def update_task(
         STEP_UPDATE,
         handle.uri,
         change.title or "",
-        change.notes or "",
+        change.notes_html or "",
         "" if change.due_date is None else change.due_date.isoformat(),
         str(change.clear_due_date),
         change.priority or "",
@@ -350,8 +352,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         title: Annotated[
             str | None, Field(min_length=1, pattern=r"\S", description=TITLE_FIELD)
         ] = None,
-        notes: Annotated[
-            str | None, Field(min_length=1, pattern=r"\S", description=BODY_FIELD)
+        notes_html: Annotated[
+            str | None, Field(min_length=1, pattern=r"\S", description=NOTES_HTML_FIELD)
         ] = None,
         due_date: Annotated[date | None, Field(description=DUE_DATE_FIELD)] = None,
         clear_due_date: Annotated[
@@ -385,7 +387,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             uri=uri,
             change=TaskChange(
                 title=title,
-                notes=notes,
+                notes_html=notes_html,
                 due_date=due_date,
                 clear_due_date=clear_due_date,
                 priority=priority,

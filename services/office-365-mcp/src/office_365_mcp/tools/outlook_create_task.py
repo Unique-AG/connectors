@@ -18,10 +18,10 @@ from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import task_list_handle
 from office_365_mcp.shared.outlook.tasks import (
-    BODY_FIELD,
     CATEGORIES_FIELD,
     DEFAULT_TIME_ZONE,
     DUE_DATE_FIELD,
+    NOTES_HTML_FIELD,
     PRIORITY_FIELD,
     REMINDER_FIELD,
     REPEAT_FIELD,
@@ -108,7 +108,7 @@ async def create_task(
     *,
     task_list: str,
     title: str,
-    notes: str | None = None,
+    notes_html: str | None = None,
     due_date: date | None = None,
     priority: Priority | None = None,
     start_date: date | None = None,
@@ -138,7 +138,7 @@ async def create_task(
             raise ToolError(no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CREATED))
     body = TodoTask(
         title=title,
-        body=None if notes is None else html_body(notes),
+        body=None if notes_html is None else html_body(notes_html),
         due_date_time=None if due_date is None else due_moment(due_date, zone=zone),
         importance=None if priority is None else graph_importance(priority),
         start_date_time=None if start_date is None else due_moment(start_date, zone=zone),
@@ -154,7 +154,7 @@ async def create_task(
         STEP_CREATE,
         handle.uri,
         title,
-        notes or "",
+        notes_html or "",
         "" if due_date is None else due_date.isoformat(),
         priority or "",
         "" if start_date is None else start_date.isoformat(),
@@ -218,8 +218,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         ],
         title: Annotated[str, Field(min_length=1, pattern=r"\S", description=TITLE_FIELD)],
         ctx: Context,
-        notes: Annotated[
-            str | None, Field(min_length=1, pattern=r"\S", description=BODY_FIELD)
+        notes_html: Annotated[
+            str | None, Field(min_length=1, pattern=r"\S", description=NOTES_HTML_FIELD)
         ] = None,
         due_date: Annotated[date | None, Field(description=DUE_DATE_FIELD)] = None,
         priority: Annotated[Priority | None, Field(description=PRIORITY_FIELD)] = None,
@@ -236,7 +236,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             task_list=task_list,
             title=title,
-            notes=notes,
+            notes_html=notes_html,
             due_date=due_date,
             priority=priority,
             start_date=start_date,

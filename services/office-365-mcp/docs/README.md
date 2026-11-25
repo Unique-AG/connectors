@@ -20,6 +20,9 @@ through the Microsoft Graph API.
 - **Always on:** The tool `get_me` is on in every deployment.
 - **Live data:** Every call goes to Microsoft Graph at once. The server keeps no copy of mail or
   messages. It stores only an OAuth token.
+- **Formatted text:** A tool that writes a mail body, an event body, a Teams message, or a OneNote
+  page takes it as HTML, in `body_html`. The server sends the HTML to Microsoft as it is. It does
+  not change Markdown or plain text into HTML.
 
 ## Start from what you want to do
 
@@ -209,6 +212,7 @@ Chats, channels, meetings, transcripts, and the files of a channel.
 - Walk the channels of a team, and read the posts and replies of a channel.
 - Search every Teams message that you can see.
 - Read the transcript of a meeting, and see whether a recording exists.
+- Get the link that opens a meeting recording in a browser, from the meeting chat.
 
 **Note:** This preset holds every Teams tool of the Read kind, except `teams_get_channel_files_folder`, `teams_read_meeting`, `teams_list_call_transcripts`, and `teams_read_call_transcript`. Call transcripts are on [`teams-call-transcripts`](#teams-call-transcripts).
 
@@ -373,7 +377,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 - Find a meeting from its chat.
 - See whether a recording exists, how long it runs, and who can download it.
 
-**Note:** The preset never returns the video.
+**Note:** The preset never returns the video. The link that opens the recording is in the meeting chat. Use `teams_list_chat_messages` of the [`teams`](#teams) preset to read it.
 
 **Tools**
 
@@ -433,7 +437,7 @@ Teams has to allow the transcript: `AllowTranscriptionForCalling` for 1:1 and PS
 | `teams_list_chat_members` | 🟢 Read | — | Lists the members of one chat, with user id, name, email address, and roles. |
 | `teams_list_my_teams` | 🟢 Read | — | Lists the teams that you are a member of. |
 | `teams_list_channels` | 🟢 Read | — | Lists the channels of one team that you can access. |
-| `teams_send_chat_message` | 🟠 Add | ✋ Always | Posts a plain-text message to a chat. Supports mentions, a subject, and an importance. |
+| `teams_send_chat_message` | 🟠 Add | ✋ Always | Posts an HTML message to a chat. Supports mentions, a subject, and an importance. |
 | `teams_send_channel_message` | 🟠 Add | ✋ Always | Posts a message to a channel, or a reply in a thread. Supports mentions, a subject, and an importance. |
 | `teams_react_to_message` | 🔴 Change | ✋ Always | Adds or removes one reaction on a chat message, a channel post, or a reply. |
 
@@ -596,13 +600,13 @@ Messages, folders, drafts, and sending.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_search_mail` | 🟢 Read | — | Searches your mailbox, or a shared mailbox, with a KQL query. Filters by importance, flag, category, and attachments. |
+| `outlook_search_mail` | 🟢 Read | — | Searches your mailbox, or a shared mailbox, with a KQL query. Searches the whole mailbox or one folder. Filters by importance, flag, category, and attachments. |
 | `outlook_read_mail` | 🟢 Read | — | Reads one message in full. Lists its attachments and headers, but never their bytes. |
 | `outlook_list_attachments` | 🟢 Read | — | Lists the attachments of one message, with name, size, and type. |
 | `outlook_read_attachment` | 🟢 Read | — | Reads one mail attachment of 10 MB or less, with its real media type. |
 | `outlook_browse_folders` | 🟢 Read | — | Lists one level of the mail folder tree, with a handle for each folder. |
 | `outlook_find_recipient` | 🟢 Read | — | Finds the email address behind a display name. |
-| `outlook_read_thread` | 🟢 Read | — | Reads the messages of one conversation, with a short preview of each body. |
+| `outlook_read_thread` | 🟢 Read | — | Reads the messages of one conversation, with a short preview of each body. With access to some folders of a mailbox only, it reads the conversation in the folder of the message. |
 | `outlook_list_mail` | 🟢 Read | — | Lists the newest messages of one folder. Filters by importance, flag, attachments, and category. |
 | `outlook_get_mail_tips` | 🟢 Read | — | Reads the MailTips of recipients, for example an automatic reply or a full mailbox. Sends nothing. |
 | `outlook_list_focused_overrides` | 🟢 Read | — | Lists the senders that have a fixed inbox tab, Focused or Other. |
@@ -612,6 +616,16 @@ Messages, folders, drafts, and sending.
 - **Graph permissions (4):** `Mail.Read`, `Mail.Read.Shared`, `People.Read`, `User.Read`
 - **Admin consent:** Not required.
 - **User approval:** None. No tool of this preset asks the user.
+
+**Access to some folders of a mailbox**
+
+The owner of a mailbox can give a delegate access to the whole mailbox (Full Access) or to some folders only, for example the Inbox. A delegate with access to some folders only gets these results:
+
+- `outlook_list_mail` lists each folder that the delegate has access to.
+- `outlook_read_mail`, `outlook_list_attachments`, and `outlook_read_attachment` read a message in such a folder.
+- `outlook_read_thread` reads the conversation in the folder of the message only.
+- `outlook_search_mail` does not work. Microsoft Graph refuses a search for a delegate without Full Access, also in a folder that the delegate has access to. The tool tells the agent to use `outlook_list_mail`.
+- To draft, the delegate needs access to the Drafts folder. To send, the delegate needs Send As or Send on Behalf.
 
 ### `outlook-write`
 
@@ -642,6 +656,9 @@ Messages, folders, drafts, and sending.
 | `outlook_draft_reply` | 🟠 Add | 🤝 Shared mailbox | Composes a reply or a forward into Drafts. The text goes above the quoted original message. A forward keeps the attachments of the original. |
 | `outlook_draft_reply_all` | 🟠 Add | 🤝 Shared mailbox | Composes a reply to everyone on one message into Drafts. |
 | `outlook_update_draft` | 🔴 Change | 🤝 Shared mailbox | Changes the subject, text, recipients, importance, or categories of one draft. |
+
+The four drafting tools take the text as HTML. In a shared mailbox, the approval question lists
+every link in the text.
 
 **What it needs**
 
@@ -685,7 +702,7 @@ Messages, folders, drafts, and sending.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. |
+| `outlook_send_draft` | 🔴 Change | ✋ Always | Sends one draft. This is the only tool that puts mail on the wire. The approval question lists every link in the draft. |
 
 **What it needs**
 
@@ -829,7 +846,7 @@ Calendars, events, availability, rooms, and sharing.
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
 | `outlook_create_event` | 🟠 Add | 🤝 The event has attendees, a room, or a location | Creates one event on your own calendar and sends the invitations. Supports series and rooms. |
-| `outlook_update_event` | 🟠 Add | 🤝 The event has attendees, or the change sets a location | Changes one event that you organize: time, location, body, attendees, and more. |
+| `outlook_update_event` | 🟠 Add | 🤝 The event has attendees, or the change sets a location | Changes one event that you organize: time, all-day or timed, location, body, attendees, and more. |
 | `outlook_cancel_event` | 🔴 Change | 🤝 The event has attendees | Cancels one event that you organize. Mails a cancellation to the attendees. |
 | `outlook_respond_to_invite` | 🟠 Add | 🤝 When it sends a response | Accepts, declines, or tentatively accepts an invitation that you received. |
 
@@ -882,7 +899,7 @@ Calendars, events, availability, rooms, and sharing.
 
 | Tool | Kind | User approval | What it does |
 | --- | --- | --- | --- |
-| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. |
+| `outlook_create_event_on_behalf` | 🟠 Add | ✋ Always | Creates an event on another calendar, delegated or a second one of the user, under the name of the calendar owner. The approval question lists every link in the body. |
 
 **What it needs**
 
@@ -1825,11 +1842,11 @@ messages. It stores only an OAuth token.
 | Capability | office-365-mcp | teams-mcp |
 | --- | --- | --- |
 | Read a transcript in the chat | Yes, live. Microsoft erases a one-off transcript after about 60 days. | No, ingest only |
-| Read the data of a recording, or the attendance of a meeting | Yes. A recording gives metadata only. Only the organizer reads attendance. | No |
+| Read the data of a recording, or the attendance of a meeting | Yes. A recording gives its length and who can download it. The meeting chat gives the link that opens the recording in a browser. Only the organizer reads attendance. | No |
 | Read the replies in a channel thread | Yes, 50 replies of one post in one call | No, root posts only |
 | Read a chat further back in time | Yes, with `sent_before` | No, the newest 50 messages only |
 | Filter the list of chats by type or by topic | Yes | No |
-| Send a message with a mention, a subject, an importance, a thread reply, or Markdown formatting | Yes | No, plain text only |
+| Send a message with a mention, a subject, an importance, a thread reply, or HTML formatting | Yes | No, plain text only |
 | Send a message with a file | Yes, if the file is already in SharePoint | No |
 | Edit, delete, or react to a message | Yes, edit and delete for own messages only | No |
 | Create a chat, change its members, or rename it | Yes | No |
@@ -1912,6 +1929,7 @@ model then tells the user.
 | Limit | What the user sees |
 | --- | --- |
 | A user cannot view the details of a shared calendar | Each event shows the time only. The subject and the body are empty. |
+| A user asks about the calendar of a person who did not share it | No tool reads that calendar. The agent says that it cannot open the calendar. `outlook_check_availability` can give the free and busy time and the working hours of that person, if the settings of that person and of the organization let the user see it. |
 | An event has a Teams meeting | A tool can add a Teams meeting to an event, but cannot remove it. A tool cannot change the existing text in the body of such an event. The user does this in Outlook. |
 
 #### Outlook contacts

@@ -59,7 +59,7 @@ outlook_create_task-full:
     - tool: outlook_create_task
       args:
         title: seed-v1 case-outlook_create_task-full task
-        notes: The room must hold twenty people.
+        notes_html: <p>The room must hold twenty people.</p>
         due_date: "~nextMonday+4"
         start_date: "~nextMonday"
         reminder_at: "~nextMondayT09:00:00"
@@ -78,7 +78,7 @@ outlook_update_task-created:
     - tool: outlook_update_task
       args:
         title: seed-v1 case-outlook_update_task task renamed
-        notes: The slides need the new logo.
+        notes_html: <p>The slides need the new logo.</p>
         due_date: "~nextMonday+7"
         priority: low
       bind: {uri: "$prev.uri"}

@@ -112,7 +112,7 @@ The chart neither creates nor owns that secret either way. See
 
 | Variable | Default | Description |
 |---|---|---|
-| `UNIQUE_MCP_FRONTEND_BASE_URL` | none | Web app origin for citation deep links. Without it, citations fall back to `unique://content/{id}` |
+| `UNIQUE_MCP_FRONTEND_BASE_URL` | none | Web app origin for citation deep links. Without it no deep link is built: a file with an external page cites that page's URL, any other file cites `unique://content/{id}` |
 | `UNIQUE_MCP_LOCAL_BASE_URL` | `http://0.0.0.0:8000` (chart) | Bind address inside the pod |
 | `LOG_LEVEL` | `info` | `DEBUG` / `INFO` / `WARNING` / `ERROR` / `CRITICAL` |
 | `KB_MCP_HTTP_MAX_CONNECTIONS` | `100` | Outbound pool to the Unique API, shared by all tools |

@@ -33,7 +33,11 @@ from office_365_mcp.shared.seam.elicitation import (
     person_confirms,
 )
 from office_365_mcp.shared.seam.files import FileFromGraph
-from office_365_mcp.shared.seam.permissions import REQUESTABLE_PERMISSIONS, graph_scope
+from office_365_mcp.shared.seam.permissions import (
+    REQUESTABLE_PERMISSIONS,
+    graph_scope,
+    named_permissions,
+)
 
 __all__ = [
     "MAILBOX_FIELD",
@@ -57,6 +61,7 @@ __all__ = [
     "graph_client_for_caller",
     "graph_mailbox",
     "graph_scope",
+    "named_permissions",
     "narrowed_to",
     "owner_refused",
     "person_confirms",

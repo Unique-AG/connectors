@@ -57,19 +57,42 @@ sequenceDiagram
 
     OutlookMCP->>MSGraph: API call with access token
     MSGraph->>Middleware: 401 InvalidAuthenticationToken
-    Middleware->>DB: Fetch encrypted refresh token from user_profiles
-    Middleware->>EntraID: POST /oauth2/v2.0/token (grant_type=refresh_token)
-    EntraID->>Middleware: New access token (+ possibly new refresh token)
-    Middleware->>DB: Update encrypted tokens in user_profiles
-    Middleware->>MSGraph: Retry original request with new access token
-    MSGraph->>OutlookMCP: Successful response
+    alt Another request is already refreshing this user's token
+        Middleware->>Middleware: Wait for that refresh and take its token
+        Middleware->>MSGraph: Retry original request with new access token
+    else Stored access token is no longer the rejected one
+        Middleware->>DB: Read stored access token
+        Middleware->>MSGraph: Retry original request with stored access token
+    else Refresh is backing off (token_refresh_retry_at not reached)
+        Middleware->>OutlookMCP: Original 401, Entra ID not called
+    else Refresh needed
+        Middleware->>DB: Fetch encrypted refresh token from user_profiles
+        Middleware->>EntraID: POST /oauth2/v2.0/token (grant_type=refresh_token)
+        alt New tokens
+            EntraID->>Middleware: New access token (+ possibly new refresh token)
+            Middleware->>DB: Store tokens, clear backoff
+            Middleware->>MSGraph: Retry original request with new access token
+        else Grant permanently invalid (invalid_grant, consent_required, invalid_client…)
+            EntraID->>Middleware: OAuth error
+            Middleware->>DB: Clear tokens, revoke MCP session
+            Middleware->>OutlookMCP: Error, user must reconnect
+        else Network error, 429 or 5xx
+            EntraID->>Middleware: Error or no answer
+            Middleware->>DB: Record failure code, count and token_refresh_retry_at
+            Middleware->>OutlookMCP: Original 401
+        end
+    end
+    MSGraph->>OutlookMCP: Response to the retried request
 ```
 
 **Key points:**
 
 - Refresh is automatic — no user intervention required.
 - If the refresh token itself is expired (~90 days of inactivity), the user must reconnect via `reconnect_inbox`.
+- Writes after a refresh only apply while the user's row still holds the refresh token that was refreshed. A reconnect that stored new tokens in the meantime keeps them, even if Microsoft then rejects the old ones.
 - The server stores the new refresh token if Microsoft rotates it; otherwise the existing refresh token is kept.
+- Requests that hit a `401` for the same user at the same time share one refresh. A request whose token another request has already replaced retries with the stored token without calling Entra ID.
+- If Entra ID cannot be reached or answers with a rate limit or a server error, the server waits before it tries again for that user: as long as the `Retry-After` header asks, or otherwise 1, 2, 4 and so on minutes after each consecutive failure, up to 30 minutes. Requests in between keep the original `401` and do not call Entra ID. The next successful refresh or a reconnect ends the wait.
 
 ## Subscription Creation and Renewal Lifecycle
 
@@ -227,9 +250,11 @@ sequenceDiagram
 - Discovery iterates over all connected user pairs (delegate × owner). It probes one Graph endpoint per pair — `GET /users/{ownerEmail}/messages` in `full_access_only` mode, `GET /users/{ownerEmail}/mailFolders` in `granular_access` mode.
 - A 403 or 404 response immediately deletes the access record and all associated folder grants (cascading delete). The owner's scope is excluded from the delegate's next `search_emails` call.
 - Transient errors (429, 5xx) cause the pair to be skipped; the next scheduled run retries.
+- Each scheduled run starts a cycle that checks every connected user as a delegate. A delegate counts as discovered only when every owner check succeeded. A delegate whose requests cannot complete, for example because its Microsoft token cannot be refreshed right now, rate limits outlast the retries or one owner check fails, stays pending, and discovery moves on to the next delegate. An owner check that did not complete leaves that pair's record unchanged; the updates and 403/404 deletions of the checks that did complete still apply. A delegate whose Microsoft grant is permanently invalid has its access records deleted.
 - The verification job (`granular_access` only) tests each folder individually, rebuilds `delegatedAccessDirectories` from confirmed-accessible folders, and deletes the account record if no folders remain accessible and no transient errors occurred.
 - In Mode B (`microsoft_graph`), only full-access delegations are searchable — honouring folder-level grants would require querying every accessible folder individually, which is not implemented due to API rate limits. Folder-level grants detected by verification have no effect on Mode B search results.
-- A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted.
+- A recovery scheduler (configurable via `DELEGATED_ACCESS_RECOVERY_CRON_SCHEDULE`, default `*/30 * * * *`) monitors both jobs. If either stalls (state `running` for > 10 minutes with no progress), it is automatically restarted. A restarted discovery continues its cycle with the delegates it has not finished. A scheduled request that RabbitMQ delivers again after the run processing it was killed continues that cycle instead of starting a new one.
+- The recovery scheduler also reruns discovery for the delegates the current cycle has not finished, such as one that failed or a user who connected after the cycle started. It skips a delegate while its token refresh is backing off. If a run is still in progress when the next scheduled run fires, the new cycle starts once that run has finished.
 
 ## Email Draft Creation Flow
 
