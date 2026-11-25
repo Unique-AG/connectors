@@ -9,8 +9,9 @@ from mcp_configs.config import shared_config
 class ElicitationSettings(BaseSettings):
     """How long a tool waits for a person to answer, and how a question survives a replica change.
 
-    A tool that gets no answer within `timeout_before_cancel_seconds` gives up on the question:
-    a choice returns the options to the model instead, and a confirmation does nothing.
+    On protocols up to 2025-11-25, a tool that gets no answer within
+    `timeout_before_cancel_seconds` gives up on the question: a choice returns the options to the
+    model instead, and a confirmation does nothing. 2026-07-28 has no answer timeout.
 
     `request_state_keys` seals the `request_state` a question hands the client, so the call that
     brings the answer back opens on any replica and after a restart. The first key seals, every

@@ -100,9 +100,5 @@ class NeedsChoice(BaseModel):
 
 
 def needs_answer(result: object) -> TypeIs[InputRequiredResult | NeedsChoice]:
-    """True when the tool has to return `result` now, before doing anything.
-
-    An `InputRequiredResult` goes to the client, which shows the person a form and calls the tool
-    again with the answer. A `NeedsChoice` goes to the model, which picks and calls again.
-    """
+    """True when the tool returns `result` now: to the client to ask, or to the model to pick."""
     return isinstance(result, InputRequiredResult | NeedsChoice)

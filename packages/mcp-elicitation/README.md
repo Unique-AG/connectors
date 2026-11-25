@@ -15,8 +15,9 @@ A tool with `asks-confirmation` asks unless the call carries `skip-confirmation:
 key, `false`, or any other value means it asks, so Claude and other clients keep being asked.
 MCP Hub drops its own generic approval for such a tool, so a person confirms once.
 
-When nobody can be asked (skipped, or a client that cannot elicit), a confirmation refuses and a
-choice returns its options to the model. Neither guesses.
+With `skip-confirmation`, `confirm` returns `Confirmed(skipped=True)` and the tool goes ahead,
+while a choice returns its options to the model (`NeedsChoice`). With a client that cannot elicit,
+`confirm` refuses and a choice returns `NeedsChoice`. Neither guesses.
 
 ## Wiring, once per server
 
@@ -35,9 +36,10 @@ def get_elicitation() -> Elicitation:
     return Elicitation(settings, store=persistence.store)
 ```
 
-`store` is any `py-key-value-aio` store. It holds one marker per open question, so each answer is
+`store` is a `py-key-value-aio` store. It holds one marker per open question, so each answer is
 used once. A service with Postgres or Redis passes that store, which holds across replicas; a
-service without one passes a `MemoryStore`.
+service without one passes a `MemoryStore`. The store must delete atomically, returning true to
+one caller only: memory, Redis and Postgres do, Firestore checks then deletes and does not.
 
 `ELICITATION_REQUEST_STATE_KEYS` lets an answer come back to any replica on 2026-07-28. Without
 it, only the process that asked can take the answer.
@@ -105,7 +107,8 @@ the tool goes ahead without a second question.
 
 On 2026-07-28 an answer counts only for the same tool, arguments and signed-in user (the SDK
 binds the sealed state to them), only once, and only for the question the person saw: if the
-message or options changed in between, the tool asks again.
+message or options changed in between, the tool asks again. There is no answer timeout on
+2026-07-28; a question stays open for the SDK's seal lifetime, 10 minutes.
 
 ## Forms
 

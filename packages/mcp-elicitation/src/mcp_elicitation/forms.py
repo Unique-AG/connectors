@@ -1,8 +1,4 @@
-"""The only forms a tool can show. A tool sets their text and options, never their controls.
-
-Every form has one required field and no default, so a client that accepts a form without
-showing it (an empty `accept`) never confirms or picks anything.
-"""
+"""The only forms a tool can show. One required field, no default: an empty accept picks nothing."""
 
 from collections.abc import Sequence
 

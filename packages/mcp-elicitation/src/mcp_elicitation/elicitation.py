@@ -1,18 +1,4 @@
-"""Ask a person, on whichever MCP protocol era the client speaks.
-
-Handshake era (up to 2025-11-25): the tool waits on `elicitation/create`, sent on the stream of
-the open `tools/call`, for at most `timeout_before_cancel_seconds`.
-
-2026-07-28: there is no back-channel. The first call returns an `InputRequiredResult`; the
-client shows the form and calls the same tool again with the same arguments and the answer. The
-tool runs from the top, and the same question finds its answer instead of asking.
-
-The SDK seals `request_state` and binds it to the tool, its arguments and the signed-in user, so
-an answer never counts for another call or another person. On top of that, each question carries
-a nonce that the answering call deletes from the store, so an answer is used once even across
-replicas, and a question is keyed by what the person saw, so an answer to an older version of it
-does not count.
-"""
+"""Ask a person, on whichever MCP protocol era the client speaks. See the README."""
 
 import asyncio
 import hashlib
@@ -63,9 +49,9 @@ from mcp_elicitation.results import Option
 
 logger = logging.getLogger(__name__)
 
-# The sealed state and the unused marker outlive the question, so an answer that arrives late is
-# refused as expired rather than as unknown.
-_GRACE_SECONDS = 60
+# How long a 2026-07-28 question stays open: the SDK's default seal lifetime, which it requires to
+# be finite. There is no answer timeout of ours there, so the marker lives as long as the seal.
+_OPEN_SECONDS = 600.0
 _COLLECTION = "mcp-elicitation-questions"
 _ROUND = "mcp_elicitation.round"
 _ASK_AGAIN = (
@@ -107,28 +93,22 @@ class _Round:
 
 
 def create_request_state_security(settings: ElicitationSettings) -> RequestStateSecurity:
-    """Pass to `FastMCP(request_state_security=...)`.
-
-    With `request_state_keys`, an answer opens on any replica and after a restart. Without them,
-    only the process that asked can open it.
-    """
-    ttl = settings.timeout_before_cancel_seconds + _GRACE_SECONDS
+    """Pass to `FastMCP(request_state_security=...)`. Without keys, only this process opens."""
     keys = [key.get_secret_value() for key in settings.request_state_keys]
     if keys:
-        return RequestStateSecurity(keys=keys, ttl=ttl)
-    return RequestStateSecurity.ephemeral(ttl=ttl)
+        return RequestStateSecurity(keys=keys, ttl=_OPEN_SECONDS)
+    return RequestStateSecurity.ephemeral(ttl=_OPEN_SECONDS)
 
 
 class Elicitation:
     """Confirm an action or ask for a choice. Build one per app and share it.
 
-    `store` keeps one marker per open question, so each answer is used once. A store every replica
-    shares makes that hold across replicas; an in-memory store only within one process.
+    `store` must delete atomically (memory, Redis, Postgres do; Firestore does not), or an answer
+    can be used twice.
     """
 
     def __init__(self, settings: ElicitationSettings, store: AsyncKeyValue) -> None:
         self._timeout_seconds: float = settings.timeout_before_cancel_seconds
-        self._marker_ttl_seconds: float = settings.timeout_before_cancel_seconds + _GRACE_SECONDS
         self._store: AsyncKeyValue = store
 
     @overload
@@ -167,9 +147,7 @@ class Elicitation:
     ) -> Confirmed | NotConfirmed | InputRequiredResult:
         """Ask the person to confirm `message`. Only an explicit `agree` confirms.
 
-        `agree` and `decline` label the two answers. `nothing_happened` opens the message the
-        model gets when the tool must not go ahead, such as "The rule was not deleted."
-        With `raises`, that case raises `NotConfirmedError`; without, it returns `NotConfirmed`.
+        `nothing_happened` opens the refusal the model gets, such as "The rule was not deleted."
         """
         if confirmation_skipped(ctx):
             logger.info("Confirmation skipped: the client said no person has to confirm")
@@ -285,7 +263,7 @@ class Elicitation:
         self, message: str, form: Form, *, key: str, answers: Mapping[str, _Answer]
     ) -> InputRequiredResult:
         nonce = token_urlsafe(32)
-        await self._store.put(nonce, {}, collection=_COLLECTION, ttl=self._marker_ttl_seconds)
+        await self._store.put(nonce, {}, collection=_COLLECTION, ttl=_OPEN_SECONDS)
         state = _State(nonce=nonce, asked=key, answers=dict(answers))
         logger.info("Asked the client to show a form")
         return InputRequiredResult(
@@ -325,8 +303,11 @@ def _state(raw: str | None) -> _State | None:
         return None
     try:
         return _State.model_validate_json(raw)
-    except ValidationError:
-        logger.warning("Answer refused: request_state is not ours")
+    except ValidationError as error:
+        # The error text quotes the input, which holds the person's answers.
+        logger.warning(
+            "Answer refused: request_state is not ours", extra={"errors": error.error_count()}
+        )
         return None
 
 

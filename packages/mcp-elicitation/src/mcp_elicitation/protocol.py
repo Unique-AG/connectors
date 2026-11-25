@@ -1,8 +1,4 @@
-"""The two `_meta` keys Unique's MCP client and our servers agree on (UN-27224).
-
-A tool that asks for confirmation itself says so in its definition, so MCP Hub drops its own
-generic approval for it. MCP Hub then tells each call whether a person has to confirm.
-"""
+"""The two `_meta` keys MCP Hub and our servers agree on (UN-27224). See the README."""
 
 from collections.abc import Mapping
 from typing import cast
