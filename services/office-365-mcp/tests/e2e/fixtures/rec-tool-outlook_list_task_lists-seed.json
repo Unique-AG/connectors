@@ -12,7 +12,7 @@
     "response_json": {
       "value": [
         {
-          "@odata.etag": "W/\"g3Ftsq77EsKUXd4Q0ituicUJ+z8lhX==\"",
+          "@odata.etag": "W/\"q6Paqu95IlERJv7F3npfhsEJ/ZPNRX==\"",
           "displayName": "Tasks",
           "id": "AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=",
           "isOwner": true,
@@ -20,9 +20,9 @@
           "wellknownListName": "defaultList"
         },
         {
-          "@odata.etag": "W/\"j7Noyy28IlEQMy8X8atghpOR+rBWyu==\"",
+          "@odata.etag": "W/\"v4Rzir59PnQTPs6D7zyacqUJ/ZnBZd==\"",
           "displayName": "seed-v1 Launch plan",
-          "id": "AAMkKKtbGXB8XYC5PXMkQRwqSHP3LK15Ctm4IHJ7VWEwMSWrX8WwMJLbFXQMYKHpdxbRSLvoQVgkO6a3PQJ9AKNajNqbWonsOCEjGjWk-CbnRLY1MlJVFTH=",
+          "id": "AAMkWCfyFDF0NVF4QQZkFJvmXKT2XT94Xpp6PKE8VNJbTKSzX4UjFVYuICJTARShpasAIRvqBBgbS9t9UUY0IEPbdFusViobGRYtDfRg-BdaGHB9EE3HSBV=",
           "isOwner": true,
           "isShared": false,
           "wellknownListName": "none"

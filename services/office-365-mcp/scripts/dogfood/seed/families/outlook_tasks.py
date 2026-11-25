@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import docgen
 import yaml
-from model import Context, Step
+from model import ConfigError, Context, Step
 
 if TYPE_CHECKING:
     from seed import Graph
@@ -151,7 +151,7 @@ def _task_steps(tasks_path: str, task: Spec, anchor: dt.date, *, files: bool) ->
 
 
 def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
-    if owner != OWNER or PHASE not in phases:
+    if owner != OWNER or not phases & {PHASE, FILES_PHASE}:
         return []
     corpus = _corpus()
     found = [
@@ -173,6 +173,9 @@ def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
     found.append(_lookup(tasks))
     for task in corpus["default_tasks"]:
         found += _task_steps(tasks, task, ctx.anchor, files=FILES_PHASE in phases)
+    made = [step.key for step in found if step.kind != "lookup"]
+    if len(made) != len(set(made)):
+        raise ConfigError("two To Do items of the corpus have the same name; rename one")
     return found
 
 
@@ -197,7 +200,10 @@ def sweep(graph: Graph, owner: str) -> Iterator[tuple[str, str]]:
 def cleanup(
     graph: Graph, ctx: Context, owner: str, phases: set[str]
 ) -> Iterator[tuple[str, str, None]]:
-    if owner != OWNER or PHASE not in phases:
+    if owner != OWNER or not phases & {PHASE, FILES_PHASE}:
+        return
+    if PHASE not in phases:
+        yield from _file_cleanup(graph)
         return
     corpus = _corpus()
     seeded = {_named(one["name"]) for one in corpus["lists"]}
@@ -207,5 +213,26 @@ def cleanup(
             yield "DELETE", f"{LISTS}/{found['id']}", None
         elif found.get("wellknownListName") == DEFAULT_LIST:
             for task in _tasks(graph, str(found["id"])):
-                if task.get("title") in titles:
+                if task.get("title") in titles and TAG in (task.get("categories") or []):
                     yield "DELETE", f"{LISTS}/{found['id']}/tasks/{task['id']}", None
+
+
+def _file_cleanup(graph: Graph) -> Iterator[tuple[str, str, None]]:
+    corpus = _corpus()
+    seeded = {_named(one["name"]) for one in corpus["lists"]}
+    files = {
+        _named(task["title"]): {_named(one["name"]) for one in task.get("attachments", [])}
+        for one in corpus["lists"]
+        for task in one["tasks"]
+    }
+    for found in graph.get_all(LISTS, {}):
+        if found.get("displayName") not in seeded:
+            continue
+        for task in _tasks(graph, str(found["id"])):
+            names = files.get(str(task.get("title") or ""), set())
+            if not names:
+                continue
+            path = f"{LISTS}/{found['id']}/tasks/{task['id']}/attachments"
+            for attachment in graph.get_all(path, {"$select": "id,name"}):
+                if attachment.get("name") in names:
+                    yield "DELETE", f"{path}/{attachment['id']}", None

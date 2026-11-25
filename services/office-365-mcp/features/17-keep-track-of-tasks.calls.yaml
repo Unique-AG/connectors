@@ -186,7 +186,7 @@ uc-17-15:
   blocker:
     kind: graph
     tool: outlook_list_task_lists
-    text: Microsoft Graph documents To Do access for the signed-in user only, with no delegated access to the lists of another person or of a shared mailbox.
+    text: Microsoft Graph reads the To Do lists of the signed-in user and the lists that other people share with that user. It has no delegated call that reads the other lists of another person or of a shared mailbox.
     user: The assistant reads only Mia's own tasks and the lists that people share with her, not the tasks of another person or of a shared mailbox.
   provenance: drafted
   asks_user: false
@@ -564,7 +564,7 @@ uc-17-40:
     kind: graph
     tool: outlook_update_task
     text: Microsoft Graph has no call that moves a To Do task to another list.
-    user: The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one, but the new task loses its creation date.
+    user: The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one. The new task loses its creation date and its attached files, because no tool adds a file to a task, so save the files before the old task is deleted.
   provenance: drafted
   asks_user: false
   chain: []

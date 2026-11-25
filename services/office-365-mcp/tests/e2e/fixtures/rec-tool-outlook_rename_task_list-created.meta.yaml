@@ -2,7 +2,7 @@ scenario: outlook_rename_task_list-created
 fixture: rec-tool-outlook_rename_task_list-created
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:10:21+00:00'
+recorded_at: '2026-11-25T09:34:50+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 8

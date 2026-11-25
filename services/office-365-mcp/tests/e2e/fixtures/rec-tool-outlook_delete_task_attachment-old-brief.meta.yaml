@@ -2,7 +2,7 @@ scenario: outlook_delete_task_attachment-old-brief
 fixture: rec-tool-outlook_delete_task_attachment-old-brief
 source: recorded
 target: graph
-recorded_at: '2026-11-25T08:27:19+00:00'
+recorded_at: '2026-11-25T09:37:54+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 36

@@ -175,8 +175,8 @@ class TestAListThatOthersShare:
         _ = await _add(client, confirm=capture)
 
         assert asked == [
-            "Add the link 'Q3 report' to a task in the list 'Launch', which other people share. "
-            + "They see the change?"
+            f"Add the link 'Q3 report', which opens {_WEB_URL!r}, to a task in the list 'Launch', "
+            + "which other people share. They see the change?"
         ]
         assert post.call_count == 1
 

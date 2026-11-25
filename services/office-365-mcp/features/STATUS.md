@@ -62,7 +62,7 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 | --- | --- | --- | --- | --- | --- |
 | `uc-08-02` | Working with notes in OneNote | A page is found by a word that is only in its body | gap | `onenote_list_pages` | Microsoft Graph has no full-text search over the words of a page for a work or school account. |
 | `uc-08-76` | Working with notes in OneNote | A new page is made a subpage of another page | gap | `onenote_create_page` | Microsoft Graph has the page level as a read-only property, and no create or update call sets it. |
-| `uc-17-15` | Keeping track of tasks | The tasks of another person are read | gap | `outlook_list_task_lists` | Microsoft Graph documents To Do access for the signed-in user only, with no delegated access to the lists of another person or of a shared mailbox. |
+| `uc-17-15` | Keeping track of tasks | The tasks of another person are read | gap | `outlook_list_task_lists` | Microsoft Graph reads the To Do lists of the signed-in user and the lists that other people share with that user. It has no delegated call that reads the other lists of another person or of a shared mailbox. |
 | `uc-17-40` | Keeping track of tasks | A task is moved to another list | gap | `outlook_update_task` | Microsoft Graph has no call that moves a To Do task to another list. |
 
 ## It fails in prod and the cause is not known

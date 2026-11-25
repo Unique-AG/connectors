@@ -2,7 +2,7 @@ scenario: outlook_add_task_step-created
 fixture: rec-tool-outlook_add_task_step-created
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:06:10+00:00'
+recorded_at: '2026-11-25T09:30:13+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 14

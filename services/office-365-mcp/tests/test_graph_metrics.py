@@ -1396,6 +1396,7 @@ GRAPH_STEPS = frozenset(
         "update_task",
         "set_task_status",
         "task_due_date",
+        "task_title",
         "add_task_link",
         "add_task_step",
         "create_task_list",

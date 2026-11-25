@@ -11,9 +11,9 @@
       "location": "https://graph.microsoft.com"
     },
     "response_json": {
-      "@odata.etag": "W/\"s8Ugdj02HrJGZm5I7sreymUS+kUsnQ==\"",
+      "@odata.etag": "W/\"f7Hquy06XqNFEd3L8jvognJZ/CyZcy==\"",
       "displayName": "seed-v1 case-outlook_set_task_status-completed",
-      "id": "AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=",
+      "id": "AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -21,15 +21,15 @@
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=",
+    "path": "/v1.0/me/todo/lists/AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=",
     "status": 200,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"s8Ugdj02HrJGZm5I7sreymUS+kUsnQ==\"",
+      "@odata.etag": "W/\"f7Hquy06XqNFEd3L8jvognJZ/CyZcy==\"",
       "displayName": "seed-v1 case-outlook_set_task_status-completed",
-      "id": "AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=",
+      "id": "AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -37,7 +37,10 @@
   },
   {
     "method": "POST",
-    "path": "/v1.0/me/todo/lists/AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=/tasks",
+    "path": "/v1.0/me/todo/lists/AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
     "json": {
       "title": "seed-v1 case-outlook_tasks task"
     },
@@ -47,33 +50,33 @@
       "location": "https://graph.microsoft.com"
     },
     "response_json": {
-      "@odata.etag": "W/\"x1Xknh58SaCCVj4T1naodpOJ+dNtgF==\"",
+      "@odata.etag": "W/\"q2Fpfj52JxNTIm3U2lpetdNQ/MdG6a==\"",
       "body": {
         "content": "",
         "contentType": "text"
       },
       "categories": [],
-      "createdDateTime": "2026-11-24T15:11:12.8617961Z",
+      "createdDateTime": "2026-11-25T09:35:26.4328285Z",
       "hasAttachments": false,
-      "id": "AAMkJPymEZA7ANX2GLZjAFxqGJH8CF85Dah9UWI3LUCxSGXuZ4XmKZQWGSFOWAQtqimEJPkbHQbaP9m6FDL9CfFlaGzoJkkhXTGvBfRy-ValCQD1CdZgUWOmxCsbAwlaDQVfUzMk-RnwLZG1WnUKMRW=",
+      "id": "AAMkQMeiITY2WTQ0RFFpXDfyQWG3IW13Gue8SFZ2BKXsXFOnL0SlIPTBUAHUSJQmiazNENljTNddB6w0PJF1VuPmsCmdUnocBCNrDoBo-ZjhNXH8LO5nIGTzhHzmNgclIKRrJqAj-XlvMBX8ICWfPUX=",
       "importance": "normal",
       "isReminderOn": false,
-      "lastModifiedDateTime": "2026-11-24T15:11:12.9788526Z",
+      "lastModifiedDateTime": "2026-11-25T09:35:26.5782197Z",
       "status": "notStarted",
       "title": "seed-v1 case-outlook_tasks task"
     }
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=",
+    "path": "/v1.0/me/todo/lists/AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=",
     "status": 200,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"o0Ekzw52AhUNUf9L1bftjeTN+dCzoT==\"",
+      "@odata.etag": "W/\"b9Sssc28NwKCXr1A9lexbpOB/DsI0b==\"",
       "displayName": "seed-v1 case-outlook_set_task_status-completed",
-      "id": "AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=",
+      "id": "AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -81,7 +84,10 @@
   },
   {
     "method": "PATCH",
-    "path": "/v1.0/me/todo/lists/AAMkDVusIZK3FBG0WQQsXMczFGQ2JK90Opp0DAM3CSLwCJJnG6QjLBGdFZROTJGeulwGQAalBRbjV9c2DKG3UJVnjUajEzypIDBuXeEd-GjoKKQ2FzQkUEC=/tasks/AAMkJPymEZA7ANX2GLZjAFxqGJH8CF85Dah9UWI3LUCxSGXuZ4XmKZQWGSFOWAQtqimEJPkbHQbaP9m6FDL9CfFlaGzoJkkhXTGvBfRy-ValCQD1CdZgUWOmxCsbAwlaDQVfUzMk-RnwLZG1WnUKMRW=",
+    "path": "/v1.0/me/todo/lists/AAMkRLxfESK5MXC2CCRzYEqePPL0QJ91Cbt4UCX7MQPaUJJkH2NoETTdYWJGZDPobptZCEbdDAujV5s7UEA2ANZvzKujUigaDQHuGcNe-TomMLO5UM9lZLW=/tasks/AAMkQMeiITY2WTQ0RFFpXDfyQWG3IW13Gue8SFZ2BKXsXFOnL0SlIPTBUAHUSJQmiazNENljTNddB6w0PJF1VuPmsCmdUnocBCNrDoBo-ZjhNXH8LO5nIGTzhHzmNgclIKRrJqAj-XlvMBX8ICWfPUX=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
     "json": {
       "status": "completed"
     },
@@ -90,22 +96,22 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"x3Alft32DqXODz6M3jqmcmZF+vQwqE==\"",
+      "@odata.etag": "W/\"i0Pxte77DpNJZk6C5uqcpbHB/PsT3x==\"",
       "body": {
         "content": "",
         "contentType": "text"
       },
       "categories": [],
       "completedDateTime": {
-        "dateTime": "2026-11-24T00:00:00.0000000",
+        "dateTime": "2026-11-25T00:00:00.0000000",
         "timeZone": "UTC"
       },
-      "createdDateTime": "2026-11-24T15:11:12.8617961Z",
+      "createdDateTime": "2026-11-25T09:35:26.4328285Z",
       "hasAttachments": false,
-      "id": "AAMkJPymEZA7ANX2GLZjAFxqGJH8CF85Dah9UWI3LUCxSGXuZ4XmKZQWGSFOWAQtqimEJPkbHQbaP9m6FDL9CfFlaGzoJkkhXTGvBfRy-ValCQD1CdZgUWOmxCsbAwlaDQVfUzMk-RnwLZG1WnUKMRW=",
+      "id": "AAMkQMeiITY2WTQ0RFFpXDfyQWG3IW13Gue8SFZ2BKXsXFOnL0SlIPTBUAHUSJQmiazNENljTNddB6w0PJF1VuPmsCmdUnocBCNrDoBo-ZjhNXH8LO5nIGTzhHzmNgclIKRrJqAj-XlvMBX8ICWfPUX=",
       "importance": "normal",
       "isReminderOn": false,
-      "lastModifiedDateTime": "2026-11-24T15:11:13.3099092Z",
+      "lastModifiedDateTime": "2026-11-25T09:35:26.8801666Z",
       "status": "completed",
       "title": "seed-v1 case-outlook_tasks task"
     }

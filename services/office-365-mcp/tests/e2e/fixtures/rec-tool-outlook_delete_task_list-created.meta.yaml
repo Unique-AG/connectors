@@ -2,7 +2,7 @@ scenario: outlook_delete_task_list-created
 fixture: rec-tool-outlook_delete_task_list-created
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:09:16+00:00'
+recorded_at: '2026-11-25T09:33:37+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 6

@@ -28,6 +28,7 @@ from office_365_mcp.shared.outlook.tasks import (
     TaskStep,
     bad_task_handle,
     bad_zone,
+    utc_times,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -86,7 +87,8 @@ async def read_task(
             .tasks.by_todo_task_id(handle.task_id)
             .get(
                 request_configuration=RequestConfiguration[_TaskQuery](
-                    query_parameters=_TaskQuery(expand=["checklistItems", "linkedResources"])
+                    headers=utc_times(),
+                    query_parameters=_TaskQuery(expand=["checklistItems", "linkedResources"]),
                 )
             )
         )

@@ -168,6 +168,7 @@ class TestFindingTasks:
         assert answer["capped"] is False
         assert route.calls.last.request.url.params["$filter"] == "status ne 'completed'"
         assert "$select" not in route.calls.last.request.url.params
+        assert route.calls.last.request.headers["prefer"] == 'outlook.timezone="UTC"'
 
     async def test_a_task_due_on_a_day_matches_a_moment_later_that_day(
         self, graph: respx.MockRouter
@@ -314,7 +315,7 @@ class TestChangingTasks:
                 "content": "<p>Use the <strong>numbers</strong> from Anna.</p>",
                 "contentType": "html",
             },
-            "dueDateTime": {"dateTime": "2026-11-26T23:00:00", "timeZone": "UTC"},
+            "dueDateTime": {"dateTime": "2026-11-27T00:00:00", "timeZone": "Europe/Zurich"},
             "importance": "high",
         }
         assert (answer["uri"], answer["due_date"], person.asked) == (TASK, "2026-11-27", [])
@@ -377,7 +378,7 @@ class TestPlanningATask:
 
         sent = _sent(route)
         assert (sent["startDateTime"], sent["reminderDateTime"], sent["isReminderOn"]) == (
-            {"dateTime": "2026-11-22T23:00:00", "timeZone": "UTC"},
+            {"dateTime": "2026-11-23T00:00:00", "timeZone": "Europe/Zurich"},
             {"dateTime": "2026-11-26T08:00:00", "timeZone": "UTC"},
             True,
         )
@@ -411,6 +412,42 @@ class TestPlanningATask:
 
         assert _sent(route)["recurrence"] == series
         assert answer["repeat"] == {"every": "week", "interval": 1, "weekdays": ["monday"]}
+
+    async def test_a_series_on_a_weekday_of_the_month_still_reads_as_repeating(
+        self, graph: respx.MockRouter
+    ) -> None:
+        last_friday = {
+            "pattern": {
+                "type": "relativeMonthly",
+                "interval": 1,
+                "daysOfWeek": ["friday"],
+                "index": "last",
+            },
+            "range": {"type": "noEnd", "startDate": "2026-11-27"},
+        }
+        _ = graph.get(ONE_TASK).mock(
+            return_value=httpx.Response(
+                200, json=_task(TASK_ID, "Send the report", recurrence=last_friday)
+            )
+        )
+
+        answer = await call("outlook_read_task", uri=TASK)
+
+        assert (answer["repeats"], answer["repeat"]) == (True, None)
+
+    async def test_a_reminder_in_the_hour_that_the_clocks_skip_is_refused(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="skip that time"):
+            _ = await call(
+                "outlook_create_task",
+                task_list=TASK_LIST,
+                title="Call the bank",
+                reminder_at="2027-03-28T02:30:00",
+                time_zone=ZURICH,
+            )
+
+        assert graph.calls.call_count == 0
 
     async def test_a_repeating_task_with_no_due_date_is_refused(
         self, graph: respx.MockRouter
@@ -454,6 +491,7 @@ class TestPlanningATask:
         answer = await call("outlook_set_task_status", uri=TASK, status="waiting_on_others")
 
         assert _sent(route) == {"status": "waitingOnOthers"}
+        assert route.calls.last.request.headers["prefer"] == 'outlook.timezone="UTC"'
         assert answer["status"] == "waiting_on_others"
 
 
@@ -494,7 +532,7 @@ class TestSteps:
         [question] = person.asked
         assert "'Get the numbers from Anna'" in question
         assert person.writes_before_each_question == [0]
-        assert (answer["deleted"], route.call_count) == (True, 1)
+        assert (answer["outcome"], route.call_count) == ("deleted", 1)
 
     async def test_a_declined_step_in_a_shared_list_adds_nothing(
         self, graph: respx.MockRouter
@@ -568,6 +606,7 @@ class TestSteps:
         answer = await call("outlook_read_task", uri=TASK)
 
         assert read.calls.last.request.url.params["$expand"] == "checklistItems,linkedResources"
+        assert read.calls.last.request.headers["prefer"] == 'outlook.timezone="UTC"'
         assert [(row["text"], row["is_checked"]) for row in _rows(answer, "steps")] == [
             ("Get the numbers from Anna", True),
             ("Check the totals", False),
@@ -611,7 +650,7 @@ class TestLinksAndFiles:
         [question] = person.asked
         assert "'Q3 numbers'" in question
         assert person.writes_before_each_question == [0]
-        assert (answer["deleted"], route.call_count) == (True, 1)
+        assert (answer["outcome"], route.call_count) == ("deleted", 1)
 
     async def test_a_file_of_a_task_is_read(self, graph: respx.MockRouter) -> None:
         _ = graph.get(f"{FILES}/FILE1").mock(return_value=httpx.Response(200, json=_CSV))
@@ -640,7 +679,7 @@ class TestLinksAndFiles:
         [question] = person.asked
         assert "'Numbers.csv'" in question
         assert person.writes_before_each_question == [0]
-        assert (answer["deleted"], route.call_count) == (True, 1)
+        assert (answer["outcome"], route.call_count) == ("deleted", 1)
 
     async def test_an_address_that_is_not_https_is_not_linked(
         self, graph: respx.MockRouter
@@ -706,7 +745,7 @@ class TestDeletingTasks:
         [question] = person.asked
         assert "'Old report'" in question
         assert person.writes_before_each_question == [0]
-        assert (answer["deleted"], route.call_count) == (True, 1)
+        assert (answer["outcome"], route.call_count) == ("deleted", 1)
 
     async def test_a_declined_delete_keeps_the_task(self, graph: respx.MockRouter) -> None:
         _list_is(graph, shared=False)
@@ -768,7 +807,7 @@ class TestLists:
         [question] = person.asked
         assert "'Move to Basel' and every task in it" in question
         assert person.writes_before_each_question == [0]
-        assert (answer["deleted"], route.call_count) == (True, 1)
+        assert (answer["outcome"], route.call_count) == ("deleted", 1)
 
     async def test_a_new_list_is_not_made_twice_after_a_failure(
         self, graph: respx.MockRouter
@@ -815,6 +854,7 @@ class TestASharedList:
         self, graph: respx.MockRouter
     ) -> None:
         _list_is(graph, shared=True, name="Team launch")
+        _task_is(graph)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
 
         with pytest.raises(ToolError, match="Nothing was changed"):
@@ -831,6 +871,7 @@ class TestASharedList:
         self, graph: respx.MockRouter
     ) -> None:
         _list_is(graph, shared=True, name="Team launch")
+        _task_is(graph)
         changed = _task(TASK_ID, "Book the venue", importance="high")
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=changed))
         person = _PersonWatchingWrites(write=route)
@@ -843,6 +884,7 @@ class TestASharedList:
         assert answer.structured_content is not None
         [question] = person.asked
         assert "'Team launch'" in question
+        assert "'Book the venue' (priority high)" in question
         assert person.writes_before_each_question == [0]
         assert route.call_count == 1
 
@@ -850,6 +892,7 @@ class TestASharedList:
         self, graph: respx.MockRouter
     ) -> None:
         _list_is(graph, shared=None, name="Team launch")
+        _task_is(graph)
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(200, json=_SOME_TASK))
         person = Person()
 
@@ -857,6 +900,7 @@ class TestASharedList:
 
         [question] = person.asked
         assert "did not report as private" in question
+        assert "'Book the venue' to completed" in question
         assert route.call_count == 1
 
 

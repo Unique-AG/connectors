@@ -9,7 +9,6 @@ from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphNotFound
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools.outlook_delete_task_link import DeletedTaskLink, delete_task_link
 
@@ -56,6 +55,10 @@ async def _refuses(question: str, about: str) -> str | None:
     return _NOTHING_DELETED
 
 
+async def _never_asked(question: str, about: str) -> str | None:
+    raise AssertionError(f"a refused delete was put to a person: {question!r} ({about})")
+
+
 async def _delete(
     client: GraphServiceClient, *, link: str = _LINK, confirm: Confirm = _agrees
 ) -> DeletedTaskLink:
@@ -80,9 +83,9 @@ class TestWhatItSendsToGraph:
             ("DELETE", f"/v1.0{_ONE_LINK}"),
         ]
         assert "$select" not in made[1].request.url.params
-        assert (answer.title, answer.deleted) == ("Q3 report", True)
+        assert (answer.title, answer.outcome) == ("Q3 report", "deleted")
 
-    async def test_a_link_that_is_gone_after_the_read_is_reported_as_deleted(
+    async def test_a_link_that_is_gone_at_the_delete_is_reported_as_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _link_is_there(graph)
@@ -90,16 +93,29 @@ class TestWhatItSendsToGraph:
 
         answer = await _delete(client)
 
-        assert answer.deleted is True
+        assert (answer.title, answer.outcome) == ("Q3 report", "not_found")
 
-    async def test_a_link_that_is_gone_before_the_read_deletes_nothing(
+    async def test_a_link_that_is_gone_before_the_question_is_reported_as_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_ONE_LINK).mock(return_value=httpx.Response(404))
         delete = _deleted(graph)
 
-        with pytest.raises(GraphNotFound):
-            _ = await _delete(client)
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert (answer.title, answer.outcome) == (None, "not_found")
+        assert delete.call_count == 0
+
+    async def test_a_task_that_is_gone_after_the_link_read_answers_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _link_is_there(graph)
+        _ = graph.get(_ONE_TASK).mock(return_value=httpx.Response(404))
+        delete = _deleted(graph)
+
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert answer.outcome == "not_found"
 
         assert delete.call_count == 0
 

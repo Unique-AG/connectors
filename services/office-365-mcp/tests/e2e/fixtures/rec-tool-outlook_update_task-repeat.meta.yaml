@@ -2,7 +2,7 @@ scenario: outlook_update_task-repeat
 fixture: rec-tool-outlook_update_task-repeat
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:12:25+00:00'
+recorded_at: '2026-11-25T09:36:36+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 19

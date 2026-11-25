@@ -2,7 +2,7 @@ scenario: outlook_list_tasks-seed
 fixture: rec-tool-outlook_list_tasks-seed
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:04:48+00:00'
+recorded_at: '2026-11-25T09:28:45+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 20

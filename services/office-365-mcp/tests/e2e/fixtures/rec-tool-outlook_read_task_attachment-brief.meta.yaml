@@ -2,7 +2,7 @@ scenario: outlook_read_task_attachment-brief
 fixture: rec-tool-outlook_read_task_attachment-brief
 source: recorded
 target: graph
-recorded_at: '2026-11-25T08:27:08+00:00'
+recorded_at: '2026-11-25T09:29:27+00:00'
 scrub_version: 1.0.0
 replacements:
   binaries kept by hash: 1

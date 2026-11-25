@@ -41,15 +41,6 @@ _DECLINE = "keep the list"
 
 _AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
-GRAPH_NOT_FOUND = (
-    "Microsoft 365 did not find this task list, and nothing was deleted. The handle is well "
-    + "formed, so this is not a bad argument. A person or an earlier call of this tool probably "
-    + "deleted the list, or its owner stopped sharing it. Call outlook_list_task_lists again. If "
-    + "the list is not in that result, it is already gone and nothing is left to delete. The "
-    + "same handle fails the same way, so do not retry it."
-)
-
-
 _DESCRIPTION = """\
 Deletes one Microsoft To Do task list of the signed-in user and every task in it, given the \
 `uri` of an outlook_list_task_lists row. Outlook and To Do no longer show the list. This tool \
@@ -59,7 +50,8 @@ Notes:
 - This tool refuses the built-in Tasks list and the built-in list of flagged messages, because \
 Microsoft To Do does not delete them.
 - No tool of this connector can bring back a deleted list or its tasks.
-- This call is safe to repeat after a timeout. A second call finds no list and reports that.
+- This call is safe to repeat after a timeout. A second call finds no list and answers \
+`not_found`.
 """
 
 _NOT_A_LIST_HANDLE = (
@@ -76,24 +68,31 @@ _BUILT_IN = (
 )
 
 
+Outcome = Literal["deleted", "not_found"]
+
+
 class DeletedTaskList(BaseModel):
     uri: str = Field(
         description=(
-            "The handle that this call was given, echoed back. The list that this handle named "
-            + "is deleted, so do not pass this handle to another tool."
+            "The handle that this call was given, echoed back. Microsoft 365 finds no list for "
+            + "this handle now, so do not pass it to another tool."
         )
     )
     name: str | None = Field(
         description=(
             "The name of the list, as Microsoft 365 reported it immediately before the delete. "
-            + "The value is null when Microsoft 365 reported no name."
+            + "The value is null when Microsoft 365 reported no name, or when Microsoft 365 "
+            + "found no list to read."
         )
     )
-    deleted: Literal[True] = Field(
+    outcome: Outcome = Field(
         description=(
-            "Always true, because this tool answers only when the list is gone. It is also true "
-            + "when the list was there at the start of this call, but Graph then found no list "
-            + "to delete."
+            "What this call did. `deleted`: Microsoft 365 accepted the delete, and this call "
+            + "deleted the list. `not_found`: Microsoft 365 found no such list, before the "
+            + "question or at the delete. The list was deleted before, or the user cannot see "
+            + "it now, for example because its owner stopped sharing it. This call deleted "
+            + "nothing. When the value is `not_found`, do not tell the user that this call "
+            + "deleted the list."
         )
     )
 
@@ -107,8 +106,11 @@ async def delete_task_list(
 
     asked: InputRequiredResult | None = None
     refused: str | None = None
+    outcome: Outcome = "not_found"
     with graph_errors():
         found = await _task_list(client, handle.list_id)
+        if found is None:
+            return DeletedTaskList(uri=handle.uri, name=None, outcome="not_found")
         if _is_built_in(found):
             refused = _BUILT_IN
         else:
@@ -121,17 +123,21 @@ async def delete_task_list(
         if refused is None and asked is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE):
                 await client.me.todo.lists.by_todo_task_list_id(handle.list_id).delete()
+                outcome = "deleted"
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    return DeletedTaskList(uri=handle.uri, name=found.display_name, deleted=True)
+    return DeletedTaskList(uri=handle.uri, name=found.display_name, outcome=outcome)
 
 
-async def _task_list(client: GraphServiceClient, list_id: str) -> TodoTaskList:
-    with graph_step(STEP_TASK_LIST):
-        found = await client.me.todo.lists.by_todo_task_list_id(list_id).get()
+async def _task_list(client: GraphServiceClient, list_id: str) -> TodoTaskList | None:
+    try:
+        with graph_step(STEP_TASK_LIST):
+            found = await client.me.todo.lists.by_todo_task_list_id(list_id).get()
+    except GraphNotFound:
+        return None
     assert found is not None, "Graph answered a task list read with no list"
     return found
 

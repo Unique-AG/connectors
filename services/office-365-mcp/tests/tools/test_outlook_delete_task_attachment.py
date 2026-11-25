@@ -9,7 +9,6 @@ from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
-from office_365_mcp.graph_client import GraphNotFound
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools.outlook_delete_task_attachment import (
     DeletedTaskAttachment,
@@ -51,6 +50,10 @@ async def _refuses(question: str, about: str) -> str | None:
     return _NOTHING_DELETED
 
 
+async def _never_asked(question: str, about: str) -> str | None:
+    raise AssertionError(f"a refused delete was put to a person: {question!r} ({about})")
+
+
 async def _delete(
     client: GraphServiceClient, *, attachment: str = _FILE, confirm: Confirm = _agrees
 ) -> DeletedTaskAttachment:
@@ -76,9 +79,9 @@ class TestWhatItSendsToGraph:
         ]
         assert made[0].request.url.params["$select"] == "id,name"
         assert "$select" not in made[1].request.url.params
-        assert (answer.name, answer.deleted) == ("Agenda.pdf", True)
+        assert (answer.name, answer.outcome) == ("Agenda.pdf", "deleted")
 
-    async def test_a_file_that_is_gone_after_the_read_is_reported_as_deleted(
+    async def test_a_file_that_is_gone_at_the_delete_is_reported_as_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _file_is_there(graph)
@@ -86,16 +89,29 @@ class TestWhatItSendsToGraph:
 
         answer = await _delete(client)
 
-        assert answer.deleted is True
+        assert (answer.name, answer.outcome) == ("Agenda.pdf", "not_found")
 
-    async def test_a_file_that_is_gone_before_the_read_deletes_nothing(
+    async def test_a_file_that_is_gone_before_the_question_is_reported_as_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = graph.get(_ONE_FILE).mock(return_value=httpx.Response(404))
         delete = _deleted(graph)
 
-        with pytest.raises(GraphNotFound):
-            _ = await _delete(client)
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert (answer.name, answer.outcome) == (None, "not_found")
+        assert delete.call_count == 0
+
+    async def test_a_task_that_is_gone_after_the_file_read_answers_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _file_is_there(graph)
+        _ = graph.get(_ONE_TASK).mock(return_value=httpx.Response(404))
+        delete = _deleted(graph)
+
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert answer.outcome == "not_found"
 
         assert delete.call_count == 0
 

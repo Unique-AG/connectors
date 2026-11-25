@@ -25,9 +25,12 @@ from office_365_mcp.shared.outlook.tasks import (
     graph_status,
     list_audience,
     shared_list_reason,
+    task_title,
+    utc_times,
 )
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
-    WRITE_DESTRUCTIVE_IDEMPOTENT,
+    WRITE_DESTRUCTIVE,
     Confirm,
     answer_pending,
     graph_client_for_caller,
@@ -41,6 +44,8 @@ PRESETS: tuple[str, ...] = ("outlook-tasks-write", "outlook-tasks-delete")
 STEP_SET_STATUS = "set_task_status"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Tasks.ReadWrite",)
+
+CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_tasks",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "uri": "outlook:///tasks/AAMkAGI2SYNTHETIC-list-0001%3D/AAMkAGI2SYNTHETIC-task-0001%3D",
@@ -67,10 +72,11 @@ outlook_list_tasks row. `completed` marks the task done, and `not_started` reope
 and To Do show the new status.
 
 Notes:
-- When the user completes a repeating task, To Do makes the next task of the series.
+- `completed` on a repeating task keeps the same `uri` for the next task of the series: the \
+answer shows that task open, with the next due date. To Do keeps the completed task as a copy. \
+A second `completed` completes the next task too.
 - This tool asks the user to agree before it changes a task in a list that other people share, \
 because they see the change. A task in the user's own unshared list changes without a question.
-- This call is safe to repeat after a timeout.
 """
 
 _SPOKEN: Mapping[Status, str] = {
@@ -106,8 +112,12 @@ async def set_task_status(
     with graph_errors():
         audience = await list_audience(client, handle.list_id)
         if answer_pending or audience.reaches_others:
+            title = await task_title(client, handle)
             with not_graph():
-                question = f"Set a task to {_SPOKEN[status]} {shared_list_reason(audience)}?"
+                question = (
+                    f"Set the task {cut_for_a_question(title)!r} to {_SPOKEN[status]} "
+                    + f"{shared_list_reason(audience)}?"
+                )
                 answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
@@ -119,7 +129,7 @@ async def set_task_status(
                     .patch(
                         TodoTask(status=graph_status(status)),
                         request_configuration=RequestConfiguration[QueryParameters](
-                            options=no_retry()
+                            headers=utc_times(), options=no_retry()
                         ),
                     )
                 )
@@ -139,7 +149,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         name=TOOL_NAME,
         title="Outlook: Set the Status of a Task",
         description=_DESCRIPTION,
-        annotations=WRITE_DESTRUCTIVE_IDEMPOTENT,
+        annotations=WRITE_DESTRUCTIVE,
     )
     async def outlook_set_task_status(
         uri: Annotated[

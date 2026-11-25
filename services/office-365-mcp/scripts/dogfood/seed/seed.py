@@ -664,7 +664,7 @@ class Graph:
 
     def _guard(self, method: str, url: str) -> None:
         parts = urlsplit(url)
-        if method == "PUT" and url in (self._upload_url, self._token_upload_url):
+        if method == "PUT" and url == self._upload_url:
             return
         path = unquote(parts.path)
         decoded = path
@@ -969,8 +969,8 @@ def apply(
 
 def _uploaded(graph: Graph, session_path: str, body: Mapping[str, Any]) -> dict[str, Any]:
     name = body["attachmentInfo"]["name"]
-    listing = graph.request("GET", session_path.removesuffix("/createUploadSession")).json()
-    stored = [row for row in listing.get("value", []) if row.get("name") == name]
+    listing = graph.get_all(session_path.removesuffix("/createUploadSession"), {})
+    stored = [row for row in listing if row.get("name") == name]
     if not stored:
         raise GraphError(f"the upload of {name} ended, and Graph lists no such file")
     return cast("dict[str, Any]", stored[0])

@@ -1740,7 +1740,7 @@ This reference lists all 147 tools. Use it to build an `enabled` list, or to fin
 | `outlook_read_task_attachment` | 🟢 Read | `Tasks.Read` | No | — |
 | `outlook_create_task` | 🟠 Write, adds | `Tasks.ReadWrite` | No | 🤝 Shared list |
 | `outlook_update_task` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
-| `outlook_set_task_status` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |
+| `outlook_set_task_status` | 🔴 Write, changes or removes | `Tasks.ReadWrite` | No | 🤝 Shared list |
 | `outlook_delete_task` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | ✋ Always |
 | `outlook_add_task_step` | 🟠 Write, adds | `Tasks.ReadWrite` | No | 🤝 Shared list |
 | `outlook_update_task_step` | 🔴 Write, changes or removes, safe to repeat | `Tasks.ReadWrite` | No | 🤝 Shared list |

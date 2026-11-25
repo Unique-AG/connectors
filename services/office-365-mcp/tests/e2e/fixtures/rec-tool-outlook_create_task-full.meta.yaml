@@ -2,13 +2,13 @@ scenario: outlook_create_task-full
 fixture: rec-tool-outlook_create_task-full
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:06:44+00:00'
+recorded_at: '2026-11-25T09:30:57+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 8
   keys dropped: 3
   response headers dropped: 27
-  text kept: 8
+  text kept: 10
 literals:
 - '2026-11-30'
 - '2026-11-30T09:00:00'

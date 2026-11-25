@@ -32,9 +32,10 @@ def creates(phases: set[str] = PHASES) -> dict[str, Step]:
 class TodoFake(FakeGraph):
     """Answers the To Do calls of the seed: a store of rows for each collection path."""
 
-    def __init__(self, *, stores_uploads: bool = True) -> None:
+    def __init__(self, *, stores_uploads: bool = True, upload_owner: str = "/me") -> None:
         super().__init__()
         self.stores_uploads = stores_uploads
+        self.upload_owner = upload_owner
         self.sessions: dict[str, dict[str, Any]] = {}
         self.rows: dict[str, list[dict[str, Any]]] = {
             "/me/todo/lists": [
@@ -74,8 +75,9 @@ class TodoFake(FakeGraph):
 
     def session(self, attachments: str, body: dict[str, Any]) -> httpx.Response:
         task = attachments.removesuffix("/attachments")
-        url = f"https://graph.microsoft.com/v1.0{task}/attachmentSessions/{self.new_id('s')}"
-        self.sessions[f"{url.removeprefix('https://graph.microsoft.com/v1.0')}/content"] = {
+        owned = task.replace("/me/", f"{self.upload_owner}/", 1)
+        url = f"https://graph.microsoft.com/v1.0{owned}/attachmentSessions/{self.new_id('s')}"
+        self.sessions[f"{task}/attachmentSessions/{url.rpartition('/')[2]}/content"] = {
             "attachments": attachments,
             **body["attachmentInfo"],
         }
@@ -216,9 +218,14 @@ def test_apply_creates_the_corpus_and_a_second_apply_creates_nothing() -> None:
 def test_cleanup_deletes_the_seed_list_and_the_seed_tasks_and_keeps_the_rest() -> None:
     fake = TodoFake()
     assert run(["apply", "--as", "1", "--phases", "todo"], fake) == 0
+    look_alike = {"id": "look-alike", "title": "seed-v1 Renew the parking permit"}
+    fake.rows["/me/todo/lists/default/tasks"].append(look_alike)
     assert run(["cleanup", "--as", "1", "--phases", "todo"], fake) == 0
     assert fake.names("/me/todo/lists", "displayName") == ["Flagged", "Holiday", "Tasks"]
-    assert fake.names("/me/todo/lists/default/tasks", "title") == ["Buy milk"]
+    assert fake.names("/me/todo/lists/default/tasks", "title") == [
+        "Buy milk",
+        "seed-v1 Renew the parking permit",
+    ]
 
 
 def test_the_sweep_names_case_lists_and_case_tasks_only() -> None:
@@ -254,3 +261,30 @@ def test_a_file_upload_that_graph_answers_with_500_counts_when_the_file_is_liste
 def test_a_file_upload_that_stores_nothing_stops_the_run() -> None:
     fake = TodoFake(stores_uploads=False)
     assert run(["apply", "--as", "1", "--phases", "todo,todo-files"], fake) != 0
+
+
+def test_a_file_upload_to_another_user_is_refused() -> None:
+    fake = TodoFake(upload_owner="/users/someone-else")
+    assert run(["apply", "--as", "1", "--phases", "todo,todo-files"], fake) != 0
+    assert not [call for call in fake.calls if call[0] == "PUT"]
+
+
+def test_the_file_phase_alone_adds_only_files_to_the_tasks_that_todo_made() -> None:
+    fake = TodoFake()
+    assert run(["apply", "--as", "1", "--phases", "todo"], fake) == 0
+    before = len(fake.calls)
+    assert run(["apply", "--as", "1", "--phases", "todo-files"], fake) == 0
+    written = [call for call in fake.calls[before:] if call[0] in ("POST", "PUT")]
+    assert {path.rsplit("/", 1)[-1] for _, path in written} == {"createUploadSession", "content"}
+
+
+def test_the_file_phase_alone_makes_the_missing_tasks_first() -> None:
+    fake = TodoFake()
+    assert run(["apply", "--as", "1", "--phases", "todo-files"], fake) == 0
+    filed = sorted(
+        str(row["name"])
+        for key, rows in fake.rows.items()
+        if key.endswith("/attachments")
+        for row in rows
+    )
+    assert filed == ["seed-v1 Launch brief.docx", "seed-v1 Old brief.docx"]

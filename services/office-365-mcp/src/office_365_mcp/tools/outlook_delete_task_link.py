@@ -6,6 +6,10 @@ import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
 from mcp.types import InputRequiredResult
+from msgraph.generated.models.linked_resource import LinkedResource
+from msgraph.generated.users.item.todo.lists.item.tasks.item.linked_resources.item.linked_resource_item_request_builder import (  # noqa: E501
+    LinkedResourceItemRequestBuilder,
+)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
@@ -43,12 +47,6 @@ _DECLINE = "keep the link"
 
 _AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
-GRAPH_NOT_FOUND = (
-    "Microsoft 365 did not return this link or its task, and nothing was deleted. The handle is "
-    + "well formed, so this is not a bad argument. The link was most likely deleted already, or "
-    + "its task was deleted or moved to another list. Read the task again with outlook_read_task "
-    + f"and take a fresh `uri` from its `links`. {_AGAIN}"
-)
 
 _BAD_HANDLE = (
     "outlook_delete_task_link takes the `uri` of a link on a task, and this is not one. Take the "
@@ -63,21 +61,29 @@ the `links` of outlook_read_task. The item that the link opens does not change.
 
 Notes:
 - This tool always asks the user to agree, and the question names the link and the task.
-- This call is safe to repeat after a timeout.
+- This call is safe to repeat after a timeout. A second call finds no link and answers \
+`not_found`.
 """
+
+
+Outcome = Literal["deleted", "not_found"]
 
 
 class DeletedTaskLink(BaseModel):
     title: str | None = Field(
         description=(
             "The words that To Do showed for the link, as Microsoft 365 reported them immediately "
-            + "before the delete. Null when the link had none."
+            + "before the delete. Null when the link had none, or when Microsoft 365 found no "
+            + "link to read."
         )
     )
-    deleted: Literal[True] = Field(
+    outcome: Outcome = Field(
         description=(
-            "Always true, because this tool answers only when the link is gone. It is also true "
-            + "when Graph found no link to delete after this call read it."
+            "What this call did. `deleted`: Microsoft 365 accepted the delete, and this call "
+            + "deleted the link. `not_found`: Microsoft 365 found no such link, before the "
+            + "question or at the delete. The link was deleted before, or the user cannot see "
+            + "it now. This call deleted nothing. When the value is `not_found`, do not tell the "
+            + "user that this call deleted the link."
         )
     )
 
@@ -97,13 +103,17 @@ async def delete_task_link(
     title: str | None = None
     asked: InputRequiredResult | None = None
     refused: str | None = None
+    outcome: Outcome = "not_found"
     with graph_errors():
-        with graph_step(STEP_LINK):
-            resource = await found.get()
-        assert resource is not None, "Graph answered a task link read with no link"
+        resource = await _link(found)
+        if resource is None:
+            return DeletedTaskLink(title=None, outcome="not_found")
         title = resource.display_name
-        with graph_step(STEP_TASK):
-            owner = await task.get()
+        try:
+            with graph_step(STEP_TASK):
+                owner = await task.get()
+        except GraphNotFound:
+            return DeletedTaskLink(title=title, outcome="not_found")
         assert owner is not None, "Graph answered a task read with no task"
         question = _question(title, owner.title)
         with not_graph():
@@ -113,12 +123,23 @@ async def delete_task_link(
         if refused is None and asked is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE):
                 await found.delete()
+                outcome = "deleted"
 
     if asked is not None:
         return asked
     if refused is not None:
         raise ToolError(refused)
-    return DeletedTaskLink(title=title, deleted=True)
+    return DeletedTaskLink(title=title, outcome=outcome)
+
+
+async def _link(found: LinkedResourceItemRequestBuilder) -> LinkedResource | None:
+    try:
+        with graph_step(STEP_LINK):
+            resource = await found.get()
+    except GraphNotFound:
+        return None
+    assert resource is not None, "Graph answered a task link read with no link"
+    return resource
 
 
 def _question(title: str | None, task_title: str | None) -> str:

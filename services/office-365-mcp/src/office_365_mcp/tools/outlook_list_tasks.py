@@ -23,6 +23,7 @@ from office_365_mcp.shared.outlook.tasks import (
     TaskSummary,
     bad_zone,
     day_of,
+    utc_times,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
@@ -132,11 +133,14 @@ async def list_tasks(
     with graph_errors(), graph_step(STEP):
         first_page = await client.me.todo.lists.by_todo_task_list_id(handle.list_id).tasks.get(
             request_configuration=RequestConfiguration[_TasksQuery](
-                query_parameters=_TasksQuery(filter=_STATUS_FILTER[show], top=_PAGE_SIZE)
+                headers=utc_times(),
+                query_parameters=_TasksQuery(filter=_STATUS_FILTER[show], top=_PAGE_SIZE),
             )
         )
         assert first_page is not None, "Graph answered a task listing with no collection"
-        collected = await collect_pages(first_page, client, limit=limit, matches=matches)
+        collected = await collect_pages(
+            first_page, client, limit=limit, matches=matches, headers=utc_times()
+        )
 
     return Tasks(
         tasks=[

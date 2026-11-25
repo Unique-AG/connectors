@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 from datetime import date, datetime
 from typing import Annotated
@@ -35,12 +36,15 @@ from office_365_mcp.shared.outlook.tasks import (
     graph_importance,
     html_body,
     list_audience,
+    missing_time_refusal,
     moment_in,
     no_due_date_to_repeat,
     recurrence_for,
     repeat_refusal,
     shared_list_reason,
+    utc_times,
 )
+from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
     Confirm,
@@ -121,6 +125,11 @@ async def create_task(
     zone = zone_named(time_zone)
     if zone is None:
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CREATED))
+    skipped = missing_time_refusal(
+        TOOL_NAME, reminder_at, zone=zone, nothing_happened=_NOTHING_CREATED
+    )
+    if skipped is not None:
+        raise ToolError(skipped)
     if repeat is not None:
         refusal = repeat_refusal(TOOL_NAME, repeat, nothing_happened=_NOTHING_CREATED)
         if refusal is not None:
@@ -151,7 +160,7 @@ async def create_task(
         "" if start_date is None else start_date.isoformat(),
         "" if reminder_at is None else reminder_at.isoformat(),
         "" if repeat is None else repeat.model_dump_json(),
-        "" if categories is None else "\n".join(categories),
+        json.dumps(None if categories is None else list(categories)),
         time_zone,
     )
 
@@ -162,8 +171,9 @@ async def create_task(
         audience = await list_audience(client, handle.list_id)
         if answer_pending or audience.reaches_others:
             with not_graph():
+                named = cut_for_a_question(title)
                 answer = await confirm(
-                    f"Create the task {title!r} {shared_list_reason(audience)}?", about
+                    f"Create the task {named!r} {shared_list_reason(audience)}?", about
                 )
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
@@ -173,7 +183,9 @@ async def create_task(
                     handle.list_id
                 ).tasks.post(
                     body,
-                    request_configuration=RequestConfiguration[QueryParameters](options=no_retry()),
+                    request_configuration=RequestConfiguration[QueryParameters](
+                        headers=utc_times(), options=no_retry()
+                    ),
                 )
 
     if asked is not None:

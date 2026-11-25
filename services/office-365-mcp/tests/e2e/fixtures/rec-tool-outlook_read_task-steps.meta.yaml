@@ -2,7 +2,7 @@ scenario: outlook_read_task-steps
 fixture: rec-tool-outlook_read_task-steps
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:05:20+00:00'
+recorded_at: '2026-11-25T09:29:17+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 24

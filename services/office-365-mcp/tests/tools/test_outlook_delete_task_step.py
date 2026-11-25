@@ -112,9 +112,9 @@ class TestWhatItSendsToGraph:
         ]
         assert "$select" not in made[1].request.url.params
         assert "$select" not in made[2].request.url.params
-        assert (answer.text, answer.deleted) == ("Book the room", True)
+        assert (answer.text, answer.outcome) == ("Book the room", "deleted")
 
-    async def test_a_step_that_is_gone_after_the_read_is_reported_as_deleted(
+    async def test_a_step_that_is_gone_at_the_delete_is_reported_as_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _list(graph)
@@ -124,7 +124,34 @@ class TestWhatItSendsToGraph:
 
         answer = await _delete(client)
 
-        assert answer.deleted is True
+        assert (answer.text, answer.outcome) == ("Book the room", "not_found")
+
+    async def test_a_step_that_is_gone_before_the_question_is_reported_as_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _list(graph)
+        _ = _task(graph)
+        _ = graph.get(_STEP_PATH).mock(return_value=httpx.Response(404))
+        delete = _deleted(graph)
+
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert (answer.text, answer.outcome) == (None, "not_found")
+        assert delete.call_count == 0
+
+    async def test_a_task_that_is_gone_answers_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _list(graph)
+        _ = graph.get(_TASK_PATH).mock(return_value=httpx.Response(404))
+        step = _step(graph)
+        delete = _deleted(graph)
+
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert (answer.text, answer.outcome) == (None, "not_found")
+
+        assert (step.call_count, delete.call_count) == (0, 0)
 
 
 class TestWhatItRefuses:

@@ -101,9 +101,9 @@ class TestWhatItSendsToGraph:
             ("DELETE", f"/v1.0{_PATH}"),
         ]
         assert "$select" not in made[0].request.url.params
-        assert (answer.uri, answer.name, answer.deleted) == (_URI, "Launch", True)
+        assert (answer.uri, answer.name, answer.outcome) == (_URI, "Launch", "deleted")
 
-    async def test_a_list_that_is_gone_after_the_read_is_reported_as_deleted(
+    async def test_a_list_that_is_gone_at_the_delete_is_reported_as_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _read(graph)
@@ -111,7 +111,18 @@ class TestWhatItSendsToGraph:
 
         answer = await _delete(client)
 
-        assert answer.deleted is True
+        assert (answer.uri, answer.name, answer.outcome) == (_URI, "Launch", "not_found")
+
+    async def test_a_list_that_is_gone_before_the_question_is_reported_as_not_found(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(_PATH).mock(return_value=httpx.Response(404))
+        delete = _deleted(graph)
+
+        answer = await _delete(client, confirm=_never_asked)
+
+        assert (answer.uri, answer.name, answer.outcome) == (_URI, None, "not_found")
+        assert delete.call_count == 0
 
 
 class TestWhatItRefuses:

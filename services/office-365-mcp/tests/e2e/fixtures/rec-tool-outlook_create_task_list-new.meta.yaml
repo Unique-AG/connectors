@@ -2,7 +2,7 @@ scenario: outlook_create_task_list-new
 fixture: rec-tool-outlook_create_task_list-new
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:07:18+00:00'
+recorded_at: '2026-11-25T09:31:33+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 2

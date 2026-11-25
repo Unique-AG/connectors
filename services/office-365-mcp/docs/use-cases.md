@@ -5741,7 +5741,7 @@ What happens:
 #### Not supported yet in keeping track of tasks
 
 - The assistant cannot attach a file to a task yet. It can link the file to the task instead.
-- The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one, but the new task loses its creation date.
+- The assistant cannot move a task to another list. It can make the task again in the other list and delete the old one. The new task loses its creation date and its attached files, because no tool adds a file to a task, so save the files before the old task is deleted.
 - The assistant reads only Mia's own tasks and the lists that people share with her, not the tasks of another person or of a shared mailbox.
 
 ## Teams

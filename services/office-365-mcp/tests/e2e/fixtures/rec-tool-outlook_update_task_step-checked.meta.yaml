@@ -2,7 +2,7 @@ scenario: outlook_update_task_step-checked
 fixture: rec-tool-outlook_update_task_step-checked
 source: recorded
 target: graph
-recorded_at: '2026-11-24T15:12:58+00:00'
+recorded_at: '2026-11-25T09:37:13+00:00'
 scrub_version: 1.0.0
 replacements:
   ids mapped: 21

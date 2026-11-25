@@ -11,9 +11,9 @@
       "location": "https://graph.microsoft.com"
     },
     "response_json": {
-      "@odata.etag": "W/\"t4Nwyi28ViBJTe8J7twhknNX+vYcYo==\"",
+      "@odata.etag": "W/\"f0Tayd60AmBOJm3H4tayorEI/CjKyW==\"",
       "displayName": "seed-v1 case-outlook_rename_task_list-created",
-      "id": "AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+      "id": "AAMkJYinPHG6WTB8MBHgDXzgOQQ1KH14Lmh1MWL9YMQhWRJtZ0UiEDMxJKRDAKThlhtHQEysMQgmJ3b6NPL4DFBaaQbeTzqeBFWcXxOj-OhmBZH6JR9wEVA=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -21,15 +21,15 @@
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+    "path": "/v1.0/me/todo/lists/AAMkJYinPHG6WTB8MBHgDXzgOQQ1KH14Lmh1MWL9YMQhWRJtZ0UiEDMxJKRDAKThlhtHQEysMQgmJ3b6NPL4DFBaaQbeTzqeBFWcXxOj-OhmBZH6JR9wEVA=",
     "status": 200,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"t4Nwyi28ViBJTe8J7twhknNX+vYcYo==\"",
+      "@odata.etag": "W/\"f0Tayd60AmBOJm3H4tayorEI/CjKyW==\"",
       "displayName": "seed-v1 case-outlook_rename_task_list-created",
-      "id": "AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+      "id": "AAMkJYinPHG6WTB8MBHgDXzgOQQ1KH14Lmh1MWL9YMQhWRJtZ0UiEDMxJKRDAKThlhtHQEysMQgmJ3b6NPL4DFBaaQbeTzqeBFWcXxOj-OhmBZH6JR9wEVA=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -37,7 +37,7 @@
   },
   {
     "method": "PATCH",
-    "path": "/v1.0/me/todo/lists/AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+    "path": "/v1.0/me/todo/lists/AAMkJYinPHG6WTB8MBHgDXzgOQQ1KH14Lmh1MWL9YMQhWRJtZ0UiEDMxJKRDAKThlhtHQEysMQgmJ3b6NPL4DFBaaQbeTzqeBFWcXxOj-OhmBZH6JR9wEVA=",
     "json": {
       "displayName": "seed-v1 case-outlook_rename_task_list-created renamed"
     },
@@ -46,9 +46,9 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"x6Wvie28EwFEPc7W3ucdjrXH+qVnwf==\"",
+      "@odata.etag": "W/\"r4Nysi04DcMQCw5C0fpfilRI/IoQhj==\"",
       "displayName": "seed-v1 case-outlook_rename_task_list-created renamed",
-      "id": "AAMkFIynPAM3SDW6XZTbELxmKHL3IF89Dsq1MXR2FEUgJVQpV8JmCIGsTQMQZQPkpooCAQglWKmmA7l9DAJ1NGHptGtcTebhGBHkGfKd-GaqUPT1GlIaUZS=",
+      "id": "AAMkJYinPHG6WTB8MBHgDXzgOQQ1KH14Lmh1MWL9YMQhWRJtZ0UiEDMxJKRDAKThlhtHQEysMQgmJ3b6NPL4DFBaaQbeTzqeBFWcXxOj-OhmBZH6JR9wEVA=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"

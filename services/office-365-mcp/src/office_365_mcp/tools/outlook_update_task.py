@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -42,12 +43,16 @@ from office_365_mcp.shared.outlook.tasks import (
     graph_importance,
     html_body,
     list_audience,
+    missing_time_refusal,
     moment_in,
     no_due_date_to_repeat,
     recurrence_for,
     repeat_refusal,
     shared_list_reason,
+    task_title,
+    utc_times,
 )
+from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     Confirm,
@@ -110,6 +115,29 @@ _NOTHING_TO_CHANGE = (
 )
 
 
+def _changes(change: TaskChange) -> str:
+    parts = [
+        *([f"title {cut_for_a_question(change.title)!r}"] if change.title else []),
+        *([f"notes that open with {body_opening(change.notes)!r}"] if change.notes else []),
+        *([f"due {change.due_date}"] if change.due_date else []),
+        *(["no due date"] if change.clear_due_date else []),
+        *([f"start {change.start_date}"] if change.start_date else []),
+        *(["no start date"] if change.clear_start_date else []),
+        *([f"reminder {change.reminder_at.isoformat()}"] if change.reminder_at else []),
+        *(["no reminder"] if change.clear_reminder else []),
+        *([f"repeats every {change.repeat.every}"] if change.repeat else []),
+        *(["no repeat"] if change.clear_repeat else []),
+        *([f"priority {change.priority}"] if change.priority else []),
+        *(
+            [f"categories {cut_for_a_question(', '.join(change.categories))!r}"]
+            if change.categories
+            else []
+        ),
+        *(["no categories"] if change.categories == () else []),
+    ]
+    return "; ".join(parts)
+
+
 def _both(name: str) -> str:
     return (
         f"outlook_update_task takes either `{name}` or `clear_{_CLEARED[name]}`, not both: one "
@@ -134,7 +162,7 @@ async def _due_date(
             .tasks.by_todo_task_id(handle.task_id)
             .get(
                 request_configuration=RequestConfiguration[_TaskQuery](
-                    query_parameters=_TaskQuery(select=["id", "dueDateTime"])
+                    headers=utc_times(), query_parameters=_TaskQuery(select=["id", "dueDateTime"])
                 )
             )
         )
@@ -187,6 +215,11 @@ async def update_task(
     ):
         if given and cleared:
             raise ToolError(_both(name))
+    skipped = missing_time_refusal(
+        TOOL_NAME, change.reminder_at, zone=zone, nothing_happened=_NOTHING_CHANGED
+    )
+    if skipped is not None:
+        raise ToolError(skipped)
     if change.repeat is not None:
         refusal = repeat_refusal(TOOL_NAME, change.repeat, nothing_happened=_NOTHING_CHANGED)
         if refusal is not None:
@@ -233,7 +266,7 @@ async def update_task(
         str(change.clear_reminder),
         "" if change.repeat is None else change.repeat.model_dump_json(),
         str(change.clear_repeat),
-        "" if change.categories is None else "\n".join(change.categories),
+        json.dumps(None if change.categories is None else list(change.categories)),
         time_zone,
     )
 
@@ -251,8 +284,13 @@ async def update_task(
         if refused is None:
             audience = await list_audience(client, handle.list_id)
             if answer_pending or audience.reaches_others:
+                title = await task_title(client, handle)
                 with not_graph():
-                    answer = await confirm(f"Change a task {shared_list_reason(audience)}?", about)
+                    question = (
+                        f"Change the task {cut_for_a_question(title)!r} ({_changes(change)}) "
+                        + f"{shared_list_reason(audience)}?"
+                    )
+                    answer = await confirm(question, about)
                 asked = answer if isinstance(answer, InputRequiredResult) else None
                 refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
@@ -263,7 +301,7 @@ async def update_task(
                     .patch(
                         body,
                         request_configuration=RequestConfiguration[QueryParameters](
-                            options=no_retry()
+                            headers=utc_times(), options=no_retry()
                         ),
                     )
                 )

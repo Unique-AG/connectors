@@ -11,9 +11,9 @@
       "location": "https://graph.microsoft.com"
     },
     "response_json": {
-      "@odata.etag": "W/\"t1Cqqh38YtEZSe2P0xtxinJZ+xAMFq==\"",
+      "@odata.etag": "W/\"g4Tskx75RiROWo4V6rfzefMV/HoZoA==\"",
       "displayName": "seed-v1 case-outlook_delete_task_list-created",
-      "id": "AAMkAXmjFUT7QEI7KTMiYLziKVD4KR44Eez2XLM7IKMwSMAmZ6SmPMOuVNKURGZrvogYVUteAPmsK0y9HXI8DYSswPojAgzcSUNxUlAs-TuuNDH8WtGjFFZ=",
+      "id": "AAMkMBbdYMF8VSP5RNGnZFwoKJG1YI38Ckh1FFI7ANSiYMYwU5OrSTUoEBFXJLZuesrCINauLTbjU0a4QMF1ZVQsdZllGojcSGEfQbCi-NdqVML6HH9oDXL=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -21,15 +21,15 @@
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkAXmjFUT7QEI7KTMiYLziKVD4KR44Eez2XLM7IKMwSMAmZ6SmPMOuVNKURGZrvogYVUteAPmsK0y9HXI8DYSswPojAgzcSUNxUlAs-TuuNDH8WtGjFFZ=",
+    "path": "/v1.0/me/todo/lists/AAMkMBbdYMF8VSP5RNGnZFwoKJG1YI38Ckh1FFI7ANSiYMYwU5OrSTUoEBFXJLZuesrCINauLTbjU0a4QMF1ZVQsdZllGojcSGEfQbCi-NdqVML6HH9oDXL=",
     "status": 200,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"t1Cqqh38YtEZSe2P0xtxinJZ+xAMFq==\"",
+      "@odata.etag": "W/\"g4Tskx75RiROWo4V6rfzefMV/HoZoA==\"",
       "displayName": "seed-v1 case-outlook_delete_task_list-created",
-      "id": "AAMkAXmjFUT7QEI7KTMiYLziKVD4KR44Eez2XLM7IKMwSMAmZ6SmPMOuVNKURGZrvogYVUteAPmsK0y9HXI8DYSswPojAgzcSUNxUlAs-TuuNDH8WtGjFFZ=",
+      "id": "AAMkMBbdYMF8VSP5RNGnZFwoKJG1YI38Ckh1FFI7ANSiYMYwU5OrSTUoEBFXJLZuesrCINauLTbjU0a4QMF1ZVQsdZllGojcSGEfQbCi-NdqVML6HH9oDXL=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -37,7 +37,7 @@
   },
   {
     "method": "DELETE",
-    "path": "/v1.0/me/todo/lists/AAMkAXmjFUT7QEI7KTMiYLziKVD4KR44Eez2XLM7IKMwSMAmZ6SmPMOuVNKURGZrvogYVUteAPmsK0y9HXI8DYSswPojAgzcSUNxUlAs-TuuNDH8WtGjFFZ=",
+    "path": "/v1.0/me/todo/lists/AAMkMBbdYMF8VSP5RNGnZFwoKJG1YI38Ckh1FFI7ANSiYMYwU5OrSTUoEBFXJLZuesrCINauLTbjU0a4QMF1ZVQsdZllGojcSGEfQbCi-NdqVML6HH9oDXL=",
     "status": 204
   }
 ]

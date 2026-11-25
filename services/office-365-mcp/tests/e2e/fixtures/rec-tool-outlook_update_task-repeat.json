@@ -11,9 +11,9 @@
       "location": "https://graph.microsoft.com"
     },
     "response_json": {
-      "@odata.etag": "W/\"j2Iywe86KdEPFr8N4mssjjMP+jKptT==\"",
+      "@odata.etag": "W/\"i2Fzzj67QoPFWu1Z2navrxBA/BgP+G==\"",
       "displayName": "seed-v1 case-outlook_update_task-repeat",
-      "id": "AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=",
+      "id": "AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -21,15 +21,15 @@
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=",
+    "path": "/v1.0/me/todo/lists/AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=",
     "status": 200,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"t6Tbqv95SnATYb1Y0gewznKU+kFwbr==\"",
+      "@odata.etag": "W/\"r2Vdjx41UmOXJx3C8iwpffBT/NtS+l==\"",
       "displayName": "seed-v1 case-outlook_update_task-repeat",
-      "id": "AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=",
+      "id": "AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -37,7 +37,10 @@
   },
   {
     "method": "POST",
-    "path": "/v1.0/me/todo/lists/AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=/tasks",
+    "path": "/v1.0/me/todo/lists/AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
     "json": {
       "dueDateTime": {
         "dateTime": "~nextFriday",
@@ -51,29 +54,32 @@
       "location": "https://graph.microsoft.com"
     },
     "response_json": {
-      "@odata.etag": "W/\"p1Vmsi26SyDSKq2C2ovmshKP+eNkkx==\"",
+      "@odata.etag": "W/\"n0Snfq49GgWNEk6G9frkcvIL/PcA/k==\"",
       "body": {
         "content": "",
         "contentType": "text"
       },
       "categories": [],
-      "createdDateTime": "2026-11-24T15:12:26.7101302Z",
+      "createdDateTime": "2026-11-25T09:36:37.5062055Z",
       "dueDateTime": {
         "dateTime": "2026-11-27T00:00:00.0000000",
         "timeZone": "UTC"
       },
       "hasAttachments": false,
-      "id": "AAMkOUsaJKR3WVM3OWHwAIerICG2RE37Veb7WFJ5TETgRZYrB9JdQUSKFPIWYHFwqbjOQZgkOWzxF0k8HKU5IoSdpLoaLfseBNIaNvPa-PpjFDR4SeNbPLQaoUsiVcnzXWOdGtTt-DyqBUB0BrliEQU=",
+      "id": "AAMkTAvuJTZ7DVN1OEXbENrbNMT3OG65Sgz3AQX4HRLoRKPmZ6OxXJUIZTXCUZTvkbsNGYdrWLbeR1j8OAW3GkQorRjaPgykIRTjIiSq-BjsSPK2WV7dVOGvkDdtVpsdOTIhIcAi-LyiLLK7QK5MGGP=",
       "importance": "normal",
       "isReminderOn": false,
-      "lastModifiedDateTime": "2026-11-24T15:12:26.8696037Z",
+      "lastModifiedDateTime": "2026-11-25T09:36:37.6250198Z",
       "status": "notStarted",
       "title": "seed-v1 case-outlook_update_task task"
     }
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=/tasks/AAMkOUsaJKR3WVM3OWHwAIerICG2RE37Veb7WFJ5TETgRZYrB9JdQUSKFPIWYHFwqbjOQZgkOWzxF0k8HKU5IoSdpLoaLfseBNIaNvPa-PpjFDR4SeNbPLQaoUsiVcnzXWOdGtTt-DyqBUB0BrliEQU=",
+    "path": "/v1.0/me/todo/lists/AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=/tasks/AAMkTAvuJTZ7DVN1OEXbENrbNMT3OG65Sgz3AQX4HRLoRKPmZ6OxXJUIZTXCUZTvkbsNGYdrWLbeR1j8OAW3GkQorRjaPgykIRTjIiSq-BjsSPK2WV7dVOGvkDdtVpsdOTIhIcAi-LyiLLK7QK5MGGP=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
     "query": {
       "$select": "id,dueDateTime"
     },
@@ -82,37 +88,37 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"p1Vmsi26SyDSKq2C2ovmshKP+eNkkx==\"",
+      "@odata.etag": "W/\"n0Snfq49GgWNEk6G9frkcvIL/PcA/k==\"",
       "body": {
         "content": "",
         "contentType": "text"
       },
       "categories": [],
-      "createdDateTime": "2026-11-24T15:12:26.7101302Z",
+      "createdDateTime": "2026-11-25T09:36:37.5062055Z",
       "dueDateTime": {
         "dateTime": "2026-11-27T00:00:00.0000000",
         "timeZone": "UTC"
       },
       "hasAttachments": false,
-      "id": "AAMkOUsaJKR3WVM3OWHwAIerICG2RE37Veb7WFJ5TETgRZYrB9JdQUSKFPIWYHFwqbjOQZgkOWzxF0k8HKU5IoSdpLoaLfseBNIaNvPa-PpjFDR4SeNbPLQaoUsiVcnzXWOdGtTt-DyqBUB0BrliEQU=",
+      "id": "AAMkTAvuJTZ7DVN1OEXbENrbNMT3OG65Sgz3AQX4HRLoRKPmZ6OxXJUIZTXCUZTvkbsNGYdrWLbeR1j8OAW3GkQorRjaPgykIRTjIiSq-BjsSPK2WV7dVOGvkDdtVpsdOTIhIcAi-LyiLLK7QK5MGGP=",
       "importance": "normal",
       "isReminderOn": false,
-      "lastModifiedDateTime": "2026-11-24T15:12:26.8696037Z",
+      "lastModifiedDateTime": "2026-11-25T09:36:37.6250198Z",
       "status": "notStarted",
       "title": "seed-v1 case-outlook_update_task task"
     }
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/todo/lists/AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=",
+    "path": "/v1.0/me/todo/lists/AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=",
     "status": 200,
     "response_headers": {
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"t6Tbqv95SnATYb1Y0gewznKU+kFwbr==\"",
+      "@odata.etag": "W/\"r2Vdjx41UmOXJx3C8iwpffBT/NtS+l==\"",
       "displayName": "seed-v1 case-outlook_update_task-repeat",
-      "id": "AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=",
+      "id": "AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=",
       "isOwner": true,
       "isShared": false,
       "wellknownListName": "none"
@@ -120,7 +126,10 @@
   },
   {
     "method": "PATCH",
-    "path": "/v1.0/me/todo/lists/AAMkNRrqSMZ7IVA0GVFlYOtsNXP0MK31Knz0ZHQ0ZAErXULcD0AtXUTzTFSFFBVfppyCYEcfTExgT4h2HWZ5LGZcdJkxOnrcWGDkHiHb-CfrXRJ8XtCfSCO=/tasks/AAMkOUsaJKR3WVM3OWHwAIerICG2RE37Veb7WFJ5TETgRZYrB9JdQUSKFPIWYHFwqbjOQZgkOWzxF0k8HKU5IoSdpLoaLfseBNIaNvPa-PpjFDR4SeNbPLQaoUsiVcnzXWOdGtTt-DyqBUB0BrliEQU=",
+    "path": "/v1.0/me/todo/lists/AAMkXBolUGW4BDX7QVMsLFebDJR1PM17Ooj6VLO8JAQcGATtJ0UzXXLdCGYZLWPiqbjZGPuyCCxxQ2u0BPS0XXVpqGykUpgtIFPiXlLa-TfxMDB7AI4qACX=/tasks/AAMkTAvuJTZ7DVN1OEXbENrbNMT3OG65Sgz3AQX4HRLoRKPmZ6OxXJUIZTXCUZTvkbsNGYdrWLbeR1j8OAW3GkQorRjaPgykIRTjIiSq-BjsSPK2WV7dVOGvkDdtVpsdOTIhIcAi-LyiLLK7QK5MGGP=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
     "json": {
       "recurrence": {
         "pattern": {
@@ -141,22 +150,22 @@
       "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
     },
     "response_json": {
-      "@odata.etag": "W/\"u2Rgov75UdKMAf4Q2maemcXA+tTmjw==\"",
+      "@odata.etag": "W/\"o8Gyse16FaBJUu9P9wqizgBZ/OgIRz==\"",
       "body": {
         "content": "",
         "contentType": "text"
       },
       "categories": [],
-      "createdDateTime": "2026-11-24T15:12:26.7101302Z",
+      "createdDateTime": "2026-11-25T09:36:37.5062055Z",
       "dueDateTime": {
         "dateTime": "2026-11-30T00:00:00.0000000",
         "timeZone": "UTC"
       },
       "hasAttachments": false,
-      "id": "AAMkOUsaJKR3WVM3OWHwAIerICG2RE37Veb7WFJ5TETgRZYrB9JdQUSKFPIWYHFwqbjOQZgkOWzxF0k8HKU5IoSdpLoaLfseBNIaNvPa-PpjFDR4SeNbPLQaoUsiVcnzXWOdGtTt-DyqBUB0BrliEQU=",
+      "id": "AAMkTAvuJTZ7DVN1OEXbENrbNMT3OG65Sgz3AQX4HRLoRKPmZ6OxXJUIZTXCUZTvkbsNGYdrWLbeR1j8OAW3GkQorRjaPgykIRTjIiSq-BjsSPK2WV7dVOGvkDdtVpsdOTIhIcAi-LyiLLK7QK5MGGP=",
       "importance": "normal",
       "isReminderOn": false,
-      "lastModifiedDateTime": "2026-11-24T15:12:27.266521Z",
+      "lastModifiedDateTime": "2026-11-25T09:36:37.9512789Z",
       "recurrence": {
         "pattern": {
           "dayOfMonth": 0,

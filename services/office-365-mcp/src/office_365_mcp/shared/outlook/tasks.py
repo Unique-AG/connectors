@@ -3,6 +3,8 @@ from datetime import UTC, date, datetime, time
 from typing import Annotated, ClassVar, Literal, Self
 from zoneinfo import ZoneInfo
 
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.headers_collection import HeadersCollection
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.checklist_item import ChecklistItem
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
@@ -31,6 +33,8 @@ from office_365_mcp.shared.markdown import markdown_to_html
 DEFAULT_TIME_ZONE = "UTC"
 
 STEP_TASK_LIST = "task_list"
+
+STEP_TASK_TITLE = "task_title"
 
 
 Status = Literal["not_started", "in_progress", "completed", "waiting_on_others", "deferred"]
@@ -130,10 +134,30 @@ def bad_step_handle(tool: str, *, nothing_happened: str) -> str:
     )
 
 
+def utc_times() -> HeadersCollection:
+    headers = HeadersCollection()
+    headers.add("Prefer", 'outlook.timezone="UTC"')
+    return headers
+
+
 def due_moment(day: date, *, zone: ZoneInfo) -> DateTimeTimeZone:
-    midnight = datetime.combine(day, time(), tzinfo=zone).astimezone(UTC)
     return DateTimeTimeZone(
-        date_time=midnight.replace(tzinfo=None).isoformat(timespec="seconds"), time_zone="UTC"
+        date_time=datetime.combine(day, time()).isoformat(timespec="seconds"), time_zone=zone.key
+    )
+
+
+def missing_time_refusal(
+    tool: str, moment: datetime | None, *, zone: ZoneInfo, nothing_happened: str
+) -> str | None:
+    if moment is None or moment.tzinfo is not None:
+        return None
+    back = moment.replace(tzinfo=zone).astimezone(UTC).astimezone(zone).replace(tzinfo=None)
+    if back == moment:
+        return None
+    return (
+        f"{tool} cannot set the reminder at {moment.isoformat()}, because the clocks in "
+        + f"{zone.key} skip that time when they change. Ask the user for a time outside the "
+        + f"change, or give the time with an offset. {nothing_happened} {_AGAIN}"
     )
 
 
@@ -281,6 +305,17 @@ async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudienc
     return ListAudience(name=found.display_name or "", is_shared=found.is_shared)
 
 
+async def task_title(client: GraphServiceClient, task: TaskHandle) -> str:
+    with graph_step(STEP_TASK_TITLE):
+        found = (
+            await client.me.todo.lists.by_todo_task_list_id(task.list_id)
+            .tasks.by_todo_task_id(task.task_id)
+            .get(request_configuration=RequestConfiguration(headers=utc_times()))
+        )
+    assert found is not None, "Graph answered a task read with no task"
+    return found.title or ""
+
+
 def shared_list_reason(audience: ListAudience) -> str:
     named = f"the list {audience.name!r}" if audience.name else "a list"
     if audience.is_shared is None:
@@ -384,8 +419,13 @@ class TaskSummary(BaseModel):
     reminder_at: datetime | None = Field(
         description="When To Do reminds the user of the task, in UTC. Null when no reminder is on."
     )
+    repeats: bool = Field(description="True when the task repeats.")
     repeat: TaskRepeat | None = Field(
-        description="How the task repeats. Null when it does not repeat."
+        description=(
+            "How the task repeats. Null when it does not repeat, or when it repeats on a weekday "
+            + "of the month, such as the last Friday, which `repeat` cannot show. `repeats` tells "
+            + "the two apart."
+        )
     )
     has_attachments: bool = Field(
         description="True when files are attached to the task. outlook_read_task lists them."
@@ -406,6 +446,7 @@ class TaskSummary(BaseModel):
             categories=list(task.categories or []),
             start_date=day_of(task.start_date_time, zone=zone),
             reminder_at=instant_of(task.reminder_date_time) if task.is_reminder_on else None,
+            repeats=task.recurrence is not None,
             repeat=TaskRepeat.from_recurrence(task.recurrence),
             has_attachments=bool(task.has_attachments),
         )

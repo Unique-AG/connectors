@@ -118,8 +118,8 @@ async def add_task_link(
         if answer_pending or audience.reaches_others:
             with not_graph():
                 question = (
-                    f"Add the link {cut_for_a_question(title)!r} to a task "
-                    + f"{shared_list_reason(audience)}?"
+                    f"Add the link {cut_for_a_question(title)!r}, which opens "
+                    + f"{cut_for_a_question(web_url)!r}, to a task {shared_list_reason(audience)}?"
                 )
                 answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
