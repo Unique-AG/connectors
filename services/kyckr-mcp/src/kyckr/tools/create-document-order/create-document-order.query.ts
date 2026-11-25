@@ -22,6 +22,11 @@ export const CreateDocumentOrderInputSchema = z.object({
     .describe(
       'Product id of the document to order. Use the `id` of an entry returned by `list_company_documents`. Do not construct or guess.',
     ),
+  confirm: z
+    .boolean()
+    .describe(
+      'Must be `true` to place the order. Pass `false` to receive a description of what the order will do and its credit cost without placing it. Always call with `confirm: false` first, present the summary to the user, and only call again with `confirm: true` after the user explicitly agrees.',
+    ),
 });
 
 export type CreateDocumentOrderInput = z.infer<typeof CreateDocumentOrderInputSchema>;
@@ -73,6 +78,12 @@ export class CreateDocumentOrderQuery {
 
   @Span()
   public async run(input: CreateDocumentOrderInput): Promise<CreateDocumentOrderResult> {
+    if (!input.confirm) {
+      return {
+        success: false,
+        message: `Order not placed. Calling this tool with confirm: true will place a paid Kyckr order for product "${input.productId}" on company "${input.kyckrId}", spending Kyckr credits. This action cannot be undone. Please confirm with the user before proceeding.`,
+      };
+    }
     this.logger.debug(
       { kyckrId: input.kyckrId, productId: input.productId },
       'create_document_order: invoked',
