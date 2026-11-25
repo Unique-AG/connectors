@@ -14,7 +14,6 @@ from mcp_configs import (
     RedisSettings,
     RetrySettings,
     ServerSettings,
-    Toggle,
     TraceExporter,
     TracingSettings,
     ZitadelSettings,
@@ -212,25 +211,17 @@ def test_redis_ignores_a_url_without_its_prefix(monkeypatch: pytest.MonkeyPatch)
         from_environment(RedisSettings)
 
 
-def test_elicitation_asks_for_everything_by_default() -> None:
+def test_elicitation_waits_two_minutes_and_seals_per_process_by_default() -> None:
     settings = ElicitationSettings()
 
-    assert settings.for_disambiguation is Toggle.ENABLED
-    assert settings.for_data_modification is Toggle.ENABLED
-    assert settings.for_data_removal is Toggle.ENABLED
     assert settings.timeout_before_cancel_seconds == 120
     assert settings.request_state_keys == []
 
 
-def test_elicitation_reads_each_toggle(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ELICITATION_FOR_DATA_MODIFICATION", "Disabled")
+def test_elicitation_reads_the_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ELICITATION_TIMEOUT_BEFORE_CANCEL_SECONDS", "45")
 
-    settings = ElicitationSettings()
-
-    assert settings.for_data_modification is Toggle.DISABLED
-    assert settings.for_data_removal is Toggle.ENABLED
-    assert settings.timeout_before_cancel_seconds == 45
+    assert ElicitationSettings().timeout_before_cancel_seconds == 45
 
 
 def test_elicitation_reads_the_request_state_keys_in_order(
@@ -247,15 +238,6 @@ def test_elicitation_rejects_a_request_state_key_under_32_characters(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ELICITATION_REQUEST_STATE_KEYS", '["short"]')
-
-    with pytest.raises(ValidationError):
-        ElicitationSettings()
-
-
-def test_elicitation_rejects_a_toggle_that_is_not_enabled_or_disabled(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setenv("ELICITATION_FOR_DATA_REMOVAL", "sometimes")
 
     with pytest.raises(ValidationError):
         ElicitationSettings()

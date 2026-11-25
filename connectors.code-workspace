@@ -4,6 +4,7 @@
     { "path": "packages/mcp-architecture" },
     { "path": "packages/mcp-configs" },
     { "path": "packages/mcp-credential-auth" },
+    { "path": "packages/mcp-elicitation" },
     { "path": "packages/mcp-observability" },
     { "path": "packages/mcp-openapi" },
     { "path": "packages/mcp-scaffold" },

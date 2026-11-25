@@ -150,7 +150,9 @@ Changes under `packages/mcp-credential-auth` run the same uv formatting, linting
 and test sequence in that package. They also add its consuming services to the service matrix.
 Directly changed Python services are included in the same matrix rather than being replaced by
 the shared-package consumers. `packages/mcp-openapi`, `packages/mcp-configs`,
-`packages/mcp-observability` and `packages/mcp-architecture` work the same way.
+`packages/mcp-elicitation`, `packages/mcp-observability` and `packages/mcp-architecture` work the
+same way. `packages/mcp-elicitation` also runs for a change to `packages/mcp-configs`, which it
+depends on.
 `packages/mcp-scaffold` also runs for a change to `packages/mcp-configs`,
 `packages/mcp-observability`, `packages/mcp-architecture` or `packages/mcp-openapi`, because the
 MCPs its tests generate use all four: the last for an OpenAPI upstream. It runs as well for a change to a

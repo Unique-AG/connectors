@@ -12,6 +12,7 @@ on:
       - "packages/mcp-architecture/**"
       - "packages/mcp-configs/**"
       - "packages/mcp-credential-auth/**"
+      - "packages/mcp-elicitation/**"
       - "packages/mcp-observability/**"
       - "packages/mcp-openapi/**"
       - "packages/mcp-scaffold/**"
@@ -53,6 +54,7 @@ jobs:
       mcp-architecture-changed: ${{ steps.filter.outputs.mcp_architecture }}
       mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
       mcp-configs-changed: ${{ steps.filter.outputs.mcp_configs }}
+      mcp-elicitation-changed: ${{ steps.filter.outputs.mcp_elicitation }}
       mcp-observability-changed: ${{ steps.filter.outputs.mcp_observability }}
       mcp-scaffold-changed: ${{ steps.filter.outputs.mcp_scaffold }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
@@ -76,6 +78,10 @@ jobs:
             mcp_openapi:
               - 'packages/mcp-openapi/**'
             mcp_configs:
+              - 'packages/mcp-configs/**'
+            # mcp-elicitation depends on mcp-configs, so a change to either runs its tests.
+            mcp_elicitation:
+              - 'packages/mcp-elicitation/**'
               - 'packages/mcp-configs/**'
             mcp_observability:
               - 'packages/mcp-observability/**'
@@ -113,6 +119,7 @@ jobs:
           MCP_ARCHITECTURE_CHANGED: ${{ steps.filter.outputs.mcp_architecture }}
           MCP_OPENAPI_CHANGED: ${{ steps.filter.outputs.mcp_openapi }}
           MCP_CONFIGS_CHANGED: ${{ steps.filter.outputs.mcp_configs }}
+          MCP_ELICITATION_CHANGED: ${{ steps.filter.outputs.mcp_elicitation }}
           MCP_OBSERVABILITY_CHANGED: ${{ steps.filter.outputs.mcp_observability }}
           SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
@@ -168,6 +175,10 @@ jobs:
             fi
             if [ "$MCP_CONFIGS_CHANGED" = "true" ]; then
               consumers=$(grep -l '"mcp-configs' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+              packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
+            fi
+            if [ "$MCP_ELICITATION_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-elicitation' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
             if [ "$MCP_OBSERVABILITY_CHANGED" = "true" ]; then
@@ -375,6 +386,47 @@ jobs:
     defaults:
       run:
         working-directory: packages/mcp-configs
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.11.33"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Sync dependencies
+        run: uv sync --locked
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Lint
+        run: uv run ruff check .
+
+      - name: Typecheck
+        run: uv run basedpyright
+
+      - name: Run tests
+        run: uv run pytest
+
+  test-mcp-elicitation:
+    name: Test mcp-elicitation
+    needs: detect-changes
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      needs.detect-changes.outputs.mcp-elicitation-changed == 'true' ||
+      needs.detect-changes.outputs.workflow-changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: packages/mcp-elicitation
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

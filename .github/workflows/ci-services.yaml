@@ -12,6 +12,7 @@ on:
       - "!packages/mcp-architecture/**"
       - "!packages/mcp-configs/**"
       - "!packages/mcp-credential-auth/**"
+      - "!packages/mcp-elicitation/**"
       - "!packages/mcp-observability/**"
       - "!packages/mcp-openapi/**"
       - "!packages/mcp-scaffold/**"
@@ -63,6 +64,7 @@ jobs:
               - '!packages/mcp-architecture/**'
               - '!packages/mcp-configs/**'
               - '!packages/mcp-credential-auth/**'
+              - '!packages/mcp-elicitation/**'
               - '!packages/mcp-observability/**'
               - '!packages/mcp-openapi/**'
               - '!packages/mcp-scaffold/**'
