@@ -112,9 +112,9 @@ async def delete_todo_item(
         shown: tuple[Parsable, ...] = (audience.task_list, task, *(() if part is None else (part,)))
         return Question(_question(audience, task.title, part, whole_task=True), shown)
 
-    async def write(_headers: HeadersCollection) -> Removed:
+    async def write(headers: HeadersCollection) -> Removed:
         with graph_step(STEP_DELETE):
-            await _sent_delete(client, target)
+            await _sent_delete(client, target, headers)
         return Removed(named, "deleted")
 
     with graph_errors():
@@ -124,9 +124,11 @@ async def delete_todo_item(
             return Removed(named, "not_found")
 
 
-async def _sent_delete(client: GraphServiceClient, target: Target) -> None:
+async def _sent_delete(
+    client: GraphServiceClient, target: Target, headers: HeadersCollection
+) -> None:
     once: RequestConfiguration[QueryParameters] = todo_request(
-        safe_to_repeat=False, task_times=False
+        safe_to_repeat=False, task_times=False, headers=headers
     )
     task_list = client.me.todo.lists.by_todo_task_list_id(target.list_id)
     if isinstance(target, TaskListHandle):
