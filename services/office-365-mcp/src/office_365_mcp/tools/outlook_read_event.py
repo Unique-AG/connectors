@@ -70,7 +70,7 @@ GRAPH_NOT_FOUND = (
     + "expected to still exist, list the window again, and read the new handle it returns."
 )
 
-GRAPH_FORBIDDEN = calendar_not_shared("No event was read.")
+GRAPH_FORBIDDEN = calendar_not_shared("No event was read.", GRAPH_PERMISSIONS)
 
 _EVENT_FIELDS: tuple[str, ...] = (
     *SUMMARY_FIELDS,
@@ -103,11 +103,11 @@ returns stripped. `subject` holds the display form of `show_as`, `body` is null,
 is empty, and `organizer` names the signed-in user, regardless of who organized the event. \
 Report only the time, and say that you cannot read the rest.
 - The user's own calendar holds the user's own events and the meetings that the user is invited \
-to. An event there does not show the calendar of another attendee. The calendar of another \
-person opens only after that person shares it and the user accepts the invitation in Outlook. \
-Then it shows in outlook_list_calendars. If it does not show there, `capped` is false, and this \
-deployment runs outlook_check_availability, call it for that person. It reads only free and busy \
-time.
+to. An event there does not show the calendar of another attendee. The calendar of another person \
+opens only after that person shares it and the user accepts the invitation or adds the shared \
+calendar in Outlook. Then it shows in outlook_list_calendars. If it does not show there, `capped` \
+is false, and this deployment runs outlook_check_availability, call it for that person. It reads \
+only free and busy time.
 """
 
 _BAD_HANDLE = (

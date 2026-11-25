@@ -444,7 +444,8 @@ class TestACalendarThatIsNotShared:
         assert message.startswith(forbidden)
         assert "Usually this calendar is not shared with the user" in message
         assert "outlook_check_availability" in message
-        assert "administrator" not in message
+        assert "Ask a Microsoft 365 administrator to grant" not in message
+        assert "Calendars.Read and Calendars.Read.Shared" in message
 
 
 class TestWhereTheMappingSits:
