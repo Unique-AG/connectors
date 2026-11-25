@@ -3,8 +3,8 @@ apiVersion: v2
 name: kyckr-mcp
 description: "Search company registries and order registry documents through Kyckr for KYC and KYB workflows."
 type: application
-version: 0.1.1
-appVersion: 0.1.1
+version: 0.1.1-dev.1
+appVersion: 0.1.1-dev.1
 dependencies:
   - name: base
     repository: oci://ghcr.io/unique-ag/helm
