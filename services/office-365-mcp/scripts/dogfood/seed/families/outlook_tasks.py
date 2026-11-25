@@ -1,4 +1,3 @@
-import base64
 import datetime as dt
 from collections.abc import Iterator, Mapping
 from pathlib import Path
@@ -106,12 +105,14 @@ ASSETS: Mapping[str, bytes] = {
 }
 
 
-def _attachment_body(attachment: Spec) -> dict[str, str]:
+def _upload_session(attachment: Spec) -> dict[str, dict[str, str | int]]:
     return {
-        "@odata.type": "#microsoft.graph.taskFileAttachment",
-        "name": _named(attachment["name"]),
-        "contentType": DOCX,
-        "contentBytes": base64.b64encode(attachment_bytes(attachment)).decode("ascii"),
+        "attachmentInfo": {
+            "attachmentType": "file",
+            "name": _named(attachment["name"]),
+            "contentType": DOCX,
+            "size": len(attachment_bytes(attachment)),
+        }
     }
 
 
@@ -137,11 +138,12 @@ def _task_steps(tasks_path: str, task: Spec, anchor: dt.date, *, files: bool) ->
         found += [
             Step(
                 FILES_PHASE,
-                "create",
+                "upload-with-token",
                 "POST",
-                f"{path}/attachments",
-                body=_attachment_body(one),
+                f"{path}/attachments/createUploadSession",
+                body=_upload_session(one),
                 key=f"attachment:{key}:{_named(one['name'])}",
+                payload=attachment_bytes(one),
             )
             for one in task["attachments"]
         ]

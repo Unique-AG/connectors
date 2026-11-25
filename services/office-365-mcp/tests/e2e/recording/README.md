@@ -316,9 +316,11 @@ scripts/dogfood/record_all.sh meeting start|wait|record|all [--force] [--dry-run
 5. The To Do cases (`cases/outlook-tasks.yaml`) need the permission Tasks.ReadWrite and the seed
    phase `todo` for Mia. A write case makes its own list `seed-v1 case-<id>` and changes only the
    tasks, steps and links in that list. `CREATED_ONLY` refuses a change to a seed list or a seed
-   task. The two file cases need the opt-in seed phase `todo-files`. They are deferred, because
-   Graph does not add a file to a task on the dogfood tenant. The recorder has no case for a
-   shared list, because the seed cannot share a list.
+   task. The two file cases need the opt-in seed phase `todo-files`.
+   `outlook_delete_task_attachment-old-brief` deletes the file of the seed task
+   `seed-v1 Remove the old brief`, so the runbook runs `cleanup` and `apply` of the phases `todo`
+   and `todo-files` after it. The recorder has no case for a shared list, because the seed cannot
+   share a list.
 
 ## Commands
 

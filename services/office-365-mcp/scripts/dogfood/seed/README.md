@@ -158,9 +158,8 @@ The onenote family has two more phases. `onenote-group` runs as Mia. It makes th
 notebook or a section, so they stay.
 
 The To Do family has two phases. `todo` runs as Mia, in the default of `apply`, and needs the
-permission Tasks.ReadWrite. `todo-files` is opt-in and adds the two Word files. On the dogfood
-tenant, Graph answers 500 to each file that it adds to a task, and the upload session answers 404.
-Its data is in `corpus/outlook-tasks.yaml`.
+permission Tasks.ReadWrite. `todo-files` is opt-in and adds the two Word files. Its data is in
+`corpus/outlook-tasks.yaml`.
 
 - It makes the list `seed-v1 Launch plan` with six tasks: a task with a due date, a completed
   task, a task with two steps, a task with a link, and two tasks that get one Word file each in
@@ -175,6 +174,11 @@ Its data is in `corpus/outlook-tasks.yaml`.
   built-in list. The case sweep deletes each list and each task that has `seed-v1 case-` in its
   name.
 - Graph has no call to share a To Do list. The seed therefore has no shared list.
+- Graph answers 500 to a file that `POST .../attachments` adds to a task, and adds no file. The
+  phase `todo-files` therefore uses an upload session: `POST .../attachments/createUploadSession`,
+  then one `PUT` with the token for each chunk to `{uploadUrl}/content`. Graph answers 500 to this
+  `PUT` too, but it keeps the file. The seed then lists the files of the task and stops when the
+  file is not there.
 
 The mail family has three more phases. Its data is in `corpus/mail-extra.yaml`. All three run in
 the default of `apply`, and none of them needs the earlier phases of the family.

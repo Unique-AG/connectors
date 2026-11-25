@@ -31,7 +31,6 @@ outlook_read_task-repeat:
     - {tool: outlook_read_task, bind: {uri: "$prev.tasks[0].uri"}}
 
 outlook_read_task_attachment-brief:
-  deferred: "Graph answers 500 to every file that the seed adds to a task on the dogfood tenant, and its upload session answers 404. The opt-in seed phase todo-files makes the file when Graph accepts it."
   chain:
     - *lists
     - {tool: outlook_list_tasks, args: {title_contains: Print the launch brief}, bind: {task_list: "$1.task_lists[name=seed-v1 Launch plan].uri"}}
@@ -148,7 +147,6 @@ outlook_delete_task_link-created:
     - {tool: outlook_delete_task_link, bind: {link: "$prev.uri"}}
 
 outlook_delete_task_attachment-old-brief:
-  deferred: "Graph answers 500 to every file that the seed adds to a task on the dogfood tenant, and its upload session answers 404. The opt-in seed phase todo-files makes the file when Graph accepts it."
   destructive: true
   reseed: [todo, todo-files]
   chain:

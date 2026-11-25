@@ -1,0 +1,20 @@
+scenario: outlook_read_task_attachment-brief
+fixture: rec-tool-outlook_read_task_attachment-brief
+source: recorded
+target: graph
+recorded_at: '2026-11-25T08:27:08+00:00'
+scrub_version: 1.0.0
+replacements:
+  binaries kept by hash: 1
+  ids mapped: 32
+  keys dropped: 7
+  response headers dropped: 46
+  text kept: 26
+literals:
+- Print the launch brief
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

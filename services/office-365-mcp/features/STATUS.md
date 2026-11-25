@@ -69,19 +69,17 @@ These causes are in the connector: a tool, a parameter, a description, or a pres
 
 ## Deferred work
 
-Scenarios tagged `@deferred`: 14 of 782. Recorder cases with a `deferred` reason: 19. No gate counts them as failed or blocked.
+Scenarios tagged `@deferred`: 14 of 782. Recorder cases with a `deferred` reason: 17. No gate counts them as failed or blocked.
 
 | Recorder case | Reason | Scenarios |
 | --- | --- | --- |
 | `outlook_create_event_on_behalf-manager` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-14-03` |
 | `outlook_create_mail_rule-forward-found-person` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-05-40` |
-| `outlook_delete_task_attachment-old-brief` | Graph answers 500 to every file that the seed adds to a task on the dogfood tenant, and its upload session answers 404. The opt-in seed phase todo-files makes the file when Graph accepts it. |  |
 | `outlook_draft_mail-to-found-person` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-04-01`, `uc-05-58`, `uc-15-06` |
 | `outlook_find_recipient-tom` | The tenant index lists a new user 1 to 24 hours after the first mail. | `uc-05-58`, `uc-15-06` |
 | `outlook_list_calendar_groups-with-shared` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-03-27` |
 | `outlook_list_calendars-shared` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-03-08` |
 | `outlook_list_events-colleague-calendar` | Mia must accept two sharing mails in Outlook on the web. Graph has no call to accept them. | `uc-03-08` |
-| `outlook_read_task_attachment-brief` | Graph answers 500 to every file that the seed adds to a task on the dogfood tenant, and its upload session answers 404. The opt-in seed phase todo-files makes the file when Graph accepts it. |  |
 | `teams_browse_channel-private` | The tenant policy refuses to create a private channel. An administrator must switch on private channels. |  |
 | `teams_create_chat-one-to-one` | The recorder creates or writes only to a chat that has a seed-v1 case- title, and a one-to-one chat has no title. | `uc-13-47` |
 | `teams_get_channel_files_folder-private` | The tenant policy refuses to create a private channel. An administrator must switch on private channels. |  |

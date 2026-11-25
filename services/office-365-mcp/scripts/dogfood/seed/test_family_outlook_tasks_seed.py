@@ -1,4 +1,3 @@
-import base64
 import datetime as dt
 import hashlib
 import json
@@ -33,8 +32,10 @@ def creates(phases: set[str] = PHASES) -> dict[str, Step]:
 class TodoFake(FakeGraph):
     """Answers the To Do calls of the seed: a store of rows for each collection path."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, stores_uploads: bool = True) -> None:
         super().__init__()
+        self.stores_uploads = stores_uploads
+        self.sessions: dict[str, dict[str, Any]] = {}
         self.rows: dict[str, list[dict[str, Any]]] = {
             "/me/todo/lists": [
                 {"id": "default", "displayName": "Tasks", "wellknownListName": "defaultList"},
@@ -62,10 +63,33 @@ class TodoFake(FakeGraph):
             return httpx.Response(204)
         if request.method == "GET":
             return self.page(request, self.rows.setdefault(path, []))
+        if request.method == "PUT":
+            return self.chunk(request, path)
         body = json.loads(request.content)
+        if path.endswith("/attachments/createUploadSession"):
+            return self.session(path.removesuffix("/createUploadSession"), body)
         made = {"id": self.new_id("todo"), **body}
         self.rows.setdefault(path, []).append(made)
         return httpx.Response(201, json=made)
+
+    def session(self, attachments: str, body: dict[str, Any]) -> httpx.Response:
+        task = attachments.removesuffix("/attachments")
+        url = f"https://graph.microsoft.com/v1.0{task}/attachmentSessions/{self.new_id('s')}"
+        self.sessions[f"{url.removeprefix('https://graph.microsoft.com/v1.0')}/content"] = {
+            "attachments": attachments,
+            **body["attachmentInfo"],
+        }
+        return httpx.Response(201, json={"uploadUrl": url})
+
+    def chunk(self, request: httpx.Request, path: str) -> httpx.Response:
+        assert request.headers["authorization"].startswith("Bearer ")
+        opened = self.sessions[path]
+        assert len(request.content) == opened["size"]
+        if self.stores_uploads:
+            self.rows.setdefault(opened["attachments"], []).append(
+                {"id": self.new_id("file"), "name": opened["name"], "size": opened["size"]}
+            )
+        return httpx.Response(500, json={"error": {"code": "generalException"}})
 
 
 def test_only_mia_gets_to_do_data_and_only_in_its_phase() -> None:
@@ -114,14 +138,23 @@ def test_the_seed_list_holds_a_due_a_completed_a_stepped_a_linked_and_two_filed_
         ("seed-v1 Check the logo", False),
         ("seed-v1 Check the dates", True),
     ]
-    assert not [s for s in creates().values() if s.path.endswith("/attachments")]
-    with_files = creates({*PHASES, outlook_tasks.FILES_PHASE})
-    filed = [s for s in with_files.values() if s.path.endswith("/attachments")]
-    assert [s.body["name"] for s in filed] == [
+    assert not [s for s in plan() if "/attachments" in s.path and s.kind != "lookup"]
+    with_files = [
+        s for s in plan({*PHASES, outlook_tasks.FILES_PHASE}) if s.kind == "upload-with-token"
+    ]
+    assert [s.path.rsplit("/", 2)[-2:] for s in with_files] == [
+        ["attachments", "createUploadSession"],
+        ["attachments", "createUploadSession"],
+    ]
+    assert [s.body["attachmentInfo"]["name"] for s in with_files] == [
         "seed-v1 Launch brief.docx",
         "seed-v1 Old brief.docx",
     ]
-    assert all(s.body["@odata.type"] == "#microsoft.graph.taskFileAttachment" for s in filed)
+    assert all(
+        s.payload == outlook_tasks.ASSETS[s.body["attachmentInfo"]["name"]]
+        and s.body["attachmentInfo"]["size"] == len(s.payload)
+        for s in with_files
+    )
 
 
 def test_the_built_in_list_gets_a_reminded_task_and_a_weekly_task_on_its_due_day() -> None:
@@ -159,7 +192,6 @@ def test_the_manifest_holds_the_texts_and_the_hash_of_each_file() -> None:
             b for b in manifest["binaries"] if b["name"] == f"seed-v1 {attachment['name']}"
         )
         assert found["sha256"] == hashlib.sha256(raw).hexdigest()
-        assert base64.b64encode(raw).decode("ascii") in strings
 
 
 def test_apply_creates_the_corpus_and_a_second_apply_creates_nothing() -> None:
@@ -201,3 +233,24 @@ def test_the_sweep_names_case_lists_and_case_tasks_only() -> None:
         ("DELETE", "/me/todo/lists/case-list"),
     ]
     assert list(outlook_tasks.sweep(graph, "anna")) == []
+
+
+def test_a_file_upload_that_graph_answers_with_500_counts_when_the_file_is_listed() -> None:
+    fake = TodoFake()
+    phases = ["apply", "--as", "1", "--phases", "todo,todo-files"]
+    assert run(phases, fake) == 0
+    filed = sorted(
+        str(row["name"])
+        for key, rows in fake.rows.items()
+        if key.endswith("/attachments")
+        for row in rows
+    )
+    assert filed == ["seed-v1 Launch brief.docx", "seed-v1 Old brief.docx"]
+    before = len(fake.calls)
+    assert run(phases, fake) == 0
+    assert not [call for call in fake.calls[before:] if call[0] in ("POST", "PUT")]
+
+
+def test_a_file_upload_that_stores_nothing_stops_the_run() -> None:
+    fake = TodoFake(stores_uploads=False)
+    assert run(["apply", "--as", "1", "--phases", "todo,todo-files"], fake) != 0

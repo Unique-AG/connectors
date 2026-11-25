@@ -16,7 +16,8 @@ class ConfigError(SeedError):
 @dataclass(frozen=True)
 class Step:
     phase: str
-    kind: str  # "lookup", "create" or "upload" (createUploadSession, then PUT of `payload`)
+    kind: str  # "lookup", "create", "upload" (createUploadSession, then PUT of `payload`), or
+    # "upload-with-token" (the same, with the token, to `{uploadUrl}/content`: To Do)
     method: str
     path: str  # "{key}" placeholders name ids found or created earlier in the run
     params: tuple[tuple[str, str], ...] = ()
