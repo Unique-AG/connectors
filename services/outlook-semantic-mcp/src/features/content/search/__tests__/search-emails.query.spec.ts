@@ -89,6 +89,7 @@ describe('SearchEmailsQuery', () => {
       loadFeaturesConfig({
         MCP_BACKEND: 'microsoft_graph_and_unique_api',
         MCP_TOOLS: JSON.stringify(['search_emails']),
+        DELEGATED_ACCESS_SCAN: 'disabled',
       }),
     );
   });

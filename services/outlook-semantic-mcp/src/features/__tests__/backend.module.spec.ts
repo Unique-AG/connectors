@@ -62,7 +62,8 @@ const registeredToolNames = (module: DynamicModule) =>
     return name ? [name] : [];
   });
 
-const register = (env: NodeJS.ProcessEnv) => registerBackendModule(loadFeaturesConfig(env));
+const register = (env: NodeJS.ProcessEnv) =>
+  registerBackendModule(loadFeaturesConfig({ DELEGATED_ACCESS_SCAN: 'full_access_only', ...env }));
 
 describe(registerBackendModule.name, () => {
   it.each([

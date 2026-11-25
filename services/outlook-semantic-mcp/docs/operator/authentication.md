@@ -5,17 +5,22 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Mail permissions do not require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`). `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically **does** require admin consent.
+All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Mail permissions do not require admin consent. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically **does** require admin consent.
 
-| Permission | Type | Admin Consent |
-|------------|------|---------------|
-| `User.Read` | Delegated | No |
-| `Mail.ReadWrite` | Delegated | No |
-| `Mail.ReadWrite.Shared` | Delegated | No |
-| `MailboxSettings.Read` | Delegated | No |
-| `People.Read` | Delegated | No |
-| `Calendars.ReadWrite.Shared` | Delegated | Yes — only when a calendar tool is listed in `MCP_TOOLS` |
-| `offline_access` | Delegated | No |
+| Permission | Type | Admin Consent | Requested when |
+|------------|------|---------------|----------------|
+| `User.Read` | Delegated | No | Always |
+| `Mail.Read` | Delegated | No | Always, unless `Mail.ReadWrite` is requested |
+| `Mail.ReadWrite` | Delegated | No | A draft tool is listed in `MCP_TOOLS` |
+| `Mail.Read.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled`, unless `Mail.ReadWrite.Shared` is requested |
+| `Mail.ReadWrite.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled` and a draft tool is listed |
+| `User.Read.All` | Delegated | Yes | `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `MailboxSettings.Read` | Delegated | No | Always |
+| `People.Read` | Delegated | No | Always |
+| `Calendars.ReadWrite.Shared` | Delegated | Yes | A calendar tool is listed in `MCP_TOOLS` |
+| `offline_access` | Delegated | No | Always |
+
+Register and grant at least the permissions your configuration requests. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. If the app was granted `Mail.ReadWrite` but the deployment lists no draft tool, add `Mail.ReadWrite` to [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS), or Entra asks users to consent to `Mail.Read`.
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
@@ -76,6 +81,8 @@ module "outlook_semantic_mcp_app" {
 
 > **`service_principal_configuration` (optional):** When set, the module creates a service principal and pre-grants delegated permissions tenant-wide via `azuread_service_principal_delegated_permission_grant`. Omit this variable for multi-tenant deployments where admin consent is granted by each customer tenant individually.
 
+> **Registered permissions:** The module registers a fixed list whatever the server's configuration: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. A deployment that lists no draft tool requests `Mail.Read`, and `Mail.Read.Shared` with shared mailboxes on, which the module does not register. List `Mail.ReadWrite`, and `Mail.ReadWrite.Shared` with shared mailboxes on, in [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS) to stay within the grant.
+
 #### Option 2: Azure Portal (Manual)
 
 1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations** → **New registration**:
@@ -84,7 +91,7 @@ module "outlook_semantic_mcp_app" {
    - **Redirect URI**: Web — `https://outlook.semantic.mcp.example.com/auth/callback`
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
-   - Add all permissions listed under [Required Permissions](#Required-Permissions)
+   - Add the permissions your configuration requests, listed under [Required Permissions](#Required-Permissions)
    - If you will list calendar tools in `MCP_TOOLS`, also add `Calendars.ReadWrite.Shared` and grant admin consent before listing them
 
 3. Go to **Certificates & secrets** → **New client secret**:

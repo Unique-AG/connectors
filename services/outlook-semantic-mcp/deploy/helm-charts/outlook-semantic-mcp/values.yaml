@@ -411,6 +411,9 @@ mcpConfig:
     # access at their next Microsoft token refresh.
     # example: ["d050ee55-f842-4802-8263-d802dc017162"]
     allowedTenantIds: []
+    # -- Graph permissions requested on top of what the tools and features need, for an Entra app
+    #    granted more than they need. Env var: MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS (JSON array).
+    additionalGraphPermissions: []
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://outlook.mcp.unique.app

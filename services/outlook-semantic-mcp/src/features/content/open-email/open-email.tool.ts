@@ -6,6 +6,7 @@ import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { type FeaturesConfig, featuresConfig, McpBackendType } from '~/config';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
+import { CheckMailboxAccessQuery } from '~/features/user-utils/check-mailbox-access.query';
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { GRAPH_ID_PATTERN } from '~/msgraph/graph-id-pattern';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
@@ -106,6 +107,7 @@ export class OpenEmailTool {
     private readonly openEmailQuery: OpenEmailQuery,
     private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
     @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
+    private readonly checkMailboxAccessQuery: CheckMailboxAccessQuery,
   ) {}
 
   @Tool({
@@ -131,6 +133,10 @@ export class OpenEmailTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
+    const mailboxAccess = await this.checkMailboxAccessQuery.run(userProfileTypeId, input.mailbox);
+    if (!mailboxAccess.allowed) {
+      return { success: false, message: mailboxAccess.message };
+    }
 
     if (this.features.mode !== McpBackendType.MicrosoftGraph) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);

@@ -467,7 +467,9 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 ### Can I create drafts in a shared mailbox?
 
-**Answer:** Yes. Pass the shared mailbox UPN as the `mailbox` parameter (e.g. `"support@company.com"`). The signed-in user must have been granted at least **Send As** or **Full Access** permissions to the shared mailbox in Microsoft 365 — the Graph API enforces this at request time.
+**Answer:** Yes, when [`DELEGATED_ACCESS_SCAN`](./operator/configuration.md#DELEGATED_ACCESS_SCAN) is `full_access_only` or `granular_access`. Pass the shared mailbox UPN as the `mailbox` parameter (e.g. `"support@company.com"`). The signed-in user must have been granted at least **Send As** or **Full Access** permissions to the shared mailbox in Microsoft 365 — the Graph API enforces this at request time.
+
+With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only, and the draft tools refuse any other `mailbox` with a tool error.
 
 Both draft types work with shared mailboxes:
 
@@ -613,11 +615,13 @@ A permission error on a *delegated* mailbox is different: that is not `consentRe
 
 ### Why does the server need `Mail.ReadWrite` if it mostly reads emails?
 
-**Answer:** `Mail.ReadWrite` serves dual purposes: it provides read access for email sync and search (full sync, live catch-up), and write access for the `draft_email` tool which creates email messages in the user's mailbox via `POST /me/messages`. Since `Mail.ReadWrite` already includes full read access, the narrower `Mail.Read` and `Mail.ReadBasic` scopes are not needed.
+**Answer:** It needs it only for drafts. The server requests `Mail.ReadWrite` when a draft tool (`draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email`) is listed in `MCP_TOOLS`. Those tools create and edit messages in the user's mailbox, for example via `POST /me/messages`. Without a draft tool it requests `Mail.Read` instead. `Mail.ReadWrite` includes full read access, so `Mail.Read` is dropped when `Mail.ReadWrite` is requested.
+
+An Entra app granted `Mail.ReadWrite` whose deployment lists no draft tool can keep requesting it through [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./operator/configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS). Otherwise Entra asks users to consent to `Mail.Read`.
 
 Delete detection does not require write access — it works by observing `created` change notifications on ignored folders (such as Deleted Items), not by moving emails.
 
-In addition, `Mail.ReadWrite.Shared` is requested at OAuth time for delegated-access support. It is a no-op when `DELEGATED_ACCESS_SCAN=disabled` — no shared mailbox data is accessed — but it always appears on the Microsoft consent screen.
+The `.Shared` mail permissions are requested only when `DELEGATED_ACCESS_SCAN` is not `disabled`: `Mail.ReadWrite.Shared` with a draft tool listed, `Mail.Read.Shared` without one. See [Configuration — Requested Graph permissions](./operator/configuration.md#Requested-Graph-permissions).
 
 **See also:** [Permissions](./technical/permissions.md) — [Tools — draft_email](./technical/tools.md#draft_email)
 

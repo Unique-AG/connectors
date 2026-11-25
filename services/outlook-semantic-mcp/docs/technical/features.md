@@ -64,7 +64,7 @@ Available in both modes. Behaviour is identical.
 - Edit an existing unsent draft — subject, body, To and CC recipients — via `update_draft_email`. This works for drafts created by the MCP and for drafts the user wrote in Outlook.
 - Add attachments to an existing draft via `add_attachments_to_draft_email`.
 - Remove attachments from an existing draft via `remove_attachments_from_draft_email`. The user must confirm the removal in a prompt first.
-- Find drafts with `search_emails` (results carry `isDraft`) and read the live HTML with `open_email` (`openEmailParams`) before editing. Edits in a shared or delegated mailbox use `openEmailParams.mailbox`.
+- Find drafts with `search_emails` (results carry `isDraft`) and read the live HTML with `open_email` (`openEmailParams`) before editing. Edits in a shared or delegated mailbox use `openEmailParams.mailbox`, which needs [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DELEGATED_ACCESS_SCAN) set to anything but `disabled`.
 
 **What's not supported**
 

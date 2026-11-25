@@ -4,6 +4,7 @@ import { McpBackendType } from '../mcp-backend-type.config';
 
 const READ_ONLY_ENV = {
   MCP_BACKEND: 'microsoft_graph',
+  DELEGATED_ACCESS_SCAN: 'disabled',
   MCP_TOOLS: JSON.stringify([
     'search_emails',
     'fetch_next_search_pages',
@@ -15,7 +16,11 @@ const READ_ONLY_ENV = {
 };
 
 const load = (env: NodeJS.ProcessEnv) =>
-  loadFeaturesConfig({ MCP_BACKEND: 'microsoft_graph_and_unique_api', ...env });
+  loadFeaturesConfig({
+    MCP_BACKEND: 'microsoft_graph_and_unique_api',
+    DELEGATED_ACCESS_SCAN: 'full_access_only',
+    ...env,
+  });
 
 const tools = (...names: string[]) => JSON.stringify(names);
 
@@ -39,9 +44,9 @@ describe(loadFeaturesConfig.name, () => {
   });
 
   it('throws naming MCP_BACKEND when it is unset', () => {
-    expect(() => loadFeaturesConfig({ MCP_TOOLS: tools('search_emails') })).toThrow(
-      /MCP_BACKEND: /,
-    );
+    expect(() =>
+      loadFeaturesConfig({ DELEGATED_ACCESS_SCAN: 'disabled', MCP_TOOLS: tools('search_emails') }),
+    ).toThrow(/MCP_BACKEND: /);
   });
 
   describe('MCP_TOOLS', () => {
