@@ -252,3 +252,16 @@ async def test_an_enhanced_profile_keeps_a_shareholder_individual_and_corporatio
     result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
 
     assert result.structured_content == {"data": data}
+
+
+async def test_an_enhanced_profile_keeps_a_corporations_registered_address(
+    call_tool: CallTool, kyckr: FakeKyckr
+) -> None:
+    owner = {"name": "Holding B", "registeredAddress": {"fullAddress": "1 Example Street"}}
+    kyckr.answers({"data": {"ultimateBeneficialOwners": {"corporations": [owner]}}})
+
+    result = await call_tool("get_enhanced_profile", {"kyckr_id": "GB|abc"})
+
+    assert result.structured_content == {
+        "data": {"ultimateBeneficialOwners": {"corporations": [owner]}}
+    }

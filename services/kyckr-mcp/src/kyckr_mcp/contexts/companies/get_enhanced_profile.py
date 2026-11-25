@@ -44,6 +44,9 @@ class Party(KyckrModel):
         None, description="A corporation's registration number at its home registry."
     )
     address: Address | None = Field(None, description="The party's address.")
+    registered_address: Address | None = Field(
+        None, description="A corporation's registered address, which some registries give instead."
+    )
 
 
 class Parties(KyckrModel):

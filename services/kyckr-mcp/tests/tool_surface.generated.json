@@ -960,6 +960,129 @@
                                                         "default": null,
                                                         "description": "How a beneficial owner controls the company."
                                                       },
+                                                      "registeredAddress": {
+                                                        "anyOf": [
+                                                          {
+                                                            "description": "An address at the registry.",
+                                                            "properties": {
+                                                              "city": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The city or town."
+                                                              },
+                                                              "country": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The country."
+                                                              },
+                                                              "fullAddress": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The whole address on one line."
+                                                              },
+                                                              "isoCode": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The jurisdiction, ISO 3166 alpha-2."
+                                                              },
+                                                              "postcode": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The postal code."
+                                                              },
+                                                              "region": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The region, such as a US state or UK county."
+                                                              },
+                                                              "streetName": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The street."
+                                                              },
+                                                              "streetNumber": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The number on the street."
+                                                              },
+                                                              "type": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The kind of address, such as `Head Office`."
+                                                              }
+                                                            },
+                                                            "type": "object"
+                                                          },
+                                                          {
+                                                            "type": "null"
+                                                          }
+                                                        ],
+                                                        "default": null,
+                                                        "description": "A corporation's registered address, which some registries give instead."
+                                                      },
                                                       "registrationNumber": {
                                                         "anyOf": [
                                                           {
@@ -1331,6 +1454,129 @@
                                                         ],
                                                         "default": null,
                                                         "description": "How a beneficial owner controls the company."
+                                                      },
+                                                      "registeredAddress": {
+                                                        "anyOf": [
+                                                          {
+                                                            "description": "An address at the registry.",
+                                                            "properties": {
+                                                              "city": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The city or town."
+                                                              },
+                                                              "country": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The country."
+                                                              },
+                                                              "fullAddress": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The whole address on one line."
+                                                              },
+                                                              "isoCode": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The jurisdiction, ISO 3166 alpha-2."
+                                                              },
+                                                              "postcode": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The postal code."
+                                                              },
+                                                              "region": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The region, such as a US state or UK county."
+                                                              },
+                                                              "streetName": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The street."
+                                                              },
+                                                              "streetNumber": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The number on the street."
+                                                              },
+                                                              "type": {
+                                                                "anyOf": [
+                                                                  {
+                                                                    "type": "string"
+                                                                  },
+                                                                  {
+                                                                    "type": "null"
+                                                                  }
+                                                                ],
+                                                                "default": null,
+                                                                "description": "The kind of address, such as `Head Office`."
+                                                              }
+                                                            },
+                                                            "type": "object"
+                                                          },
+                                                          {
+                                                            "type": "null"
+                                                          }
+                                                        ],
+                                                        "default": null,
+                                                        "description": "A corporation's registered address, which some registries give instead."
                                                       },
                                                       "registrationNumber": {
                                                         "anyOf": [
@@ -2022,6 +2268,129 @@
                                     "default": null,
                                     "description": "How a beneficial owner controls the company."
                                   },
+                                  "registeredAddress": {
+                                    "anyOf": [
+                                      {
+                                        "description": "An address at the registry.",
+                                        "properties": {
+                                          "city": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The city or town."
+                                          },
+                                          "country": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The country."
+                                          },
+                                          "fullAddress": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The whole address on one line."
+                                          },
+                                          "isoCode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The jurisdiction, ISO 3166 alpha-2."
+                                          },
+                                          "postcode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The postal code."
+                                          },
+                                          "region": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The region, such as a US state or UK county."
+                                          },
+                                          "streetName": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The street."
+                                          },
+                                          "streetNumber": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The number on the street."
+                                          },
+                                          "type": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The kind of address, such as `Head Office`."
+                                          }
+                                        },
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "description": "A corporation's registered address, which some registries give instead."
+                                  },
                                   "registrationNumber": {
                                     "anyOf": [
                                       {
@@ -2393,6 +2762,129 @@
                                     ],
                                     "default": null,
                                     "description": "How a beneficial owner controls the company."
+                                  },
+                                  "registeredAddress": {
+                                    "anyOf": [
+                                      {
+                                        "description": "An address at the registry.",
+                                        "properties": {
+                                          "city": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The city or town."
+                                          },
+                                          "country": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The country."
+                                          },
+                                          "fullAddress": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The whole address on one line."
+                                          },
+                                          "isoCode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The jurisdiction, ISO 3166 alpha-2."
+                                          },
+                                          "postcode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The postal code."
+                                          },
+                                          "region": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The region, such as a US state or UK county."
+                                          },
+                                          "streetName": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The street."
+                                          },
+                                          "streetNumber": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The number on the street."
+                                          },
+                                          "type": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The kind of address, such as `Head Office`."
+                                          }
+                                        },
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "description": "A corporation's registered address, which some registries give instead."
                                   },
                                   "registrationNumber": {
                                     "anyOf": [
@@ -2871,6 +3363,129 @@
                                     "default": null,
                                     "description": "How a beneficial owner controls the company."
                                   },
+                                  "registeredAddress": {
+                                    "anyOf": [
+                                      {
+                                        "description": "An address at the registry.",
+                                        "properties": {
+                                          "city": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The city or town."
+                                          },
+                                          "country": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The country."
+                                          },
+                                          "fullAddress": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The whole address on one line."
+                                          },
+                                          "isoCode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The jurisdiction, ISO 3166 alpha-2."
+                                          },
+                                          "postcode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The postal code."
+                                          },
+                                          "region": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The region, such as a US state or UK county."
+                                          },
+                                          "streetName": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The street."
+                                          },
+                                          "streetNumber": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The number on the street."
+                                          },
+                                          "type": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The kind of address, such as `Head Office`."
+                                          }
+                                        },
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "description": "A corporation's registered address, which some registries give instead."
+                                  },
                                   "registrationNumber": {
                                     "anyOf": [
                                       {
@@ -3242,6 +3857,129 @@
                                     ],
                                     "default": null,
                                     "description": "How a beneficial owner controls the company."
+                                  },
+                                  "registeredAddress": {
+                                    "anyOf": [
+                                      {
+                                        "description": "An address at the registry.",
+                                        "properties": {
+                                          "city": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The city or town."
+                                          },
+                                          "country": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The country."
+                                          },
+                                          "fullAddress": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The whole address on one line."
+                                          },
+                                          "isoCode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The jurisdiction, ISO 3166 alpha-2."
+                                          },
+                                          "postcode": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The postal code."
+                                          },
+                                          "region": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The region, such as a US state or UK county."
+                                          },
+                                          "streetName": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The street."
+                                          },
+                                          "streetNumber": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The number on the street."
+                                          },
+                                          "type": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string"
+                                              },
+                                              {
+                                                "type": "null"
+                                              }
+                                            ],
+                                            "default": null,
+                                            "description": "The kind of address, such as `Head Office`."
+                                          }
+                                        },
+                                        "type": "object"
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ],
+                                    "default": null,
+                                    "description": "A corporation's registered address, which some registries give instead."
                                   },
                                   "registrationNumber": {
                                     "anyOf": [
