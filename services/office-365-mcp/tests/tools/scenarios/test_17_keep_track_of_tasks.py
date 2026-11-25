@@ -796,6 +796,22 @@ class TestLists:
         assert _sent(route) == {"displayName": "Move to Bern"}
         assert (answer["uri"], answer["name"], person.asked) == (TASK_LIST, "Move to Bern", [])
 
+    @pytest.mark.parametrize(
+        ("tool", "arguments"),
+        [
+            ("outlook_create_task_list", {"name": "   "}),
+            ("outlook_rename_task_list", {"task_list": TASK_LIST, "name": "   "}),
+        ],
+        ids=["create", "rename"],
+    )
+    async def test_a_blank_list_name_is_refused(
+        self, graph: respx.MockRouter, tool: str, arguments: dict[str, str]
+    ) -> None:
+        with pytest.raises(ToolError):
+            _ = await call(tool, **arguments)
+
+        assert graph.calls.call_count == 0
+
     async def test_a_list_is_renamed(self, graph: respx.MockRouter) -> None:
         _list_is(graph, shared=False, name="Move to Bern")
         renamed = {"id": LIST_ID, "displayName": "Move to Basel", "isShared": False}

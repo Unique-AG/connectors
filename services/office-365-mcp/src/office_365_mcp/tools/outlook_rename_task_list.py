@@ -155,6 +155,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             str,
             Field(
                 min_length=1,
+                pattern=r"\S",
                 description="The new name of the list, such as `Q4 launch`, as the user writes it.",
             ),
         ],

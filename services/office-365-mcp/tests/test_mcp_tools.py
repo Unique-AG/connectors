@@ -873,7 +873,8 @@ class TestTheToolsThisServerAdvertises:
         assert found == recorded | _ONE_DAY_OR_MOMENT_NOT_A_WINDOW, (
             "a date-shaped argument is either a search window — record it in `_WINDOWED_TOOLS`, "
             + "where the test above holds it to both shapes — or it is not a window at all, in "
-            + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"
+            + "which case add it to `_ONE_DAY_OR_MOMENT_NOT_A_WINDOW`. Unaccounted for: "
+            + f"{sorted(found - recorded - _ONE_DAY_OR_MOMENT_NOT_A_WINDOW)}"
         )
 
     async def test_no_tool_that_takes_a_mailbox_claims_only_the_users_own(

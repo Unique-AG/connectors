@@ -209,8 +209,12 @@ def cleanup(
     if owner != OWNER or not phases & {PHASE, FILES_PHASE}:
         return
     if PHASE not in phases:
-        yield from _file_cleanup(graph)
+        yield from list(_file_cleanup(graph))
         return
+    yield from list(_seed_cleanup(graph))
+
+
+def _seed_cleanup(graph: Graph) -> Iterator[tuple[str, str, None]]:
     corpus = _corpus()
     seeded = {_named(one["name"]) for one in corpus["lists"]}
     titles = {_named(task["title"]) for task in corpus["default_tasks"]}
