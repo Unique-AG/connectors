@@ -7,6 +7,7 @@ packages:
   - "!services/architecture-demo-mcp"
   - "!services/world-check-mcp"
   - "!services/polixis-mcp"
+  - "!services/kyckr-mcp"
   - packages/*
 
 # Versions shared by two or more workspace units live here, and the manifests reference them

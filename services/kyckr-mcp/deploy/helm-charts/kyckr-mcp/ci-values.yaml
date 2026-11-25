@@ -1,0 +1,16 @@
+# mcp-scaffold-commit: 6474bb8667dc, timestamp: 2026-11-16T10:36:30+00:00
+# Placeholders for what the overlay supplies: the three mandatory URLs and the database
+# connection, so `helm template` clears the chart and the base chart's schema.
+mcpConfig:
+  app:
+    publicBaseUrl: https://kyckr-mcp.ci.example.com
+  zitadel:
+    baseUrl: https://id.ci.example.com
+  kyckr:
+    apiUrl: https://test-api.kyckr.com/v2
+postgresql:
+  connection:
+    url:
+      fromSecret:
+        name: kyckr-mcp-ci-dummy
+        key: database-url

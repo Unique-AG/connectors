@@ -1,0 +1,327 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: kyckr-mcp chart
+templates:
+  - all.yaml
+values:
+  - ../ci-values.yaml
+capabilities:
+  apiVersions:
+    - cilium.io/v2
+tests:
+  - it: maps every mcpConfig value to the variable the app reads
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://{{ .Release.Name }}.example.com
+        zitadel:
+          baseUrl: https://id.example.com
+          orgId: "123"
+        kyckr:
+          apiUrl: https://api.kyckr.com/v2
+          timeoutSeconds: 45
+          defaultCustomerReference: ref
+          defaultContactEmail: ops@example.com
+        rateLimit:
+          toolCallsPerWindow: 7
+          windowSeconds: 11
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_BASE_URL, value: https://RELEASE-NAME.example.com }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: ZITADEL_BASE_URL, value: https://id.example.com }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: ZITADEL_ORG_ID, value: "123" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_API_URL, value: https://api.kyckr.com/v2 }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_TIMEOUT_SECONDS, value: "45" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_DEFAULT_CUSTOMER_REFERENCE, value: ref }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_DEFAULT_CONTACT_EMAIL, value: ops@example.com }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW, value: "7" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_RATE_LIMIT_WINDOW_SECONDS, value: "11" }
+
+  - it: pins the Kyckr timeout and the rate limit
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_TIMEOUT_SECONDS, value: "30" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_RATE_LIMIT_TOOL_CALLS_PER_WINDOW, value: "60" }
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_RATE_LIMIT_WINDOW_SECONDS, value: "60" }
+
+  - it: rejects a secret in mcpConfig
+    set:
+      mcpConfig:
+        kyckr:
+          apiKey: secret
+    asserts:
+      - failedTemplate:
+          errorPattern: additional properties 'apiKey' not allowed
+
+  - it: rejects a URL the egress rule cannot match
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: https://id.example.com:8443
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects an empty Kyckr URL
+    set:
+      mcpConfig:
+        kyckr:
+          apiUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects an empty Zitadel URL
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects an empty public URL
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: ""
+    asserts:
+      - failedTemplate:
+          errorPattern: minLength
+
+  - it: rejects a Kyckr URL that is not https
+    set:
+      mcpConfig:
+        kyckr:
+          apiUrl: http://api.kyckr.com/v2
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects a Zitadel URL that is not https
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: http://id.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: fails the schema when the app group is null
+    set:
+      mcpConfig:
+        app: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'app'
+
+  - it: fails the schema when the zitadel group is null
+    set:
+      mcpConfig:
+        zitadel: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'zitadel'
+
+  - it: fails the schema when the kyckr group is null
+    set:
+      mcpConfig:
+        kyckr: null
+    asserts:
+      - failedTemplate:
+          errorPattern: missing property 'kyckr'
+
+  - it: rejects a public URL with a path
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com/mcp
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: rejects a public URL that is not https
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: http://kyckr-mcp.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: accepts a bare public origin, with a port or a trailing slash
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://kyckr-mcp.example.com:8443/
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_BASE_URL, value: "https://kyckr-mcp.example.com:8443/" }
+
+  - it: accepts a templated public URL
+    set:
+      mcpConfig:
+        app:
+          publicBaseUrl: https://{{ .Release.Name }}.example.com
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: MCP_BASE_URL, value: "https://RELEASE-NAME.example.com" }
+
+  - it: rejects a contact email that is not an address
+    set:
+      mcpConfig:
+        kyckr:
+          defaultContactEmail: ops.example.com
+    asserts:
+      - failedTemplate:
+          errorPattern: does not match pattern
+
+  - it: accepts a contact email address
+    set:
+      mcpConfig:
+        kyckr:
+          defaultContactEmail: ops@example.com
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_DEFAULT_CONTACT_EMAIL, value: ops@example.com }
+
+  - it: leaves the contact email empty by default
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content: { name: UPSTREAM_DEFAULT_CONTACT_EMAIL }
+          any: true
+
+  - it: runs one replica and restarts the pods when a secret changes
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - equal:
+          path: spec.replicas
+          value: 1
+      - equal:
+          path: metadata.annotations["reloader.stakater.com/auto"]
+          value: "true"
+
+  - it: reads the listed Secret and the ConfigMap into the environment
+    set:
+      extraEnvSecrets:
+        - kyckr-mcp-secrets
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].envFrom
+          content:
+            secretRef:
+              name: kyckr-mcp-secrets
+
+  - it: sets the chart defaults the app needs behind the gateway
+    documentSelector:
+      path: kind
+      value: ConfigMap
+    asserts:
+      - equal:
+          path: data.HOST
+          value: 0.0.0.0
+      - equal:
+          path: data.MCP_AUTH_MODE
+          value: zitadel
+      - equal:
+          path: data.DB_SSL_ROOT_CERT
+          value: /etc/postgresql-ca/ca.crt
+
+  - it: allows egress to the Zitadel and Kyckr hosts
+    set:
+      mcpConfig:
+        zitadel:
+          baseUrl: https://id.tenant.example.com
+      networkPolicy:
+        enabled: true
+    documentSelector:
+      path: kind
+      value: CiliumNetworkPolicy
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            toFQDNs:
+              - matchName: id.tenant.example.com
+            toPorts:
+              - ports:
+                  - port: "443"
+                    protocol: TCP
+      - contains:
+          path: spec.egress
+          content:
+            toFQDNs:
+              - matchName: test-api.kyckr.com
+            toPorts:
+              - ports:
+                  - port: "443"
+                    protocol: TCP
+
+  - it: allows Postgres egress when the connection names a host
+    set:
+      networkPolicy:
+        enabled: true
+      postgresql:
+        connection:
+          host: pg.example.com
+    documentSelector:
+      path: kind
+      value: CiliumNetworkPolicy
+    asserts:
+      - contains:
+          path: spec.egress
+          content:
+            toFQDNs:
+              - matchName: pg.example.com
+            toPorts:
+              - ports:
+                  - port: "5432"
+                    protocol: TCP
