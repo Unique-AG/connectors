@@ -7,11 +7,15 @@ from typing import cast, override
 import weakref
 
 import httpx2
-from mcp_observability import MetricNamespace
 from opentelemetry import trace
 from opentelemetry.trace import SpanKind
 from opentelemetry.trace import Status
 from opentelemetry.trace import StatusCode
+
+from kyckr_mcp.telemetry import credits_consumed
+from kyckr_mcp.telemetry import upstream_duration_ms
+from kyckr_mcp.telemetry import upstream_requests
+from kyckr_mcp.telemetry import upstream_retries
 
 # The labels the NestJS kyckr-mcp wrote, so its dashboards keep working. Matched against the raw
 # path, so an id with an encoded slash stays one segment, after the optional `/v2` of `api_url`.
@@ -31,29 +35,6 @@ _PAID_TOOLS = {
     ("POST", "/orders"): "create_document_order",
     ("GET", "/orders/:orderId"): "get_order",
 }
-# OpenTelemetry's default millisecond buckets, which the NestJS service used, up to the
-# longest timeout the chart allows.
-_DURATION_BUCKETS_MS = (
-    *(0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000),
-    *(30000, 60000, 120000),
-)
-
-_metrics = MetricNamespace("kyckr")
-_requests = _metrics.counter(
-    "api_requests_total", "Kyckr API requests", ["method", "path", "status"]
-)
-_duration = _metrics.histogram(
-    "api_request_duration_ms",
-    "Kyckr API request duration in milliseconds",
-    ["method", "path"],
-    buckets=_DURATION_BUCKETS_MS,
-)
-_retries = _metrics.counter(
-    "api_retries_total", "Kyckr API requests sent again after a failed attempt", ["method", "path"]
-)
-_credits = _metrics.counter(
-    "credits_consumed_total", "Kyckr credits consumed, by the tool that paid", ["tool"]
-)
 _tracer = trace.get_tracer("kyckr_mcp")
 _log = logging.getLogger(__name__)
 
@@ -97,7 +78,7 @@ class RecordedTransport(httpx2.AsyncBaseTransport):
         method = request.method
         route = _route(request)
         if request in self._sent:
-            _retries.labels(method=method, path=route).inc()
+            upstream_retries.labels(method=method, path=route).inc()
         self._sent.add(request)
         status = 0
         started = time.perf_counter()
@@ -129,8 +110,8 @@ class RecordedTransport(httpx2.AsyncBaseTransport):
                 if status == 0 or status >= 400:
                     span.set_status(Status(StatusCode.ERROR))
                 elapsed_ms = (time.perf_counter() - started) * 1000
-                _requests.labels(method=method, path=route, status=str(status)).inc()
-                _duration.labels(method=method, path=route).observe(elapsed_ms)
+                upstream_requests.labels(method=method, path=route, status=str(status)).inc()
+                upstream_duration_ms.labels(method=method, path=route).observe(elapsed_ms)
 
     @override
     async def aclose(self) -> None:
@@ -147,4 +128,4 @@ async def record_credits(response: httpx2.Response) -> None:
         body = cast(object, response.json())
     except ValueError:
         return
-    _credits.labels(tool=tool).inc(credit_cost(body))
+    credits_consumed.labels(tool=tool).inc(credit_cost(body))

@@ -11,8 +11,8 @@ from mcp_openapi.retry import RetryAfterPolicy
 from mcp_openapi.upstream import OperationClient
 import yaml
 
-from kyckr_mcp.telemetry import record_credits
-from kyckr_mcp.telemetry import RecordedTransport
+from kyckr_mcp.upstream.recording import record_credits
+from kyckr_mcp.upstream.recording import RecordedTransport
 from kyckr_mcp.upstream.settings import UpstreamSettings
 
 # The name the contexts and tools import the client by, kept the same in every MCP whatever

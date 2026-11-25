@@ -14,17 +14,17 @@ from opentelemetry.trace import SpanKind
 from opentelemetry.trace import StatusCode
 import pytest
 
-from kyckr_mcp.telemetry.upstream_calls import credit_cost
-from kyckr_mcp.telemetry.upstream_calls import route_template
 from kyckr_mcp.upstream import upstream_http
 from kyckr_mcp.upstream import UpstreamSettings
+from kyckr_mcp.upstream.recording import credit_cost
+from kyckr_mcp.upstream.recording import route_template
 from tests.conftest import CallTool
 from tests.conftest import FakeKyckr
 
 type Handler = Callable[[httpx2.Request], httpx2.Response]
 
 LITE = "/companies/:kyckrId/lite"
-UPSTREAM_LOGGER = "kyckr_mcp.telemetry.upstream_calls"
+UPSTREAM_LOGGER = "kyckr_mcp.upstream.recording"
 SECRETS = ("dummy-api-key", "GB%7C12345678", "12345678", "J40")
 
 
@@ -94,7 +94,7 @@ def spans(monkeypatch: pytest.MonkeyPatch) -> InMemorySpanExporter:
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    monkeypatch.setattr("kyckr_mcp.telemetry.upstream_calls._tracer", provider.get_tracer("test"))
+    monkeypatch.setattr("kyckr_mcp.upstream.recording._tracer", provider.get_tracer("test"))
     return exporter
 
 
@@ -184,7 +184,7 @@ async def test_the_duration_is_recorded_in_milliseconds(
 ) -> None:
     ticks = itertools.count(0, 0.25)
     monkeypatch.setattr(
-        "kyckr_mcp.telemetry.upstream_calls.time", SimpleNamespace(perf_counter=lambda: next(ticks))
+        "kyckr_mcp.upstream.recording.time", SimpleNamespace(perf_counter=lambda: next(ticks))
     )
     labels = {"method": "GET", "path": "/companies/:kyckrId/documents"}
     name = "kyckr_api_request_duration_ms"
