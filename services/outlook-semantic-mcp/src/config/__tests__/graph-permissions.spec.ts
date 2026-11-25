@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { loadFeaturesConfig } from '../features.config';
 import { resolveScopes } from '../graph-permissions';
 
-// main's MAIL_SCOPES and CALENDAR_SCOPES (src/auth/microsoft.provider.ts), copied, not derived.
+// Literal expected scopes, the fixed list earlier versions requested; never derived from the code under test.
 const MAIN_MAIL_SCOPES = [
   'openid',
   'profile',
