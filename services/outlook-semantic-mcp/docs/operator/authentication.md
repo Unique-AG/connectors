@@ -5,7 +5,7 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on, or when `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` lists it. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and is user-consentable like the mail permissions.
+All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS`, `DELEGATED_ACCESS_SCAN` and `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on, or when `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` lists it. `Calendars.ReadWrite.Shared` is requested when a calendar tool is listed in `MCP_TOOLS`, and is user-consentable like the mail permissions. Any permission listed in `MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS` is requested as well.
 
 | Permission | Type | Admin Consent | Requested when |
 |------------|------|---------------|----------------|
@@ -17,7 +17,7 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `User.Read.All` | Delegated | Yes | `DELEGATED_ACCESS_SCAN` is not `disabled` |
 | `MailboxSettings.Read` | Delegated | No | Always |
 | `People.Read` | Delegated | No | Always |
-| `Calendars.ReadWrite.Shared` | Delegated | Yes | A calendar tool is listed in `MCP_TOOLS` |
+| `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` |
 | `offline_access` | Delegated | No | Always |
 
 Register and grant at least the permissions your configuration requests. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. If the app was granted `Mail.ReadWrite` but the deployment lists no draft tool, add `Mail.ReadWrite` to [`MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS`](./configuration.md#MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS), or Entra asks users to consent to `Mail.Read`.
@@ -34,7 +34,7 @@ https://<your-outlook-mcp-host>/admin/consent
 
 The link needs no sign-in. It redirects to the Microsoft admin consent page for the app registration and sign-in tenant of that deployment. After approving, you are redirected to a Unique confirmation page.
 
-The consent prompt lists the [Required Permissions](#Required-Permissions) above. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. `User.Read.All`, requested with shared mailboxes on, needs admin consent.
+The link asks for every permission registered on the app registration, which can be more than the deployment's configuration requests, for example `User.Read.All` with shared mailboxes off. Review the listed permissions before granting. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. `User.Read.All`, requested with shared mailboxes on, needs admin consent.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. Unless Unique pinned your deployment to one directory, Microsoft opens the directory of the admin account you sign in with. See [Admin consent link](#Admin-consent-link).
 
