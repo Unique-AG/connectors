@@ -49,7 +49,7 @@ from office_365_mcp.shared.outlook.tasks import (
     recurrence_for,
     repeat_refusal,
     shared_list_reason,
-    task_title,
+    task_for_a_question,
     utc_times,
 )
 from office_365_mcp.shared.prose import body_opening, cut_for_a_question
@@ -115,7 +115,7 @@ _NOTHING_TO_CHANGE = (
 )
 
 
-def _changes(change: TaskChange) -> str:
+def _changes(change: TaskChange, *, series_from: date | None) -> str:
     parts = [
         *([f"title {cut_for_a_question(change.title)!r}"] if change.title else []),
         *([f"notes that open with {body_opening(change.notes)!r}"] if change.notes else []),
@@ -125,7 +125,7 @@ def _changes(change: TaskChange) -> str:
         *(["no start date"] if change.clear_start_date else []),
         *([f"reminder {change.reminder_at.isoformat()}"] if change.reminder_at else []),
         *(["no reminder"] if change.clear_reminder else []),
-        *([f"repeats every {change.repeat.every}"] if change.repeat else []),
+        *([f"{_series(change.repeat)} from {series_from}"] if change.repeat else []),
         *(["no repeat"] if change.clear_repeat else []),
         *([f"priority {change.priority}"] if change.priority else []),
         *(
@@ -136,6 +136,16 @@ def _changes(change: TaskChange) -> str:
         *(["no categories"] if change.categories == () else []),
     ]
     return "; ".join(parts)
+
+
+def _series(repeat: TaskRepeat) -> str:
+    every = (
+        f"every {repeat.every}"
+        if repeat.interval == 1
+        else f"every {repeat.interval} {repeat.every}s"
+    )
+    days = f" on {', '.join(repeat.weekdays)}" if repeat.weekdays else ""
+    return f"repeats {every}{days}"
 
 
 def _both(name: str) -> str:
@@ -281,13 +291,15 @@ async def update_task(
             refused = no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED)
         elif change.repeat is not None and due is not None:
             body.recurrence = recurrence_for(change.repeat, due=due)
+            about = write_state_for(about, due.isoformat())
         if refused is None:
             audience = await list_audience(client, handle.list_id)
             if answer_pending or audience.reaches_others:
-                title = await task_title(client, handle)
+                title = (await task_for_a_question(client, handle)).title or ""
                 with not_graph():
                     question = (
-                        f"Change the task {cut_for_a_question(title)!r} ({_changes(change)}) "
+                        f"Change the task {cut_for_a_question(title)!r} "
+                        + f"({_changes(change, series_from=due)}) "
                         + f"{shared_list_reason(audience)}?"
                     )
                     answer = await confirm(question, about)

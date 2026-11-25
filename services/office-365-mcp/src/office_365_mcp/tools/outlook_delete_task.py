@@ -111,7 +111,7 @@ async def delete_task(
         if task is None:
             return DeletedTask(title=None, outcome="not_found")
         question = _question(task.title, audience)
-        about = confirmation_digest(TOOL_NAME, handle.uri, question)
+        about = confirmation_digest(TOOL_NAME, handle.uri, question, task.title or "")
         with not_graph():
             answer = await confirm(question, about)
         asked = answer if isinstance(answer, InputRequiredResult) else None

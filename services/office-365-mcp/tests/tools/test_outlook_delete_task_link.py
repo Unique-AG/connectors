@@ -9,6 +9,7 @@ from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
+from office_365_mcp.graph_client import GraphFailure
 from office_365_mcp.shared.seam import Confirm
 from office_365_mcp.tools.outlook_delete_task_link import DeletedTaskLink, delete_task_link
 
@@ -184,3 +185,16 @@ class TestThePersonBetweenTheReadAndTheDelete:
 
         assert answer is pending
         assert delete.call_count == 0
+
+
+class TestAFailedDelete:
+    async def test_a_delete_that_graph_fails_is_sent_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _link_is_there(graph)
+        delete = _deleted(graph, status=503)
+
+        with pytest.raises(GraphFailure):
+            _ = await _delete(client)
+
+        assert delete.call_count == 1

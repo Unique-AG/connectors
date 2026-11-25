@@ -31,6 +31,7 @@ _LIST_PATH = f"/me/todo/lists/{_LIST_ID}"
 _STEP_PATH = f"{_LIST_PATH}/tasks/{_TASK_ID}/checklistItems/{_STEP_ID}"
 
 _NOTHING_CHANGED = "Nothing was changed."
+_NAMED = "the step 'Call the hotel' of the task 'Plan the offsite'"
 
 _UPDATED = {
     "id": _STEP_ID,
@@ -45,6 +46,15 @@ def _list(graph: respx.MockRouter, *, is_shared: bool | None = False) -> respx.R
         return_value=httpx.Response(
             200, json={"id": _LIST_ID, "displayName": "Team", "isShared": is_shared}
         )
+    )
+
+
+def _named(graph: respx.MockRouter) -> None:
+    _ = graph.get(f"{_LIST_PATH}/tasks/{_TASK_ID}").mock(
+        return_value=httpx.Response(200, json={"id": _TASK_ID, "title": "Plan the offsite"})
+    )
+    _ = graph.get(_STEP_PATH).mock(
+        return_value=httpx.Response(200, json={"id": _STEP_ID, "displayName": "Call the hotel"})
     )
 
 
@@ -158,13 +168,25 @@ class TestThePersonBeforeTheWrite:
     @pytest.mark.parametrize(
         ("text", "is_checked", "opening"),
         [
-            (None, True, "Check off a step of a task in the list 'Team'"),
-            (None, False, "Clear the check of a step of a task in the list 'Team'"),
-            ("Call Anna", None, "Change a step of a task to 'Call Anna' in the list 'Team'"),
+            (
+                None,
+                True,
+                f"Check off {_NAMED} in the list 'Team'",
+            ),
+            (
+                None,
+                False,
+                f"Clear the check of {_NAMED} in the list 'Team'",
+            ),
+            (
+                "Call Anna",
+                None,
+                f"Change {_NAMED} to 'Call Anna' in the list 'Team'",
+            ),
             (
                 "Call Anna",
                 True,
-                "Change a step of a task to 'Call Anna' and check it off in the list 'Team'",
+                f"Change {_NAMED} to 'Call Anna' and check it off in the list 'Team'",
             ),
         ],
     )
@@ -177,6 +199,7 @@ class TestThePersonBeforeTheWrite:
         opening: str,
     ) -> None:
         _ = _list(graph, is_shared=True)
+        _named(graph)
         _ = _patched(graph)
         asked: list[str] = []
 
@@ -195,6 +218,7 @@ class TestThePersonBeforeTheWrite:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _list(graph, is_shared=True)
+        _named(graph)
         patch = _patched(graph)
 
         async def refuses(question: str, about: str) -> str | None:
@@ -212,6 +236,7 @@ class TestThePersonBeforeTheWrite:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _list(graph, is_shared=None)
+        _named(graph)
         patch = _patched(graph)
 
         async def ask_back(question: str, about: str) -> InputRequiredResult:

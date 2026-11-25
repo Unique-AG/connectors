@@ -11,6 +11,7 @@ from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
+from office_365_mcp.graph_client import GraphFailure
 from office_365_mcp.shared.seam import WRITE_DESTRUCTIVE_IDEMPOTENT, Confirm
 from office_365_mcp.tools import outlook_delete_task_list as deleter
 from office_365_mcp.tools.outlook_delete_task_list import DeletedTaskList, delete_task_list
@@ -232,3 +233,16 @@ class TestWhatItAdvertises:
             WRITE_DESTRUCTIVE_IDEMPOTENT
         )
         assert cast("dict[str, object]", tool.parameters)["required"] == ["task_list"]
+
+
+class TestAFailedDelete:
+    async def test_a_delete_that_graph_fails_is_sent_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _read(graph)
+        delete = _deleted(graph, status=503)
+
+        with pytest.raises(GraphFailure):
+            _ = await _delete(client)
+
+        assert delete.call_count == 1

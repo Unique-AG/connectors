@@ -5,6 +5,8 @@ from typing import Annotated, Literal
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
+from kiota_abstractions.base_request_configuration import RequestConfiguration
+from kiota_abstractions.default_query_parameters import QueryParameters
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.linked_resource import LinkedResource
 from msgraph.generated.users.item.todo.lists.item.tasks.item.linked_resources.item.linked_resource_item_request_builder import (  # noqa: E501
@@ -13,7 +15,7 @@ from msgraph.generated.users.item.todo.lists.item.tasks.item.linked_resources.it
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
-from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, not_graph
+from office_365_mcp.graph_client import GraphNotFound, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.handles import TaskPartHandle, task_part_handle
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -117,12 +119,19 @@ async def delete_task_link(
         assert owner is not None, "Graph answered a task read with no task"
         question = _question(title, owner.title)
         with not_graph():
-            answer = await confirm(question, confirmation_digest(TOOL_NAME, handle.uri, question))
+            answer = await confirm(
+                question,
+                confirmation_digest(
+                    TOOL_NAME, handle.uri, question, title or "", owner.title or ""
+                ),
+            )
         asked = answer if isinstance(answer, InputRequiredResult) else None
         refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
             with suppress(GraphNotFound), graph_step(STEP_DELETE):
-                await found.delete()
+                await found.delete(
+                    request_configuration=RequestConfiguration[QueryParameters](options=no_retry())
+                )
                 outcome = "deleted"
 
     if asked is not None:

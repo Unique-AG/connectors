@@ -19,6 +19,7 @@ from office_365_mcp.shared.outlook.tasks import (
     bad_step_handle,
     list_audience,
     shared_list_reason,
+    task_for_a_question,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
@@ -32,6 +33,8 @@ from office_365_mcp.shared.seam import (
 TOOL_NAME = "outlook_update_task_step"
 
 PRESETS: tuple[str, ...] = ("outlook-tasks-write", "outlook-tasks-delete")
+
+STEP_READ = "task_step_to_update"
 
 STEP_UPDATE = "update_task_step"
 
@@ -101,8 +104,18 @@ async def update_task_step(
     with graph_errors():
         audience = await list_audience(client, handle.list_id)
         if answer_pending or audience.reaches_others:
+            task = await task_for_a_question(client, handle.task)
+            with graph_step(STEP_READ):
+                item = (
+                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                    .tasks.by_todo_task_id(handle.task_id)
+                    .checklist_items.by_checklist_item_id(handle.part_id)
+                    .get()
+                )
+            assert item is not None, "Graph answered a checklist item read with no item"
+            named = _named(item.display_name or "", task.title or "")
             with not_graph():
-                question = f"{_change(text, is_checked)} {shared_list_reason(audience)}?"
+                question = f"{_change(named, text, is_checked)} {shared_list_reason(audience)}?"
                 answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
@@ -137,10 +150,14 @@ def _patch(text: str | None, is_checked: bool | None) -> ChecklistItem:
     return item
 
 
-def _change(text: str | None, is_checked: bool | None) -> str:
+def _named(step: str, task: str) -> str:
+    return f"the step {cut_for_a_question(step)!r} of the task {cut_for_a_question(task)!r}"
+
+
+def _change(named: str, text: str | None, is_checked: bool | None) -> str:
     if text is None:
-        return "Check off a step of a task" if is_checked else "Clear the check of a step of a task"
-    words = f"Change a step of a task to {cut_for_a_question(text)!r}"
+        return f"Check off {named}" if is_checked else f"Clear the check of {named}"
+    words = f"Change {named} to {cut_for_a_question(text)!r}"
     if is_checked is None:
         return words
     return f"{words} and check it off" if is_checked else f"{words} and clear its check"

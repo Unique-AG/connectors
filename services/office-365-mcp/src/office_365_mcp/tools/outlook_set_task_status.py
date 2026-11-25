@@ -11,7 +11,7 @@ from msgraph.generated.models.todo_task import TodoTask
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import task_handle
@@ -25,7 +25,7 @@ from office_365_mcp.shared.outlook.tasks import (
     graph_status,
     list_audience,
     shared_list_reason,
-    task_title,
+    task_for_a_question,
     utc_times,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -79,6 +79,16 @@ A second `completed` completes the next task too.
 because they see the change. A task in the user's own unshared list changes without a question.
 """
 
+_MOVED_ON = (
+    "The task changed while the user decided: for example, another person completed it, which "
+    + f"moves a repeating task to its next due date. {_NOTHING_CHANGED} Read the task with "
+    + "outlook_read_task, and ask the user again."
+)
+
+
+_CHANGED_SINCE_READ = 412
+
+
 _SPOKEN: Mapping[Status, str] = {
     "not_started": "not started",
     "in_progress": "in progress",
@@ -111,28 +121,39 @@ async def set_task_status(
     refused: str | None = None
     with graph_errors():
         audience = await list_audience(client, handle.list_id)
+        etag: str | None = None
         if answer_pending or audience.reaches_others:
-            title = await task_title(client, handle)
+            before = await task_for_a_question(client, handle)
+            etag = str(before.additional_data.get("@odata.etag") or "") or None
+            about = write_state_for(about, etag or "")
             with not_graph():
                 question = (
-                    f"Set the task {cut_for_a_question(title)!r} to {_SPOKEN[status]} "
-                    + f"{shared_list_reason(audience)}?"
+                    f"Set the task {cut_for_a_question(before.title or '')!r} to "
+                    + f"{_SPOKEN[status]} {shared_list_reason(audience)}?"
                 )
                 answer = await confirm(question, about)
             asked = answer if isinstance(answer, InputRequiredResult) else None
             refused = answer if isinstance(answer, str) else None
         if refused is None and asked is None:
-            with graph_step(STEP_SET_STATUS):
-                updated = (
-                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                    .tasks.by_todo_task_id(handle.task_id)
-                    .patch(
-                        TodoTask(status=graph_status(status)),
-                        request_configuration=RequestConfiguration[QueryParameters](
-                            headers=utc_times(), options=no_retry()
-                        ),
+            headers = utc_times()
+            if etag is not None:
+                headers.add("If-Match", etag)
+            try:
+                with graph_step(STEP_SET_STATUS):
+                    updated = (
+                        await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                        .tasks.by_todo_task_id(handle.task_id)
+                        .patch(
+                            TodoTask(status=graph_status(status)),
+                            request_configuration=RequestConfiguration[QueryParameters](
+                                headers=headers, options=no_retry()
+                            ),
+                        )
                     )
-                )
+            except GraphFailure as failure:
+                if failure.status != _CHANGED_SINCE_READ:
+                    raise
+                refused = _MOVED_ON
 
     if asked is not None:
         return asked

@@ -151,13 +151,18 @@ def missing_time_refusal(
 ) -> str | None:
     if moment is None or moment.tzinfo is not None:
         return None
-    back = moment.replace(tzinfo=zone).astimezone(UTC).astimezone(zone).replace(tzinfo=None)
-    if back == moment:
+    first, second = (moment.replace(tzinfo=zone, fold=fold).astimezone(UTC) for fold in (0, 1))
+    back = first.astimezone(zone).replace(tzinfo=None)
+    if back != moment:
+        problem = "the clocks skip that time when they change"
+    elif first != second:
+        problem = "that time occurs twice when the clocks change back"
+    else:
         return None
     return (
-        f"{tool} cannot set the reminder at {moment.isoformat()}, because the clocks in "
-        + f"{zone.key} skip that time when they change. Ask the user for a time outside the "
-        + f"change, or give the time with an offset. {nothing_happened} {_AGAIN}"
+        f"{tool} cannot set the reminder at {moment.isoformat()}, because in {zone.key} "
+        + f"{problem}. Ask the user for a time outside the change, or give the time with an "
+        + f"offset. {nothing_happened} {_AGAIN}"
     )
 
 
@@ -305,7 +310,7 @@ async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudienc
     return ListAudience(name=found.display_name or "", is_shared=found.is_shared)
 
 
-async def task_title(client: GraphServiceClient, task: TaskHandle) -> str:
+async def task_for_a_question(client: GraphServiceClient, task: TaskHandle) -> TodoTask:
     with graph_step(STEP_TASK_TITLE):
         found = (
             await client.me.todo.lists.by_todo_task_list_id(task.list_id)
@@ -313,7 +318,7 @@ async def task_title(client: GraphServiceClient, task: TaskHandle) -> str:
             .get(request_configuration=RequestConfiguration(headers=utc_times()))
         )
     assert found is not None, "Graph answered a task read with no task"
-    return found.title or ""
+    return found
 
 
 def shared_list_reason(audience: ListAudience) -> str:

@@ -438,12 +438,26 @@ class TestPlanningATask:
     async def test_a_reminder_in_the_hour_that_the_clocks_skip_is_refused(
         self, graph: respx.MockRouter
     ) -> None:
-        with pytest.raises(ToolError, match="skip that time"):
+        with pytest.raises(ToolError, match="the clocks skip that time"):
             _ = await call(
                 "outlook_create_task",
                 task_list=TASK_LIST,
                 title="Call the bank",
                 reminder_at="2027-03-28T02:30:00",
+                time_zone=ZURICH,
+            )
+
+        assert graph.calls.call_count == 0
+
+    async def test_a_reminder_in_the_hour_that_occurs_twice_needs_an_offset(
+        self, graph: respx.MockRouter
+    ) -> None:
+        with pytest.raises(ToolError, match="occurs twice"):
+            _ = await call(
+                "outlook_create_task",
+                task_list=TASK_LIST,
+                title="Call the bank",
+                reminder_at="2026-10-25T02:30:00",
                 time_zone=ZURICH,
             )
 
@@ -887,6 +901,22 @@ class TestASharedList:
         assert "'Book the venue' (priority high)" in question
         assert person.writes_before_each_question == [0]
         assert route.call_count == 1
+
+    async def test_a_repeating_task_that_moves_on_while_the_person_decides_is_not_completed(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _list_is(graph, shared=True, name="Team launch")
+        this_week = _task(
+            TASK_ID, "Water the plants", due_utc="2026-11-26T23:00:00", **{"@odata.etag": 'W/"1"'}
+        )
+        _ = graph.get(ONE_TASK).mock(return_value=httpx.Response(200, json=this_week))
+        conflict = {"error": {"code": "ErrorIrresolvableConflict", "message": "Conflict."}}
+        route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(412, json=conflict))
+
+        with pytest.raises(ToolError, match="The task changed while the user decided"):
+            _ = await call("outlook_set_task_status", uri=TASK, status="completed")
+
+        assert route.calls.last.request.headers["if-match"] == 'W/"1"'
 
     async def test_a_list_that_does_not_say_whether_it_is_shared_is_asked_about(
         self, graph: respx.MockRouter
