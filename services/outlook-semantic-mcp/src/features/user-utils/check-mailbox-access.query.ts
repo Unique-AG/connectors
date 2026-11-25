@@ -3,7 +3,7 @@ import { type FeaturesConfig, featuresConfig } from '~/config';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { GetUserProfileQuery } from './get-user-profile.query';
 
-export type MailboxAccess = { allowed: true } | { allowed: false; message: string };
+type MailboxAccess = { allowed: true } | { allowed: false; message: string };
 
 // Without shared mailboxes the server is not granted the `.Shared` permissions, so another
 // person's mailbox is refused before Graph is called.

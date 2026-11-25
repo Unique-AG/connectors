@@ -620,7 +620,7 @@ List all Outlook mail categories available for the user.
 
 ### `list_mailboxes_and_directories`
 
-List all Outlook mailboxes and their folder trees available to the user.
+List all Outlook mailboxes and their folder trees available to the user. With `DELEGATED_ACCESS_SCAN=disabled` only the user's own mailbox is listed, and search covers only that mailbox.
 
 **Available in:** Both modes
 

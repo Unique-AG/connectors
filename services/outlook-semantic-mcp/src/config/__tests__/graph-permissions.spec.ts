@@ -1,6 +1,9 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { loadFeaturesConfig } from '../features.config';
 import { resolveScopes } from '../graph-permissions';
+import { GRAPH_PERMISSIONS } from '../tool-declarations';
 
 // main's MAIL_SCOPES and CALENDAR_SCOPES (src/auth/microsoft.provider.ts), copied, not derived.
 const MAIN_MAIL_SCOPES = [
@@ -187,5 +190,24 @@ describe('MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS', () => {
         MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS: 'Mail.ReadWrite',
       }),
     ).toThrow('MICROSOFT_ADDITIONAL_GRAPH_PERMISSIONS: a JSON array of Graph permission names');
+  });
+});
+
+describe('the Helm values schema', () => {
+  it('allows exactly the known Graph permissions in additionalGraphPermissions', () => {
+    const schema = JSON.parse(
+      readFileSync(
+        resolve(
+          __dirname,
+          '../../../deploy/helm-charts/outlook-semantic-mcp/values.additional.schema.json',
+        ),
+        'utf8',
+      ),
+    );
+    const allowed =
+      schema.properties.mcpConfig.properties.microsoft.properties.additionalGraphPermissions.items
+        .enum;
+
+    expect([...allowed].sort()).toEqual([...GRAPH_PERMISSIONS].sort());
   });
 });
