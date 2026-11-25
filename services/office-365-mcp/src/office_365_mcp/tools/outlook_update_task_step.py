@@ -1,31 +1,36 @@
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.checklist_item import ChecklistItem
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.confirmation import write_state_for
+from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import task_part_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     TaskStep,
-    bad_step_handle,
+    bad_handle,
     list_audience,
-    shared_list_reason,
-    task_for_a_question,
+    named_in_question,
+    read_task,
+    read_task_part,
+    todo_request,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Approval,
     Confirm,
+    Question,
     answer_pending,
+    answered,
+    approved_write,
     graph_client_for_caller,
     person_confirms,
 )
@@ -33,8 +38,6 @@ from office_365_mcp.shared.seam import (
 TOOL_NAME = "outlook_update_task_step"
 
 PRESETS: tuple[str, ...] = ("outlook-tasks-write", "outlook-tasks-delete")
-
-STEP_READ = "task_step_to_update"
 
 STEP_UPDATE = "update_task_step"
 
@@ -52,13 +55,11 @@ _NOTHING_CHANGED = "Nothing was changed."
 _CHANGE = "change the step"
 _DO_NOT_CHANGE = "keep the step"
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this step, and nothing was changed. The handle is well formed, "
     + "so this is not a bad argument. The step or its task was most likely deleted, or the task "
     + "moved to another list, which gives it a new handle. Read the task again with "
-    + f"outlook_read_task and take a fresh `steps[].uri`. {_AGAIN}"
+    + f"outlook_read_task and take a fresh `steps[].uri`. {AGAIN}"
 )
 
 
@@ -79,6 +80,13 @@ because they see the change. A task in the user's own unshared list changes with
 """
 
 
+class _StepChange(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    text: str | None
+    is_checked: bool | None
+
+
 async def update_task_step(
     client: GraphServiceClient,
     *,
@@ -90,69 +98,59 @@ async def update_task_step(
 ) -> TaskStep | InputRequiredResult:
     handle = task_part_handle("steps", step)
     if handle is None:
-        raise ToolError(bad_step_handle(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
+        raise ToolError(
+            bad_handle(TOOL_NAME, "step", argument="step", nothing_happened=_NOTHING_CHANGED)
+        )
     if text is None and is_checked is None:
         raise ToolError(_NOTHING_TO_CHANGE)
 
-    about = write_state_for(
-        STEP_UPDATE, handle.uri, text or "", "" if is_checked is None else str(is_checked)
-    )
-
-    updated: ChecklistItem | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
-    with graph_errors():
+    async def prepare(must_ask: bool) -> Question | None:
         audience = await list_audience(client, handle.list_id)
-        if answer_pending or audience.reaches_others:
-            task = await task_for_a_question(client, handle.task)
-            with graph_step(STEP_READ):
-                item = (
-                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                    .tasks.by_todo_task_id(handle.task_id)
-                    .checklist_items.by_checklist_item_id(handle.part_id)
-                    .get()
+        if not (must_ask or audience.reaches_others):
+            return None
+        task = await read_task(client, handle.task)
+        item = await read_task_part(client, handle)
+        assert isinstance(item, ChecklistItem), "Graph answered a step read with another part"
+        named = _named(item.display_name, task.title)
+        question = (
+            f"{_change(named, text, is_checked)} in {audience.named}?"
+            + audience.sharing_note("see the change")
+        )
+        return Question(question, (audience.task_list, task, item))
+
+    async def write(headers: HeadersCollection) -> TaskStep:
+        with graph_step(STEP_UPDATE):
+            updated = (
+                await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                .tasks.by_todo_task_id(handle.task_id)
+                .checklist_items.by_checklist_item_id(handle.part_id)
+                .patch(
+                    ChecklistItem(display_name=text, is_checked=is_checked),
+                    request_configuration=todo_request(
+                        safe_to_repeat=False, task_times=False, headers=headers
+                    ),
                 )
-            assert item is not None, "Graph answered a checklist item read with no item"
-            named = _named(item.display_name or "", task.title or "")
-            about = write_state_for(about, item.display_name or "", task.title or "")
-            with not_graph():
-                question = f"{_change(named, text, is_checked)} {shared_list_reason(audience)}?"
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            with graph_step(STEP_UPDATE):
-                updated = (
-                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                    .tasks.by_todo_task_id(handle.task_id)
-                    .checklist_items.by_checklist_item_id(handle.part_id)
-                    .patch(
-                        _patch(text, is_checked),
-                        request_configuration=RequestConfiguration[QueryParameters](
-                            options=no_retry()
-                        ),
-                    )
-                )
+            )
+        assert updated is not None, "Graph answered a checklist item update with no item"
+        return TaskStep.from_item(updated, task=handle.task)
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert updated is not None, "Graph answered a checklist item update with no item"
-    return TaskStep.from_item(updated, task=handle.task)
+    approval = Approval(
+        TOOL_NAME,
+        handle.uri,
+        _StepChange(text=text, is_checked=is_checked),
+        confirm,
+        answer_pending,
+        _NOTHING_CHANGED,
+    )
+    with graph_errors():
+        result = await approved_write(approval, prepare=prepare, write=write)
+    return answered(result)
 
 
-def _patch(text: str | None, is_checked: bool | None) -> ChecklistItem:
-    item = ChecklistItem()
-    if text is not None:
-        item.display_name = text
-    if is_checked is not None:
-        item.is_checked = is_checked
-    return item
-
-
-def _named(step: str, task: str) -> str:
-    return f"the step {cut_for_a_question(step)!r} of the task {cut_for_a_question(task)!r}"
+def _named(step: str | None, task: str | None) -> str:
+    return f"{named_in_question('step', step, missing='with no words')} of " + named_in_question(
+        "task", task, missing="with no title"
+    )
 
 
 def _change(named: str, text: str | None, is_checked: bool | None) -> str:

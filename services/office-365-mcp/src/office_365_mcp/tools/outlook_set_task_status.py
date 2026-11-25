@@ -1,38 +1,40 @@
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.calendar import zone_named
-from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     DEFAULT_TIME_ZONE,
     TIME_ZONE_FIELD,
     Status,
     TaskDetail,
-    bad_task_handle,
+    bad_handle,
     bad_zone,
     graph_status,
     list_audience,
-    shared_list_reason,
-    task_for_a_question,
-    utc_times,
+    named_in_question,
+    read_task,
+    todo_request,
 )
-from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE,
+    Approval,
     Confirm,
+    Question,
     answer_pending,
+    answered,
+    approved_write,
     graph_client_for_caller,
     person_confirms,
 )
@@ -56,14 +58,12 @@ _NOTHING_CHANGED = "Nothing was changed."
 _CHANGE = "change the status"
 _DO_NOT_CHANGE = "keep the status"
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task, and nothing was changed. The handle is well formed, "
     + "so this is not a bad argument. The task was most likely deleted, or moved to another "
     + "list, which gives it a new handle: find it again with outlook_list_tasks and take a fresh "
     + "`uri`. If its list was deleted or is no longer shared with the user, call "
-    + f"outlook_list_task_lists again instead. {_AGAIN}"
+    + f"outlook_list_task_lists again instead. {AGAIN}"
 )
 
 _DESCRIPTION = """\
@@ -79,16 +79,6 @@ A second `completed` completes the next task too.
 because they see the change. A task in the user's own unshared list changes without a question.
 """
 
-_MOVED_ON = (
-    "The task changed while the user decided: for example, another person completed it, which "
-    + f"moves a repeating task to its next due date. {_NOTHING_CHANGED} Read the task with "
-    + "outlook_read_task, and ask the user again."
-)
-
-
-_CHANGED_SINCE_READ = 412
-
-
 _SPOKEN: Mapping[Status, str] = {
     "not_started": "not started",
     "in_progress": "in progress",
@@ -96,6 +86,13 @@ _SPOKEN: Mapping[Status, str] = {
     "waiting_on_others": "waiting on others",
     "deferred": "deferred",
 }
+
+
+class _NewStatus(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    status: Status
+    time_zone: str
 
 
 async def set_task_status(
@@ -109,58 +106,50 @@ async def set_task_status(
 ) -> TaskDetail | InputRequiredResult:
     handle = task_handle(uri)
     if handle is None:
-        raise ToolError(bad_task_handle(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
+        raise ToolError(
+            bad_handle(TOOL_NAME, "task", argument="uri", nothing_happened=_NOTHING_CHANGED)
+        )
     zone = zone_named(time_zone)
     if zone is None:
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
 
-    about = write_state_for(STEP_SET_STATUS, handle.uri, status)
-
-    updated: TodoTask | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
-    with graph_errors():
+    async def prepare(must_ask: bool) -> Question | None:
         audience = await list_audience(client, handle.list_id)
-        etag: str | None = None
-        if answer_pending or audience.reaches_others:
-            before = await task_for_a_question(client, handle)
-            etag = str(before.additional_data.get("@odata.etag") or "") or None
-            about = write_state_for(about, etag or "")
-            with not_graph():
-                question = (
-                    f"Set the task {cut_for_a_question(before.title or '')!r} to "
-                    + f"{_SPOKEN[status]} {shared_list_reason(audience)}?"
-                )
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            headers = utc_times()
-            if etag is not None:
-                headers.add("If-Match", etag)
-            try:
-                with graph_step(STEP_SET_STATUS):
-                    updated = (
-                        await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                        .tasks.by_todo_task_id(handle.task_id)
-                        .patch(
-                            TodoTask(status=graph_status(status)),
-                            request_configuration=RequestConfiguration[QueryParameters](
-                                headers=headers, options=no_retry()
-                            ),
-                        )
-                    )
-            except GraphFailure as failure:
-                if failure.status != _CHANGED_SINCE_READ:
-                    raise
-                refused = _MOVED_ON
+        if not (must_ask or audience.reaches_others):
+            return None
+        task = await read_task(client, handle)
+        named = named_in_question("task", task.title, missing="with no title")
+        question = f"Set {named} to {_SPOKEN[status]} in {audience.named}?" + audience.sharing_note(
+            "see the change"
+        )
+        return Question(question, (audience.task_list, task), guarded=task)
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert updated is not None, "Graph answered a task update with no task"
-    return TaskDetail.from_full_task(updated, list_id=handle.list_id, zone=zone)
+    async def write(headers: HeadersCollection) -> TaskDetail:
+        with graph_step(STEP_SET_STATUS):
+            updated = (
+                await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                .tasks.by_todo_task_id(handle.task_id)
+                .patch(
+                    TodoTask(status=graph_status(status)),
+                    request_configuration=todo_request(
+                        safe_to_repeat=False, task_times=True, headers=headers
+                    ),
+                )
+            )
+        assert updated is not None, "Graph answered a task update with no task"
+        return TaskDetail.from_full_task(updated, list_id=handle.list_id, zone=zone)
+
+    approval = Approval(
+        TOOL_NAME,
+        handle.uri,
+        _NewStatus(status=status, time_zone=time_zone),
+        confirm,
+        answer_pending,
+        _NOTHING_CHANGED,
+    )
+    with graph_errors():
+        result = await approved_write(approval, prepare=prepare, write=write)
+    return answered(result)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

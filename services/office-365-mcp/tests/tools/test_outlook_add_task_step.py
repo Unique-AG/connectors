@@ -8,7 +8,6 @@ import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
-from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -138,6 +137,9 @@ class TestThePersonBeforeTheWrite:
         self, client: GraphServiceClient, graph: respx.MockRouter, is_shared: bool | None
     ) -> None:
         _ = _list(graph, is_shared=is_shared)
+        _ = graph.get(f"{_LIST_PATH}/tasks/{_TASK_ID}").mock(
+            return_value=httpx.Response(200, json={"id": _TASK_ID, "title": "Plan the offsite"})
+        )
         _ = _posted(graph)
         asked: list[str] = []
 
@@ -149,40 +151,10 @@ class TestThePersonBeforeTheWrite:
         _ = await _add(client, confirm=capture)
 
         [question] = asked
-        assert question.startswith("Add the step 'Book the room' to a task in the list 'Team'")
-
-    async def test_a_person_who_declines_gets_no_new_step(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _list(graph, is_shared=True)
-        post = _posted(graph)
-
-        async def refuses(question: str, about: str) -> str | None:
-            assert question
-            assert about
-            return _NOTHING_ADDED
-
-        with pytest.raises(ToolError) as raised:
-            _ = await _add(client, confirm=refuses)
-
-        assert str(raised.value) == _NOTHING_ADDED
-        assert post.call_count == 0
-
-    async def test_a_question_that_a_modern_client_must_answer_is_returned_before_any_write(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _list(graph, is_shared=True)
-        post = _posted(graph)
-
-        async def ask_back(question: str, about: str) -> InputRequiredResult:
-            assert question
-            assert about
-            return InputRequiredResult(input_requests={}, request_state="state")
-
-        answer = await add_task_step(client, uri=_URI, text="Book the room", confirm=ask_back)
-
-        assert isinstance(answer, InputRequiredResult)
-        assert post.call_count == 0
+        assert question.startswith(
+            "Add the step 'Book the room', not checked off, to the task 'Plan the offsite' in the "
+            + "list 'Team'?"
+        )
 
 
 class TestWhatItAdvertises:

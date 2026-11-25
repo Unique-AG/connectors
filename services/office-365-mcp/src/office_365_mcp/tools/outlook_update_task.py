@@ -1,6 +1,4 @@
-import json
 from collections.abc import Mapping
-from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
@@ -8,21 +6,17 @@ from zoneinfo import ZoneInfo
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.todo_task import TodoTask
-from msgraph.generated.users.item.todo.lists.item.tasks.item.todo_task_item_request_builder import (  # noqa: E501
-    TodoTaskItemRequestBuilder,
-)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.calendar import zone_named
-from office_365_mcp.shared.confirmation import write_state_for
-from office_365_mcp.shared.handles import TaskHandle, task_handle
+from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     CATEGORIES_FIELD,
     DEFAULT_TIME_ZONE,
     DUE_DATE_FIELD,
@@ -35,28 +29,30 @@ from office_365_mcp.shared.outlook.tasks import (
     TITLE_FIELD,
     Priority,
     TaskDetail,
+    TaskFields,
     TaskRepeat,
-    bad_task_handle,
+    bad_handle,
     bad_zone,
     day_of,
-    due_moment,
-    graph_importance,
-    html_body,
     list_audience,
     missing_time_refusal,
-    moment_in,
+    named_in_question,
     no_due_date_to_repeat,
-    recurrence_for,
+    read_task,
     repeat_refusal,
-    shared_list_reason,
-    task_for_a_question,
-    utc_times,
+    spoken_fields,
+    task_body,
+    todo_request,
 )
-from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
+    Approval,
     Confirm,
+    Question,
+    Refusal,
     answer_pending,
+    answered,
+    approved_write,
     graph_client_for_caller,
     person_confirms,
 )
@@ -66,8 +62,6 @@ TOOL_NAME = "outlook_update_task"
 PRESETS: tuple[str, ...] = ("outlook-tasks-write", "outlook-tasks-delete")
 
 STEP_UPDATE = "update_task"
-
-STEP_DUE_DATE = "task_due_date"
 
 GRAPH_PERMISSIONS: tuple[str, ...] = ("Tasks.ReadWrite",)
 
@@ -80,14 +74,12 @@ _NOTHING_CHANGED = "Nothing was changed."
 _CHANGE = "change"
 _DO_NOT_CHANGE = "do not change"
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task, and nothing was changed. The handle is well formed, "
     + "so this is not a bad argument. The task was most likely deleted, or moved to another "
     + "list, which gives it a new handle: find it again with outlook_list_tasks and take a fresh "
     + "`uri`. If its list was deleted or is no longer shared with the user, call "
-    + f"outlook_list_task_lists again instead. {_AGAIN}"
+    + f"outlook_list_task_lists again instead. {AGAIN}"
 )
 
 _DESCRIPTION = """\
@@ -104,58 +96,11 @@ because they see the change. A task in the user's own unshared list changes with
 - This call is safe to repeat after a timeout.
 """
 
-_TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
-
 _NOTHING_TO_CHANGE = (
     "outlook_update_task needs at least one field to change, besides `uri`. With none of them, "
     + f"there is nothing to change. {_NOTHING_CHANGED} Find out which change the user asked for, "
     + "and then call again."
 )
-
-
-def _changes(change: TaskChange, *, series_from: date | None) -> str:
-    parts = [
-        *([f"title {cut_for_a_question(change.title)!r}"] if change.title else []),
-        *(
-            [f"notes that open with {body_opening(change.notes_html)!r}"]
-            if change.notes_html
-            else []
-        ),
-        *([f"due {change.due_date}"] if change.due_date else []),
-        *(["no due date"] if change.clear_due_date else []),
-        *([f"start {change.start_date}"] if change.start_date else []),
-        *(["no start date"] if change.clear_start_date else []),
-        *([f"reminder {change.reminder_at.isoformat()}"] if change.reminder_at else []),
-        *(["no reminder"] if change.clear_reminder else []),
-        *([f"{_series(change.repeat)} from {series_from}"] if change.repeat else []),
-        *(["no repeat"] if change.clear_repeat else []),
-        *([f"priority {change.priority}"] if change.priority else []),
-        *(
-            [f"categories {cut_for_a_question(', '.join(change.categories))!r}"]
-            if change.categories
-            else []
-        ),
-        *(["no categories"] if change.categories == () else []),
-    ]
-    return "; ".join(parts)
-
-
-def _series(repeat: TaskRepeat) -> str:
-    every = (
-        f"every {repeat.every}"
-        if repeat.interval == 1
-        else f"every {repeat.interval} {repeat.every}s"
-    )
-    days = f" on {', '.join(repeat.weekdays)}" if repeat.weekdays else ""
-    return f"repeats {every}{days}"
-
-
-def _both(name: str) -> str:
-    return (
-        f"outlook_update_task takes either `{name}` or `clear_{_CLEARED[name]}`, not both: one "
-        + f"sets the value and the other removes it. {_NOTHING_CHANGED} {_AGAIN}"
-    )
-
 
 _CLEARED = {
     "due_date": "due_date",
@@ -165,60 +110,52 @@ _CLEARED = {
 }
 
 
-async def _due_date(
-    client: GraphServiceClient, handle: TaskHandle, *, zone: ZoneInfo
-) -> date | None:
-    with graph_step(STEP_DUE_DATE):
-        task = (
-            await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-            .tasks.by_todo_task_id(handle.task_id)
-            .get(
-                request_configuration=RequestConfiguration[_TaskQuery](
-                    headers=utc_times(), query_parameters=_TaskQuery(select=["id", "dueDateTime"])
-                )
-            )
-        )
-    assert task is not None, "Graph answered a task read with no task"
-    return day_of(task.due_date_time, zone=zone)
+def _both(name: str) -> str:
+    return (
+        f"outlook_update_task takes either `{name}` or `clear_{_CLEARED[name]}`, not both: one "
+        + f"sets the value and the other removes it. {_NOTHING_CHANGED} {AGAIN}"
+    )
 
 
-@dataclass(frozen=True, slots=True)
-class TaskChange:
-    title: str | None = None
-    notes_html: str | None = None
-    due_date: date | None = None
+class TaskChange(TaskFields):
     clear_due_date: bool = False
-    priority: Priority | None = None
-    start_date: date | None = None
     clear_start_date: bool = False
-    reminder_at: datetime | None = None
     clear_reminder: bool = False
-    repeat: TaskRepeat | None = None
     clear_repeat: bool = False
-    categories: tuple[str, ...] | None = None
 
     @property
     def is_nothing(self) -> bool:
-        return self == TaskChange()
+        return self.model_dump(exclude={"time_zone"}) == TaskChange().model_dump(
+            exclude={"time_zone"}
+        )
+
+    def spoken(self, *, series_from: date | None) -> str:
+        cleared = [
+            *(["no due date"] if self.clear_due_date else []),
+            *(["no start date"] if self.clear_start_date else []),
+            *(["no reminder"] if self.clear_reminder else []),
+            *(["no repeat"] if self.clear_repeat else []),
+        ]
+        return "; ".join([*spoken_fields(self, series_from=series_from), *cleared])
+
+    def body(self, *, zone: ZoneInfo, series_from: date | None) -> TodoTask:
+        body = task_body(self, zone=zone, series_from=series_from)
+        for cleared, field in (
+            (self.clear_due_date, "dueDateTime"),
+            (self.clear_start_date, "startDateTime"),
+            (self.clear_reminder, "reminderDateTime"),
+            (self.clear_repeat, "recurrence"),
+        ):
+            if cleared:
+                body.additional_data[field] = None
+        if self.clear_reminder:
+            body.is_reminder_on = False
+        return body
 
 
-async def update_task(
-    client: GraphServiceClient,
-    *,
-    uri: str,
-    change: TaskChange,
-    time_zone: str = DEFAULT_TIME_ZONE,
-    confirm: Confirm,
-    answer_pending: bool = False,
-) -> TaskDetail | InputRequiredResult:
-    handle = task_handle(uri)
-    if handle is None:
-        raise ToolError(bad_task_handle(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
-    zone = zone_named(time_zone)
-    if zone is None:
-        raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
+def _refusal(change: TaskChange, zone: ZoneInfo) -> str | None:
     if change.is_nothing:
-        raise ToolError(_NOTHING_TO_CHANGE)
+        return _NOTHING_TO_CHANGE
     for given, cleared, name in (
         (change.due_date is not None, change.clear_due_date, "due_date"),
         (change.start_date is not None, change.clear_start_date, "start_date"),
@@ -226,106 +163,88 @@ async def update_task(
         (change.repeat is not None, change.clear_repeat, "repeat"),
     ):
         if given and cleared:
-            raise ToolError(_both(name))
+            return _both(name)
     skipped = missing_time_refusal(
         TOOL_NAME, change.reminder_at, zone=zone, nothing_happened=_NOTHING_CHANGED
     )
     if skipped is not None:
-        raise ToolError(skipped)
+        return skipped
     if change.repeat is not None:
         refusal = repeat_refusal(TOOL_NAME, change.repeat, nothing_happened=_NOTHING_CHANGED)
         if refusal is not None:
-            raise ToolError(refusal)
+            return refusal
     if change.clear_due_date and change.repeat is not None:
-        raise ToolError(no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
+        return no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED)
+    return None
 
-    body = TodoTask(
-        title=change.title,
-        body=None if change.notes_html is None else html_body(change.notes_html),
-        due_date_time=None if change.due_date is None else due_moment(change.due_date, zone=zone),
-        importance=None if change.priority is None else graph_importance(change.priority),
-        start_date_time=(
-            None if change.start_date is None else due_moment(change.start_date, zone=zone)
-        ),
-        reminder_date_time=(
-            None if change.reminder_at is None else moment_in(change.reminder_at, zone=zone)
-        ),
-        is_reminder_on=True if change.reminder_at is not None else None,
-        categories=None if change.categories is None else list(change.categories),
-    )
-    for cleared, field in (
-        (change.clear_due_date, "dueDateTime"),
-        (change.clear_start_date, "startDateTime"),
-        (change.clear_reminder, "reminderDateTime"),
-        (change.clear_repeat, "recurrence"),
-    ):
-        if cleared:
-            body.additional_data[field] = None
-    if change.clear_reminder:
-        body.is_reminder_on = False
 
-    about = write_state_for(
-        STEP_UPDATE,
-        handle.uri,
-        change.title or "",
-        change.notes_html or "",
-        "" if change.due_date is None else change.due_date.isoformat(),
-        str(change.clear_due_date),
-        change.priority or "",
-        "" if change.start_date is None else change.start_date.isoformat(),
-        str(change.clear_start_date),
-        "" if change.reminder_at is None else change.reminder_at.isoformat(),
-        str(change.clear_reminder),
-        "" if change.repeat is None else change.repeat.model_dump_json(),
-        str(change.clear_repeat),
-        json.dumps(None if change.categories is None else list(change.categories)),
-        time_zone,
-    )
-
-    updated: TodoTask | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
-    with graph_errors():
-        due = change.due_date
-        if change.repeat is not None and due is None:
-            due = await _due_date(client, handle, zone=zone)
-        if change.repeat is not None and due is None:
-            refused = no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED)
-        elif change.repeat is not None and due is not None:
-            body.recurrence = recurrence_for(change.repeat, due=due)
-            about = write_state_for(about, due.isoformat())
-        if refused is None:
-            audience = await list_audience(client, handle.list_id)
-            if answer_pending or audience.reaches_others:
-                title = (await task_for_a_question(client, handle)).title or ""
-                with not_graph():
-                    question = (
-                        f"Change the task {cut_for_a_question(title)!r} "
-                        + f"({_changes(change, series_from=due)}) "
-                        + f"{shared_list_reason(audience)}?"
-                    )
-                    answer = await confirm(question, about)
-                asked = answer if isinstance(answer, InputRequiredResult) else None
-                refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            with graph_step(STEP_UPDATE):
-                updated = (
-                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                    .tasks.by_todo_task_id(handle.task_id)
-                    .patch(
-                        body,
-                        request_configuration=RequestConfiguration[QueryParameters](
-                            headers=utc_times(), options=no_retry()
-                        ),
-                    )
-                )
-
-    if asked is not None:
-        return asked
+async def update_task(
+    client: GraphServiceClient,
+    *,
+    uri: str,
+    change: TaskChange,
+    confirm: Confirm,
+    answer_pending: bool = False,
+) -> TaskDetail | InputRequiredResult:
+    handle = task_handle(uri)
+    if handle is None:
+        raise ToolError(
+            bad_handle(TOOL_NAME, "task", argument="uri", nothing_happened=_NOTHING_CHANGED)
+        )
+    zone = zone_named(change.time_zone)
+    if zone is None:
+        raise ToolError(bad_zone(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
+    refused = _refusal(change, zone)
     if refused is not None:
         raise ToolError(refused)
-    assert updated is not None, "Graph answered a task update with no task"
-    return TaskDetail.from_full_task(updated, list_id=handle.list_id, zone=zone)
+    needs_due = change.repeat is not None and change.due_date is None
+    no_series = Refusal(no_due_date_to_repeat(TOOL_NAME, nothing_happened=_NOTHING_CHANGED))
+    read: TodoTask | None = None
+
+    def series_from(task: TodoTask | None) -> date | None:
+        if not needs_due or task is None:
+            return change.due_date
+        return day_of(task.due_date_time, zone=zone)
+
+    async def prepare(must_ask: bool) -> Question | Refusal | None:
+        nonlocal read
+        audience = await list_audience(client, handle.list_id)
+        if not (must_ask or audience.reaches_others):
+            return None
+        read = await read_task(client, handle)
+        first = series_from(read)
+        if change.repeat is not None and first is None:
+            return no_series
+        named = named_in_question("task", read.title, missing="with no title")
+        question = (
+            f"Change {named} ({change.spoken(series_from=first)}) in {audience.named}?"
+            + audience.sharing_note("see the change")
+        )
+        return Question(question, (audience.task_list, read), guarded=read)
+
+    async def write(headers: HeadersCollection) -> TaskDetail | Refusal:
+        task = read if read is not None or not needs_due else await read_task(client, handle)
+        first = series_from(task)
+        if change.repeat is not None and first is None:
+            return no_series
+        with graph_step(STEP_UPDATE):
+            updated = (
+                await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                .tasks.by_todo_task_id(handle.task_id)
+                .patch(
+                    change.body(zone=zone, series_from=first),
+                    request_configuration=todo_request(
+                        safe_to_repeat=False, task_times=True, headers=headers
+                    ),
+                )
+            )
+        assert updated is not None, "Graph answered a task update with no task"
+        return TaskDetail.from_full_task(updated, list_id=handle.list_id, zone=zone)
+
+    approval = Approval(TOOL_NAME, handle.uri, change, confirm, answer_pending, _NOTHING_CHANGED)
+    with graph_errors():
+        result = await approved_write(approval, prepare=prepare, write=write)
+    return answered(result)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
@@ -398,8 +317,8 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 repeat=repeat,
                 clear_repeat=clear_repeat,
                 categories=None if categories is None else tuple(categories),
+                time_zone=time_zone,
             ),
-            time_zone=time_zone,
             confirm=person_confirms(
                 ctx, agree=_CHANGE, decline=_DO_NOT_CHANGE, nothing_happened=_NOTHING_CHANGED
             ),

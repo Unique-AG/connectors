@@ -26,7 +26,7 @@ class Step:
     key: str | None = None
     lookup: str | None = None  # how a step finds an id, stored under `key`: "tagged", "named",
     # "subject", "drive-folder", "drive-children", "single", "site", "columns", "attachments",
-    # "replies", "default-list"
+    # "replies", "default-list", "within" (a tagged child, keyed under the parent `key`)
     poll: bool = False  # the answer is 202: wait for the operation in its Location header
     learns: str | None = (
         None  # "team", "drive", "site" or "chat": the id of the found or created item joins the guard

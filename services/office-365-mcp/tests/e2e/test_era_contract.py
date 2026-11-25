@@ -38,6 +38,7 @@ _SCENARIO_14 = "tests/tools/scenarios/test_14_share_and_delegate_calendars.py"
 _SCENARIO_04 = "tests/tools/scenarios/test_04_draft_and_send_mail.py"
 _SURFACE = "tests/tools/test_outlook_{}_surface.py"
 _SCENARIO_17 = "tests/tools/scenarios/test_17_keep_track_of_tasks.py"
+_TODO_DELETES = "tests/tools/test_outlook_task_deletes.py"
 _NEVER_ASKS_IN_A_CASE = {
     "outlook_share_calendar": _SCENARIO_14,
     "outlook_unshare_calendar": _SCENARIO_14,
@@ -52,11 +53,11 @@ _NEVER_ASKS_IN_A_CASE = {
     "outlook_set_task_status": _SCENARIO_17,
     "outlook_add_task_link": "tests/tools/test_outlook_add_task_link.py",
     "outlook_add_task_step": "tests/tools/test_outlook_add_task_step.py",
-    "outlook_delete_task": "tests/tools/test_outlook_delete_task.py",
-    "outlook_delete_task_attachment": "tests/tools/test_outlook_delete_task_attachment.py",
-    "outlook_delete_task_link": "tests/tools/test_outlook_delete_task_link.py",
-    "outlook_delete_task_list": "tests/tools/test_outlook_delete_task_list.py",
-    "outlook_delete_task_step": "tests/tools/test_outlook_delete_task_step.py",
+    "outlook_delete_task": _TODO_DELETES,
+    "outlook_delete_task_attachment": _TODO_DELETES,
+    "outlook_delete_task_link": _TODO_DELETES,
+    "outlook_delete_task_list": _TODO_DELETES,
+    "outlook_delete_task_step": _TODO_DELETES,
     "outlook_rename_task_list": "tests/tools/test_outlook_rename_task_list.py",
     "outlook_update_task_step": "tests/tools/test_outlook_update_task_step.py",
     **{

@@ -901,6 +901,9 @@ def run_lookup(graph: Graph, step: Step, path: str, ctx: Context) -> dict[str, d
                 item.get("displayName") or item.get("title") or item.get("topic") or title or ""
             )
             key = f"{step.phase}:{name}" if name.startswith(f"{TAG} ") else None
+        elif step.lookup == "within":
+            name = str(item.get("displayName") or item.get("title") or "")
+            key = f"{step.key}>{name}" if name.startswith(f"{TAG} ") else None
         elif step.lookup == "subject":
             key = f"subject:{item.get('subject')}"
         elif step.lookup == "members":

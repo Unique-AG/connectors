@@ -2,13 +2,13 @@ scenario: outlook_delete_task_list-created
 fixture: rec-tool-outlook_delete_task_list-created
 source: recorded
 target: graph
-recorded_at: '2026-11-25T09:33:37+00:00'
+recorded_at: '2026-11-25T13:45:30+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 6
-  keys dropped: 2
-  response headers dropped: 23
-  text kept: 3
+  ids mapped: 9
+  keys dropped: 3
+  response headers dropped: 32
+  text kept: 4
 literals:
 - seed-v1 case-outlook_delete_task_list-created
 sdk_versions:

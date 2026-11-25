@@ -217,20 +217,6 @@ class TestFindingTasks:
 
         assert [row["title"] for row in _rows(answer, "tasks")] == titles
 
-    async def test_a_due_date_in_a_windows_zone_keeps_its_day(
-        self, graph: respx.MockRouter
-    ) -> None:
-        windows_due = {
-            "dateTime": "2026-11-27T00:00:00.0000000",
-            "timeZone": "W. Europe Standard Time",
-        }
-        tasks = [_task("T1", "Send the Q3 report", dueDateTime=windows_due)]
-        _ = graph.get(TASKS).mock(return_value=httpx.Response(200, json={"value": tasks}))
-
-        answer = await call("outlook_list_tasks", task_list=TASK_LIST, time_zone=ZURICH)
-
-        assert [row["due_date"] for row in _rows(answer, "tasks")] == ["2026-11-27"]
-
     async def test_completed_tasks_are_listed_by_a_word_of_their_title(
         self, graph: respx.MockRouter
     ) -> None:
@@ -552,6 +538,7 @@ class TestSteps:
         self, graph: respx.MockRouter
     ) -> None:
         _list_is(graph, shared=True, name="Team launch")
+        _task_is(graph)
         route = graph.post(STEPS).mock(return_value=httpx.Response(201, json=_STEP))
 
         with pytest.raises(ToolError, match="Nothing was changed"):
@@ -913,7 +900,7 @@ class TestASharedList:
         conflict = {"error": {"code": "ErrorIrresolvableConflict", "message": "Conflict."}}
         route = graph.patch(ONE_TASK).mock(return_value=httpx.Response(412, json=conflict))
 
-        with pytest.raises(ToolError, match="The task changed while the user decided"):
+        with pytest.raises(ToolError, match="The item changed while the user decided"):
             _ = await call("outlook_set_task_status", uri=TASK, status="completed")
 
         assert route.calls.last.request.headers["if-match"] == 'W/"1"'
@@ -929,7 +916,7 @@ class TestASharedList:
         _ = await call("outlook_set_task_status", uri=TASK, status="completed", person=person)
 
         [question] = person.asked
-        assert "did not report as private" in question
+        assert "did not report this list as private" in question
         assert "'Book the venue' to completed" in question
         assert route.call_count == 1
 

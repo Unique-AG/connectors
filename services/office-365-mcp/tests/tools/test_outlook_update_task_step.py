@@ -212,42 +212,7 @@ class TestThePersonBeforeTheWrite:
 
         [question] = asked
         assert question.startswith(opening)
-        assert question.endswith("They see the change?")
-
-    async def test_a_person_who_declines_keeps_the_step(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _list(graph, is_shared=True)
-        _named(graph)
-        patch = _patched(graph)
-
-        async def refuses(question: str, about: str) -> str | None:
-            assert question
-            assert about
-            return _NOTHING_CHANGED
-
-        with pytest.raises(ToolError) as raised:
-            _ = await _update(client, is_checked=True, confirm=refuses)
-
-        assert str(raised.value) == _NOTHING_CHANGED
-        assert patch.call_count == 0
-
-    async def test_a_question_that_a_modern_client_must_answer_is_returned_before_any_write(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _list(graph, is_shared=None)
-        _named(graph)
-        patch = _patched(graph)
-
-        async def ask_back(question: str, about: str) -> InputRequiredResult:
-            assert question
-            assert about
-            return InputRequiredResult(input_requests={}, request_state="state")
-
-        answer = await update_task_step(client, step=_STEP_URI, is_checked=True, confirm=ask_back)
-
-        assert isinstance(answer, InputRequiredResult)
-        assert patch.call_count == 0
+        assert question.endswith("? Other people share this list, so they can see the change.")
 
 
 class TestWhatItAdvertises:

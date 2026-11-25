@@ -124,16 +124,16 @@ def test_the_seed_list_holds_a_due_a_completed_a_stepped_a_linked_and_two_filed_
     assert len(tasks) == 6
     assert all(body["categories"] == ["seed-v1"] for body in tasks.values())
     assert [key for key, body in tasks.items() if "dueDateTime" in body] == [
-        "todo:seed-v1 Book the launch room"
+        "todo:seed-v1 Launch plan>seed-v1 Book the launch room"
     ]
-    assert tasks["todo:seed-v1 Book the launch room"]["dueDateTime"] == {
+    assert tasks["todo:seed-v1 Launch plan>seed-v1 Book the launch room"]["dueDateTime"] == {
         "dateTime": "2026-10-30T00:00:00",
         "timeZone": "UTC",
     }
     assert [key for key, body in tasks.items() if body.get("status") == "completed"] == [
-        "todo:seed-v1 Send the press note"
+        "todo:seed-v1 Launch plan>seed-v1 Send the press note"
     ]
-    links = tasks["todo:seed-v1 Read the launch site"]["linkedResources"]
+    links = tasks["todo:seed-v1 Launch plan>seed-v1 Read the launch site"]["linkedResources"]
     assert [link["displayName"] for link in links] == ["seed-v1 Launch site"]
     stepped = [s for s in creates().values() if s.path.endswith("/checklistItems")]
     assert [(s.body["displayName"], s.body["isChecked"]) for s in stepped] == [
@@ -166,13 +166,13 @@ def test_the_built_in_list_gets_a_reminded_task_and_a_weekly_task_on_its_due_day
         if step.path == "/me/todo/lists/{todo:defaultList}/tasks"
     }
     assert set(tasks) == {
-        "todo:seed-v1 Renew the parking permit",
-        "todo:seed-v1 Water the office plants",
+        "todo:defaultList>seed-v1 Renew the parking permit",
+        "todo:defaultList>seed-v1 Water the office plants",
     }
-    permit = tasks["todo:seed-v1 Renew the parking permit"]
+    permit = tasks["todo:defaultList>seed-v1 Renew the parking permit"]
     assert permit["isReminderOn"] is True
     assert permit["reminderDateTime"]["dateTime"] == "2026-11-05T09:00:00"
-    plants = tasks["todo:seed-v1 Water the office plants"]
+    plants = tasks["todo:defaultList>seed-v1 Water the office plants"]
     assert plants["dueDateTime"]["dateTime"] == "2026-10-26T00:00:00"
     assert plants["recurrence"]["pattern"]["daysOfWeek"] == ["monday"]
     assert plants["recurrence"]["range"] == {"type": "noEnd", "startDate": "2026-10-26"}
@@ -288,3 +288,25 @@ def test_the_file_phase_alone_makes_the_missing_tasks_first() -> None:
         for row in rows
     )
     assert filed == ["seed-v1 Launch brief.docx", "seed-v1 Old brief.docx"]
+
+
+def test_a_seed_task_moved_to_another_list_is_made_again_in_its_own_list() -> None:
+    fake = TodoFake()
+    assert run(["apply", "--as", "1", "--phases", "todo"], fake) == 0
+    launch = next(
+        key
+        for key in fake.rows
+        if key.endswith("/tasks")
+        and "default" not in key
+        and key.count("/") == 5
+        and any(row.get("title") == "seed-v1 Book the launch room" for row in fake.rows[key])
+    )
+    moved = {"id": "moved", "title": "seed-v1 Renew the parking permit", "categories": ["seed-v1"]}
+    fake.rows[launch].append(moved)
+    fake.rows["/me/todo/lists/default/tasks"] = [
+        row
+        for row in fake.rows["/me/todo/lists/default/tasks"]
+        if row.get("title") != "seed-v1 Renew the parking permit"
+    ]
+    assert run(["apply", "--as", "1", "--phases", "todo"], fake) == 0
+    assert "seed-v1 Renew the parking permit" in fake.names("/me/todo/lists/default/tasks", "title")

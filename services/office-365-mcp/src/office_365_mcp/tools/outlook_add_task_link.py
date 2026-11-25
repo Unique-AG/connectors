@@ -1,31 +1,36 @@
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, ClassVar
 from urllib.parse import urlsplit
 
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.linked_resource import LinkedResource
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.confirmation import write_state_for
+from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     TaskLink,
-    bad_task_handle,
+    bad_handle,
     list_audience,
-    shared_list_reason,
+    named_in_question,
+    read_task,
+    todo_request,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
+    Approval,
     Confirm,
+    Question,
     answer_pending,
+    answered,
+    approved_write,
     graph_client_for_caller,
     person_confirms,
 )
@@ -52,21 +57,19 @@ _NOTHING_ADDED = "No link was added."
 _ADD = "add the link"
 _DO_NOT_ADD = "do not add the link"
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task, and no link was added. The handle is well formed, "
     + "so this is not a bad argument. The task was most likely deleted, or moved to another "
     + "list, which gives it a new handle: find it again with outlook_list_tasks and take a fresh "
     + "`uri`. If its list was deleted or is no longer shared with the user, call "
-    + f"outlook_list_task_lists again instead. {_AGAIN}"
+    + f"outlook_list_task_lists again instead. {AGAIN}"
 )
 
 _NOT_HTTPS = (
     "outlook_add_task_link takes an `https` address in `web_url`, such as the `web_link` that "
     + "outlook_read_mail returns, and this is not one. Use an address that the user gave or that "
     + "a tool returned, and copy it word for word. Do not make an address. "
-    + f"{_NOTHING_ADDED} {_AGAIN}"
+    + f"{_NOTHING_ADDED} {AGAIN}"
 )
 
 _DESCRIPTION = """\
@@ -92,6 +95,14 @@ def _is_https(address: str) -> bool:
     return parts.scheme == "https" and bool(parts.hostname)
 
 
+class _NewLink(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    web_url: str
+    title: str
+    application: str
+
+
 async def add_task_link(
     client: GraphServiceClient,
     *,
@@ -104,47 +115,53 @@ async def add_task_link(
 ) -> TaskLink | InputRequiredResult:
     handle = task_handle(uri)
     if handle is None:
-        raise ToolError(bad_task_handle(TOOL_NAME, nothing_happened=_NOTHING_ADDED))
+        raise ToolError(
+            bad_handle(TOOL_NAME, "task", argument="uri", nothing_happened=_NOTHING_ADDED)
+        )
     if not _is_https(web_url):
         raise ToolError(_NOT_HTTPS)
 
-    about = write_state_for(STEP_ADD_LINK, handle.uri, web_url, title, application)
-
-    created: LinkedResource | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
-    with graph_errors():
+    async def prepare(must_ask: bool) -> Question | None:
         audience = await list_audience(client, handle.list_id)
-        if answer_pending or audience.reaches_others:
-            with not_graph():
-                question = (
-                    f"Add the link {cut_for_a_question(title)!r}, which opens "
-                    + f"{cut_for_a_question(web_url)!r}, to a task {shared_list_reason(audience)}?"
-                )
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            with graph_step(STEP_ADD_LINK):
-                created = (
-                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                    .tasks.by_todo_task_id(handle.task_id)
-                    .linked_resources.post(
-                        LinkedResource(
-                            web_url=web_url, display_name=title, application_name=application
-                        ),
-                        request_configuration=RequestConfiguration[QueryParameters](
-                            options=no_retry()
-                        ),
-                    )
-                )
+        if not (must_ask or audience.reaches_others):
+            return None
+        task = await read_task(client, handle)
+        named = named_in_question("task", task.title, missing="with no title")
+        question = (
+            f"Add the link {cut_for_a_question(title)!r}, which opens "
+            + f"{cut_for_a_question(web_url)!r} in {cut_for_a_question(application)!r}, to "
+            + f"{named} in {audience.named}?{audience.sharing_note('see the new link')}"
+        )
+        return Question(question, (audience.task_list, task))
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert created is not None, "Graph answered a new task link with no link"
-    return TaskLink.from_resource(created, task=handle)
+    async def write(headers: HeadersCollection) -> TaskLink:
+        with graph_step(STEP_ADD_LINK):
+            created = (
+                await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                .tasks.by_todo_task_id(handle.task_id)
+                .linked_resources.post(
+                    LinkedResource(
+                        web_url=web_url, display_name=title, application_name=application
+                    ),
+                    request_configuration=todo_request(
+                        safe_to_repeat=False, task_times=False, headers=headers
+                    ),
+                )
+            )
+        assert created is not None, "Graph answered a new task link with no link"
+        return TaskLink.from_resource(created, task=handle)
+
+    approval = Approval(
+        TOOL_NAME,
+        handle.uri,
+        _NewLink(web_url=web_url, title=title, application=application),
+        confirm,
+        answer_pending,
+        _NOTHING_ADDED,
+    )
+    with graph_errors():
+        result = await approved_write(approval, prepare=prepare, write=write)
+    return answered(result)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

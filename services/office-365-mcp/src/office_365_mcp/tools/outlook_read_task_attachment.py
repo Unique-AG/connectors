@@ -16,6 +16,7 @@ from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.files import MAX_BYTES, MEGABYTE
 from office_365_mcp.shared.handles import TaskPartHandle, task_part_handle
 from office_365_mcp.shared.outlook.attachments import media_type
+from office_365_mcp.shared.outlook.tasks import AGAIN, bad_handle
 from office_365_mcp.shared.seam import READ_ONLY, FileFromGraph, graph_client_for_caller
 
 TOOL_NAME = "outlook_read_task_attachment"
@@ -40,21 +41,13 @@ _AttachmentQuery = (
     AttachmentBaseItemRequestBuilder.AttachmentBaseItemRequestBuilderGetQueryParameters
 )
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this file. The handle is well formed, so this is not a bad "
     + "argument. The file or its task was most likely deleted, or the task moved to another "
     + "list, which gives the file a new handle. Read the task again with outlook_read_task and "
-    + f"take a fresh `uri` from its `attachments`. {_AGAIN}"
+    + f"take a fresh `uri` from its `attachments`. {AGAIN}"
 )
 
-_BAD_HANDLE = (
-    "outlook_read_task_attachment takes the `uri` of a file on a task, and this is not one. Take "
-    + "the `uri` of a row in the `attachments` that outlook_read_task returned, and copy it word "
-    + f"for word. A file handle looks like {_EXAMPLE_HANDLE.uri}. A task handle and a file name "
-    + f"are not file handles. This tool read nothing. {_AGAIN}"
-)
 
 _NO_SIZE = (
     "Microsoft 365 did not say how large this file is. outlook_read_task_attachment does not "
@@ -88,7 +81,11 @@ one message. The `size` of the row tells you the size first.
 async def read_task_attachment(client: GraphServiceClient, *, attachment: str) -> File:
     handle = task_part_handle("attachments", attachment)
     if handle is None:
-        raise ToolError(_BAD_HANDLE)
+        raise ToolError(
+            bad_handle(
+                TOOL_NAME, "file", argument="attachment", nothing_happened="This tool read nothing."
+            )
+        )
 
     found = (
         client.me.todo.lists.by_todo_task_list_id(handle.list_id)
@@ -134,7 +131,7 @@ def _too_large(size: int) -> str:
         + f"of {MAX_BYTES / MEGABYTE:.1f} MB or less. This tool must hold the whole file in "
         + "memory and send it to you in one message. As a result, this tool cannot return a file "
         + "this large. This tool never sends part of a file. Tell the user to open the task in To "
-        + f"Do instead. No other tool here returns this file. {_AGAIN}"
+        + f"Do instead. No other tool here returns this file. {AGAIN}"
     )
 
 

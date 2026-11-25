@@ -1,30 +1,35 @@
 from collections.abc import Mapping
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 import httpx
 from fastmcp import Context, FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
-from kiota_abstractions.default_query_parameters import QueryParameters
+from kiota_abstractions.headers_collection import HeadersCollection
 from mcp.types import InputRequiredResult
 from msgraph.generated.models.checklist_item import ChecklistItem
 from msgraph.graph_service_client import GraphServiceClient
-from pydantic import Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
-from office_365_mcp.shared.confirmation import write_state_for
+from office_365_mcp.graph_client import graph_errors, graph_step
 from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     TaskStep,
-    bad_task_handle,
+    bad_handle,
     list_audience,
-    shared_list_reason,
+    named_in_question,
+    read_task,
+    todo_request,
 )
 from office_365_mcp.shared.prose import cut_for_a_question
 from office_365_mcp.shared.seam import (
     WRITE_ADDITIVE,
+    Approval,
     Confirm,
+    Question,
     answer_pending,
+    answered,
+    approved_write,
     graph_client_for_caller,
     person_confirms,
 )
@@ -48,14 +53,12 @@ _NOTHING_ADDED = "No step was added."
 _ADD = "add the step"
 _DO_NOT_ADD = "do not add the step"
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task, and no step was added. The handle is well formed, "
     + "so this is not a bad argument. The task was most likely deleted, or moved to another "
     + "list, which gives it a new handle: find it again with outlook_list_tasks and take a fresh "
     + "`uri`. If its list was deleted or is no longer shared with the user, call "
-    + f"outlook_list_task_lists again instead. {_AGAIN}"
+    + f"outlook_list_task_lists again instead. {AGAIN}"
 )
 
 _DESCRIPTION = """\
@@ -70,6 +73,13 @@ because they see the new step. A task in the user's own unshared list changes wi
 """
 
 
+class _NewStep(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    text: str
+    is_checked: bool
+
+
 async def add_task_step(
     client: GraphServiceClient,
     *,
@@ -81,43 +91,49 @@ async def add_task_step(
 ) -> TaskStep | InputRequiredResult:
     handle = task_handle(uri)
     if handle is None:
-        raise ToolError(bad_task_handle(TOOL_NAME, nothing_happened=_NOTHING_ADDED))
+        raise ToolError(
+            bad_handle(TOOL_NAME, "task", argument="uri", nothing_happened=_NOTHING_ADDED)
+        )
 
-    about = write_state_for(STEP_ADD, handle.uri, text, str(is_checked))
-
-    added: ChecklistItem | None = None
-    asked: InputRequiredResult | None = None
-    refused: str | None = None
-    with graph_errors():
+    async def prepare(must_ask: bool) -> Question | None:
         audience = await list_audience(client, handle.list_id)
-        if answer_pending or audience.reaches_others:
-            with not_graph():
-                question = (
-                    f"Add the step {cut_for_a_question(text)!r} to a task "
-                    + f"{shared_list_reason(audience)}?"
-                )
-                answer = await confirm(question, about)
-            asked = answer if isinstance(answer, InputRequiredResult) else None
-            refused = answer if isinstance(answer, str) else None
-        if refused is None and asked is None:
-            with graph_step(STEP_ADD):
-                added = (
-                    await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
-                    .tasks.by_todo_task_id(handle.task_id)
-                    .checklist_items.post(
-                        ChecklistItem(display_name=text, is_checked=is_checked),
-                        request_configuration=RequestConfiguration[QueryParameters](
-                            options=no_retry()
-                        ),
-                    )
-                )
+        if not (must_ask or audience.reaches_others):
+            return None
+        task = await read_task(client, handle)
+        named = named_in_question("task", task.title, missing="with no title")
+        checked = "checked off" if is_checked else "not checked off"
+        question = (
+            f"Add the step {cut_for_a_question(text)!r}, {checked}, to {named} in "
+            + f"{audience.named}?{audience.sharing_note('see the new step')}"
+        )
+        return Question(question, (audience.task_list, task))
 
-    if asked is not None:
-        return asked
-    if refused is not None:
-        raise ToolError(refused)
-    assert added is not None, "Graph answered a checklist item create with no item"
-    return TaskStep.from_item(added, task=handle)
+    async def write(headers: HeadersCollection) -> TaskStep:
+        with graph_step(STEP_ADD):
+            added = (
+                await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
+                .tasks.by_todo_task_id(handle.task_id)
+                .checklist_items.post(
+                    ChecklistItem(display_name=text, is_checked=is_checked),
+                    request_configuration=todo_request(
+                        safe_to_repeat=False, task_times=False, headers=headers
+                    ),
+                )
+            )
+        assert added is not None, "Graph answered a checklist item create with no item"
+        return TaskStep.from_item(added, task=handle)
+
+    approval = Approval(
+        TOOL_NAME,
+        handle.uri,
+        _NewStep(text=text, is_checked=is_checked),
+        confirm,
+        answer_pending,
+        _NOTHING_ADDED,
+    )
+    with graph_errors():
+        result = await approved_write(approval, prepare=prepare, write=write)
+    return answered(result)
 
 
 def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:

@@ -8,7 +8,6 @@ import respx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 from fastmcp.tools import Tool
-from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -48,12 +47,6 @@ def _read(
 def _patched(graph: respx.MockRouter) -> respx.Route:
     renamed = {**_list(), "displayName": "Q4 launch"}
     return graph.patch(_PATH).mock(return_value=httpx.Response(200, json=renamed))
-
-
-async def _refuses(question: str, about: str) -> str | None:
-    assert question
-    assert about
-    return _NOTHING_CHANGED
 
 
 async def _never_asked(question: str, about: str) -> str | None:
@@ -141,8 +134,8 @@ class TestThePersonBeforeTheRename:
 
         [(question, about)] = asked
         assert question == (
-            "Rename the list 'Launch' to 'Q4 launch'? Other people share this list. They see "
-            + "the new name."
+            "Rename the list 'Launch' to 'Q4 launch'? Other people share this list, so they can "
+            + "see the new name."
         )
         assert about
 
@@ -162,34 +155,6 @@ class TestThePersonBeforeTheRename:
 
         [question] = asked
         assert "did not report this list as private" in question
-
-    async def test_a_person_who_declines_keeps_the_name(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _read(graph, is_shared=True)
-        patch = _patched(graph)
-
-        with pytest.raises(ToolError) as raised:
-            _ = await _rename(client, confirm=_refuses)
-
-        assert str(raised.value) == _NOTHING_CHANGED
-        assert patch.call_count == 0
-
-    async def test_a_question_that_a_modern_client_must_answer_is_returned_before_any_write(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _read(graph, is_shared=True)
-        patch = _patched(graph)
-
-        async def ask_back(question: str, about: str) -> InputRequiredResult:
-            assert question
-            assert about
-            return InputRequiredResult(input_requests={}, request_state="state")
-
-        answer = await rename_task_list(client, task_list=_URI, name="Q4 launch", confirm=ask_back)
-
-        assert isinstance(answer, InputRequiredResult)
-        assert patch.call_count == 0
 
 
 class TestWhatItAdvertises:

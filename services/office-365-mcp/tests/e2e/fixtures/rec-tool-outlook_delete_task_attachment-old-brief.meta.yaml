@@ -2,13 +2,13 @@ scenario: outlook_delete_task_attachment-old-brief
 fixture: rec-tool-outlook_delete_task_attachment-old-brief
 source: recorded
 target: graph
-recorded_at: '2026-11-25T09:37:54+00:00'
+recorded_at: '2026-11-25T13:47:18+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 36
-  keys dropped: 8
-  response headers dropped: 55
-  text kept: 29
+  ids mapped: 50
+  keys dropped: 12
+  response headers dropped: 90
+  text kept: 35
 literals:
 - Remove the old brief
 sdk_versions:

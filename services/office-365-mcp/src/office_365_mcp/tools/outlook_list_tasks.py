@@ -6,7 +6,6 @@ from zoneinfo import ZoneInfo
 import httpx
 from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
-from kiota_abstractions.base_request_configuration import RequestConfiguration
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.generated.users.item.todo.lists.item.tasks.tasks_request_builder import (
     TasksRequestBuilder,
@@ -18,11 +17,14 @@ from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_
 from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.handles import task_list_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     DEFAULT_TIME_ZONE,
     TIME_ZONE_FIELD,
     TaskSummary,
+    bad_handle,
     bad_zone,
     day_of,
+    todo_request,
     utc_times,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -42,13 +44,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 
 _PAGE_SIZE = 100
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task list. The handle is well formed, so this is not a "
     + "bad argument. The list was most likely deleted, or it was shared with the user and the "
     + "owner stopped the share. Call outlook_list_task_lists again and take a fresh `uri`. "
-    + _AGAIN
+    + AGAIN
 )
 
 _TasksQuery = TasksRequestBuilder.TasksRequestBuilderGetQueryParameters
@@ -75,12 +75,6 @@ to do so. It cannot search the notes of a task.
 matches, make sure that `capped` is false.
 """
 
-_NOT_A_LIST_HANDLE = (
-    "outlook_list_tasks takes the `uri` of a task list in `task_list`, and this is not one. Take "
-    + "the `uri` of a row that outlook_list_task_lists returned, and copy it word for word. A "
-    + "task list handle looks like outlook:///tasklists/AAMkAGI2SYNTHETIC-list-0001%3D. A list "
-    + f"name is not a handle. This tool read nothing. {_AGAIN}"
-)
 
 _BACKWARDS = (
     "outlook_list_tasks found nothing, because `due_before` falls before `due_after`, so no day "
@@ -122,7 +116,14 @@ async def list_tasks(
     )
     handle = task_list_handle(task_list)
     if handle is None:
-        raise ToolError(_NOT_A_LIST_HANDLE)
+        raise ToolError(
+            bad_handle(
+                TOOL_NAME,
+                "task list",
+                argument="task_list",
+                nothing_happened="This tool read nothing.",
+            )
+        )
     zone = zone_named(time_zone)
     if zone is None:
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened="This tool read nothing."))
@@ -132,9 +133,10 @@ async def list_tasks(
 
     with graph_errors(), graph_step(STEP):
         first_page = await client.me.todo.lists.by_todo_task_list_id(handle.list_id).tasks.get(
-            request_configuration=RequestConfiguration[_TasksQuery](
-                headers=utc_times(),
-                query_parameters=_TasksQuery(filter=_STATUS_FILTER[show], top=_PAGE_SIZE),
+            request_configuration=todo_request(
+                safe_to_repeat=True,
+                task_times=True,
+                query=_TasksQuery(filter=_STATUS_FILTER[show], top=_PAGE_SIZE),
             )
         )
         assert first_page is not None, "Graph answered a task listing with no collection"

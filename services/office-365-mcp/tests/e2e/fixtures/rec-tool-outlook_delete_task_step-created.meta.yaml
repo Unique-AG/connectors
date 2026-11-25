@@ -2,13 +2,13 @@ scenario: outlook_delete_task_step-created
 fixture: rec-tool-outlook_delete_task_step-created
 source: recorded
 target: graph
-recorded_at: '2026-11-25T09:34:09+00:00'
+recorded_at: '2026-11-25T13:46:07+00:00'
 scrub_version: 1.0.0
 replacements:
-  ids mapped: 29
-  keys dropped: 9
-  response headers dropped: 75
-  text kept: 14
+  ids mapped: 41
+  keys dropped: 13
+  response headers dropped: 101
+  text kept: 19
 literals:
 - seed-v1 case-outlook_delete_task_step-created
 - seed-v1 case-outlook_tasks step

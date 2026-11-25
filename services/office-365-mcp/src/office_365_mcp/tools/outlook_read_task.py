@@ -19,6 +19,7 @@ from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_
 from office_365_mcp.shared.calendar import zone_named
 from office_365_mcp.shared.handles import TaskHandle, task_handle
 from office_365_mcp.shared.outlook.tasks import (
+    AGAIN,
     DEFAULT_TIME_ZONE,
     TIME_ZONE_FIELD,
     TaskAttachmentSummary,
@@ -26,9 +27,9 @@ from office_365_mcp.shared.outlook.tasks import (
     TaskInFull,
     TaskLink,
     TaskStep,
-    bad_task_handle,
+    bad_handle,
     bad_zone,
-    utc_times,
+    todo_request,
 )
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -49,13 +50,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
 _TaskQuery = TodoTaskItemRequestBuilder.TodoTaskItemRequestBuilderGetQueryParameters
 _AttachmentsQuery = AttachmentsRequestBuilder.AttachmentsRequestBuilderGetQueryParameters
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
-
 GRAPH_NOT_FOUND = (
     "Microsoft 365 did not return this task. The handle is well formed, so this is not a bad "
     + "argument. The task was most likely deleted, or moved to another list, which gives it a "
     + "new handle. Find it again with outlook_list_tasks and take a fresh `uri`. "
-    + _AGAIN
+    + AGAIN
 )
 
 _DESCRIPTION = """\
@@ -76,7 +75,7 @@ async def read_task(
     nothing = "This tool read nothing."
     handle = task_handle(uri)
     if handle is None:
-        raise ToolError(bad_task_handle(TOOL_NAME, nothing_happened=nothing))
+        raise ToolError(bad_handle(TOOL_NAME, "task", argument="uri", nothing_happened=nothing))
     zone = zone_named(time_zone)
     if zone is None:
         raise ToolError(bad_zone(TOOL_NAME, nothing_happened=nothing))
@@ -86,9 +85,10 @@ async def read_task(
             await client.me.todo.lists.by_todo_task_list_id(handle.list_id)
             .tasks.by_todo_task_id(handle.task_id)
             .get(
-                request_configuration=RequestConfiguration[_TaskQuery](
-                    headers=utc_times(),
-                    query_parameters=_TaskQuery(expand=["checklistItems", "linkedResources"]),
+                request_configuration=todo_request(
+                    safe_to_repeat=True,
+                    task_times=True,
+                    query=_TaskQuery(expand=["checklistItems", "linkedResources"]),
                 )
             )
         )

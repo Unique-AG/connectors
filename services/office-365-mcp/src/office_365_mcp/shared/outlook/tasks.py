@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
+from msgraph.generated.models.attachment_base import AttachmentBase
 from msgraph.generated.models.body_type import BodyType
 from msgraph.generated.models.checklist_item import ChecklistItem
 from msgraph.generated.models.date_time_time_zone import DateTimeTimeZone
@@ -22,19 +23,25 @@ from msgraph.generated.models.task_status import TaskStatus
 from msgraph.generated.models.todo_task import TodoTask
 from msgraph.generated.models.todo_task_list import TodoTaskList
 from msgraph.generated.models.wellknown_list_name import WellknownListName
+from msgraph.generated.users.item.todo.lists.item.tasks.item.attachments.item.attachment_base_item_request_builder import (  # noqa: E501
+    AttachmentBaseItemRequestBuilder,
+)
 from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from office_365_mcp.graph_client import graph_step
+from office_365_mcp.graph_client import graph_step, no_retry
 from office_365_mcp.shared.body_html import BODY_HTML_FIELD
-from office_365_mcp.shared.calendar import DayName, zone_named
+from office_365_mcp.shared.calendar import DayName
 from office_365_mcp.shared.handles import TaskHandle, TaskListHandle, TaskPartHandle
+from office_365_mcp.shared.prose import body_opening, cut_for_a_question
 
 DEFAULT_TIME_ZONE = "UTC"
 
 STEP_TASK_LIST = "task_list"
 
-STEP_TASK_TITLE = "task_title"
+STEP_TASK = "task"
+
+STEP_TASK_PART = "task_part"
 
 
 Status = Literal["not_started", "in_progress", "completed", "waiting_on_others", "deferred"]
@@ -49,24 +56,22 @@ _STATUS: dict[Status, TaskStatus] = {
 }
 _STATUS_OF: dict[TaskStatus, Status] = {graph: ours for ours, graph in _STATUS.items()}
 
-_PRIORITY: dict[Priority, Importance] = {
-    "low": Importance.Low,
-    "normal": Importance.Normal,
-    "high": Importance.High,
-}
-_PRIORITY_OF: dict[Importance, Priority] = {graph: ours for ours, graph in _PRIORITY.items()}
+_PRIORITIES: tuple[Priority, ...] = ("low", "normal", "high")
+_PRIORITY_OF: dict[Importance, Priority] = {Importance(ours): ours for ours in _PRIORITIES}
 
 _KIND_OF: dict[WellknownListName, Literal["tasks", "flagged_email"]] = {
     WellknownListName.DefaultList: "tasks",
     WellknownListName.FlaggedEmails: "flagged_email",
 }
 
+_UTC = "UTC"
+
 
 TIME_ZONE_FIELD = (
     "The zone that due dates use, as an IANA name such as `Europe/Zurich`, `America/New_York`, or "
-    + "`UTC`. Pass the zone of the user. To Do keeps a due date as midnight in the zone of the "
-    + "user, so the default zone, UTC, can show a due date one day off. This tool refuses a "
-    + "Windows zone name, such as `W. Europe Standard Time`."
+    + "`UTC`. Pass the zone of the user. To Do keeps a due date as midnight in the zone that this "
+    + "argument names, so the default zone, UTC, can show a due date one day off for the user. "
+    + "This tool refuses a Windows zone name, such as `W. Europe Standard Time`."
 )
 
 NOTES_HTML_FIELD = (
@@ -85,8 +90,7 @@ DUE_DATE_FIELD = (
 PRIORITY_FIELD = "How important the task is: `low`, `normal`, or `high`."
 
 START_DATE_FIELD = (
-    "The day work on the task starts, such as `2026-11-23`, in the zone that `time_zone` names. "
-    + "To Do does not show it, but Outlook does."
+    "The day work on the task starts, such as `2026-11-23`, in the zone that `time_zone` names."
 )
 
 REMINDER_FIELD = (
@@ -105,7 +109,7 @@ REPEAT_FIELD = (
     + "day of the series. A repeating task needs a due date, and the series starts on it."
 )
 
-_AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
+AGAIN = "If you call this tool again with the same arguments, the call will fail the same way."
 
 
 def bad_zone(tool: str, *, nothing_happened: str) -> str:
@@ -113,25 +117,45 @@ def bad_zone(tool: str, *, nothing_happened: str) -> str:
         f"{tool} cannot resolve the name in `time_zone`. This argument takes an IANA zone name, "
         + "such as `Europe/Zurich`, `America/New_York` or `UTC`. A Windows zone name, a city, an "
         + "offset such as `+02:00`, and an abbreviation such as `CEST` are refused. "
-        + f"{nothing_happened} {_AGAIN}"
+        + f"{nothing_happened} {AGAIN}"
     )
 
 
-def bad_task_handle(tool: str, *, nothing_happened: str) -> str:
-    return (
-        f"{tool} takes the `uri` of a task, and this is not one. Take the `uri` of a row that "
-        + "outlook_list_tasks returned, and copy it word for word. A task handle looks like "
-        + "outlook:///tasks/AAMkAGI2SYNTHETIC-list-0001%3D/AAMkAGI2SYNTHETIC-task-0001%3D. A "
-        + f"title and a task list handle are not task handles. {nothing_happened} {_AGAIN}"
-    )
+type HandleKind = Literal["task list", "task", "step", "link", "file"]
+
+_LIST_EXAMPLE = "AAMkAGI2SYNTHETIC-list-0001="
+_TASK_EXAMPLE = "AAMkAGI2SYNTHETIC-task-0001="
+
+_HANDLE_SOURCE: dict[HandleKind, tuple[str, str]] = {
+    "task list": (
+        "the `uri` of a row that outlook_list_task_lists returned",
+        TaskListHandle(_LIST_EXAMPLE).uri,
+    ),
+    "task": (
+        "the `uri` of a row that outlook_list_tasks returned",
+        TaskHandle(_LIST_EXAMPLE, _TASK_EXAMPLE).uri,
+    ),
+    "step": (
+        "a `steps[].uri` that outlook_read_task returned",
+        TaskPartHandle("steps", _LIST_EXAMPLE, _TASK_EXAMPLE, "SYNTHETIC-step-0001").uri,
+    ),
+    "link": (
+        "a `links[].uri` that outlook_read_task returned",
+        TaskPartHandle("links", _LIST_EXAMPLE, _TASK_EXAMPLE, "SYNTHETIC-link-0001").uri,
+    ),
+    "file": (
+        "an `attachments[].uri` that outlook_read_task returned",
+        TaskPartHandle("attachments", _LIST_EXAMPLE, _TASK_EXAMPLE, "SYNTHETIC-file-0001").uri,
+    ),
+}
 
 
-def bad_step_handle(tool: str, *, nothing_happened: str) -> str:
+def bad_handle(tool: str, kind: HandleKind, *, argument: str, nothing_happened: str) -> str:
+    source, example = _HANDLE_SOURCE[kind]
     return (
-        f"{tool} takes the `uri` of a step in `step`, and this is not one. Take a `steps[].uri` "
-        + "that outlook_read_task returned, and copy it word for word. The words of a step, a task "
-        + "handle, a link handle, and a file handle are not step handles. "
-        + f"{nothing_happened} {_AGAIN}"
+        f"{tool} takes the handle of a {kind} in `{argument}`, and this is not one. Take {source}, "
+        + f"and copy it word for word. A {kind} handle looks like {example}. A name, a title, and "
+        + f"a handle of another kind are not {kind} handles. {nothing_happened} {AGAIN}"
     )
 
 
@@ -139,6 +163,21 @@ def utc_times() -> HeadersCollection:
     headers = HeadersCollection()
     headers.add("Prefer", 'outlook.timezone="UTC"')
     return headers
+
+
+def todo_request[Q](
+    *,
+    safe_to_repeat: bool,
+    task_times: bool,
+    headers: HeadersCollection | None = None,
+    query: Q | None = None,
+) -> RequestConfiguration[Q]:
+    sent = utc_times() if task_times else HeadersCollection()
+    if headers is not None:
+        sent.add_all(headers)
+    return RequestConfiguration[Q](
+        headers=sent, options=None if safe_to_repeat else no_retry(), query_parameters=query
+    )
 
 
 def due_moment(day: date, *, zone: ZoneInfo) -> DateTimeTimeZone:
@@ -163,38 +202,29 @@ def missing_time_refusal(
     return (
         f"{tool} cannot set the reminder at {moment.isoformat()}, because in {zone.key} "
         + f"{problem}. Ask the user for a time outside the change, or give the time with an "
-        + f"offset. {nothing_happened} {_AGAIN}"
+        + f"offset. {nothing_happened} {AGAIN}"
     )
 
 
 def moment_in(moment: datetime, *, zone: ZoneInfo) -> DateTimeTimeZone:
     aware = moment if moment.tzinfo is not None else moment.replace(tzinfo=zone)
     in_utc = aware.astimezone(UTC).replace(tzinfo=None)
-    return DateTimeTimeZone(date_time=in_utc.isoformat(timespec="seconds"), time_zone="UTC")
+    return DateTimeTimeZone(date_time=in_utc.isoformat(timespec="seconds"), time_zone=_UTC)
 
 
 def instant_of(moment: DateTimeTimeZone | None) -> datetime | None:
     if moment is None or moment.date_time is None:
         return None
+    assert moment.time_zone == _UTC, f"To Do answered a moment in {moment.time_zone}, not in UTC"
     try:
-        naive = datetime.fromisoformat(moment.date_time)
+        return datetime.fromisoformat(moment.date_time).replace(tzinfo=UTC)
     except ValueError:
         return None
-    stated = zone_named(moment.time_zone or "UTC")
-    return naive.replace(tzinfo=stated or UTC).astimezone(UTC)
 
 
 def day_of(moment: DateTimeTimeZone | None, *, zone: ZoneInfo) -> date | None:
-    if moment is None or moment.date_time is None:
-        return None
-    try:
-        naive = datetime.fromisoformat(moment.date_time)
-    except ValueError:
-        return None
-    stated = zone_named(moment.time_zone or "UTC")
-    if stated is None:
-        return naive.date()
-    return naive.replace(tzinfo=stated).astimezone(zone).date()
+    instant = instant_of(moment)
+    return None if instant is None else instant.astimezone(zone).date()
 
 
 type RepeatUnit = Literal["day", "week", "month", "year"]
@@ -238,8 +268,8 @@ class TaskRepeat(BaseModel):
         default=(),
         description=(
             "For `week` only: the weekdays that the task falls on, in lowercase English, such as "
-            + "`monday`. Every weekday from Monday to Friday is how To Do repeats on workdays. "
-            + "Empty means the weekday of the due date. The other units take none."
+            + "`monday`. To repeat on workdays, give every weekday from Monday to Friday. Empty "
+            + "means the weekday of the due date. The other units take none."
         ),
     )
 
@@ -262,12 +292,20 @@ class TaskRepeat(BaseModel):
             }
         )
 
+    @property
+    def spoken(self) -> str:
+        every = (
+            f"every {self.every}" if self.interval == 1 else f"every {self.interval} {self.every}s"
+        )
+        days = f" on {', '.join(self.weekdays)}" if self.weekdays else ""
+        return f"repeats {every}{days}"
+
 
 def repeat_refusal(tool: str, repeat: TaskRepeat, *, nothing_happened: str) -> str | None:
     if repeat.weekdays and repeat.every != "week":
         return (
             f"{tool} takes `weekdays` only when `every` is `week`. Remove `weekdays`, or set "
-            + f"`every` to `week`. {nothing_happened} {_AGAIN}"
+            + f"`every` to `week`. {nothing_happened} {AGAIN}"
         )
     return None
 
@@ -275,7 +313,7 @@ def repeat_refusal(tool: str, repeat: TaskRepeat, *, nothing_happened: str) -> s
 def no_due_date_to_repeat(tool: str, *, nothing_happened: str) -> str:
     return (
         f"{tool} cannot make a task repeat without a due date, because the series starts on the "
-        + f"due date. Give `due_date` in the same call. {nothing_happened} {_AGAIN}"
+        + f"due date. Give `due_date` in the same call. {nothing_happened} {AGAIN}"
     )
 
 
@@ -294,39 +332,146 @@ def recurrence_for(repeat: TaskRepeat, *, due: date) -> PatternedRecurrence:
     )
 
 
+class TaskFields(BaseModel):
+    model_config: ClassVar[ConfigDict] = ConfigDict(frozen=True)
+
+    title: str | None = None
+    notes_html: str | None = None
+    due_date: date | None = None
+    priority: Priority | None = None
+    start_date: date | None = None
+    reminder_at: datetime | None = None
+    repeat: TaskRepeat | None = None
+    categories: tuple[str, ...] | None = None
+    time_zone: str = DEFAULT_TIME_ZONE
+
+
+def task_body(fields: TaskFields, *, zone: ZoneInfo, series_from: date | None) -> TodoTask:
+    return TodoTask(
+        title=fields.title,
+        body=None if fields.notes_html is None else html_body(fields.notes_html),
+        due_date_time=None if fields.due_date is None else due_moment(fields.due_date, zone=zone),
+        importance=None if fields.priority is None else Importance(fields.priority),
+        start_date_time=(
+            None if fields.start_date is None else due_moment(fields.start_date, zone=zone)
+        ),
+        reminder_date_time=(
+            None if fields.reminder_at is None else moment_in(fields.reminder_at, zone=zone)
+        ),
+        is_reminder_on=None if fields.reminder_at is None else True,
+        recurrence=(
+            None
+            if fields.repeat is None or series_from is None
+            else recurrence_for(fields.repeat, due=series_from)
+        ),
+        categories=None if fields.categories is None else list(fields.categories),
+    )
+
+
+def spoken_fields(fields: TaskFields, *, series_from: date | None) -> list[str]:
+    dated = (fields.due_date, fields.start_date, fields.reminder_at, fields.repeat)
+    return [
+        *([f"title {cut_for_a_question(fields.title)!r}"] if fields.title else []),
+        *(
+            [f"notes that open with {body_opening(fields.notes_html)!r}"]
+            if fields.notes_html
+            else []
+        ),
+        *([f"due {fields.due_date}"] if fields.due_date else []),
+        *([f"start {fields.start_date}"] if fields.start_date else []),
+        *([f"reminder {fields.reminder_at.isoformat()}"] if fields.reminder_at else []),
+        *([f"{fields.repeat.spoken} from {series_from}"] if fields.repeat else []),
+        *([f"priority {fields.priority}"] if fields.priority else []),
+        *(
+            [f"categories {cut_for_a_question(', '.join(fields.categories))!r}"]
+            if fields.categories
+            else []
+        ),
+        *(["no categories"] if fields.categories == () else []),
+        *([f"dates in {fields.time_zone}"] if any(one is not None for one in dated) else []),
+    ]
+
+
 @dataclass(frozen=True, slots=True)
 class ListAudience:
-    name: str
-    is_shared: bool | None
+    task_list: TodoTaskList
+
+    @property
+    def is_shared(self) -> bool | None:
+        return self.task_list.is_shared
 
     @property
     def reaches_others(self) -> bool:
         return self.is_shared is not False
+
+    @property
+    def is_built_in(self) -> bool:
+        return self.task_list.wellknown_list_name not in (None, WellknownListName.None_)
+
+    @property
+    def named(self) -> str:
+        return named_in_question("list", self.task_list.display_name, missing="with no name")
+
+    def sharing_note(self, effect: str) -> str:
+        if self.is_shared is False:
+            return ""
+        if self.is_shared is None:
+            return (
+                " Microsoft 365 did not report this list as private, so other people can "
+                + f"{effect}."
+            )
+        return f" Other people share this list, so they can {effect}."
+
+
+def named_in_question(noun: str, value: str | None, *, missing: str) -> str:
+    return f"the {noun} {cut_for_a_question(value)!r}" if value else f"a {noun} {missing}"
 
 
 async def list_audience(client: GraphServiceClient, list_id: str) -> ListAudience:
     with graph_step(STEP_TASK_LIST):
         found = await client.me.todo.lists.by_todo_task_list_id(list_id).get()
     assert found is not None, "Graph answered a task list read with no list"
-    return ListAudience(name=found.display_name or "", is_shared=found.is_shared)
+    return ListAudience(found)
 
 
-async def task_for_a_question(client: GraphServiceClient, task: TaskHandle) -> TodoTask:
-    with graph_step(STEP_TASK_TITLE):
+async def read_task(client: GraphServiceClient, task: TaskHandle) -> TodoTask:
+    with graph_step(STEP_TASK):
         found = (
             await client.me.todo.lists.by_todo_task_list_id(task.list_id)
             .tasks.by_todo_task_id(task.task_id)
-            .get(request_configuration=RequestConfiguration(headers=utc_times()))
+            .get(request_configuration=todo_request(safe_to_repeat=True, task_times=True))
         )
     assert found is not None, "Graph answered a task read with no task"
     return found
 
 
-def shared_list_reason(audience: ListAudience) -> str:
-    named = f"the list {audience.name!r}" if audience.name else "a list"
-    if audience.is_shared is None:
-        return f"in {named}, which Microsoft 365 did not report as private. Others can see it"
-    return f"in {named}, which other people share. They see the change"
+type TaskPart = ChecklistItem | LinkedResource | AttachmentBase
+
+_AttachmentQuery = (
+    AttachmentBaseItemRequestBuilder.AttachmentBaseItemRequestBuilderGetQueryParameters
+)
+
+
+async def read_task_part(client: GraphServiceClient, part: TaskPartHandle) -> TaskPart:
+    task = client.me.todo.lists.by_todo_task_list_id(part.list_id).tasks.by_todo_task_id(
+        part.task_id
+    )
+    found: TaskPart | None
+    with graph_step(STEP_TASK_PART):
+        if part.kind == "steps":
+            found = await task.checklist_items.by_checklist_item_id(part.part_id).get()
+        elif part.kind == "links":
+            found = await task.linked_resources.by_linked_resource_id(part.part_id).get()
+        else:
+            found = await task.attachments.by_attachment_base_id(part.part_id).get(
+                request_configuration=todo_request(
+                    safe_to_repeat=True,
+                    task_times=False,
+                    query=_AttachmentQuery(select=["id", "name"]),
+                )
+            )
+    assert found is not None, f"Graph answered a read of a task's {part.kind} with nothing"
+    return found
 
 
 def html_body(html: str) -> ItemBody:
@@ -335,10 +480,6 @@ def html_body(html: str) -> ItemBody:
 
 def graph_status(status: Status) -> TaskStatus:
     return _STATUS[status]
-
-
-def graph_importance(priority: Priority) -> Importance:
-    return _PRIORITY[priority]
 
 
 ListKind = Annotated[
@@ -559,7 +700,7 @@ class TaskAttachmentSummary(BaseModel):
 
 class TaskInFull(TaskDetail):
     steps: list[TaskStep] = Field(
-        description="The checklist steps of the task, in the order To Do shows them."
+        description="The checklist steps of the task, in the order that Microsoft 365 returns them."
     )
     links: list[TaskLink] = Field(
         description="The links on the task, such as the message that the task came from."

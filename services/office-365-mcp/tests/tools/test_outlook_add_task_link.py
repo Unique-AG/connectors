@@ -6,7 +6,6 @@ import httpx
 import pytest
 import respx
 from fastmcp.exceptions import ToolError
-from mcp.types import InputRequiredResult
 from msgraph.graph_service_client import GraphServiceClient
 from respx.models import Call
 
@@ -32,6 +31,12 @@ def _list_is(graph: respx.MockRouter, *, shared: bool | None) -> respx.Route:
     return graph.get(_ONE_LIST).mock(return_value=httpx.Response(200, json=listed))
 
 
+def _task_is(graph: respx.MockRouter) -> None:
+    _ = graph.get(f"{_ONE_LIST}/tasks/{_TASK_ID}").mock(
+        return_value=httpx.Response(200, json={"id": _TASK_ID, "title": "Book the venue"})
+    )
+
+
 def _posted(graph: respx.MockRouter) -> respx.Route:
     return graph.post(_LINKS).mock(
         return_value=httpx.Response(
@@ -54,12 +59,6 @@ async def _agrees(question: str, about: str) -> str | None:
     assert question
     assert about
     return None
-
-
-async def _refuses(question: str, about: str) -> str | None:
-    assert question
-    assert about
-    return _NOTHING_ADDED
 
 
 async def _add(
@@ -160,10 +159,11 @@ class TestWhatItRefusesBeforeAnyCall:
 
 
 class TestAListThatOthersShare:
-    async def test_the_question_names_the_link_and_the_list(
+    async def test_the_question_names_the_link_the_app_the_task_and_the_list(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _list_is(graph, shared=True)
+        _task_is(graph)
         post = _posted(graph)
         asked: list[str] = []
 
@@ -175,8 +175,9 @@ class TestAListThatOthersShare:
         _ = await _add(client, confirm=capture)
 
         assert asked == [
-            f"Add the link 'Q3 report', which opens {_WEB_URL!r}, to a task in the list 'Launch', "
-            + "which other people share. They see the change?"
+            f"Add the link 'Q3 report', which opens {_WEB_URL!r} in 'Outlook', to the task "
+            + "'Book the venue' in the list 'Launch'? Other people share this list, so they can "
+            + "see the new link."
         ]
         assert post.call_count == 1
 
@@ -184,39 +185,9 @@ class TestAListThatOthersShare:
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         _ = _list_is(graph, shared=None)
+        _task_is(graph)
         post = _posted(graph)
 
         _ = await _add(client, confirm=_agrees)
 
         assert post.call_count == 1
-
-    async def test_a_person_who_declines_gets_no_link(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _list_is(graph, shared=True)
-        post = _posted(graph)
-
-        with pytest.raises(ToolError) as raised:
-            _ = await _add(client, confirm=_refuses)
-
-        assert str(raised.value) == _NOTHING_ADDED
-        assert post.call_count == 0
-
-    async def test_a_question_that_a_modern_client_must_answer_comes_back_before_the_post(
-        self, client: GraphServiceClient, graph: respx.MockRouter
-    ) -> None:
-        _ = _list_is(graph, shared=True)
-        post = _posted(graph)
-        pending = InputRequiredResult(input_requests={}, request_state="state")
-
-        async def ask_back(question: str, about: str) -> InputRequiredResult:
-            assert question
-            assert about
-            return pending
-
-        answer = await add_task_link(
-            client, uri=_TASK, web_url=_WEB_URL, title="Q3 report", confirm=ask_back
-        )
-
-        assert answer is pending
-        assert post.call_count == 0

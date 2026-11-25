@@ -116,12 +116,18 @@ def _upload_session(attachment: Spec) -> dict[str, dict[str, str | int]]:
     }
 
 
-def _task_steps(tasks_path: str, task: Spec, anchor: dt.date, *, files: bool) -> list[Step]:
-    key = _key(task["title"])
+def _within(parent: str, name: str) -> str:
+    return f"{parent}>{_named(name)}"
+
+
+def _task_steps(
+    list_key: str, tasks_path: str, task: Spec, anchor: dt.date, *, files: bool
+) -> list[Step]:
+    key = _within(list_key, task["title"])
     path = f"{tasks_path}/{_ref(key)}"
     found = [Step(PHASE, "create", "POST", tasks_path, body=task_body(task, anchor), key=key)]
     if task.get("steps"):
-        found.append(_lookup(f"{path}/checklistItems"))
+        found.append(_lookup(f"{path}/checklistItems", None, "within", key))
         found += [
             Step(
                 PHASE,
@@ -129,7 +135,7 @@ def _task_steps(tasks_path: str, task: Spec, anchor: dt.date, *, files: bool) ->
                 "POST",
                 f"{path}/checklistItems",
                 body={"displayName": _named(one["text"]), "isChecked": bool(one.get("checked"))},
-                key=_key(one["text"]),
+                key=_within(key, one["text"]),
             )
             for one in task["steps"]
         ]
@@ -165,14 +171,14 @@ def steps(ctx: Context, owner: str, phases: set[str]) -> list[Step]:
             Step(
                 PHASE, "create", "POST", LISTS, body={"displayName": _named(one["name"])}, key=key
             ),
-            _lookup(tasks),
+            _lookup(tasks, None, "within", key),
         ]
         for task in one["tasks"]:
-            found += _task_steps(tasks, task, ctx.anchor, files=FILES_PHASE in phases)
+            found += _task_steps(key, tasks, task, ctx.anchor, files=FILES_PHASE in phases)
     tasks = f"{LISTS}/{_ref(DEFAULT_KEY)}/tasks"
-    found.append(_lookup(tasks))
+    found.append(_lookup(tasks, None, "within", DEFAULT_KEY))
     for task in corpus["default_tasks"]:
-        found += _task_steps(tasks, task, ctx.anchor, files=FILES_PHASE in phases)
+        found += _task_steps(DEFAULT_KEY, tasks, task, ctx.anchor, files=FILES_PHASE in phases)
     made = [step.key for step in found if step.kind != "lookup"]
     if len(made) != len(set(made)):
         raise ConfigError("two To Do items of the corpus have the same name; rename one")
