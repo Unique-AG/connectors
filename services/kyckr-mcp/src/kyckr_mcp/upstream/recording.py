@@ -52,14 +52,12 @@ def _mapping(value: object) -> Mapping[str, object]:
 
 
 def credit_cost(body: object) -> float:
-    """The `cost.value` of an answer. A value that is not a finite number of at least 0 is no
-    cost, since a counter rejects it and the call has been paid.
+    """The top-level `cost.value` of an answer, the price of this call. A value that is not a
+    finite number of at least 0 is no cost, since a counter rejects it and the call has been paid.
     """
-    top = _mapping(body)
-    for holder in (top, _mapping(top.get("data"))):
-        value = _mapping(holder.get("cost")).get("value")
-        if isinstance(value, int | float) and not isinstance(value, bool):
-            return value if 0 <= value < math.inf else 0
+    value = _mapping(_mapping(body).get("cost")).get("value")
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return value if 0 <= value < math.inf else 0
     return 0
 
 
