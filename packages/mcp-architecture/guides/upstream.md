@@ -17,7 +17,7 @@ two ways:
 
 - **Served from the spec.** List its operationId in `EXPOSED` in `upstream/routes.py`.
   `upstream_tools` serves it with the name, arguments and output schema the spec gives
-  (`getDailyPrices` becomes `get_daily_prices`), with no context and no code. It says what the
+  (`getDailyMeta` becomes `get_daily_meta`), with no context and no code. It says what the
   spec says, so the description check skips it, and retries do not apply to it.
 - **A tool of our own.** List the operationId under `operation-ids` in `[tool.mcp-openapi]`
   and run `uv run poe codegen`. It writes `vendor_responses.py`, `vendor_requests.py` and
