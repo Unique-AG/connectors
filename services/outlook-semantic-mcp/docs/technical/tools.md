@@ -350,8 +350,8 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 | `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Without it, a `mailbox` message is read from `/users/{mailbox}/messages/{id}`. |
 | `idIsImmutable` | boolean | No | Use `idIsImmutable` from that object when present. |
 | `bodyContentType` | `"text"` \| `"html"` | No | `"html"` when the message is a draft. Omit for plain text. |
-| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. |
-| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. |
+| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. Offered only with `MCP_BACKEND=microsoft_graph_and_unique_api`, the only backend whose search returns it. |
+| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. Offered only with `MCP_BACKEND=microsoft_graph_and_unique_api`. |
 
 **Return shape:**
 
@@ -433,7 +433,7 @@ Supports two modes selected by `recipientsData.type`:
 | Inline base64 | `data:[mediatype];base64,<data>` | Base64-encoded content with explicit MIME type |
 
 !!! warning "Attachment scheme availability"
-    The `unique://content/{contentId}` scheme only works when `UNIQUE_SERVICE_AUTH_MODE=cluster_local`. In external auth mode the Unique ingestion service cannot resolve internal content URIs — use the `data:[mediatype];base64,<data>` scheme instead.
+    The `unique://content/{contentId}` scheme only works when `UNIQUE_ATTACHMENTS=enabled` (the default) and `UNIQUE_SERVICE_AUTH_MODE=cluster_local`. With `UNIQUE_ATTACHMENTS=disabled` the tool does not offer it and fails such an attachment. In external auth mode the Unique ingestion service cannot resolve internal content URIs. Use the `data:[mediatype];base64,<data>` scheme instead.
 
 **Return shape:**
 

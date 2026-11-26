@@ -84,13 +84,16 @@ Set via `mcpConfig.microsoft` in Helm values:
 
 ### Unique API Configuration
 
-Set via `mcpConfig.unique` in Helm values:
+Set via `mcpConfig.unique` in Helm values.
+
+The server talks to Unique only when an enabled feature needs it: `MCP_BACKEND=microsoft_graph_and_unique_api`, or `UNIQUE_ATTACHMENTS=enabled`. Otherwise it does not read the other `UNIQUE_*` variables, the chart does not render them, and the server makes no call to Unique. With `MCP_BACKEND=microsoft_graph`, the folder sync never calls Unique. When Unique is needed and a variable is missing, startup fails and names the variable.
 
 | Variable | Helm key | Default | Description |
 |----------|----------|---------|-------------|
+| `UNIQUE_ATTACHMENTS` | `attachments` | `enabled` | `enabled` lets `draft_email` and `add_attachments_to_draft_email` attach `unique://content/{contentId}` files from the Unique knowledge base. `disabled` accepts only `data:` URIs |
 | `UNIQUE_SERVICE_AUTH_MODE` | `serviceAuthMode` | `cluster_local` | Auth mode: `cluster_local` or `external` |
-| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `ingestionServiceBaseUrl` | (required) | Unique ingestion service endpoint |
-| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `scopeManagementServiceBaseUrl` | (required) | Unique scope management service endpoint |
+| `UNIQUE_INGESTION_SERVICE_BASE_URL` | `ingestionServiceBaseUrl` | (required when Unique is needed) | Unique ingestion service endpoint |
+| `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `scopeManagementServiceBaseUrl` | (required when Unique is needed) | Unique scope management service endpoint |
 | `UNIQUE_STORE_INTERNALLY` | `storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
 | `UNIQUE_SERVICE_EXTRA_HEADERS` | `serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
 | `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |

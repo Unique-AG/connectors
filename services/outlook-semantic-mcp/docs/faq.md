@@ -459,7 +459,7 @@ All three check that the message is still a draft and fail without changing anyt
 **Answer:** Yes. The `draft_email` tool accepts attachments as an array of objects with `fileName` and `data` fields. The `data` field accepts:
 
 - A **base64-encoded data URI** (`data:[mediatype];base64,<data>`) — works in all deployment modes
-- A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail.
+- A **Unique content URI** (`unique://content/{contentId}`) — only in cluster-local mode we expect the attachment to be in the chat or in knowledge base. In external mode this URI is unresolvable and the attachment will fail. With `UNIQUE_ATTACHMENTS=disabled` the server does not offer this scheme and fails such an attachment.
 
 If one or more attachments fail to upload, the draft is still created and the failed attachments are listed in the response.
 
