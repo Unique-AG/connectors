@@ -215,6 +215,17 @@ describe('TokenProvider against Postgres', () => {
       expect(onPermanentAuthFailure).toHaveBeenCalledWith(userProfileId);
     });
 
+    it('asks for a new sign-in again when a concurrent request already revoked the grant', async () => {
+      await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+
+      await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+      expect(onPermanentAuthFailure).toHaveBeenCalledTimes(1);
+    });
+
     it('keeps a new sign-in that replaced the expired one', async () => {
       const provider = createProvider();
       const stale = await db.query.userProfiles.findFirst({

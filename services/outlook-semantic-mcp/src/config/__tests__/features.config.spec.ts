@@ -224,6 +224,25 @@ describe('featuresConfig', () => {
     expect(await featuresConfig()).toEqual(loadFeaturesConfig(READ_ONLY_ENV));
   });
 
+  it('reads every setting the same way as loadFeaturesConfig', async () => {
+    const env = {
+      ...READ_ONLY_ENV,
+      MCP_DEBUG_MODE: 'disabled',
+      UNIQUE_ATTACHMENTS: 'disabled',
+      DIRECTORY_SYNC_MODE: 'on_demand',
+      MICROSOFT_OFFLINE_ACCESS: 'disabled',
+      MICROSOFT_PROFILE_SCOPES: 'disabled',
+    };
+    for (const [key, value] of Object.entries(env)) {
+      vi.stubEnv(key, value);
+    }
+
+    const config = await featuresConfig();
+
+    expect(config).toEqual(loadFeaturesConfig(env));
+    expect(config).toMatchObject({ offlineAccess: false, profileScopes: false });
+  });
+
   it('fails naming the tool in MCP_TOOLS', async () => {
     vi.stubEnv('MCP_BACKEND', 'microsoft_graph');
     vi.stubEnv('MCP_TOOLS', tools('sync_progress'));

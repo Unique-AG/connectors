@@ -154,9 +154,13 @@ export class TokenProvider implements AuthenticationProvider {
 
     assert.ok(userProfile, `User profile not found: ${userProfileId}`);
     if (!userProfile.refreshToken) {
+      // Another request already cleared this grant and revoked the session.
+      if (!userProfile.accessToken) {
+        throw new UpstreamCredentialRevokedError(SIGN_IN_EXPIRED_REASON);
+      }
       // Signed in without offline_access: the only way to a new Graph token is a new sign-in.
       return await this.revokeUpstreamCredential(userProfile, {
-        reason: 'the Microsoft sign-in has expired and the server keeps no refresh token',
+        reason: SIGN_IN_EXPIRED_REASON,
         failureCode: 'no_refresh_token',
         logMessage:
           'Microsoft rejected the access token and no refresh token is stored; cleared the Graph token and revoked the MCP session so the user signs in again',
@@ -375,6 +379,9 @@ export class TokenProvider implements AuthenticationProvider {
     throw new UpstreamCredentialRevokedError(reason);
   }
 }
+
+const SIGN_IN_EXPIRED_REASON =
+  'the Microsoft sign-in has expired and the server keeps no refresh token';
 
 const MIN_REFRESH_BACKOFF_MS = 60_000;
 const MAX_REFRESH_BACKOFF_MS = 30 * 60_000;

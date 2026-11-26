@@ -61,8 +61,8 @@ const FeaturesEnvSchema = z.object({
     .describe(
       'How the folder cache is refreshed: "scheduled" by a cron and a scan at startup, "on_demand" by the tool calls that read it.',
     ),
-  offlineAccess: offlineAccessSchema,
-  profileScopes: enabledDisabledBoolean(
+  microsoftOfflineAccess: offlineAccessSchema,
+  microsoftProfileScopes: enabledDisabledBoolean(
     'Whether sign-in requests the `profile` and `email` scopes. `openid` is always requested.',
   ),
 });
@@ -74,8 +74,8 @@ const FEATURE_ENV_KEYS = {
   delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
   uniqueAttachments: 'UNIQUE_ATTACHMENTS',
   directorySyncMode: 'DIRECTORY_SYNC_MODE',
-  offlineAccess: 'MICROSOFT_OFFLINE_ACCESS',
-  profileScopes: 'MICROSOFT_PROFILE_SCOPES',
+  microsoftOfflineAccess: 'MICROSOFT_OFFLINE_ACCESS',
+  microsoftProfileScopes: 'MICROSOFT_PROFILE_SCOPES',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -128,7 +128,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
   }
 
   // Every background job runs on a stored refresh token; without one, only the caller's token is used.
-  if (!env.offlineAccess) {
+  if (!env.microsoftOfflineAccess) {
     const conflicts = [
       ...(env.mcpBackend === McpBackendType.MicrosoftGraph ? [] : ['MCP_BACKEND=microsoft_graph']),
       ...(env.directorySyncMode === DirectorySyncMode.OnDemand
@@ -139,7 +139,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     for (const conflict of conflicts) {
       ctx.addIssue({
         code: 'custom',
-        path: ['offlineAccess'],
+        path: ['microsoftOfflineAccess'],
         input: 'disabled',
         message: `"disabled" needs ${conflict}, because no background job can run without a refresh token`,
       });
@@ -158,8 +158,8 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     uniqueAttachments: env.uniqueAttachments,
     uniqueNeeded: needsUnique(env.mcpBackend, env.uniqueAttachments),
     directorySyncMode: env.directorySyncMode,
-    offlineAccess: env.offlineAccess,
-    profileScopes: env.profileScopes,
+    offlineAccess: env.microsoftOfflineAccess,
+    profileScopes: env.microsoftProfileScopes,
   };
 });
 
