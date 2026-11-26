@@ -11,10 +11,10 @@ from mcp.server.auth.provider import (
 )
 from mcp.shared.auth import InvalidRedirectUriError, OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from mcp_credential_auth import CredentialOAuthProvider, transaction
+from mcp_credential_auth import CredentialOAuthProvider, read_session, transaction
 from mcp_credential_auth.models import AuthorizationCode as AuthorizationCodeRow
 from mcp_credential_auth.models import OAuthClient as OAuthClientRow
 from mcp_credential_auth.models import PendingAuthorization
@@ -43,12 +43,14 @@ def _client(client_id: str, redirect_uris: list[str] | None = None) -> OAuthClie
     )
 
 
-def _params(*, scopes: list[str] | None = None) -> AuthorizationParams:
+def _params(
+    *, scopes: list[str] | None = None, redirect_uri: str = _REDIRECT_URI
+) -> AuthorizationParams:
     return AuthorizationParams(
         state="state",
         scopes=scopes or ["read"],
         code_challenge="challenge",
-        redirect_uri=AnyUrl(_REDIRECT_URI),
+        redirect_uri=AnyUrl(redirect_uri),
         redirect_uri_provided_explicitly=True,
     )
 
@@ -242,6 +244,33 @@ async def test_authorization_completion_rechecks_expiry(
         return "subject"
 
     assert await provider.complete_authorization(pending, subject_factory) is None
+
+
+async def test_authorization_completion_rechecks_the_redirect_policy(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    redirect_uri = "https://client.example/callback"
+    before_narrowing = CredentialOAuthProvider(
+        base_url="https://mcp.example",
+        session_factory=session_factory,
+        login_path="/login",
+        allowed_redirect_hosts=["client.example"],
+    )
+    client = _client("client-narrowed", [redirect_uri])
+    await before_narrowing.register_client(client)
+    location = await before_narrowing.authorize(client, _params(redirect_uri=redirect_uri))
+    request_id = parse_qs(urlparse(location).query)["request_id"][0]
+    pending = await before_narrowing.load_pending_authorization(request_id)
+    assert pending is not None
+    after_narrowing = _provider(session_factory)
+
+    async def subject_factory(_session: AsyncSession) -> str:
+        return "subject"
+
+    assert await after_narrowing.complete_authorization(pending, subject_factory) is None
+    async with read_session(session_factory) as session:
+        issued_codes = await session.scalar(select(func.count()).select_from(AuthorizationCodeRow))
+    assert issued_codes == 0
 
 
 async def test_authorization_code_exchange_is_single_use(

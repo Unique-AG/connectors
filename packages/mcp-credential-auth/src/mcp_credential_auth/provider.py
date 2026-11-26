@@ -201,6 +201,9 @@ class CredentialOAuthProvider(OAuthProvider):
         pending: PendingAuthorization,
         subject_factory: SubjectFactory,
     ) -> str | None:
+        # The allowlist can narrow between /authorize and the login that completes it.
+        if not self._redirect_policy.allows(pending.redirect_uri):
+            return None
         code = secrets.token_urlsafe(32)
         now = datetime.now(UTC)
         expires_at = (now + self.authorization_code_ttl).timestamp()
