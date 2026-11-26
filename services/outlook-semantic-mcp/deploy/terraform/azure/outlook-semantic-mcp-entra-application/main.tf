@@ -11,18 +11,6 @@ removed {
   }
 }
 
-locals {
-  mail_scopes = toset([
-    "User.Read",
-    "User.Read.All",
-    "Mail.ReadWrite",
-    "Mail.ReadWrite.Shared",
-    "MailboxSettings.Read",
-    "People.Read",
-  ])
-  graph_scopes = var.calendar_integration == "enabled" ? setunion(local.mail_scopes, toset(["Calendars.ReadWrite.Shared"])) : local.mail_scopes
-}
-
 resource "azuread_application" "outlook_semantic_mcp" {
   display_name     = var.display_name
   sign_in_audience = var.sign_in_audience
