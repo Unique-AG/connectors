@@ -32,7 +32,9 @@ interface PermissionSelection {
   readonly profileScopes: boolean;
 }
 
-function resolveGraphPermissions(selection: PermissionSelection): GraphPermission[] {
+export function resolveGraphPermissions(
+  selection: Pick<PermissionSelection, 'mode' | 'tools' | 'sharedMailboxes'>,
+): GraphPermission[] {
   const own = [
     ...BASE_PERMISSIONS,
     ...(selection.mode === McpBackendType.MicrosoftGraphAndUniqueApi
