@@ -1,8 +1,4 @@
-"""A write whose result carries a title and a CRM link tells the agent not to cite it.
-
-Conduct cites any record with a title and a link. A write's echo of the record it made is a
-confirmation, not a source, so its description sends the agent to the read tool instead.
-"""
+"""Create tools tell the agent not to cite their result; read tools do not."""
 
 from collections.abc import Callable
 

@@ -174,7 +174,10 @@ Link answers back to the Backstop web app, and understand links users paste in.
 - A pasted link is turned into the record id and the tool to call next.
 - The read tools that return people, organizations, deals, activities, tasks, products or
   investors name each record by its name or title and link it to its CRM page, so Conduct
-  cites it as a source.
+  cites it as a source. An investor that Backstop names only as a contact has no page, so it
+  is not cited.
+- A create tool's result confirms the write and is not a source. Its description tells the
+  agent to cite the record it reads with the matching read tool instead.
 
 Code: [`ui_links`](https://github.com/Unique-AG/connectors/tree/main/services/backstop-mcp/src/backstop_mcp/features/ui_links).
 
