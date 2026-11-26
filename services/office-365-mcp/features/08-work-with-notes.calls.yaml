@@ -362,7 +362,7 @@ uc-08-25:
       args: {title_contains: Acme kickoff}
     - tool: onenote_read_page
       uses: {page: handle of the page}
-  note: "expected behaviour from tools/onenote_read_page.py:40 and 142 and graph_client/download.py:69 and 133 (max_bytes is 1 MB, 1048576 bytes, and only a size above it raises GraphResponseTooLarge), so a page of exactly 1 MB is read"
+  note: "expected behaviour from tools/onenote_read_page.py:40 and 168 and graph_client/download.py:69 and 133 (max_bytes is 1 MB, 1048576 bytes, and only a size above it raises GraphResponseTooLarge), so a page of exactly 1 MB is read"
 
 uc-08-26:
   status: working
