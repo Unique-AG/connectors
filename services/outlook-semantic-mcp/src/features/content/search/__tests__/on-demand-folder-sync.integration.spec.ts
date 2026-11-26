@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: Graph client, resolver and query stand-ins */
 import assert from 'node:assert';
 import path from 'node:path';
-import type { McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
+import { type McpAuthenticatedRequest, UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import type { Context } from '@unique-ag/mcp-server-module';
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from '@testcontainers/postgresql';
 import { eq } from 'drizzle-orm';
@@ -210,6 +210,32 @@ describe('Folder cache with DIRECTORY_SYNC_MODE against Postgres', () => {
       expect(folderDeltaReads).not.toHaveBeenCalled();
       expect(searchedUrls()).toEqual([]);
       expect(output.searchSummary).toContain(PROJECTS.id);
+    });
+
+    it('searches the cached folders when the folder sync fails', async () => {
+      await lastSyncedHoursAgo(ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS / HOUR_MS + 1);
+      folderDeltaReads.mockRejectedValue(new Error('Graph is unavailable'));
+
+      const output = await searchEmailsQuery(features).run(
+        convertUserProfileIdToTypeId(userProfileId),
+        {
+          msGraphKeywordSearchQueries: [
+            { kqlQuery: 'budget', directories: [INBOX.id, PROJECTS.id] },
+          ],
+        },
+      );
+
+      expect(searchedUrls()).toEqual([expect.stringContaining(`/mailFolders/${INBOX.id}/`)]);
+      expect(output.searchSummary).toContain(PROJECTS.id);
+    });
+
+    it('passes on a revoked sign-in from the folder sync', async () => {
+      folderDeltaReads.mockRejectedValue(new UpstreamCredentialRevokedError('invalid_grant'));
+
+      await expect(searchProjectsFolder(features)).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+      expect(searchBatches).not.toHaveBeenCalled();
     });
 
     it('does not sync for a search without a folder filter', async () => {

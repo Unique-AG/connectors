@@ -1,3 +1,4 @@
+import { isUpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { eq } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
@@ -9,7 +10,9 @@ import { SyncDirectoriesCommand } from './sync-directories.command';
 export const ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 
 // With DIRECTORY_SYNC_MODE=on_demand no job keeps the folder cache fresh, so a tool that reads
-// it refreshes the caller's folders first once they are older than the max age.
+// it refreshes the caller's folders first once they are older than the max age. A failed refresh
+// leaves the cached folders in use; only a revoked sign-in is passed on, so the client asks the
+// user to sign in again.
 @Injectable()
 export class RefreshStaleDirectoriesCommand {
   private readonly logger = new Logger(this.constructor.name);
@@ -39,6 +42,17 @@ export class RefreshStaleDirectoriesCommand {
       lastSyncAt: lastSyncAt?.toISOString() ?? null,
       msg: 'Folder cache is stale, syncing directories before reading it',
     });
-    await this.syncDirectoriesCommand.run(userProfileId, { allowDelegateFallback: false });
+    try {
+      await this.syncDirectoriesCommand.run(userProfileId, { allowDelegateFallback: false });
+    } catch (err) {
+      if (isUpstreamCredentialRevokedError(err)) {
+        throw err;
+      }
+      this.logger.warn({
+        userProfileId: userProfileId.toString(),
+        err,
+        msg: 'Folder sync failed, reading the cached folders',
+      });
+    }
   }
 }
