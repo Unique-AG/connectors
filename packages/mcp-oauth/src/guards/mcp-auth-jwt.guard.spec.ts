@@ -32,6 +32,7 @@ describe('McpAuthJwtGuard', () => {
       authCodeExpiresIn: 600,
       accessTokenExpiresIn: 3600,
       refreshTokenExpiresIn: 86400,
+      refreshTokenExpiry: 'sliding',
       oauthSessionExpiresIn: 600000,
       serverUrl: 'http://localhost:3000',
       resource: 'http://localhost:3000/mcp',
