@@ -508,7 +508,7 @@ uc-10-35:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from shared/files.py:431-438 (GRAPH_FORBIDDEN of sharepoint_create_text_file at tools/sharepoint_create_text_file.py:137): no file was created, the user can lack the necessary access or a policy of the organization can refuse, the owner of the item can give the user more access. The folder read works (Mia can open the folder), the question to Mia comes next, and the PUT at :216 is refused after she approves. The PUT uses no_retry."
+  note: "expected behaviour from shared/files.py:434-441 (GRAPH_FORBIDDEN of sharepoint_create_text_file at tools/sharepoint_create_text_file.py:137): no file was created, the user can lack the necessary access or a policy of the organization can refuse, the owner of the item can give the user more access. The folder read works (Mia can open the folder), the question to Mia comes next, and the PUT at :216 is refused after she approves. The PUT uses no_retry."
 
 uc-10-36:
   status: working
@@ -699,7 +699,7 @@ uc-10-50:
   chain:
     - tool: teams_send_channel_message_with_files
       uses: {attachments: handle of the notebook}
-  note: "expected behaviour from shared/files.py:331-336 (_attachable): the item is not a plain file in Microsoft 365, a OneNote notebook is an example, this tool attaches files only. The refusal comes before the question to Mia."
+  note: "expected behaviour from shared/files.py:334-339 (_attachable): the item is not a plain file in Microsoft 365, a OneNote notebook is an example, this tool attaches files only. The refusal comes before the question to Mia."
 
 uc-10-51:
   status: working

@@ -615,7 +615,7 @@ uc-04-41:
       uses: {message_ref: uri of the message}
     - tool: outlook_search_mail
   must_not: [outlook_send_draft]
-  note: "The first step finds the message and the delete comes after it, so the reply call gets the old handle. Expected behaviour from tools/outlook_draft_reply_all.py:74-83 (GRAPH_NOT_FOUND): this tool created no draft, find the message again with outlook_search_mail or outlook_list_mail, and if neither finds it, tell the user that the message is not in this mailbox now. A message that only moved keeps its handle, so the cause is a permanent delete or a move to an archive mailbox. One missing message for a move is uc-05-33."
+  note: "The first step finds the message and the delete comes after it, so the reply call gets the old handle. Expected behaviour from tools/outlook_draft_reply_all.py:70-79 (GRAPH_NOT_FOUND): this tool created no draft, find the message again with outlook_search_mail or outlook_list_mail, and if neither finds it, tell the user that the message is not in this mailbox now. A message that only moved keeps its handle, so the cause is a permanent delete or a move to an archive mailbox. One missing message for a move is uc-05-33."
 
 uc-04-42:
   status: working

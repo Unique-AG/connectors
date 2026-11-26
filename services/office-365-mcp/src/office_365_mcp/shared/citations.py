@@ -1,9 +1,4 @@
-"""The notes that keep a tool's titled and linked records out of the sources an answer cites.
-
-Unique's chat cites every record of a tool result that carries a title and a link. A lookup or a
-write returns such records too, yet the user checks a claim against what the agent read, not
-against the folder it browsed or the draft it saved.
-"""
+"""Notes that keep titled, linked lookup and write results out of the cited sources."""
 
 
 def lookup_not_a_source(found: str, *, cite: str) -> str:
