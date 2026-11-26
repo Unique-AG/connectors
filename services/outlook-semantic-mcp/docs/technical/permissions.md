@@ -24,7 +24,7 @@ A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.
 
 **Only `User.Read.All` requires admin consent**, and the server requests it only with shared mailboxes on. Every other permission, calendar included, is user-consentable — see [`Calendars.ReadWrite.Shared`](https://learn.microsoft.com/en-us/graph/permissions-reference#calendarsreadwriteshared). With `DELEGATED_ACCESS_SCAN=disabled`, users can connect their own accounts without IT intervention, unless the tenant disables user consent.
 
-Admin involvement is still needed in two cases: the tenant has disabled user consent for applications (a tenant-wide policy, not a property of these scopes), or the admin wants to pre-grant consent organisation-wide so users never see the consent screen. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. Independently of consent, `Calendars.ReadWrite.Shared` must be **registered** on the Entra app (Terraform `calendar_integration = "enabled"`) before a calendar tool is listed in `MCP_TOOLS`, otherwise token refresh requests a scope the app does not expose.
+Admin involvement is still needed in two cases: the tenant has disabled user consent for applications (a tenant-wide policy, not a property of these scopes), or the admin wants to pre-grant consent organisation-wide so users never see the consent screen. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. Independently of consent, `Calendars.ReadWrite.Shared` must be **registered** on the Entra app (the Terraform module with the calendar tools selected in the Terraform module, e.g. `tools_preset = ["mail", "calendar"]`) before a calendar tool is listed in `MCP_TOOLS`, otherwise token refresh requests a scope the app does not expose.
 
 ## Understanding Consent Requirements
 
@@ -117,7 +117,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Purpose** | Read and write the signed-in user's calendars, including calendars shared with them |
 | **Used For** | Calendar tools (`list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, `cancel_event`). Live Graph query-through; no calendar ingest |
 | **Why Not `Calendars.Read`** | Writes (create/update/respond/cancel) need write. `Calendars.ReadWrite` does not cover calendars shared with the user |
-| **Note** | Requested at OAuth time only when a calendar tool is listed in `MCP_TOOLS`. The Entra app registers the scope only when Terraform `calendar_integration = "enabled"`. It is not on the mail-only consent screen |
+| **Note** | Requested at OAuth time only when a calendar tool is listed in `MCP_TOOLS`. The Entra app registers the scope only when the calendar tools selected in the Terraform module, e.g. `tools_preset = ["mail", "calendar"]`. It is not on the mail-only consent screen |
 
 ### `offline_access`
 

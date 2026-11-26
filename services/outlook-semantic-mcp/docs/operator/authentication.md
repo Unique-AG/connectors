@@ -57,9 +57,11 @@ module "outlook_semantic_mcp_app" {
   sign_in_audience = "AzureADMyOrg"  # Single tenant
   notes            = "MCP server for Outlook email access"
 
-  # Optional. "enabled" registers Calendars.ReadWrite.Shared and includes it in the grant.
-  # Apply this before listing a calendar tool in the service's MCP_TOOLS.
-  calendar_integration = "disabled"
+  # The service's MCP_TOOLS and DELEGATED_ACCESS_SCAN: the module registers and grants exactly the
+  # Microsoft Graph permissions they need. Name tool groups (mail, calendar, sync, debug) in
+  # tools_preset, or the tools themselves in tools_enabled. Without either, the mail tools.
+  tools_preset          = ["mail"]
+  delegated_access_scan = "full_access_only"
 
   redirect_uris = [
     "https://outlook.semantic.mcp.example.com/auth/callback"
@@ -81,7 +83,9 @@ module "outlook_semantic_mcp_app" {
 
 > **`service_principal_configuration` (optional):** When set, the module creates a service principal and pre-grants delegated permissions tenant-wide via `azuread_service_principal_delegated_permission_grant`. Omit this variable for multi-tenant deployments where admin consent is granted by each customer tenant individually.
 
-> **Registered permissions:** The module registers a fixed list whatever the server's configuration: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. A deployment that lists no draft tool requests `Mail.Read`, and `Mail.Read.Shared` with shared mailboxes on, which the module does not register yet; add them to the app registration and grant consent.
+> **Registered permissions:** The module registers and grants the Microsoft Graph permissions the server requests for the same `tools_preset`/`tools_enabled` and `delegated_access_scan`, by the rule in [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). It reads that rule and the tools from `registry.generated.tf.json`, which the service generates (`pnpm codegen`). It does not register `offline_access`, `openid`, `profile` or `email`; they need no registration. The defaults (the mail tools, shared mailboxes on) register what earlier versions of the module did: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`. Keep the module inputs and the service's `MCP_TOOLS` and `DELEGATED_ACCESS_SCAN` in step: a scope the server requests but the app does not register fails token refresh.
+
+> **Upgrading from `calendar_integration`:** the module no longer has that variable; calendar follows the tools, as in the service. Replace `calendar_integration = "enabled"` with `tools_preset = ["mail", "calendar"]`, and drop `calendar_integration = "disabled"`.
 
 #### Option 2: Azure Portal (Manual)
 

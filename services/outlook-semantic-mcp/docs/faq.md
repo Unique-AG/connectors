@@ -599,7 +599,7 @@ If the cursor has expired (HTTP 410), the sync falls back to a fresh query filte
 
 Calendar is the same: `Calendars.ReadWrite.Shared` is user-consentable and does **not** require admin consent by itself. Admin consent only becomes necessary if the tenant has disabled user consent for applications, or if an admin wants to pre-grant organisation-wide.
 
-What calendar *does* require is that the scope is **registered on the Entra app** (`calendar_integration = "enabled"` on the Terraform module) before you list a calendar tool in `MCP_TOOLS`. Listing one against an app registration that does not expose the scope breaks mail token refresh (`invalid_grant`) — that failure is about registration, not consent.
+What calendar *does* require is that the scope is **registered on the Entra app** (the calendar tools selected in the Terraform module, e.g. `tools_preset = ["mail", "calendar"]`) before you list a calendar tool in `MCP_TOOLS`. Listing one against an app registration that does not expose the scope breaks mail token refresh (`invalid_grant`) — that failure is about registration, not consent.
 
 **See also:** [Permissions](./technical/permissions.md) — [Configuration — Calendar tools](./operator/configuration.md#Calendar-tools)
 
