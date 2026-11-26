@@ -224,7 +224,8 @@ describe('TokenProvider against Postgres', () => {
         .update(schema.userProfiles)
         .set({ accessToken: encryption.encryptToString('new-access-token') })
         .where(eq(schema.userProfiles.id, userProfileId));
-      // The provider read the profile just before the new sign-in landed.
+      // The provider read the profile just before the new sign-in landed. No Microsoft call sits
+      // between that read and the revoke to hook into, so the read itself returns the stale row.
       vi.spyOn(db.query.userProfiles, 'findFirst').mockResolvedValueOnce(stale);
 
       await expect(provider.refreshAccessToken(userProfileId)).rejects.toThrow(

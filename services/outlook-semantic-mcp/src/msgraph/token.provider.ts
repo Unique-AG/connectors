@@ -158,6 +158,8 @@ export class TokenProvider implements AuthenticationProvider {
       return await this.revokeUpstreamCredential(userProfile, {
         reason: 'the Microsoft sign-in has expired and the server keeps no refresh token',
         failureCode: 'no_refresh_token',
+        logMessage:
+          'Microsoft rejected the access token and no refresh token is stored; cleared the Graph token and revoked the MCP session so the user signs in again',
       });
     }
 
@@ -335,7 +337,8 @@ export class TokenProvider implements AuthenticationProvider {
       reason,
       failureCode,
       aadstsCodes,
-    }: { reason?: string; failureCode: string; aadstsCodes?: number[] },
+      logMessage = 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
+    }: { reason?: string; failureCode: string; aadstsCodes?: number[]; logMessage?: string },
   ): Promise<never> {
     const cleared = await this.drizzle
       .update(userProfiles)
@@ -364,7 +367,7 @@ export class TokenProvider implements AuthenticationProvider {
       });
     }
     this.logger.warn({
-      msg: 'Microsoft grant is permanently invalid; cleared the Graph tokens and revoked the MCP session',
+      msg: logMessage,
       userProfileId: userProfile.id,
       failureCode,
       aadstsCodes,
