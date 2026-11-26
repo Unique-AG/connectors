@@ -40,6 +40,10 @@ export enum DirectorySyncMode {
   OnDemand = 'on_demand',
 }
 
+export const offlineAccessSchema = enabledDisabledBoolean(
+  'Whether sign-in requests `offline_access`, so Microsoft returns a refresh token the server uses to stay signed in.',
+);
+
 export const needsUnique = (mode: McpBackendType, uniqueAttachments: boolean): boolean =>
   mode === McpBackendType.MicrosoftGraphAndUniqueApi || uniqueAttachments;
 
@@ -57,6 +61,10 @@ const FeaturesEnvSchema = z.object({
     .describe(
       'How the folder cache is refreshed: "scheduled" by a cron and a scan at startup, "on_demand" by the tool calls that read it.',
     ),
+  offlineAccess: offlineAccessSchema,
+  profileScopes: enabledDisabledBoolean(
+    'Whether sign-in requests the `profile` and `email` scopes. `openid` is always requested.',
+  ),
 });
 
 const FEATURE_ENV_KEYS = {
@@ -66,6 +74,8 @@ const FEATURE_ENV_KEYS = {
   delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
   uniqueAttachments: 'UNIQUE_ATTACHMENTS',
   directorySyncMode: 'DIRECTORY_SYNC_MODE',
+  offlineAccess: 'MICROSOFT_OFFLINE_ACCESS',
+  profileScopes: 'MICROSOFT_PROFILE_SCOPES',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -117,6 +127,25 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     }
   }
 
+  // Every background job runs on a stored refresh token; without one, only the caller's token is used.
+  if (!env.offlineAccess) {
+    const conflicts = [
+      ...(env.mcpBackend === McpBackendType.MicrosoftGraph ? [] : ['MCP_BACKEND=microsoft_graph']),
+      ...(env.directorySyncMode === DirectorySyncMode.OnDemand
+        ? []
+        : ['DIRECTORY_SYNC_MODE=on_demand']),
+      ...(sharedMailboxes ? ['DELEGATED_ACCESS_SCAN=disabled'] : []),
+    ];
+    for (const conflict of conflicts) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['offlineAccess'],
+        input: 'disabled',
+        message: `"disabled" needs ${conflict}, because no background job can run without a refresh token`,
+      });
+    }
+  }
+
   const tools: ReadonlySet<ToolName> = new Set(
     TOOL_NAMES.filter((name) => env.mcpTools.includes(name)),
   );
@@ -129,6 +158,8 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     uniqueAttachments: env.uniqueAttachments,
     uniqueNeeded: needsUnique(env.mcpBackend, env.uniqueAttachments),
     directorySyncMode: env.directorySyncMode,
+    offlineAccess: env.offlineAccess,
+    profileScopes: env.profileScopes,
   };
 });
 

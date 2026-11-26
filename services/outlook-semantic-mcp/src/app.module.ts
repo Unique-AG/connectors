@@ -206,6 +206,7 @@ import { deploymentSecrets } from './utils/log-secrets';
         refreshTokenExpiresIn: configService.get('auth.refreshTokenExpiresInSeconds', {
           infer: true,
         }),
+        refreshTokenExpiry: configService.get('auth.refreshTokenExpiry', { infer: true }),
         disableRateLimiting: configService.get('auth.disableRateLimiting', { infer: true }),
 
         oauthStore: new McpOAuthStore(

@@ -1,0 +1,167 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
+suite: Microsoft config env injection
+templates:
+  - all.yaml
+tests:
+  - it: renders offline access and profile scopes enabled by default
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MICROSOFT_OFFLINE_ACCESS
+            value: enabled
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MICROSOFT_PROFILE_SCOPES
+            value: enabled
+
+  - it: renders the read-only deployment with offline access and profile scopes disabled
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          directorySyncMode: on_demand
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+          offlineAccess: disabled
+          profileScopes: disabled
+        auth:
+          refreshTokenExpiresInSeconds: 3600
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MICROSOFT_OFFLINE_ACCESS
+            value: disabled
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MICROSOFT_PROFILE_SCOPES
+            value: disabled
+
+  - it: fails to render offline access disabled outside microsoft_graph mode
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          directorySyncMode: scheduled
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+          offlineAccess: disabled
+        auth:
+          refreshTokenExpiresInSeconds: 3600
+    asserts:
+      - failedTemplate:
+          errorPattern: "offlineAccess disabled needs mcpConfig.app.mcpBackend microsoft_graph"
+
+  - it: fails to render offline access disabled with the scheduled folder sync
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+          offlineAccess: disabled
+        auth:
+          refreshTokenExpiresInSeconds: 3600
+    asserts:
+      - failedTemplate:
+          errorPattern: "offlineAccess disabled needs mcpConfig.app.directorySyncMode on_demand"
+
+  - it: fails to render offline access disabled with delegated access on
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          directorySyncMode: on_demand
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+          offlineAccess: disabled
+        auth:
+          refreshTokenExpiresInSeconds: 3600
+        delegatedAccess:
+          scan: full_access_only
+    asserts:
+      - failedTemplate:
+          errorPattern: "needs mcpConfig.delegatedAccess.scan disabled"
+
+  - it: fails to render offline access disabled with the default 30-day MCP session
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          directorySyncMode: on_demand
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+          offlineAccess: disabled
+    asserts:
+      - failedTemplate:
+          errorPattern: "needs mcpConfig.auth.refreshTokenExpiresInSeconds of at most 3600"
+
+  - it: fails to render offline access disabled with an MCP session over an hour
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          directorySyncMode: on_demand
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+          offlineAccess: disabled
+        auth:
+          refreshTokenExpiresInSeconds: 7200
+    asserts:
+      - failedTemplate:
+          errorPattern: "needs mcpConfig.auth.refreshTokenExpiresInSeconds of at most 3600"

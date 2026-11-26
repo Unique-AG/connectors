@@ -109,6 +109,44 @@ describe(loadFeaturesConfig.name, () => {
     });
   });
 
+  describe('MICROSOFT_OFFLINE_ACCESS', () => {
+    const offline = { ...READ_ONLY_ENV, DIRECTORY_SYNC_MODE: 'on_demand' };
+
+    it('is on by default', () => {
+      expect(load({ MCP_TOOLS: tools('search_emails') }).offlineAccess).toBe(true);
+    });
+
+    it('reads disabled in the read-only deployment', () => {
+      expect(load({ ...offline, MICROSOFT_OFFLINE_ACCESS: 'disabled' }).offlineAccess).toBe(false);
+    });
+
+    it.each([
+      ['MCP_BACKEND=microsoft_graph', { MCP_BACKEND: 'microsoft_graph_and_unique_api' }],
+      ['DIRECTORY_SYNC_MODE=on_demand', { DIRECTORY_SYNC_MODE: 'scheduled' }],
+      ['DELEGATED_ACCESS_SCAN=disabled', { DELEGATED_ACCESS_SCAN: 'full_access_only' }],
+    ])('throws naming MICROSOFT_OFFLINE_ACCESS when disabled without %s', (needed, change) => {
+      expect(() => load({ ...offline, MICROSOFT_OFFLINE_ACCESS: 'disabled', ...change })).toThrow(
+        `MICROSOFT_OFFLINE_ACCESS: "disabled" needs ${needed}`,
+      );
+    });
+
+    it('throws naming MICROSOFT_OFFLINE_ACCESS when it is not enabled or disabled', () => {
+      expect(() => load({ ...offline, MICROSOFT_OFFLINE_ACCESS: 'off' })).toThrow(
+        /MICROSOFT_OFFLINE_ACCESS: /,
+      );
+    });
+  });
+
+  describe('MICROSOFT_PROFILE_SCOPES', () => {
+    it('is on by default and reads disabled', () => {
+      expect(load({ MCP_TOOLS: tools('search_emails') }).profileScopes).toBe(true);
+      expect(
+        load({ MCP_TOOLS: tools('search_emails'), MICROSOFT_PROFILE_SCOPES: 'disabled' })
+          .profileScopes,
+      ).toBe(false);
+    });
+  });
+
   it('throws naming MCP_BACKEND when it is unset', () => {
     expect(() =>
       loadFeaturesConfig({ DELEGATED_ACCESS_SCAN: 'disabled', MCP_TOOLS: tools('search_emails') }),

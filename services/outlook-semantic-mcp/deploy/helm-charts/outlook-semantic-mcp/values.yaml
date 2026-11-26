@@ -417,6 +417,16 @@ mcpConfig:
     # access at their next Microsoft token refresh.
     # example: ["d050ee55-f842-4802-8263-d802dc017162"]
     allowedTenantIds: []
+    # -- Whether sign-in requests offline_access, so Microsoft returns a refresh token. Env var: MICROSOFT_OFFLINE_ACCESS
+    #   enabled  - the server refreshes Microsoft tokens and runs background jobs with them
+    #   disabled - no refresh token: the MCP session ends when the Microsoft sign-in would. Needs
+    #              app.mcpBackend: microsoft_graph, app.directorySyncMode: on_demand, delegatedAccess.scan: disabled
+    #              and auth.refreshTokenExpiresInSeconds of at most 3600.
+    offlineAccess: enabled
+    # -- Whether sign-in requests the profile and email scopes. openid is always requested.
+    # The profile is read from Microsoft Graph GET /me, so disabling them changes nothing the server stores.
+    # Env var: MICROSOFT_PROFILE_SCOPES
+    profileScopes: enabled
     # -- The public webhook URL reachable from external network for Microsoft Graph subscriptions.
     # Optional - defaults to SELF_URL if not provided.
     # example: https://outlook.mcp.unique.app
