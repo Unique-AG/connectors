@@ -202,6 +202,8 @@ Set via `mcpConfig.app` in Helm values:
 | `MCP_BACKEND` | `mcpBackend` | (required; the chart sets `microsoft_graph_and_unique_api`) | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
 | `MCP_TOOLS` | `tools` | (required) | Non-empty JSON array of the tool names to register. Listing a calendar tool turns calendar on — see [MCP_TOOLS](#MCP_TOOLS) and [Calendar tools](#Calendar-tools) |
 | `DIRECTORY_SYNC_MODE` | `directorySyncMode` | `scheduled` | How the folder cache is refreshed: `scheduled` or `on_demand` — see [DIRECTORY_SYNC_MODE](#DIRECTORY_SYNC_MODE) |
+| `EXCLUDED_SENSITIVITY_LABELS` | `excludedSensitivity.labels` | `[]` | JSON array of Purview sensitivity label ids or names. Mail carrying one is left out — see [Sensitivity exclusions](#Sensitivity-exclusions) |
+| `EXCLUDED_LEGACY_SENSITIVITY` | `excludedSensitivity.legacy` | `[]` | JSON array of legacy Outlook sensitivity flags: `personal`, `private`, `confidential`. Mail flagged with one is left out — see [Sensitivity exclusions](#Sensitivity-exclusions) |
 | `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
@@ -634,6 +636,26 @@ Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook 
 - **`on_demand`** — no scan at startup and no cron job. The folders are refreshed with the calling user's own token: on every `list_mailboxes_and_directories` call, and before a `search_emails` call with a folder filter when the user's folders were last refreshed over 4 hours ago. Concurrent searches of one user share one refresh. When that refresh fails, the search uses the folders already cached, unless the user's Microsoft sign-in was revoked, and searches in the next 5 minutes do not try it again. The sign-in also refreshes them. A folder created in Outlook is therefore found by a folder filter at the latest 4 hours later, or at once after `list_mailboxes_and_directories`.
 
 `on_demand` needs `MCP_BACKEND=microsoft_graph`, because ingestion syncs the folders itself, and `DELEGATED_ACCESS_SCAN=disabled`, because shared mailbox folders are refreshed only by the scheduled sync. The server refuses to start otherwise, and the chart refuses to render.
+
+#### Sensitivity exclusions
+
+Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` answers it as not found, so the agent cannot tell it exists.
+
+```yaml
+mcpConfig:
+  app:
+    mcpBackend: microsoft_graph
+    excludedSensitivity:
+      labels: [Confidential, 2d69afbc-f32c-424f-83ad-75460acd2aa1]
+      legacy: [private, confidential]
+```
+
+- **`labels`** (`EXCLUDED_SENSITIVITY_LABELS`) — Microsoft Purview sensitivity labels, each by its id (a GUID) or its name, ignoring case. A message is excluded when one of its labels matches. A sublabel carries only its own name and id, so list each sublabel to exclude.
+- **`legacy`** (`EXCLUDED_LEGACY_SENSITIVITY`) — the sensitivity flag Outlook sets under *Options → Sensitivity*: `personal`, `private` or `confidential`.
+
+The server reads both from each message Microsoft Graph returns, without an extra request: a search asks Graph for the two properties alongside its results, and `open_email` asks for them with the message. A message whose properties Graph does not return, or returns in a form the server cannot read, is left out as well. A results page the filter empties still carries its cursor, so `fetch_next_search_pages` continues past it. With both lists empty (the default) the requests to Graph are unchanged and nothing is filtered.
+
+Both settings need `MCP_BACKEND=microsoft_graph`, because semantic search results from the Unique knowledge base carry no sensitivity to filter on. The server refuses to start otherwise, naming the setting, and the chart refuses to render. An unknown legacy flag, a blank label, or a value that is not a JSON array also stops the server at startup. `lookup_contacts` and the draft tools are not filtered.
 
 #### Calendar tools
 

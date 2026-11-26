@@ -89,6 +89,9 @@ export const EmailDataSchema = z.object({
     ),
 });
 
+const NOT_FOUND_MESSAGE =
+  'This email could not be found in Outlook. It may have been deleted or moved, or the parameters come from an older search. Run `search_emails` again and pass the new `openEmailParams`.';
+
 const OpenEmailByIdOutputSchema = z.object({
   success: z.boolean(),
   status: z.string().optional(),
@@ -155,7 +158,7 @@ export class OpenEmailTool {
 
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
     try {
-      const { webLink, ...emailData } = await this.openEmailQuery.run({
+      const result = await this.openEmailQuery.run({
         userProfileId: userProfileTypeId,
         id: input.id,
         mailbox: input.mailbox,
@@ -166,6 +169,11 @@ export class OpenEmailTool {
         chunkIds: input.chunkIds,
         outputTimeZone: outputTimeZone,
       });
+      // A message withheld for its sensitivity reads as missing, so its existence is not disclosed.
+      if (!result) {
+        return { success: false, message: NOT_FOUND_MESSAGE };
+      }
+      const { webLink, ...emailData } = result;
       // A top-level title makes Unique cite the email, which it should only do with a link to open.
       const title = webLink === null ? undefined : emailData.title;
       return { success: true, title, webLink, emailData };
@@ -173,11 +181,7 @@ export class OpenEmailTool {
       // 404: deleted or moved in Outlook since it was indexed. 400: an id Graph does not accept,
       // such as a Unique content id from `openEmailParams` of an older search.
       if (err instanceof GraphError && (err.statusCode === 404 || err.statusCode === 400)) {
-        return {
-          success: false,
-          message:
-            'This email could not be found in Outlook. It may have been deleted or moved, or the parameters come from an older search. Run `search_emails` again and pass the new `openEmailParams`.',
-        };
+        return { success: false, message: NOT_FOUND_MESSAGE };
       }
       throw err;
     }

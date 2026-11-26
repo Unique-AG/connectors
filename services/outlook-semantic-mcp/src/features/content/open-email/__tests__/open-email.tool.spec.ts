@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 import type * as z from 'zod';
 import { loadFeaturesConfig } from '~/config';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
+import { SensitivityFilter } from '../../sensitivity-filter';
 import { OpenEmailQuery } from '../open-email.query';
 import { OpenEmailTool } from '../open-email.tool';
 
@@ -92,6 +93,16 @@ describe('OpenEmailTool', () => {
     });
   });
 
+  it('answers a message withheld for its sensitivity as not found', async () => {
+    openEmailQuery.run.mockRejectedValueOnce(new GraphError(404, 'Not found'));
+    const missing = await tool.openEmailById({ id: 'msg-gone' }, context, request);
+    openEmailQuery.run.mockResolvedValueOnce(undefined);
+
+    const withheld = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
+
+    expect(withheld).toEqual(missing);
+  });
+
   it('rethrows any other Graph failure', async () => {
     const error = new GraphError(503, 'Unavailable');
     openEmailQuery.run.mockRejectedValue(error);
@@ -165,6 +176,7 @@ describe('OpenEmailTool input', () => {
         { content: { getContentById } } as never,
         { run: vi.fn().mockResolvedValue({ id: 'user-1', email: 'own@example.com' }) } as never,
         new BuildWebLinksCommand({ run: vi.fn().mockResolvedValue(new Map()) } as never),
+        new SensitivityFilter(loadFeaturesConfig(READ_ONLY_ENV)),
       ),
       { run: vi.fn().mockResolvedValue(undefined) } as never,
       loadFeaturesConfig(READ_ONLY_ENV),

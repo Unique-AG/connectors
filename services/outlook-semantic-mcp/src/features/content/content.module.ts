@@ -14,6 +14,7 @@ import { SearchCursorCleanupSchedulerService } from './search/cursors/search-cur
 import { MsGraphKqlSearchEmailsQuery } from './search/ms-graph-kql-search-emails.query';
 import { SearchEmailsQuery } from './search/search-emails.query';
 import { SemanticSearchEmailsQuery } from './search/semantic-search-emails.query';
+import { SensitivityFilter } from './sensitivity-filter';
 
 const QUERIES = [
   SemanticSearchEmailsQuery,
@@ -35,7 +36,7 @@ const QUERIES = [
     DelegatedAccessUtilsModule,
     DirectoriesSyncModule,
   ],
-  providers: [...QUERIES, SearchCursorCleanupSchedulerService],
+  providers: [...QUERIES, SearchCursorCleanupSchedulerService, SensitivityFilter],
   exports: [...QUERIES],
 })
 export class ContentModule {}

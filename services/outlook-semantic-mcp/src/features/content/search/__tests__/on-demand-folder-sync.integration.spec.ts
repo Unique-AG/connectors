@@ -26,6 +26,7 @@ import { UpsertDirectoryCommand } from '~/features/directories-sync/upsert-direc
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { createPostgresPool, stopPostgres } from '../../../../__mocks__/stop-postgres';
+import { SensitivityFilter } from '../../sensitivity-filter';
 import { BuildMsGraphKqlBatchRequestsQuery } from '../build-ms-graph-kql-batch-requests.query';
 import { SearchCursorRepository } from '../cursors/search-cursor.repository';
 import { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
@@ -154,6 +155,7 @@ describe('Folder cache with DIRECTORY_SYNC_MODE against Postgres', () => {
         getUserProfileQuery,
       ),
       { run: vi.fn() } as any,
+      new SensitivityFilter(features),
     );
     return new SearchEmailsQuery(
       { run: vi.fn() } as any,

@@ -20,6 +20,11 @@ import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { sleep } from '~/utils/sleep';
 import {
+  extendedPropertiesSchema,
+  SensitivityFilter,
+  SensitivityVerdict,
+} from '../sensitivity-filter';
+import {
   BuildMsGraphKqlBatchRequestsQuery,
   GraphBatchRequest,
   QueryInput,
@@ -42,6 +47,7 @@ export class MsGraphKqlSearchEmailsQuery {
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
     private readonly buildMsGraphKqlBatchRequestsQuery: BuildMsGraphKqlBatchRequestsQuery,
     private readonly removeDelegatedAccessCommand: RemoveDelegatedAccessCommand,
+    private readonly sensitivityFilter: SensitivityFilter,
   ) {}
 
   @Span()
@@ -193,7 +199,7 @@ export class MsGraphKqlSearchEmailsQuery {
       .filter((hit) => !lostAccessMailboxes.has(hit.mailbox));
 
     return {
-      results: await this.buildResults(userProfile, hits),
+      results: await this.buildResults(userProfile, this.withoutExcludedSensitivity(hits)),
       pages: outcomes.map((outcome) => this.toBackendPage(outcome, lostAccessMailboxes)),
       searchSummary: this.buildSearchSummary({
         ...buildNotes,
@@ -201,6 +207,21 @@ export class MsGraphKqlSearchEmailsQuery {
         lostAccessMailboxes,
       }),
     };
+  }
+
+  // Pages keep their cursors whatever the filter drops, so a page left empty still leads on.
+  private withoutExcludedSensitivity(hits: Hit[]): Hit[] {
+    const unreadable = hits.filter(
+      ({ sensitivity }) => sensitivity === SensitivityVerdict.Unreadable,
+    ).length;
+    if (unreadable > 0) {
+      this.logger.warn({
+        msg: 'Dropped search hits whose sensitivity could not be read',
+        unreadable,
+        hits: hits.length,
+      });
+    }
+    return hits.filter(({ sensitivity }) => sensitivity === SensitivityVerdict.Allowed);
   }
 
   private async buildResults(
@@ -466,6 +487,7 @@ export class MsGraphKqlSearchEmailsQuery {
         webLink: msg.webLink ?? '',
         bodyPreview: msg.bodyPreview ?? '',
         isDraft: msg.isDraft === true,
+        sensitivity: this.sensitivityFilter.judge(msg.singleValueExtendedProperties),
       }),
     );
 
@@ -558,7 +580,12 @@ export class MsGraphKqlSearchEmailsQuery {
     const search = encodeURIComponent(sanitizeKqlQuery(request.kqlQuery));
     const select =
       'subject,from,sentDateTime,receivedDateTime,parentFolderId,webLink,bodyPreview,isDraft';
-    return `${base}?$search=${search}&$select=${select}&$top=${top}`;
+    if (!this.sensitivityFilter.isActive) {
+      return `${base}?$search=${search}&$select=${select}&$top=${top}`;
+    }
+    // $search honours the $expand only with internetMessageHeaders selected. The nextLink keeps both.
+    const expand = encodeURIComponent(this.sensitivityFilter.expand);
+    return `${base}?$search=${search}&$select=${select},internetMessageHeaders&$expand=${expand}&$top=${top}`;
   }
 
   // Round-robin over the queries, so deferral holds back the last mailboxes and folders of every
@@ -643,6 +670,7 @@ const messagePageSchema = z.object({
       webLink: z.string().optional().nullish(),
       bodyPreview: z.string().optional().nullish(),
       isDraft: z.boolean().optional().nullish(),
+      singleValueExtendedProperties: extendedPropertiesSchema,
     }),
   ),
   '@odata.nextLink': z.string().optional(),
@@ -661,6 +689,7 @@ interface Hit {
   webLink: string;
   bodyPreview: string;
   isDraft: boolean;
+  sensitivity: SensitivityVerdict;
 }
 
 // One Graph request: the first page of a (query × mailbox × folder), or the page a cursor points at.

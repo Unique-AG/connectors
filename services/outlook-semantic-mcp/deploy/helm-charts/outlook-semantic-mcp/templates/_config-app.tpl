@@ -21,6 +21,19 @@
 {{- end }}
 - name: DIRECTORY_SYNC_MODE
   value: {{ .app.directorySyncMode | quote }}
+{{- with .app.excludedSensitivity }}
+{{- if and (or .labels .legacy) (ne $.Values.mcpConfig.app.mcpBackend "microsoft_graph") }}
+{{- fail "mcpConfig.app.excludedSensitivity needs mcpConfig.app.mcpBackend microsoft_graph: semantic search results cannot be filtered by sensitivity." }}
+{{- end }}
+{{- if .labels }}
+- name: EXCLUDED_SENSITIVITY_LABELS
+  value: {{ toJson .labels | quote }}
+{{- end }}
+{{- if .legacy }}
+- name: EXCLUDED_LEGACY_SENSITIVITY
+  value: {{ toJson .legacy | quote }}
+{{- end }}
+{{- end }}
 {{- if .app.directorySyncCronSchedule }}
 - name: DIRECTORY_SYNC_CRON_SCHEDULE
   value: {{ .app.directorySyncCronSchedule | quote }}

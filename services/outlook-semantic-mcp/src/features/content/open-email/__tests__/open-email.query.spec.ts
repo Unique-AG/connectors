@@ -1,6 +1,9 @@
+import assert from 'node:assert';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { type FeaturesConfig, LegacySensitivity } from '~/config';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { SensitivityFilter } from '../../sensitivity-filter';
 import { OpenEmailQuery } from '../open-email.query';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
@@ -22,7 +25,24 @@ describe('OpenEmailQuery', () => {
   let translateImmutableIdsToRestIds: { run: Mock };
   let instance: OpenEmailQuery;
 
-  const run = () => instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' });
+  const createInstance = (sensitivityExclusions: FeaturesConfig['sensitivityExclusions']) =>
+    new OpenEmailQuery(
+      { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
+      { content: { getContentById } } as never,
+      {
+        run: vi.fn().mockResolvedValue({ id: USER_PROFILE_ID.toString(), email: OWN_EMAIL }),
+      } as never,
+      new BuildWebLinksCommand(translateImmutableIdsToRestIds as never),
+      new SensitivityFilter({ sensitivityExclusions } as FeaturesConfig),
+    );
+
+  const open = async (input: Parameters<OpenEmailQuery['run']>[0]) => {
+    const result = await instance.run(input);
+    assert.ok(result, 'the message was withheld');
+    return result;
+  };
+
+  const run = () => open({ userProfileId: USER_PROFILE_ID, id: 'msg-1' });
 
   beforeEach(() => {
     graphRequest = {
@@ -34,14 +54,7 @@ describe('OpenEmailQuery', () => {
     api = vi.fn().mockReturnValue(graphRequest);
     getContentById = vi.fn();
     translateImmutableIdsToRestIds = { run: vi.fn().mockResolvedValue(new Map()) };
-    instance = new OpenEmailQuery(
-      { createClientForUser: vi.fn().mockReturnValue({ api }) } as never,
-      { content: { getContentById } } as never,
-      {
-        run: vi.fn().mockResolvedValue({ id: USER_PROFILE_ID.toString(), email: OWN_EMAIL }),
-      } as never,
-      new BuildWebLinksCommand(translateImmutableIdsToRestIds as never),
-    );
+    instance = createInstance({ labels: new Set(), legacy: new Set() });
   });
 
   it('returns the subject as title and the Graph web link of an own-mailbox message', async () => {
@@ -66,7 +79,7 @@ describe('OpenEmailQuery', () => {
     graphRequest.get.mockResolvedValue({ ...graphMessage, id: 'AAk-msg', webLink: GRAPH_WEB_LINK });
     translateImmutableIdsToRestIds.run.mockResolvedValue(new Map([['AAk-msg', 'AAMk/rest=']]));
 
-    const result = await instance.run({
+    const result = await open({
       userProfileId: USER_PROFILE_ID,
       id: 'AAk-msg',
       mailbox: 'shared@example.com',
@@ -86,7 +99,7 @@ describe('OpenEmailQuery', () => {
   it('returns no web link when the shared-mailbox id cannot be translated', async () => {
     graphRequest.get.mockResolvedValue({ ...graphMessage, id: 'AAk-msg', webLink: GRAPH_WEB_LINK });
 
-    const result = await instance.run({
+    const result = await open({
       userProfileId: USER_PROFILE_ID,
       id: 'AAk-msg',
       mailbox: 'shared@example.com',
@@ -111,7 +124,7 @@ describe('OpenEmailQuery', () => {
   });
 
   it('encodes immutable message and folder ids that contain a slash', async () => {
-    await instance.run({
+    await open({
       userProfileId: USER_PROFILE_ID,
       id: 'AAk/msg=',
       mailbox: 'shared@example.com',
@@ -125,7 +138,7 @@ describe('OpenEmailQuery', () => {
   });
 
   it('reads a shared mailbox message without a folder from the mailbox messages', async () => {
-    await instance.run({
+    await open({
       userProfileId: USER_PROFILE_ID,
       id: 'AAk/draft=',
       mailbox: 'shared@example.com',
@@ -144,7 +157,7 @@ describe('OpenEmailQuery', () => {
       ],
     });
 
-    const result = await instance.run({
+    const result = await open({
       userProfileId: USER_PROFILE_ID,
       id: 'msg-1',
       bodyContentType: 'html',
@@ -161,7 +174,7 @@ describe('OpenEmailQuery', () => {
   it('returns the Graph body without chunks when the ingested email cannot be read', async () => {
     getContentById.mockRejectedValue(new Error('Unique API Content not found'));
 
-    const result = await instance.run({
+    const result = await open({
       userProfileId: USER_PROFILE_ID,
       id: 'msg-1',
       uniqueContentId: 'cont-1',
@@ -178,7 +191,7 @@ describe('OpenEmailQuery', () => {
       chunks: [{ id: 'chunk-new', order: 0, text: 'Re-ingested passage' }],
     });
 
-    const result = await instance.run({
+    const result = await open({
       userProfileId: USER_PROFILE_ID,
       id: 'msg-1',
       uniqueContentId: 'cont-1',
@@ -197,7 +210,7 @@ describe('OpenEmailQuery', () => {
   });
 
   it('requests the HTML body when editing a draft', async () => {
-    const result = await instance.run({
+    const result = await open({
       userProfileId: USER_PROFILE_ID,
       id: 'msg-1',
       idIsImmutable: true,
@@ -254,5 +267,76 @@ describe('OpenEmailQuery', () => {
     const { metadata } = await run();
 
     expect(metadata).toMatchObject({ isDraft: false, attachments: [] });
+  });
+
+  describe('with sensitivity exclusions', () => {
+    const PURVIEW = 'String {00020386-0000-0000-C000-000000000046} Name msip_labels';
+    const LABEL_ID = '2d69afbc-f32c-424f-83ad-75460acd2aa1';
+
+    beforeEach(() => {
+      instance = createInstance({
+        labels: new Set(['confidential encrypted']),
+        legacy: new Set([LegacySensitivity.Private]),
+      });
+    });
+
+    it('expands both sensitivity properties next to the attachments', async () => {
+      graphRequest.get.mockResolvedValue({
+        ...graphMessage,
+        singleValueExtendedProperties: [{ id: 'Integer 0x0036', value: '0' }],
+      });
+
+      await run();
+
+      expect(graphRequest.expand).toHaveBeenCalledWith(
+        `attachments($select=name,size,isInline),singleValueExtendedProperties($filter=id eq '${PURVIEW}' or id eq 'Integer 0x0036')`,
+      );
+    });
+
+    it('opens a message without an excluded label', async () => {
+      graphRequest.get.mockResolvedValue({
+        ...graphMessage,
+        singleValueExtendedProperties: [
+          { id: 'Integer 0x0036', value: '3' },
+          { id: PURVIEW, value: '' },
+        ],
+      });
+
+      expect((await run()).text).toBe('Hello');
+    });
+
+    it('withholds a message with an excluded Purview label', async () => {
+      graphRequest.get.mockResolvedValue({
+        ...graphMessage,
+        singleValueExtendedProperties: [
+          { id: 'Integer 0x0036', value: '0' },
+          {
+            id: PURVIEW,
+            value: `MSIP_Label_${LABEL_ID}_Enabled=True;MSIP_Label_${LABEL_ID}_Name=Confidential Encrypted;`,
+          },
+        ],
+      });
+
+      await expect(
+        instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('withholds a message with an excluded legacy flag', async () => {
+      graphRequest.get.mockResolvedValue({
+        ...graphMessage,
+        singleValueExtendedProperties: [{ id: 'Integer 0x0036', value: '2' }],
+      });
+
+      await expect(
+        instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' }),
+      ).resolves.toBeUndefined();
+    });
+
+    it('withholds a message whose sensitivity Graph did not return', async () => {
+      await expect(
+        instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' }),
+      ).resolves.toBeUndefined();
+    });
   });
 });

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { featuresConfig, loadFeaturesConfig } from '../features.config';
+import { featuresConfig, LegacySensitivity, loadFeaturesConfig } from '../features.config';
 import { McpBackendType } from '../mcp-backend-type.config';
 
 const READ_ONLY_ENV = {
@@ -155,6 +155,59 @@ describe(loadFeaturesConfig.name, () => {
 
   it('throws naming DELEGATED_ACCESS_SCAN when its value is unknown', () => {
     expect(() => load({ DELEGATED_ACCESS_SCAN: 'disable' })).toThrow(/DELEGATED_ACCESS_SCAN: /);
+  });
+
+  describe('EXCLUDED_SENSITIVITY_LABELS and EXCLUDED_LEGACY_SENSITIVITY', () => {
+    it('exclude nothing by default', () => {
+      expect(load(READ_ONLY_ENV).sensitivityExclusions).toEqual({
+        labels: new Set(),
+        legacy: new Set(),
+      });
+    });
+
+    it('read Purview labels trimmed and lower-cased, and legacy flags', () => {
+      const config = load({
+        ...READ_ONLY_ENV,
+        EXCLUDED_SENSITIVITY_LABELS: JSON.stringify([
+          ' Highly Confidential ',
+          '2D69AFBC-F32C-424F-83AD-75460ACD2AA1',
+        ]),
+        EXCLUDED_LEGACY_SENSITIVITY: JSON.stringify(['private', 'confidential']),
+      });
+
+      expect(config.sensitivityExclusions).toEqual({
+        labels: new Set(['highly confidential', '2d69afbc-f32c-424f-83ad-75460acd2aa1']),
+        legacy: new Set([LegacySensitivity.Private, LegacySensitivity.Confidential]),
+      });
+    });
+
+    it.each([
+      ['EXCLUDED_LEGACY_SENSITIVITY', JSON.stringify(['secret'])],
+      ['EXCLUDED_LEGACY_SENSITIVITY', JSON.stringify(['normal'])],
+      ['EXCLUDED_SENSITIVITY_LABELS', JSON.stringify(['  '])],
+      ['EXCLUDED_SENSITIVITY_LABELS', 'Confidential,Secret'],
+    ])('throw naming %s for %s', (key, value) => {
+      expect(() => load({ ...READ_ONLY_ENV, [key]: value })).toThrow(new RegExp(`${key}: `));
+    });
+
+    it.each([
+      ['EXCLUDED_SENSITIVITY_LABELS', JSON.stringify(['Confidential'])],
+      ['EXCLUDED_LEGACY_SENSITIVITY', JSON.stringify(['private'])],
+    ])('throw in Unique mode, whose semantic search they cannot filter: %s', (key, value) => {
+      expect(() => load({ MCP_TOOLS: tools('search_emails'), [key]: value })).toThrow(
+        new RegExp(`${key}: needs MCP_BACKEND=microsoft_graph`),
+      );
+    });
+
+    it('accept empty lists in Unique mode', () => {
+      const config = load({
+        MCP_TOOLS: tools('search_emails'),
+        EXCLUDED_SENSITIVITY_LABELS: '[]',
+        EXCLUDED_LEGACY_SENSITIVITY: '[]',
+      });
+
+      expect(config.sensitivityExclusions.labels.size).toBe(0);
+    });
   });
 
   describe('MCP_TOOLS', () => {

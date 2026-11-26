@@ -27,6 +27,7 @@ Where a feature works the same in both modes, this page says so once. Where beha
 - `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs.
 - Folder filtering is supported via the `directories` field on each `msGraphKeywordSearchQueries` entry. Pass a well-known folder name (e.g. `Inbox`) or a folder ID from `list_mailboxes_and_directories`. This works for the user's own mailbox and for fully delegated mailboxes (Full Access).
 - Search is **not supported** for mailboxes where the user only has folder-level (partial) access — Microsoft Graph requires full mailbox access for `$search` queries. See [Known limitations](#Known-Limitations) below.
+- Mail with a configured Purview sensitivity label or legacy Outlook sensitivity flag can be left out of search and `open_email`. See [Configuration — Sensitivity exclusions](../operator/configuration.md#Sensitivity-exclusions).
 
 **What's not supported (both modes)**
 

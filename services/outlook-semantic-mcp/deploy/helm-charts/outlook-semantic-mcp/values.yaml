@@ -317,6 +317,15 @@ mcpConfig:
     #               every call, and search_emails with a folder filter does when they are over 4 hours old.
     #               Needs mcpBackend: microsoft_graph and delegatedAccess.scan: disabled.
     directorySyncMode: scheduled
+    # Mail left out of search_emails, fetch_next_search_pages and open_email for its sensitivity. open_email answers
+    # such a message as not found. A message whose sensitivity Graph does not return is left out too.
+    # Needs mcpBackend: microsoft_graph, because semantic search results cannot be filtered.
+    excludedSensitivity:
+      # -- Purview sensitivity label ids or names, matched ignoring case. Env var: EXCLUDED_SENSITIVITY_LABELS (JSON array)
+      labels: []
+      # -- Legacy Outlook sensitivity flags: personal, private, confidential.
+      # Env var: EXCLUDED_LEGACY_SENSITIVITY (JSON array)
+      legacy: []
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'

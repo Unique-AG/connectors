@@ -334,6 +334,7 @@ Fetch the next page of results, or retry a throttled or failed page, for searche
 - Cursors are stored server-side (`search_cursors` table) and scoped to the user. The agent only sees the id. Unknown ids, ids of another user, and ids older than 30 days are reported in `searchNotes`.
 - Cursor rows are immutable: each page gets a new id, and following an id again returns the same page. A throttled or failed page keeps its id so it can be retried without skipping results.
 - The same email can appear on pages of different requests; `msGraphMessageId` identifies it.
+- With [sensitivity exclusions](../operator/configuration.md#Sensitivity-exclusions) set, excluded mail is dropped from each page after Graph returns it. A page can therefore come back with fewer results than its size, or none, and still carry a cursor.
 
 ---
 
@@ -379,6 +380,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 - With `MCP_BACKEND=microsoft_graph_and_unique_api`, when `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
 - With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
+- A message with a sensitivity excluded by [`EXCLUDED_SENSITIVITY_LABELS` or `EXCLUDED_LEGACY_SENSITIVITY`](../operator/configuration.md#Sensitivity-exclusions), or whose sensitivity cannot be read while one is set, returns the same not-found answer.
 - `webLink` is the Outlook on the web link of the email. For a shared or delegated mailbox it is the classic OWA link built from the message RestId (see `BuildWebLinksCommand`), because the link Graph returns for those mailboxes does not always open. Link the subject to it when it is set; otherwise show the subject as plain text.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.

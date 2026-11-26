@@ -1,6 +1,8 @@
 import { UpstreamCredentialRevokedError } from '@unique-ag/mcp-oauth';
 import { describe, expect, it, type Mock, vi } from 'vitest';
+import { type FeaturesConfig, LegacySensitivity } from '~/config';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
+import { SensitivityFilter } from '../../sensitivity-filter';
 import { GraphBatchRequest } from '../build-ms-graph-kql-batch-requests.query';
 import { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
 import { SearchBackend, SearchPageStatus } from '../search-results.types';
@@ -45,13 +47,20 @@ function createQuery(opts: {
   delegatedMailboxes?: string[];
   mockPost?: Mock;
   idTranslationMap?: Map<string, string>;
+  sensitivityExclusions?: FeaturesConfig['sensitivityExclusions'];
   mockBuildResult?: {
     requests: GraphBatchRequest[];
     skippedFolders: Array<{ mailbox: string; folder: string }>;
     queriedMailboxesWithoutFullAccess?: string[];
   };
 }) {
-  const { delegatedMailboxes = [], mockPost, idTranslationMap = new Map(), mockBuildResult } = opts;
+  const {
+    delegatedMailboxes = [],
+    mockPost,
+    idTranslationMap = new Map(),
+    mockBuildResult,
+    sensitivityExclusions = { labels: new Set(), legacy: new Set() },
+  } = opts;
 
   // Build default mock result from delegatedMailboxes if mockBuildResult not explicitly provided
   const defaultBuildResult: {
@@ -104,6 +113,7 @@ function createQuery(opts: {
     buildMsGraphKqlBatchRequestsQuery as any,
     // biome-ignore lint/suspicious/noExplicitAny: constructor injection mocking
     removeDelegatedAccessCommand as any,
+    new SensitivityFilter({ sensitivityExclusions } as FeaturesConfig),
   );
 
   return {
@@ -1422,6 +1432,199 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         expect(pages[0]?.status).toBe(SearchPageStatus.AccessRevoked);
         expect(removeDelegatedAccessCommand.run).toHaveBeenCalled();
       });
+    });
+  });
+
+  describe('sensitivity exclusions', () => {
+    const PURVIEW = 'String {00020386-0000-0000-C000-000000000046} Name msip_labels';
+    const LEGACY = 'Integer 0x0036';
+    const LABEL_ID = '2d69afbc-f32c-424f-83ad-75460acd2aa1';
+    const OTHER_LABEL_ID = '0e4c1a54-7f3b-4d0a-9d4e-1c2b3a4d5e6f';
+
+    const purviewValue = (id: string, name: string) =>
+      `MSIP_Label_${id}_Enabled=True;MSIP_Label_${id}_SiteId=00000000-0000-0000-0000-000000000000;MSIP_Label_${id}_Name=${name};MSIP_Label_${id}_Method=Privileged;`;
+
+    const labelled = (id: string, labelId: string, name: string) =>
+      makeMessage(id, {
+        singleValueExtendedProperties: [
+          { id: LEGACY, value: '0' },
+          { id: PURVIEW, value: purviewValue(labelId, name) },
+        ],
+      });
+    const flagged = (id: string, legacy: string) =>
+      makeMessage(id, { singleValueExtendedProperties: [{ id: LEGACY, value: legacy }] });
+    const unlabelled = (id: string) => flagged(id, '0');
+
+    const excluding = (labels: string[], legacy: LegacySensitivity[] = []) => ({
+      labels: new Set(labels),
+      legacy: new Set(legacy),
+    });
+
+    const searchOwnMailbox = async (
+      sensitivityExclusions: FeaturesConfig['sensitivityExclusions'],
+      body: Record<string, unknown>,
+    ) => {
+      const respond = ({ requests }: { requests: { id: string }[] }) => ({
+        responses: requests.map((req) => ({ id: req.id, status: 200, body })),
+      });
+      const mockPost = vi.fn().mockImplementation(async (batch) => respond(batch));
+      const { instance } = createQuery({ mockPost, sensitivityExclusions });
+      const output = await instance.run(testUserId, [{ kqlQuery: 'subject:test' }]);
+      return { ...output, url: mockPost.mock.calls[0]?.[0]?.requests[0]?.url as string };
+    };
+
+    it('leaves the request unchanged when nothing is excluded', async () => {
+      const { url, results } = await searchOwnMailbox(excluding([]), {
+        value: [labelled('msg-1', LABEL_ID, 'Confidential')],
+      });
+
+      expect(url).not.toContain('internetMessageHeaders');
+      expect(url).not.toContain('$expand');
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-1']);
+    });
+
+    it('selects internetMessageHeaders and expands both properties when something is excluded', async () => {
+      const { url } = await searchOwnMailbox(excluding(['confidential']), { value: [] });
+
+      const params = new URLSearchParams(url.split('?')[1]);
+      expect(params.get('$select')).toContain(',internetMessageHeaders');
+      expect(params.get('$expand')).toBe(
+        `singleValueExtendedProperties($filter=id eq '${PURVIEW}' or id eq '${LEGACY}')`,
+      );
+    });
+
+    it('drops the hits with an excluded label and keeps the others of the page', async () => {
+      const { results } = await searchOwnMailbox(excluding(['confidential encrypted']), {
+        value: [
+          labelled('msg-labelled', LABEL_ID, 'Confidential Encrypted'),
+          labelled('msg-other-label', OTHER_LABEL_ID, 'General'),
+          unlabelled('msg-plain'),
+        ],
+      });
+
+      expect(results.map((r) => r.msGraphMessageId).sort()).toEqual([
+        'msg-other-label',
+        'msg-plain',
+      ]);
+    });
+
+    // The config lower-cases its entries; the message keeps Graph's casing.
+    it.each([
+      ['its id', LABEL_ID],
+      ['its name', 'confidential encrypted'],
+    ])('matches a Purview label by %s, ignoring case', async (_, entry) => {
+      const { results } = await searchOwnMailbox(excluding([entry]), {
+        value: [
+          labelled('msg-labelled', LABEL_ID.toUpperCase(), 'Confidential Encrypted'),
+          unlabelled('msg-plain'),
+        ],
+      });
+
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+    });
+
+    it('drops the hits with an excluded legacy flag', async () => {
+      const { results } = await searchOwnMailbox(
+        excluding([], [LegacySensitivity.Private, LegacySensitivity.Confidential]),
+        {
+          value: [
+            flagged('msg-personal', '1'),
+            flagged('msg-private', '2'),
+            flagged('msg-confidential', '3'),
+            unlabelled('msg-plain'),
+          ],
+        },
+      );
+
+      expect(results.map((r) => r.msGraphMessageId).sort()).toEqual(['msg-personal', 'msg-plain']);
+    });
+
+    it('keeps the cursor of a page whose every hit is excluded', async () => {
+      const nextLink = `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$search=%22test%22&$skip=50`;
+      const { results, pages } = await searchOwnMailbox(excluding([LABEL_ID]), {
+        value: [
+          labelled('msg-1', LABEL_ID, 'Confidential Encrypted'),
+          labelled('msg-2', LABEL_ID, 'Confidential Encrypted'),
+        ],
+        '@odata.nextLink': nextLink,
+      });
+
+      expect(results).toEqual([]);
+      expect(pages[0]?.status).toBe(SearchPageStatus.HasMore);
+      expect(pages[0]?.continuation).toMatchObject({
+        url: `/users/${OWN_EMAIL}/messages?$search=%22test%22&$skip=50`,
+        delivered: 2,
+      });
+    });
+
+    it.each([
+      ['Graph returns no extended properties', undefined],
+      [
+        'Graph returns other properties in place of the requested ones',
+        [
+          { id: 'Binary 0xf03', value: 'AAAA' },
+          { id: 'String 0xe1d', value: 'Subject' },
+        ],
+      ],
+      ['the legacy flag is missing', [{ id: PURVIEW, value: '' }]],
+      ['the legacy flag is not a known value', [{ id: LEGACY, value: '7' }]],
+      [
+        'the Purview value holds no label',
+        [
+          { id: LEGACY, value: '0' },
+          { id: PURVIEW, value: 'garbled' },
+        ],
+      ],
+    ])('drops a hit whose sensitivity cannot be read: %s', async (_, properties) => {
+      const { results } = await searchOwnMailbox(excluding(['confidential']), {
+        value: [
+          makeMessage('msg-unreadable', { singleValueExtendedProperties: properties }),
+          unlabelled('msg-plain'),
+        ],
+      });
+
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+    });
+
+    it('drops a hit whose Purview label lost its name when labels are excluded by name', async () => {
+      const truncated = `MSIP_Label_${OTHER_LABEL_ID}_Enabled=True;MSIP_Label_${OTHER_LABEL_ID}_SiteId=0000`;
+      const { results } = await searchOwnMailbox(excluding(['confidential']), {
+        value: [
+          makeMessage('msg-truncated', {
+            singleValueExtendedProperties: [
+              { id: LEGACY, value: '0' },
+              { id: PURVIEW, value: truncated },
+            ],
+          }),
+        ],
+      });
+
+      expect(results).toEqual([]);
+    });
+
+    it('filters the pages fetched from a cursor too', async () => {
+      const mockPost = makeSuccessPost({
+        [OWN_EMAIL]: [labelled('msg-labelled', LABEL_ID, 'Confidential'), unlabelled('msg-plain')],
+      });
+      const { instance } = createQuery({ mockPost, sensitivityExclusions: excluding([LABEL_ID]) });
+
+      const { results } = await instance.fetchNextPages(testUserId, [
+        {
+          id: 'cursor-1',
+          createdAt: new Date(),
+          payload: {
+            backend: SearchBackend.MsGraph,
+            kqlQuery: 'subject:test',
+            mailbox: OWN_EMAIL,
+            isDelegated: false,
+            url: `/users/${OWN_EMAIL}/messages?$skip=50`,
+            pageSize: 50,
+            delivered: 50,
+          },
+        },
+      ]);
+
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
     });
   });
 });
