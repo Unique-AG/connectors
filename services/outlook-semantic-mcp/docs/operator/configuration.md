@@ -199,6 +199,7 @@ Set via `mcpConfig.app` in Helm values:
 | `MCP_DEBUG_MODE` | `mcpDebugMode` | `disabled` | Adds debug data to tool responses and allows the debug tools in `MCP_TOOLS`. **Do not leave enabled in production** — see [MCP_DEBUG_MODE](#MCP_DEBUG_MODE) |
 | `MCP_BACKEND` | `mcpBackend` | (required; the chart sets `microsoft_graph_and_unique_api`) | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
 | `MCP_TOOLS` | `tools` | (required) | Non-empty JSON array of the tool names to register. Listing a calendar tool turns calendar on — see [MCP_TOOLS](#MCP_TOOLS) and [Calendar tools](#Calendar-tools) |
+| `DIRECTORY_SYNC_MODE` | `directorySyncMode` | `scheduled` | How the folder cache is refreshed: `scheduled` or `on_demand` — see [DIRECTORY_SYNC_MODE](#DIRECTORY_SYNC_MODE) |
 | `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
@@ -250,7 +251,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
-| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync. No dedicated `mcpConfig.app` Helm path exists — set via `server.env` |
+| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync with `DIRECTORY_SYNC_MODE=scheduled`. No dedicated `mcpConfig.app` Helm path exists — set via `server.env` |
 
 ## Helm Values Reference
 
@@ -610,6 +611,15 @@ The server refuses to start, naming the tool and the setting, when:
 - a debug tool (`run_full_sync`, `restart_full_sync`, `pause_full_sync`, `resume_full_sync`, `admin_ops`) is listed and `MCP_DEBUG_MODE` is not `enabled`; debug tools also need `MCP_BACKEND=microsoft_graph_and_unique_api`
 
 Tool descriptions and the server instructions still mention other tools by name, including ones a deployment leaves out.
+
+#### DIRECTORY_SYNC_MODE
+
+Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook folders in a table. `list_mailboxes_and_directories` lists them, and `search_emails` resolves its folder filter (`directories`) from them.
+
+- **`scheduled`** (default) — a scan at startup and a cron job (`DIRECTORY_SYNC_CRON_SCHEDULE`) refresh the folders of every signed-in user and shared mailbox, with the stored Microsoft tokens.
+- **`on_demand`** — no scan at startup and no cron job. The folders are refreshed with the calling user's own token: on every `list_mailboxes_and_directories` call, and before a `search_emails` call with a folder filter when the user's folders were last refreshed over 4 hours ago. The sign-in also refreshes them. A folder created in Outlook is therefore found by a folder filter at the latest 4 hours later, or at once after `list_mailboxes_and_directories`.
+
+`on_demand` needs `DELEGATED_ACCESS_SCAN=disabled`, because shared mailbox folders are refreshed only by the scheduled sync. The server refuses to start otherwise.
 
 #### Calendar tools
 
