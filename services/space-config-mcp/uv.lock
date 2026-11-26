@@ -1407,7 +1407,7 @@ dev = [
     { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-asyncio", specifier = "==1.5.0" },
-    { name = "ruff", specifier = "==0.17.5" },
+    { name = "ruff", specifier = "==0.17.6" },
 ]
 
 [[package]]
@@ -1430,7 +1430,7 @@ dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
     { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.2.0" },
-    { name = "ruff", specifier = "==0.17.5" },
+    { name = "ruff", specifier = "==0.17.6" },
 ]
 
 [[package]]
@@ -1467,11 +1467,11 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
-    { name = "httpx2", specifier = "==2.16.0" },
+    { name = "httpx2", specifier = "==2.16.2" },
     { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-asyncio", specifier = "==1.5.0" },
-    { name = "ruff", specifier = "==0.17.5" },
+    { name = "ruff", specifier = "==0.17.6" },
 ]
 
 [[package]]
@@ -1509,8 +1509,8 @@ dev = [
     { name = "openapi-pydantic", specifier = "==0.6.0" },
     { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.2.0" },
-    { name = "pyyaml", specifier = "==6.0.3" },
-    { name = "ruff", specifier = "==0.17.5" },
+    { name = "pyyaml", specifier = "==6.0.4" },
+    { name = "ruff", specifier = "==0.17.6" },
 ]
 
 [[package]]
