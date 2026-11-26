@@ -35,14 +35,27 @@ def get_persistence(ctx: Context = CurrentContext()) -> Persistence:
     return cast(Persistence, ctx.lifespan_context["persistence"])
 
 
+def _auth_configured() -> bool:
+    """True when Zitadel OIDC is configured — _meta values are then verified by the auth layer."""
+    return bool(os.environ.get("ZITADEL_BASE_URL"))
+
+
 async def get_caller() -> tuple[str, str]:
     """Resolve (user_id, company_id) for the current request.
 
     Priority:
-    1. ``_meta`` keys injected by the Unique platform per tool call
+    1. ``_meta`` keys injected by the Unique platform per tool call (auth configured only)
     2. ``UNIQUE_AUTH_USER_ID`` / ``UNIQUE_AUTH_COMPANY_ID`` env vars (local dev)
+
+    ``_meta`` is only trusted when Zitadel OIDC is configured; without it the values
+    are unverified and the env-var identity is used instead.
     """
-    if _get_request_meta is not None and _user_id_key is not None and _company_id_key is not None:
+    if (
+        _auth_configured()
+        and _get_request_meta is not None
+        and _user_id_key is not None
+        and _company_id_key is not None
+    ):
         meta = _get_request_meta()
         if meta is not None:
             uid = meta.get(_user_id_key)
@@ -77,7 +90,7 @@ async def get_space_id(
     Falls back to ``UNIQUE_AUTH_ASSISTANT_ID`` for local development (skips
     the verification round-trip in that path).
     """
-    if _get_request_meta is not None and _assistant_id_key is not None:
+    if _auth_configured() and _get_request_meta is not None and _assistant_id_key is not None:
         meta = _get_request_meta()
         if meta is not None:
             aid = meta.get(_assistant_id_key)

@@ -20,9 +20,9 @@ INSTRUCTIONS = "Read and update Unique AI space and module configuration"
 def create_server(
     upstream: UpstreamSettings,
     persistence: PersistenceSettings,
-    auth_settings: AuthSettings,
+    auth_settings: AuthSettings | None = None,
 ) -> FastMCP:
-    oidc_proxy: OIDCProxy = build_auth(auth_settings)
+    oidc_proxy: OIDCProxy | None = build_auth(auth_settings) if auth_settings is not None else None
 
     @asynccontextmanager
     async def lifespan(_: FastMCP) -> AsyncGenerator[dict[str, object]]:
