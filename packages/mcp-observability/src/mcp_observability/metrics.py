@@ -1,5 +1,6 @@
 """Prometheus metrics in a registry of their own, which `/metrics` serves."""
 
+import logging
 import time
 from collections.abc import Sequence
 from typing import cast
@@ -9,6 +10,9 @@ from prometheus_client import Counter
 from prometheus_client import Gauge
 from prometheus_client import Histogram
 from prometheus_client import generate_latest
+from starlette.routing import BaseRoute
+from starlette.routing import Match
+from starlette.routing import Router
 from starlette.types import ASGIApp
 from starlette.types import Message
 from starlette.types import Receive
@@ -16,6 +20,7 @@ from starlette.types import Scope
 from starlette.types import Send
 
 REGISTRY = CollectorRegistry()
+_log = logging.getLogger("mcp_observability")
 
 
 class MetricNamespace:
@@ -70,6 +75,27 @@ _duration = Histogram(
 )
 
 
+_UNMATCHED = "unmatched"
+
+
+def _route_label(entry_scope: Scope) -> str:
+    """The template of the route the app's router took, matched again on the scope as it entered
+    because routing rewrites `root_path`. A mount gives its own `/prefix/{path}`."""
+    router = cast(Router | None, getattr(entry_scope.get("app"), "router", None))
+    partial: BaseRoute | None = None
+    try:
+        for route in router.routes if router else ():
+            match, _ = route.matches(entry_scope)
+            if match is Match.FULL:
+                return cast(str, getattr(route, "path_format", _UNMATCHED))
+            if match is Match.PARTIAL and partial is None:
+                partial = route
+    except Exception as error:
+        _log.warning("HTTP metric route label lookup failed", exc_info=error)
+        return _UNMATCHED
+    return cast(str, getattr(partial, "path_format", _UNMATCHED))
+
+
 class HttpMetricsMiddleware:
     """Counts, times and tracks in flight every HTTP request but those to `excluded_paths`. A
     request whose handler raises counts as a 500."""
@@ -84,6 +110,7 @@ class HttpMetricsMiddleware:
             await self._app(scope, receive, send)
             return
         method = cast(str, scope.get("method", "UNKNOWN"))
+        entry_scope = {**scope}
         status_code = "500"
 
         async def send_with_status(message: Message) -> None:
@@ -98,5 +125,6 @@ class HttpMetricsMiddleware:
             await self._app(scope, receive, send_with_status)
         finally:
             _in_progress.labels(method=method).dec()
-            _duration.labels(method=method, path=path).observe(time.perf_counter() - start)
-            _requests.labels(method=method, path=path, status_code=status_code).inc()
+            route = _route_label(entry_scope)
+            _duration.labels(method=method, path=route).observe(time.perf_counter() - start)
+            _requests.labels(method=method, path=route, status_code=status_code).inc()
