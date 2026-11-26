@@ -13,6 +13,7 @@ const context = {} as Context;
 
 const htmlMessage: MsChatMessage = {
   id: '1657782060227',
+  title: 'Carol Lee: Deploy is green.',
   messageType: 'message',
   subject: null,
   body: { contentType: 'html', content: '<p>Deploy is <strong>green</strong>.</p>' },
@@ -123,6 +124,23 @@ describe('GetChatMessagesTool', () => {
       mentions: [],
       reactions: [],
       attachments: [],
+    });
+  });
+
+  it('returns each message with its title and Teams link', async () => {
+    const messageLink =
+      'https://teams.microsoft.com/l/message/chat-1/1657782060227?context=%7B%22contextType%22%3A%22chat%22%7D';
+    getChatMessages.mockResolvedValue([{ ...htmlMessage, webUrl: messageLink }]);
+
+    const result = await unit.getChatMessages(
+      GetChatMessagesInputSchema.parse({ chatId: 'chat-1' }),
+      context,
+      request,
+    );
+
+    expect(result.messages[0]).toMatchObject({
+      title: 'Carol Lee: Deploy is green.',
+      webUrl: messageLink,
     });
   });
 

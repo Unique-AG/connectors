@@ -18,6 +18,10 @@ The `list_*` tools return distinguishing metadata (creation dates, last-message 
 
 The ids are internal. The tool descriptions, output schemas and server instructions tell the agent to pass them between tools unchanged but never show them to the user. A chat list shows the topic or members, the type and the last-message date, numbered so the user can pick an entry by number. The last-message preview is added only when two chats would otherwise read the same.
 
+### Citations
+
+Every message that `get_chat_messages`, `get_channel_messages` and `search_messages` return carries a `title` and a `webUrl`. A chat message the server reads from Graph always has a link: the one Graph sends, else the chat deep link. A channel post has the link Graph sends, or `null` when Graph sends none. A `search_messages` row whose message could not be fetched has `null` too when it has neither a message id to build the deep link from nor an index link. Conduct (`unique-cli mcp`) cites each message that has an http(s) `webUrl` by its title, with that link, so a channel post without a link is not cited. `list_teams`, `list_chats` and `list_channels` are not cited: they are lookup steps the agent uses to find the messages. The tools send the module's default content, one JSON text item of the output, so Unique AI does not cite them.
+
 ## Tool Overview
 
 | Tool | Category | Mutating | Description |
@@ -150,7 +154,9 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
 
 ## Messages
 
-Both `get_*_messages` tools return a message exactly as Graph gives it: `body.contentType` plus the raw `body.content`, which is usually Teams HTML. Nothing is rewritten and no placeholder text is invented. The structured metadata — `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId`, `channelIdentity` — is returned alongside, so a caller reads those instead of parsing the body.
+Both `get_*_messages` tools return the body exactly as Graph gives it: `body.contentType` plus the raw `body.content`, which is usually Teams HTML. Nothing is rewritten and no placeholder text is invented. The structured metadata — `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId`, `channelIdentity` — is returned alongside, so a caller reads those instead of parsing the body.
+
+Each message also carries a `title` and a `webUrl`, so a client can cite it. `title` is not a Graph field: the server derives it. Chat messages rarely have a subject, so `title` is the subject when there is one, and otherwise the sender's name and the first 80 characters of the text (`Carol Lee: Deploy is green.`). A reply leaves out the message it quotes, and a message with no text, such as a shared file, is named by its first attachment (`Carol Lee: Q3 plan.xlsx`). It is `null` only for an event with none of them. `webUrl` opens the message in Teams. Graph normally sends one. A chat message that arrives without one gets the documented deep link `https://teams.microsoft.com/l/message/<chatId>/<messageId>?context={"contextType":"chat"}`. A channel post gets no fallback: its `webUrl` is `null` when Graph sends none.
 
 ### `get_chat_messages`
 
@@ -164,7 +170,7 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
 | `limit` | integer (1–50) | No | `20` | Maximum number of messages to return (newest first). |
 | `includeSystemMessages` | boolean | No | `false` | Include event notifications (member added, call ended). |
 
-**Returns:** The `chatId` and a `messages` array (newest first). Each message carries `id`, `messageType`, `subject`, `body` (`contentType` + raw `content`), `from`, `createdDateTime`, `lastModifiedDateTime`, `lastEditedDateTime`, `deletedDateTime`, `importance`, `locale`, `webUrl`, `etag`, `replyToId`, `channelIdentity`, `mentions`, `reactions` and `attachments`.
+**Returns:** The `chatId` and a `messages` array (newest first). Each message carries `id`, `title`, `messageType`, `subject`, `body` (`contentType` + raw `content`), `from`, `createdDateTime`, `lastModifiedDateTime`, `lastEditedDateTime`, `deletedDateTime`, `importance`, `locale`, `webUrl`, `etag`, `replyToId`, `channelIdentity`, `mentions`, `reactions` and `attachments`.
 
 **Example:**
 
@@ -174,9 +180,26 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
   "messages": [
     {
       "id": "1718901120000",
-      "senderDisplayName": "Alice Smith",
+      "title": "Alice Smith: Bob Jones can you review the PR?",
+      "messageType": "message",
+      "subject": null,
       "body": { "contentType": "html", "content": "<p><at id=\"0\">Bob Jones</at> can you review the PR?</p>" },
-      "createdDateTime": "2024-06-20T14:32:07.113Z"
+      "from": { "id": "user-alice", "displayName": "Alice Smith" },
+      "createdDateTime": "2024-06-20T14:32:07.113Z",
+      "lastModifiedDateTime": "2024-06-20T14:32:07.113Z",
+      "lastEditedDateTime": null,
+      "deletedDateTime": null,
+      "importance": "normal",
+      "locale": "en-us",
+      "webUrl": "https://teams.microsoft.com/l/message/19:1on1@unq.gbl.spaces/1718901120000?context=%7B%22contextType%22%3A%22chat%22%7D",
+      "etag": "1718901120000",
+      "replyToId": null,
+      "channelIdentity": null,
+      "mentions": [
+        { "id": 0, "mentionText": "Bob Jones", "mentioned": { "id": "user-bob", "displayName": "Bob Jones" } }
+      ],
+      "reactions": [],
+      "attachments": []
     }
   ]
 }
@@ -208,9 +231,24 @@ Retrieve recent messages from a channel, identified by `teamId` + `channelId`. C
   "messages": [
     {
       "id": "1718900000000",
-      "senderDisplayName": "Carol Lee",
-      "content": "Deploy is green.",
-      "createdDateTime": "2024-06-20 13:50"
+      "title": "Carol Lee: Deploy is green.",
+      "messageType": "message",
+      "subject": null,
+      "body": { "contentType": "html", "content": "<p>Deploy is green.</p>" },
+      "from": { "id": "user-carol", "displayName": "Carol Lee" },
+      "createdDateTime": "2024-06-20T13:50:00.000Z",
+      "lastModifiedDateTime": "2024-06-20T13:50:00.000Z",
+      "lastEditedDateTime": null,
+      "deletedDateTime": null,
+      "importance": "normal",
+      "locale": "en-us",
+      "webUrl": "https://teams.microsoft.com/l/message/19%3Ach1...%40thread.tacv2/1718900000000?groupId=...",
+      "etag": "1718900000000",
+      "replyToId": null,
+      "channelIdentity": { "teamId": "19:abc...@thread.tacv2", "channelId": "19:ch1...@thread.tacv2" },
+      "mentions": [],
+      "reactions": [],
+      "attachments": []
     }
   ]
 }
@@ -297,6 +335,7 @@ There is no way to scope a Graph search to chats or to channels, and the search 
 | Field | Description |
 |-------|-------------|
 | `id` | Message id |
+| `title` | The fetched message's `title` (see [Messages](#Messages)). For a hit that was not fetched: the sender and the summary as plain text |
 | `source` | `chat`, `channel`, or `unknown`. `channel` requires **both** `teamId` and `channelId` on the hit; `chat` requires a `chatId`; anything else is `unknown` and cannot be fetched |
 | `chatId` | Chat id (populated only for a `chat` hit, else `null`) |
 | `teamId` | Team id (populated only for a `channel` hit, else `null`) |
@@ -308,7 +347,7 @@ There is no way to scope a Graph search to chats or to channels, and the search 
 | `summary` | Search snippet exactly as Graph returns it, including its `<c0>` hit-highlighting markup (nullable) |
 | `message` | The fetched message, exactly as Graph returns it — `body` (`contentType` + raw `content`), plus `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId` and the rest. Absent for an `unknown` hit, a channel reply, or a failed fetch. The row gives no reason code, so an absent `message` does not say which |
 | `createdDateTime` | Message timestamp (nullable) |
-| `webUrl` | Link to the message (nullable). Observed as a Teams deep link, but Graph documents an Outlook Web link (`webLink`) for this projection, so either can appear — do not label it "open in Teams" |
+| `webUrl` | Link to the message (nullable). It can open Outlook rather than Teams. It is the fetched message's link when the message has one, which a chat message always does (Graph's `webUrl`, else the chat-message deep link). Otherwise a `chat` hit that carries both its chat id and its message id gets the deep link built from them. Any other hit, including a chat hit without a message id and a channel post Graph sent no link for, keeps the link from the search index, which Graph documents as an Outlook Web link (`webLink`), though a Teams deep link has been observed |
 
 Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messages` or `send_*_message`. Show the user `chatName`, or `teamName` and `channelName`, to say where a message was posted, never the ids.
 
@@ -334,6 +373,7 @@ Pass the returned `chatId` (or `teamId` + `channelId`) straight to `get_*_messag
   "messages": [
     {
       "id": "1718900000000",
+      "title": "Carol Lee: Deploy is green. Rollout finished at 13:49.",
       "source": "channel",
       "chatId": null,
       "teamId": "fbe2bf47-16c8-47cf-b4a5-4b9b187c508b",
