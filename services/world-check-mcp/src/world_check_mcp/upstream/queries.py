@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import ClassVar
 
 from mcp_openapi.upstream import Operation
@@ -10,6 +11,7 @@ from world_check_mcp.upstream.generated.vendor_requests import GetOngoingScreeni
 from world_check_mcp.upstream.generated.vendor_requests import GetResultsRequest
 from world_check_mcp.upstream.generated.vendor_requests import SearchCasesRequest
 from world_check_mcp.upstream.generated.vendor_responses import PaginationReferenceResponse
+from world_check_mcp.upstream.generated.vendor_responses import RecordName
 from world_check_mcp.upstream.generated.vendor_responses import WatchlistResults
 
 
@@ -122,6 +124,17 @@ SEARCH_CASES = Operation[CaseSearchWire, SearchCasesRequest](
 GET_SCREENING_STATUS = Operation[list[ScreeningStatusWire]](
     "getScreeningStatus", TypeAdapter(list[ScreeningStatusWire])
 )
+
+
+def primary_name(names: Sequence[RecordName]) -> str | None:
+    """A record's name, preferring a PRIMARY name and its FULL_NAME part over the rest."""
+    parts = [
+        (name.type != "PRIMARY", detail.type != "FULL_NAME", detail.value)
+        for name in names
+        for detail in name.details or []
+        if detail.value
+    ]
+    return min(parts, key=lambda part: part[:2])[2] if parts else None
 
 
 def next_page(pagination: PaginationReferenceResponse | None) -> str | None:

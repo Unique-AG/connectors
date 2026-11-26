@@ -77,6 +77,7 @@ from world_check_mcp.upstream.queries import GET_ONGOING_SCREENING_UPDATES
 from world_check_mcp.upstream.queries import GET_RESULTS
 from world_check_mcp.upstream.queries import GET_SCREENING_STATUS
 from world_check_mcp.upstream.queries import next_page
+from world_check_mcp.upstream.queries import primary_name
 from world_check_mcp.upstream.queries import ResultWire
 from world_check_mcp.upstream.queries import SEARCH_CASES
 from world_check_mcp.upstream.settings import UpstreamSettings
@@ -155,6 +156,7 @@ __all__ = [
     "VERIFY_PASSPORT",
     "next_page",
     "open_upstream",
+    "primary_name",
     "upstream_http",
     "upstream_tools",
 ]
