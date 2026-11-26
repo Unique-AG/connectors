@@ -52,10 +52,10 @@ export class SensitivityFilter {
     if (!parsed.success) {
       return UNREADABLE;
     }
-    const values = new Map(parsed.data.map(({ id, value }) => [id.toLowerCase(), value]));
+    const values = new Map(parsed.data.map(({ id, value }) => [canonicalPropertyId(id), value]));
     // Other property ids mean Graph ignored the $expand filter. Every message carries the legacy
     // flag, 0 when unset.
-    const legacyValue = values.get(LEGACY_SENSITIVITY_PROPERTY.toLowerCase());
+    const legacyValue = values.get(canonicalPropertyId(LEGACY_SENSITIVITY_PROPERTY));
     const legacy = typeof legacyValue === 'string' ? LEGACY_VALUES.get(legacyValue) : undefined;
     if ([...values.keys()].some((id) => !KNOWN_PROPERTIES.has(id)) || legacy === undefined) {
       return UNREADABLE;
@@ -69,7 +69,7 @@ export class SensitivityFilter {
     }
 
     // Absent or empty means no label; present without a value cannot be read.
-    const purviewKey = PURVIEW_LABELS_PROPERTY.toLowerCase();
+    const purviewKey = canonicalPropertyId(PURVIEW_LABELS_PROPERTY);
     const purviewValue = values.has(purviewKey) ? values.get(purviewKey) : '';
     const labels =
       typeof purviewValue === 'string' ? this.parsePurviewLabels(purviewValue) : undefined;
@@ -114,8 +114,12 @@ export class SensitivityFilter {
 
 const PURVIEW_LABELS_PROPERTY = 'String {00020386-0000-0000-C000-000000000046} Name msip_labels';
 const LEGACY_SENSITIVITY_PROPERTY = 'Integer 0x0036';
+// Graph answers with its own spelling of a requested id: `Integer 0x36` for `Integer 0x0036`, and
+// the property set GUID in lower case.
+const canonicalPropertyId = (id: string): string =>
+  id.toLowerCase().replace(/\b0x0*([0-9a-f]+)\b/g, '0x$1');
 const KNOWN_PROPERTIES = new Set(
-  [PURVIEW_LABELS_PROPERTY, LEGACY_SENSITIVITY_PROPERTY].map((id) => id.toLowerCase()),
+  [PURVIEW_LABELS_PROPERTY, LEGACY_SENSITIVITY_PROPERTY].map(canonicalPropertyId),
 );
 
 const LEGACY_VALUES = new Map<string, LegacySensitivity | null>([

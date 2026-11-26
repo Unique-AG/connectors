@@ -1436,8 +1436,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
   });
 
   describe('sensitivity exclusions', () => {
+    // As the server requests the properties, and as Graph returns them (probed 2026-11-26).
     const PURVIEW = 'String {00020386-0000-0000-C000-000000000046} Name msip_labels';
     const LEGACY = 'Integer 0x0036';
+    const GRAPH_PURVIEW = 'String {00020386-0000-0000-c000-000000000046} Name msip_labels';
+    const GRAPH_LEGACY = 'Integer 0x36';
     const LABEL_ID = '2d69afbc-f32c-424f-83ad-75460acd2aa1';
     const OTHER_LABEL_ID = '0e4c1a54-7f3b-4d0a-9d4e-1c2b3a4d5e6f';
 
@@ -1447,12 +1450,12 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     const labelled = (id: string, labelId: string, name: string) =>
       makeMessage(id, {
         singleValueExtendedProperties: [
-          { id: LEGACY, value: '0' },
-          { id: PURVIEW, value: purviewValue(labelId, name) },
+          { id: GRAPH_LEGACY, value: '0' },
+          { id: GRAPH_PURVIEW, value: purviewValue(labelId, name) },
         ],
       });
     const flagged = (id: string, legacy: string) =>
-      makeMessage(id, { singleValueExtendedProperties: [{ id: LEGACY, value: legacy }] });
+      makeMessage(id, { singleValueExtendedProperties: [{ id: GRAPH_LEGACY, value: legacy }] });
     const unlabelled = (id: string) => flagged(id, '0');
 
     const excluding = (labels: string[], legacy: LegacySensitivity[] = []) => ({
@@ -1516,6 +1519,27 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         value: [
           labelled('msg-labelled', LABEL_ID.toUpperCase(), 'Confidential Encrypted'),
           unlabelled('msg-plain'),
+        ],
+      });
+
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+    });
+
+    it.each([
+      ['as Graph returns them', GRAPH_LEGACY, GRAPH_PURVIEW],
+      ['as the server requests them', LEGACY, PURVIEW],
+    ])('reads the property ids spelled %s', async (_, legacyId, purviewId) => {
+      const { results } = await searchOwnMailbox(excluding(['Confidential Encrypted']), {
+        value: [
+          makeMessage('msg-labelled', {
+            singleValueExtendedProperties: [
+              { id: legacyId, value: '0' },
+              { id: purviewId, value: purviewValue(LABEL_ID, 'Confidential Encrypted') },
+            ],
+          }),
+          makeMessage('msg-plain', {
+            singleValueExtendedProperties: [{ id: legacyId, value: '0' }],
+          }),
         ],
       });
 
@@ -1620,11 +1644,14 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       [
         'the Purview property has a null value',
         [
-          { id: LEGACY, value: '0' },
-          { id: PURVIEW, value: null },
+          { id: GRAPH_LEGACY, value: '0' },
+          { id: GRAPH_PURVIEW, value: null },
         ],
       ],
-      ['the Purview property has no value', [{ id: LEGACY, value: '0' }, { id: PURVIEW }]],
+      [
+        'the Purview property has no value',
+        [{ id: GRAPH_LEGACY, value: '0' }, { id: GRAPH_PURVIEW }],
+      ],
       [
         'Graph returns other properties in place of the requested ones',
         [
@@ -1632,13 +1659,13 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
           { id: 'String 0xe1d', value: 'Subject' },
         ],
       ],
-      ['the legacy flag is missing', [{ id: PURVIEW, value: '' }]],
-      ['the legacy flag is not a known value', [{ id: LEGACY, value: '7' }]],
+      ['the legacy flag is missing', [{ id: GRAPH_PURVIEW, value: '' }]],
+      ['the legacy flag is not a known value', [{ id: GRAPH_LEGACY, value: '7' }]],
       [
         'the Purview value holds no label',
         [
-          { id: LEGACY, value: '0' },
-          { id: PURVIEW, value: 'garbled' },
+          { id: GRAPH_LEGACY, value: '0' },
+          { id: GRAPH_PURVIEW, value: 'garbled' },
         ],
       ],
     ])('drops a hit whose sensitivity cannot be read: %s', async (_, properties) => {
@@ -1671,8 +1698,8 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
         value: [
           makeMessage('msg-truncated', {
             singleValueExtendedProperties: [
-              { id: LEGACY, value: '0' },
-              { id: PURVIEW, value: truncated },
+              { id: GRAPH_LEGACY, value: '0' },
+              { id: GRAPH_PURVIEW, value: truncated },
             ],
           }),
         ],

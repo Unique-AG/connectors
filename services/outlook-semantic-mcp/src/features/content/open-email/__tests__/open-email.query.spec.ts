@@ -271,6 +271,9 @@ describe('OpenEmailQuery', () => {
 
   describe('with sensitivity exclusions', () => {
     const PURVIEW = 'String {00020386-0000-0000-C000-000000000046} Name msip_labels';
+    // As Graph returns the two properties (probed 2026-11-26).
+    const GRAPH_PURVIEW = 'String {00020386-0000-0000-c000-000000000046} Name msip_labels';
+    const GRAPH_LEGACY = 'Integer 0x36';
     const LABEL_ID = '2d69afbc-f32c-424f-83ad-75460acd2aa1';
 
     beforeEach(() => {
@@ -283,7 +286,7 @@ describe('OpenEmailQuery', () => {
     it('expands both sensitivity properties next to the attachments', async () => {
       graphRequest.get.mockResolvedValue({
         ...graphMessage,
-        singleValueExtendedProperties: [{ id: 'Integer 0x0036', value: '0' }],
+        singleValueExtendedProperties: [{ id: GRAPH_LEGACY, value: '0' }],
       });
 
       await run();
@@ -297,8 +300,8 @@ describe('OpenEmailQuery', () => {
       graphRequest.get.mockResolvedValue({
         ...graphMessage,
         singleValueExtendedProperties: [
-          { id: 'Integer 0x0036', value: '3' },
-          { id: PURVIEW, value: '' },
+          { id: GRAPH_LEGACY, value: '3' },
+          { id: GRAPH_PURVIEW, value: '' },
         ],
       });
 
@@ -309,9 +312,9 @@ describe('OpenEmailQuery', () => {
       graphRequest.get.mockResolvedValue({
         ...graphMessage,
         singleValueExtendedProperties: [
-          { id: 'Integer 0x0036', value: '0' },
+          { id: GRAPH_LEGACY, value: '0' },
           {
-            id: PURVIEW,
+            id: GRAPH_PURVIEW,
             value: `MSIP_Label_${LABEL_ID}_Enabled=True;MSIP_Label_${LABEL_ID}_Name=Confidential Encrypted;`,
           },
         ],
@@ -331,8 +334,8 @@ describe('OpenEmailQuery', () => {
       graphRequest.get.mockResolvedValue({
         ...graphMessage,
         singleValueExtendedProperties: [
-          { id: 'Integer 0x0036', value: '0' },
-          { id: PURVIEW, value: `MSIP_Label_${LABEL_ID}_Name=Any text the sender chose;` },
+          { id: GRAPH_LEGACY, value: '0' },
+          { id: GRAPH_PURVIEW, value: `MSIP_Label_${LABEL_ID}_Name=Any text the sender chose;` },
         ],
       });
 
@@ -344,7 +347,7 @@ describe('OpenEmailQuery', () => {
     it('withholds a message with an excluded legacy flag', async () => {
       graphRequest.get.mockResolvedValue({
         ...graphMessage,
-        singleValueExtendedProperties: [{ id: 'Integer 0x0036', value: '2' }],
+        singleValueExtendedProperties: [{ id: GRAPH_LEGACY, value: '2' }],
       });
 
       await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
@@ -356,8 +359,8 @@ describe('OpenEmailQuery', () => {
       graphRequest.get.mockResolvedValue({
         ...graphMessage,
         singleValueExtendedProperties: [
-          { id: 'Integer 0x0036', value: '0' },
-          { id: PURVIEW, value: null },
+          { id: GRAPH_LEGACY, value: '0' },
+          { id: GRAPH_PURVIEW, value: null },
         ],
       });
 
