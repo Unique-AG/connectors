@@ -49,6 +49,10 @@ describe(loadFeaturesConfig.name, () => {
     ).toThrow(/MCP_BACKEND: /);
   });
 
+  it('throws naming DELEGATED_ACCESS_SCAN when its value is unknown', () => {
+    expect(() => load({ DELEGATED_ACCESS_SCAN: 'disable' })).toThrow(/DELEGATED_ACCESS_SCAN: /);
+  });
+
   describe('MCP_TOOLS', () => {
     it.each([
       ['unset', undefined],

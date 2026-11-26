@@ -80,7 +80,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Purpose** | Read delegated mailboxes and create drafts in them |
 | **Used For** | Everything `Mail.Read.Shared` covers; creating and editing drafts in a shared or delegated mailbox through the `mailbox` parameter of the draft tools |
 | **Why Not Less** | No narrower delegated-shared permission exists for read and draft access on a delegated mailbox |
-| **Note** | Requested when `DELEGATED_ACCESS_SCAN` is not `disabled` and a draft tool is listed in `MCP_TOOLS`. With `DELEGATED_ACCESS_SCAN=disabled` it is not requested, and the tools with a `mailbox` parameter refuse any mailbox other than the user's own |
+| **Note** | Requested when `DELEGATED_ACCESS_SCAN` is not `disabled` and a draft tool is listed in `MCP_TOOLS`. With `DELEGATED_ACCESS_SCAN=disabled` it is not requested, and the draft tools and `open_email` refuse any mailbox other than the user's own. `search_emails` searches only the mailboxes the user can access, so it skips another mailbox and says so when no query is left |
 
 ### `User.Read.All`
 

@@ -21,8 +21,10 @@ export class CheckMailboxAccessQuery {
     if (mailbox === undefined || this.features.sharedMailboxes) {
       return { allowed: true };
     }
-    const { email } = await this.getUserProfileQuery.run(userProfileId);
-    if (mailbox.trim().toLowerCase() === email.toLowerCase()) {
+    const { email, username } = await this.getUserProfileQuery.run(userProfileId);
+    // The mailbox goes to Graph as given, so it is compared as given: the address or the UPN.
+    const own = [email, username].map((address) => address.toLowerCase());
+    if (own.includes(mailbox.toLowerCase())) {
       return { allowed: true };
     }
     return {

@@ -37,7 +37,7 @@ interface ToolUnderTest {
 
 const build = (name: string): ToolUnderTest => {
   const guard = new CheckMailboxAccessQuery(features, {
-    run: vi.fn().mockResolvedValue({ email: OWN_EMAIL }),
+    run: vi.fn().mockResolvedValue({ email: OWN_EMAIL, username: 'ada@example.onmicrosoft.com' }),
   } as never);
   const failedDraftState = { status: 'failed', message: 'not a draft' };
 

@@ -32,8 +32,7 @@ const FeaturesEnvSchema = z.object({
   mcpDebugMode: mcpDebugModeSchema,
   mcpTools: mcpToolsSchema,
   delegatedAccessScan: z
-    .string()
-    .nonempty()
+    .enum(['disabled', 'full_access_only', 'granular_access'])
     .describe('Shared mailboxes are on unless DELEGATED_ACCESS_SCAN is "disabled".'),
 });
 
