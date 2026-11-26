@@ -9,6 +9,7 @@ from with_intelligence_mcp.features.managers.api_responses import (
 )
 from with_intelligence_mcp.models import OmitNoneModel
 from with_intelligence_mcp.utils import (
+    APP_LINK_DESCRIPTION,
     explore_url,
     html_to_markdown,
     names,
@@ -46,12 +47,7 @@ class ManagerProfileResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence manager identifier.", examples=[2145860302])
     name: str | None = Field(default=None, description="Management company name.")
-    url: str = Field(
-        description=(
-            "This manager's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     updated_at: str | None = Field(
         default=None, description="When With Intelligence last changed this manager record."
     )

@@ -4,7 +4,13 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.consultants.api_responses import ConsultantExtendedAttributes
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import explore_url, names, when_either, when_present
+from with_intelligence_mcp.utils import (
+    APP_LINK_DESCRIPTION,
+    explore_url,
+    names,
+    when_either,
+    when_present,
+)
 
 
 class ConsultantProfileResponse(OmitNoneModel):
@@ -12,12 +18,7 @@ class ConsultantProfileResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence consultant identifier.")
     name: str | None = Field(default=None, description="Consulting firm name.")
-    url: str = Field(
-        description=(
-            "This consultant's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     updated_at: str | None = Field(
         default=None, description="When With Intelligence last changed this consultant record."
     )

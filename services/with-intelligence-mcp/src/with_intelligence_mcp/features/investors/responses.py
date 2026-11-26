@@ -12,7 +12,13 @@ from with_intelligence_mcp.features.investors.api_responses import (
     StrategyGroupAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import explore_url, html_to_markdown, names, when_present
+from with_intelligence_mcp.utils import (
+    APP_LINK_DESCRIPTION,
+    explore_url,
+    html_to_markdown,
+    names,
+    when_present,
+)
 
 
 class AssetsUnderManagementResponse(OmitNoneModel):
@@ -58,12 +64,7 @@ class InvestorProfileResponse(OmitNoneModel):
 
     id: int
     name: str | None = None
-    url: str = Field(
-        description=(
-            "This investor's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     investor_type: str | None = None
     summary: str | None = None
     profile: str | None = None

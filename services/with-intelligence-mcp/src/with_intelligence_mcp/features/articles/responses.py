@@ -8,7 +8,13 @@ from with_intelligence_mcp.features.articles.api_responses import (
     ArticleListItemAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import article_url, attachment_url, html_to_markdown, when_present
+from with_intelligence_mcp.utils import (
+    APP_LINK_DESCRIPTION,
+    article_url,
+    attachment_url,
+    html_to_markdown,
+    when_present,
+)
 
 
 class ArticleFirmResponse(OmitNoneModel):
@@ -39,12 +45,7 @@ class ArticleResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence article identifier.", examples=[100])
     title: str | None = Field(default=None, description="Article title.")
-    url: str = Field(
-        description=(
-            "This article's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     published_at: str | None = Field(
         default=None,
         description="When the article was published. The page is not ordered by this.",

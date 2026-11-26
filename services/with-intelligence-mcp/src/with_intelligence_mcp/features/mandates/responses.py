@@ -8,7 +8,7 @@ from with_intelligence_mcp.features.mandates.api_responses import (
     MandateNoteAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import explore_url, html_to_markdown, names
+from with_intelligence_mcp.utils import APP_LINK_DESCRIPTION, explore_url, html_to_markdown, names
 
 
 class MandateAmountResponse(OmitNoneModel):
@@ -32,12 +32,7 @@ class MandateResponse(OmitNoneModel):
         description="Short label: the service and what it targets. Mandates have no name.",
         examples=["Manager Search: Equity, Long/Short Equity"],
     )
-    url: str = Field(
-        description=(
-            "This mandate's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     status: str | None = Field(
         default=None,
         description="With Intelligence's current mandate status; do not infer a boolean.",

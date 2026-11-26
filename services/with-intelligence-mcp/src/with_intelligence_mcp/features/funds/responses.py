@@ -5,6 +5,7 @@ from pydantic import Field
 from with_intelligence_mcp.features.funds.api_responses import FundExtendedAttributes
 from with_intelligence_mcp.models import OmitNoneModel
 from with_intelligence_mcp.utils import (
+    APP_LINK_DESCRIPTION,
     explore_url,
     html_to_markdown,
     names,
@@ -22,12 +23,7 @@ class FundProfileResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence fund identifier.", examples=[8677])
     name: str | None = Field(default=None, description="Fund name.")
-    url: str = Field(
-        description=(
-            "This fund's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     updated_at: str | None = Field(
         default=None, description="When With Intelligence last changed this fund record."
     )

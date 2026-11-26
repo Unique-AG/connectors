@@ -8,7 +8,7 @@ from with_intelligence_mcp.features.persons.api_responses import (
     PersonRoleAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import explore_url
+from with_intelligence_mcp.utils import APP_LINK_DESCRIPTION, explore_url
 
 
 class PersonResponse(OmitNoneModel):
@@ -18,12 +18,7 @@ class PersonResponse(OmitNoneModel):
     name: str | None = Field(
         default=None, description="Person's full name.", examples=["Jordan Smith"]
     )
-    url: str = Field(
-        description=(
-            "This person's page in the With Intelligence app. It opens for a user signed in to "
-            "With Intelligence."
-        )
-    )
+    url: str = Field(description=APP_LINK_DESCRIPTION)
     job_title: str | None = Field(
         default=None,
         description="Person's title at this investor.",

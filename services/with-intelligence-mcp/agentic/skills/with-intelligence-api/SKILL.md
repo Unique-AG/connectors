@@ -175,6 +175,21 @@ authoritative is undocumented — report both rather than picking one.
 **`organisation_type_id`** on `/v3/persons` maps `1 = Investor`, `2 = Manager`,
 `3 = Consultant`.
 
+**Web app links are built from API ids.** Nothing documents them; each was checked by opening
+the API's id in the app (UN-30437). They open only for a user signed in to With Intelligence,
+and `utils/app_links.py` builds them:
+
+| Record | Link on `https://platform.withintelligence.com` |
+| --- | --- |
+| investor, manager, consultant, fund, mandate | `/explore/{investors,managers,consultants,funds,mandates}/<id>` |
+| person | `/explore/people/<id>` |
+| article | `/insights/<post_name>?a=<id>`; the app reads only `a`, so any slug opens it |
+| article attachment | `/files/<path>`, where `document.url` is `…/wp-content/uploads/<path>` |
+
+Manager, consultant and mandate ids run near 2^31 and can be negative; they are the same ids in
+both. `exists[document]=true` on `/v3/articles` finds articles with an attachment, since an
+investor's own articles may have none.
+
 **Entitlements observed:** the trial account returns no `preferences` on an investor record,
 which is what an account without the Intentions & Preferences add-on sees.
 
