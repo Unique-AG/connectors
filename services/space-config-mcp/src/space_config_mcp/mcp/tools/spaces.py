@@ -32,6 +32,10 @@ _META_COMPANY = merge_tool_meta(
     {},
     ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID]),
 )
+_NEW_CHAT_NOTE = (
+    "Language model changes take effect in new chat sessions — "
+    "existing chats keep the previous model."
+)
 
 
 @tool(
@@ -187,14 +191,15 @@ async def update_space(  # noqa: PLR0913
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Space:
+) -> dict[str, object]:
     """Update metadata and configuration of the current space. Only provided fields are changed.
 
     Creates a pre-update snapshot before applying changes.
     """
     user_id, company_id = caller
+    model_changed = language_model is not None or switchable_language_models is not None
     try:
-        return await contexts.update_space(
+        space = await contexts.update_space(
             upstream=upstream,
             persistence=persistence,
             user_id=user_id,
@@ -214,3 +219,7 @@ async def update_space(  # noqa: PLR0913
         )
     except Exception as exc:
         raise ToolError(str(exc)) from exc
+    result: dict[str, object] = dict(space)
+    if model_changed:
+        result["note"] = _NEW_CHAT_NOTE
+    return result

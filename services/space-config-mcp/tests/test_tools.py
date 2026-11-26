@@ -6,14 +6,14 @@ tool → context → upstream chain without hitting a live API.
 
 import json
 from typing import cast
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
+from unittest.mock import patch
 
+from fastmcp.client import Client
 import pytest
 import unique_sdk
-from fastmcp.client import Client
 
 from tests.offline_server import build_server
-
 
 # ---------------------------------------------------------------------------
 # Factory helpers for unique_sdk objects
@@ -178,20 +178,20 @@ class TestMagicTableSpace:
     async def test_get_magic_table_config_errors_when_no_rfp_agent_module(self, server):
         with patch("unique_sdk.Module.list_async", new=AsyncMock(return_value=[])):
             async with Client(server) as client:
-                result = await client.call_tool(
-                    "get_magic_table_config", {}, raise_on_error=False
-                )
+                result = await client.call_tool("get_magic_table_config", {}, raise_on_error=False)
         assert result.is_error
 
     async def test_update_magic_table_config_patches_language_model(self, server):
         mod = _module("mod-rfp-1", "RfpAgent", {"languageModel": "gpt-4o", "columns": []})
-        updated = _module(
-            "mod-rfp-1", "RfpAgent", {"languageModel": "gpt-4o-mini", "columns": []}
-        )
+        updated = _module("mod-rfp-1", "RfpAgent", {"languageModel": "gpt-4o-mini", "columns": []})
         with (
             patch("space_config_mcp.contexts.modules.write.snapshot_space", new=AsyncMock()),
             patch("unique_sdk.Module.list_async", new=AsyncMock(return_value=[mod])),
             patch("unique_sdk.Module.modify_async", new=AsyncMock(return_value=updated)),
+            patch(
+                "space_config_mcp.upstream.client.LLMModels.get_models_async",
+                new=AsyncMock(return_value={"models": ["gpt-4o", "gpt-4o-mini"]}),
+            ),
         ):
             async with Client(server) as client:
                 result = await client.call_tool(

@@ -40,6 +40,21 @@ async def update_space(
         space_id=space_id,
         label="pre-update_space",
     )
+    models_to_validate: list[str] = []
+    if language_model is not None:
+        models_to_validate.append(language_model)
+    if switchable_language_models is not None:
+        models_to_validate.extend(m.language_model for m in switchable_language_models)
+    if models_to_validate:
+        available = await upstream.list_language_models(user_id, company_id)
+        valid_ids: set[str] = set(available["models"])
+        invalid = [m for m in models_to_validate if m not in valid_ids]
+        if invalid:
+            raise SpaceConfigError(
+                f"Unknown language model(s): {', '.join(invalid)}. "
+                "Call list_language_models to see the exact IDs accepted by this company."
+            )
+
     patch: unique_sdk.Space.UpdateParams = {}
     if name is not None:
         patch["name"] = name

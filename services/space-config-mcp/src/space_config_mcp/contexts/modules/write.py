@@ -18,6 +18,28 @@ from space_config_mcp.upstream import Upstream
 
 _CONDUCT_MODULE_NAME = "SwappableIntelligence"
 _TRANSLATOR_MODULE_NAME = "TranslatorV2"
+
+
+async def _assert_valid_models(
+    upstream: Upstream,
+    user_id: str,
+    company_id: str,
+    *,
+    model_ids: list[str | None],
+) -> None:
+    candidates = [m for m in model_ids if m is not None]
+    if not candidates:
+        return
+    available = await upstream.list_language_models(user_id, company_id)
+    valid: set[str] = set(available["models"])
+    invalid = [m for m in candidates if m not in valid]
+    if invalid:
+        raise SpaceConfigError(
+            f"Unknown language model(s): {', '.join(invalid)}. "
+            "Call list_language_models to see the exact IDs accepted by this company."
+        )
+
+
 _MAGIC_TABLE_MODULE_NAME = "RfpAgent"
 
 
@@ -96,6 +118,17 @@ async def update_conduct_config(
     setup_patch: ConductSetupConfig | None = None,
 ) -> unique_sdk.Module:
     """Merge typed patches into the Conduct harness configuration."""
+    await _assert_valid_models(
+        upstream,
+        user_id,
+        company_id,
+        model_ids=[
+            claude_patch.model if claude_patch else None,
+            claude_patch.fallback_model if claude_patch else None,
+            pi_agent_patch.model_name if pi_agent_patch else None,
+            codex_patch.model if codex_patch else None,
+        ],
+    )
     await snapshot_space(
         upstream=upstream,
         persistence=persistence,
@@ -176,6 +209,12 @@ async def update_translator_config(
     patch: TranslationConfig,
 ) -> unique_sdk.Module:
     """Deep-merge a TranslationConfig patch into the TranslatorV2 module configuration."""
+    await _assert_valid_models(
+        upstream,
+        user_id,
+        company_id,
+        model_ids=[patch.language_model_translation, patch.language_model_language_detection],
+    )
     await snapshot_space(
         upstream=upstream,
         persistence=persistence,
@@ -226,6 +265,22 @@ async def update_magic_table_config(  # noqa: PLR0913
     space_settings_patch: MagicTableSpaceSettings | None = None,
 ) -> unique_sdk.Module:
     """Update the RfpAgent module config and/or space-level Magic Table settings."""
+    if module_patch is not None:
+        column_models = (
+            [col.language_model for col in module_patch.columns]
+            if module_patch.columns is not None
+            else []
+        )
+        await _assert_valid_models(
+            upstream,
+            user_id,
+            company_id,
+            model_ids=[
+                module_patch.language_model,
+                module_patch.question_extraction_language_model,
+                *column_models,
+            ],
+        )
     await snapshot_space(
         upstream=upstream,
         persistence=persistence,

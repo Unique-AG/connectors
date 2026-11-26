@@ -1024,6 +1024,10 @@
       "type": "object"
     },
     "name": "update_conduct_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
     "title": "Update Conduct Config"
   },
   {
@@ -1295,6 +1299,10 @@
       "type": "object"
     },
     "name": "update_magic_table_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
     "title": "Update Magic Table Config"
   },
   {
@@ -1576,6 +1584,10 @@
       "type": "object"
     },
     "name": "update_space",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
     "title": "Update Space"
   },
   {
@@ -1760,6 +1772,10 @@
       "type": "object"
     },
     "name": "update_translator_config",
+    "outputSchema": {
+      "additionalProperties": true,
+      "type": "object"
+    },
     "title": "Update Translator Config"
   }
 ]

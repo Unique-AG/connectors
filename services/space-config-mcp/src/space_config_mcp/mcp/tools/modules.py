@@ -40,6 +40,10 @@ _META = merge_tool_meta(
     {},
     ContextRequirements(required=[MetaKeys.USER_ID, MetaKeys.COMPANY_ID, MetaKeys.ASSISTANT_ID]),
 )
+_NEW_CHAT_NOTE = (
+    "Language model changes take effect in new chat sessions — "
+    "existing chats keep the previous model."
+)
 
 
 @tool(
@@ -299,7 +303,7 @@ async def update_conduct_config(  # noqa: PLR0913
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Module:
+) -> dict[str, object]:
     """Update the current space's SwappableIntelligence harness configuration.
 
     Each parameter targets a specific key in the stored configuration. Only provided
@@ -308,6 +312,7 @@ async def update_conduct_config(  # noqa: PLR0913
     Creates a pre-update snapshot before applying changes.
     """
     user_id, company_id = caller
+    model_changed = any(m is not None for m in (claude_model, pi_agent_model_name, codex_model))
     claude_patch: ClaudeSDKConfig | None = None
     if any(
         v is not None
@@ -371,7 +376,7 @@ async def update_conduct_config(  # noqa: PLR0913
         )
 
     try:
-        return await contexts.update_conduct_config(
+        module = await contexts.update_conduct_config(
             upstream=upstream,
             persistence=persistence,
             user_id=user_id,
@@ -386,6 +391,10 @@ async def update_conduct_config(  # noqa: PLR0913
         )
     except SpaceConfigError as exc:
         raise ToolError(str(exc)) from exc
+    result: dict[str, object] = dict(module)
+    if model_changed:
+        result["note"] = _NEW_CHAT_NOTE
+    return result
 
 
 @tool(
@@ -477,7 +486,7 @@ async def update_translator_config(
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Module:
+) -> dict[str, object]:
     """Update the current space's TranslatorV2 module configuration.
 
     Only provided (non-None) parameters are written; everything else in the existing config
@@ -485,6 +494,9 @@ async def update_translator_config(
     Creates a pre-update snapshot before applying changes.
     """
     user_id, company_id = caller
+    model_changed = (
+        language_model_translation is not None or language_model_language_detection is not None
+    )
     patch = TranslationConfig(
         language_model_translation=language_model_translation,
         language_model_language_detection=language_model_language_detection,
@@ -497,7 +509,7 @@ async def update_translator_config(
         post_processing=post_processing,
     )
     try:
-        return await contexts.update_translator_config(
+        module = await contexts.update_translator_config(
             upstream=upstream,
             persistence=persistence,
             user_id=user_id,
@@ -507,6 +519,10 @@ async def update_translator_config(
         )
     except SpaceConfigError as exc:
         raise ToolError(str(exc)) from exc
+    result: dict[str, object] = dict(module)
+    if model_changed:
+        result["note"] = _NEW_CHAT_NOTE
+    return result
 
 
 @tool(
@@ -652,7 +668,7 @@ async def update_magic_table_config(  # noqa: PLR0913
     persistence: Persistence = Depends(get_persistence),
     caller: tuple[str, str] = Depends(get_caller),
     space_id: str = Depends(get_space_id),
-) -> unique_sdk.Module:
+) -> dict[str, object]:
     """Update a Magic Table space's RfpAgent module and/or space-level settings.
 
     Updates the current space by default. Pass target_space_id to configure a Magic Table
@@ -713,8 +729,16 @@ async def update_magic_table_config(  # noqa: PLR0913
             disable_notifications_by_default=disable_notifications_by_default,
         )
 
+    model_changed = module_patch is not None and (
+        module_patch.language_model is not None
+        or module_patch.question_extraction_language_model is not None
+        or any(
+            col.language_model is not None
+            for col in (module_patch.columns or [])
+        )
+    )
     try:
-        return await contexts.update_magic_table_config(
+        module = await contexts.update_magic_table_config(
             upstream=upstream,
             persistence=persistence,
             user_id=user_id,
@@ -725,6 +749,10 @@ async def update_magic_table_config(  # noqa: PLR0913
         )
     except SpaceConfigError as exc:
         raise ToolError(str(exc)) from exc
+    result: dict[str, object] = dict(module)
+    if model_changed:
+        result["note"] = _NEW_CHAT_NOTE
+    return result
 
 
 # Re-export enums so they are importable from this module by the architecture check.
