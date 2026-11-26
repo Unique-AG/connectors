@@ -80,5 +80,24 @@ describe('OpaqueTokenService refresh token expiry', () => {
       );
       expect(third.expires_in).toBe(60);
     });
+
+    it('keeps the configured access token lifetime when it is longer than the refresh lifetime', async () => {
+      const store = new MockOAuthStore();
+      const service = new OpaqueTokenService(
+        {
+          accessTokenExpiresIn: 3600,
+          refreshTokenExpiresIn: 60,
+          refreshTokenExpiry: 'sliding',
+        } as McpOAuthModuleOptions,
+        store,
+      );
+
+      const pair = await service.generateTokenPair('user-1', 'client-1', 'mail', 'r', 'profile-1');
+
+      expect(pair.expires_in).toBe(3600);
+      expect((await store.getAccessToken(pair.access_token))?.expiresAt).toEqual(
+        new Date(SIGN_IN_AT.getTime() + HOUR_MS),
+      );
+    });
   });
 });

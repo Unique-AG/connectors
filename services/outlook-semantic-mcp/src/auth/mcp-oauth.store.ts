@@ -176,7 +176,7 @@ export class McpOAuthStore implements IOAuthStore {
     const { profile, accessToken, refreshToken, provider } = user;
 
     const encryptedAccessToken = this.encryptionService.encryptToString(accessToken);
-    // Without offline_access Microsoft returns no refresh token; the session then ends with it.
+    // Without offline_access Microsoft returns no refresh token, so none is stored.
     const encryptedRefreshToken = refreshToken
       ? this.encryptionService.encryptToString(refreshToken)
       : null;

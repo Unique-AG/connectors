@@ -94,8 +94,11 @@ export class OpaqueTokenService {
     const now = Date.now();
     const refreshExpiresAt =
       sessionExpiresAt ?? new Date(now + this.options.refreshTokenExpiresIn * 1000);
+    const accessLifetimeEnd = now + this.options.accessTokenExpiresIn * 1000;
     const accessExpiresAt = new Date(
-      Math.min(now + this.options.accessTokenExpiresIn * 1000, refreshExpiresAt.getTime()),
+      this.options.refreshTokenExpiry === 'absolute'
+        ? Math.min(accessLifetimeEnd, refreshExpiresAt.getTime())
+        : accessLifetimeEnd,
     );
 
     const tokenFamilyId = familyId || typeid('tkfam').toString();
