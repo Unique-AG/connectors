@@ -9,7 +9,8 @@ const UNIQUE_ENV = {
 };
 
 const loadWith = (env: Record<string, string | undefined>) => {
-  for (const key of [...Object.keys(UNIQUE_ENV), 'UNIQUE_ATTACHMENTS', 'MCP_BACKEND']) {
+  const ambientUniqueKeys = Object.keys(process.env).filter((key) => key.startsWith('UNIQUE_'));
+  for (const key of [...ambientUniqueKeys, 'MCP_BACKEND']) {
     vi.stubEnv(key, undefined);
   }
   for (const [key, value] of Object.entries(env)) {
