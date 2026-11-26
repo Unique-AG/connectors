@@ -166,7 +166,8 @@ class TeamsMessage(BaseModel):
             "A short label for this message, to name it when you cite it: its subject; else who "
             + "sent it and how its text opens; else, when it has no text, the file name of its "
             + "meeting recording or the name of its system event. This connector builds it, so "
-            + "read `body` for what the message says. Null when none of these exists."
+            + "read `body` for what the message says. Null for a deleted message, and when none "
+            + "of these exists."
         )
     )
     message_id: str = Field(description="The message's Graph id.")
@@ -237,7 +238,9 @@ class TeamsMessage(BaseModel):
         recording = recording_of(message)
         return cls(
             uri=handle.uri,
-            title=_message_title(
+            title=None
+            if message.deleted_date_time is not None
+            else _message_title(
                 message.subject,
                 sender,
                 text,

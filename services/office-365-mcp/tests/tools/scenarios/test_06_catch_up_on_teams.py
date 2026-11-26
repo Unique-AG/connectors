@@ -1383,6 +1383,17 @@ class TestWhatACitationOfTeamsShows:
 
         assert read["title"] == "Ada Lovelace: Yes, green."
 
+    async def test_a_deleted_message_has_no_title(self, graph: respx.MockRouter) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=message_payload(deleted_at="2026-02-11T10:00:00Z")
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert (read["deleted_at"] is not None, read["body"], read["title"]) == (True, None, None)
+
     async def test_a_chat_message_without_a_link_opens_through_the_deep_link_to_its_chat(
         self, graph: respx.MockRouter
     ) -> None:
