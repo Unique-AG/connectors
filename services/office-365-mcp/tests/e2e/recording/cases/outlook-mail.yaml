@@ -245,7 +245,7 @@ outlook_draft_mail-basic:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_draft_mail-basic"
-        body: "Written by the recorder."
+        body_html: "<p>Written by the recorder.</p>"
         importance: high
         categories: [Website]
       bind: {to: ["$1.messages[0].sender.address"], cc: ["$1.messages[1].sender.address"]}
@@ -255,12 +255,12 @@ outlook_update_draft-basic:
     - tool: outlook_list_mail
       args: {folder: inbox, category: seed-v1, limit: 1}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_update_draft-basic", body: "First text."}
+      args: {subject: "seed-v1 case-outlook_update_draft-basic", body_html: "<p>First text.</p>"}
       bind: {to: ["$1.messages[0].sender.address"]}
     - tool: outlook_update_draft
       args:
         subject: "seed-v1 case-outlook_update_draft-basic changed"
-        body: "Second text."
+        body_html: "<p>Second text.</p>"
         importance: high
       bind: {message_ref: "$2.uri"}
 
@@ -274,7 +274,7 @@ outlook_draft_reply-reply:
     - tool: outlook_draft_reply
       args:
         mode: reply
-        body: "Thanks for the note."
+        body_html: "<p>Thanks for the note.</p>"
         categories: ["seed-v1 case-outlook_draft_reply-reply"]
       bind: {message_ref: "$1.messages[0].uri"}
 
@@ -288,7 +288,7 @@ outlook_draft_reply-forward:
     - tool: outlook_draft_reply
       args:
         mode: forward
-        body: "Please read this."
+        body_html: "<p>Please read this.</p>"
         categories: ["seed-v1 case-outlook_draft_reply-forward"]
         to: ["persona:tom"]
       bind: {message_ref: "$1.messages[0].uri"}
@@ -299,7 +299,7 @@ outlook_draft_reply_all-everyone:
       args: {folder: inbox, category: seed-v1, has_attachments: true, limit: 1}
     - tool: outlook_draft_reply_all
       args:
-        body: "Thanks to all."
+        body_html: "<p>Thanks to all.</p>"
         categories: ["seed-v1 case-outlook_draft_reply_all-everyone"]
       bind: {message_ref: "$1.messages[0].uri"}
 
@@ -308,7 +308,7 @@ outlook_mark_mail-flag:
     - tool: outlook_list_mail
       args: {folder: inbox, category: seed-v1, limit: 1}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_mark_mail-flag", body: "A draft to mark."}
+      args: {subject: "seed-v1 case-outlook_mark_mail-flag", body_html: "<p>A draft to mark.</p>"}
       bind: {to: ["$1.messages[0].sender.address"]}
     - tool: outlook_mark_mail
       args: {flagged: true, add_categories: [Website]}
@@ -348,7 +348,7 @@ outlook_send_draft-persona:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_send_draft-persona"
-        body: "Sent by the recorder."
+        body_html: "<p>Sent by the recorder.</p>"
         to: ["persona:tom"]
     - tool: outlook_send_draft
       bind: {message_ref: "$prev.uri"}
@@ -488,7 +488,7 @@ outlook_draft_reply_all-three:
       bind: {uri: "$prev.messages[0].uri"}
     - tool: outlook_draft_reply_all
       args:
-        body: "Thanks to both of you."
+        body_html: "<p>Thanks to both of you.</p>"
         categories: ["seed-v1 case-outlook_draft_reply_all-three"]
       bind: {message_ref: "$1.messages[0].uri"}
       expect: {result: {recipient_count: 2, "to[0].address": "persona:tom"}}
@@ -503,7 +503,7 @@ outlook_draft_reply-forward-workbook:
     - tool: outlook_draft_reply
       args:
         mode: forward
-        body: "Please read this workbook."
+        body_html: "<p>Please read this workbook.</p>"
         categories: ["seed-v1 case-outlook_draft_reply-forward-workbook"]
         to: ["persona:tom"]
       bind: {message_ref: "$1.messages[0].uri"}
@@ -522,7 +522,7 @@ outlook_move_mail-invoice:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_move_mail-invoice"
-        body: "The invoice is filed under Clients."
+        body_html: "<p>The invoice is filed under Clients.</p>"
       bind: {to: ["$1.messages[0].sender.address"]}
     - tool: outlook_move_mail
       bind:
@@ -532,11 +532,11 @@ outlook_move_mail-invoice:
 outlook_move_mail-batch:
   chain:
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_move_mail-batch one", body: "One.", to: ["persona:tom"]}
+      args: {subject: "seed-v1 case-outlook_move_mail-batch one", body_html: "<p>One.</p>", to: ["persona:tom"]}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_move_mail-batch two", body: "Two.", to: ["persona:tom"]}
+      args: {subject: "seed-v1 case-outlook_move_mail-batch two", body_html: "<p>Two.</p>", to: ["persona:tom"]}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_move_mail-batch three", body: "Three.", to: ["persona:tom"]}
+      args: {subject: "seed-v1 case-outlook_move_mail-batch three", body_html: "<p>Three.</p>", to: ["persona:tom"]}
     - tool: outlook_move_mail
       args: {destination: archive}
       bind: {message_refs: ["$1.uri", "$2.uri", "$3.uri"]}
@@ -547,7 +547,7 @@ outlook_move_mail-restore-deleted:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_move_mail-restore-deleted"
-        body: "A draft that goes to Deleted Items by mistake."
+        body_html: "<p>A draft that goes to Deleted Items by mistake.</p>"
         categories: ["seed-v1 case-outlook_move_mail-restore-deleted"]
         to: ["persona:tom"]
     - tool: outlook_move_mail
@@ -566,11 +566,11 @@ outlook_move_mail-restore-deleted:
 outlook_mark_mail-batch:
   chain:
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_mark_mail-batch one", body: "One.", to: ["persona:tom"]}
+      args: {subject: "seed-v1 case-outlook_mark_mail-batch one", body_html: "<p>One.</p>", to: ["persona:tom"]}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_mark_mail-batch two", body: "Two.", to: ["persona:tom"]}
+      args: {subject: "seed-v1 case-outlook_mark_mail-batch two", body_html: "<p>Two.</p>", to: ["persona:tom"]}
     - tool: outlook_draft_mail
-      args: {subject: "seed-v1 case-outlook_mark_mail-batch three", body: "Three.", to: ["persona:tom"]}
+      args: {subject: "seed-v1 case-outlook_mark_mail-batch three", body_html: "<p>Three.</p>", to: ["persona:tom"]}
     - tool: outlook_mark_mail
       args: {flagged: true, importance: high}
       bind: {message_refs: ["$1.uri", "$2.uri", "$3.uri"]}
@@ -580,7 +580,7 @@ outlook_mark_mail-flag-dates:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_mark_mail-flag-dates"
-        body: "A draft with a follow-up."
+        body_html: "<p>A draft with a follow-up.</p>"
         to: ["persona:tom"]
     - tool: outlook_mark_mail
       args:
@@ -678,7 +678,7 @@ outlook_draft_mail-to-found-person:
     - tool: outlook_draft_mail
       args:
         subject: "seed-v1 case-outlook_draft_mail-to-found-person"
-        body: "Written for the person that the name found."
+        body_html: "<p>Written for the person that the name found.</p>"
       bind: {to: ["$prev.candidates[0].address"]}
 
 outlook_get_mail_tips-anna-away:

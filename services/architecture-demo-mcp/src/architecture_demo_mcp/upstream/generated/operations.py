@@ -4,10 +4,15 @@ from pydantic import TypeAdapter
 
 from architecture_demo_mcp.upstream.generated.vendor_requests import GetDailyMetaRequest
 from architecture_demo_mcp.upstream.generated.vendor_requests import GetDailyPricesRequest
+from architecture_demo_mcp.upstream.generated.vendor_requests import GetIexTopOfBookRequest
 from architecture_demo_mcp.upstream.generated.vendor_responses import DailyMeta
 from architecture_demo_mcp.upstream.generated.vendor_responses import DailyPriceBar
+from architecture_demo_mcp.upstream.generated.vendor_responses import IexTopOfBook
 
 GET_DAILY_META = Operation[DailyMeta, GetDailyMetaRequest]("getDailyMeta", TypeAdapter(DailyMeta))
 GET_DAILY_PRICES = Operation[list[DailyPriceBar], GetDailyPricesRequest](
     "getDailyPrices", TypeAdapter(list[DailyPriceBar])
+)
+GET_IEX_TOP_OF_BOOK = Operation[list[IexTopOfBook], GetIexTopOfBookRequest](
+    "getIexTopOfBook", TypeAdapter(list[IexTopOfBook])
 )

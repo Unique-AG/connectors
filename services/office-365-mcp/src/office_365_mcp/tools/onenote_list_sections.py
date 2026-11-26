@@ -23,6 +23,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
@@ -84,7 +85,11 @@ _SectionGroupsBuilder = _notebook_section_groups_module.SectionGroupsRequestBuil
 _SectionsQuery = _SectionsBuilder.SectionsRequestBuilderGetQueryParameters
 _SectionGroupsQuery = _SectionGroupsBuilder.SectionGroupsRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source(
+    "sections and section groups", cite="the page you read with onenote_read_page"
+)
+
+_DESCRIPTION = f"""\
 Lists the sections and the section groups directly under one notebook or one section group, one \
 level at a time. Both lists always come back. To walk deeper, call again with a section group's \
 `uri` as `parent`. onenote_list_notebooks is the sibling for every section of every notebook in \
@@ -95,6 +100,7 @@ Notes:
 different order.
 - Microsoft can refuse to list under a section group with error 403. Then list the notebook \
 itself.
+- {_NOT_A_SOURCE}
 """
 
 _NOT_A_PARENT_HANDLE = (

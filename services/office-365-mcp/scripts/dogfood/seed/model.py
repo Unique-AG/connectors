@@ -16,7 +16,8 @@ class ConfigError(SeedError):
 @dataclass(frozen=True)
 class Step:
     phase: str
-    kind: str  # "lookup", "create" or "upload" (createUploadSession, then PUT of `payload`)
+    kind: str  # "lookup", "create", "upload" (createUploadSession, then PUT of `payload`), or
+    # "upload-with-token" (the same, with the token, to `{uploadUrl}/content`: To Do)
     method: str
     path: str  # "{key}" placeholders name ids found or created earlier in the run
     params: tuple[tuple[str, str], ...] = ()
@@ -24,7 +25,8 @@ class Step:
     content_type: str | None = None
     key: str | None = None
     lookup: str | None = None  # how a step finds an id, stored under `key`: "tagged", "named",
-    # "subject", "drive-folder", "drive-children", "single", "site", "columns", "attachments", "replies"
+    # "subject", "drive-folder", "drive-children", "single", "site", "columns", "attachments",
+    # "replies", "default-list", "within" (a tagged child, keyed under the parent `key`)
     poll: bool = False  # the answer is 202: wait for the operation in its Location header
     learns: str | None = (
         None  # "team", "drive", "site" or "chat": the id of the found or created item joins the guard

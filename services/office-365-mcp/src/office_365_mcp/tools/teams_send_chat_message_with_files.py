@@ -13,6 +13,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.seam import (
@@ -28,7 +30,6 @@ from office_365_mcp.shared.teams.messages import (
     CHAT_SEND,
     CHAT_SUBJECT_FIELD,
     MENTIONS_FIELD,
-    MESSAGE_FIELD,
     ChatImportance,
     Mention,
     TeamsMessage,
@@ -51,14 +52,14 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_list_chat_messages",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "chat_id": "19:release@thread.v2",
-    "message": "Here is the plan.",
+    "body_html": "<p>Here is the plan.</p>",
     "attachments": ["sharepoint:///files/b%21SYNTHETICDRIVE0000/01SYNTHETICFILE0000"],
 }
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Sends one message as the signed-in user to an existing Teams chat. The message attaches one or \
 more files that are already in SharePoint. The message can @mention people. The mentions come \
-first, in the order given, and the text of `message` follows them. The files come after the \
+first, in the order given, and the HTML of `body_html` follows them. The files come after the \
 text. This tool uploads nothing and changes no sharing setting of a file. This tool sends the \
 message immediately, and nothing here can recall it. teams_send_chat_message sends a message with \
 no file. teams_send_channel_message_with_files is the tool for a channel.
@@ -71,6 +72,7 @@ the members of the chat. The question and the message show the name that Microso
 member. If a person in `mentions` is not a member of the chat, this tool sends nothing.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 teams_list_chat_messages does not already show the message.
+- {ACTION_NOT_A_SOURCE}
 """
 
 
@@ -78,7 +80,7 @@ async def send_chat_message_with_files(
     client: GraphServiceClient,
     *,
     chat_id: str,
-    message: str,
+    body_html: str,
     attachments: Sequence[str],
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
@@ -103,7 +105,7 @@ async def send_chat_message_with_files(
                 with graph_step(STEP_SEND):
                     return await client.chats.by_chat_id(chat_id).messages.post(
                         outgoing_message(
-                            message,
+                            body_html,
                             mentions=members,
                             importance=None
                             if importance is None
@@ -120,7 +122,7 @@ async def send_chat_message_with_files(
                 confirm,
                 send_question(
                     CHAT_SEND,
-                    message,
+                    body_html,
                     f"to chat {chat_id!r}",
                     members,
                     subject=subject,
@@ -129,7 +131,7 @@ async def send_chat_message_with_files(
                 ),
                 send_binding(
                     (chat_id,),
-                    message,
+                    body_html,
                     members,
                     subject=subject,
                     importance=importance,
@@ -168,7 +170,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     )
     async def teams_send_chat_message_with_files(
         chat_id: Annotated[str, Field(min_length=1, description=CHAT_ID_FIELD)],
-        message: Annotated[str, Field(min_length=1, description=MESSAGE_FIELD)],
+        body_html: Annotated[str, Field(min_length=1, description=TEAMS_BODY_HTML_FIELD)],
         attachments: Annotated[list[str], Field(min_length=1, description=ATTACHMENTS_FIELD)],
         mentions: Annotated[list[Mention], Field(default=[], description=MENTIONS_FIELD)],
         ctx: Context,
@@ -181,7 +183,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await send_chat_message_with_files(
             client,
             chat_id=chat_id,
-            message=message,
+            body_html=body_html,
             attachments=attachments,
             confirm=a_person_agrees(ctx),
             mentions=mentions,

@@ -36,19 +36,19 @@
       "@odata.nextLink": "https://graph.microsoft.com/v1.0/me/mailFolders('drafts')/messages?$orderby=receivedDateTime%20desc&$select=id,subject,bodyPreview,from,toRecipients,receivedDateTime,isRead,hasAttachments,parentFolderId,webLink,importance,flag,categories,isDraft,sender,replyTo&$top=1&$skip=1",
       "value": [
         {
-          "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+          "@odata.etag": "W/\"KQPLRGZXUQPrjLekVajwQPJeCnWw/RjsATVbrW19\"",
           "bodyPreview": "Hi Anna, can we spend 60 per person for the offsite dinner?",
           "categories": ["seed-v1"],
           "flag": {
             "flagStatus": "notFlagged"
           },
           "hasAttachments": false,
-          "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+          "id": "UHcSRkLJKRFNEXHQTnzoYc4nlMHcLF-AMx2Gg8Jryf27KdUDMm4R6egecfUG2sTz8wKC",
           "importance": "normal",
           "isDraft": true,
           "isRead": true,
           "parentFolderId": "AAMkPWohWUS8OGG0HCYeGYatQVV3AU06Qzl6WAS7EJPgSHTqK4UdUQWsQLXQBNIfktbXHYyzGMdkS8f3RKA8RRLonErtSjcpTCPhRaRi-LmhDOAGys6SLIJ=",
-          "receivedDateTime": "2026-11-02T21:32:11Z",
+          "receivedDateTime": "2026-11-02T22:38:06Z",
           "replyTo": [],
           "subject": "Offsite: budget for the dinner",
           "toRecipients": [
@@ -59,19 +59,19 @@
               }
             }
           ],
-          "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FIOq4Cp1Tpwt40ZoJHDd8I9ovqbzCY3fAtOLKR&exvsurl=1&viewmodel=ReadMessageItem"
+          "webLink": "https://outlook.office365.com/owa/?ItemID=UOyEFsLGUAOCOENATjndRa1kpGGyTK%2FGHf8Xg5Prof43UmPVCt3O0ckzicYR2cKa3pSY&exvsurl=1&viewmodel=ReadMessageItem"
         }
       ]
     }
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/messages/HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+    "path": "/v1.0/me/messages/UHcSRkLJKRFNEXHQTnzoYc4nlMHcLF-AMx2Gg8Jryf27KdUDMm4R6egecfUG2sTz8wKC",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
     "query": {
-      "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey"
+      "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey,body"
     },
     "status": 200,
     "response_headers": {
@@ -79,11 +79,15 @@
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+      "@odata.etag": "W/\"KQPLRGZXUQPrjLekVajwQPJeCnWw/RjsATVbrW19\"",
       "bccRecipients": [],
+      "body": {
+        "content": "Hi Anna, can we spend 60 per person for the offsite dinner?",
+        "contentType": "text"
+      },
       "ccRecipients": [],
-      "changeKey": "ATYKHRBPGKBqkNxcBjroETWvYmYh/JmwARUpu/iT",
-      "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+      "changeKey": "PZOTHDKHPUGovWxvOqgpBOMpAmLy/IusLIKnjO77",
+      "id": "UHcSRkLJKRFNEXHQTnzoYc4nlMHcLF-AMx2Gg8Jryf27KdUDMm4R6egecfUG2sTz8wKC",
       "isDraft": true,
       "subject": "Offsite: budget for the dinner",
       "toRecipients": [
@@ -98,12 +102,12 @@
   },
   {
     "method": "GET",
-    "path": "/v1.0/me/messages/HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+    "path": "/v1.0/me/messages/UHcSRkLJKRFNEXHQTnzoYc4nlMHcLF-AMx2Gg8Jryf27KdUDMm4R6egecfUG2sTz8wKC",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },
     "query": {
-      "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey"
+      "$select": "toRecipients,ccRecipients,bccRecipients,subject,isDraft,changeKey,body"
     },
     "status": 200,
     "response_headers": {
@@ -111,11 +115,15 @@
       "preference-applied": "IdType=ImmutableId"
     },
     "response_json": {
-      "@odata.etag": "W/\"KYVWCLTJITNufHdpZsrrEPVfWhHd/FouUUSnl/hQ\"",
+      "@odata.etag": "W/\"KQPLRGZXUQPrjLekVajwQPJeCnWw/RjsATVbrW19\"",
       "bccRecipients": [],
+      "body": {
+        "content": "Hi Anna, can we spend 60 per person for the offsite dinner?",
+        "contentType": "text"
+      },
       "ccRecipients": [],
-      "changeKey": "ATYKHRBPGKBqkNxcBjroETWvYmYh/JmwARUpu/iT",
-      "id": "HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS",
+      "changeKey": "PZOTHDKHPUGovWxvOqgpBOMpAmLy/IusLIKnjO77",
+      "id": "UHcSRkLJKRFNEXHQTnzoYc4nlMHcLF-AMx2Gg8Jryf27KdUDMm4R6egecfUG2sTz8wKC",
       "isDraft": true,
       "subject": "Offsite: budget for the dinner",
       "toRecipients": [
@@ -130,7 +138,7 @@
   },
   {
     "method": "POST",
-    "path": "/v1.0/me/messages/HErGSwWEJSFWCDRQXkroBq2bnXUdQU-IYt5Oc4Ynxa75UfEXAq4S3nngatMU3xIcUFNS/send",
+    "path": "/v1.0/me/messages/UHcSRkLJKRFNEXHQTnzoYc4nlMHcLF-AMx2Gg8Jryf27KdUDMm4R6egecfUG2sTz8wKC/send",
     "headers": {
       "prefer": "IdType=\"ImmutableId\""
     },

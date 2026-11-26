@@ -33,8 +33,8 @@ async def build_backstop_links(
             description=(
                 "Discriminated target: `kind` plus that kind's id. Activity kinds take the "
                 "bare `id` of a `search_activities` row — never a `meeting-or-calls_…` "
-                "handle. Rows already carry `url` when that field is selected. An account "
-                "id is not a party id."
+                "handle. Search rows carry `url` unless a custom `fields` list leaves it out. "
+                "An account id is not a party id."
             ),
         ),
     ],

@@ -1,0 +1,18 @@
+scenario: outlook_list_tasks-seed
+fixture: rec-tool-outlook_list_tasks-seed
+source: recorded
+target: graph
+recorded_at: '2026-11-25T09:28:45+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 20
+  keys dropped: 4
+  response headers dropped: 16
+  text kept: 24
+literals: []
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

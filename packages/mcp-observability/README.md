@@ -13,9 +13,9 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   `log_config=None` so its lines do too. The access log lines of the ops routes, and of an MCP's
   own `/ready`, are dropped.
   - `LOG_LEVEL` is the level of `own_loggers` (the MCP's package). `LIBRARY_LOG_LEVELS`, a JSON
-    object such as `{"httpx": "INFO"}`, sets libraries, over defaults that keep `httpx` and
-    `httpcore` at WARNING (their INFO lines are request URLs) and `sse_starlette` at INFO (its
-    DEBUG lines are tool results). A library not named logs at INFO.
+    object such as `{"httpx": "INFO"}`, sets libraries, over defaults that keep `httpx`,
+    `httpx2` and `httpcore` at WARNING (their INFO lines are request URLs) and `sse_starlette` at
+    INFO (its DEBUG lines are tool results). A library not named logs at INFO.
   - A line logged with an exception names it in `error_type`. Below ERROR its stack is dropped; at
     ERROR, `err` keeps the frames and exception types but no message, which can quote a payload. A
     pydantic `ValidationError`, or one it was raised from, adds `failed_fields`: `path (error
@@ -66,12 +66,16 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   `Tool call started` and one of `Tool call completed`, `failed` or `cancelled` per call, with the
   values `@trace_arguments` declared, a failure at its level (an exception class can declare one
   with `DeclaresFailureLevel`) and an invalid argument as `failed_fields`. It drops FastMCP's and
-  `setup_ops`'s per-call lines for a tool, which repeat it and can quote the input.
+  `setup_ops`'s per-call lines for a tool, which repeat it and can quote the input. Creating it
+  also makes FastMCP's `enduser.id` span attribute the token's `subject`, the value of the log
+  line's `subject`, where FastMCP sets the OAuth client id.
 - `setup_ops(mcp)`: serves `/probe`, `/health` and `/metrics` from the server, counts, times and
   logs every tool, resource and prompt call (`mcp_calls_total`, `mcp_call_duration_seconds`), and
   returns the HTTP metrics middleware (`python_http_requests_total`,
   `python_http_requests_in_progress`, `python_http_request_duration_seconds`) for the app. The
-  metric names are the ones the dashboards and alerts of every Python service read.
+  metric names are the ones the dashboards and alerts of every Python service read. The `path`
+  label is the matched route template (`/items/{id}`), or `unmatched` when no route matches, so
+  scanner traffic cannot add series.
 - `MetricNamespace(prefix)`: a metric of the MCP's own, named `<prefix>_<name>` and served at
   `/metrics`.
 

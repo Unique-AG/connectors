@@ -18,6 +18,7 @@ from tests.conftest import ACME_META
 from tests.conftest import CallTool
 from tests.conftest import daily_bar
 from tests.conftest import FakeTiingo
+from tests.conftest import IEX_QUOTES
 from tests.offline_server import build_server
 
 ACME_PERFORMANCE = {
@@ -101,6 +102,115 @@ async def test_a_served_operation_answers_straight_from_the_spec(
     assert result.structured_content == {"result": [{"ticker": "ACME", "name": "Acme Corporation"}]}
     (request,) = tiingo.requests
     assert request.headers["Authorization"] == "Token dummy-api-key"
+
+
+async def test_get_daily_prices_titles_the_prices_by_ticker_and_dates(call_tool: CallTool) -> None:
+    result = await call_tool(
+        "get_daily_prices",
+        {"ticker": "acme", "start_date": "2026-10-14", "end_date": "2026-10-19"},
+    )
+
+    prices = result.structured_content
+    assert prices is not None
+    assert prices["title"] == "ACME daily prices, 2026-10-14 to 2026-10-19"
+    assert prices["ticker"] == "ACME"
+    rows = cast(list[dict[str, object]], prices["prices"])
+    assert [(price["date"], price["adj_close"]) for price in rows] == [
+        ("2026-10-14", 100),
+        ("2026-10-15", 110),
+        ("2026-10-16", 99),
+        ("2026-10-19", 121),
+    ]
+
+
+async def test_get_daily_prices_titles_the_latest_day_alone_by_its_date(
+    call_tool: CallTool,
+) -> None:
+    result = await call_tool("get_daily_prices", {"ticker": "globex"})
+
+    assert result.structured_content is not None
+    assert result.structured_content["title"] == "GLOBEX daily prices, 2026-10-20"
+
+
+async def test_get_iex_top_of_book_titles_the_quotes_by_their_tickers(
+    call_tool: CallTool, tiingo: FakeTiingo
+) -> None:
+    result = await call_tool("get_iex_top_of_book", {"tickers": ["acme", "globex"]})
+
+    book = result.structured_content
+    assert book is not None
+    assert book["title"] == "IEX top of book: ACME, GLOBEX"
+    quotes = cast(list[dict[str, object]], book["quotes"])
+    assert [(quote["ticker"], quote["last"]) for quote in quotes] == [
+        ("ACME", 120.5),
+        ("GLOBEX", 40.25),
+    ]
+    (request,) = tiingo.requests
+    assert request.url.params["tickers"] == "ACME,GLOBEX"
+
+
+SEVEN_TICKERS = ["ACME", "GLOBEX", "INITECH", "HOOLI", "UMBRELLA", "STARK", "WAYNE"]
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments", "rows", "title"),
+    [
+        pytest.param(
+            "get_iex_top_of_book",
+            {"tickers": SEVEN_TICKERS},
+            [{"ticker": ticker.lower()} for ticker in SEVEN_TICKERS],
+            "IEX top of book: ACME, GLOBEX, INITECH, HOOLI, UMBRELLA and 2 more",
+            id="more tickers than the title names",
+        ),
+        pytest.param(
+            "get_iex_top_of_book", {"tickers": ["ACME"]}, [], "IEX top of book", id="no quotes"
+        ),
+        pytest.param(
+            "get_iex_top_of_book",
+            {"tickers": ["ACME"]},
+            [{"ticker": None, "last": 1.0}, IEX_QUOTES[0]],
+            "IEX top of book: ACME",
+            id="a quote without a ticker",
+        ),
+        pytest.param("get_daily_prices", {"ticker": "acme"}, [], "ACME daily prices", id="no bars"),
+        pytest.param(
+            "get_daily_prices",
+            {"ticker": "acme"},
+            [{**daily_bar("2026-10-16", 99), "date": None}, daily_bar("2026-10-19", 121)],
+            "ACME daily prices, 2026-10-19",
+            id="a bar without a date",
+        ),
+        pytest.param(
+            "get_daily_prices",
+            {"ticker": "acme", "start_date": "2026-10-14", "resample_freq": "weekly"},
+            [daily_bar("2026-10-16", 99), daily_bar("2026-10-23", 121)],
+            "ACME weekly prices, periods ending 2026-10-16 to 2026-10-23",
+            id="weekly periods",
+        ),
+        pytest.param(
+            "get_daily_prices",
+            {"ticker": "acme", "start_date": "2026-10-14", "resample_freq": "monthly"},
+            [daily_bar("2026-10-30", 121)],
+            "ACME monthly prices, period ending 2026-10-30",
+            id="one monthly period",
+        ),
+    ],
+)
+async def test_a_price_result_is_titled_by_what_tiingo_sent(
+    upstream_settings: UpstreamSettings,
+    persistence: Persistence,
+    *,
+    tool: str,
+    arguments: dict[str, object],
+    rows: list[dict[str, object]],
+    title: str,
+) -> None:
+    transport = httpx2.MockTransport(lambda _: httpx2.Response(200, json=rows))
+    async with Client(build_server(upstream_settings, persistence, transport)) as client:
+        result = await client.call_tool(tool, arguments)
+
+    assert result.structured_content is not None
+    assert result.structured_content["title"] == title
 
 
 async def test_get_price_performance_summarizes_the_period(call_tool: CallTool) -> None:

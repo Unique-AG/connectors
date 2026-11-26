@@ -25,7 +25,7 @@ from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared import kql
 from office_365_mcp.shared.files import DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
-from office_365_mcp.shared.window import closes_at, opens_at, runs_backwards
+from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at, runs_backwards
 
 TOOL_NAME = "sharepoint_search_files"
 
@@ -319,7 +319,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         modified_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Only items last changed at or after this point. A date, `2026-03-04`, "
@@ -330,7 +330,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         modified_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Only items last changed at or before this point, inclusive, in the same "

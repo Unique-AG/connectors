@@ -47,8 +47,9 @@ class Settings(BaseSettings):
         default=None,
         description=(
             "Unique web app origin used to build clickable knowledge-upload "
-            "deep links, e.g. https://<tenant>.unique.app. When unset, "
-            "references fall back to unique://content/{id}."
+            "deep links, e.g. https://<tenant>.unique.app. When unset, a file "
+            "with an external page cites that page's URL, any other file "
+            "unique://content/{id}."
         ),
         validation_alias="UNIQUE_MCP_FRONTEND_BASE_URL",
     )

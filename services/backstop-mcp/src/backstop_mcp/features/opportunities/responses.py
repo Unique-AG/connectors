@@ -514,8 +514,8 @@ class SearchOpportunityRowResponse(OmitNoneModel):
     url: str | None = Field(
         default=None,
         description=(
-            "Canonical CRM UI URL for this deal (no tab). Not in the default fieldset — "
-            "select `url` to get it, since one URL per row is dead weight on a wide walk. "
+            "Canonical CRM UI URL for this deal (no tab). In the default fields; omitted "
+            "when a custom `fields` list leaves `url` out. "
             "Omitted when this deployment has no UI origin. Echo it; never invent one."
         ),
     )

@@ -23,17 +23,20 @@ from office_365_mcp.graph_client import (
     request_with_json_body,
     send_no_response_content,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
     FOLDER_HANDLE_SOURCES,
     ITEM_HANDLE_SOURCES,
     NAME_RULES,
+    BrowserUrl,
     folder_label,
     item_access_refused,
     item_for_a_question,
     item_label,
     unusable_name,
+    view_url,
 )
 from office_365_mcp.shared.handles import (
     DriveFileHandle,
@@ -67,7 +70,7 @@ _COPY = "copy"
 _DO_NOT_COPY = "do not copy"
 _NOTHING_COPIED = "Nothing was copied."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Starts a copy of one file or folder in OneDrive or SharePoint, for the signed-in user. The copy \
 goes into a folder in the same drive or in another drive. The copy of a folder includes everything \
 inside it. Microsoft runs the copy after this call returns, so the copy can take some time to \
@@ -87,6 +90,7 @@ occur after this call returns, and then this tool cannot show it. To copy an ite
 folder, give the copy a new `name`.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 sharepoint_browse_folder does not show the copy in the destination.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_AN_ITEM_HANDLE = (
@@ -140,7 +144,7 @@ class CopyStarted(BaseModel):
             + "handle. The original stays where it is, and this tool does not change it."
         )
     )
-    source_web_url: str | None = Field(
+    source_web_url: BrowserUrl | None = Field(
         description=(
             "The web address that opens the original item in a browser. Always give it to the "
             + "user when you report this copy."
@@ -153,7 +157,7 @@ class CopyStarted(BaseModel):
             + "it to sharepoint_browse_folder to see the copy."
         )
     )
-    destination_web_url: str | None = Field(
+    destination_web_url: BrowserUrl | None = Field(
         description=(
             "The web address that opens the destination folder in a browser. Always give it to "
             + "the user, so that the user can open the folder and find the copy there."
@@ -219,9 +223,9 @@ async def copy_item(
                 )
             started = CopyStarted(
                 source_uri=source.uri,
-                source_web_url=original.web_url,
+                source_web_url=view_url(original),
                 destination_uri=DriveFolderHandle(destination.drive_id, target.id).uri,
-                destination_web_url=target.web_url,
+                destination_web_url=view_url(target),
                 name=name if name is not None else original.name,
             )
 

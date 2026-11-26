@@ -1,5 +1,37 @@
 # Changelog
 
+## [5.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.3...outlook-semantic-mcp@5.1.0) (2026-11-26)
+
+
+### Features
+
+* **outlook-semantic-mcp:** keep a failed delegate's access records and rerun only unfinished delegates ([#1867](https://github.com/Unique-AG/connectors/issues/1867)) ([3ae8f9e](https://github.com/Unique-AG/connectors/commit/3ae8f9e4b05b43246879797298fa34763bfb423f))
+
+
+### Bug Fixes
+
+* **mcp-oauth,outlook-semantic-mcp:** share one Microsoft token refresh per user and back off after transient failures ([#1866](https://github.com/Unique-AG/connectors/issues/1866)) ([999636f](https://github.com/Unique-AG/connectors/commit/999636f661350e29111d74fa27660b76d0c9f6e0))
+
+## [5.0.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.2...outlook-semantic-mcp@5.0.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** serve the first-use pair on a refresh replay inside a 10s grace window ([#1802](https://github.com/Unique-AG/connectors/issues/1802)) ([0fe880a](https://github.com/Unique-AG/connectors/commit/0fe880a90ba41b238f715ea9a592c93dd2f56d82))
+
+## [5.0.2](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.1...outlook-semantic-mcp@5.0.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** stop rate-limiting OAuth discovery, serve the default OAuth paths, add a rate-limit kill switch ([#1778](https://github.com/Unique-AG/connectors/issues/1778)) ([67df6eb](https://github.com/Unique-AG/connectors/commit/67df6eb8e4cdc78331de1f60cca8ad069bb64239))
+* **outlook-semantic-mcp:** follow a calendar nextLink without adding query options again ([#1729](https://github.com/Unique-AG/connectors/issues/1729)) ([93f4ce5](https://github.com/Unique-AG/connectors/commit/93f4ce549217cb9933856418ca406d334fa785c7))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+
 ## [5.0.1](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.0...outlook-semantic-mcp@5.0.1) (2026-11-12)
 
 

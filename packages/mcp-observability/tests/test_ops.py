@@ -53,7 +53,7 @@ def test_metrics_count_http_requests_but_not_the_ops_routes(client: TestClient) 
 
     text = client.get("/metrics").text
 
-    assert 'python_http_requests_total{method="GET",path="/missing",status_code="404"}' in text
+    assert 'python_http_requests_total{method="GET",path="unmatched",status_code="404"}' in text
     assert 'path="/probe"' not in text
     assert "text/plain" in client.get("/metrics").headers["content-type"]
 

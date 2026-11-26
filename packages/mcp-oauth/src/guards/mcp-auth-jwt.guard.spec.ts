@@ -28,6 +28,7 @@ describe('McpAuthJwtGuard', () => {
   beforeEach(async () => {
     options = {
       hmacSecret: 'test-secret',
+      disableRateLimiting: false,
       authCodeExpiresIn: 600,
       accessTokenExpiresIn: 3600,
       refreshTokenExpiresIn: 86400,

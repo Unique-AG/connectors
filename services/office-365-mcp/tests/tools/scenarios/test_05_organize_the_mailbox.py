@@ -49,6 +49,11 @@ _DELETING_TOOLS = {
     "outlook_delete_event",
     "outlook_delete_folder",
     "outlook_delete_mail_rule",
+    "outlook_delete_task",
+    "outlook_delete_task_attachment",
+    "outlook_delete_task_link",
+    "outlook_delete_task_list",
+    "outlook_delete_task_step",
     "sharepoint_delete_item",
     "sharepoint_delete_list_item",
     "teams_delete_meeting",
@@ -1175,7 +1180,7 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
             "outlook_draft_reply",
             message_ref=_Q3_MESSAGE,
             mode="reply",
-            body="I will sign it on Friday.",
+            body_html="<p>I will sign it on Friday.</p>",
         )
         moved = await call("outlook_move_mail", message_refs=[_Q3_MESSAGE], destination="archive")
 
@@ -1204,7 +1209,7 @@ class TestAPersonPlansMoreThanOneStepInOneRequest:
             "outlook_draft_mail",
             to=[sender],
             subject="Invoice filed",
-            body="The invoice is filed in Clients.",
+            body_html="<p>The invoice is filed in Clients.</p>",
         )
 
         assert (moved["moved_count"], moved["destination"]) == (1, "seed-v1 Clients")

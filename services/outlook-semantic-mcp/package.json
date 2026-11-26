@@ -1,7 +1,7 @@
 {
   "name": "@unique-ag/outlook-semantic-mcp",
   "description": "",
-  "version": "5.0.1",
+  "version": "5.1.0",
   "author": "",
   "private": true,
   "license": "Unique License v1",
@@ -89,6 +89,7 @@
     "@suites/unit": "catalog:",
     "@swc/cli": "catalog:",
     "@swc/core": "catalog:",
+    "@testcontainers/postgresql": "12.2.2",
     "@types/amqplib": "catalog:",
     "@types/express": "catalog:",
     "@types/markdown-it": "14.2.0",

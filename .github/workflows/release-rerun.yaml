@@ -11,6 +11,7 @@ on:
           - backstop-mcp
           - confluence-connector
           - kb-mcp
+          - kyckr-mcp
           - office-365-mcp
           - outlook-semantic-mcp
           - polixis-mcp

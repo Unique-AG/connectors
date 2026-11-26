@@ -667,6 +667,113 @@ class TestASharedMailbox:
         assert "administrator" not in advice
 
 
+class TestAMailboxWhereMiaCanOpenSomeFoldersOnly:
+    async def test_a_search_in_one_well_known_folder_asks_that_folder(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(f"{_INBOX}/messages").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+
+        found = await call("outlook_search_mail", subject="invoice", folder="inbox", limit=5)
+
+        assert found["messages"] == []
+        assert paths_asked(graph) == [f"/v1.0{_INBOX}/messages"]
+        assert search_of(graph) == "subject:invoice"
+
+    async def test_a_search_in_a_folder_from_its_handle_asks_that_folder(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/users/boss@example.test/mailFolders/RFQ1=/messages").mock(
+            return_value=httpx.Response(200, json={"value": []})
+        )
+
+        _ = await call(
+            "outlook_search_mail",
+            subject="quote",
+            folder_ref="outlook:///folders/RFQ1%3D",
+            mailbox="boss@example.test",
+            limit=5,
+        )
+
+        assert paths_asked(graph) == ["/v1.0/users/boss@example.test/mailFolders/RFQ1=/messages"]
+
+    async def test_a_folder_and_a_folder_handle_together_search_nothing(
+        self, graph: respx.MockRouter
+    ) -> None:
+        advice = await advice_for(
+            "outlook_search_mail",
+            subject="quote",
+            folder="inbox",
+            folder_ref="outlook:///folders/RFQ1%3D",
+            limit=5,
+        )
+
+        assert "alternatives, not a pair" in advice
+        assert paths_asked(graph) == []
+
+    async def test_a_refused_search_in_a_delegated_mailbox_points_to_the_folder_list(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/users/boss@example.test/mailFolders/inbox/messages").mock(
+            side_effect=answers({"status": 403, "body": "error.accessDenied.json"})
+        )
+
+        advice = await advice_for(
+            "outlook_search_mail",
+            subject="quote",
+            folder="inbox",
+            mailbox="boss@example.test",
+            limit=5,
+        )
+
+        assert "only for a delegate with Full Access" in advice
+        assert "Call outlook_list_mail with the same `mailbox`" in advice
+
+    async def test_a_thread_is_listed_in_the_folder_of_the_message_when_the_mailbox_refuses(
+        self, graph: respx.MockRouter
+    ) -> None:
+        boss = "/users/boss@example.test"
+        thread = [mail_message(f"T{n}=", "Quote", conversation_id="CONV1") for n in (1, 2)]
+        _ = graph.get(f"{boss}/messages/T1=").mock(
+            side_effect=[
+                httpx.Response(200, json={"id": "T1=", "conversationId": "CONV1"}),
+                httpx.Response(200, json={"parentFolderId": "INBOX1="}),
+            ]
+        )
+        _ = graph.get(f"{boss}/messages").mock(
+            side_effect=answers({"status": 404, "body": "error.ErrorItemNotFound.json"})
+        )
+        _ = graph.get(f"{boss}/mailFolders/INBOX1=/messages").mock(
+            return_value=httpx.Response(200, json={"value": thread})
+        )
+
+        found = await call(
+            "outlook_read_thread", uri="outlook:///messages/T1%3D", mailbox="boss@example.test"
+        )
+
+        assert found["message_count"] == 2
+        assert found["complete"] is False
+        assert "only the folder of the given message" in cast("str", found["searched_scope"])
+        assert paths_asked(graph)[-1] == f"/v1.0{boss}/mailFolders/INBOX1=/messages"
+
+    async def test_a_refused_thread_in_the_own_mailbox_is_not_narrowed_to_a_folder(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get("/me/messages/T1=").mock(
+            return_value=httpx.Response(
+                200, json={"id": "T1=", "conversationId": "CONV1", "parentFolderId": "INBOX1="}
+            )
+        )
+        _ = graph.get("/me/messages").mock(
+            side_effect=answers({"status": 404, "body": "error.ErrorItemNotFound.json"})
+        )
+
+        _ = await advice_for("outlook_read_thread", uri="outlook:///messages/T1%3D")
+
+        assert "/v1.0/me/mailFolders/INBOX1=/messages" not in paths_asked(graph)
+
+
 class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
     async def test_one_busy_answer_is_waited_out_and_the_search_shows_its_result(
         self, graph: respx.MockRouter, retry_sleeps: RecordedSleeps

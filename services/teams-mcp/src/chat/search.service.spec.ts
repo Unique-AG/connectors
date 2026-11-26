@@ -3,7 +3,7 @@ import { TestBed } from '@suites/unit';
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { ChannelService } from './channel.service';
-import { type MsChat, type MsChatMessage } from './chat.dtos';
+import { type MsChatMessage, MsChatSchema } from './chat.dtos';
 import { ChatService } from './chat.service';
 import { SearchService } from './search.service';
 
@@ -41,6 +41,7 @@ const channelHit = {
 
 const hydratedMessage: MsChatMessage = {
   id: 'msg-1',
+  title: 'Carol Lee (Teams): Deploy is green.',
   messageType: 'message',
   subject: null,
   body: { contentType: 'html', content: '<p>Deploy is green.</p>' },
@@ -60,15 +61,15 @@ const hydratedMessage: MsChatMessage = {
   attachments: [],
 };
 
-const mockChat: MsChat = {
+const graphChat = {
   id: '19:chat-1@thread.v2',
   chatType: 'group',
   topic: 'Q3 Planning',
   createdDateTime: '2024-01-10T08:00:00Z',
-  lastMessageAt: '2024-06-20T13:50:00Z',
-  lastMessagePreview: 'Deploy is green.',
   members: [{ userId: 'user-1', displayName: 'Carol Lee', email: null }],
 };
+
+const mockChat = MsChatSchema.parse(graphChat);
 
 const mockTeams = [
   { id: 'team-1', displayName: 'Finance', description: null, isArchived: false },
@@ -151,15 +152,17 @@ describe('SearchService', () => {
 
     it("names a chat without a topic by its members' names", async () => {
       post.mockResolvedValue(searchResponse([chatHit]));
-      getChat.mockResolvedValue({
-        ...mockChat,
-        topic: null,
-        members: [
-          { userId: 'user-1', displayName: 'Carol Lee', email: null },
-          { userId: 'user-2', displayName: null, email: null },
-          { userId: 'user-3', displayName: 'Dave Ops', email: null },
-        ],
-      });
+      getChat.mockResolvedValue(
+        MsChatSchema.parse({
+          ...graphChat,
+          topic: null,
+          members: [
+            { userId: 'user-1', displayName: 'Carol Lee', email: null },
+            { userId: 'user-2', displayName: null, email: null },
+            { userId: 'user-3', displayName: 'Dave Ops', email: null },
+          ],
+        }),
+      );
 
       const result = await unit.searchMessages(userProfileId, searchParams);
 
@@ -726,27 +729,94 @@ describe('SearchService', () => {
       expect(result.messages[0]?.summary).toBe('Deploy is <c0>green</c0>.');
     });
 
-    it('falls back to the Exchange webLink when the hit carries no webUrl', async () => {
+    it('links a chat hit to the message in Teams rather than to its Exchange copy', async () => {
       post.mockResolvedValue(searchResponse([chatHit]));
+      getChatMessageById.mockRejectedValue(new Error('Forbidden'));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]?.webUrl).toBe(
+        'https://teams.microsoft.com/l/message/19:chat-1@thread.v2/msg-1?context=%7B%22contextType%22%3A%22chat%22%7D',
+      );
+    });
+
+    it('keeps the index link of a chat hit that carries no Teams message id', async () => {
+      post.mockResolvedValue(
+        searchResponse([{ ...chatHit, resource: { ...chatHit.resource, id: null } }]),
+      );
+      getChatMessageById.mockRejectedValue(new Error('Not Found'));
 
       const result = await unit.searchMessages(userProfileId, searchParams);
 
       expect(result.messages[0]?.webUrl).toBe('https://outlook.office365.com/owa/?ItemID=abc');
     });
 
-    it('prefers the Teams webUrl over the Exchange webLink', async () => {
+    it('links a channel hit to the Teams link of the fetched message', async () => {
       post.mockResolvedValue(
         searchResponse([
           {
-            ...chatHit,
-            resource: { ...chatHit.resource, webUrl: 'https://teams.microsoft.com/l/message/1' },
+            ...channelHit,
+            resource: { ...channelHit.resource, webLink: 'https://outlook.office365.com/owa/?x' },
           },
+        ]),
+      );
+      getChannelMessageById.mockResolvedValue({
+        ...hydratedMessage,
+        webUrl: 'https://teams.microsoft.com/l/message/19%3Achannel-1%40thread.tacv2/msg-2',
+      });
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]?.webUrl).toBe(
+        'https://teams.microsoft.com/l/message/19%3Achannel-1%40thread.tacv2/msg-2',
+      );
+    });
+
+    it('keeps the index link of a channel hit whose message could not be fetched', async () => {
+      post.mockResolvedValue(
+        searchResponse([
+          {
+            ...channelHit,
+            resource: { ...channelHit.resource, webUrl: 'https://teams.microsoft.com/l/message/1' },
+          },
+        ]),
+      );
+      getChannelMessageById.mockRejectedValue(new Error('Forbidden'));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]?.webUrl).toBe('https://teams.microsoft.com/l/message/1');
+    });
+
+    it('falls back to the Exchange webLink for a hit that names no container', async () => {
+      post.mockResolvedValue(
+        searchResponse([
+          { ...chatHit, resource: { ...chatHit.resource, chatId: null, channelIdentity: {} } },
         ]),
       );
 
       const result = await unit.searchMessages(userProfileId, searchParams);
 
-      expect(result.messages[0]?.webUrl).toBe('https://teams.microsoft.com/l/message/1');
+      expect(result.messages[0]?.webUrl).toBe('https://outlook.office365.com/owa/?ItemID=abc');
+    });
+
+    it('titles a fetched hit with the title of its message', async () => {
+      post.mockResolvedValue(searchResponse([chatHit]));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]?.title).toBe('Carol Lee (Teams): Deploy is green.');
+    });
+
+    it('titles a hit that was not fetched with its sender and plain summary', async () => {
+      post.mockResolvedValue(
+        searchResponse([{ ...chatHit, summary: 'Deploy is <c0>green</c0><ddd/>' }]),
+      );
+      getChatMessageById.mockRejectedValue(new Error('Forbidden'));
+
+      const result = await unit.searchMessages(userProfileId, searchParams);
+
+      expect(result.messages[0]?.title).toBe('Carol Lee: Deploy is green');
     });
 
     it('surfaces the container pagination flag', async () => {

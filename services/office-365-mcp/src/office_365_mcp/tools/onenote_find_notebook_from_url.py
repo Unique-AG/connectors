@@ -15,6 +15,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step, send_parsed
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
@@ -46,7 +47,9 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "web_url": "https://onenote.example.invalid/notebooks/synthetic-notebook"
 }
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source("a notebook", cite="the page you read with onenote_read_page")
+
+_DESCRIPTION = f"""\
 Resolves a OneNote web address into the handle of a notebook, for the signed-in user. It asks \
 Microsoft directly. It does not search or guess. onenote_list_recent_notebooks rows carry no \
 handle. Pass their `web_url` here to get one.
@@ -58,6 +61,7 @@ owns. Without them, the handle carries the group or the site only when Microsoft
 answer.
 - If a later call on an onenote:///notebooks/ handle answers not found, call this tool again with \
 `group` or `site`.
+- {_NOT_A_SOURCE}
 """
 
 _OWN_NOTEBOOK_HANDLE_NOT_A_WEB_ADDRESS = (

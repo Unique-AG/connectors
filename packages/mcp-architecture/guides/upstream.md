@@ -17,7 +17,7 @@ two ways:
 
 - **Served from the spec.** List its operationId in `EXPOSED` in `upstream/routes.py`.
   `upstream_tools` serves it with the name, arguments and output schema the spec gives
-  (`getDailyPrices` becomes `get_daily_prices`), with no context and no code. It says what the
+  (`getDailyMeta` becomes `get_daily_meta`), with no context and no code. It says what the
   spec says, so the description check skips it, and retries do not apply to it.
 - **A tool of our own.** List the operationId under `operation-ids` in `[tool.mcp-openapi]`
   and run `uv run poe codegen`. It writes `vendor_responses.py`, `vendor_requests.py` and
@@ -56,9 +56,12 @@ sends. Keep it in `upstream/`, and name in its docstring the field the spec gets
 A new MCP starts with its spec's first JSON operation, a GET if there is one, in both lists:
 served, and typed for when it is promoted. Serve more operations to grow the first version.
 Promote one when its output needs trimming or renaming, or a business rule, or when several
-operations make one tool: remove it from `EXPOSED` and write the tool. An operation may also
-stay served while a tool of our own builds on it: the demo serves `get_daily_prices` for the
-raw bars, and `get_price_performance` turns the same `getDailyPrices` into a summary.
+operations make one tool, or when a chat client cannot cite what it returns: a record cites by a
+title key (`title`, `name`, `subject`), with an http(s) link key when it has one, and price rows
+or quotes have no title. Remove it from `EXPOSED` and write the tool, as the demo does for `get_daily_prices`
+and `get_iex_top_of_book`, whose results are titled by what they cover. An operation may also
+stay served while a tool of our own builds on it: the demo serves `get_daily_meta`, and
+`record_position` calls the same `getDailyMeta` to check that Tiingo lists a ticker.
 `upstream_http` builds the one client both kinds share, so they send the same auth: the
 `UPSTREAM_API_KEY` bearer token, or with `--auth credentials` the caller's own credentials (see
 [auth](auth.md)).

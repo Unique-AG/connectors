@@ -19,6 +19,7 @@ _VERBS = frozenset(
         "append",
         "cancel",
         "check",
+        "complete",
         "copy",
         "create",
         "delete",
@@ -76,7 +77,6 @@ _DESCRIPTION_WITHOUT_NOTES = frozenset(
         "outlook_move_mail",
         "outlook_list_categories",
         "sharepoint_get_list",
-        "onenote_list_recent_notebooks",
     }
 )
 
@@ -106,6 +106,7 @@ _NEVER_ASKS = frozenset(
     {
         "outlook_create_category",
         "outlook_create_contact",
+        "outlook_create_task_list",
         "outlook_set_focused_override",
         "outlook_disable_mail_rule",
         "outlook_update_contact",

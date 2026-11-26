@@ -31,7 +31,13 @@ export class DiscoverDelegatedAccessListener {
   @NewTrace('amqp.discover-delegated-access')
   public async onDiscoverDelegatedAccessEvent(@RabbitPayload() payload: unknown): Promise<void> {
     const event = DiscoverDelegatedAccessEventDto.parse(payload);
-    this.logger.log({ msg: 'Delegated access discovery event received', type: event.type });
-    await this.discoverDelegatedAccessCommand.run();
+    this.logger.log({
+      msg: 'Delegated access discovery event received',
+      type: event.type,
+      newCycleRequestedAt: event.payload.newCycleRequestedAt,
+    });
+    await this.discoverDelegatedAccessCommand.run({
+      newCycleRequestedAt: event.payload.newCycleRequestedAt,
+    });
   }
 }

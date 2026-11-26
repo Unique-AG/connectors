@@ -12,6 +12,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from fastmcp import Client, FastMCP
 from fastmcp.server.providers.filesystem_discovery import import_module_from_file
 from fastmcp.tools import ToolResult
 from pydantic import SecretStr
@@ -33,6 +34,8 @@ from kb_mcp.common.references import (
     INVALID_METADATA_FILTER_MESSAGE,
     METADATA_FILTER_ARG_DESCRIPTION,
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    NOT_A_SOURCE_PROMPT,
+    UNEXPECTED_ERROR_MESSAGE,
     UNIQUEQL_EQUALS_PDF,
     UNIQUEQL_EQUALS_PDF_WRAPPED,
     MetadataFilterArgument,
@@ -45,6 +48,8 @@ from kb_mcp.tools.content_tree import (
     content_tree,
 )
 from kb_mcp.tools.content_tree import tool as ct_module
+from kb_mcp.tools.read_file.tool import read_file
+from kb_mcp.tools.search.tool import search
 
 pytestmark = pytest.mark.ai
 
@@ -154,6 +159,18 @@ def test_metadata_filter_arg_uses_locked_field_description():
         is MetadataFilterArgument
     )
     assert METADATA_FILTER_ARG_DESCRIPTION in str(MetadataFilterArgument.__value__)
+
+
+async def test_description_tells_the_agent_not_to_cite_results():
+    mcp = FastMCP("kb-mcp-test")
+    for tool in (content_tree, search, read_file):
+        mcp.add_tool(tool)
+    async with Client(mcp) as client:
+        descriptions = {t.name: t.description or "" for t in await client.list_tools()}
+
+    assert NOT_A_SOURCE_PROMPT in descriptions["content_tree"]
+    assert NOT_A_SOURCE_PROMPT not in descriptions["search"]
+    assert NOT_A_SOURCE_PROMPT not in descriptions["read_file"]
 
 
 def _make_dispatch_probe_tree():
@@ -751,7 +768,7 @@ async def test_identity_refusal_surfaces_as_tool_error(identity):
     result = await content_tree(mode="tree", config=ContentTreeToolConfig())
 
     assert result.is_error is True
-    assert "UNIQUE_AUTH_" in result.content[0].text  # type: ignore[union-attr]
+    assert result.content[0].text == UNEXPECTED_ERROR_MESSAGE  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio

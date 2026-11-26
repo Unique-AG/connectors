@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { jsonb, pgEnum, pgTable, unique, varchar } from 'drizzle-orm/pg-core';
+import { integer, jsonb, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 import { typeid } from 'typeid-js';
 import { timestamps } from '../timestamps.columns';
 import { authorizationCodes } from './auth/authorization-codes.table';
@@ -54,11 +54,28 @@ export const userProfiles = pgTable(
     raw: jsonb(`raw`),
     accessToken: varchar(`access_token`),
     refreshToken: varchar(`refresh_token`),
+    // Transient Microsoft token refresh failures (network, 429, 5xx). Permanent ones clear the
+    // tokens instead. Refresh is skipped until tokenRefreshRetryAt.
+    tokenRefreshFailedAt: timestamp(`token_refresh_failed_at`),
+    tokenRefreshFailureCount: integer(`token_refresh_failure_count`).notNull().default(0),
+    tokenRefreshFailureCode: varchar(`token_refresh_failure_code`),
+    tokenRefreshRetryAt: timestamp(`token_refresh_retry_at`),
+    // When delegated access discovery last finished checking this user's access to every other
+    // mailbox. A discovery cycle reruns every delegate discovered before the cycle started.
+    delegatedAccessDiscoveredAt: timestamp(`delegated_access_discovered_at`),
     source: userProfileSource('source').notNull().default('oauth'),
     ...timestamps,
   },
   (table) => [unique().on(table.provider, table.providerUserId)],
 );
+
+// A successful refresh or a new sign-in ends any token refresh backoff.
+export const CLEARED_TOKEN_REFRESH_BACKOFF = {
+  tokenRefreshFailedAt: null,
+  tokenRefreshFailureCount: 0,
+  tokenRefreshFailureCode: null,
+  tokenRefreshRetryAt: null,
+} satisfies Partial<typeof userProfiles.$inferInsert>;
 
 export const userProfileRelations = relations(userProfiles, ({ many }) => ({
   authorizationCodes: many(authorizationCodes),

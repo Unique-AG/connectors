@@ -49,7 +49,7 @@ SearchOrganizationField = Literal[
     "internal_organization",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
-    {"id", "name", "legal_name", "email", "city", "country", "locations"}
+    {"id", "url", "name", "legal_name", "email", "city", "country", "locations"}
 )
 
 
@@ -190,11 +190,11 @@ async def search_organizations(
         list[SearchOrganizationField] | None,
         Field(
             description=(
-                "Sparse row fields. Defaults to id, name, legal_name, email, city, "
+                "Sparse row fields. Defaults to id, url, name, legal_name, email, city, "
                 "country, locations. `city`, `country`, `state`, `postal_code`, "
                 "`street_address`, and `location_title` are the primary location; "
-                "`locations` is every address. `id` is always included. Select `url` when "
-                "the answer will link to the organization — it is off by default. "
+                "`locations` is every address. `id` is always included. Keep `url` in a "
+                "custom list when the answer will link to the organizations. "
                 "`custom_field_values` is included automatically unless "
                 "`exclude_custom_fields` is set."
             )
@@ -250,7 +250,7 @@ async def search_organizations(
     Call like: {"location_filter": {"country": "Finland"},
     "custom_fields": [{"definition_id": "<definition id from list_custom_fields>",
     "values": ["<option from list_custom_fields>"]}],
-    "fields": ["name", "locations"]}
+    "fields": ["url", "name", "locations"]}
     """
     # A custom-field filter reads the custom fields anyway, so skipping them saves nothing.
     skip_custom_fields = exclude_custom_fields and not custom_fields

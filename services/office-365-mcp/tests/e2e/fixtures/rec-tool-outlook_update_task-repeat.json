@@ -1,0 +1,188 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_update_task-repeat"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"t0Ilqu39BxNZUa4T2lfrehBX/QvuBd==\"",
+      "displayName": "seed-v1 case-outlook_update_task-repeat",
+      "id": "AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"t0Ilqu39BxNZUa4T2lfrehBX/QvuBd==\"",
+      "displayName": "seed-v1 case-outlook_update_task-repeat",
+      "id": "AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "json": {
+      "dueDateTime": {
+        "dateTime": "~nextFriday",
+        "timeZone": "UTC"
+      },
+      "title": "seed-v1 case-outlook_update_task task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"s8Yjgr83HbFLMl5S1gyuzuEJ/LyoJM==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-25T13:46:44.7488098Z",
+      "dueDateTime": {
+        "dateTime": "2026-11-27T00:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkLPitVHY1URR7QZOhDNpoPRE2GQ67Brv0OJH3YARmLBUlL5KqKNLANRCMKJUuwhtLGAkqYAoeM4e1KCB9AlOqtSbyLmigTROnMtMa-EzdJRJ5LX2qZFMhzTunUnfiPVBzWiPc-MeqPXJ3GlmaSVO=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T13:46:44.8796992Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_update_task task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"a5Bkry49YtPITx1O2mfjdsBT/BlyGZ==\"",
+      "displayName": "seed-v1 case-outlook_update_task-repeat",
+      "id": "AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=/tasks/AAMkLPitVHY1URR7QZOhDNpoPRE2GQ67Brv0OJH3YARmLBUlL5KqKNLANRCMKJUuwhtLGAkqYAoeM4e1KCB9AlOqtSbyLmigTROnMtMa-EzdJRJ5LX2qZFMhzTunUnfiPVBzWiPc-MeqPXJ3GlmaSVO=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"s8Yjgr83HbFLMl5S1gyuzuEJ/LyoJM==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-25T13:46:44.7488098Z",
+      "dueDateTime": {
+        "dateTime": "2026-11-27T00:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkLPitVHY1URR7QZOhDNpoPRE2GQ67Brv0OJH3YARmLBUlL5KqKNLANRCMKJUuwhtLGAkqYAoeM4e1KCB9AlOqtSbyLmigTROnMtMa-EzdJRJ5LX2qZFMhzTunUnfiPVBzWiPc-MeqPXJ3GlmaSVO=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T13:46:44.8796992Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_update_task task"
+    }
+  },
+  {
+    "method": "PATCH",
+    "path": "/v1.0/me/todo/lists/AAMkCVmoFFH0UVW6ZNUyLVofIEP3WO24Rqs1LBG7TSEaBPIuU4VhAKVbFWERAVMzeoqCSLoyCAazW9i0ZCX4JXVllWbeUmjgXIUfEfBk-BwiSOM7RL7rLCG=/tasks/AAMkLPitVHY1URR7QZOhDNpoPRE2GQ67Brv0OJH3YARmLBUlL5KqKNLANRCMKJUuwhtLGAkqYAoeM4e1KCB9AlOqtSbyLmigTROnMtMa-EzdJRJ5LX2qZFMhzTunUnfiPVBzWiPc-MeqPXJ3GlmaSVO=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "json": {
+      "recurrence": {
+        "pattern": {
+          "daysOfWeek": ["monday"],
+          "firstDayOfWeek": "sunday",
+          "interval": 1,
+          "type": "weekly"
+        },
+        "range": {
+          "startDate": "~nextFriday",
+          "type": "noEnd"
+        }
+      },
+      "title": "seed-v1 case-outlook_update_task task weekly"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"n0Qtar78CsYBQd5P8utwhwBL/AfpRU==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-25T13:46:44.7488098Z",
+      "dueDateTime": {
+        "dateTime": "2026-11-30T00:00:00.0000000",
+        "timeZone": "UTC"
+      },
+      "hasAttachments": false,
+      "id": "AAMkLPitVHY1URR7QZOhDNpoPRE2GQ67Brv0OJH3YARmLBUlL5KqKNLANRCMKJUuwhtLGAkqYAoeM4e1KCB9AlOqtSbyLmigTROnMtMa-EzdJRJ5LX2qZFMhzTunUnfiPVBzWiPc-MeqPXJ3GlmaSVO=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T13:46:45.2244044Z",
+      "recurrence": {
+        "pattern": {
+          "dayOfMonth": 0,
+          "daysOfWeek": ["monday"],
+          "firstDayOfWeek": "sunday",
+          "index": "first",
+          "interval": 1,
+          "month": 0,
+          "type": "weekly"
+        },
+        "range": {
+          "endDate": "0001-01-01",
+          "numberOfOccurrences": 0,
+          "recurrenceTimeZone": "UTC",
+          "startDate": "2026-11-30",
+          "type": "noEnd"
+        }
+      },
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_update_task task weekly"
+    }
+  }
+]

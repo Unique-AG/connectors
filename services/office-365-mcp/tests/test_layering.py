@@ -143,6 +143,8 @@ _HANDLE_FAMILIES: Mapping[str, frozenset[str]] = {
             "events",
             "calendarpermissions",
             "contacts",
+            "tasklists",
+            "tasks",
         }
     ),
     "sharepoint:///": frozenset({"files", "folders", "lists", "listitems"}),

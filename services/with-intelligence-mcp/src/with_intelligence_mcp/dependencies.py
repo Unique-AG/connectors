@@ -106,6 +106,8 @@ def get_auth_provider() -> WithIntelligenceOAuthProvider:
             max_attempts=auth_config.login_max_attempts,
             window=auth_config.login_attempt_window,
         ),
+        allowed_redirect_hosts=auth_config.allowed_redirect_hosts,
+        allowed_redirect_schemes=auth_config.allowed_redirect_schemes,
     )
 
 

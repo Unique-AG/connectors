@@ -68,6 +68,7 @@ async def test_it_returns_items_with_their_fields_and_a_handle(
 
     (row,) = result.items
     assert list_item_handle(row.uri) == ListItemHandle(_SITE_ID, _LIST_ID, "7")
+    assert row.title == "Close books"
     assert row.fields == {"id": "70", "Title": "Close books", "Amount": 12.5, "CustomTag": "q1"}
     assert (
         row.web_url
@@ -77,6 +78,30 @@ async def test_it_returns_items_with_their_fields_and_a_handle(
     assert row.last_modified_at.isoformat() == "2026-02-11T09:15:22+00:00"
     assert result.capped is False
     assert _query(items) == {"$expand": "fields"}
+
+
+@pytest.mark.parametrize(
+    ("fields", "title"),
+    [
+        ({"id": "71", "Title": "  ", "FileLeafRef": "Budget.xlsx"}, "Budget.xlsx"),
+        ({"id": "72", "FileLeafRef": "Budget.xlsx"}, "Budget.xlsx"),
+        ({"id": "73", "Amount": 3}, None),
+    ],
+    ids=["blank-title", "library-file", "neither"],
+)
+async def test_an_item_without_a_title_is_named_by_its_file_or_by_nothing(
+    client: GraphServiceClient,
+    graph: respx.MockRouter,
+    fields: Mapping[str, object],
+    title: str | None,
+) -> None:
+    _ = graph.get(_ITEMS_ROUTE).mock(
+        return_value=httpx.Response(200, json={"value": [{**_ITEM, "fields": dict(fields)}]})
+    )
+
+    (row,) = (await list_items(client, list_uri=_LIST_URI, limit=25)).items
+
+    assert row.title == title
 
 
 async def test_an_indexed_eq_filter_is_the_only_items_query(

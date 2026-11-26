@@ -1,0 +1,1 @@
+ALTER TABLE "user_profiles" ADD COLUMN "delegated_access_discovered_at" timestamp;

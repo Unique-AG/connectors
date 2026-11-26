@@ -12,7 +12,8 @@ from world_check_mcp.upstream import Upstream
 @tool(
     title="Get Profile",
     description=(
-        "Get the World-Check record for a match: its names and categories.\n"
+        "Get the World-Check record for a match: its names, categories, and the first public "
+        "source page LSEG cites for it, if any.\n"
         "\n"
         "Pass the match's referenceId, not its resultId."
     ),

@@ -29,7 +29,8 @@ recorder replaces any text that is not seed text, but unknown mail still changes
 
 1. The Entra app registration has "Allow public client flows" = Yes. The device-code flow needs it.
 2. The app has these delegated permissions with consent: Mail.ReadWrite, Calendars.ReadWrite,
-   Contacts.ReadWrite, Files.ReadWrite, Files.Read.All, Sites.Read.All, Team.Create and User.Read.
+   Contacts.ReadWrite, Files.ReadWrite, Files.Read.All, Sites.Read.All, Tasks.ReadWrite, Team.Create
+   and User.Read.
    The opt-in phase `lists` also needs Sites.Manage.All, and only to create a list or a column.
    `run_all.sh` does not ask for it. Grant it for that apply, then it can be removed.
 3. `ENTRA_TENANT_ID`, `ENTRA_CLIENT_ID` and `SEED_UPNS` are set in your shell. Do not put a client
@@ -156,6 +157,30 @@ The onenote family has two more phases. `onenote-group` runs as Mia. It makes th
 `onenote` first. `cleanup --phases` deletes the pages of these two phases. Graph cannot delete a
 notebook or a section, so they stay.
 
+The To Do family has two phases. `todo` runs as Mia, in the default of `apply`, and needs the
+permission Tasks.ReadWrite. `todo-files` is opt-in and adds the two Word files. It also makes the
+tasks of `todo` that are missing. `cleanup --phases todo-files` deletes the two files and keeps
+their tasks. The data is in `corpus/outlook-tasks.yaml`.
+
+- It makes the list `seed-v1 Launch plan` with six tasks: a task with a due date, a completed
+  task, a task with two steps, a task with a link, and two tasks that get one Word file each in
+  the phase `todo-files`.
+- It adds two tasks to the built-in Tasks list: a task with a reminder, and a task that repeats
+  each week on the weekday of its due date.
+- Each task has the category `seed-v1`. Each name of a list, task, step, link or file starts with
+  `seed-v1 `.
+- A second run looks for each list, task, step and file by its name, and makes only what is
+  missing.
+- `cleanup --phases todo` deletes the list, with its tasks, and the two seed tasks of the
+  built-in list. The case sweep deletes each list that has `seed-v1 case-` in its name, and each
+  task with that name in a seed list or in the built-in list. It keeps such a task in another list.
+- Graph has no call to share a To Do list. The seed therefore has no shared list.
+- Graph answers 500 to a file that `POST .../attachments` adds to a task, and adds no file. The
+  phase `todo-files` therefore uses an upload session: `POST .../attachments/createUploadSession`,
+  then one `PUT` with the token for each chunk to `{uploadUrl}/content`. Graph answers 500 to this
+  `PUT` too, but it keeps the file. The seed then lists the files of the task and stops when the
+  file is not there.
+
 The mail family has three more phases. Its data is in `corpus/mail-extra.yaml`. All three run in
 the default of `apply`, and none of them needs the earlier phases of the family.
 
@@ -200,6 +225,7 @@ switches off an automatic reply whose text holds `seed-v1 case-`.
 | Events | 9 (Mia 8, Tom 1), no attendees |
 | OneDrive files | 5 (Mia 4, Anna 1) |
 | Mail attachments | 3, and 4 more in the phase `mail-attach` |
+| To Do | 1 list with 6 tasks, 2 steps and 1 link, and 2 files in the opt-in phase `todo-files`; 2 tasks in the built-in Tasks list |
 
 The corpus has these quirks on purpose: a mail with no subject, an empty body, an HTML-only body,
 flags, attachments, a draft, mail received yesterday, events in Windows time zones, one all-day

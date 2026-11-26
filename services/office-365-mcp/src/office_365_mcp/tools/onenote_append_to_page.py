@@ -13,6 +13,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.body_html import ONENOTE_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
@@ -56,7 +58,7 @@ _NOTHING_APPENDED = "Nothing was appended."
 _UNTITLED_PAGE = "an untitled page"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Adds HTML to the end of one page. It changes nothing that is already there: it cannot insert in \
 the middle, edit a word, or delete. onenote_edit_page is the sibling for those changes. OneNote \
 can show the change to everyone who opens the notebook.
@@ -71,6 +73,7 @@ onenote_read_page does not already show the block.
 on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
 empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
 Graph does not support custom tags.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_PAGE_HANDLE = (
@@ -196,11 +199,9 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The HTML to add after everything already on the page. A newline is not a "
-                    + "line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, `<ul>`, `<ol>`, `<li>`, "
-                    + "`<table>`, `<b>` and `<i>` for structure. Microsoft removes JavaScript, "
-                    + "CSS and forms. Escape `&`, `<` and `>` where they must read as themselves. "
-                    + "No argument here attaches a file or an image."
+                    ONENOTE_BODY_HTML_FIELD
+                    + " This tool adds it after everything already on the page. No argument here "
+                    + "attaches a file or an image."
                 ),
             ),
         ],

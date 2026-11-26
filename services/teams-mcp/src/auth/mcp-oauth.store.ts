@@ -351,6 +351,7 @@ export class McpOAuthStore implements IOAuthStore {
         familyId: tokens.familyId,
         generation: tokens.generation,
         usedAt: tokens.usedAt,
+        successor: tokens.successor,
       })
       .from(tokens)
       .where(and(eq(tokens.token, this.hashToken(token)), eq(tokens.type, 'REFRESH')));
@@ -364,10 +365,10 @@ export class McpOAuthStore implements IOAuthStore {
       .where(and(eq(tokens.token, this.hashToken(token)), eq(tokens.type, 'REFRESH')));
   }
 
-  public async redeemRefreshToken(token: string): Promise<boolean> {
+  public async redeemRefreshToken(token: string, successor: string): Promise<boolean> {
     const redeemed = await this.drizzle
       .update(tokens)
-      .set({ usedAt: new Date() })
+      .set({ usedAt: new Date(), successor })
       .where(
         and(
           eq(tokens.token, this.hashToken(token)),

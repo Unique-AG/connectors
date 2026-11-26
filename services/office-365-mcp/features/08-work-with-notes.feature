@@ -56,6 +56,12 @@ Feature: Working with notes in OneNote
       Then the section "Work" holds the page "Weekly sync"
       And the page holds the three notes in order
 
+    @happy @uc-08-76
+    Scenario: A new page is made a subpage of another page
+      Given Mia has the page "Acme kickoff" in the section "Work"
+      When Mia asks her assistant to create the page "Action items" as a subpage of "Acme kickoff"
+      Then "Action items" is indented under "Acme kickoff"
+
     @happy @uc-08-05
     Scenario: A task list is added to the end of an existing page
       Given Mia has the page "Planning" with 2 paragraphs

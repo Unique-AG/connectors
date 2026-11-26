@@ -53,6 +53,8 @@ NEEDS_ADMIN_CONSENT: Mapping[str, bool] = {
     "Group.Read.All": True,
     "Contacts.Read": False,
     "Contacts.ReadWrite": False,
+    "Tasks.Read": False,
+    "Tasks.ReadWrite": False,
 }
 
 _LABEL_WIDTH = 17

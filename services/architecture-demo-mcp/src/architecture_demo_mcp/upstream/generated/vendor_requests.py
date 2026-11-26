@@ -52,3 +52,11 @@ class GetDailyPricesQuery(RequestModel):
 class GetDailyPricesRequest(RequestModel):
     path: GetDailyPricesPath
     query: GetDailyPricesQuery | None = None
+
+
+class GetIexTopOfBookQuery(RequestModel):
+    tickers: str | None = Field(default=None, description="Ticker related to the asset.")
+
+
+class GetIexTopOfBookRequest(RequestModel):
+    query: GetIexTopOfBookQuery | None = None

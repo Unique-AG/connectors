@@ -39,6 +39,8 @@ export const MsChatMemberSchema = z.object({
 
 export const LAST_MESSAGE_PREVIEW_MAX_LENGTH = 150;
 
+const MESSAGE_TITLE_EXCERPT_MAX_LENGTH = 80;
+
 // Teams sends emoji as <emoji alt="😄">, whose only text is the alt. maxDepth stops
 // html-to-text's recursive walk overflowing the stack on deeply nested HTML.
 const PREVIEW_HTML_OPTIONS: HtmlToTextOptions = {
@@ -54,10 +56,22 @@ const PREVIEW_HTML_OPTIONS: HtmlToTextOptions = {
   },
 };
 
-function toPreviewText(body: { contentType: string; content: string }): string | null {
-  const text = (
-    body.contentType === 'html' ? convert(body.content, PREVIEW_HTML_OPTIONS) : body.content
-  )
+// A reply that quotes another message opens with the quote, which would crowd the
+// reply's own text out of the title.
+const TITLE_HTML_OPTIONS: HtmlToTextOptions = {
+  ...PREVIEW_HTML_OPTIONS,
+  selectors: [
+    ...(PREVIEW_HTML_OPTIONS.selectors ?? []),
+    { selector: 'blockquote[itemtype*="schema.skype.com/Reply"]', format: 'skip' },
+  ],
+};
+
+function toPreviewText(
+  body: { contentType: string; content: string },
+  maxLength: number,
+  htmlOptions: HtmlToTextOptions = PREVIEW_HTML_OPTIONS,
+): string | null {
+  const text = (body.contentType === 'html' ? convert(body.content, htmlOptions) : body.content)
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -66,11 +80,30 @@ function toPreviewText(body: { contentType: string; content: string }): string |
   }
   // Cut by code point, so an emoji at the limit is not split into a lone surrogate.
   const chars = Array.from(text);
-  if (chars.length <= LAST_MESSAGE_PREVIEW_MAX_LENGTH) {
+  if (chars.length <= maxLength) {
     return text;
   }
-  const kept = chars.slice(0, LAST_MESSAGE_PREVIEW_MAX_LENGTH - 1).join('');
+  const kept = chars.slice(0, maxLength - 1).join('');
   return `${kept.trimEnd()}…`;
+}
+
+// Chat messages rarely carry a subject, so a message is named by its sender and the
+// start of its text instead, which keeps two messages of one chat apart. A message
+// with no text, such as a shared file, is named by its first attachment.
+export function messageTitle(
+  subject: string | null,
+  senderName: string | null,
+  body: { contentType: string; content: string },
+  attachmentName: string | null,
+): string | null {
+  const trimmedSubject = subject?.trim();
+  if (trimmedSubject) {
+    return trimmedSubject;
+  }
+  const excerpt =
+    toPreviewText(body, MESSAGE_TITLE_EXCERPT_MAX_LENGTH, TITLE_HTML_OPTIONS) ??
+    attachmentName?.trim();
+  return [senderName, excerpt].filter(Boolean).join(': ') || null;
 }
 
 // `lastMessagePreview` is a navigation property (chatMessageInfo) only returned
@@ -100,7 +133,10 @@ export const MsChatSchema = z
       topic: chat.topic,
       createdDateTime: chat.createdDateTime ?? null,
       lastMessageAt: preview?.createdDateTime ?? null,
-      lastMessagePreview: preview?.body && isUserMessage ? toPreviewText(preview.body) : null,
+      lastMessagePreview:
+        preview?.body && isUserMessage
+          ? toPreviewText(preview.body, LAST_MESSAGE_PREVIEW_MAX_LENGTH)
+          : null,
       members: chat.members,
     };
   });
@@ -180,6 +216,12 @@ export const MsChatMessageSchema = z
   })
   .transform((msg) => ({
     id: msg.id,
+    title: messageTitle(
+      msg.subject ?? null,
+      msg.from?.user?.displayName ?? msg.from?.application?.displayName ?? null,
+      msg.body,
+      msg.attachments?.find((attachment) => attachment.name?.trim())?.name ?? null,
+    ),
     messageType: msg.messageType,
     subject: msg.subject ?? null,
     body: { contentType: msg.body.contentType, content: msg.body.content },
@@ -224,6 +266,12 @@ export const MsChatMessageSchema = z
 // parsed Graph message can be handed straight to a caller.
 export const MessageOutputSchema = z.object({
   id: z.string(),
+  title: z
+    .string()
+    .nullable()
+    .describe(
+      'The subject, or else the sender and the start of the text, or the name of the first attachment when there is no text. Null for an event with none of them.',
+    ),
   messageType: z.string(),
   subject: z.string().nullable(),
   body: z.object({
@@ -241,7 +289,7 @@ export const MessageOutputSchema = z.object({
   deletedDateTime: z.string().nullable(),
   importance: z.string().nullable(),
   locale: z.string().nullable(),
-  webUrl: z.string().nullable(),
+  webUrl: z.string().nullable().describe('Link that opens the message in Microsoft Teams.'),
   etag: z.string().nullable(),
   replyToId: z.string().nullable(),
   channelIdentity: z

@@ -1,0 +1,335 @@
+[
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists",
+    "query": {
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"q6Paqu95IlERJv7F3npfhsEJ/ZPNRX==\"",
+          "displayName": "Tasks",
+          "id": "AAMkUOzqLDG2LAI2HQSlMAzyGDA4WV10Kli5NRD8JXNkVHYaC4DzNKWgAPHLJJElfyyYLWfrNJlvP7u5EQM4VGYhdTceWhbnGLVeIrUu-NwrCJJ0frjnYGG=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "defaultList"
+        },
+        {
+          "@odata.etag": "W/\"j6Zqce39KbMUVq5Z8dhucoVF/ZeZRN==\"",
+          "displayName": "seed-v1 Launch plan",
+          "id": "AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=",
+          "isOwner": true,
+          "isShared": false,
+          "wellknownListName": "none"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "query": {
+      "$filter": "status ne 'completed'",
+      "$top": "100"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.etag": "W/\"u9Nisr22GrDDSs3E8pcfpoLZ/XuBes==\"",
+          "body": {
+            "content": "The old brief is out of date.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T09:38:37.5561162Z",
+          "hasAttachments": true,
+          "id": "AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T09:38:38.3762583Z",
+          "status": "notStarted",
+          "title": "seed-v1 Remove the old brief"
+        },
+        {
+          "@odata.etag": "W/\"j4Amks99TtINLb5K4zmjnpRB/EiRMx==\"",
+          "body": {
+            "content": "Print ten copies of the brief.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T09:38:36.3046844Z",
+          "hasAttachments": true,
+          "id": "AAMkMMrpLFR2KOR2QKNlPYppEHB1KL96Qkc8WBP3IVAkHLBnF8MlZAZRZMFKWMJckbrOAKecSNedL8l4XXZ0IlFkpWbiStslDTMxGzYf-LkiZGE5FN9xKYHikAhrBsisYNUbGqDq-DqmWDP7RHAkEXJ=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T09:38:37.2285084Z",
+          "status": "notStarted",
+          "title": "seed-v1 Print the launch brief"
+        },
+        {
+          "@odata.etag": "W/\"s1Duwu50UjVBZx3K1kztokGS/AtEIV==\"",
+          "body": {
+            "content": "The site shows the launch plan.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T09:38:36.0490876Z",
+          "hasAttachments": false,
+          "id": "AAMkGGseJTI1CLW4LIPmQMclOEG5DM18Ulw0TZH6HEAvLRAvU3RuXKMFBJUEARAsxbaESEoaFMuzJ9s7NJZ6QhWixZyvQwcnVALuHmLz-BokMRD2FV9sDPPuaEoiUtheBESiSjYd-DwsGQS5HYSxMQH=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T09:38:36.20008Z",
+          "linkedResources": [
+            {
+              "applicationName": "Outlook",
+              "displayName": "seed-v1 Launch site",
+              "id": "00000000-7ff9-441b-87fd-b8e3b8539513",
+              "webUrl": "https://outlook.office365.com/owa/mail"
+            }
+          ],
+          "status": "notStarted",
+          "title": "seed-v1 Read the launch site"
+        },
+        {
+          "@odata.etag": "W/\"k2Fasb83PlBLLf1Q6lmyxpOW/XmAUn==\"",
+          "body": {
+            "content": "The slides need the new logo.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "checklistItems": [
+            {
+              "createdDateTime": "2026-11-25T09:38:35Z",
+              "displayName": "seed-v1 Check the logo",
+              "id": "00000000-e3dc-4086-8495-2fdbbb584802",
+              "isChecked": false
+            },
+            {
+              "checkedDateTime": "2026-11-25T09:38:35.8619911Z",
+              "createdDateTime": "2026-11-25T09:38:35.8619712Z",
+              "displayName": "seed-v1 Check the dates",
+              "id": "00000000-fd21-4622-80a8-128ba8d3b4e8",
+              "isChecked": true
+            }
+          ],
+          "createdDateTime": "2026-11-25T09:38:35.3504249Z",
+          "hasAttachments": false,
+          "id": "AAMkUEcoFXI0MLL2DDCxNItaZFH9NC56Xlm5KGV7RUPlRJIfH1ZzNSXBTJSHXAClwvuULXbdRUtnF9i8MAH6OfNnnTgtBnyjASJyFjMl-RroIJT6LV2iDULtlVfeDmtkLEUwTxWz-WuqGFL0ZMMjOTW=",
+          "importance": "normal",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T09:38:35.9513069Z",
+          "status": "inProgress",
+          "title": "seed-v1 Check the slides"
+        },
+        {
+          "@odata.etag": "W/\"a1Hxdz43RnIPTt1D3irmkhYO/PwKQv==\"",
+          "body": {
+            "content": "The room must hold twenty people.",
+            "contentType": "text"
+          },
+          "categories": ["seed-v1"],
+          "createdDateTime": "2026-11-25T09:38:34.8197963Z",
+          "dueDateTime": {
+            "dateTime": "2026-12-02T00:00:00.0000000",
+            "timeZone": "UTC"
+          },
+          "hasAttachments": false,
+          "id": "AAMkGRdgBYW9PWH2MDHqLMiqTNU3AD70Pik9UNS1HSHvYAYmP9BzQCBPJEKLEKTjjlaSLUrrISvdB4p7SXZ7UrIdgRrhVrunCFEhGbWf-CacMQQ5XD1zVUDukUwpWqwjRUSuNqHs-EasXOQ1NBBdUIE=",
+          "importance": "high",
+          "isReminderOn": false,
+          "lastModifiedDateTime": "2026-11-25T09:38:34.9995696Z",
+          "status": "notStarted",
+          "title": "seed-v1 Book the launch room"
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "query": {
+      "$expand": "checklistItems,linkedResources"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"u9Nisr22GrDDSs3E8pcfpoLZ/XuBes==\"",
+      "body": {
+        "content": "The old brief is out of date.",
+        "contentType": "text"
+      },
+      "categories": ["seed-v1"],
+      "createdDateTime": "2026-11-25T09:38:37.5561162Z",
+      "hasAttachments": true,
+      "id": "AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T09:38:38.3762583Z",
+      "status": "notStarted",
+      "title": "seed-v1 Remove the old brief"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=/attachments",
+    "query": {
+      "$select": "id,name,contentType,size"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "value": [
+        {
+          "@odata.type": "#microsoft.graph.taskFileAttachment",
+          "contentType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "id": "AAMkJPvmXMA5ZBG1SQGfXAhxVEN4PL42Dxh9HPJ6THWjXVDzU4IjBLMCKPUKIHMoghqLWNgsQOqvL7i5KNP2EmJpbOrwNvwySKVsEpZv-SuvBBB0WG3fOEZerMsqMccgUKSjPnUq-CqqXGN0APNhAYFKQbOFPIJXda65LNSDqpA1eTAgawx=",
+          "lastModifiedDateTime": "2026-11-25T09:38:38Z",
+          "name": "seed-v1 Old brief.docx",
+          "size": 1995
+        }
+      ]
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"j6Zqce39KbMUVq5Z8dhucoVF/ZeZRN==\"",
+      "displayName": "seed-v1 Launch plan",
+      "id": "AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"u9Nisr22GrDDSs3E8pcfpoLZ/XuBes==\"",
+      "body": {
+        "content": "The old brief is out of date.",
+        "contentType": "text"
+      },
+      "categories": ["seed-v1"],
+      "createdDateTime": "2026-11-25T09:38:37.5561162Z",
+      "hasAttachments": true,
+      "id": "AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T09:38:38.3762583Z",
+      "status": "notStarted",
+      "title": "seed-v1 Remove the old brief"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=/attachments/AAMkJPvmXMA5ZBG1SQGfXAhxVEN4PL42Dxh9HPJ6THWjXVDzU4IjBLMCKPUKIHMoghqLWNgsQOqvL7i5KNP2EmJpbOrwNvwySKVsEpZv-SuvBBB0WG3fOEZerMsqMccgUKSjPnUq-CqqXGN0APNhAYFKQbOFPIJXda65LNSDqpA1eTAgawx=",
+    "query": {
+      "$select": "id,name"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.type": "#microsoft.graph.taskFileAttachment",
+      "id": "AAMkJPvmXMA5ZBG1SQGfXAhxVEN4PL42Dxh9HPJ6THWjXVDzU4IjBLMCKPUKIHMoghqLWNgsQOqvL7i5KNP2EmJpbOrwNvwySKVsEpZv-SuvBBB0WG3fOEZerMsqMccgUKSjPnUq-CqqXGN0APNhAYFKQbOFPIJXda65LNSDqpA1eTAgawx=",
+      "name": "seed-v1 Old brief.docx"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"j6Zqce39KbMUVq5Z8dhucoVF/ZeZRN==\"",
+      "displayName": "seed-v1 Launch plan",
+      "id": "AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"u9Nisr22GrDDSs3E8pcfpoLZ/XuBes==\"",
+      "body": {
+        "content": "The old brief is out of date.",
+        "contentType": "text"
+      },
+      "categories": ["seed-v1"],
+      "createdDateTime": "2026-11-25T09:38:37.5561162Z",
+      "hasAttachments": true,
+      "id": "AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T09:38:38.3762583Z",
+      "status": "notStarted",
+      "title": "seed-v1 Remove the old brief"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=/attachments/AAMkJPvmXMA5ZBG1SQGfXAhxVEN4PL42Dxh9HPJ6THWjXVDzU4IjBLMCKPUKIHMoghqLWNgsQOqvL7i5KNP2EmJpbOrwNvwySKVsEpZv-SuvBBB0WG3fOEZerMsqMccgUKSjPnUq-CqqXGN0APNhAYFKQbOFPIJXda65LNSDqpA1eTAgawx=",
+    "query": {
+      "$select": "id,name"
+    },
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.type": "#microsoft.graph.taskFileAttachment",
+      "id": "AAMkJPvmXMA5ZBG1SQGfXAhxVEN4PL42Dxh9HPJ6THWjXVDzU4IjBLMCKPUKIHMoghqLWNgsQOqvL7i5KNP2EmJpbOrwNvwySKVsEpZv-SuvBBB0WG3fOEZerMsqMccgUKSjPnUq-CqqXGN0APNhAYFKQbOFPIJXda65LNSDqpA1eTAgawx=",
+      "name": "seed-v1 Old brief.docx"
+    }
+  },
+  {
+    "method": "DELETE",
+    "path": "/v1.0/me/todo/lists/AAMkSFapPTZ7HPU8FCSnANsuPRO9BY15Vdc0JYA6HRCoLTClI8TcIANsMBFPWVIpwvdSBFhvLBdaN5m2OMJ2BCVspZrmJebjXKTrQgRx-SuvKYJ3KU4zCAQ=/tasks/AAMkXQbeSYP3XDF5BGVxAXzcTOZ5TZ53Iuv4WBU3XYIeYMQoA9GoOKFUCCNMZCApljhFUBkeMTurF6g7KIM9XrWrjVetTubjVOBuDsEk-MaiGPV9AP9mXJKckCslDcqkVRDgEmVg-VwyIUQ2RETcFAZ=/attachments/AAMkJPvmXMA5ZBG1SQGfXAhxVEN4PL42Dxh9HPJ6THWjXVDzU4IjBLMCKPUKIHMoghqLWNgsQOqvL7i5KNP2EmJpbOrwNvwySKVsEpZv-SuvBBB0WG3fOEZerMsqMccgUKSjPnUq-CqqXGN0APNhAYFKQbOFPIJXda65LNSDqpA1eTAgawx=",
+    "status": 204
+  }
+]

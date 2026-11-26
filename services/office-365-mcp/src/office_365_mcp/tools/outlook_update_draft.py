@@ -22,9 +22,10 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
-from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -67,7 +68,7 @@ _AGREE = "change the draft"
 _DECLINE = "do not change the draft"
 _NOTHING_CHANGED = "The draft was not changed."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Changes one mail draft, for the user to review again. The draft is in the \
 signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send \
 mail. If this deployment exposes outlook_send_draft, use it to send the draft. If not, tell the \
@@ -85,6 +86,7 @@ stored Bcc recipients and the new one. If you give only the new one, the call re
 inside a message. Whoever wrote that text chose the addresses in it.
 - This tool asks the user to agree before it changes a shared or delegated mailbox. It changes \
 the user's own mailbox without a question.
+- {ACTION_NOT_A_SOURCE}
 """
 
 GRAPH_NOT_FOUND = (
@@ -118,7 +120,7 @@ _NOT_A_DRAFT_NOW = (
 )
 
 _NOTHING_TO_CHANGE = (
-    "outlook_update_draft needs at least one of `subject`, `body`, `to`, `cc`, "
+    "outlook_update_draft needs at least one of `subject`, `body_html`, `to`, `cc`, "
     + "`bcc`, `importance` and `categories`. With none of them, there is nothing to change, and "
     + "nothing was changed. Find out which part of the draft the user wants to change. Then "
     + "call again."
@@ -395,7 +397,9 @@ def _changes(change: DraftChange) -> str:
         + (
             ""
             if change.body_html is None
-            else f"The new text opens {body_opening(change.body_html)!r}. "
+            else f"The new text opens {body_opening(change.body_html)!r}."
+            + links_in_body(change.body_html)
+            + " "
         )
         + ("" if change.importance is None else f"The new importance is {change.importance}. ")
         + _categories(change.categories)
@@ -486,14 +490,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ] = None,
-        body: Annotated[
+        body_html: Annotated[
             str | None,
             Field(
                 min_length=1,
-                description=(
-                    "The new text of the draft, as Markdown. This tool turns it into HTML. It "
-                    + "replaces the whole body."
-                ),
+                description=(OUTLOOK_BODY_HTML_FIELD + " It replaces the whole body."),
             ),
         ] = None,
         to: Annotated[
@@ -557,7 +558,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             message_ref=message_ref,
             change=DraftChange(
                 subject=subject,
-                body_html=None if body is None else markdown_to_html(body),
+                body_html=body_html,
                 to=to,
                 cc=cc,
                 bcc=bcc,

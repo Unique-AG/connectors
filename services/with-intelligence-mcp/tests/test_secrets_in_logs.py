@@ -216,7 +216,7 @@ def _initialized_session(client: TestClient) -> str:
 
 def _submit_login(client: TestClient, *, username: str, password: str) -> int:
     """Register a client, start the authorization and submit the real login form."""
-    redirect_uri = "https://client.example/callback"
+    redirect_uri = "https://claude.ai/api/mcp/auth_callback"
     registered = client.post(
         "/register",
         json={

@@ -17,13 +17,17 @@ export class UpstreamCredentialRevokedError extends McpError {
   }
 }
 
-/** Name-based: `instanceof` fails across two copies of the SDK and on a deserialized error. */
+/**
+ * Name-based: `instanceof` fails across two copies of the SDK and on a deserialized error. The
+ * Microsoft Graph SDK wraps an error thrown by a middleware in its own `GraphError`, keeping only
+ * the original name, as `code`.
+ */
 export function isUpstreamCredentialRevokedError(error: unknown): boolean {
   return (
     typeof error === 'object' &&
     error !== null &&
-    'name' in error &&
-    error.name === 'UpstreamCredentialRevokedError'
+    (('name' in error && error.name === 'UpstreamCredentialRevokedError') ||
+      ('code' in error && error.code === 'UpstreamCredentialRevokedError'))
   );
 }
 

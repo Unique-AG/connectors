@@ -1,10 +1,10 @@
 import { type INestApplication } from '@nestjs/common';
 import { Test, type TestingModule } from '@nestjs/testing';
-import { ThrottlerGuard } from '@nestjs/throttler';
 import request from 'supertest';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { OAUTH_ENDPOINTS } from '../src';
 import { createMockModuleConfig, MockOAuthStore } from '../src/__mocks__';
+import { McpOAuthThrottlerGuard } from '../src/guards/mcp-oauth-throttler.guard';
 import { McpOAuthModule } from '../src/mcp-oauth.module';
 import {
   type ConsentPage,
@@ -29,7 +29,7 @@ describe('OAuth consent (E2E)', () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [McpOAuthModule.forRootAsync({ useFactory: () => config })],
     })
-      .overrideGuard(ThrottlerGuard)
+      .overrideGuard(McpOAuthThrottlerGuard)
       .useValue({ canActivate: () => true })
       .compile();
 

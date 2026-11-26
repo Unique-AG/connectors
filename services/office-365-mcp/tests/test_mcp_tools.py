@@ -135,6 +135,29 @@ _SYSTEM_MESSAGE = {
     },
 }
 
+_RECORDING_LINK = (
+    "https://contoso-my.sharepoint.com/:v:/g/personal/organizer_contoso_onmicrosoft_com/"
+    + "EXAMPLErecordingLink"
+)
+
+
+def _recording_event(status: str, url: str | None) -> dict[str, object]:
+    return {
+        **_SYSTEM_MESSAGE,
+        "messageType": "unknownFutureValue",
+        "eventDetail": {
+            "@odata.type": "#microsoft.graph.callRecordingEventMessageDetail",
+            "callId": "00000000-7a83-45f2-8e26-fbb8452113cd",
+            "callRecordingDisplayName": "Weekly sync-20261124_101500-Meeting Recording.mp4",
+            "callRecordingDuration": "PT2M5S",
+            "callRecordingStatus": status,
+            "callRecordingUrl": url,
+            "meetingOrganizer": None,
+            "initiator": None,
+        },
+    }
+
+
 _TEAM_ID = "8a9c3c47-0f9e-4a24-9b1e-2f0d5c6b7a81"
 _CHANNEL_ID = "19:general@thread.tacv2"
 _CHANNELS_PATH = f"/teams/{_TEAM_ID}/channels"
@@ -601,7 +624,14 @@ _WINDOWED_TOOLS: Mapping[str, tuple[str, ...]] = {
         "created_after",
         "created_before",
     ),
+    "outlook_list_tasks": ("due_after", "due_before"),
 }
+
+_ONE_DAY_OR_MOMENT_NOT_A_WINDOW: frozenset[str] = frozenset(
+    f"{tool}.{argument}"
+    for tool in ("outlook_create_task", "outlook_update_task")
+    for argument in ("due_date", "start_date", "reminder_at")
+)
 
 
 _MESSAGE_TOOLS: tuple[str, ...] = (
@@ -650,6 +680,7 @@ _RETURNS_A_FILE: frozenset[str] = frozenset(
     {
         "outlook_read_attachment",
         "outlook_read_event_attachment",
+        "outlook_read_task_attachment",
         "sharepoint_read_file",
         "onenote_read_resource",
     }
@@ -697,6 +728,19 @@ WRITE_TOOLS: frozenset[str] = frozenset(
         "outlook_delete_calendar",
         "outlook_create_contact",
         "outlook_update_contact",
+        "outlook_create_task",
+        "outlook_update_task",
+        "outlook_set_task_status",
+        "outlook_delete_task",
+        "outlook_add_task_step",
+        "outlook_update_task_step",
+        "outlook_delete_task_step",
+        "outlook_add_task_link",
+        "outlook_delete_task_link",
+        "outlook_delete_task_attachment",
+        "outlook_create_task_list",
+        "outlook_rename_task_list",
+        "outlook_delete_task_list",
         "onenote_create_page",
         "onenote_append_to_page",
         "onenote_create_notebook",
@@ -826,10 +870,11 @@ class TestTheToolsThisServerAdvertises:
                 if formats & {"date", "date-time"}:
                     found.add(f"{tool.name}.{name}")
 
-        assert found == recorded, (
+        assert found == recorded | _ONE_DAY_OR_MOMENT_NOT_A_WINDOW, (
             "a date-shaped argument is either a search window — record it in `_WINDOWED_TOOLS`, "
             + "where the test above holds it to both shapes — or it is not a window at all, in "
-            + f"which case say why here. Unaccounted for: {sorted(found - recorded)}"
+            + "which case add it to `_ONE_DAY_OR_MOMENT_NOT_A_WINDOW`. Unaccounted for: "
+            + f"{sorted(found - recorded - _ONE_DAY_OR_MOMENT_NOT_A_WINDOW)}"
         )
 
     async def test_no_tool_that_takes_a_mailbox_claims_only_the_users_own(
@@ -895,6 +940,7 @@ class TestTheToolsThisServerAdvertises:
         }
         assert set(_properties(tools["teams_read_message"].output_schema)) == {
             "uri",
+            "title",
             "message_id",
             "chat_id",
             "team_id",
@@ -903,6 +949,7 @@ class TestTheToolsThisServerAdvertises:
             "body",
             "body_is_plain_text",
             "event",
+            "recording",
             "created_at",
             "last_edited_at",
             "deleted_at",
@@ -1260,7 +1307,7 @@ class TestTheToolsThisServerAdvertises:
         assert description is not None
         rendered = description + json.dumps(tools["teams_list_meeting_recordings"].output_schema)
 
-        assert "This tool returns no video, and none is reachable here" in description
+        assert "This tool returns no video." in description
         assert "teams_list_meeting_transcripts" in description, (
             "where a question about content goes"
         )
@@ -1957,6 +2004,72 @@ class TestCallingThem:
         body = _structured(result)
         assert body["event"] == "members joined"
         assert body["sender"] is None
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_saved_call_recording_event_returns_the_link_a_person_opens(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        event = _recording_event("success", _RECORDING_LINK)
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=event))
+
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
+
+        body = _structured(result)
+        assert body["event"] == "call recording"
+        assert body["recording"] == {
+            "url": _RECORDING_LINK,
+            "display_name": "Weekly sync-20261124_101500-Meeting Recording.mp4",
+        }
+        assert len(graph.calls) == 1, "the server never opens the link"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_saved_call_recording_event_is_named_by_its_recording(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        event = _recording_event("success", _RECORDING_LINK)
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=event))
+
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
+
+        assert _structured(result)["title"] == "Weekly sync-20261124_101500-Meeting Recording.mp4"
+
+    @pytest.mark.parametrize(
+        ("status", "url"),
+        [("initial", None), ("chunkFinished", ""), ("chunkFinished", _RECORDING_LINK)],
+    )
+    @pytest.mark.usefixtures("obo")
+    async def test_an_unfinished_call_recording_event_returns_no_link(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+        status: str,
+        url: str | None,
+    ) -> None:
+        event = _recording_event(status, url)
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=event))
+
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
+
+        body = _structured(result)
+        assert body["event"] == "call recording"
+        assert body["recording"] is None
+        assert body["title"] == "call recording"
+
+    @pytest.mark.usefixtures("obo")
+    async def test_a_message_that_is_no_recording_event_has_no_recording(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=_SYSTEM_MESSAGE))
+
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
+
+        assert _structured(result)["recording"] is None
 
     @pytest.mark.usefixtures("obo")
     async def test_the_message_text_reaches_the_caller_and_no_log_or_span(

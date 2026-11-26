@@ -13,6 +13,8 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
+from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.seam import (
@@ -28,7 +30,6 @@ from office_365_mcp.shared.teams.messages import (
     CHANNEL_POST,
     CHANNEL_SUBJECT_FIELD,
     MENTIONS_FIELD,
-    MESSAGE_FIELD,
     REPLY_TO_ID_FIELD,
     TEAM_ID_FIELD,
     ChannelImportance,
@@ -55,16 +56,16 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("teams_browse_channel",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "team_id": "2b7c9d10-4e5f-4a6b-8c7d-9e0f1a2b3c4d",
     "channel_id": "19:general@thread.tacv2",
-    "message": "Ship it.",
+    "body_html": "<p>Ship it.</p>",
     "attachments": ["sharepoint:///files/b%21SYNTHETICDRIVE0000/01SYNTHETICFILE0000"],
 }
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Posts one new message as the signed-in user to an existing channel of a Teams team. The message \
 attaches one or more files that are already in SharePoint. With `reply_to_id`, this tool replies \
 in the thread of an existing post. The message can @mention people. The mentions come first, in \
-the order given, and the text of `message` follows them. The files come after the text. This tool \
-uploads nothing and changes no sharing setting of a file. This tool posts the message \
+the order given, and the HTML of `body_html` follows them. The files come after the text. \
+This tool uploads nothing and changes no sharing setting of a file. This tool posts the message \
 immediately, and nothing here can recall it. teams_send_channel_message posts a message with no \
 file. teams_send_chat_message_with_files is the tool for a chat.
 
@@ -75,6 +76,7 @@ nothing unless the user agrees.
 question is only a label. The message shows the same label.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 the channel does not already show the message.
+- {ACTION_NOT_A_SOURCE}
 """
 
 
@@ -83,7 +85,7 @@ async def send_channel_message_with_files(
     *,
     team_id: str,
     channel_id: str,
-    message: str,
+    body_html: str,
     attachments: Sequence[str],
     confirm: Confirm,
     mentions: Sequence[Mention] = (),
@@ -106,7 +108,7 @@ async def send_channel_message_with_files(
 
             async def post() -> ChatMessage | None:
                 outgoing = outgoing_message(
-                    message,
+                    body_html,
                     mentions=mentions,
                     importance=None if importance is None else ChatMessageImportance(importance),
                     subject=subject,
@@ -129,7 +131,7 @@ async def send_channel_message_with_files(
                 confirm,
                 send_question(
                     CHANNEL_POST,
-                    message,
+                    body_html,
                     f"{where} channel {channel_id!r} in team {team_id!r}",
                     mentions,
                     subject=subject,
@@ -138,7 +140,7 @@ async def send_channel_message_with_files(
                 ),
                 send_binding(
                     (team_id, channel_id, repr(reply_to_id)),
-                    message,
+                    body_html,
                     mentions,
                     subject=subject,
                     importance=importance,
@@ -183,7 +185,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     async def teams_send_channel_message_with_files(
         team_id: Annotated[str, Field(min_length=1, description=TEAM_ID_FIELD)],
         channel_id: Annotated[str, Field(min_length=1, description=CHANNEL_ID_FIELD)],
-        message: Annotated[str, Field(min_length=1, description=MESSAGE_FIELD)],
+        body_html: Annotated[str, Field(min_length=1, description=TEAMS_BODY_HTML_FIELD)],
         attachments: Annotated[list[str], Field(min_length=1, description=ATTACHMENTS_FIELD)],
         mentions: Annotated[list[Mention], Field(default=[], description=MENTIONS_FIELD)],
         ctx: Context,
@@ -202,7 +204,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             team_id=team_id,
             channel_id=channel_id,
-            message=message,
+            body_html=body_html,
             attachments=attachments,
             confirm=a_person_agrees(ctx),
             mentions=mentions,

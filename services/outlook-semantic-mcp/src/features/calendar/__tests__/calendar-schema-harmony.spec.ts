@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { CALENDAR_INSTRUCTIONS } from '../../../server.instructions';
 import { RELATIVE_RANGES } from '../../../utils/relative-range';
 import { CALENDAR_TOOLS } from '../../backend.module';
+import { EVENT_WRITE_IS_NOT_A_SOURCE } from '../utils/calendar-tool-format';
 
 interface JsonSchema {
   description?: string;
@@ -238,6 +239,15 @@ describe('calendar tool schema harmony', () => {
       'suggest_meeting_times',
       'update_event',
     ]);
+  });
+
+  it('tells the agent not to cite the event writes that return a subject and webLink', () => {
+    expect(
+      registeredTools()
+        .filter(({ options }) => options.description?.includes(EVENT_WRITE_IS_NOT_A_SOURCE))
+        .map((tool) => tool.name)
+        .sort(),
+    ).toEqual(['create_event', 'update_event']);
   });
 
   it.each(registeredTools())(

@@ -1,7 +1,7 @@
 """Published discriminated link target. Each kind names its own id so a mix-up cannot build.
 
 Activity links take the bare `id` of a `search_activities` row. Never a
-`meeting-or-calls_…` handle. Rows already carry `url` when that field is selected.
+`meeting-or-calls_…` handle. Search rows carry `url` unless a custom `fields` list leaves it out.
 """
 
 from typing import Annotated, Literal

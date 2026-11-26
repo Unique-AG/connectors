@@ -82,6 +82,7 @@ UNIQUE_SERVICE_EXTRA_HEADERS={"x-company-id":"<company-id>","x-user-id":"<user-i
 | `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `60` | Access token TTL |
 | `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `2592000` | Refresh token TTL (30 days) |
+| `AUTH_DISABLE_RATE_LIMITING` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 | `UNIQUE_USER_FETCH_CONCURRENCY` | `5` | Concurrent user resolution limit |
 | `UNIQUE_AUTO_START_INGESTION` | `false` | Auto-enqueue a transcript subscription for every user at login (skips the `start_kb_integration` tool) |
 

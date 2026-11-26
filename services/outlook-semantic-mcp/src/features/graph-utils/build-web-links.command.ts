@@ -37,7 +37,7 @@ export interface WebLinkInput {
  *
  * ## What this utility does
  *
- * **Own mailbox** (`mailbox === userProfileEmail`): the stored webLink is returned as-is.
+ * **Own mailbox** (`mailbox` equals `userProfileEmail`, ignoring case): the stored webLink is returned as-is.
  * Own-mailbox webLinks work regardless of format because the user is opening their own Outlook
  * instance where both URL formats are supported.
  *
@@ -93,7 +93,7 @@ export class BuildWebLinksCommand {
     const delegatedByMailbox = new Map<string, WebLinkInput[]>();
 
     for (const item of ids) {
-      if (item.mailbox === userProfileEmail) {
+      if (item.mailbox.toLowerCase() === userProfileEmail.toLowerCase()) {
         result.set(item.mailbox, item.id, item.webLink);
       } else {
         const bucket = delegatedByMailbox.get(item.mailbox) ?? [];

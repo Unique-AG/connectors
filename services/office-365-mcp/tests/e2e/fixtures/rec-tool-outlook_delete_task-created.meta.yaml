@@ -1,0 +1,20 @@
+scenario: outlook_delete_task-created
+fixture: rec-tool-outlook_delete_task-created
+source: recorded
+target: graph
+recorded_at: '2026-11-25T13:44:04+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 24
+  keys dropped: 7
+  response headers dropped: 68
+  text kept: 12
+literals:
+- seed-v1 case-outlook_delete_task-created
+- seed-v1 case-outlook_tasks task
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

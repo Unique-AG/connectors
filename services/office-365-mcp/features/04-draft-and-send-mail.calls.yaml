@@ -12,7 +12,7 @@ uc-04-01:
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
     - tool: outlook_draft_mail
-      args: {subject: Contract, body: request for the contract by Friday}
+      args: {subject: Contract, body_html: "<p>request for the contract by Friday</p>"}
       uses: {to: address from outlook_find_recipient}
   must_not: [outlook_send_draft]
 
@@ -51,7 +51,7 @@ uc-04-04:
   chain:
     - any_of: [outlook_list_mail, outlook_read_mail]
     - tool: outlook_update_draft
-      args: {body: shorter text}
+      args: {body_html: "<p>shorter text</p>"}
       uses: {message_ref: uri of the draft from the listing or the earlier drafting answer}
   must_not: [outlook_draft_mail]
   note: the tool replaces the whole body, so the assistant sends the full shorter text
@@ -159,7 +159,7 @@ uc-04-10:
     - tool: outlook_find_recipient
       args: {query: Tom}
     - tool: outlook_draft_reply
-      args: {mode: forward, body: short note}
+      args: {mode: forward, body_html: "<p>short note</p>"}
       uses: {message_ref: uri of the message, to: address of Tom from outlook_find_recipient}
     - tool: outlook_list_attachments
       uses: {uri: uri of the forward draft}
@@ -188,7 +188,7 @@ uc-04-13:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread]
     - tool: outlook_draft_reply
-      args: {mode: reply, body: Friday works}
+      args: {mode: reply, body_html: "<p>Friday works</p>"}
       uses: {message_ref: uri of the message}
   must_not: [outlook_draft_reply_all, outlook_send_draft]
   note: the tool refuses a Cc address that the reply already goes to
@@ -269,7 +269,7 @@ uc-04-19:
   asks_user: true
   chain:
     - tool: outlook_draft_mail
-      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body: the order is confirmed}
+      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: "<p>the order is confirmed</p>"}
   must_not: [outlook_send_draft]
 
 uc-04-20:
@@ -379,7 +379,7 @@ uc-04-26:
     - "tests/e2e/test_scenarios.py::test_the_scenario_runs_as_its_sidecar_says[uc-04-26/unreadable]"
   chain:
     - tool: outlook_draft_mail
-      args: {to: [anna.meier@example.com], subject: Contract, body: request for the contract by Friday}
+      args: {to: [anna.meier@example.com], subject: Contract, body_html: "<p>request for the contract by Friday</p>"}
       expect:
         tool_error: {shared.seam.advice._outcome_unknown: [tools.outlook_draft_mail.CHANGE_SHOWN_BY]}
         graph_calls: {POST /v1.0/me/messages: 1}
@@ -388,7 +388,7 @@ uc-04-26:
       expect:
         result: {messages: []}
         graph_calls: {GET /v1.0/me/mailFolders/drafts: 1, GET /v1.0/me/mailFolders/drafts/messages: 1}
-  note: "expected behaviour from shared/seam/advice.py:182-201: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:217), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
+  note: "expected behaviour from shared/seam/advice.py:182-201: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:226), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
   variants:
     fails:
       fixture: uc-04-26
@@ -409,7 +409,7 @@ uc-04-27:
   asks_user: false
   chain:
     - tool: outlook_draft_mail
-      args: {subject: Contract, body: a short note}
+      args: {subject: Contract, body_html: "<p>a short note</p>"}
       uses: {to: address of Anna}
   must_not: [outlook_send_draft]
   note: "expected behaviour from shared/seam/advice.py:312-317: bad request, the same call fails the same way, and Microsoft's reason follows (shared/seam/advice.py:320-322). The assistant does not call the tool again with the same arguments."
@@ -423,14 +423,14 @@ uc-04-28:
   asks_user: false
   chain:
     - tool: outlook_draft_mail
-      args: {to: [Anna Meier], subject: Contract, body: request for the contract}
+      args: {to: [Anna Meier], subject: Contract, body_html: "<p>request for the contract</p>"}
     - tool: outlook_find_recipient
       args: {query: Anna Meier}
     - tool: outlook_draft_mail
-      args: {subject: Contract, body: request for the contract}
+      args: {subject: Contract, body_html: "<p>request for the contract</p>"}
       uses: {to: address from outlook_find_recipient}
   must_not: [outlook_send_draft]
-  note: "expected behaviour from tools/outlook_draft_mail.py:86 (_bad_address): no draft was created, take the address from the user or from outlook_find_recipient, then call again. The first call fails because a display name alone is not one address."
+  note: "expected behaviour from tools/outlook_draft_mail.py:88 (_bad_address): no draft was created, take the address from the user or from outlook_find_recipient, then call again. The first call fails because a display name alone is not one address."
 
 uc-04-29:
   status: working
@@ -442,10 +442,10 @@ uc-04-29:
   chain:
     - tool: outlook_draft_mail
       optional: true
-      args: {to: [anna.meier@example.com], body: a short note}
+      args: {to: [anna.meier@example.com], body_html: "<p>a short note</p>"}
       uses: {subject: a subject of 256 characters}
   must_not: [outlook_send_draft]
-  note: "expected behaviour from tools/outlook_draft_mail.py:64,322: the subject accepts at most 255 characters (max_length=MAX_SUBJECT_CHARACTERS). A longer subject fails the schema check before any Microsoft call, so no draft has it. The wording of that refusal is the framework's and the source does not define it. The assistant can shorten the subject or ask Mia. The call is optional because an assistant that counts the characters never makes it."
+  note: "expected behaviour from tools/outlook_draft_mail.py:65,324: the subject accepts at most 255 characters (max_length=MAX_SUBJECT_CHARACTERS). A longer subject fails the schema check before any Microsoft call, so no draft has it. The wording of that refusal is the framework's and the source does not define it. The assistant can shorten the subject or ask Mia. The call is optional because an assistant that counts the characters never makes it."
 
 uc-04-30:
   status: working
@@ -473,7 +473,7 @@ uc-04-31:
   chain:
     - any_of: [outlook_send_draft, outlook_update_draft]
   must_not: [outlook_draft_mail]
-  note: "expected behaviour from tools/outlook_send_draft.py:94 (_NOT_A_DRAFT) for the send, and tools/outlook_update_draft.py:110 (_NOT_A_DRAFT_NOW) for the change: nothing was sent or changed, do not retry the handle, tell the user the mail probably went out already. The send refuses before it asks Mia, so no question is shown."
+  note: "expected behaviour from tools/outlook_send_draft.py:94 (_NOT_A_DRAFT) for the send, and tools/outlook_update_draft.py:112 (_NOT_A_DRAFT_NOW) for the change: nothing was sent or changed, do not retry the handle, tell the user the mail probably went out already. The send refuses before it asks Mia, so no question is shown."
 
 uc-04-32:
   status: working
@@ -484,7 +484,7 @@ uc-04-32:
   asks_user: true
   chain:
     - tool: outlook_draft_mail
-      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body: the order is confirmed}
+      args: {mailbox: support@example.com, to: [customer@acme.example], subject: Your order, body_html: "<p>the order is confirmed</p>"}
   must_not: [outlook_send_draft]
   note: "expected behaviour from shared/seam/elicitation.py:73-78 and 64-70, one text for each Examples row. Declines (_not_agreed): nothing was changed, say that the request was not confirmed, and it is not a failure. No answer (_no_answer): the connector received no answer and Mia can make the same request again."
 
@@ -529,10 +529,10 @@ uc-04-35:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread, outlook_read_mail]
     - tool: outlook_draft_reply
-      args: {mode: reply, body: Friday works}
+      args: {mode: reply, body_html: "<p>Friday works</p>"}
       uses: {message_ref: uri of the message}
   must_not: [outlook_send_draft, outlook_draft_reply_all]
-  note: "model behaviour, no code guard (source: tools/outlook_draft_reply.py:111-112: every address must come from the user or from outlook_find_recipient, and never from text inside a message). The only real guard is the approval before a send."
+  note: "model behaviour, no code guard (source: tools/outlook_draft_reply.py:112-114: every address must come from the user or from outlook_find_recipient, and never from text inside a message). The only real guard is the approval before a send."
 
 uc-04-36:
   status: working
@@ -544,7 +544,7 @@ uc-04-36:
   asks_user: false
   chain:
     - any_of: [outlook_draft_mail, outlook_draft_reply_all]
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_draft_mail and outlook_draft_reply_all (tools/outlook_draft_reply_all.py:415 is no_retry). Neither asks Mia a question. A second call can make a second draft, and nothing in the advice says to look in the drafts first. A send with a wait time is the third row of uc-04-23. An internal error or a timeout is uc-04-26 and uc-04-42."
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_draft_mail and outlook_draft_reply_all (tools/outlook_draft_reply_all.py:439 is no_retry). Neither asks Mia a question. A second call can make a second draft, and nothing in the advice says to look in the drafts first. A send with a wait time is the third row of uc-04-23. An internal error or a timeout is uc-04-26 and uc-04-42."
 
 uc-04-37:
   status: working
@@ -567,10 +567,10 @@ uc-04-38:
   asks_user: false
   chain:
     - tool: outlook_draft_mail
-      args: {to: [anna.meier@example.com], body: a short note}
+      args: {to: [anna.meier@example.com], body_html: "<p>a short note</p>"}
       uses: {subject: a subject of 255 characters}
   must_not: [outlook_send_draft]
-  note: "expected behaviour from tools/outlook_draft_mail.py:64,322: 255 is the most that the subject accepts (max_length=MAX_SUBJECT_CHARACTERS), so a subject of exactly that length passes. uc-04-29 states the refusal above it."
+  note: "expected behaviour from tools/outlook_draft_mail.py:65,324: 255 is the most that the subject accepts (max_length=MAX_SUBJECT_CHARACTERS), so a subject of exactly that length passes. uc-04-29 states the refusal above it."
 
 uc-04-39:
   status: working
@@ -615,7 +615,7 @@ uc-04-41:
       uses: {message_ref: uri of the message}
     - tool: outlook_search_mail
   must_not: [outlook_send_draft]
-  note: "The first step finds the message and the delete comes after it, so the reply call gets the old handle. Expected behaviour from tools/outlook_draft_reply_all.py:73-82 (GRAPH_NOT_FOUND): this tool created no draft, find the message again with outlook_search_mail or outlook_list_mail, and if neither finds it, tell the user that the message is not in this mailbox now. A message that only moved keeps its handle, so the cause is a permanent delete or a move to an archive mailbox. One missing message for a move is uc-05-33."
+  note: "The first step finds the message and the delete comes after it, so the reply call gets the old handle. Expected behaviour from tools/outlook_draft_reply_all.py:70-79 (GRAPH_NOT_FOUND): this tool created no draft, find the message again with outlook_search_mail or outlook_list_mail, and if neither finds it, tell the user that the message is not in this mailbox now. A message that only moved keeps its handle, so the cause is a permanent delete or a move to an archive mailbox. One missing message for a move is uc-05-33."
 
 uc-04-42:
   status: working
@@ -631,7 +631,7 @@ uc-04-42:
       uses: {message_ref: uri of the message}
     - tool: outlook_list_mail
       args: {folder: drafts}
-  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail (CHANGE_SHOWN_BY, tools/outlook_draft_reply_all.py:67). The first write (create reply-all) runs with no_retry (tools/outlook_draft_reply_all.py:415, graph_client/client.py:220-232), so one failure makes exactly one create call. The assistant creates a second reply only when the drafts do not show the first. The rows are an internal error with no wait time and a timeout. A 503 or 504 with a wait time gets the retry-after text and not this text (uc-04-36, now a row there; uc-04-43 is retired). The same check for a new note is uc-04-26."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail (CHANGE_SHOWN_BY, tools/outlook_draft_reply_all.py:63). The first write (create reply-all) runs with no_retry (tools/outlook_draft_reply_all.py:439, graph_client/client.py:220-232), so one failure makes exactly one create call. The assistant creates a second reply only when the drafts do not show the first. The rows are an internal error with no wait time and a timeout. A 503 or 504 with a wait time gets the retry-after text and not this text (uc-04-36, now a row there; uc-04-43 is retired). The same check for a new note is uc-04-26."
 
 uc-04-44:
   status: working
@@ -643,10 +643,10 @@ uc-04-44:
   chain:
     - any_of: [outlook_read_mail, outlook_read_thread, outlook_search_mail]
     - tool: outlook_draft_reply_all
-      args: {body: Friday works}
+      args: {body_html: "<p>Friday works</p>"}
       uses: {message_ref: uri of the message}
   must_not: [outlook_send_draft]
-  note: "expected behaviour from tools/outlook_draft_reply_all.py:203-215 and 403-411 (body_written false, failure holds what Microsoft said) and :382-400: the tool writes the draft in two steps, and when the second write fails it still answers with the handle of the draft, with `body` null, with none of the added Cc recipients, and with `failure`. The source does not define the draft that createReplyAll made as empty, so the Then says only that the text is not in it. Telling Mia is the reading of those fields (model behaviour, no code guard). The source does not say what the assistant does next to repair the draft (OPEN)."
+  note: "expected behaviour from tools/outlook_draft_reply_all.py:205-217 and 403-411 (body_written false, failure holds what Microsoft said) and :382-400: the tool writes the draft in two steps, and when the second write fails it still answers with the handle of the draft, with `body` null, with none of the added Cc recipients, and with `failure`. The source does not define the draft that createReplyAll made as empty, so the Then says only that the text is not in it. Telling Mia is the reading of those fields (model behaviour, no code guard). The source does not say what the assistant does next to repair the draft (OPEN)."
 
 uc-04-45:
   status: working
@@ -659,7 +659,7 @@ uc-04-45:
     - tool: outlook_find_recipient
     - tool: outlook_draft_mail
       uses: {to: address of Anna from outlook_find_recipient}
-  note: "expected behaviour from the address checks before any Graph call: tools/outlook_draft_mail.py:98-108 and :170-173, tools/outlook_draft_reply.py:148-174 and :331-379, tools/outlook_draft_reply_all.py:122-137 and :303-311, shared/outlook/replies.py:31-40, tools/outlook_update_draft.py:124-153, :257-273 and :326-337. Each tool refuses before it makes a draft."
+  note: "expected behaviour from the address checks before any Graph call: tools/outlook_draft_mail.py:100-110 and :172-175, tools/outlook_draft_reply.py:150-176 and :333-381, tools/outlook_draft_reply_all.py:124-139 and :305-313, shared/outlook/replies.py:31-40, tools/outlook_update_draft.py:126-155, :257-273 and :326-337. Each tool refuses before it makes a draft."
 
 uc-04-46:
   status: working
@@ -673,7 +673,7 @@ uc-04-46:
     - tool: outlook_draft_reply
       args: {mode: reply}
       uses: {message_ref: uri of the message from the previous listing}
-  note: "expected behaviour from the handle check at the start of each tool: tools/outlook_draft_reply.py:263-265, tools/outlook_draft_reply_all.py:232-234, tools/outlook_update_draft.py:319-322. The tool refuses before it makes or changes a draft."
+  note: "expected behaviour from the handle check at the start of each tool: tools/outlook_draft_reply.py:265-267, tools/outlook_draft_reply_all.py:234-236, tools/outlook_update_draft.py:321-324. The tool refuses before it makes or changes a draft."
 
 uc-04-47:
   status: working
@@ -688,7 +688,7 @@ uc-04-47:
     - tool: outlook_draft_reply
       args: {mode: reply}
       uses: {message_ref: uri of the message of Anna, cc: address of Anna}
-  note: "expected behaviour from tools/outlook_draft_reply.py:274-280 (_reply_already_goes_to) and :365-379: the tool reads the original, finds that the reply goes to the copied address, and makes no draft."
+  note: "expected behaviour from tools/outlook_draft_reply.py:276-282 (_reply_already_goes_to) and :365-379: the tool reads the original, finds that the reply goes to the copied address, and makes no draft."
 
 uc-04-48:
   status: working
@@ -704,7 +704,7 @@ uc-04-48:
     - tool: outlook_draft_reply
       args: {mode: reply}
       uses: {message_ref: uri of the message of Anna, cc: address of Tom}
-  note: "tools/outlook_draft_reply.py:274-276 reads the original when a reply has a copy, and :451-480 writes the copy in the second request."
+  note: "tools/outlook_draft_reply.py:276-278 reads the original when a reply has a copy, and :451-480 writes the copy in the second request."
 
 uc-04-49:
   status: working
@@ -717,7 +717,7 @@ uc-04-49:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - any_of: [outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft]
-  note: "tools/outlook_draft_reply.py:274-321, tools/outlook_draft_reply_all.py:245-293 and tools/outlook_update_draft.py:283-310 read the message, ask Mia with the draft and the mailbox named, and write after a yes."
+  note: "tools/outlook_draft_reply.py:276-323, tools/outlook_draft_reply_all.py:247-295 and tools/outlook_update_draft.py:285-312 read the message, ask Mia with the draft and the mailbox named, and write after a yes."
 
 uc-04-50:
   status: working
@@ -729,7 +729,7 @@ uc-04-50:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - any_of: [outlook_draft_reply, outlook_draft_reply_all, outlook_update_draft]
-  note: "expected behaviour from the legacy elicitation path, shared/seam/elicitation.py:92-101: a decline gives _not_agreed, and a question that fails with an error gives _no_answer. The write comes after the answer (tools/outlook_draft_reply.py:306-321), so the shared mailbox is not touched."
+  note: "expected behaviour from the legacy elicitation path, shared/seam/elicitation.py:92-101: a decline gives _not_agreed, and a question that fails with an error gives _no_answer. The write comes after the answer (tools/outlook_draft_reply.py:308-323), so the shared mailbox is not touched."
 
 uc-04-51:
   status: working
@@ -742,7 +742,7 @@ uc-04-51:
   chain:
     - tool: outlook_draft_mail
       uses: {to: address of Anna}
-  note: "shared/seam/elicitation.py:45-128: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing (for example tools/outlook_draft_mail.py:199-200)."
+  note: "shared/seam/elicitation.py:45-128: on a connection of the newer protocol the tool returns an input-required result with the question and writes nothing (for example tools/outlook_draft_mail.py:201-202)."
 
 uc-04-52:
   status: working
@@ -756,7 +756,7 @@ uc-04-52:
     - tool: outlook_draft_reply
       args: {mode: reply}
       uses: {message_ref: uri of the message from the previous listing}
-  note: "tools/outlook_draft_reply.py:387-408: the question says with no subject, and says that Microsoft chooses the address when the original names no sender and no reply-to address."
+  note: "tools/outlook_draft_reply.py:389-410: the question says with no subject, and says that Microsoft chooses the address when the original names no sender and no reply-to address."
 
 uc-04-53:
   status: working
@@ -768,9 +768,9 @@ uc-04-53:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail]
     - tool: outlook_draft_reply
-      args: {mode: reply, body: Friday works}
+      args: {mode: reply, body_html: "<p>Friday works</p>"}
       uses: {message_ref: uri of the message of Anna, bcc: address of Priya}
-  note: "expected behaviour from tools/outlook_draft_reply.py:468-480 and :487-504 (the same shape as uc-04-44 for a reply to everyone): the draft exists, body_written is false, and failure holds what Microsoft said. The second request is not repeated."
+  note: "expected behaviour from tools/outlook_draft_reply.py:470-482 and :489-506 (the same shape as uc-04-44 for a reply to everyone): the draft exists, body_written is false, and failure holds what Microsoft said. The second request is not repeated."
 
 uc-04-54:
   status: working
@@ -856,10 +856,10 @@ uc-04-60:
   chain:
     - any_of: [outlook_search_mail, outlook_list_mail, outlook_read_thread]
     - tool: outlook_draft_reply
-      args: {mode: reply, body: Friday works}
+      args: {mode: reply, body_html: "<p>Friday works</p>"}
       uses: {message_ref: uri of the message}
   must_not: [outlook_draft_reply_all, outlook_send_draft]
-  note: "tools/outlook_draft_reply.py:428-448: the text is the comment of the create request, so Microsoft puts it above the quoted message. No second request runs when the call has no Cc, Bcc, importance or category (:458-459 and :471-472)."
+  note: "tools/outlook_draft_reply.py:430-450: the text is the comment of the create request, so Microsoft puts it above the quoted message. No second request runs when the call has no Cc, Bcc, importance or category (:458-459 and :471-472)."
 
 uc-04-61:
   status: working
@@ -873,7 +873,7 @@ uc-04-61:
     - tool: outlook_find_recipient
       args: {query: Tom}
     - tool: outlook_draft_reply
-      args: {mode: forward, body: short note}
+      args: {mode: forward, body_html: "<p>short note</p>"}
       uses: {message_ref: uri of the message, to: address of Tom from outlook_find_recipient}
   must_not: [outlook_send_draft]
-  note: "tools/outlook_draft_reply.py:428-448: the note is the comment of the create request, so Microsoft puts it above the quoted message."
+  note: "tools/outlook_draft_reply.py:430-450: the note is the comment of the create request, so Microsoft puts it above the quoted message."

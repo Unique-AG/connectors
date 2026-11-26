@@ -1,0 +1,7 @@
+# The database connection alone, so only the mandatory URLs are missing.
+postgresql:
+  connection:
+    url:
+      fromSecret:
+        name: kyckr-mcp-ci-dummy
+        key: database-url

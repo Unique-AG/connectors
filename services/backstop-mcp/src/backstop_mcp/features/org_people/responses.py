@@ -371,6 +371,10 @@ class PersonResolvedResponse(OmitNoneModel):
         default="resolved",
         description="Always 'resolved': the person was found and fetched.",
     )
+    name: str | None = Field(
+        default=None,
+        description="Display name, as in `resolved.name`. Omitted when unknown.",
+    )
     person: PersonRecordResponse = Field(
         description=(
             "The person's own top-level Backstop attributes (name parts, emails, title, "
@@ -433,6 +437,10 @@ class OrganizationResolvedResponse(OmitNoneModel):
     status: Literal["resolved"] = Field(
         default="resolved",
         description="Always 'resolved': the organization was found and fetched.",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Display name, as in `resolved.name`. Omitted when unknown.",
     )
     organization: OrganizationRecordResponse = Field(
         description=(
@@ -556,7 +564,8 @@ class SearchOrganizationRowResponse(OmitNoneModel):
     url: str | None = Field(
         default=None,
         description=(
-            "CRM link for this organization. Omitted unless `fields` includes `url`. "
+            "CRM link for this organization. In the default fields; omitted when a custom "
+            "`fields` list leaves `url` out. "
             "Absent when this deployment has no UI origin."
         ),
     )
@@ -666,8 +675,8 @@ class SearchPersonRowResponse(OmitNoneModel):
     url: str | None = Field(
         default=None,
         description=(
-            "CRM link for this person. Omitted unless `fields` includes `url`. Absent when "
-            "this deployment has no UI origin."
+            "CRM link for this person. In the default fields; omitted when a custom "
+            "`fields` list leaves `url` out. Absent when this deployment has no UI origin."
         ),
     )
     name: str | None = Field(

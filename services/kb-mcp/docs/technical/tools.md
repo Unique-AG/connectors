@@ -54,8 +54,18 @@ just keyword matches, and returns them as citation-ready chunks.
 | `metadata_filter` | UniqueQL narrowing, AND-ed with the admin filter |
 | `limit`, `score_threshold` | Override the admin defaults for this call |
 
+Each hit is one JSON text block, `{title, url, content_id, pages?, text}`, that also carries a
+`unique.app/reference` in its `_meta` for Unique AI. `url` is an external page's own URL, else the
+knowledge-upload deep link when `UNIQUE_MCP_FRONTEND_BASE_URL` is set and the folder is known, else
+`unique://content/{id}`. `read_file` tries the deep link before the external URL.
+Only an http(s) `url` becomes a citation link in a generic client; a `unique://` one cites the file
+by title alone. The reference in `_meta` always uses `unique://content/{id}` for a knowledge-base
+document. Unique AI shows the model only each referenced block's `_meta.text`, the passage itself,
+so the trailing citation instruction reaches generic clients only. For Unique AI, `search` sets
+`unique.app/tool-format-information` instead, which tells the model to cite with `[sourceN]`
+markers; the tool description keeps the markdown-link guidance for every other client.
 `KB_MCP_SEARCH_SCOPE_LOOKUP_CONCURRENCY` (default `8`) bounds the parallel scope lookups used to
-build citation links.
+build the deep links.
 
 ### `content_tree`
 
@@ -131,10 +141,14 @@ views over the same visible-file snapshot.
 
 ### `read_file`
 
-Returns file content by `content_id`, as surfaced by `content_tree` or `search`.
+Returns file content by `content_id`, as surfaced by `content_tree` or `search`, as one JSON
+text block, `{title, url, content_id, text}`, with `url` built as for `search`. The block has no
+`_meta`, so Unique AI does not cite the file.
 
-`max_tokens_per_call` (admin default `8000`) bounds one response. Larger files are split into
-virtual pages of that size, selected with `start_page` and `end_page`. A caller may raise or
+`max_tokens_per_call` (admin default `8000`) bounds one response. It counts the text as the JSON
+block carries it, with quotes, backslashes and newlines escaped. Larger files are split into virtual
+pages sized to fit it, selected with `start_page` and `end_page`, so a page of a JSON or code file holds
+less raw text than a page of prose. A caller may raise or
 lower it, since it is a default the caller can override; if the file still doesn't fit in one call
 and no page range was given, the call returns an error instead of silently truncating, naming the
 file's total token/page count so the caller can pick a range.

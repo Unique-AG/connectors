@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.3](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.2...teams-mcp@0.5.3) (2026-11-23)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** serve the first-use pair on a refresh replay inside a 10s grace window ([#1802](https://github.com/Unique-AG/connectors/issues/1802)) ([0fe880a](https://github.com/Unique-AG/connectors/commit/0fe880a90ba41b238f715ea9a592c93dd2f56d82))
+
+
+### Dependencies
+
+* **deps:** bump @testcontainers/postgresql from 12.2.1 to 12.2.2 ([#1841](https://github.com/Unique-AG/connectors/issues/1841)) ([58b6930](https://github.com/Unique-AG/connectors/commit/58b693082f9bc783a63698af0dde8987df57b26f))
+
+## [0.5.2](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.1...teams-mcp@0.5.2) (2026-11-20)
+
+
+### Bug Fixes
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** stop rate-limiting OAuth discovery, serve the default OAuth paths, add a rate-limit kill switch ([#1778](https://github.com/Unique-AG/connectors/issues/1778)) ([67df6eb](https://github.com/Unique-AG/connectors/commit/67df6eb8e4cdc78331de1f60cca8ad069bb64239))
+
+
+### Dependencies
+
+* **deps:** bump azurerm from 5.13.0 to 5.14.0 ([#1719](https://github.com/Unique-AG/connectors/issues/1719)) ([66e2f41](https://github.com/Unique-AG/connectors/commit/66e2f41280a3f3b1c491119fc3436689cc53abca))
+
 ## [0.5.1](https://github.com/Unique-AG/connectors/compare/teams-mcp@0.5.0...teams-mcp@0.5.1) (2026-11-12)
 
 

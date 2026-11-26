@@ -1,0 +1,105 @@
+[
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists",
+    "json": {
+      "displayName": "seed-v1 case-outlook_add_task_link-created"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"l2Rrwy69FtQHTz2P8hxdcnVK/AgDRy==\"",
+      "displayName": "seed-v1 case-outlook_add_task_link-created",
+      "id": "AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"l2Rrwy69FtQHTz2P8hxdcnVK/AgDRy==\"",
+      "displayName": "seed-v1 case-outlook_add_task_link-created",
+      "id": "AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=/tasks",
+    "headers": {
+      "prefer": "outlook.timezone=\"UTC\""
+    },
+    "json": {
+      "title": "seed-v1 case-outlook_tasks task"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"t3Rpzx36MzEDXg1U3uyxfcBM/XyEGe==\"",
+      "body": {
+        "content": "",
+        "contentType": "text"
+      },
+      "categories": [],
+      "createdDateTime": "2026-11-25T09:29:39.3364182Z",
+      "hasAttachments": false,
+      "id": "AAMkQUayWOG7MAK3GTVvGVsuWQH1KN84Tkb8LKE1OHVtRXPfU3GpZAZZHBMGZSTacldFWGeeQSviE7g6YZB8HiLkrJqzVnygRLAfAoJa-RyiMTF6DB1SPKAhfAbxSgxhTKOjYqNw-NdeZIC6SL2GPDO=",
+      "importance": "normal",
+      "isReminderOn": false,
+      "lastModifiedDateTime": "2026-11-25T09:29:39.4617456Z",
+      "status": "notStarted",
+      "title": "seed-v1 case-outlook_tasks task"
+    }
+  },
+  {
+    "method": "GET",
+    "path": "/v1.0/me/todo/lists/AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=",
+    "status": 200,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8"
+    },
+    "response_json": {
+      "@odata.etag": "W/\"l2Rrwy69FtQHTz2P8hxdcnVK/AgDRy==\"",
+      "displayName": "seed-v1 case-outlook_add_task_link-created",
+      "id": "AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=",
+      "isOwner": true,
+      "isShared": false,
+      "wellknownListName": "none"
+    }
+  },
+  {
+    "method": "POST",
+    "path": "/v1.0/me/todo/lists/AAMkMKuoRZA4OEG0DZAsYJakXTY6TS97Udc0EKF2HYJnGDTmW7CtMPDjBZFNPTFbtbpCDJviIWkiU1b2JPH7OLAaqEiuYdgqTBEyVoUe-GziEIL6SD4QPRM=/tasks/AAMkQUayWOG7MAK3GTVvGVsuWQH1KN84Tkb8LKE1OHVtRXPfU3GpZAZZHBMGZSTacldFWGeeQSviE7g6YZB8HiLkrJqzVnygRLAfAoJa-RyiMTF6DB1SPKAhfAbxSgxhTKOjYqNw-NdeZIC6SL2GPDO=/linkedResources",
+    "json": {
+      "applicationName": "Outlook",
+      "displayName": "seed-v1 case-outlook_tasks link",
+      "webUrl": "https://outlook.office365.com/owa/mail"
+    },
+    "status": 201,
+    "response_headers": {
+      "content-type": "application/json;odata.metadata=minimal;odata.streaming=true;IEEE754Compatible=false;charset=utf-8",
+      "location": "https://graph.microsoft.com"
+    },
+    "response_json": {
+      "applicationName": "Outlook",
+      "displayName": "seed-v1 case-outlook_tasks link",
+      "id": "00000000-1709-4b22-8cc4-42082b80b694",
+      "webUrl": "https://outlook.office365.com/owa/mail"
+    }
+  }
+]

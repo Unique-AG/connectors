@@ -47,6 +47,8 @@ from kb_mcp.common.metadata_filter import (
 )
 from kb_mcp.common.references import (
     METADATA_FILTER_EMPTY_RETRY_HINT,
+    NOT_A_SOURCE_PROMPT,
+    UNEXPECTED_ERROR_MESSAGE,
     MetadataFilterArgument,
     file_reference_url,
     markdown_citation_link,
@@ -383,8 +385,50 @@ _META = merge_tool_meta(
 )
 
 
+_DESCRIPTION = f"""Browse the knowledge base's folder/file structure — use this only when
+you need to know what files or folders exist, not to find information
+inside them (use search for that). Reach for this when: the user names a
+specific folder/file and you need to resolve its path or content_id; the
+user asks what documents/files exist somewhere rather than a substantive
+question about their content ('which documents do we have owned by X',
+'what's in the X folder', 'list files under X') — that's an enumeration
+request (use mode='list' with folder_path, or mode='tree'), not a content
+search; or you're about to call read_file and need the content_id first.
+Pick a mode; only that mode's args below apply, rest ignored. '*' = required.
+folder_path, metadata_filter, limit and timeout apply to every mode.
+Pass folder_path whenever the request is about one folder rather than the
+whole knowledge base — it scopes the walk rather than filtering afterwards,
+which is the difference between a fast call and a slow one. It takes a path
+('Contracts/2024') or a scope_xxx id.
+- mode='tree': max_depth, folders_only — first orientation view of
+folders/files. Folder lines carry `(folder_id=scope_xxx)` when known — pass
+that id back as folder_path here, or as search's `folder_ids`, to scope to
+that folder. A folder shows no id until the walk reaches a file beneath it;
+if the one you need is missing, re-run with a larger max_depth
+(folders_only=true keeps this cheap — it only hides files from the rendered
+lines, not from the walk that discovers ids). Capped at `limit` files and,
+by default, the same number of folders; either says so when it truncated.
+- mode='list': flat listing; each result's content_id is needed for a later
+read_file call. Capped at `limit`; says so when it truncated.
+- mode='search': query*, min_score, match_on, case_sensitive — fuzzy
+filename/path lookup when you know roughly what a file is called but not
+where it is — not for finding files by their content, use search for that.
+Capped at `limit`; says when there may be more to raise it for.
+'list' and 'search' rows start with a markdown link that opens the file
+in the Unique knowledge base — paste it as-is when referring the user to
+a file; use the content_id for read_file calls.
+{NOT_A_SOURCE_PROMPT}
+Listings are cached per user (~10 min); repeat calls are fast. When the
+user says they added, deleted, or changed files and needs a fresh tree,
+call with refresh=true (expect a slower ~20s refetch).
+timeout is seconds to wait before returning a partial tree; the walk
+continues, so a follow-up call usually returns the complete tree."""
+
+
 @tool(
     name="content_tree",
+    # Not the docstring: a docstring can't reference NOT_A_SOURCE_PROMPT.
+    description=_DESCRIPTION,
     meta=_META,
     icons=tool_icons("folder-tree"),
     annotations=ToolAnnotations(
@@ -493,44 +537,6 @@ async def content_tree(
     metadata_filter: MetadataFilterArgument = None,
     config: ContentTreeToolConfig = Depends(get_tool_config(ContentTreeToolConfig)),
 ) -> ToolResult:
-    """Browse the knowledge base's folder/file structure — use this only when
-    you need to know what files or folders exist, not to find information
-    inside them (use search for that). Reach for this when: the user names a
-    specific folder/file and you need to resolve its path or content_id; the
-    user asks what documents/files exist somewhere rather than a substantive
-    question about their content ('which documents do we have owned by X',
-    'what's in the X folder', 'list files under X') — that's an enumeration
-    request (use mode='list' with folder_path, or mode='tree'), not a content
-    search; or you're about to call read_file and need the content_id first.
-    Pick a mode; only that mode's args below apply, rest ignored. '*' = required.
-    folder_path, metadata_filter, limit and timeout apply to every mode.
-    Pass folder_path whenever the request is about one folder rather than the
-    whole knowledge base — it scopes the walk rather than filtering afterwards,
-    which is the difference between a fast call and a slow one. It takes a path
-    ('Contracts/2024') or a scope_xxx id.
-    - mode='tree': max_depth, folders_only — first orientation view of
-    folders/files. Folder lines carry `(folder_id=scope_xxx)` when known — pass
-    that id back as folder_path here, or as search's `folder_ids`, to scope to
-    that folder. A folder shows no id until the walk reaches a file beneath it;
-    if the one you need is missing, re-run with a larger max_depth
-    (folders_only=true keeps this cheap — it only hides files from the rendered
-    lines, not from the walk that discovers ids). Capped at `limit` files and,
-    by default, the same number of folders; either says so when it truncated.
-    - mode='list': flat listing; each result's content_id is needed for a later
-    read_file call. Capped at `limit`; says so when it truncated.
-    - mode='search': query*, min_score, match_on, case_sensitive — fuzzy
-    filename/path lookup when you know roughly what a file is called but not
-    where it is — not for finding files by their content, use search for that.
-    Capped at `limit`; says when there may be more to raise it for.
-    'list' and 'search' rows start with a markdown link that opens the file
-    in the Unique knowledge base — paste it as-is when referring the user to
-    a file; use the content_id for read_file calls.
-    Listings are cached per user (~10 min); repeat calls are fast. When the
-    user says they added, deleted, or changed files and needs a fresh tree,
-    call with refresh=true (expect a slower ~20s refetch).
-    timeout is seconds to wait before returning a partial tree; the walk
-    continues, so a follow-up call usually returns the complete tree.
-    """
     kb_settings = get_settings()
     cid: str | None = None
     try:
@@ -798,5 +804,6 @@ async def content_tree(
             type(exc).__name__,
         )
         return ToolResult(
-            is_error=True, content=[TextContent(type="text", text=str(exc))]
+            is_error=True,
+            content=[TextContent(type="text", text=UNEXPECTED_ERROR_MESSAGE)],
         )

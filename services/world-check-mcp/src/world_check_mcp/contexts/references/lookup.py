@@ -20,6 +20,7 @@ from world_check_mcp.upstream import GetProvidersRequest
 from world_check_mcp.upstream import GetRecordPath
 from world_check_mcp.upstream import GetRecordRequest
 from world_check_mcp.upstream import GetSearchFiltersRequest
+from world_check_mcp.upstream import primary_name
 from world_check_mcp.upstream import ProviderDetail
 from world_check_mcp.upstream import SearchParameterCollection
 from world_check_mcp.upstream import Upstream
@@ -58,14 +59,18 @@ async def get_reference_data(*, upstream: Upstream, kind: ReferenceKind) -> Refe
 
 
 def _profile(*, record: Entity) -> Profile:
-    names = [
-        part.value
-        for detail in record.names.name_details or []
-        for part in detail.details or []
-        if part.value
-    ]
+    name_details = record.names.name_details or []
+    names = [part.value for detail in name_details for part in detail.details or [] if part.value]
     categories = [category.value for category in record.categories or [] if category.value]
+    links = record.source_reference_links
+    pages = (
+        link.uri
+        for link in (links.source_reference_link_details or [] if links else [])
+        if link.uri and link.uri.lower().startswith(("https://", "http://"))
+    )
     return Profile(
+        name=primary_name(name_details),
+        url=next(pages, None),
         reference_id=record.reference_id,
         entity_type=record.entity_type,
         names=names,

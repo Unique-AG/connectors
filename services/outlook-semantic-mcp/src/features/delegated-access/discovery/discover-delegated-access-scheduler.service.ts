@@ -69,7 +69,7 @@ export class DiscoverDelegatedAccessSchedulerService implements OnModuleInit, On
 
     const event = DiscoverDelegatedAccessEventDto.parse({
       type: 'unique.outlook-semantic-mcp.delegated-access.discover',
-      payload: {},
+      payload: { newCycleRequestedAt: Date.now() },
     });
     await this.amqp.publish(
       MAIN_EXCHANGE.name,

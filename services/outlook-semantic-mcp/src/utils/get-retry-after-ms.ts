@@ -2,28 +2,19 @@ import { GraphError } from '@microsoft/microsoft-graph-client';
 import { isNonNullish, isNumber } from 'remeda';
 import { errors } from 'undici';
 import { GenericRateLimitError } from './is-rate-limit-error';
+import { parseRetryAfterMs } from './parse-retry-after-ms';
 
 // Extracts the Retry-After delay (ms) from Graph, undici, and GenericRateLimitError (including batched-cause arrays); returns the maximum found, or null.
 export const getRetryAfterMs = (error: unknown): number | null => {
   if (error instanceof GraphError) {
-    const retryAfter = error.headers?.get('Retry-After');
-    if (retryAfter) {
-      const seconds = parseInt(retryAfter, 10);
-      if (!Number.isNaN(seconds)) {
-        return seconds * 1000;
-      }
-    }
-    return null;
+    return parseRetryAfterMs(error.headers?.get('Retry-After'));
   }
   if (error instanceof errors.ResponseError) {
     const headers = error.headers;
     if (headers && !Array.isArray(headers)) {
       const retryAfter = headers['retry-after'];
       if (typeof retryAfter === 'string') {
-        const seconds = parseInt(retryAfter, 10);
-        if (!Number.isNaN(seconds)) {
-          return seconds * 1000;
-        }
+        return parseRetryAfterMs(retryAfter);
       }
     }
     return null;

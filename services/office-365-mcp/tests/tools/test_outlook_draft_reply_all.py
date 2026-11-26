@@ -48,3 +48,80 @@ class TestTheQuestionForAnotherMailbox:
         (question,) = asked
         assert f"It is copied to {_LOOKALIKE.upper()}, {_LOOKALIKE}." in question, question
         assert "That is 4 addresses in all." in question, question
+
+    async def test_the_mailbox_in_the_original_does_not_hide_it_as_an_added_bcc(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        original = {
+            **_original(),
+            "toRecipients": [{"emailAddress": {"name": "Support", "address": _MAILBOX}}],
+        }
+        _ = graph.get(_ORIGINAL_PATH).mock(return_value=httpx.Response(200, json=original))
+        asked: list[str] = []
+
+        async def refusing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return "Nothing was created."
+
+        with pytest.raises(ToolError, match="Nothing was created"):
+            _ = await draft_reply_all(
+                client,
+                message_ref=_MESSAGE_REF,
+                body_html="<p>Thanks.</p>",
+                confirm=refusing,
+                bcc=[_MAILBOX.upper()],
+                mailbox=_MAILBOX,
+            )
+
+        (question,) = asked
+        assert f"It is blind copied to {_MAILBOX.upper()}." in question, question
+
+    async def test_the_mailbox_on_the_original_cc_and_added_as_cc_is_asked_about_once(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        original = {
+            **_original(),
+            "ccRecipients": [{"emailAddress": {"name": "Support", "address": _MAILBOX}}],
+        }
+        _ = graph.get(_ORIGINAL_PATH).mock(return_value=httpx.Response(200, json=original))
+        asked: list[str] = []
+
+        async def refusing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return "Nothing was created."
+
+        with pytest.raises(ToolError, match="Nothing was created"):
+            _ = await draft_reply_all(
+                client,
+                message_ref=_MESSAGE_REF,
+                body_html="<p>Thanks.</p>",
+                confirm=refusing,
+                cc=[_MAILBOX.upper()],
+                mailbox=_MAILBOX,
+            )
+
+        (question,) = asked
+        assert f"It is copied to {_MAILBOX.upper()}." in question, question
+
+    async def test_a_cc_named_like_the_mailbox_but_with_no_address_is_still_shown(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        original = {**_original(), "ccRecipients": [{"emailAddress": {"name": _MAILBOX}}]}
+        _ = graph.get(_ORIGINAL_PATH).mock(return_value=httpx.Response(200, json=original))
+        asked: list[str] = []
+
+        async def refusing(question: str, _about: str) -> Confirmed:
+            asked.append(question)
+            return "Nothing was created."
+
+        with pytest.raises(ToolError, match="Nothing was created"):
+            _ = await draft_reply_all(
+                client,
+                message_ref=_MESSAGE_REF,
+                body_html="<p>Thanks.</p>",
+                confirm=refusing,
+                mailbox=_MAILBOX,
+            )
+
+        (question,) = asked
+        assert f"It is copied to {_MAILBOX}." in question, question

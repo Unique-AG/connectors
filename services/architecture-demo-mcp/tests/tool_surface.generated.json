@@ -321,48 +321,63 @@
     "title": "Get Daily Meta"
   },
   {
-    "_meta": {
-      "fastmcp": {
-        "tags": [
-          "End-of-Day"
-        ]
-      }
-    },
     "annotations": {
+      "idempotentHint": true,
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get end-of-day price history for a ticker",
+    "description": "Get a ticker's open, high, low, close and volume per period, raw and adjusted for splits\nand dividends, oldest first. The result's `title` names the ticker and the dates covered:\ncite the prices by it.\n\nFor a summary of how the price moved, call `get_price_performance`.",
     "inputSchema": {
+      "additionalProperties": false,
       "properties": {
-        "endDate": {
-          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or before the endDate (<=). Parameter must be in YYYY-MM-DD format.",
-          "format": "date",
-          "type": "string"
-        },
-        "format": {
-          "description": "Response format. Supports \"json\" (default) and \"csv\". CSV is a bare-bones return type that is often 4-5x faster than JSON.",
-          "enum": [
-            "json",
-            "csv"
+        "end_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
           ],
-          "type": "string"
+          "default": null,
+          "description": "The last day, `YYYY-MM-DD`. Leave it out for today."
         },
-        "resampleFreq": {
-          "description": "Allows resampled values that allow you to choose the values returned as daily, weekly, monthly, or annually values. Note: ONLY DAILY takes into account holidays. All others use standard business days Acceptable values: daily : Values returned as daily periods, with a holiday calendar. weekly : Values returned as weekly data, with days ending on Friday. monthly : Values returned as monthly data, with days ending on the last standard business day (Mon-Fri) of each month. annually : Values returned as annual data, with days ending on the last standard business day (Mon-Fri) of each year. Note, that if you choose a value in-between the resample period for weekly, monthly, and daily, the start date rolls back to consider the entire period. For example, if you choose to resample weekly, but your \"startDate\" parameter is set to Wednesday of that week, the startDate will be adjusted to Monday, so the entire week is captured. Another example is if you send a startDate mid-month, we roll back the startDate to the beginning of the month. Similarly, if you provide an endDate, and it's midway through the period, we roll-forward the date to capture the whole period. In the above example, if the end date is set to a wednesday with a weekly resample, the end date is rolled forward to the Friday of that week.",
-          "type": "string"
+        "resample_freq": {
+          "anyOf": [
+            {
+              "enum": [
+                "daily",
+                "weekly",
+                "monthly",
+                "annually"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Period per row: `daily` (the default, with holidays), `weekly`, `monthly` or `annually`. A longer period widens the dates to whole periods."
         },
-        "sort": {
-          "description": "This field allows you to specify the sort direct and which column to sort by. Prepend \"-\" if you want descending order, otherwise it will be ascending. E.g. sort=date will sort by date in ascending order. sort=-date will sort by date in descending order.",
-          "type": "string"
-        },
-        "startDate": {
-          "description": "If startDate or endDate is not null, historical data will be queried. This filter limits metrics to on or after the startDate (>=). Parameter must be in YYYY-MM-DD format.",
-          "format": "date",
-          "type": "string"
+        "start_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The first day, `YYYY-MM-DD`. Leave both dates out for the latest trading day alone."
         },
         "ticker": {
-          "description": "Ticker related to the asset.",
+          "description": "A stock, ETF or fund ticker such as `AAPL`, as `search_assets` returns it.",
+          "maxLength": 32,
+          "minLength": 1,
           "type": "string"
         }
       },
@@ -374,73 +389,183 @@
     "name": "get_daily_prices",
     "outputSchema": {
       "properties": {
-        "result": {
+        "prices": {
+          "description": "The periods, oldest first.",
           "items": {
+            "description": "One period's prices as Tiingo reports them, raw and adjusted for splits and dividends.",
             "properties": {
-              "adjClose": {
-                "description": "The adjusted closing price for the asset on the given date.",
-                "type": "number"
+              "adj_close": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Closing price adjusted for splits and dividends."
               },
-              "adjHigh": {
-                "description": "The adjusted high price for the asset on the given date.",
-                "type": "number"
+              "adj_high": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Highest price adjusted for splits and dividends."
               },
-              "adjLow": {
-                "description": "The adjusted low price for the asset on the given date.",
-                "type": "number"
+              "adj_low": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Lowest price adjusted for splits and dividends."
               },
-              "adjOpen": {
-                "description": "The adjusted opening price for the asset on the given date.",
-                "type": "number"
+              "adj_open": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Opening price adjusted for splits and dividends."
               },
-              "adjVolume": {
-                "description": "The number of shares traded for the asset.",
-                "type": "integer"
+              "adj_volume": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Shares traded, adjusted for splits."
               },
               "close": {
-                "description": "The closing price for the asset on the given date.",
-                "type": "number"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Closing price."
               },
               "date": {
-                "description": "The date this data pertains to.",
+                "description": "The day the period ends.",
                 "format": "date",
                 "type": "string"
               },
-              "divCash": {
-                "description": "The dividend paid out on \"date\" (note that \"date\" will be the \"exDate\" for the dividend).",
-                "type": "number"
+              "div_cash": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Dividend paid on the day, per share."
               },
               "high": {
-                "description": "The high price for the asset on the given date.",
-                "type": "number"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Highest price."
               },
               "low": {
-                "description": "The low price for the asset on the given date.",
-                "type": "number"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Lowest price."
               },
               "open": {
-                "description": "The opening price for the asset on the given date.",
-                "type": "number"
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Opening price."
               },
-              "splitFactor": {
-                "description": "The factor used to adjust prices when a company splits, reverse splits, or pays a distribution.",
-                "type": "number"
+              "split_factor": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Split applied on the day, 1 when none."
               },
               "volume": {
-                "description": "The number of shares traded for the asset.",
-                "type": "integer"
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Shares traded."
               }
             },
+            "required": [
+              "date",
+              "open",
+              "high",
+              "low",
+              "close",
+              "volume",
+              "adj_open",
+              "adj_high",
+              "adj_low",
+              "adj_close",
+              "adj_volume",
+              "div_cash",
+              "split_factor"
+            ],
             "type": "object"
           },
           "type": "array"
+        },
+        "ticker": {
+          "description": "The ticker the prices are for.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The ticker, the period length and the dates covered, by which a chat cites it.",
+          "type": "string"
         }
       },
       "required": [
-        "result"
+        "title",
+        "ticker",
+        "prices"
       ],
-      "type": "object",
-      "x-fastmcp-wrap-result": true
+      "type": "object"
     },
     "title": "Get Daily Prices"
   },
@@ -878,166 +1003,224 @@
     "title": "Get Fundamentals Statements"
   },
   {
-    "_meta": {
-      "fastmcp": {
-        "tags": [
-          "IEX"
-        ]
-      }
-    },
     "annotations": {
+      "idempotentHint": false,
       "openWorldHint": true,
       "readOnlyHint": true
     },
-    "description": "Get IEX top-of-book and last-sale quotes",
+    "description": "Get the latest IEX quote of each ticker: last sale, bid and ask, today's open, high and low,\nand the previous close. The result's `title` names the tickers: cite the quotes by it.",
     "inputSchema": {
+      "additionalProperties": false,
       "properties": {
         "tickers": {
-          "description": "Ticker related to the asset.",
-          "type": "string"
+          "anyOf": [
+            {
+              "items": {
+                "description": "A stock, ETF or fund ticker such as `AAPL`, as `search_assets` returns it.",
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The tickers to quote. Leave it out for every ticker IEX quotes."
         }
       },
-      "required": [],
       "type": "object"
     },
     "name": "get_iex_top_of_book",
     "outputSchema": {
       "properties": {
-        "result": {
+        "quotes": {
+          "description": "One quote per ticker.",
           "items": {
+            "description": "A ticker's latest IEX quote.",
             "properties": {
-              "askPrice": {
-                "description": "The current ask price. IEX entitlement required",
-                "type": [
-                  "number",
-                  "null"
-                ]
+              "ask_price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Best ask price."
               },
-              "askSize": {
-                "description": "The amount of shares at the ask price. IEX entitlement required",
-                "type": [
-                  "number",
-                  "null"
-                ]
+              "ask_size": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Shares at the best ask."
               },
-              "bidPrice": {
-                "description": "The current bid price. IEX entitlement required",
-                "type": [
-                  "number",
-                  "null"
-                ]
+              "bid_price": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Best bid price."
               },
-              "bidSize": {
-                "description": "The amount of shares at the bid price. IEX entitlement required",
-                "type": [
-                  "number",
-                  "null"
-                ]
+              "bid_size": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Shares at the best bid."
               },
               "high": {
-                "description": "The high price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Today's highest price."
               },
               "last": {
-                "description": "Last is the last trade that was executed on IEX. IEX entitlement required",
-                "type": [
-                  "number",
-                  "null"
-                ]
-              },
-              "lastSaleTimestamp": {
-                "description": "The timestamp the last time the trade (last/lastSize) data was received from IEX. IEX entitlement required",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "lastSize": {
-                "description": "The amount of shares traded (volume) at the last price on IEX. IEX entitlement required",
-                "type": [
-                  "integer",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Last sale price on IEX."
               },
               "low": {
-                "description": "The low price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Today's lowest price."
               },
               "mid": {
-                "description": "The mid price of the current timestamp when both \"bidPrice\" and \"askPrice\" are not-null. In mathematical terms: mid = (bidPrice + askPrice)/2.0 This value is calculated by Tiingo and not provided by IEX.",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Midpoint of the bid and ask."
               },
               "open": {
-                "description": "The opening price of the asset on the current day This value is calculated by Tiingo and not provided by IEX.",
-                "type": [
-                  "number",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Today's opening price."
               },
-              "prevClose": {
-                "description": "Previous day's closing price of the security.This can be from any of the exchanges, NYSE, NASDAQ, IEX, etc.",
-                "type": [
-                  "number",
-                  "null"
-                ]
-              },
-              "quoteTimestamp": {
-                "description": "The timestamp the last time the quote (bid/ask) data was received from IEX. IEX entitlement required",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
+              "prev_close": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Previous trading day's close."
               },
               "ticker": {
-                "description": "Ticker related to the asset.",
+                "description": "The ticker the quote is for.",
                 "type": "string"
               },
               "timestamp": {
-                "description": "The timestamp the data was last refresh on.",
-                "format": "date-time",
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "When Tiingo last refreshed the quote."
               },
-              "tngoLast": {
-                "description": "Tiingo Last is either the last price or mid price. The mid price is only used if our algo determines it is a good proxy for the last price. So if the spread is considered wide by our algo, we do not use it. Also, after the official exchange print comes in, this value changes to that value. This value is calculated by Tiingo and not provided by IEX .",
-                "type": [
-                  "number",
-                  "null"
-                ]
+              "tngo_last": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Tiingo's last price: the last sale, or the mid when Tiingo judges the spread tight, then the official close once it is in."
               },
               "volume": {
-                "description": "Volume will be IEX Volume throughout the day, but once the official closing price comes in, volume will reflect the volume done on the entire day across all exchanges. This field is available for convenience.",
-                "type": [
-                  "integer",
-                  "null"
-                ]
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Shares traded today: on IEX during the day, then on every exchange once the official close is in."
               }
             },
+            "required": [
+              "ticker",
+              "timestamp",
+              "last",
+              "tngo_last",
+              "prev_close",
+              "open",
+              "high",
+              "low",
+              "mid",
+              "bid_price",
+              "bid_size",
+              "ask_price",
+              "ask_size",
+              "volume"
+            ],
             "type": "object"
           },
           "type": "array"
+        },
+        "title": {
+          "description": "The tickers quoted, by which a chat cites the quotes.",
+          "type": "string"
         }
       },
       "required": [
-        "result"
+        "title",
+        "quotes"
       ],
-      "type": "object",
-      "x-fastmcp-wrap-result": true
+      "type": "object"
     },
-    "title": "Get Iex Top Of Book"
+    "title": "Get IEX Top of Book"
   },
   {
     "annotations": {

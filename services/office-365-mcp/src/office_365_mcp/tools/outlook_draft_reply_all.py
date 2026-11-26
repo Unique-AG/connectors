@@ -21,9 +21,10 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
-from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -63,7 +64,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "message_ref": "outlook:///messages/AAMkAGI2SYNTHETIC-immutable-0001%3D",
-    "body": "Thanks, Friday works for all of us.",
+    "body_html": "<p>Thanks, Friday works for all of us.</p>",
 }
 
 GRAPH_NOT_FOUND = (
@@ -85,7 +86,7 @@ _NOTHING_CREATED = "No draft was created."
 
 _CHOSEN_BY_MICROSOFT = "an address that Microsoft chooses"
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Drafts a reply-all to a found message, for the user to review. The draft goes into Drafts in the \
 signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send \
 mail. outlook_draft_reply is the tool for a reply to the sender only, or a forward.
@@ -101,6 +102,7 @@ file, tell them to add it in Outlook before they send the draft. Never put file 
 in the body.
 - This tool asks the user to agree before it changes a shared or delegated mailbox. It changes \
 the user's own mailbox without a question.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_MESSAGE_HANDLE = (
@@ -244,10 +246,13 @@ async def draft_reply_all(
         if mailbox is not None:
             original = await read_original(reached, handle, fields=_ORIGINAL_FIELDS)
             addressed = _addressed(original)
-            original_cc = spelled_recipients(original.cc_recipients)
-            recorded = _recorded(
-                [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
-                original.cc_recipients,
+            original_cc = spelled_recipients(_without(original.cc_recipients, mailbox))
+            recorded = _not_yet_on(
+                _recorded(
+                    [*(original.reply_to or _sender(original)), *(original.to_recipients or [])],
+                    original.cc_recipients,
+                ),
+                [mailbox],
             )
             copied = [*original_cc, *_not_yet_on(added, recorded)]
             blind = _not_yet_on(blind_added, recorded)
@@ -256,6 +261,7 @@ async def draft_reply_all(
                     _question(
                         mailbox,
                         subject=original.subject,
+                        body_html=body_html,
                         addressed=addressed,
                         copied=copied,
                         blind=blind,
@@ -329,6 +335,15 @@ def _recorded(*lists: list[Recipient] | None) -> list[str]:
     ]
 
 
+def _without(recipients: list[Recipient] | None, address: str) -> list[Recipient]:
+    return [
+        one
+        for one in recipients or []
+        if one.email_address is None
+        or (one.email_address.address or "").casefold() != address.casefold()
+    ]
+
+
 def _not_yet_on(added: Sequence[str], present: Sequence[str]) -> list[str]:
     seen = {address.casefold() for address in present}
     return [address for address in added if address.casefold() not in seen]
@@ -338,6 +353,7 @@ def _question(
     mailbox: str,
     *,
     subject: str | None,
+    body_html: str,
     addressed: Sequence[str],
     copied: Sequence[str],
     blind: Sequence[str],
@@ -356,6 +372,7 @@ def _question(
         + (f" It is blind copied to {', '.join(blind)}." if blind else "")
         + ("" if importance is None else f" It has {importance} importance.")
         + (f" It is tagged {cut_for_a_question(', '.join(categories))}." if categories else "")
+        + links_in_body(body_html)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
     )
@@ -464,14 +481,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 ),
             ),
         ],
-        body: Annotated[
+        body_html: Annotated[
             str,
             Field(
                 min_length=1,
-                description=(
-                    "What to say to everyone on the message, as Markdown. This tool turns it "
-                    + "into HTML."
-                ),
+                description=OUTLOOK_BODY_HTML_FIELD,
             ),
         ],
         cc: Annotated[
@@ -525,7 +539,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
         return await draft_reply_all(
             client,
             message_ref=message_ref,
-            body_html=markdown_to_html(body),
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             cc=cc,
             bcc=bcc,

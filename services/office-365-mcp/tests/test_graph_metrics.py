@@ -55,8 +55,8 @@ from office_365_mcp.graph_client import (
 from office_365_mcp.graph_client.observability import record_graph_call
 from office_365_mcp.graph_operations import (
     TOOL_OUTCOMES_TOTAL,
-    TOOL_REFUSALS,
     GraphOperationMiddleware,
+    is_refusal,
     start_tool_outcomes,
 )
 from office_365_mcp.metrics import configure_metrics
@@ -260,7 +260,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         with (
             pytest.raises(ToolError),
-            measured_graph_operation(TRANSCRIPT_TOOL, not_failures=TOOL_REFUSALS),
+            measured_graph_operation(TRANSCRIPT_TOOL, is_refusal=is_refusal),
         ):
             _ = await teams_read_transcript(
                 client,
@@ -303,7 +303,7 @@ class TestAGraphCallIsCountedAndTimed:
 
         with (
             pytest.raises(ToolError),
-            measured_graph_operation("outlook_send_draft", not_failures=TOOL_REFUSALS),
+            measured_graph_operation("outlook_send_draft", is_refusal=is_refusal),
         ):
             _ = await send_draft(
                 client, confirm=declines, message_ref=f"outlook:///messages/{draft_id}"
@@ -426,7 +426,7 @@ class TestOneGraphCallInsideAToolIsMeasuredOnItsOwn:
         answered = _value(GRAPH_STEPS_TOTAL, **labels, status="ok")
         missing = _value(GRAPH_STEPS_TOTAL, **labels, status="not_found")
 
-        with measured_graph_operation(CALL_TRANSCRIPTS_TOOL, not_failures=TOOL_REFUSALS):
+        with measured_graph_operation(CALL_TRANSCRIPTS_TOOL, is_refusal=is_refusal):
             found = await teams_list_call_transcripts(client, limit=20)
 
         assert found.status == "none_found"
@@ -624,9 +624,9 @@ async def _send_to_chat(client: GraphServiceClient, answer: Confirmed) -> object
         assert question and about
         return answer
 
-    with measured_graph_operation(CHAT_SEND_TOOL, not_failures=TOOL_REFUSALS):
+    with measured_graph_operation(CHAT_SEND_TOOL, is_refusal=is_refusal):
         return await send_chat_message(
-            client, chat_id=_CHAT_ID, message="Ship it.", confirm=confirm
+            client, chat_id=_CHAT_ID, body_html="Ship it.", confirm=confirm
         )
 
 
@@ -635,9 +635,9 @@ async def _send_to_channel(client: GraphServiceClient, answer: Confirmed) -> obj
         assert question and about
         return answer
 
-    with measured_graph_operation(CHANNEL_SEND_TOOL, not_failures=TOOL_REFUSALS):
+    with measured_graph_operation(CHANNEL_SEND_TOOL, is_refusal=is_refusal):
         return await send_channel_message(
-            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, message="Ship it.", confirm=confirm
+            client, team_id=_TEAM_ID, channel_id=_CHANNEL_ID, body_html="Ship it.", confirm=confirm
         )
 
 
@@ -920,6 +920,13 @@ def _probe_server(client: GraphServiceClient) -> FastMCP[None]:
         empty: dict[str, str] = {}
         return empty["missing"]
 
+    @server.tool(name="zz_reads_then_crashes")
+    async def reads_then_crashes() -> str:
+        with graph_errors():
+            _ = await client.me.get()
+        empty: dict[str, str] = {}
+        return empty["missing"]
+
     @server.tool(name="zz_asserts_inside_graph")
     async def asserts_inside_graph() -> str:
         with graph_errors():
@@ -976,6 +983,12 @@ def _probe_server(client: GraphServiceClient) -> FastMCP[None]:
             raise ToolError("Microsoft refused") from ValueError("parsed after the refusal")
         return "unreachable"
 
+    @server.tool(name="zz_reads_then_builds_a_bad_answer")
+    async def reads_then_builds_a_bad_answer() -> str:
+        with graph_errors():
+            _ = await client.me.get()
+        return str(SignedInUser.model_validate({}))
+
     @server.tool(name="zz_builds_a_bad_answer")
     async def builds_a_bad_answer() -> str:
         return str(SignedInUser.model_validate({}))
@@ -1012,6 +1025,36 @@ class TestTheServerCountsEachToolCallUnderItsRegisteredName:
 
         assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="forbidden") == before + 1
 
+    @pytest.mark.parametrize(
+        ("tool", "graph_answer", "not_blamed"),
+        [
+            ("zz_reads_then_crashes", 200, "ok"),
+            ("zz_reads_then_builds_a_bad_answer", 200, "ok"),
+            ("zz_recovers_then_crashes", 403, "forbidden"),
+            ("zz_crashes_inside_a_handler", 403, "forbidden"),
+        ],
+    )
+    async def test_a_crash_after_graph_answered_is_counted_as_an_error_and_not_as_graph(
+        self,
+        client: GraphServiceClient,
+        graph: respx.MockRouter,
+        tool: str,
+        graph_answer: int,
+        not_blamed: str,
+    ) -> None:
+        _ = graph.get("/me").mock(
+            return_value=httpx.Response(graph_answer, json=_ME if graph_answer == 200 else {})
+        )
+        errors = _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="error")
+        blamed = _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status=not_blamed)
+
+        async with Client(_probe_server(client)) as mcp:
+            answered = await mcp.call_tool(tool, {}, raise_on_error=False)
+
+        assert answered.is_error
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status="error") == errors + 1
+        assert _value(GRAPH_OPERATIONS_TOTAL, operation=tool, status=not_blamed) == blamed
+
     async def test_a_call_that_never_reached_graph_is_not_counted(
         self, client: GraphServiceClient
     ) -> None:
@@ -1036,6 +1079,7 @@ class TestEachToolCallIsCountedUnderHowItEnded:
             ("zz_refuses_with_a_cause", None, "refused"),
             ("zz_crashes", None, "error"),
             ("zz_recovers_then_crashes", 403, "error"),
+            ("zz_reads_then_crashes", 200, "error"),
             ("zz_asserts_inside_graph", 200, "error"),
             ("zz_needs_an_argument", None, "refused"),
             ("zz_asks", None, "asked"),
@@ -1043,6 +1087,7 @@ class TestEachToolCallIsCountedUnderHowItEnded:
             ("zz_refuses_with_another_cause", 403, "graph"),
             ("zz_returns_an_error", None, "error"),
             ("zz_builds_a_bad_answer", None, "error"),
+            ("zz_reads_then_builds_a_bad_answer", 200, "error"),
         ],
     )
     async def test_the_outcome_names_what_ended_the_call(
@@ -1279,6 +1324,7 @@ GRAPH_STEPS = frozenset(
         "people_search",
         "mail_participants",
         "thread_anchor",
+        "thread_folder_messages",
         "thread_messages",
         "mail_folder",
         "folder_messages",
@@ -1343,6 +1389,23 @@ GRAPH_STEPS = frozenset(
         "contact",
         "create_contact",
         "update_contact",
+        "task_lists",
+        "task_list",
+        "tasks",
+        "task",
+        "task_part",
+        "create_task",
+        "update_task",
+        "set_task_status",
+        "add_task_link",
+        "add_task_step",
+        "create_task_list",
+        "delete_todo_item",
+        "rename_task_list",
+        "task_attachment",
+        "task_attachment_content",
+        "update_task_step",
+        "task_attachments",
         "notebook",
         "notebooks",
         "section",

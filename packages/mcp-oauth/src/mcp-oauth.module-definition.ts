@@ -63,6 +63,13 @@ export const mcpOAuthModuleOptionsSchema = z.object({
     .prefault(30 * 24 * 60 * 60)
     .describe('The expiration time of the JWT refresh token. Default is 30 days.'),
 
+  disableRateLimiting: z
+    .boolean()
+    .prefault(false)
+    .describe(
+      'Emergency switch that skips the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident.',
+    ),
+
   oauthSessionExpiresIn: z
     .number()
     .prefault(10 * 60 * 1000)

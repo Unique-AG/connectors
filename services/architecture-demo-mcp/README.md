@@ -12,7 +12,8 @@ It is not released: the scaffold ran with `--no-release`.
 
 | Tool | Shows |
 |---|---|
-| `search_assets`, `get_daily_meta`, `get_daily_prices`, `get_iex_top_of_book`, `list_news`, `get_forex_top_of_book`, `get_crypto_top_of_book`, `get_crypto_prices`, `get_fundamentals_meta`, `get_fundamentals_daily`, `get_fundamentals_statements`, `get_ticker_distributions`, `get_ticker_splits` | Operations served straight from the spec, listed in `upstream/routes.py`, with no code of our own |
+| `search_assets`, `get_daily_meta`, `list_news`, `get_forex_top_of_book`, `get_crypto_top_of_book`, `get_crypto_prices`, `get_fundamentals_meta`, `get_fundamentals_daily`, `get_fundamentals_statements`, `get_ticker_distributions`, `get_ticker_splits` | Operations served straight from the spec, listed in `upstream/routes.py`, with no code of our own |
+| `get_daily_prices`, `get_iex_top_of_book` | Operations promoted to tools of our own so a chat client can cite them: Tiingo's prices and quotes carry no title, so each tool maps them to its own model and titles the answer by what it covers, such as `ACME daily prices, 2026-10-14 to 2026-10-19` |
 | `get_price_performance` | A feature function that turns a typed operation into figures of its own (total return, annualized volatility, maximum drawdown), cached in Redis, raising its own error for the tool to turn into a `ToolError` |
 | `record_position` | A feature function that checks a business rule upstream, writes to Postgres under the signed-in user, then values the whole portfolio through another feature's function |
 

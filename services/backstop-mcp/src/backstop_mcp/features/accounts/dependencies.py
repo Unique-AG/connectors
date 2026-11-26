@@ -16,6 +16,10 @@ from backstop_mcp.features.accounts.queries import (
     GetTimeSeriesQuery,
     SearchProductsQuery,
 )
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    get_build_entity_link_util_factory,
+)
 
 
 @lru_cache(maxsize=1)
@@ -68,11 +72,13 @@ def get_product_investors_query_factory(
     get_latest_account_values_query: GetLatestAccountValuesQuery = Depends(
         get_latest_account_values_query_factory
     ),
+    build_entity_link_util: BuildEntityLinkUtil = Depends(get_build_entity_link_util_factory),
 ) -> GetProductInvestorsQuery:
     # Config is read here rather than taken as a `Depends`: settings are unhashable, and this
     # factory is `lru_cache`d.
     return GetProductInvestorsQuery(
         get_accounts_for_product_query=get_accounts_for_product_query,
         get_latest_account_values_query=get_latest_account_values_query,
+        build_entity_link_util=build_entity_link_util,
         max_valued_accounts=get_product_investors_config().max_valued_accounts,
     )

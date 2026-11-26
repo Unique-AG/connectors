@@ -85,7 +85,7 @@ class TestADraftGoesToTheRealAddressOfTheRightPerson:
             to=[address],
             cc=["tom@example.test"],
             subject="Contract",
-            body="Please send me the contract by Friday.",
+            body_html="<p>Please send me the contract by Friday.</p>",
             importance="high",
             categories=["Contracts"],
         )
@@ -115,7 +115,11 @@ class TestADraftGoesToTheRealAddressOfTheRightPerson:
         )
 
         draft = await call(
-            "outlook_draft_mail", to=[_ANNA], bcc=[_PRIYA], subject="Contract", body="Text."
+            "outlook_draft_mail",
+            to=[_ANNA],
+            bcc=[_PRIYA],
+            subject="Contract",
+            body_html="<p>Text.</p>",
         )
 
         created = sent_json(graph, "POST", "/me/messages")
@@ -200,10 +204,12 @@ class TestADraftChangesUntilMiaApproves:
             "outlook_draft_mail",
             to=[_ANNA],
             subject="Contract",
-            body="A long text of four paragraphs.",
+            body_html="<p>A long text of four paragraphs.</p>",
         )
 
-        _ = await call("outlook_update_draft", message_ref=draft["uri"], body="The short text.")
+        _ = await call(
+            "outlook_update_draft", message_ref=draft["uri"], body_html="<p>The short text.</p>"
+        )
 
         patched = sent_json(
             graph, "PATCH", cast("str", draft["uri"])[len("outlook:///messages/") :]
@@ -215,7 +221,9 @@ class TestADraftChangesUntilMiaApproves:
         self, graph: respx.MockRouter
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_update_draft-basic")
-        draft = await call("outlook_draft_mail", to=[_ANNA], subject="Contract", body="Text.")
+        draft = await call(
+            "outlook_draft_mail", to=[_ANNA], subject="Contract", body_html="<p>Text.</p>"
+        )
 
         advice = await advice_for("outlook_update_draft", message_ref=draft["uri"], cc=[_ANNA])
 
@@ -291,7 +299,7 @@ class TestADraftChangesUntilMiaApproves:
             "outlook_draft_mail",
             to=[_ANNA, "priya@example.test"],
             subject="Contract",
-            body="Text.",
+            body_html="<p>Text.</p>",
         )
 
         _ = await call(
@@ -357,8 +365,8 @@ class TestNothingIsSentWithoutApproval:
         self, graph: respx.MockRouter
     ) -> None:
         _ = serve(graph, "rec-tool-outlook_get_mail_tips-anna-away")
-        routes = serve(graph, "rec-tool-outlook_send_draft-persona")
-        draft = answer_of("rec-tool-outlook_send_draft-persona", "GET", "/me/messages/")
+        routes = serve(graph, "rec-tool-outlook_send_draft-seed-draft")
+        draft = answer_of("rec-tool-outlook_send_draft-seed-draft", "GET", "/me/messages/")
         person = Person()
 
         tips = await call("outlook_get_mail_tips", addresses=[_ANNA])
@@ -427,7 +435,7 @@ class TestADraftInASharedMailbox:
                 "mailbox": "support@example.com",
                 "to": ["customer@acme.example"],
                 "subject": "Your order",
-                "body": "The order is confirmed.",
+                "body_html": "<p>The order is confirmed.</p>",
             },
             person=person,
         )
@@ -449,7 +457,7 @@ class TestADraftInASharedMailbox:
                 "to": ["customer@acme.example"],
                 "bcc": [_PRIYA],
                 "subject": "Your order",
-                "body": "The order is confirmed.",
+                "body_html": "<p>The order is confirmed.</p>",
             },
             person=person,
         )
@@ -476,7 +484,7 @@ class TestADraftInASharedMailbox:
                 "mailbox": "support@example.com",
                 "to": ["customer@acme.example"],
                 "subject": "Your order",
-                "body": "The order is confirmed.",
+                "body_html": "<p>The order is confirmed.</p>",
             },
             person=Person(approval=approval),
         )
@@ -492,7 +500,7 @@ class TestAReplyKeepsTheConversation:
         _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
 
         draft = await call(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Thanks to all."
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Thanks to all.</p>"
         )
 
         assert _addresses(draft) + _addresses(draft, "cc") == [_ANNA, "tom@example.test"]
@@ -510,7 +518,7 @@ class TestAReplyKeepsTheConversation:
             "outlook_draft_reply",
             message_ref=_REPLIED,
             mode="reply",
-            body="Friday works.",
+            body_html="<p>Friday works.</p>",
         )
 
         assert _addresses(draft) == [_ANNA]
@@ -526,7 +534,10 @@ class TestAReplyKeepsTheConversation:
         _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
 
         draft = await call(
-            "outlook_draft_reply", message_ref=_REPLIED, mode="reply", body="Friday works."
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="reply",
+            body_html="<p>Friday works.</p>",
         )
 
         assert sent_json(graph, "POST", "/createReply") == {"Comment": "<p>Friday works.</p>"}
@@ -544,7 +555,7 @@ class TestAReplyKeepsTheConversation:
             message_ref=_REPLIED,
             mode="forward",
             to=["tom@example.test"],
-            body="Please read this.",
+            body_html="<p>Please read this.</p>",
         )
 
         assert sent_json(graph, "POST", "/createForward") == {
@@ -564,7 +575,7 @@ class TestAReplyKeepsTheConversation:
             message_ref=_REPLIED,
             mode="forward",
             to=["tom@example.test"],
-            body="Please read this.",
+            body_html="<p>Please read this.</p>",
         )
         forward_id = cast("str", forward["uri"]).removeprefix("outlook:///messages/")
         _ = graph.get(f"/me/messages/{forward_id}/attachments").mock(
@@ -595,7 +606,7 @@ class TestAReplyKeepsTheConversation:
             message_ref=_Q3_MESSAGE,
             mode="reply",
             to=["outsider@example.net"],
-            body="Friday works.",
+            body_html="<p>Friday works.</p>",
         )
 
         assert "takes no `to` on a reply" in advice
@@ -724,7 +735,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         )
 
         advice = await advice_for(
-            "outlook_draft_mail", to=[_ANNA], subject="Contract", body="Text."
+            "outlook_draft_mail", to=[_ANNA], subject="Contract", body_html="<p>Text.</p>"
         )
 
         assert "One of the recipients is not valid." in advice
@@ -736,12 +747,12 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         [
             (
                 "outlook_draft_mail",
-                {"to": [_ANNA], "subject": "Contract", "body": "Text."},
+                {"to": [_ANNA], "subject": "Contract", "body_html": "<p>Text.</p>"},
                 "/me/messages",
             ),
             (
                 "outlook_draft_reply_all",
-                {"message_ref": _Q3_MESSAGE, "body": "Friday works."},
+                {"message_ref": _Q3_MESSAGE, "body_html": "<p>Friday works.</p>"},
                 f"/me/messages/{_Q3_MESSAGE_ID}/createReplyAll",
             ),
         ],
@@ -797,7 +808,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         )
 
         advice = await advice_for(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Friday works."
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Friday works.</p>"
         )
 
         assert "This tool created no draft" in advice
@@ -819,7 +830,7 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
         create = graph.post(path).mock(side_effect=[failure])
 
         advice = await advice_for(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Friday works."
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Friday works.</p>"
         )
 
         assert "does not know if Microsoft 365 made the change" in advice
@@ -838,7 +849,9 @@ class TestMiaIsToldWhatHappenedWhenMicrosoftCannotDoWhatSheAsked:
             )
         )
 
-        draft = await call("outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body="Friday works.")
+        draft = await call(
+            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html="<p>Friday works.</p>"
+        )
 
         assert draft["body_written"] is False
         assert draft["body"] is None
@@ -857,13 +870,13 @@ class TestAWrongValueChangesNothing:
             "outlook_draft_mail",
             to=[_ANNA_MEIER],
             subject="Contract",
-            body="Please send the contract.",
+            body_html="<p>Please send the contract.</p>",
         )
         made = await call(
             "outlook_draft_mail",
             to=[_ANNA],
             subject="Contract",
-            body="Please send the contract.",
+            body_html="<p>Please send the contract.</p>",
         )
 
         assert "is not one email address" in refused
@@ -874,7 +887,9 @@ class TestAWrongValueChangesNothing:
     async def test_a_subject_of_256_characters_creates_no_draft(
         self, graph: respx.MockRouter
     ) -> None:
-        advice = await advice_for("outlook_draft_mail", to=[_ANNA], subject="s" * 256, body="Text.")
+        advice = await advice_for(
+            "outlook_draft_mail", to=[_ANNA], subject="s" * 256, body_html="<p>Text.</p>"
+        )
 
         assert "255" in advice
         assert graph.calls.call_count == 0
@@ -882,7 +897,9 @@ class TestAWrongValueChangesNothing:
     async def test_a_subject_of_255_characters_is_kept(self, graph: respx.MockRouter) -> None:
         _ = serve(graph, "rec-tool-outlook_draft_mail-basic")
 
-        _ = await call("outlook_draft_mail", to=[_ANNA], subject="s" * 255, body="Text.")
+        _ = await call(
+            "outlook_draft_mail", to=[_ANNA], subject="s" * 255, body_html="<p>Text.</p>"
+        )
 
         assert sent_json(graph, "POST", "/me/messages")["subject"] == "s" * 255
 
@@ -1012,17 +1029,17 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
         [
             (
                 "outlook_draft_mail",
-                {"to": [_ANNA, _ANNA.upper()], "subject": "Hello", "body": "Hi"},
+                {"to": [_ANNA, _ANNA.upper()], "subject": "Hello", "body_html": "<p>Hi</p>"},
                 "twice in `to`",
             ),
             (
                 "outlook_draft_mail",
-                {"to": [_ANNA], "cc": [_ANNA], "subject": "Hello", "body": "Hi"},
+                {"to": [_ANNA], "cc": [_ANNA], "subject": "Hello", "body_html": "<p>Hi</p>"},
                 "in more than one of `to`, `cc` and `bcc`",
             ),
             (
                 "outlook_draft_reply",
-                {"message_ref": _Q3_MESSAGE, "mode": "forward", "body": "Hi"},
+                {"message_ref": _Q3_MESSAGE, "mode": "forward", "body_html": "<p>Hi</p>"},
                 "needs at least one address in `to`",
             ),
             (
@@ -1031,7 +1048,7 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "message_ref": _Q3_MESSAGE,
                     "mode": "forward",
                     "to": [_ANNA_MEIER],
-                    "body": "Hi",
+                    "body_html": "<p>Hi</p>",
                 },
                 "is not one email address",
             ),
@@ -1041,13 +1058,18 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "message_ref": _Q3_MESSAGE,
                     "mode": "forward",
                     "to": [_ANNA, _ANNA.upper()],
-                    "body": "Hi",
+                    "body_html": "<p>Hi</p>",
                 },
                 "twice in `to`",
             ),
             (
                 "outlook_draft_reply",
-                {"message_ref": _Q3_MESSAGE, "mode": "reply", "cc": [_ANNA_MEIER], "body": "Hi"},
+                {
+                    "message_ref": _Q3_MESSAGE,
+                    "mode": "reply",
+                    "cc": [_ANNA_MEIER],
+                    "body_html": "<p>Hi</p>",
+                },
                 "is not one email address",
             ),
             (
@@ -1056,7 +1078,7 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "message_ref": _Q3_MESSAGE,
                     "mode": "reply",
                     "cc": [_OTHER, _OTHER.upper()],
-                    "body": "Hi",
+                    "body_html": "<p>Hi</p>",
                 },
                 "twice in `cc`",
             ),
@@ -1067,18 +1089,23 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "mode": "forward",
                     "to": [_ANNA],
                     "cc": [_ANNA],
-                    "body": "Hi",
+                    "body_html": "<p>Hi</p>",
                 },
                 "in more than one of `to`, `cc` and `bcc`",
             ),
             (
                 "outlook_draft_mail",
-                {"to": [_ANNA], "bcc": [_ANNA.upper()], "subject": "Hello", "body": "Hi"},
+                {
+                    "to": [_ANNA],
+                    "bcc": [_ANNA.upper()],
+                    "subject": "Hello",
+                    "body_html": "<p>Hi</p>",
+                },
                 "in more than one of `to`, `cc` and `bcc`",
             ),
             (
                 "outlook_draft_mail",
-                {"to": [_ANNA], "bcc": [_ANNA_MEIER], "subject": "Hello", "body": "Hi"},
+                {"to": [_ANNA], "bcc": [_ANNA_MEIER], "subject": "Hello", "body_html": "<p>Hi</p>"},
                 "in `bcc`, which is not one email address",
             ),
             (
@@ -1089,7 +1116,7 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "to": [_ANNA],
                     "cc": [_OTHER],
                     "bcc": [_OTHER],
-                    "body": "Hi",
+                    "body_html": "<p>Hi</p>",
                 },
                 "in more than one of `to`, `cc` and `bcc`",
             ),
@@ -1099,18 +1126,23 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
                     "message_ref": _Q3_MESSAGE,
                     "mode": "reply",
                     "bcc": [_OTHER, _OTHER.upper()],
-                    "body": "Hi",
+                    "body_html": "<p>Hi</p>",
                 },
                 "twice in `bcc`",
             ),
             (
                 "outlook_draft_reply_all",
-                {"message_ref": _Q3_MESSAGE, "cc": [_OTHER], "bcc": [_OTHER], "body": "Hi"},
+                {
+                    "message_ref": _Q3_MESSAGE,
+                    "cc": [_OTHER],
+                    "bcc": [_OTHER],
+                    "body_html": "<p>Hi</p>",
+                },
                 "in both `cc` and `bcc`",
             ),
             (
                 "outlook_draft_reply_all",
-                {"message_ref": _Q3_MESSAGE, "bcc": [_ANNA_MEIER], "body": "Hi"},
+                {"message_ref": _Q3_MESSAGE, "bcc": [_ANNA_MEIER], "body_html": "<p>Hi</p>"},
                 "in `bcc`, which is not one email address",
             ),
             (
@@ -1120,12 +1152,16 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
             ),
             (
                 "outlook_draft_reply_all",
-                {"message_ref": _Q3_MESSAGE, "cc": [_ANNA_MEIER], "body": "Hi"},
+                {"message_ref": _Q3_MESSAGE, "cc": [_ANNA_MEIER], "body_html": "<p>Hi</p>"},
                 "is not one email address",
             ),
             (
                 "outlook_draft_reply_all",
-                {"message_ref": _Q3_MESSAGE, "cc": [_OTHER, _OTHER.upper()], "body": "Hi"},
+                {
+                    "message_ref": _Q3_MESSAGE,
+                    "cc": [_OTHER, _OTHER.upper()],
+                    "body_html": "<p>Hi</p>",
+                },
                 "twice in `cc`",
             ),
             (
@@ -1184,8 +1220,8 @@ class TestAnAddressThatDoesNotFitStopsTheDraft:
     @pytest.mark.parametrize(
         ("tool", "arguments"),
         [
-            ("outlook_draft_reply", {"mode": "reply", "body": "Hi"}),
-            ("outlook_draft_reply_all", {"body": "Hi"}),
+            ("outlook_draft_reply", {"mode": "reply", "body_html": "<p>Hi</p>"}),
+            ("outlook_draft_reply_all", {"body_html": "<p>Hi</p>"}),
             ("outlook_update_draft", {"subject": "New subject"}),
         ],
         ids=["reply", "reply-all", "update"],
@@ -1204,7 +1240,11 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         _ = _the_original(graph)
 
         advice = await advice_for(
-            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", cc=[_ANNA], body="Hi"
+            "outlook_draft_reply",
+            message_ref=_Q3_MESSAGE,
+            mode="reply",
+            cc=[_ANNA],
+            body_html="<p>Hi</p>",
         )
 
         assert "the reply already goes to that address" in advice
@@ -1220,7 +1260,7 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
             message_ref=_Q3_MESSAGE,
             mode="reply",
             cc=["team@example.test"],
-            body="Hi",
+            body_html="<p>Hi</p>",
         )
 
         assert "the reply already goes to that address" in advice
@@ -1230,7 +1270,11 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         _ = _the_original(graph)
 
         advice = await advice_for(
-            "outlook_draft_reply", message_ref=_Q3_MESSAGE, mode="reply", bcc=[_ANNA], body="Hi"
+            "outlook_draft_reply",
+            message_ref=_Q3_MESSAGE,
+            mode="reply",
+            bcc=[_ANNA],
+            body_html="<p>Hi</p>",
         )
 
         assert "in `bcc`, and the reply already goes to that address" in advice
@@ -1243,7 +1287,11 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
 
         _ = await call(
-            "outlook_draft_reply", message_ref=_REPLIED, mode="reply", bcc=[_PRIYA], body="Hi"
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="reply",
+            bcc=[_PRIYA],
+            body_html="<p>Hi</p>",
         )
 
         assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
@@ -1257,7 +1305,7 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
             mode="forward",
             to=[_ANNA],
             bcc=[_PRIYA],
-            body="Hi",
+            body_html="<p>Hi</p>",
         )
 
         assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
@@ -1268,7 +1316,10 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
 
         _ = await call(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, bcc=[_PRIYA], body="Thanks."
+            "outlook_draft_reply_all",
+            message_ref=_Q3_MESSAGE,
+            bcc=[_PRIYA],
+            body_html="<p>Thanks.</p>",
         )
 
         assert sent_json(graph, "PATCH", "")["bccRecipients"] == [_recipient(_PRIYA)]
@@ -1279,7 +1330,10 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
         _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
 
         _ = await call(
-            "outlook_draft_reply_all", message_ref=_Q3_MESSAGE, bcc=[_ANNA], body="Thanks."
+            "outlook_draft_reply_all",
+            message_ref=_Q3_MESSAGE,
+            bcc=[_ANNA],
+            body_html="<p>Thanks.</p>",
         )
 
         assert "bccRecipients" not in sent_json(graph, "PATCH", "")
@@ -1295,7 +1349,7 @@ class TestACopyToThePersonWhoGetsTheReplyIsRefused:
             message_ref=_REPLIED,
             mode="reply",
             cc=[_OTHER],
-            body="Hi",
+            body_html="<p>Hi</p>",
         )
 
         assert draft["mode"] == "reply"
@@ -1316,12 +1370,14 @@ def _draft_shared(tool: str) -> tuple[dict[str, object], str]:
             "mode": "forward",
             "to": [_ANNA],
             "cc": ["nina@example.test"],
-            "body": "Hi",
+            "body_html": "<p>Hi</p>",
         }, "Create a forward draft"
     if tool == "outlook_draft_reply_all":
-        return {"message_ref": _Q3_MESSAGE, "body": "Hi", "cc": ["nina@example.test"]}, (
-            "Create a reply-all draft"
-        )
+        return {
+            "message_ref": _Q3_MESSAGE,
+            "body_html": "<p>Hi</p>",
+            "cc": ["nina@example.test"],
+        }, ("Create a reply-all draft")
     return {"message_ref": _Q3_MESSAGE, "subject": "Changed", "categories": ["Reading"]}, (
         "Change the draft"
     )
@@ -1444,7 +1500,7 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
     ) -> None:
         asked = await asked_of(
             "outlook_draft_mail",
-            {"mailbox": _SHARED, "to": [_ANNA], "subject": "Hello", "body": "Hi"},
+            {"mailbox": _SHARED, "to": [_ANNA], "subject": "Hello", "body_html": "<p>Hi</p>"},
         )
 
         assert asked.input_requests
@@ -1459,12 +1515,95 @@ class TestAReplyOrAChangeInASharedMailboxAsksFirst:
 
         _ = await invoke_as(
             "outlook_draft_reply",
-            {"message_ref": _REPLIED, "mode": "reply", "body": "Hi", "mailbox": _SHARED},
+            {
+                "message_ref": _REPLIED,
+                "mode": "reply",
+                "body_html": "<p>Hi</p>",
+                "mailbox": _SHARED,
+            },
             person=person,
         )
 
         assert "with no subject" in person.asked[0]
         assert "an address that Microsoft chooses" in person.asked[0]
+
+
+_STYLED = '<p style="color:red">Ship it</p><script>alert(1)</script>'
+_LINKED = '<p>See <a href="https://plan.example">the plan</a>.</p>'
+
+
+class TestAStyledBodyReachesMicrosoftUnchanged:
+    async def test_a_new_draft_sends_the_html_unchanged(self, graph: respx.MockRouter) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_mail-basic")
+
+        _ = await call(
+            "outlook_draft_mail",
+            to=[_ANNA],
+            subject="Contract",
+            body_html=_STYLED,
+        )
+
+        assert sent_json(graph, "POST", "/me/messages")["body"] == {
+            "contentType": "html",
+            "content": _STYLED,
+        }
+
+    async def test_a_reply_sends_the_html_unchanged(self, graph: respx.MockRouter) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply-reply")
+
+        _ = await call(
+            "outlook_draft_reply",
+            message_ref=_REPLIED,
+            mode="reply",
+            body_html=_STYLED,
+        )
+
+        assert sent_json(graph, "POST", "/createReply") == {"Comment": _STYLED}
+
+    async def test_a_reply_to_everyone_sends_the_html_unchanged(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-outlook_draft_reply_all-everyone")
+
+        _ = await call("outlook_draft_reply_all", message_ref=_Q3_MESSAGE, body_html=_STYLED)
+
+        assert sent_json(graph, "PATCH", "")["body"] == {
+            "contentType": "html",
+            "content": _STYLED,
+        }
+
+    async def test_a_changed_draft_sends_the_html_unchanged(self, graph: respx.MockRouter) -> None:
+        _ = _a_draft_addressed_to_anna(graph)
+
+        _ = await call("outlook_update_draft", message_ref=_Q3_MESSAGE, body_html=_STYLED)
+
+        assert sent_json(graph, "PATCH", "")["body"] == {
+            "contentType": "html",
+            "content": _STYLED,
+        }
+
+    @pytest.mark.parametrize("tool", _DRAFT_TOOLS)
+    async def test_the_question_for_a_shared_mailbox_names_every_link_target(
+        self, graph: respx.MockRouter, tool: str
+    ) -> None:
+        if tool == "outlook_draft_mail":
+            _ = serve_as(graph, "rec-tool-outlook_draft_mail-basic", _SHARED)
+            arguments: dict[str, object] = {"to": [_ANNA], "subject": "Hello"}
+        else:
+            _a_shared_mailbox_that_holds(graph, tool)
+            arguments, _opening = _draft_shared(tool)
+        person = Person()
+
+        _ = await invoke_as(
+            tool,
+            arguments | {"body_html": _LINKED, "mailbox": _SHARED},
+            person=person,
+        )
+
+        (question,) = person.asked
+        told = "It links to 'https://plan.example'."
+        assert told in question, question
+        assert question.index(told) < question.index("Nothing is sent."), question
 
 
 class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:
@@ -1486,7 +1625,7 @@ class TestAReplyWhoseCopiesMicrosoftCannotSaveAreReportedAsNotSaved:
             message_ref=_REPLIED,
             mode="reply",
             bcc=[_PRIYA],
-            body="Friday works.",
+            body_html="<p>Friday works.</p>",
         )
 
         assert draft["body_written"] is False

@@ -17,6 +17,14 @@ from office_365_mcp.shared.seam.annotations import (
     WRITE_DESTRUCTIVE_IDEMPOTENT,
     WRITE_IDEMPOTENT,
 )
+from office_365_mcp.shared.seam.approved_writes import (
+    Approval,
+    Question,
+    Refusal,
+    Unasked,
+    answered,
+    approved_write,
+)
 from office_365_mcp.shared.seam.caller import (
     MAILBOX_FIELD,
     GraphToken,
@@ -33,7 +41,11 @@ from office_365_mcp.shared.seam.elicitation import (
     person_confirms,
 )
 from office_365_mcp.shared.seam.files import FileFromGraph
-from office_365_mcp.shared.seam.permissions import REQUESTABLE_PERMISSIONS, graph_scope
+from office_365_mcp.shared.seam.permissions import (
+    REQUESTABLE_PERMISSIONS,
+    graph_scope,
+    named_permissions,
+)
 
 __all__ = [
     "MAILBOX_FIELD",
@@ -44,19 +56,26 @@ __all__ = [
     "WRITE_DESTRUCTIVE_IDEMPOTENT",
     "WRITE_IDEMPOTENT",
     "Advised",
+    "Approval",
     "Confirm",
     "Confirmed",
     "DigestPart",
     "FileFromGraph",
     "GraphAdviceMiddleware",
     "GraphToken",
+    "Question",
+    "Unasked",
+    "Refusal",
     "TokenExchangeFailed",
     "ToolAdvice",
     "answer_pending",
+    "answered",
+    "approved_write",
     "confirmation_digest",
     "graph_client_for_caller",
     "graph_mailbox",
     "graph_scope",
+    "named_permissions",
     "narrowed_to",
     "owner_refused",
     "person_confirms",

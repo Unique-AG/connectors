@@ -42,7 +42,8 @@ _CHAT_ID = "19:release@thread.v2"
 _SEND_PATH = "/chats/19%3Arelease%40thread.v2/messages"
 _MEMBERS_PATH = "/chats/19%3Arelease%40thread.v2/members"
 
-_MESSAGE = "Ship it Friday."
+_SHOWN = "Ship it Friday."
+_MESSAGE = "<p>Ship it Friday.</p>"
 _SUBJECT = "Release plan"
 _SENT_MESSAGE_ID = "1770000000001"
 
@@ -136,7 +137,7 @@ class TestThePersonBeforeTheSend:
 
         with pytest.raises(ToolError, match=_NOTHING_SENT):
             _ = await send_chat_message(
-                client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_refuses
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_refuses
             )
 
         assert post.call_count == 0, "a declined send still reached the chat"
@@ -152,11 +153,28 @@ class TestThePersonBeforeTheSend:
             assert about
             return None
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing)
 
         assert len(asked) == 1
-        assert _MESSAGE in asked[0]
+        assert f"Send {_SHOWN!r}" in asked[0]
         assert "cannot be recalled" in asked[0]
+
+    async def test_the_question_shows_the_text_behind_long_markup(
+        self, client: GraphServiceClient, graph: respx.MockRouter
+    ) -> None:
+        _ = _posts(graph)
+        asked: list[str] = []
+
+        async def capturing(question: str, about: str) -> Confirmed:
+            asked.append(question)
+            assert about
+            return None
+
+        styled = f'<p style="{"color: red; " * 40}">Ship it Friday.</p>'
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=styled, confirm=capturing)
+
+        assert f"Send {_SHOWN!r}" in asked[0]
+        assert "style=" not in asked[0]
 
     async def test_the_question_lists_a_link_that_starts_after_the_preview_cut(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -172,7 +190,7 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message(
             client,
             chat_id=_CHAT_ID,
-            message="x" * 300 + " [pay](https://evil.example/pay)",
+            body_html="x" * 300 + '<a href="https://evil.example/pay">pay</a>',
             confirm=capturing,
         )
 
@@ -188,7 +206,7 @@ class TestThePersonBeforeTheSend:
             asked.append(question)
             return None
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing)
 
         assert len(asked) == 1
         assert _CHAT_ID in asked[0]
@@ -205,7 +223,7 @@ class TestThePersonBeforeTheSend:
             return None
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, mentions=[_JANE, _ADA]
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing, mentions=[_JANE, _ADA]
         )
 
         assert len(asked) == 1
@@ -230,7 +248,7 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             confirm=capturing,
             mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
         )
@@ -266,7 +284,7 @@ class TestThePersonBeforeTheSend:
             _ = await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=capturing,
                 mentions=[_ADA, _JANE],
             )
@@ -291,7 +309,7 @@ class TestThePersonBeforeTheSend:
             return None
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=watching, mentions=[_JANE, _ADA]
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=watching, mentions=[_JANE, _ADA]
         )
 
         assert calls_when_asked == [1], "asked before the members were read, or after the post"
@@ -308,11 +326,11 @@ class TestThePersonBeforeTheSend:
             return None
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, importance="urgent"
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing, importance="urgent"
         )
 
         assert len(asked) == 1
-        assert f"Send {_MESSAGE!r} with urgent importance to chat {_CHAT_ID!r} now?" in asked[0]
+        assert f"Send {_SHOWN!r} with urgent importance to chat {_CHAT_ID!r} now?" in asked[0]
 
     async def test_the_question_names_no_importance_when_none_is_given(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -324,7 +342,7 @@ class TestThePersonBeforeTheSend:
             asked.append(question)
             return None
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing)
 
         assert len(asked) == 1
         assert "importance" not in asked[0]
@@ -342,7 +360,7 @@ class TestThePersonBeforeTheSend:
         _ = await send_chat_message(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             confirm=capturing,
             importance="high",
             subject=_SUBJECT,
@@ -350,7 +368,7 @@ class TestThePersonBeforeTheSend:
 
         assert len(asked) == 1
         assert (
-            f"Send {_MESSAGE!r} with the subject {_SUBJECT!r} and high importance to chat "
+            f"Send {_SHOWN!r} with the subject {_SUBJECT!r} and high importance to chat "
             + f"{_CHAT_ID!r} now?"
         ) in asked[0]
 
@@ -365,10 +383,10 @@ class TestThePersonBeforeTheSend:
             return None
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, subject=_SUBJECT
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing, subject=_SUBJECT
         )
 
-        expected = f"Send {_MESSAGE!r} with the subject {_SUBJECT!r} to chat {_CHAT_ID!r} now?"
+        expected = f"Send {_SHOWN!r} with the subject {_SUBJECT!r} to chat {_CHAT_ID!r} now?"
         assert len(asked) == 1
         assert expected in asked[0]
         assert "importance" not in asked[0]
@@ -384,7 +402,7 @@ class TestThePersonBeforeTheSend:
             return None
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, importance="normal"
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing, importance="normal"
         )
 
         assert len(asked) == 1
@@ -401,7 +419,7 @@ class TestThePersonBeforeTheSend:
             calls_when_asked.append(len(graph.calls))
             return None
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=watching)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=watching)
 
         assert calls_when_asked == [0], "asked after the post already went out"
         assert post.call_count == 1
@@ -434,7 +452,9 @@ class TestHowTheQuestionReachesAPerson:
         confirm = a_person_agrees(self._context(DeclinedElicitation()))
 
         with pytest.raises(ToolError, match=_NOTHING_SENT):
-            _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=confirm)
+            _ = await send_chat_message(
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=confirm
+            )
 
         assert post.call_count == 0
 
@@ -494,7 +514,7 @@ class TestTheEraWithNoBackChannel:
         post = _posts(graph)
 
         answer = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=a_person_agrees(_modern_context())
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=a_person_agrees(_modern_context())
         )
 
         _key, _state, _agrees_with = _the_question(answer)
@@ -508,7 +528,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(_modern_context()),
             )
         )
@@ -516,7 +536,7 @@ class TestTheEraWithNoBackChannel:
         answer = await send_chat_message(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             confirm=a_person_agrees(
                 _modern_context(
                     answers={key: ElicitResult(action="accept", content={"value": agrees_with})},
@@ -536,7 +556,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(_modern_context()),
             )
         )
@@ -545,7 +565,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={
@@ -569,7 +589,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=message_a,
+                body_html=message_a,
                 confirm=a_person_agrees(_modern_context()),
             )
         )
@@ -578,7 +598,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=message_b,
+                body_html=message_b,
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={
@@ -607,7 +627,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(_modern_context()),
                 mentions=[_JANE],
             )
@@ -617,7 +637,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=_answered(key, state, agrees_with),
                 mentions=[other],
             )
@@ -633,7 +653,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(_modern_context()),
                 mentions=[_JANE],
             )
@@ -642,7 +662,7 @@ class TestTheEraWithNoBackChannel:
         _ = await send_chat_message(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             confirm=_answered(key, state, agrees_with),
             mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
         )
@@ -662,7 +682,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(_modern_context()),
             )
         )
@@ -671,7 +691,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={
@@ -693,7 +713,7 @@ class TestTheEraWithNoBackChannel:
             await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(_modern_context()),
                 subject=_SUBJECT,
             )
@@ -703,7 +723,7 @@ class TestTheEraWithNoBackChannel:
             _ = await send_chat_message(
                 client,
                 chat_id=_CHAT_ID,
-                message=_MESSAGE,
+                body_html=_MESSAGE,
                 confirm=a_person_agrees(
                     _modern_context(
                         answers={
@@ -724,7 +744,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _posts(graph)
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees)
 
         assert post.call_count == 1
         assert len(graph.calls) == 1, (
@@ -733,16 +753,16 @@ class TestWhatItAsksGraphFor:
         made = cast("Sequence[Call]", graph.calls)
         assert made[0].request.method == "POST"
 
-    async def test_the_post_body_carries_the_message_as_html(
+    async def test_the_post_body_carries_the_html_unchanged(
         self, client: GraphServiceClient, graph: respx.MockRouter
     ) -> None:
         post = _posts(graph)
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees)
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
         sent = cast("Mapping[str, object]", body["body"])
-        assert sent["content"] == f"<p>{_MESSAGE}</p>"
+        assert sent["content"] == _MESSAGE
         assert sent["contentType"] == "html"
         assert "mentions" not in body
 
@@ -752,7 +772,7 @@ class TestWhatItAsksGraphFor:
         post = _posts(graph)
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, subject=_SUBJECT
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees, subject=_SUBJECT
         )
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
@@ -765,7 +785,7 @@ class TestWhatItAsksGraphFor:
         post = _posts(graph)
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, importance=importance
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees, importance=importance
         )
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
@@ -776,7 +796,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _posts(graph)
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees)
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
         assert "importance" not in body, "an unset importance reached Graph as a value or a null"
@@ -789,7 +809,7 @@ class TestWhatItAsksGraphFor:
         post = _posts(graph)
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, mentions=[_JANE, _ADA]
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees, mentions=[_JANE, _ADA]
         )
 
         assert (listed.call_count, post.call_count) == (1, 1)
@@ -814,7 +834,7 @@ class TestWhatItAsksGraphFor:
         monkeypatch.setattr(messages, "graph_step", recording)
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, mentions=[_JANE]
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees, mentions=[_JANE]
         )
 
         assert measured == [messages.STEP_CHAT_MEMBERS, sender.STEP_SEND]
@@ -826,7 +846,7 @@ class TestWhatItAsksGraphFor:
         post = _posts(graph)
 
         _ = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees, mentions=[_JANE]
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees, mentions=[_JANE]
         )
 
         body = cast("Mapping[str, object]", json.loads(post.calls.last.request.content))
@@ -854,7 +874,7 @@ class TestWhatItAsksGraphFor:
         _ = await send_chat_message(
             client,
             chat_id=_CHAT_ID,
-            message=_MESSAGE,
+            body_html=_MESSAGE,
             confirm=_agrees,
             mentions=[Mention(user_id=_JANE.user_id, name=_ADA.name)],
         )
@@ -880,7 +900,7 @@ class TestWhatItAsksGraphFor:
     ) -> None:
         post = _posts(graph)
 
-        _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+        _ = await send_chat_message(client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees)
 
         assert post.call_count == 1
 
@@ -893,7 +913,9 @@ class TestTheRetryItRefuses:
         post = graph.post(_SEND_PATH).mock(return_value=httpx.Response(503))
 
         with pytest.raises(GraphUnavailable):
-            _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+            _ = await send_chat_message(
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees
+            )
 
         assert post.call_count == 1
 
@@ -906,7 +928,9 @@ class TestTheRetryItRefuses:
         )
 
         with pytest.raises(GraphThrottled):
-            _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+            _ = await send_chat_message(
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees
+            )
 
         assert post.call_count == 1
 
@@ -918,7 +942,7 @@ class TestWhatItAnswers:
         _ = _posts(graph)
 
         answer = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees
         )
 
         assert not isinstance(answer, InputRequiredResult)
@@ -932,7 +956,7 @@ class TestWhatItAnswers:
         _ = _posts(graph, _sent_payload(content="Ship it Friday, cc @Ada"))
 
         answer = await send_chat_message(
-            client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees
+            client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees
         )
 
         assert not isinstance(answer, InputRequiredResult)
@@ -950,7 +974,9 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphForbidden):
-            _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+            _ = await send_chat_message(
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees
+            )
 
     async def test_a_chat_graph_will_not_post_to_is_a_not_found(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -962,7 +988,9 @@ class TestTheFailuresItPassesOn:
         )
 
         with pytest.raises(GraphNotFound):
-            _ = await send_chat_message(client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=_agrees)
+            _ = await send_chat_message(
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=_agrees
+            )
 
     async def test_a_refused_member_read_is_a_forbidden_and_asks_nobody(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -981,7 +1009,7 @@ class TestTheFailuresItPassesOn:
 
         with pytest.raises(GraphForbidden):
             _ = await send_chat_message(
-                client, chat_id=_CHAT_ID, message=_MESSAGE, confirm=capturing, mentions=[_JANE]
+                client, chat_id=_CHAT_ID, body_html=_MESSAGE, confirm=capturing, mentions=[_JANE]
             )
 
         assert asked == []
@@ -1039,14 +1067,14 @@ class TestHowItDeclaresItself:
             + "the chat, this tool sends nothing."
         ) in " ".join((tool.description or "").split())
 
-    async def test_the_arguments_are_chat_id_message_and_the_optional_rest(
+    async def test_the_arguments_are_chat_id_body_html_and_the_optional_rest(
         self, transport: httpx.AsyncClient
     ) -> None:
         parameters, _tool = await _registered(transport)
 
         properties = cast("Mapping[str, object]", parameters["properties"])
-        assert set(properties) == {"chat_id", "message", "mentions", "importance", "subject"}
-        assert set(cast("Sequence[str]", parameters["required"])) == {"chat_id", "message"}
+        assert set(properties) == {"chat_id", "body_html", "mentions", "importance", "subject"}
+        assert set(cast("Sequence[str]", parameters["required"])) == {"chat_id", "body_html"}
 
     async def test_the_subject_is_never_empty_and_has_no_ceiling(
         self, transport: httpx.AsyncClient
@@ -1104,7 +1132,7 @@ class TestAgainstAnswersRecordedFromGraph:
             "teams_send_chat_message",
             person=mia,
             chat_id=chat_id,
-            message="seed-v1 case-teams_send_chat_message-group hello",
+            body_html="seed-v1 case-teams_send_chat_message-group hello",
         )
 
         assert sent["chat_id"] == chat_id

@@ -14,7 +14,7 @@ from office_365_mcp.graph_client import graph_step
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.teams.messages import TeamsMessage, unknown_enum_headers
-from office_365_mcp.shared.window import closes_at, opens_at
+from office_365_mcp.shared.window import DayOrMoment, closes_at, opens_at
 
 TOOL_NAME = "teams_list_chat_messages"
 
@@ -150,7 +150,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = 20,
         sent_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Only messages sent at or before this point. A date, `2026-03-04`, covers "

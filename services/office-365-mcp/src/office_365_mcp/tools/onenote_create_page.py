@@ -20,6 +20,8 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.body_html import ONENOTE_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
@@ -93,7 +95,7 @@ _BOTH_SECTION_AND_SECTION_NAME = (
     + "write into the default section of the default notebook."
 )
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Writes a new page into the signed-in user's OneNote, or into a notebook that a Microsoft 365 \
 group or a SharePoint site owns. There is no way to attach a file or an image. \
 onenote_append_to_page adds to a page later. OneNote can show the change to everyone who opens \
@@ -105,6 +107,18 @@ people or belongs to somebody else. A page in the user's own unshared notebook i
 a question.
 - Pass at most one of `section` and `section_name`. Omit both, and the page lands in the default \
 section of the default notebook.
+- Microsoft Graph cannot set the indent level of a page, so the new page is always at the top \
+level of its section. If the user wants a subpage, first read the `level` of the parent with \
+onenote_list_pages. Pass `include_level_and_order=true` and, as `section`, the `uri` of the \
+section of the parent from onenote_list_notebooks. OneNote has only two levels of subpages, so a \
+parent at `level` 2 cannot take a subpage: tell the user before you create anything. Otherwise \
+create the page in the section of the parent. Then tell the user to move the page directly below \
+the parent in the OneNote app and to indent it to one level below the parent. In OneNote for the \
+web, Make Subpage and Promote Subpage on the right-click menu of a page change its indent by one \
+level. For the desktop app, give them this page: \
+https://support.microsoft.com/en-us/onenote/onenote-help-and-learning/create-a-subpage-in-onenote \
+On an iPad or iPhone, give them this page instead: \
+https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-learning/create-a-subpage-in-onenote-for-ipad-or-iphone
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_pages does not show the page. Judge by `created_at`: a new title can stay empty for \
 days.
@@ -112,6 +126,7 @@ days.
 on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
 empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
 Graph does not support custom tags.
+- {ACTION_NOT_A_SOURCE}
 """
 
 
@@ -337,11 +352,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             Field(
                 min_length=1,
                 description=(
-                    "The page content, as HTML. Microsoft Graph refuses a request over 4 MB. "
-                    + "A newline is not a line break. Write `<p>`, `<br>`, `<h1>` to `<h6>`, "
-                    + "`<ul>`, `<ol>`, `<li>`, `<table>`, `<b>` and `<i>` for structure. Microsoft "
-                    + "removes JavaScript, CSS and forms. Escape `&`, `<` and `>` where they must "
-                    + "read as themselves."
+                    ONENOTE_BODY_HTML_FIELD + " Microsoft Graph refuses a request over 4 MB."
                 ),
             ),
         ],

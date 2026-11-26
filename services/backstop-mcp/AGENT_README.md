@@ -396,13 +396,14 @@ argument. List rows whose response is assembled in one classmethod take
 `urls: Mapping[str, str | None]` keyed by row id instead — `from_holdings` (account id)
 and `SearchActivitiesResolvedResponse.from_fetch` (activity row id).
 
-**A wide walk makes `url` opt-in.** Every read publishes a `url`, but on the two sparse
-searches (`search_opportunities`, `search_activities`) it is a selectable `fields` member
-outside the default set: one URL per row is ~100 bytes times up to 20,000 rows for a link
-the caller usually does not want. Bounded per-party lists (`get_tasks_for_party`,
-`get_people_for_party`, `get_activity_history`) publish it unconditionally. An activity
-row whose type has no CRM page — a bare `meeting_call`, or a history row Backstop sent
-without `specificResource` — gets no `url` rather than a guessed one.
+**Search rows carry `url` by default.** Every read publishes a `url`. The four sparse
+searches (`search_people`, `search_organizations`, `search_opportunities`,
+`search_activities`) have it in their default `fields`, so each row is cited with its CRM
+page; a custom `fields` list that leaves `url` out drops it (~100 bytes a row on a wide
+walk). Bounded per-party lists (`get_tasks_for_party`, `get_people_for_party`,
+`get_activity_history`) publish it unconditionally. An activity row whose type has no CRM
+page — a bare `meeting_call`, or a history row Backstop sent without `specificResource`,
+such as an email in `get_activity_history` — gets no `url` rather than a guessed one.
 
 `canonical_url` is the no-tab open link. Tabs and layouts are a `build_backstop_links`
 call. When the origin is unset, `url` is `None` — never invent a host from the API

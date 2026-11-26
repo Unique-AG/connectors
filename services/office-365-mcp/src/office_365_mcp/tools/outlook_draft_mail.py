@@ -18,6 +18,8 @@ from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.addresses import repeated_address
+from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.mail import (
     AddressFault,
@@ -26,7 +28,6 @@ from office_365_mcp.shared.mail import (
     copied_and_marked,
     one_address_each,
 )
-from office_365_mcp.shared.markdown import markdown_to_html
 from office_365_mcp.shared.odata import spelled
 from office_365_mcp.shared.outlook.categories import (
     LIST_CATEGORIES_GUARD,
@@ -58,7 +59,7 @@ CHANGE_SHOWN_BY: tuple[str, ...] = ("outlook_list_mail",)
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "to": ["ada@example.invalid"],
     "subject": "Invoice 4471",
-    "body": "Sending this over for review.",
+    "body_html": "<p>Sending this over for review.</p>",
 }
 
 MAX_SUBJECT_CHARACTERS = 255
@@ -67,7 +68,7 @@ _AGREE = "create the draft"
 _DECLINE = "do not create the draft"
 _NOTHING_CREATED = "No draft was created."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates one new message in Drafts, for the user to review. The draft goes into the signed-in \
 user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send mail. \
 outlook_draft_reply is the tool for a reply to, or a forward of, a message that exists.
@@ -80,6 +81,7 @@ file, tell them to add it in Outlook before they send the draft. Never put file 
 in the body.
 - This tool asks the user to agree before it changes a shared or delegated mailbox. It changes \
 the user's own mailbox without a question.
+- {ACTION_NOT_A_SOURCE}
 """
 
 
@@ -185,6 +187,7 @@ async def draft_mail(
             _question(
                 mailbox,
                 subject=subject,
+                body_html=body_html,
                 to=primary,
                 cc=copied,
                 bcc=blind,
@@ -247,6 +250,7 @@ def _question(
     mailbox: str,
     *,
     subject: str,
+    body_html: str,
     to: Sequence[str],
     cc: Sequence[str],
     bcc: Sequence[str],
@@ -259,6 +263,7 @@ def _question(
         + f"The draft has the subject {cut_for_a_question(subject)!r}. "
         + f"It is addressed to {', '.join(to)}."
         + copied_and_marked(cc, bcc=bcc, importance=importance, categories=categories)
+        + links_in_body(body_html)
         + " Nothing is sent. "
         + "The draft appears in that mailbox, and anyone with access to it can see it."
     )
@@ -323,11 +328,11 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
                 description="The subject line, stored exactly as given.",
             ),
         ],
-        body: Annotated[
+        body_html: Annotated[
             str,
             Field(
                 min_length=1,
-                description="The message body, as Markdown. This tool turns it into HTML.",
+                description=OUTLOOK_BODY_HTML_FIELD,
             ),
         ],
         cc: Annotated[
@@ -379,7 +384,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             client,
             to=to,
             subject=subject,
-            body_html=markdown_to_html(body),
+            body_html=body_html,
             confirm=a_person_agrees(ctx),
             cc=cc,
             bcc=bcc,

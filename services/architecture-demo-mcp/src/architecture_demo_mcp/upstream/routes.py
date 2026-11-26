@@ -6,8 +6,6 @@
 EXPOSED: list[str] = [
     "searchAssets",
     "getDailyMeta",
-    "getDailyPrices",
-    "getIexTopOfBook",
     "listNews",
     "getForexTopOfBook",
     "getCryptoTopOfBook",

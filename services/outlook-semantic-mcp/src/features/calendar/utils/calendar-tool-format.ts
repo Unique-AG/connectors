@@ -57,3 +57,7 @@ When showing \`suggest_meeting_times\`, use a markdown table with exactly 4 colu
 - NEVER show raw IDs (\`calendarRef\`, \`eventRef\`, \`calendarId\`, \`eventId\`, \`seriesMasterId\`) to the user.
 - \`calendarRef\` and \`eventRef\` are opaque handles. Pass them back exactly as received; never build one from parts.
 `;
+
+// Their subject and webLink would otherwise make Unique cite the confirmation of a write.
+export const EVENT_WRITE_IS_NOT_A_SOURCE =
+  "Do not cite this tool's results: they confirm the change you made, they are not sources. Cite the events you read with `search_calendar_events` instead.";

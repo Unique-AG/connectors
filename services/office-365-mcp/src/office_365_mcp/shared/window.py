@@ -9,6 +9,20 @@ differently.
 """
 
 from datetime import UTC, date, datetime, time, tzinfo
+from typing import Annotated
+
+from pydantic import BeforeValidator, TypeAdapter
+
+_MOMENT = TypeAdapter(datetime)
+
+
+def _moment_when_timed(value: object) -> object:
+    if isinstance(value, str) and len(value.strip()) > len("YYYY-MM-DD"):
+        return _MOMENT.validate_python(value)
+    return value
+
+
+DayOrMoment = Annotated[date | datetime, BeforeValidator(_moment_when_timed)]
 
 
 def as_utc(moment: datetime) -> datetime:
@@ -52,7 +66,7 @@ def runs_backwards(
     """
     if after is None or before is None:
         return False
-    return opens_at(after, zone=zone) > closes_at(before, zone=zone)
+    return opens_at(after, zone=zone).astimezone(UTC) > closes_at(before, zone=zone).astimezone(UTC)
 
 
 def _aware(moment: datetime, zone: tzinfo) -> datetime:

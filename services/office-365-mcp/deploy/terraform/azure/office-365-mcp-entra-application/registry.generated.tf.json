@@ -607,6 +607,108 @@
           ]
         },
         {
+          "name": "outlook_list_task_lists",
+          "permissions": [
+            "Tasks.Read"
+          ]
+        },
+        {
+          "name": "outlook_list_tasks",
+          "permissions": [
+            "Tasks.Read"
+          ]
+        },
+        {
+          "name": "outlook_read_task",
+          "permissions": [
+            "Tasks.Read"
+          ]
+        },
+        {
+          "name": "outlook_create_task",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_update_task",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_set_task_status",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_create_task_list",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_rename_task_list",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_delete_task_list",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_delete_task",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_add_task_step",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_update_task_step",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_delete_task_step",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_add_task_link",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_delete_task_link",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
+          "name": "outlook_read_task_attachment",
+          "permissions": [
+            "Tasks.Read"
+          ]
+        },
+        {
+          "name": "outlook_delete_task_attachment",
+          "permissions": [
+            "Tasks.ReadWrite"
+          ]
+        },
+        {
           "name": "sharepoint_search_files",
           "permissions": [
             "Files.Read.All"
@@ -939,6 +1041,23 @@
         "outlook_read_contact",
         "outlook_create_contact",
         "outlook_update_contact",
+        "outlook_list_task_lists",
+        "outlook_list_tasks",
+        "outlook_read_task",
+        "outlook_create_task",
+        "outlook_update_task",
+        "outlook_set_task_status",
+        "outlook_create_task_list",
+        "outlook_rename_task_list",
+        "outlook_delete_task_list",
+        "outlook_delete_task",
+        "outlook_add_task_step",
+        "outlook_update_task_step",
+        "outlook_delete_task_step",
+        "outlook_add_task_link",
+        "outlook_delete_task_link",
+        "outlook_read_task_attachment",
+        "outlook_delete_task_attachment",
         "sharepoint_search_files",
         "sharepoint_browse_folder",
         "sharepoint_list_drives",
@@ -1309,6 +1428,45 @@
           "outlook_create_contact",
           "outlook_update_contact"
         ],
+        "outlook-tasks": [
+          "outlook_list_task_lists",
+          "outlook_list_tasks",
+          "outlook_read_task",
+          "outlook_read_task_attachment"
+        ],
+        "outlook-tasks-write": [
+          "outlook_list_task_lists",
+          "outlook_list_tasks",
+          "outlook_read_task",
+          "outlook_create_task",
+          "outlook_update_task",
+          "outlook_set_task_status",
+          "outlook_create_task_list",
+          "outlook_rename_task_list",
+          "outlook_add_task_step",
+          "outlook_update_task_step",
+          "outlook_add_task_link",
+          "outlook_read_task_attachment"
+        ],
+        "outlook-tasks-delete": [
+          "outlook_list_task_lists",
+          "outlook_list_tasks",
+          "outlook_read_task",
+          "outlook_create_task",
+          "outlook_update_task",
+          "outlook_set_task_status",
+          "outlook_create_task_list",
+          "outlook_rename_task_list",
+          "outlook_delete_task_list",
+          "outlook_delete_task",
+          "outlook_add_task_step",
+          "outlook_update_task_step",
+          "outlook_delete_task_step",
+          "outlook_add_task_link",
+          "outlook_delete_task_link",
+          "outlook_read_task_attachment",
+          "outlook_delete_task_attachment"
+        ],
         "sharepoint-search": [
           "sharepoint_search_files",
           "sharepoint_browse_folder",
@@ -1470,6 +1628,8 @@
         "Calendars.ReadWrite.Shared",
         "Contacts.Read",
         "Contacts.ReadWrite",
+        "Tasks.Read",
+        "Tasks.ReadWrite",
         "Files.ReadWrite.All",
         "Sites.Read.All",
         "Sites.ReadWrite.All",
@@ -1522,7 +1682,9 @@
         "Place.Read.All": true,
         "Group.Read.All": true,
         "Contacts.Read": false,
-        "Contacts.ReadWrite": false
+        "Contacts.ReadWrite": false,
+        "Tasks.Read": false,
+        "Tasks.ReadWrite": false
       },
       "graph_scope_prefix": "https://graph.microsoft.com/",
       "api_scope_name": "access_as_user",

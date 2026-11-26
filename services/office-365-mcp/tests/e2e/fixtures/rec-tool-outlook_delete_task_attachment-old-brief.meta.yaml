@@ -1,0 +1,19 @@
+scenario: outlook_delete_task_attachment-old-brief
+fixture: rec-tool-outlook_delete_task_attachment-old-brief
+source: recorded
+target: graph
+recorded_at: '2026-11-25T13:47:18+00:00'
+scrub_version: 1.0.0
+replacements:
+  ids mapped: 50
+  keys dropped: 12
+  response headers dropped: 90
+  text kept: 35
+literals:
+- Remove the old brief
+sdk_versions:
+  msgraph-sdk: 1.65.0
+  msgraph-core: 1.5.2
+  microsoft-kiota-http: 1.18.0
+  httpx: 0.28.1
+  fastmcp: 4.1.6

@@ -40,7 +40,7 @@ from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 from office_365_mcp.shared.teams.meetings import MAX_ARTIFACT_SCAN, newest_of, user_id_of
 from office_365_mcp.shared.teams.messages import unknown_enum_headers
 from office_365_mcp.shared.teams.transcripts import CALL_TRANSCRIPT_PERMISSION
-from office_365_mcp.shared.window import as_utc, closes_at, opens_at
+from office_365_mcp.shared.window import DayOrMoment, as_utc, closes_at, opens_at
 
 TOOL_NAME = "teams_list_call_transcripts"
 
@@ -428,7 +428,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
     )
     async def list_call_transcripts(
         created_after: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Only transcripts created at or after this point. A date, `2026-03-02`, opens "
@@ -439,7 +439,7 @@ def register(mcp: FastMCP, transport: httpx.AsyncClient) -> None:
             ),
         ] = None,
         created_before: Annotated[
-            date | datetime | None,
+            DayOrMoment | None,
             Field(
                 description=(
                     "Only transcripts created at or before this point, in the same forms as "

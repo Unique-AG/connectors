@@ -576,16 +576,52 @@ _ARGUMENT_SOURCES: Mapping[str, Mapping[str, tuple[str, ...]]] = {
     "onenote_get_operation": {
         "operation": ("onenote_copy_page", "onenote_copy_section", "onenote_copy_notebook")
     },
+    "outlook_list_tasks": {"task_list": ("outlook_list_task_lists",)},
+    "outlook_create_task": {"task_list": ("outlook_list_task_lists",)},
+    "outlook_read_task": {"uri": ("outlook_list_tasks", "outlook_create_task")},
+    "outlook_update_task": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
+    "outlook_set_task_status": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
+    "outlook_delete_task": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
+    "outlook_add_task_step": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
+    "outlook_add_task_link": {
+        "uri": ("outlook_list_tasks", "outlook_read_task", "outlook_create_task")
+    },
+    "outlook_update_task_step": {"step": ("outlook_read_task", "outlook_add_task_step")},
+    "outlook_delete_task_step": {"step": ("outlook_read_task", "outlook_add_task_step")},
+    "outlook_delete_task_link": {"link": ("outlook_read_task", "outlook_add_task_link")},
+    "outlook_read_task_attachment": {"attachment": ("outlook_read_task",)},
+    "outlook_delete_task_attachment": {"attachment": ("outlook_read_task",)},
+    "outlook_rename_task_list": {
+        "task_list": ("outlook_list_task_lists", "outlook_create_task_list")
+    },
+    "outlook_delete_task_list": {
+        "task_list": ("outlook_list_task_lists", "outlook_create_task_list")
+    },
 }
 
 
 _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
-    "teams_send_chat_message": frozenset({"message", "name"}),
-    "teams_send_channel_message": frozenset({"message", "name"}),
-    "teams_send_chat_message_with_files": frozenset({"message", "name"}),
-    "teams_send_channel_message_with_files": frozenset({"message", "name"}),
+    "outlook_create_task": frozenset({"title", "every"}),
+    "outlook_update_task": frozenset({"every"}),
+    "outlook_set_task_status": frozenset({"status"}),
+    "outlook_create_task_list": frozenset({"name"}),
+    "outlook_rename_task_list": frozenset({"name"}),
+    "outlook_add_task_step": frozenset({"text"}),
+    "outlook_add_task_link": frozenset({"title", "web_url"}),
+    "teams_send_chat_message": frozenset({"body_html", "name"}),
+    "teams_send_channel_message": frozenset({"body_html", "name"}),
+    "teams_send_chat_message_with_files": frozenset({"body_html", "name"}),
+    "teams_send_channel_message_with_files": frozenset({"body_html", "name"}),
     "teams_react_to_message": frozenset({"reaction"}),
-    "teams_edit_message": frozenset({"message", "name"}),
+    "teams_edit_message": frozenset({"body_html", "name"}),
     "teams_create_meeting": frozenset({"subject", "starts_at", "ends_at", "name"}),
     "teams_update_meeting": frozenset({"name"}),
     "teams_create_chat": frozenset({"chat_type", "topic", "name"}),
@@ -614,9 +650,9 @@ _COMPOSED_BY_THE_CALLER: Mapping[str, frozenset[str]] = {
     "outlook_rename_folder": frozenset({"name"}),
     "outlook_get_mail_tips": frozenset({"addresses"}),
     "outlook_set_focused_override": frozenset({"sender", "classify_as"}),
-    "outlook_draft_mail": frozenset({"subject", "body"}),
-    "outlook_draft_reply": frozenset({"mode", "body"}),
-    "outlook_draft_reply_all": frozenset({"body"}),
+    "outlook_draft_mail": frozenset({"subject", "body_html"}),
+    "outlook_draft_reply": frozenset({"mode", "body_html"}),
+    "outlook_draft_reply_all": frozenset({"body_html"}),
     "outlook_set_automatic_reply": frozenset({"status"}),
     "outlook_disable_mail_rule": frozenset({"enabled"}),
     "outlook_create_mail_rule": frozenset({"display_name", "actions"}),
@@ -817,6 +853,19 @@ _OPT_IN: tuple[tuple[ToolsPreset, ToolsPreset, frozenset[str]], ...] = (
                 "outlook_share_calendar",
                 "outlook_unshare_calendar",
                 "outlook_delete_calendar",
+            }
+        ),
+    ),
+    (
+        ToolsPreset.OUTLOOK_TASKS_DELETE,
+        ToolsPreset.OUTLOOK_TASKS_WRITE,
+        frozenset(
+            {
+                "outlook_delete_task",
+                "outlook_delete_task_list",
+                "outlook_delete_task_step",
+                "outlook_delete_task_link",
+                "outlook_delete_task_attachment",
             }
         ),
     ),
@@ -1203,6 +1252,19 @@ PRESET_COST: tuple[tuple[ToolsPreset, tuple[str, ...], int, int], ...] = (
         ("User.Read", "Contacts.Read", "Contacts.ReadWrite"),
         0,
         5,
+    ),
+    (ToolsPreset.OUTLOOK_TASKS, ("User.Read", "Tasks.Read"), 0, 5),
+    (
+        ToolsPreset.OUTLOOK_TASKS_WRITE,
+        ("User.Read", "Tasks.Read", "Tasks.ReadWrite"),
+        0,
+        13,
+    ),
+    (
+        ToolsPreset.OUTLOOK_TASKS_DELETE,
+        ("User.Read", "Tasks.Read", "Tasks.ReadWrite"),
+        0,
+        18,
     ),
     (ToolsPreset.SHAREPOINT_SEARCH, ("User.Read", "Files.Read.All"), 1, 4),
     (ToolsPreset.SHAREPOINT_READ, ("User.Read", "Files.Read.All"), 1, 5),
