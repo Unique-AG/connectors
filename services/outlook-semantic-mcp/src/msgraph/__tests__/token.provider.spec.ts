@@ -198,23 +198,23 @@ describe('TokenProvider', () => {
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
       await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
-        'No refresh token available for user: user-profile-123',
+        'User profile not found: user-profile-123',
       );
     });
 
-    it('throws error when refresh token not found', async () => {
-      const mockUserProfile = {
+    it('asks the user to sign in again, without calling Microsoft, when no refresh token is stored', async () => {
+      mockDependencies.drizzle.__nextQueryUserProfile = {
         id: 'user-profile-123',
+        accessToken: 'encrypted-access-token',
         refreshToken: null,
       };
 
-      mockDependencies.drizzle.__nextQueryUserProfile = mockUserProfile;
-
       const unit = new TokenProvider(mockConfig, mockDependencies as any);
 
-      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toThrow(
-        'No refresh token available for user: user-profile-123',
+      await expect(unit.refreshAccessToken('user-profile-123')).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
       );
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it('clears Graph tokens, revokes the MCP session, and throws on invalid_grant', async () => {

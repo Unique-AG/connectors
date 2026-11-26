@@ -10,7 +10,7 @@ import {
   AuthenticationProviderOptions,
 } from '@microsoft/microsoft-graph-client';
 import { Logger } from '@nestjs/common';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { isObjectType } from 'remeda';
 import { type Dispatcher, fetch, type Response } from 'undici';
 import { z } from 'zod';
@@ -152,7 +152,14 @@ export class TokenProvider implements AuthenticationProvider {
       where: eq(userProfiles.id, userProfileId),
     });
 
-    assert.ok(userProfile?.refreshToken, `No refresh token available for user: ${userProfileId}`);
+    assert.ok(userProfile, `User profile not found: ${userProfileId}`);
+    if (!userProfile.refreshToken) {
+      // Signed in without offline_access: the only way to a new Graph token is a new sign-in.
+      return await this.revokeUpstreamCredential(userProfile, {
+        reason: 'the Microsoft sign-in has expired and the server keeps no refresh token',
+        failureCode: 'no_refresh_token',
+      });
+    }
 
     if (userProfile.tokenRefreshRetryAt && userProfile.tokenRefreshRetryAt > new Date()) {
       throw new TokenRefreshCoolingDownError(userProfile.tokenRefreshRetryAt);
@@ -374,10 +381,16 @@ const inFlightRefreshes = new Map<string, Promise<string>>();
 type UserProfile = typeof userProfiles.$inferSelect;
 
 // Matches the row only while it still holds the refresh token this refresh read.
+// A grant without a refresh token is told apart from a later sign-in by its access token.
 const isSameGrant = (userProfile: UserProfile) =>
   and(
     eq(userProfiles.id, userProfile.id),
-    eq(userProfiles.refreshToken, userProfile.refreshToken ?? ''),
+    userProfile.refreshToken
+      ? eq(userProfiles.refreshToken, userProfile.refreshToken)
+      : and(
+          isNull(userProfiles.refreshToken),
+          eq(userProfiles.accessToken, userProfile.accessToken ?? ''),
+        ),
   );
 
 export class TokenRefreshCoolingDownError extends Error {
