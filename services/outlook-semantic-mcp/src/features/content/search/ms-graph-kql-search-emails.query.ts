@@ -13,7 +13,7 @@ import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.quer
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { NO_SUBJECT } from '~/utils/no-subject';
+import { subjectOrFallback } from '~/utils/no-subject';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { parseRetryAfterMs } from '~/utils/parse-retry-after-ms';
 import { safeStringify } from '~/utils/safe-stringify';
@@ -242,7 +242,7 @@ export class MsGraphKqlSearchEmailsQuery {
       return {
         msGraphMessageId: id,
         folderId: hit.parentFolderId,
-        title: hit.subject || NO_SUBJECT,
+        title: subjectOrFallback(hit.subject),
         from: hit.from,
         sourceMailbox: hit.mailbox,
         outlookWebLink: hit.webLink,

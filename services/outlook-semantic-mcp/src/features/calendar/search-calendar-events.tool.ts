@@ -4,7 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
-import { NO_SUBJECT } from '~/utils/no-subject';
+import { NO_SUBJECT, subjectOrFallback } from '~/utils/no-subject';
 import { DateRangeSchema } from '~/utils/relative-range';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
@@ -241,7 +241,7 @@ export class SearchCalendarEventsTool {
     );
     return {
       ...rest,
-      events: events?.map((event) => ({ ...event, title: event.subject || NO_SUBJECT })),
+      events: events?.map((event) => ({ ...event, title: subjectOrFallback(event.subject) })),
     };
   }
 }

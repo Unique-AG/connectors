@@ -22,7 +22,7 @@ import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
-import { NO_SUBJECT } from '~/utils/no-subject';
+import { subjectOrFallback } from '~/utils/no-subject';
 import { NonNullishProps } from '~/utils/non-nullish-props';
 import { Nullish } from '~/utils/nullish';
 import { buildUniqueQlSearchFilter } from './build-unique-ql-search-filter.util';
@@ -270,7 +270,7 @@ export class SemanticSearchEmailsQuery {
 
         const result: SearchEmailResult = {
           // The content title is the ingested file name, `<subject>.eml`.
-          title: metadata.subject || item.content.title?.replace(/\.eml$/, '') || NO_SUBJECT,
+          title: subjectOrFallback(metadata.subject, item.content.title?.replace(/\.eml$/, '')),
           uniqueContentId: item.content.id,
           uniqueContentUrl: item.content.url ?? undefined,
           outlookWebLink: metadata.webLink ?? '',
