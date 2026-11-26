@@ -28,7 +28,7 @@
     "@biomejs/biome": "2.6.8",
     "rimraf": "6.1.4",
     "skills": "1.9.0",
-    "syncpack": "15.3.3",
+    "syncpack": "15.3.4",
     "turbo": "2.11.13",
     "typescript": "catalog:",
     "unplugin-swc": "catalog:",
