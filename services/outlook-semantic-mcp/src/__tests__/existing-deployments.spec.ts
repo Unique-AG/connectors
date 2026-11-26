@@ -26,8 +26,8 @@ const CALENDAR_GRANT = [...MAIL_GRANT, 'Calendars.ReadWrite.Shared'];
 // Requested at sign-in without being registered on the app.
 const UNREGISTERED = ['openid', 'profile', 'email', 'offline_access'];
 
-// What main registers in microsoft_graph mode, in its registration order.
-const MAIN_GRAPH_TOOLS = [
+// What the settings before MCP_TOOLS registered in microsoft_graph mode, in registration order.
+const LEGACY_GRAPH_TOOLS = [
   'list_mailboxes_and_directories',
   'list_categories',
   'draft_email',
@@ -39,8 +39,8 @@ const MAIN_GRAPH_TOOLS = [
   'fetch_next_search_pages',
   'open_email',
 ];
-const MAIN_GRAPH_CALENDAR_TOOLS = [
-  ...MAIN_GRAPH_TOOLS,
+const LEGACY_GRAPH_CALENDAR_TOOLS = [
+  ...LEGACY_GRAPH_TOOLS,
   'list_calendars',
   'search_calendar_events',
   'check_availability',
@@ -51,15 +51,15 @@ const MAIN_GRAPH_CALENDAR_TOOLS = [
   'cancel_event',
 ];
 
-const DEPLOYMENTS: Record<string, { grant: string[]; mainTools: string[] }> = {
-  'preview-1': { grant: CALENDAR_GRANT, mainTools: MAIN_GRAPH_CALENDAR_TOOLS },
-  'preview-2': { grant: CALENDAR_GRANT, mainTools: MAIN_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-1': { grant: CALENDAR_GRANT, mainTools: MAIN_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-2': { grant: CALENDAR_GRANT, mainTools: MAIN_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-3': { grant: CALENDAR_GRANT, mainTools: MAIN_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-4': { grant: CALENDAR_GRANT, mainTools: MAIN_GRAPH_CALENDAR_TOOLS },
-  'prod-1': { grant: MAIL_GRANT, mainTools: MAIN_GRAPH_TOOLS },
-  'prod-2': { grant: MAIL_GRANT, mainTools: MAIN_GRAPH_TOOLS },
+const DEPLOYMENTS: Record<string, { grant: string[]; legacyTools: string[] }> = {
+  'preview-1': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'preview-2': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'prod-calendar-1': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'prod-calendar-2': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'prod-calendar-3': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'prod-calendar-4': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'prod-1': { grant: MAIL_GRANT, legacyTools: LEGACY_GRAPH_TOOLS },
+  'prod-2': { grant: MAIL_GRANT, legacyTools: LEGACY_GRAPH_TOOLS },
 };
 
 interface DeploymentValues {
@@ -101,14 +101,14 @@ describe('existing deployments', () => {
   describe.each(fixtures)('$name', ({ name, values }) => {
     const expected = DEPLOYMENTS[name];
 
-    it('registers the tools main registers for it', () => {
+    it('registers the tools the settings before MCP_TOOLS registered for it', () => {
       const module = registerBackendModule(loadFeaturesConfig(envOf(values)));
       const tools = (module.providers ?? []).flatMap((provider) => {
         const toolName = typeof provider === 'function' ? toolNameOf(provider) : undefined;
         return toolName ? [toolName] : [];
       });
 
-      expect(tools).toEqual(expected?.mainTools);
+      expect(tools).toEqual(expected?.legacyTools);
     });
 
     it('requests exactly what its Entra app grants, so no new consent is needed', () => {

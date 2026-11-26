@@ -5,8 +5,8 @@ import { loadFeaturesConfig } from '~/config';
 import { registerBackendModule, TOOL_CLASSES } from '../backend.module';
 import { CalendarModule } from '../calendar/calendar.module';
 
-// What main registers, in its registration order.
-const MAIN_COMMON_TOOLS = [
+// What the settings before MCP_TOOLS registered, in registration order.
+const LEGACY_COMMON_TOOLS = [
   'list_mailboxes_and_directories',
   'list_categories',
   'draft_email',
@@ -18,20 +18,20 @@ const MAIN_COMMON_TOOLS = [
   'fetch_next_search_pages',
   'open_email',
 ];
-const MAIN_UNIQUE_TOOLS = [
+const LEGACY_UNIQUE_TOOLS = [
   'sync_progress',
   'verify_inbox_connection',
   'delete_inbox_data',
   'reconnect_inbox',
 ];
-const MAIN_DEBUG_TOOLS = [
+const LEGACY_DEBUG_TOOLS = [
   'run_full_sync',
   'restart_full_sync',
   'pause_full_sync',
   'resume_full_sync',
   'admin_ops',
 ];
-const MAIN_CALENDAR_TOOLS = [
+const LEGACY_CALENDAR_TOOLS = [
   'list_calendars',
   'search_calendar_events',
   'check_availability',
@@ -70,50 +70,55 @@ describe(registerBackendModule.name, () => {
       'microsoft_graph_and_unique_api',
       'calendar on, debug on',
       'enabled',
-      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_DEBUG_TOOLS, ...MAIN_CALENDAR_TOOLS],
+      [
+        ...LEGACY_COMMON_TOOLS,
+        ...LEGACY_UNIQUE_TOOLS,
+        ...LEGACY_DEBUG_TOOLS,
+        ...LEGACY_CALENDAR_TOOLS,
+      ],
     ],
     [
       'microsoft_graph_and_unique_api',
       'calendar on, debug off',
       'disabled',
-      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_CALENDAR_TOOLS],
+      [...LEGACY_COMMON_TOOLS, ...LEGACY_UNIQUE_TOOLS, ...LEGACY_CALENDAR_TOOLS],
     ],
     [
       'microsoft_graph_and_unique_api',
       'calendar off, debug on',
       'enabled',
-      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS, ...MAIN_DEBUG_TOOLS],
+      [...LEGACY_COMMON_TOOLS, ...LEGACY_UNIQUE_TOOLS, ...LEGACY_DEBUG_TOOLS],
     ],
     [
       'microsoft_graph_and_unique_api',
       'calendar off, debug off',
       'disabled',
-      [...MAIN_COMMON_TOOLS, ...MAIN_UNIQUE_TOOLS],
+      [...LEGACY_COMMON_TOOLS, ...LEGACY_UNIQUE_TOOLS],
     ],
     [
       'microsoft_graph',
       'calendar on, debug on',
       'enabled',
-      [...MAIN_COMMON_TOOLS, ...MAIN_CALENDAR_TOOLS],
+      [...LEGACY_COMMON_TOOLS, ...LEGACY_CALENDAR_TOOLS],
     ],
     [
       'microsoft_graph',
       'calendar on, debug off',
       'disabled',
-      [...MAIN_COMMON_TOOLS, ...MAIN_CALENDAR_TOOLS],
+      [...LEGACY_COMMON_TOOLS, ...LEGACY_CALENDAR_TOOLS],
     ],
-    ['microsoft_graph', 'calendar off, debug on', 'enabled', MAIN_COMMON_TOOLS],
-    ['microsoft_graph', 'calendar off, debug off', 'disabled', MAIN_COMMON_TOOLS],
+    ['microsoft_graph', 'calendar off, debug on', 'enabled', LEGACY_COMMON_TOOLS],
+    ['microsoft_graph', 'calendar off, debug off', 'disabled', LEGACY_COMMON_TOOLS],
   ])(
-    'registers what main registers for %s, %s, from the rewritten config',
-    (backend, _shape, debug, mainTools) => {
+    'registers the tools the settings before MCP_TOOLS registered for %s, %s, from the rewritten config',
+    (backend, _shape, debug, legacyTools) => {
       const module = register({
         MCP_BACKEND: backend,
         MCP_DEBUG_MODE: debug,
-        MCP_TOOLS: JSON.stringify([...mainTools].reverse()),
+        MCP_TOOLS: JSON.stringify([...legacyTools].reverse()),
       });
 
-      expect(registeredToolNames(module)).toEqual(mainTools);
+      expect(registeredToolNames(module)).toEqual(legacyTools);
     },
   );
 
