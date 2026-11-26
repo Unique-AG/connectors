@@ -18,7 +18,7 @@ The server does not request a fixed list. It computes the list from `MCP_TOOLS` 
 | `MailboxSettings.Read` | Delegated | No | `list_categories`, `search_emails`, `fetch_next_search_pages`, `open_email` or a calendar tool other than `list_calendars` and `respond_to_invite` is listed | Read mailbox settings and folder structure |
 | `People.Read` | Delegated | No | `lookup_contacts` is listed | Look up contacts and people for address resolution |
 | `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` | List calendars and read/write events, including calendars shared with the user |
-| `offline_access` | Delegated | No | Always | Obtain refresh tokens for background sync |
+| `offline_access` | Delegated | No | Unless `MICROSOFT_OFFLINE_ACCESS` is `disabled` | Obtain refresh tokens for background sync |
 
 A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`.
 
@@ -126,6 +126,7 @@ Each permission is the minimum required for its function. No narrower alternativ
 | **Purpose** | Obtain refresh tokens for long-lived sessions |
 | **Used For** | Refreshing expired Microsoft access tokens without user re-authentication |
 | **Why Required** | Without this, users would need to re-authenticate every ~1 hour when access tokens expire (Microsoft limit, not configurable), interrupting background email sync |
+| **Without it** | `MICROSOFT_OFFLINE_ACCESS=disabled` drops it for a deployment with no background job: the MCP session then ends at most an hour after sign-in and the user signs in again — see [Configuration — MICROSOFT_OFFLINE_ACCESS](../operator/configuration.md#MICROSOFT_OFFLINE_ACCESS) |
 
 ## Why Delegated (Not Application) Permissions
 
@@ -146,7 +147,7 @@ Application permissions would require tenant administrators to create Applicatio
 
 ## OIDC Scopes
 
-In addition to the Graph permissions above, the OAuth flow also requests the standard OIDC scopes `openid`, `profile`, and `email`. These are not Microsoft Graph permissions — they are used to obtain the user's identity (ID token) during sign-in and are not subject to admin consent.
+In addition to the Graph permissions above, the OAuth flow also requests the standard OIDC scopes `openid`, `profile`, and `email`. These are not Microsoft Graph permissions and are not subject to admin consent. They shape the ID token, which the server does not read: it takes the user's profile from Graph `GET /me` with `User.Read`. `MICROSOFT_PROFILE_SCOPES=disabled` drops `profile` and `email`; `openid` is always requested.
 
 ## Permission Reference Links
 

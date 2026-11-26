@@ -18,7 +18,7 @@ All permissions are **delegated** — they act on behalf of the signed-in user. 
 | `MailboxSettings.Read` | Delegated | No | `list_categories`, `search_emails`, `fetch_next_search_pages`, `open_email` or a calendar tool other than `list_calendars` and `respond_to_invite` is listed |
 | `People.Read` | Delegated | No | `lookup_contacts` is listed |
 | `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` |
-| `offline_access` | Delegated | No | Always |
+| `offline_access` | Delegated | No | Unless `MICROSOFT_OFFLINE_ACCESS` is `disabled` |
 
 Register and grant at least the permissions your configuration requests. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. A deployment without a draft tool requests `Mail.Read` rather than `Mail.ReadWrite`, so its app must grant `Mail.Read`. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 
