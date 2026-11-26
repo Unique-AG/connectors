@@ -22,6 +22,7 @@ import { sleep } from '~/utils/sleep';
 import {
   extendedPropertiesSchema,
   SensitivityFilter,
+  SensitivityJudgement,
   SensitivityVerdict,
 } from '../sensitivity-filter';
 import {
@@ -199,29 +200,65 @@ export class MsGraphKqlSearchEmailsQuery {
       .filter((hit) => !lostAccessMailboxes.has(hit.mailbox));
 
     return {
-      results: await this.buildResults(userProfile, this.withoutExcludedSensitivity(hits)),
+      results: await this.buildResults(
+        userProfile,
+        hits.filter(({ sensitivity }) => sensitivity.verdict === SensitivityVerdict.Allowed),
+      ),
       pages: outcomes.map((outcome) => this.toBackendPage(outcome, lostAccessMailboxes)),
       searchSummary: this.buildSearchSummary({
         ...buildNotes,
         throttledMailboxes,
         lostAccessMailboxes,
+        additionalMessages: this.describeWithheldHits(hits),
       }),
     };
   }
 
-  // Pages keep their cursors whatever the filter drops, so a page left empty still leads on.
-  private withoutExcludedSensitivity(hits: Hit[]): Hit[] {
-    const unreadable = hits.filter(
-      ({ sensitivity }) => sensitivity === SensitivityVerdict.Unreadable,
+  // The agent learns how many hits were withheld and why, never what they hold. Pages keep their
+  // cursors whatever the filter drops, so a page left empty still leads on.
+  private describeWithheldHits(hits: Hit[]): string[] {
+    const judgements = uniqueBy(hits, ({ restId }) => restId).map(({ sensitivity }) => sensitivity);
+    const excluded = judgements.filter(
+      (judgement): judgement is Extract<SensitivityJudgement, { label: string }> =>
+        judgement.verdict === SensitivityVerdict.Excluded,
+    );
+    const unreadable = judgements.filter(
+      ({ verdict }) => verdict === SensitivityVerdict.Unreadable,
     ).length;
     if (unreadable > 0) {
       this.logger.warn({
-        msg: 'Dropped search hits whose sensitivity could not be read',
+        msg: 'Withheld search hits whose sensitivity could not be read',
         unreadable,
-        hits: hits.length,
+        hits: judgements.length,
       });
     }
-    return hits.filter(({ sensitivity }) => sensitivity === SensitivityVerdict.Allowed);
+    const note = (count: number, singular: string, plural: string) =>
+      count === 1
+        ? `1 email was withheld ${singular}. Its content cannot be shown here; the user can read it in Outlook.`
+        : `${count} emails were withheld ${plural}. Their content cannot be shown here; the user can read them in Outlook.`;
+    const labels = unique(excluded.map(({ label }) => `"${label}"`))
+      .sort()
+      .join(', ');
+    return [
+      ...(excluded.length > 0
+        ? [
+            note(
+              excluded.length,
+              `because of its sensitivity label (${labels})`,
+              `because of their sensitivity labels (${labels})`,
+            ),
+          ]
+        : []),
+      ...(unreadable > 0
+        ? [
+            note(
+              unreadable,
+              'because its sensitivity label could not be read',
+              'because their sensitivity labels could not be read',
+            ),
+          ]
+        : []),
+    ];
   }
 
   private async buildResults(
@@ -689,7 +726,7 @@ interface Hit {
   webLink: string;
   bodyPreview: string;
   isDraft: boolean;
-  sensitivity: SensitivityVerdict;
+  sensitivity: SensitivityJudgement;
 }
 
 // One Graph request: the first page of a (query × mailbox × folder), or the page a cursor points at.

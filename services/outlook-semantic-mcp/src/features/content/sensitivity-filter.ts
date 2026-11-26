@@ -9,6 +9,15 @@ export enum SensitivityVerdict {
   Unreadable = 'unreadable',
 }
 
+export type SensitivityJudgement =
+  | { verdict: SensitivityVerdict.Allowed }
+  // `label` is the matched label's name as Outlook shows it, or its id when Graph omits the name.
+  | { verdict: SensitivityVerdict.Excluded; label: string }
+  | { verdict: SensitivityVerdict.Unreadable };
+
+const ALLOWED: SensitivityJudgement = { verdict: SensitivityVerdict.Allowed };
+const UNREADABLE: SensitivityJudgement = { verdict: SensitivityVerdict.Unreadable };
+
 // Mail is filtered on these properties after Graph returns it; see
 // testing-utils/sensitivity-label-probe for how Graph exposes them.
 @Injectable()
@@ -27,42 +36,42 @@ export class SensitivityFilter {
     this.excludesLabelNames = [...this.excludedLabels].some((label) => !GUID_PATTERN.test(label));
   }
 
-  public judge(properties: ExtendedProperty[] | undefined): SensitivityVerdict {
+  public judge(properties: ExtendedProperty[] | undefined): SensitivityJudgement {
     if (!this.isActive) {
-      return SensitivityVerdict.Allowed;
+      return ALLOWED;
     }
     if (!properties) {
-      return SensitivityVerdict.Unreadable;
+      return UNREADABLE;
     }
     const values = new Map(properties.map(({ id, value }) => [id.toLowerCase(), value ?? '']));
-    // Graph ignores the $expand filter of a $search that does not select internetMessageHeaders and
-    // returns other properties instead. Every message carries the legacy flag, 0 when unset.
+    // Other property ids mean Graph ignored the $expand filter. Every message carries the legacy
+    // flag, 0 when unset.
     const legacyValue = values.get(LEGACY_SENSITIVITY_PROPERTY.toLowerCase());
     const legacy = legacyValue === undefined ? undefined : LEGACY_VALUES.get(legacyValue);
     if ([...values.keys()].some((id) => !KNOWN_PROPERTIES.has(id)) || legacy === undefined) {
-      return SensitivityVerdict.Unreadable;
+      return UNREADABLE;
     }
     if (legacy !== null && this.excludedLegacy.has(legacy)) {
-      return SensitivityVerdict.Excluded;
+      return { verdict: SensitivityVerdict.Excluded, label: LEGACY_DISPLAY_NAMES[legacy] };
     }
 
     const labels = this.parsePurviewLabels(values.get(PURVIEW_LABELS_PROPERTY.toLowerCase()) ?? '');
     if (!labels) {
-      return SensitivityVerdict.Unreadable;
+      return UNREADABLE;
     }
-    const isExcluded = labels.some(
+    const excluded = labels.find(
       ({ id, name }) =>
         this.excludedLabels.has(id) ||
         (name !== undefined && this.excludedLabels.has(name.toLowerCase())),
     );
-    if (isExcluded) {
-      return SensitivityVerdict.Excluded;
+    if (excluded) {
+      return { verdict: SensitivityVerdict.Excluded, label: excluded.name ?? excluded.id };
     }
     // Graph cuts the value at 255 characters in some responses, which can lose a label's name.
     if (this.excludesLabelNames && labels.some(({ name }) => name === undefined)) {
-      return SensitivityVerdict.Unreadable;
+      return UNREADABLE;
     }
-    return SensitivityVerdict.Allowed;
+    return ALLOWED;
   }
 
   // One group of `MSIP_Label_<id>_<field>=<value>;` entries per label.
@@ -95,6 +104,13 @@ const LEGACY_VALUES = new Map<string, LegacySensitivity | null>([
   ['2', LegacySensitivity.Private],
   ['3', LegacySensitivity.Confidential],
 ]);
+
+// As Outlook shows the flag.
+const LEGACY_DISPLAY_NAMES: Record<LegacySensitivity, string> = {
+  [LegacySensitivity.Personal]: 'Personal',
+  [LegacySensitivity.Private]: 'Private',
+  [LegacySensitivity.Confidential]: 'Confidential',
+};
 
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PURVIEW_ENTRY_PATTERN =

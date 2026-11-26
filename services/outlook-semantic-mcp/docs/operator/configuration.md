@@ -639,7 +639,13 @@ Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook 
 
 #### Sensitivity exclusions
 
-Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` answers it as not found, so the agent cannot tell it exists.
+Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` refuses it. Nothing of such a message reaches the agent, not its subject, sender or id. The agent is told how many results were withheld and under which labels, and that the user can read them in Outlook:
+
+```text
+3 emails were withheld because of their sensitivity labels ("Confidential Encrypted", "Private"). Their content cannot be shown here; the user can read them in Outlook.
+```
+
+`open_email` names the label in the same way. The note shows a label by the name Outlook shows, even when it is configured by id.
 
 ```yaml
 mcpConfig:
@@ -653,7 +659,7 @@ mcpConfig:
 - **`labels`** (`EXCLUDED_SENSITIVITY_LABELS`) — Microsoft Purview sensitivity labels, each by its id (a GUID) or its name, ignoring case. A message is excluded when one of its labels matches. A sublabel carries only its own name and id, so list each sublabel to exclude.
 - **`legacy`** (`EXCLUDED_LEGACY_SENSITIVITY`) — the sensitivity flag Outlook sets under *Options → Sensitivity*: `personal`, `private` or `confidential`.
 
-The server reads both from each message Microsoft Graph returns, without an extra request: a search asks Graph for the two properties alongside its results, and `open_email` asks for them with the message. A message whose properties Graph does not return, or returns in a form the server cannot read, is left out as well. A results page the filter empties still carries its cursor, so `fetch_next_search_pages` continues past it. With both lists empty (the default) the requests to Graph are unchanged and nothing is filtered.
+The server reads both from each message Microsoft Graph returns, without an extra request: a search asks Graph for the two properties alongside its results, and `open_email` asks for them with the message. A message whose properties Graph does not return, or returns in a form the server cannot read, is left out as well, and the note says its label could not be read. A results page the filter empties still carries its cursor, so `fetch_next_search_pages` continues past it. With both lists empty (the default) the requests to Graph are unchanged and nothing is filtered.
 
 Both settings need `MCP_BACKEND=microsoft_graph`, because semantic search results from the Unique knowledge base carry no sensitivity to filter on. The server refuses to start otherwise, naming the setting, and the chart refuses to render. An unknown legacy flag, a blank label, or a value that is not a JSON array also stops the server at startup. `lookup_contacts` and the draft tools are not filtered.
 

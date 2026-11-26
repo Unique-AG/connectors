@@ -1539,6 +1539,42 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(results.map((r) => r.msGraphMessageId).sort()).toEqual(['msg-personal', 'msg-plain']);
     });
 
+    it('tells the agent how many hits were withheld under which labels, and nothing about them', async () => {
+      const { searchSummary } = await searchOwnMailbox(
+        excluding([LABEL_ID], [LegacySensitivity.Private]),
+        {
+          value: [
+            labelled('msg-1', LABEL_ID, 'Confidential Encrypted'),
+            labelled('msg-2', LABEL_ID, 'Confidential Encrypted'),
+            flagged('msg-3', '2'),
+            unlabelled('msg-plain'),
+          ],
+        },
+      );
+
+      expect(searchSummary).toBe(
+        '3 emails were withheld because of their sensitivity labels ("Confidential Encrypted", "Private"). Their content cannot be shown here; the user can read them in Outlook.',
+      );
+    });
+
+    it('tells the agent how many hits were withheld because their label could not be read', async () => {
+      const { searchSummary } = await searchOwnMailbox(excluding(['confidential']), {
+        value: [makeMessage('msg-unreadable'), unlabelled('msg-plain')],
+      });
+
+      expect(searchSummary).toBe(
+        '1 email was withheld because its sensitivity label could not be read. Its content cannot be shown here; the user can read it in Outlook.',
+      );
+    });
+
+    it('adds no note when nothing is withheld', async () => {
+      const { searchSummary } = await searchOwnMailbox(excluding(['confidential']), {
+        value: [unlabelled('msg-plain')],
+      });
+
+      expect(searchSummary).toBeUndefined();
+    });
+
     it('keeps the cursor of a page whose every hit is excluded', async () => {
       const nextLink = `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$search=%22test%22&$skip=50`;
       const { results, pages } = await searchOwnMailbox(excluding([LABEL_ID]), {

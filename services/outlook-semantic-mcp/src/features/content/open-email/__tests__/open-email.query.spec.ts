@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { type FeaturesConfig, LegacySensitivity } from '~/config';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
-import { SensitivityFilter } from '../../sensitivity-filter';
+import { SensitivityFilter, SensitivityVerdict } from '../../sensitivity-filter';
 import { OpenEmailQuery } from '../open-email.query';
 
 const USER_PROFILE_ID = convertUserProfileIdToTypeId('user_profile_01kqcg8m7teh6sh8tehd2k0byb');
@@ -38,7 +38,7 @@ describe('OpenEmailQuery', () => {
 
   const open = async (input: Parameters<OpenEmailQuery['run']>[0]) => {
     const result = await instance.run(input);
-    assert.ok(result, 'the message was withheld');
+    assert.ok(!('withheld' in result), 'the message was withheld');
     return result;
   };
 
@@ -317,9 +317,9 @@ describe('OpenEmailQuery', () => {
         ],
       });
 
-      await expect(
-        instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' }),
-      ).resolves.toBeUndefined();
+      await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
+        withheld: { verdict: SensitivityVerdict.Excluded, label: 'Confidential Encrypted' },
+      });
     });
 
     it('withholds a message with an excluded legacy flag', async () => {
@@ -328,15 +328,15 @@ describe('OpenEmailQuery', () => {
         singleValueExtendedProperties: [{ id: 'Integer 0x0036', value: '2' }],
       });
 
-      await expect(
-        instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' }),
-      ).resolves.toBeUndefined();
+      await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
+        withheld: { verdict: SensitivityVerdict.Excluded, label: 'Private' },
+      });
     });
 
     it('withholds a message whose sensitivity Graph did not return', async () => {
-      await expect(
-        instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' }),
-      ).resolves.toBeUndefined();
+      await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
+        withheld: { verdict: SensitivityVerdict.Unreadable },
+      });
     });
   });
 });

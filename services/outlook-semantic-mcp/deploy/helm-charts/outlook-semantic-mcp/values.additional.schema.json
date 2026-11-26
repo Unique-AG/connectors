@@ -186,7 +186,7 @@
             },
             "excludedSensitivity": {
               "type": "object",
-              "description": "Mail left out of search_emails, fetch_next_search_pages and open_email for its sensitivity; open_email answers it as not found. Needs mcpBackend microsoft_graph.",
+              "description": "Mail left out of search_emails, fetch_next_search_pages and open_email for its sensitivity. The agent is told how many emails were withheld and under which labels. Needs mcpBackend microsoft_graph.",
               "additionalProperties": false,
               "properties": {
                 "labels": {

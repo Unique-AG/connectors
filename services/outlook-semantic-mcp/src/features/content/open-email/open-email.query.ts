@@ -16,6 +16,7 @@ import { Nullish } from '~/utils/nullish';
 import {
   extendedPropertiesSchema,
   SensitivityFilter,
+  SensitivityJudgement,
   SensitivityVerdict,
 } from '../sensitivity-filter';
 
@@ -67,6 +68,11 @@ export interface OpenEmailResult {
   chunks?: string;
 }
 
+// A message the sensitivity filter keeps from the agent. Nothing of its content is read.
+export interface WithheldEmail {
+  withheld: Exclude<SensitivityJudgement, { verdict: SensitivityVerdict.Allowed }>;
+}
+
 @Injectable()
 export class OpenEmailQuery {
   private readonly logger = new Logger(this.constructor.name);
@@ -79,7 +85,6 @@ export class OpenEmailQuery {
     private readonly sensitivityFilter: SensitivityFilter,
   ) {}
 
-  // Undefined when the message is withheld for its sensitivity, which callers report as not found.
   @Span()
   public async run({
     userProfileId,
@@ -101,7 +106,7 @@ export class OpenEmailQuery {
     uniqueContentId?: string;
     chunkIds?: string[];
     outputTimeZone?: string;
-  }): Promise<OpenEmailResult | undefined> {
+  }): Promise<OpenEmailResult | WithheldEmail> {
     const message = await this.readMessageFromMsGraph(
       userProfileId,
       id,
@@ -111,7 +116,7 @@ export class OpenEmailQuery {
       bodyContentType === 'html' ? 'html' : 'text',
       outputTimeZone,
     );
-    if (!message || !uniqueContentId) {
+    if ('withheld' in message || !uniqueContentId) {
       return message;
     }
     try {
@@ -135,7 +140,7 @@ export class OpenEmailQuery {
     idIsImmutable?: boolean,
     bodyContentType: 'text' | 'html' = 'text',
     outputTimeZone?: string,
-  ): Promise<OpenEmailResult | undefined> {
+  ): Promise<OpenEmailResult | WithheldEmail> {
     const client = this.graphClientFactory.createClientForUser(userProfileId.toString());
     const messagePath = graphMessagePath({ messageId, mailbox, folderId });
     const immutableIdHeader = idIsImmutable ? ', IdType="ImmutableId"' : '';
@@ -155,14 +160,14 @@ export class OpenEmailQuery {
 
     const message = graphMessageSchema.parse(raw);
     const sensitivity = this.sensitivityFilter.judge(message.singleValueExtendedProperties);
-    if (sensitivity !== SensitivityVerdict.Allowed) {
-      if (sensitivity === SensitivityVerdict.Unreadable) {
+    if (sensitivity.verdict !== SensitivityVerdict.Allowed) {
+      if (sensitivity.verdict === SensitivityVerdict.Unreadable) {
         this.logger.warn({
           msg: 'Withheld a message whose sensitivity could not be read',
           userProfileId: userProfileId.toString(),
         });
       }
-      return undefined;
+      return { withheld: sensitivity };
     }
     if (message['attachments@odata.nextLink'] !== undefined) {
       this.logger.warn({

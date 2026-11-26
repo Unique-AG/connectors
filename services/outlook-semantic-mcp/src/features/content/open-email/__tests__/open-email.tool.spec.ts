@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 import type * as z from 'zod';
 import { loadFeaturesConfig } from '~/config';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
-import { SensitivityFilter } from '../../sensitivity-filter';
+import { SensitivityFilter, SensitivityVerdict } from '../../sensitivity-filter';
 import { OpenEmailQuery } from '../open-email.query';
 import { OpenEmailTool } from '../open-email.tool';
 
@@ -93,14 +93,30 @@ describe('OpenEmailTool', () => {
     });
   });
 
-  it('answers a message withheld for its sensitivity as not found', async () => {
-    openEmailQuery.run.mockRejectedValueOnce(new GraphError(404, 'Not found'));
-    const missing = await tool.openEmailById({ id: 'msg-gone' }, context, request);
-    openEmailQuery.run.mockResolvedValueOnce(undefined);
+  it('names the label of a message withheld for its sensitivity and points to Outlook', async () => {
+    openEmailQuery.run.mockResolvedValue({
+      withheld: { verdict: SensitivityVerdict.Excluded, label: 'Confidential Encrypted' },
+    });
 
-    const withheld = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
+    const result = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
 
-    expect(withheld).toEqual(missing);
+    expect(result).toEqual({
+      success: false,
+      message:
+        'This email is withheld because of its sensitivity label "Confidential Encrypted". Its content cannot be shown here; the user can read it in Outlook.',
+    });
+  });
+
+  it('says when a message is withheld because its sensitivity label could not be read', async () => {
+    openEmailQuery.run.mockResolvedValue({ withheld: { verdict: SensitivityVerdict.Unreadable } });
+
+    const result = await tool.openEmailById({ id: 'msg-unreadable' }, context, request);
+
+    expect(result).toEqual({
+      success: false,
+      message:
+        'This email is withheld because its sensitivity label could not be read. Its content cannot be shown here; the user can read it in Outlook.',
+    });
   });
 
   it('rethrows any other Graph failure', async () => {
