@@ -10,7 +10,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 | Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
 | Ingestion | Full sync + live catch-up | None |
 | Tools | Those listed in `MCP_TOOLS`, from 10 mail, 4 sync, 5 debug and 8 calendar tools | Those listed in `MCP_TOOLS`, from 10 mail and 8 calendar tools |
-| Requires Unique KB | Yes | Yes |
+| Requires Unique KB | Yes | Only with `UNIQUE_ATTACHMENTS=enabled` (the default) |
 | Requires RabbitMQ | Yes | Yes |
 | Folder filtering | Supported | Not supported |
 
@@ -18,7 +18,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 
 | Section | Mode A (`microsoft_graph_and_unique_api`) | Mode B (`microsoft_graph`) |
 |---|---|---|
-| Required Secrets | All secrets | Same — `UNIQUE_ZITADEL_CLIENT_SECRET` only needed for `external` auth |
+| Required Secrets | All secrets | Same, except `UNIQUE_ZITADEL_CLIENT_SECRET`: needed for `external` auth, and only with `UNIQUE_ATTACHMENTS=enabled` |
 | Ingestion Configuration (`mcpConfig.ingestion`) | Required | **Omit entirely** |
 
 Two values are accepted for `MCP_BACKEND`:
@@ -44,7 +44,7 @@ These must be provided via Kubernetes secrets:
 | `MICROSOFT_WEBHOOK_SECRET` | 128-character hex string | Webhook validation secret | Both modes |
 | `AUTH_HMAC_SECRET` | 64-character hex string | HMAC-SHA256 session state signing key | Both modes |
 | `ENCRYPTION_KEY` | 64-character hex string | AES-256-GCM token encryption key | Both modes |
-| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth only |
+| `UNIQUE_ZITADEL_CLIENT_SECRET` | String | Zitadel OAuth client secret | `external` service auth, when Unique is needed |
 | `PROXY_PASSWORD` | String | Proxy password. Inline value or `os.environ/ENV_VAR_NAME`. | `username_password` proxy auth only |
 
 **Connection string formats:**
@@ -95,10 +95,10 @@ The server talks to Unique only when an enabled feature needs it: `MCP_BACKEND=m
 | `UNIQUE_INGESTION_SERVICE_BASE_URL` | `ingestionServiceBaseUrl` | (required when Unique is needed) | Unique ingestion service endpoint |
 | `UNIQUE_SCOPE_MANAGEMENT_SERVICE_BASE_URL` | `scopeManagementServiceBaseUrl` | (required when Unique is needed) | Unique scope management service endpoint |
 | `UNIQUE_STORE_INTERNALLY` | `storeInternally` | `enabled` | Store emails as files in the Knowledge Base — see [UNIQUE_STORE_INTERNALLY](#UNIQUE_STORE_INTERNALLY) |
-| `UNIQUE_SERVICE_EXTRA_HEADERS` | `serviceExtraHeaders` | (required for `cluster_local`) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
-| `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`) | Zitadel OAuth client ID |
-| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`) | Zitadel OAuth token URL |
-| `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`) | Zitadel project ID for audience validation |
+| `UNIQUE_SERVICE_EXTRA_HEADERS` | `serviceExtraHeaders` | (required for `cluster_local`, when Unique is needed) | `x-company-id` and `x-user-id` headers for `cluster_local` mode — see [UNIQUE_SERVICE_EXTRA_HEADERS](#UNIQUE_SERVICE_EXTRA_HEADERS) |
+| `UNIQUE_ZITADEL_CLIENT_ID` | `zitadel.clientId` | (required for `external`, when Unique is needed) | Zitadel OAuth client ID |
+| `UNIQUE_ZITADEL_OAUTH_TOKEN_URL` | `zitadel.oauthTokenUrl` | (required for `external`, when Unique is needed) | Zitadel OAuth token URL |
+| `UNIQUE_ZITADEL_PROJECT_ID` | `zitadel.projectId` | (required for `external`, when Unique is needed) | Zitadel project ID for audience validation |
 
 ### Proxy Configuration
 
