@@ -779,6 +779,52 @@ def test_chunk_to_text_content_titles_by_key_when_title_missing():
     assert record["title"] == "notes.txt"
 
 
+def test_chunk_to_text_content_unique_ai_uses_content_url_and_keeps_meta():
+    chunk = _make_chunk(
+        "body",
+        title="CV.pdf",
+        id="cont_mvkp2iv25xy4cxccpq6i6byk",
+        start_page=2,
+        end_page=2,
+    )
+    content = chunk_to_text_content(
+        chunk,
+        sequence_number=1,
+        frontend_base_url="https://example.unique.app",
+        scope_id="scope_uy3cznkuysy3gasrxx2m4ezb",
+        unique_ai_client=True,
+    )
+
+    assert json.loads(content.text) == {
+        "title": "CV.pdf",
+        "url": "unique://content/cont_mvkp2iv25xy4cxccpq6i6byk",
+        "content_id": "cont_mvkp2iv25xy4cxccpq6i6byk",
+        "pages": "2",
+        "text": "body",
+    }
+    assert content.meta is not None
+    assert (
+        content.meta[REFERENCE_META_KEY]["url"]
+        == "unique://content/cont_mvkp2iv25xy4cxccpq6i6byk"
+    )
+    assert content.meta["text"] == "body"
+
+
+def test_chunk_to_text_content_unique_ai_keeps_an_external_page_url():
+    chunk = _make_chunk("body", title="Market update", url="https://example.com/doc")
+    content = chunk_to_text_content(
+        chunk,
+        sequence_number=1,
+        frontend_base_url="https://example.unique.app",
+        scope_id="scope_leaf",
+        unique_ai_client=True,
+    )
+
+    assert json.loads(content.text)["url"] == "https://example.com/doc"
+    assert content.meta is not None
+    assert content.meta[REFERENCE_META_KEY]["url"] == "https://example.com/doc"
+
+
 def test_chunk_to_text_content_uses_frontend_url_in_text_but_unique_in_meta():
     chunk = _make_chunk(
         "body",
@@ -900,6 +946,62 @@ async def test_search_uses_frontend_deep_links_when_scopes_resolved():
         "https://example.unique.app/knowledge-upload/"
         "scope_uy3cznkuysy3gasrxx2m4ezb?file=cont_aaaaaaaaaaaaaaaaaaaaaaa1"
     )
+    assert result.content[0].meta is not None  # type: ignore[union-attr]
+    assert (
+        result.content[0].meta[REFERENCE_META_KEY]["url"]  # type: ignore[union-attr]
+        == "unique://content/cont_aaaaaaaaaaaaaaaaaaaaaaa1"
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_unique_ai_cites_content_url_not_the_deep_link():
+    chunks = [
+        _make_chunk(
+            "first",
+            id="cont_aaaaaaaaaaaaaaaaaaaaaaa1",
+            title="A.pdf",
+            metadata=ContentMetadata(
+                key="A.pdf",
+                mime_type=MIME_TYPE_PDF,
+                folderIdPath="uniquepathid://scope_root/scope_uy3cznkuysy3gasrxx2m4ezb",  # type: ignore[call-arg]
+            ),
+        ),
+    ]
+    mock_service = MagicMock()
+    mock_service.bind_settings.return_value = mock_service
+    mock_service.state = MagicMock()
+    mock_service.run = AsyncMock(return_value=MagicMock())
+
+    with (
+        patch(
+            "kb_mcp.tools.search.tool.KnowledgeBaseInternalSearchService.from_config",
+            return_value=mock_service,
+        ),
+        _patch_post_processor(chunks),
+        _patch_identity(),
+        _patch_kb_settings("https://example.unique.app"),
+        _patch_resolve_scope_ids(),
+        _patch_is_unique_ai_client(True),
+    ):
+        result = await search(
+            search_string="query",
+            config=SearchToolConfig(),
+        )
+
+    record = json.loads(result.content[0].text)  # type: ignore[union-attr]
+    assert record == {
+        "title": "A.pdf",
+        "url": "unique://content/cont_aaaaaaaaaaaaaaaaaaaaaaa1",
+        "content_id": "cont_aaaaaaaaaaaaaaaaaaaaaaa1",
+        "text": "first",
+    }
+    assert result.content[1].text == UNIQUE_AI_RESULT_CITATION_INSTRUCTION  # type: ignore[union-attr]
+    assert result.content[0].meta is not None  # type: ignore[union-attr]
+    assert (
+        result.content[0].meta[REFERENCE_META_KEY]["url"]  # type: ignore[union-attr]
+        == "unique://content/cont_aaaaaaaaaaaaaaaaaaaaaaa1"
+    )
+    assert result.content[0].meta["text"] == "first"  # type: ignore[union-attr]
 
 
 @pytest.mark.asyncio

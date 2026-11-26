@@ -232,9 +232,11 @@ async def search(
             is_error=True,
         )
 
+    unique_ai = is_unique_ai_client()
     frontend_base_url = kb_settings.frontend_base_url_str()
     scope_by_content_id: dict[str, str] = {}
-    if frontend_base_url and chunks:
+    # Scope ids only build https deep links. Unique AI cites unique://content.
+    if frontend_base_url and chunks and not unique_ai:
         try:
             scope_by_content_id = await resolve_scope_ids(
                 chunks,
@@ -250,13 +252,12 @@ async def search(
             sequence_number=i,
             frontend_base_url=frontend_base_url,
             scope_id=scope_by_content_id.get(chunk.id) if chunk.id else None,
+            unique_ai_client=unique_ai,
         )
         for i, chunk in enumerate(chunks, start=1)
     ]
     if content:
-        content.append(
-            citation_instruction_content(is_unique_ai_chat=is_unique_ai_client())
-        )
+        content.append(citation_instruction_content(is_unique_ai_chat=unique_ai))
     elif parsed_llm_filter is not None:
         content = [TextContent(type="text", text=METADATA_FILTER_EMPTY_RETRY_HINT)]
 

@@ -287,8 +287,14 @@ def file_reference_url(
     owner_id: str | None = None,
     frontend_base_url: str | None = None,
     source_url: str | None = None,
+    unique_ai_client: bool = False,
 ) -> str:
-    """Canonical URL for a whole file: deep link, else http(s) ``source_url``, else ``unique://``."""
+    """Canonical URL for a whole file: deep link, else http(s) ``source_url``, else ``unique://``.
+
+    A Unique AI client always gets ``unique://content/{id}``.
+    """
+    if unique_ai_client:
+        return f"unique://content/{content_id}"
     scope = scope_id_from_metadata(metadata)
     if not scope and owner_id and owner_id.startswith("scope_"):
         scope = owner_id
@@ -371,6 +377,7 @@ def chunk_to_text_content(
     *,
     frontend_base_url: str | None = None,
     scope_id: str | None = None,
+    unique_ai_client: bool = False,
 ) -> TextContent:
     """Render one search result as MCP ``TextContent`` with reference info.
 
@@ -380,12 +387,18 @@ def chunk_to_text_content(
             (stored on the structured ``_meta`` reference).
         frontend_base_url: Optional Unique frontend origin for deep links.
         scope_id: Optional folder/scope id (overrides metadata on the chunk).
+        unique_ai_client: When true, ``url`` matches the ``_meta`` reference.
     """
+    url = (
+        platform_reference_url(chunk)
+        if unique_ai_client
+        else reference_url(
+            chunk, frontend_base_url=frontend_base_url, scope_id=scope_id
+        )
+    )
     hit = _SearchHit(
         title=chunk.title or chunk.key or chunk.id,
-        url=reference_url(
-            chunk, frontend_base_url=frontend_base_url, scope_id=scope_id
-        ),
+        url=url,
         content_id=chunk.id,
         pages=_pages(chunk),
         text=chunk.text,
