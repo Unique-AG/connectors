@@ -4,7 +4,7 @@ import { BASE_PERMISSIONS, UNIQUE_MODE_PERMISSIONS } from '../graph-permissions'
 import { renderTerraformRegistry, TERRAFORM_REGISTRY_PATH } from '../terraform-registry';
 
 describe('the Entra module registry', () => {
-  it('matches the committed file; run `pnpm codegen` after changing a permission or a tool', async () => {
+  it('matches the committed file; run `pnpm terraform:registry` after changing a permission or a tool', async () => {
     await expect(renderTerraformRegistry()).toMatchFileSnapshot(
       path.resolve(__dirname, '../../..', TERRAFORM_REGISTRY_PATH),
     );
