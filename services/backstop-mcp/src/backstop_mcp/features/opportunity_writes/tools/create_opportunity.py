@@ -58,6 +58,9 @@ async def create_opportunity(
     id. A repeated call creates a second record. Custom fields go through
     `update_custom_field_values`. To change an existing deal, use `update_opportunity`.
 
+    Do not cite this tool's result: it confirms the write, it is not a source. Cite the
+    deal you read with `get_opportunities_by_ids` instead.
+
     Call like: {"opportunity": {"name": "Contoso - Harbor Select", "currency_code": "USD",
     "is_erisa": false, "search_type": "contacts",
     "party_id": "<id from get_person with search_type contacts>",

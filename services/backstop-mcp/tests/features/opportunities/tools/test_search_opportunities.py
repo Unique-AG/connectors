@@ -623,7 +623,7 @@ class TestSearchOpportunities:
 
     @pytest.mark.asyncio
     @respx.mock
-    async def test_url_is_off_by_default_and_arrives_when_selected(self) -> None:
+    async def test_url_is_on_by_default_and_drops_out_of_a_custom_list(self) -> None:
         base_url = tenant("so-url")
         respx.get(f"{base_url}/opportunities").mock(
             return_value=_page(
@@ -644,17 +644,18 @@ class TestSearchOpportunities:
             )
             selected_result = tool_model(
                 await search_opportunities(
-                    fields=["name", "url"], search_opportunities_query=query, search_config=_CONFIG
+                    fields=["name"], search_opportunities_query=query, search_config=_CONFIG
                 ),
                 SearchOpportunitiesResolvedResponse,
             )
 
-        default_rows = object_list(tool_payload(default_result)["rows"])
-        assert "url" not in object_dict(default_rows[0])
-        selected_rows = object_list(tool_payload(selected_result)["rows"])
-        assert object_dict(selected_rows[0])["url"] == (
+        default_row = object_dict(object_list(tool_payload(default_result)["rows"])[0])
+        assert default_row["name"] == "Contoso - Harbor Select"
+        assert default_row["url"] == (
             "https://tenant.example.test/backstop/crm/Opportunity.action?display=&entityId=1"
         )
+        selected_rows = object_list(tool_payload(selected_result)["rows"])
+        assert "url" not in object_dict(selected_rows[0])
 
     @pytest.mark.asyncio
     @respx.mock

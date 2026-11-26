@@ -43,6 +43,9 @@ async def create_organization(
     from `list_contact_categories`. To change an existing organization, use
     `update_organization`.
 
+    Do not cite this tool's result: it confirms the write, it is not a source. Cite the
+    organization you read with `get_organization` instead.
+
     Call like: {"organization": {"name": "Acme Advisors",
     "category_ids": ["<id from list_contact_categories>"]}}
     """

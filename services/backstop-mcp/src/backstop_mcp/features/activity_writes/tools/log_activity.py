@@ -61,6 +61,9 @@ async def log_activity(
     message file, so use `attach_file(kind="email")` with the `.msg`/`.eml` blob. Any other
     file is `attach_file(kind="document")`.
 
+    Do not cite this tool's result: it confirms the write, it is not a source. Cite the
+    activity you read with `get_activity_detail` instead.
+
     Call like: {"activity": {"kind": "note", "search_type": "organizations",
     "party_id": "<id from prior resolve echo>", "title": "Follow up"}}
     """

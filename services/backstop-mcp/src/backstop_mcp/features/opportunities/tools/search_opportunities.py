@@ -60,7 +60,7 @@ SearchRowField = Literal[
     "product",
 ]
 _DEFAULT_FIELDS: frozenset[str] = frozenset(
-    {"id", "name", "stage", "is_open", "expected_investment_date", "investor", "product"}
+    {"id", "url", "name", "stage", "is_open", "expected_investment_date", "investor", "product"}
 )
 
 
@@ -231,10 +231,10 @@ async def search_opportunities(
         list[SearchRowField] | None,
         Field(
             description=(
-                "Sparse row fields. Defaults to id, name, stage, is_open, "
+                "Sparse row fields. Defaults to id, url, name, stage, is_open, "
                 "expected_investment_date, investor, product. "
-                "`id` is always included. Select `url` when the answer will link to the "
-                "deals — it is off by default so a page stays small."
+                "`id` is always included. Keep `url` in a custom list when the answer will "
+                "link to the deals."
             ),
         ),
     ] = None,
@@ -309,13 +309,14 @@ async def search_opportunities(
 
     Call like: {"representative": "jdoe", "is_open": true}
     Deals assigned to them or at organizations they cover: {"representative": "jdoe",
-    "representative_scope": "either", "is_open": true, "fields": ["name", "stage",
+    "representative_scope": "either", "is_open": true, "fields": ["url", "name", "stage",
     "requested_amount", "investor", "representative", "investor_representative"]}
     One custom-field option: {"is_open": true, "custom_fields": [{"definition_id":
     "<id from list_custom_fields>", "values": ["<option from list_custom_fields>"]}],
-    "fields": ["name", "stage", "requested_amount", "expected_investment_date", "investor"]}
+    "fields": ["url", "name", "stage", "requested_amount", "expected_investment_date",
+    "investor"]}
     Several vehicles: {"product": ["NWON", "NWOF"], "is_open": true}
-    Stage changes: {"entered_stage_from": "2026-01-01", "fields": ["name", "stage",
+    Stage changes: {"entered_stage_from": "2026-01-01", "fields": ["url", "name", "stage",
     "previous_stage", "date_entered_current_stage", "is_open", "investor"]}
     """
     if mode == "aggregate" and group_by is None:

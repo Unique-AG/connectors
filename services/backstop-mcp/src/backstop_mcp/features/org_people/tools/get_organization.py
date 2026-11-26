@@ -200,12 +200,14 @@ async def get_organization(
         ),
     )
     organization = fetched.organization
+    resolved = ResolvedPartyResponse.from_party(
+        party,
+        attributes=organization.model_dump(by_alias=True, exclude_none=True),
+    )
     return OrganizationResolvedResponse(
+        name=resolved.name,
         organization=organization,
-        resolved=ResolvedPartyResponse.from_party(
-            party,
-            attributes=organization.model_dump(by_alias=True, exclude_none=True),
-        ),
+        resolved=resolved,
         as_of=AsOfResponse.from_attributes(organization),
         included=fetched.included,
         custom_field_values=fetched.custom_field_values,
