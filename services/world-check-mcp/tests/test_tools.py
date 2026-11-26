@@ -345,6 +345,21 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 "sources": [],
             },
         )
+    if path.endswith("/references/records/e_3"):
+        return _json(
+            200,
+            {
+                "entityType": "INDIVIDUAL",
+                "referenceId": "e_3",
+                "names": {"nameDetails": [{"details": [{"value": "Mary Somerville"}]}]},
+                "sources": [],
+                "sourceReferenceLinks": {
+                    "sourceReferenceLinkDetails": [
+                        {"uri": "HTTPS://registry.example.org/officials/e_3"},
+                    ]
+                },
+            },
+        )
     if path.endswith("/references/countries"):
         return _json(200, {"GBR": "United Kingdom"})
     if path.endswith("/references/nationalities"):
@@ -887,6 +902,15 @@ async def test_get_profile_has_no_link_when_lseg_cites_no_source_page() -> None:
     assert profile is not None
     assert profile["name"] == "Grace Hopper"
     assert profile["url"] is None
+
+
+async def test_get_profile_links_a_source_page_whose_scheme_is_uppercase() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_3"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["url"] == "HTTPS://registry.example.org/officials/e_3"
 
 
 def _texts(result: CallToolResult) -> list[TextContent]:

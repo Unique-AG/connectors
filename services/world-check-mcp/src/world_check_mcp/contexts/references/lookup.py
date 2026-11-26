@@ -66,7 +66,7 @@ def _profile(*, record: Entity) -> Profile:
     pages = (
         link.uri
         for link in (links.source_reference_link_details or [] if links else [])
-        if link.uri and link.uri.startswith(("https://", "http://"))
+        if link.uri and link.uri.lower().startswith(("https://", "http://"))
     )
     return Profile(
         name=primary_name(name_details),
