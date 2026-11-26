@@ -150,8 +150,8 @@ class DriveItemSummary(BaseModel):
             + "when you answer from this item or about it, and copy it exactly: never decode its "
             + "`%` escapes. When Graph gave the file's own path, this address adds `?web=1` so "
             + "that SharePoint shows the file instead of downloading it. It is not a download "
-            + "link, and this connector cannot read a file from it. Null when Graph gave no "
-            + "address."
+            + "link: `download_url` is. This connector cannot read a file from either. Null when "
+            + "Graph gave no address."
         )
     )
     download_url: str | None = Field(
