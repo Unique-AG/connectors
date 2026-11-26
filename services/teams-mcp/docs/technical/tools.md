@@ -20,7 +20,7 @@ The ids are internal. The tool descriptions, output schemas and server instructi
 
 ### Citations
 
-Every message that `get_chat_messages`, `get_channel_messages` and `search_messages` return carries a `title` and a `webUrl`. A chat message always has a link: the one Graph sends, else the chat deep link. A channel post has the link Graph sends, or `null` when Graph sends none. Conduct (`unique-cli mcp`) cites each message that has an http(s) `webUrl` by its title, with that link, so a channel post without a link is not cited. `list_teams`, `list_chats` and `list_channels` are not cited: they are lookup steps the agent uses to find the messages. The tools send the module's default content, one JSON text item of the output, so Unique AI does not cite them.
+Every message that `get_chat_messages`, `get_channel_messages` and `search_messages` return carries a `title` and a `webUrl`. A chat message the server reads from Graph always has a link: the one Graph sends, else the chat deep link. A channel post has the link Graph sends, or `null` when Graph sends none. A `search_messages` row whose message could not be fetched has `null` too when it has neither a message id to build the deep link from nor an index link. Conduct (`unique-cli mcp`) cites each message that has an http(s) `webUrl` by its title, with that link, so a channel post without a link is not cited. `list_teams`, `list_chats` and `list_channels` are not cited: they are lookup steps the agent uses to find the messages. The tools send the module's default content, one JSON text item of the output, so Unique AI does not cite them.
 
 ## Tool Overview
 
