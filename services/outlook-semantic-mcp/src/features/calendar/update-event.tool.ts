@@ -15,6 +15,7 @@ import { UpdateEventCommand } from './update-event.command';
 import { META } from './update-event-tool.meta';
 import { describeCalendar, formatDisplayWhen } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
+import { EVENT_WRITE_IS_NOT_A_SOURCE } from './utils/calendar-tool-format';
 import { EventRefSchema } from './utils/event-ref.schema';
 import {
   isSeriesOccurrence,
@@ -154,8 +155,7 @@ export class UpdateEventTool {
   @Tool({
     name: 'update_event',
     title: 'Update Event',
-    description:
-      'Update an existing Outlook calendar event. Pass eventRef from search_calendar_events unchanged. There is no draft — attendees are notified immediately after the user confirms. For a recurring meeting the user chooses this occurrence or the whole series in the confirmation. startDateTime and endDateTime must include a timezone offset. If consentRequired is true, ask the user to reconnect Outlook.',
+    description: `Update an existing Outlook calendar event. Pass eventRef from search_calendar_events unchanged. There is no draft — attendees are notified immediately after the user confirms. For a recurring meeting the user chooses this occurrence or the whole series in the confirmation. startDateTime and endDateTime must include a timezone offset. If consentRequired is true, ask the user to reconnect Outlook. ${EVENT_WRITE_IS_NOT_A_SOURCE}`,
     parameters: UpdateEventInputSchema,
     outputSchema: UpdateEventOutputSchema,
     annotations: {

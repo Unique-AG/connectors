@@ -69,7 +69,7 @@ The Outlook Semantic MCP Server exposes tools whose availability depends on the 
 
 ### Citations
 
-`search_emails` and `fetch_next_search_pages` return their emails under `results`, and `search_calendar_events` its events under `events`, each with a `title` (the subject, or `(no subject)` when it has none) and its Outlook link (`outlookWebLink` for an email, `webLink` for an event). `open_email` returns the email's `title` and `webLink` at the top level. Conduct (`unique-cli mcp`) cites each email and event by that title and link. An event without a `webLink` is not cited. The tools send the module's default content, one JSON text item of the result, so Unique AI does not cite them.
+`search_emails` and `fetch_next_search_pages` return their emails under `results`, and `search_calendar_events` its events under `events`, each with a `title` (the subject, or `(no subject)` when it has none) and its Outlook link (`outlookWebLink` for an email, `webLink` for an event). `open_email` returns the email's `title` and `webLink` at the top level, and leaves out the top-level `title` when it has no `webLink`. Conduct (`unique-cli mcp`) cites each email and event by that title and link. An event without a `webLink`, or an opened email without one, is not cited. `create_event` and `update_event` also return the event's `subject` and `webLink`, so their descriptions tell the agent not to cite them: they confirm a write, they are not sources. The tools send the module's default content, one JSON text item of the result, so Unique AI does not cite them.
 
 ---
 
@@ -360,7 +360,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
   success: boolean;
   status?: string;
   message?: string;
-  title?: string;              // email subject, or "(no subject)"
+  title?: string;              // email subject, or "(no subject)"; absent when webLink is null
   webLink?: string | null;     // opens the email in Outlook on the web; null when no link could be built
   emailData?: {
     id: string;

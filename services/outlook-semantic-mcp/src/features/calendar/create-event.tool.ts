@@ -15,6 +15,7 @@ import { type CalendarSummary, GetCalendarQuery } from './get-calendar.query';
 import { describeCalendar, formatDisplayWhen } from './utils/calendar-display';
 import { ConsentRequiredSchema, EventDateTimeSchema } from './utils/calendar-output.schema';
 import { CalendarRefSchema } from './utils/calendar-ref.schema';
+import { EVENT_WRITE_IS_NOT_A_SOURCE } from './utils/calendar-tool-format';
 import { EventRefSchema } from './utils/event-ref.schema';
 import { smtpAddress } from './utils/smtp-address.schema';
 
@@ -120,8 +121,7 @@ export class CreateEventTool {
   @Tool({
     name: 'create_event',
     title: 'Create Event',
-    description:
-      'Create an Outlook calendar event. There is no draft state — if attendees are included, invitations are sent immediately after the user confirms. startDateTime and endDateTime must include a timezone offset. To create on a shared calendar, call list_calendars and pass that calendar calendarRef through unchanged; omit calendarRef for the signed-in user default calendar. If you retry this create, pass the same transactionId. If consentRequired is true, ask the user to reconnect Outlook.',
+    description: `Create an Outlook calendar event. There is no draft state — if attendees are included, invitations are sent immediately after the user confirms. startDateTime and endDateTime must include a timezone offset. To create on a shared calendar, call list_calendars and pass that calendar calendarRef through unchanged; omit calendarRef for the signed-in user default calendar. If you retry this create, pass the same transactionId. If consentRequired is true, ask the user to reconnect Outlook. ${EVENT_WRITE_IS_NOT_A_SOURCE}`,
     parameters: CreateEventInputSchema,
     outputSchema: CreateEventOutputSchema,
     annotations: {
