@@ -229,6 +229,38 @@ describe('Folder cache with DIRECTORY_SYNC_MODE against Postgres', () => {
       expect(output.searchSummary).toContain(PROJECTS.id);
     });
 
+    it('shares one folder sync between concurrent searches of the same user', async () => {
+      await lastSyncedHoursAgo(ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS / HOUR_MS + 1);
+      const query = searchEmailsQuery(features);
+      const search = () =>
+        query.run(convertUserProfileIdToTypeId(userProfileId), {
+          msGraphKeywordSearchQueries: [{ kqlQuery: 'budget', directories: [PROJECTS.id] }],
+        });
+
+      await Promise.all([search(), search(), search()]);
+
+      expect(folderDeltaReads).toHaveBeenCalledTimes(1);
+      expect(searchedUrls()).toHaveLength(3);
+    });
+
+    it('does not retry a failed folder sync on the next search', async () => {
+      await lastSyncedHoursAgo(ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS / HOUR_MS + 1);
+      folderDeltaReads.mockRejectedValue(new Error('Graph is unavailable'));
+      const query = searchEmailsQuery(features);
+      const search = () =>
+        query.run(convertUserProfileIdToTypeId(userProfileId), {
+          msGraphKeywordSearchQueries: [{ kqlQuery: 'budget', directories: [INBOX.id] }],
+        });
+
+      await search();
+      const readsAfterFailure = folderDeltaReads.mock.calls.length;
+      await search();
+
+      expect(readsAfterFailure).toBeGreaterThan(0);
+      expect(folderDeltaReads).toHaveBeenCalledTimes(readsAfterFailure);
+      expect(searchedUrls()).toHaveLength(2);
+    });
+
     it('passes on a revoked sign-in from the folder sync', async () => {
       folderDeltaReads.mockRejectedValue(new UpstreamCredentialRevokedError('invalid_grant'));
 
