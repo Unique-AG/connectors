@@ -1608,8 +1608,8 @@ class TestHowItDeclaresItself:
         assert "the body" in lead
         assert "add a Teams meeting" in lead
         assert "can mail the attendee a notice" in lead
-        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 4
-        assert 45 <= len(description.split()) <= 210
+        assert 1 <= len([line for line in notes.splitlines() if line.startswith("- ")]) <= 5
+        assert 45 <= len(description.split()) <= 230
 
     async def test_the_description_keeps_the_agree_gate_and_the_retry_rule(
         self, transport: httpx.AsyncClient

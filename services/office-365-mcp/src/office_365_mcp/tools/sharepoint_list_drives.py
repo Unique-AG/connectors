@@ -23,6 +23,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, BrowserUrl, display_name
 from office_365_mcp.shared.handles import DriveFolderHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -57,7 +58,11 @@ _SiteDrivesQuery = SiteDrivesRequestBuilder.DrivesRequestBuilderGetQueryParamete
 
 _SITE_DRIVES = "{+baseurl}/sites/{+site_path}{?%24select}"
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source(
+    "document libraries", cite="the file you read with sharepoint_read_file"
+)
+
+_DESCRIPTION = f"""\
 Lists drives, each with a handle for its top folder. Without `site`, it lists the drives of the \
 signed-in user. Most users have one drive, their own OneDrive. With `site`, it lists the \
 document libraries of that SharePoint site. Pass `root_uri` as `folder` to \
@@ -67,6 +72,7 @@ Notes:
 - Get `site` from the user. If this deployment exposes sharepoint_search_sites, take the `web_url` \
 of one of its rows. If not, take the `web_url` of a site from sharepoint_search_files. A library \
 is a drive whose `drive_type` is `documentLibrary`.
+- {_NOT_A_SOURCE}
 """
 
 

@@ -54,6 +54,7 @@ from office_365_mcp.shared.calendar import (
     wall_clock,
     zone_named,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import confirmation_id_for
 from office_365_mcp.shared.handles import event_handle
 from office_365_mcp.shared.mail import AddressFault, one_address_each
@@ -106,7 +107,7 @@ _NOTHING_HAPPENED = "Nothing was changed."
 
 _RETRY = " If you call this tool again with the same arguments, the call will fail the same way."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Changes one event that the signed-in user organizes. This tool can change the subject, \
 the time, whether the event is all-day, the location, the body, and the attendee lists. It can \
 also change the free-busy status, the categories, the importance, the sensitivity, and the \
@@ -125,6 +126,7 @@ gets no new location.
 that date.
 - If a call times out, do not call this tool again first. A notice can already be out. Before \
 you call again, make sure that outlook_read_event does not already show the change.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_HANDLE = (

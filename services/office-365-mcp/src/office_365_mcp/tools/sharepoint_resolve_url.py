@@ -14,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.files import ITEM_FIELDS, VIEWER_QUERY, DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -29,7 +30,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "url": "https://contoso.sharepoint.invalid/:w:/s/Finance/SYNTHETICLINK0000"
 }
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source(
+    "the file or folder that a link points to", cite="the file you read with sharepoint_read_file"
+)
+
+_DESCRIPTION = f"""\
 This tool gets the handle of the file or folder that a OneDrive or SharePoint sharing link \
 opens. It reads the item as the signed-in user. Pass a file handle to sharepoint_read_file and a \
 folder handle to sharepoint_browse_folder. To find a file by its name or its content, use \
@@ -44,6 +49,7 @@ tool also accepts the web address of a file that someone posted in a Teams chat,
 attachment.
 - A file address that ends in `?web=1`, as the `web_url` of a file in this connector's answers \
 does, is looked up without that ending.
+- {_NOT_A_SOURCE}
 """
 
 _NOT_A_WEB_ADDRESS = (

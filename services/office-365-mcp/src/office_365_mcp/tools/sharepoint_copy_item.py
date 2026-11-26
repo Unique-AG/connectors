@@ -23,6 +23,7 @@ from office_365_mcp.graph_client import (
     request_with_json_body,
     send_no_response_content,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
@@ -69,7 +70,7 @@ _COPY = "copy"
 _DO_NOT_COPY = "do not copy"
 _NOTHING_COPIED = "Nothing was copied."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Starts a copy of one file or folder in OneDrive or SharePoint, for the signed-in user. The copy \
 goes into a folder in the same drive or in another drive. The copy of a folder includes everything \
 inside it. Microsoft runs the copy after this call returns, so the copy can take some time to \
@@ -89,6 +90,7 @@ occur after this call returns, and then this tool cannot show it. To copy an ite
 folder, give the copy a new `name`.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 sharepoint_browse_folder does not show the copy in the destination.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_AN_ITEM_HANDLE = (

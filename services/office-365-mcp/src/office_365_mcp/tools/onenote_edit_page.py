@@ -14,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, not_graph
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenotePageHandle, onenote_page_handle
 from office_365_mcp.shared.notes import (
@@ -76,7 +77,7 @@ _NOTHING_CHANGED = "Nothing was changed."
 _UNTITLED_PAGE = "an untitled page"
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Adds content next to an element on one page, or replaces an element. One or more `commands` run \
 in order. There is no `delete` action. onenote_rename_page is the sibling for the title. OneNote \
 can show the change to everyone who opens the notebook.
@@ -103,6 +104,7 @@ https://support.microsoft.com/en-us/onenote/onenote-for-ipad-or-iphone-help-and-
 on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
 empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
 Graph does not support custom tags.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_PAGE_HANDLE = (

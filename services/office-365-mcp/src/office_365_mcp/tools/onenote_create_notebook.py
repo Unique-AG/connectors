@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step, no_retry, not_graph
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import OnenoteNotebookHandle, OnenoteOwner
 from office_365_mcp.shared.notes import (
@@ -50,7 +51,7 @@ _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No notebook was created."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates a new, empty notebook in the signed-in user's own OneNote. To create it in a Microsoft 365 \
 group or team, pass `group`. To create it in a SharePoint site, pass `site`. There is no draft and \
 no review step. Without `group` or `site`, a new notebook belongs to the user alone and starts \
@@ -65,6 +66,7 @@ name of that group or site, tell it to the user before you call.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 onenote_list_notebooks does not show a notebook named `name`. If the call named a `group` or a \
 `site`, pass the same one to onenote_list_notebooks.
+- {ACTION_NOT_A_SOURCE}
 """
 
 GRAPH_NOT_FOUND = (

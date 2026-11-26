@@ -7,6 +7,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.files import DriveItemSummary
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -23,7 +24,11 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "channel_id": "19:general@thread.tacv2",
 }
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source(
+    "the files folder of a channel", cite="the file you read with sharepoint_read_file"
+)
+
+_DESCRIPTION = f"""\
 Finds the SharePoint folder that holds the files of one Teams channel that the signed-in user can \
 see. The answer is the folder itself and not its contents. To list what the folder holds, pass the \
 `uri` of the answer as `folder` to sharepoint_browse_folder.
@@ -31,7 +36,8 @@ see. The answer is the folder itself and not its contents. To list what the fold
 Notes:
 - For a private channel that Microsoft migrated, the answer is the root folder.
 - Microsoft documents that some special characters in a channel name make this call return an \
-error.\
+error.
+- {_NOT_A_SOURCE}\
 """
 
 

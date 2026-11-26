@@ -14,6 +14,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import CHAT_PERMISSION, MessageHandle
 from office_365_mcp.shared.seam import (
@@ -55,7 +56,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "attachments": ["sharepoint:///files/b%21SYNTHETICDRIVE0000/01SYNTHETICFILE0000"],
 }
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Sends one message as the signed-in user to an existing Teams chat. The message attaches one or \
 more files that are already in SharePoint. The message can @mention people. The mentions come \
 first, in the order given, and the HTML of `body_html` follows them. The files come after the \
@@ -71,6 +72,7 @@ the members of the chat. The question and the message show the name that Microso
 member. If a person in `mentions` is not a member of the chat, this tool sends nothing.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 teams_list_chat_messages does not already show the message.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

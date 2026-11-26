@@ -910,7 +910,7 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         _lead, notes = description.split("\n\nNotes:\n")
         bullets = [line for line in notes.splitlines() if line.startswith("- ")]
-        assert 1 <= len(bullets) <= 3
+        assert 1 <= len(bullets) <= 4
         assert 45 <= len(description.split()) <= 210
 
     async def test_the_description_promises_no_overwrite_and_no_binary_upload(

@@ -14,6 +14,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import ListHandle, list_handle
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -58,7 +59,7 @@ _CREATE = "add the row"
 _DO_NOT_CREATE = "do not add it"
 _NOTHING_CREATED = "No row was added."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Adds one row to a SharePoint list, given the `uri` of a list from sharepoint_list_lists and the \
 values of its columns. Call sharepoint_get_list first to learn the internal column names, their \
 types, and the allowed choices. sharepoint_list_items reads the new row.
@@ -72,6 +73,7 @@ column. The tool refuses it before it asks the user and adds nothing, so tell th
 refusal. Never drop a named column or say the user did not ask for it.
 - If a call times out, do not call this tool again first. Make sure that sharepoint_list_items \
 does not show the row before you call again.
+- {ACTION_NOT_A_SOURCE}
 """
 
 
