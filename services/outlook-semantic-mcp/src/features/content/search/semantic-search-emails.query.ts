@@ -302,8 +302,7 @@ export class SemanticSearchEmailsQuery {
       }),
     );
 
-    // Semantic IDs are immutable. Delegated-mailbox webLinks are rebuilt as OWA links from a RestId,
-    // and a message with no known mailbox is opened from the signed-in one.
+    // Semantic IDs are immutable. Delegated-mailbox webLinks are rebuilt as OWA links from a RestId.
     const mailboxOf = (message: SearchEmailResult) => message.sourceMailbox ?? userProfile.email;
     const webLinks = await this.buildWebLinksCommand.run({
       userProfileId: userProfile.id,
