@@ -251,7 +251,7 @@ uc-08-18:
       optional: true
       args: {title: Retro}
       uses: {section: handle of a section of the team notebook}
-  note: "expected behaviour from shared/notes.py:137-143 (OWNED_REFUSED, raised by owner_refused at tools/onenote_create_page.py:253-256 before the question to Mia): most likely the signed-in user is not a member of that group or site, ask the user to get access, if the user already has access ask a Microsoft 365 administrator to examine the OneNote permissions. When the refusal comes at the list step, the text is shared/notes.py:146-155 (named_owner_refused), and then no create step follows, which is why that step is optional. No question to Mia comes before either refusal, so asks_user is false."
+  note: "expected behaviour from shared/notes.py:137-143 (OWNED_REFUSED, raised by owner_refused at tools/onenote_create_page.py:266 before the question to Mia): most likely the signed-in user is not a member of that group or site, ask the user to get access, if the user already has access ask a Microsoft 365 administrator to examine the OneNote permissions. When the refusal comes at the list step, the text is shared/notes.py:146-155 (named_owner_refused), and then no create step follows, which is why that step is optional. No question to Mia comes before either refusal, so asks_user is false."
 
 uc-08-19:
   status: working
@@ -282,7 +282,7 @@ uc-08-20:
     - tool: onenote_list_pages
       args: {order_by: created_desc}
       uses: {section: handle of the section Work}
-  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is onenote_list_pages from tools/onenote_create_page.py:58) and tools/onenote_create_page.py:109-111: do not call this tool again first, make sure that onenote_list_pages does not show the page, judge by created_at because a new title can stay empty for days. The tool is WRITE_ADDITIVE with no_retry (tools/onenote_create_page.py:246), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is onenote_list_pages from tools/onenote_create_page.py:59) and tools/onenote_create_page.py:122-124: do not call this tool again first, make sure that onenote_list_pages does not show the page, judge by created_at because a new title can stay empty for days. The tool is WRITE_ADDITIVE with no_retry (tools/onenote_create_page.py:259), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
 
 uc-08-21:
   status: working
@@ -296,7 +296,7 @@ uc-08-21:
     - tool: onenote_create_page
       args: {title: Weekly sync, body_html: three notes}
       uses: {section: handle of the section Work}
-  note: "expected behaviour per row. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again. No access, from shared/seam/advice.py:261-270 (onenote_create_page has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Notes.Create, and retrying will not help. Section gone, from tools/onenote_create_page.py:67-76 (GRAPH_NOT_FOUND): the section was most likely deleted or moved, call onenote_list_notebooks again and take a fresh uri for the section, because the same handle fails again."
+  note: "expected behaviour per row. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again. No access, from shared/seam/advice.py:261-270 (onenote_create_page has no GRAPH_FORBIDDEN text): ask a Microsoft 365 administrator to grant the delegated permission Notes.Create, and retrying will not help. Section gone, from tools/onenote_create_page.py:68-77 (GRAPH_NOT_FOUND): the section was most likely deleted or moved, call onenote_list_notebooks again and take a fresh uri for the section, because the same handle fails again."
 
 uc-08-22:
   status: working
@@ -334,7 +334,7 @@ uc-08-23:
       optional: true
       args: {commands: only the commands that the page does not show}
       uses: {page: handle of the page}
-  note: "expected behaviour from tools/onenote_edit_page.py:89-91 (description) and shared/seam/advice.py:182-201 (onenote_edit_page is WRITE_DESTRUCTIVE at tools/onenote_edit_page.py:276, shown_by is onenote_read_page from tools/onenote_edit_page.py:47): Microsoft reports one result for the whole set, a failure can mean a partly applied set, read the page with onenote_read_page and resend only the missing commands. The tool asks the user to agree for a set with a replace every time (tools/onenote_edit_page.py:86-88), so a second edit asks again."
+  note: "expected behaviour from tools/onenote_edit_page.py:89-90 (description) and shared/seam/advice.py:182-201 (onenote_edit_page is WRITE_DESTRUCTIVE at tools/onenote_edit_page.py:288, shown_by is onenote_read_page from tools/onenote_edit_page.py:47): Microsoft reports one result for the whole set, a failure can mean a partly applied set, read the page with onenote_read_page and resend only the missing commands. The tool asks the user to agree for a set with a replace every time (tools/onenote_edit_page.py:86-88), so a second edit asks again."
 
 uc-08-24:
   status: working
@@ -390,7 +390,7 @@ uc-08-27:
       args: {title_contains: Weekly sync}
     - tool: onenote_list_pages
       args: {order_by: created_desc}
-  note: "expected behaviour from tools/onenote_list_pages.py:84-93 (description): title_contains matches the title only, the page index can hold an empty title for days after a create, so find a new page by created_at or by its section instead"
+  note: "expected behaviour from tools/onenote_list_pages.py:86-93 (description): title_contains matches the title only, the page index can hold an empty title for days after a create, so find a new page by created_at or by its section instead"
 
 uc-08-28:
   status: working
@@ -485,7 +485,7 @@ uc-08-34:
     - tool: teams_list_my_teams
       optional: true
     - any_of: [onenote_delete_page, onenote_edit_page, onenote_create_page, onenote_copy_notebook, onenote_copy_section, onenote_copy_page, onenote_append_to_page, onenote_rename_page, onenote_create_notebook, onenote_create_section, onenote_create_section_group]
-  note: "expected behaviour for every row from shared/seam/elicitation.py:73-78 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam/elicitation.py:24-26). The page delete always asks (tools/onenote_delete_page.py:51), a replace always asks (tools/onenote_edit_page.py:86), and a page in a team notebook asks (tools/onenote_create_page.py:104-106). The row for the date uses the ask Change the launch date on my Planning page to 21 June, and the row for the team notebook uses Add the page Retro to the notebook of the Platform team. The notebook copy asks when it names a group (tools/onenote_copy_notebook.py:123-125), and the section copy and the page copy ask when the destination notebook is shared or belongs to somebody else (tools/onenote_copy_section.py:160-162, tools/onenote_copy_page.py:139-141). The copy rows use the asks Copy my Customers notebook into the Platform team, Copy the section Work into the notebook of the Platform team and Copy the page Retro into the section Planning of the Platform team, with the notebook list, the section list or the page list as the first step, and the team list as an optional step. The text for the assistant allows a new call only on a new request from Mia, and the scenario states only that the assistant does not ask again. The rows of the retired uc-08-49 sit here."
+  note: "expected behaviour for every row from shared/seam/elicitation.py:73-78 (_not_agreed): Nothing was changed, so this is not a failure to report as one, say that the request was not confirmed, do not call this tool again for the same request unless the user asks for it in a new message (_ASK_AGAIN, shared/seam/elicitation.py:24-26). The page delete always asks (tools/onenote_delete_page.py:51), a replace always asks (tools/onenote_edit_page.py:86), and a page in a team notebook asks (tools/onenote_create_page.py:105-107). The row for the date uses the ask Change the launch date on my Planning page to 21 June, and the row for the team notebook uses Add the page Retro to the notebook of the Platform team. The notebook copy asks when it names a group (tools/onenote_copy_notebook.py:123-125), and the section copy and the page copy ask when the destination notebook is shared or belongs to somebody else (tools/onenote_copy_section.py:160-162, tools/onenote_copy_page.py:139-141). The copy rows use the asks Copy my Customers notebook into the Platform team, Copy the section Work into the notebook of the Platform team and Copy the page Retro into the section Planning of the Platform team, with the notebook list, the section list or the page list as the first step, and the team list as an optional step. The text for the assistant allows a new call only on a new request from Mia, and the scenario states only that the assistant does not ask again. The rows of the retired uc-08-49 sit here."
 
 uc-08-35:
   status: working
@@ -798,7 +798,7 @@ uc-08-54:
     - any_of: [onenote_preview_page, onenote_rename_page, onenote_append_to_page]
     - tool: onenote_list_pages
       args: {title_contains: Acme kickoff}
-  note: "expected behaviour for every row from tools/onenote_preview_page.py:48-53, tools/onenote_rename_page.py:79-86, and tools/onenote_append_to_page.py:89-96 (GRAPH_NOT_FOUND): Microsoft 365 has no such page, it was most likely deleted or moved to another section, which gives it a new handle, find it again with onenote_list_pages, and do not retry the same handle. The rename and the append read the page before they ask anything, so the refusal comes before any question (tools/onenote_rename_page.py:132-136, tools/onenote_append_to_page.py:123-125). Row 1 uses the ask above, row 2 uses Rename my page Acme kickoff to Acme kickoff decisions, and row 3 uses Add a task list at the end of my Acme kickoff page."
+  note: "expected behaviour for every row from tools/onenote_preview_page.py:48-53, tools/onenote_rename_page.py:79-86, and tools/onenote_append_to_page.py:90-97 (GRAPH_NOT_FOUND): Microsoft 365 has no such page, it was most likely deleted or moved to another section, which gives it a new handle, find it again with onenote_list_pages, and do not retry the same handle. The rename and the append read the page before they ask anything, so the refusal comes before any question (tools/onenote_rename_page.py:132-136, tools/onenote_append_to_page.py:123-125). Row 1 uses the ask above, row 2 uses Rename my page Acme kickoff to Acme kickoff decisions, and row 3 uses Add a task list at the end of my Acme kickoff page."
 
 uc-08-55:
   status: working
@@ -815,7 +815,7 @@ uc-08-55:
       uses: {page: handle of the page}
     - tool: onenote_read_page
       uses: {page: handle of the page}
-  note: "expected behaviour from tools/onenote_append_to_page.py:98-103 (_WRITTEN_BUT_UNREAD): Microsoft 365 added the content to the page, then the connector did not receive the updated page, use onenote_read_page to see the new content, and do not call onenote_append_to_page again for this error, because a second call adds the same content again. The chain holds exactly one append step."
+  note: "expected behaviour from tools/onenote_append_to_page.py:99-104 (_WRITTEN_BUT_UNREAD): Microsoft 365 added the content to the page, then the connector did not receive the updated page, use onenote_read_page to see the new content, and do not call onenote_append_to_page again for this error, because a second call adds the same content again. The chain holds exactly one append step."
 
 uc-08-56:
   status: working
@@ -832,7 +832,7 @@ uc-08-56:
       uses: {page: handle of the page}
     - tool: onenote_read_page
       uses: {page: handle of the page}
-  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is onenote_read_page from tools/onenote_append_to_page.py:46) and tools/onenote_append_to_page.py:69-70: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that onenote_read_page does not already show the block. The call is sent once, because the patch of an append is not safe to repeat and is sent with no_retry (shared/notes.py:204-205, tools/onenote_append_to_page.py:170). The chain holds exactly one append step, and the check comes before any second append."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is onenote_read_page from tools/onenote_append_to_page.py:47) and tools/onenote_append_to_page.py:70-71: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that onenote_read_page does not already show the block. The call is sent once, because the patch of an append is not safe to repeat and is sent with no_retry (shared/notes.py:204-205, tools/onenote_append_to_page.py:171). The chain holds exactly one append step, and the check comes before any second append."
 
 uc-08-57:
   status: working

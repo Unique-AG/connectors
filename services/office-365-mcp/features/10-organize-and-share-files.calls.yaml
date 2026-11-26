@@ -588,7 +588,7 @@ uc-10-41:
   asks_user: false
   chain:
     - any_of: [sharepoint_create_folder, sharepoint_create_text_file, sharepoint_copy_item, sharepoint_move_item]
-  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:86-90 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:117-121. Copy tools/sharepoint_copy_item.py:119-123 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:112-116. Every refusal comes before the question to Mia."
+  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:86-90 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:117-121. Copy tools/sharepoint_copy_item.py:120-124 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:112-116. Every refusal comes before the question to Mia."
 
 uc-10-42:
   status: working
