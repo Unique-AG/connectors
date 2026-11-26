@@ -388,7 +388,7 @@ uc-04-26:
       expect:
         result: {messages: []}
         graph_calls: {GET /v1.0/me/mailFolders/drafts: 1, GET /v1.0/me/mailFolders/drafts/messages: 1}
-  note: "expected behaviour from shared/seam/advice.py:182-201: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:219), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
+  note: "expected behaviour from shared/seam/advice.py:182-201: outcome unknown, do not call the tool again first, check with outlook_list_mail. The draft is created with no_retry (tools/outlook_draft_mail.py:226), so a failure makes exactly one create call. The assistant creates a second draft only when the drafts do not show the first."
   variants:
     fails:
       fixture: uc-04-26
@@ -544,7 +544,7 @@ uc-04-36:
   asks_user: false
   chain:
     - any_of: [outlook_draft_mail, outlook_draft_reply_all]
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_draft_mail and outlook_draft_reply_all (tools/outlook_draft_reply_all.py:417 is no_retry). Neither asks Mia a question. A second call can make a second draft, and nothing in the advice says to look in the drafts first. A send with a wait time is the third row of uc-04-23. An internal error or a timeout is uc-04-26 and uc-04-42."
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The write runs with no_retry (graph_client/client.py:220-232), and the docstring there says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the message was sent or the draft was saved. The rows are outlook_draft_mail and outlook_draft_reply_all (tools/outlook_draft_reply_all.py:439 is no_retry). Neither asks Mia a question. A second call can make a second draft, and nothing in the advice says to look in the drafts first. A send with a wait time is the third row of uc-04-23. An internal error or a timeout is uc-04-26 and uc-04-42."
 
 uc-04-37:
   status: working
@@ -631,7 +631,7 @@ uc-04-42:
       uses: {message_ref: uri of the message}
     - tool: outlook_list_mail
       args: {folder: drafts}
-  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail (CHANGE_SHOWN_BY, tools/outlook_draft_reply_all.py:68). The first write (create reply-all) runs with no_retry (tools/outlook_draft_reply_all.py:417, graph_client/client.py:220-232), so one failure makes exactly one create call. The assistant creates a second reply only when the drafts do not show the first. The rows are an internal error with no wait time and a timeout. A 503 or 504 with a wait time gets the retry-after text and not this text (uc-04-36, now a row there; uc-04-43 is retired). The same check for a new note is uc-04-26."
+  note: "expected behaviour from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN): the connector does not know if Microsoft made the change, do not call the tool again first, and check with outlook_list_mail (CHANGE_SHOWN_BY, tools/outlook_draft_reply_all.py:63). The first write (create reply-all) runs with no_retry (tools/outlook_draft_reply_all.py:439, graph_client/client.py:220-232), so one failure makes exactly one create call. The assistant creates a second reply only when the drafts do not show the first. The rows are an internal error with no wait time and a timeout. A 503 or 504 with a wait time gets the retry-after text and not this text (uc-04-36, now a row there; uc-04-43 is retired). The same check for a new note is uc-04-26."
 
 uc-04-44:
   status: working

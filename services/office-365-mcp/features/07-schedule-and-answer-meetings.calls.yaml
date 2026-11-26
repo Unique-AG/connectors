@@ -324,7 +324,7 @@ uc-07-22:
       bind: {starts_on: "2026-11-02", ends_on: "2026-11-03"}
       expect:
         result: {events: []}
-  note: "expected behaviour from shared/seam/advice.py:182-201 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (CHANGE_SHOWN_BY in tools/outlook_create_event.py). The same advice is chosen at shared/seam/advice.py:279-281 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Launch review. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:431), but the advice does not rely on it. The write is not repeated by the SDK (graph_client/client.py:220-232)."
+  note: "expected behaviour from shared/seam/advice.py:182-201 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (CHANGE_SHOWN_BY in tools/outlook_create_event.py). The same advice is chosen at shared/seam/advice.py:279-281 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Launch review. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:438), but the advice does not rely on it. The write is not repeated by the SDK (graph_client/client.py:220-232)."
   variants:
     fails:
       fixture: uc-07-22
@@ -439,7 +439,7 @@ uc-07-30:
     - tool: outlook_list_events
       optional: true
     - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
-  note: "expected behaviour from shared/seam/elicitation.py:81-86 _another_request, reached from :118-119 when the answer carries the state of another question: the agreement does not cover this request, nothing was changed, ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that hands the question back to the client (shared/seam/elicitation.py:103-125). Each tool binds the answer to its own details: create_event to its transaction id (tools/outlook_create_event.py:431), the others through confirmation_id_for."
+  note: "expected behaviour from shared/seam/elicitation.py:81-86 _another_request, reached from :118-119 when the answer carries the state of another question: the agreement does not cover this request, nothing was changed, ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that hands the question back to the client (shared/seam/elicitation.py:103-125). Each tool binds the answer to its own details: create_event to its transaction id (tools/outlook_create_event.py:438), the others through confirmation_id_for."
 
 uc-07-31:
   status: working
@@ -468,7 +468,7 @@ uc-07-32:
   chain:
     - tool: outlook_create_event
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna and Tom}
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The create runs with no_retry (tools/outlook_create_event.py:447), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the event exists. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:431), which protects a repeat only if Microsoft honours it, and no source states what it does."
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The create runs with no_retry (tools/outlook_create_event.py:452), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the event exists. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:438), which protects a repeat only if Microsoft honours it, and no source states what it does."
 
 uc-07-33:
   status: working

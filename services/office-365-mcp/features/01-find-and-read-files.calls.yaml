@@ -444,7 +444,7 @@ uc-01-22:
       uses: {file: folder handle from the search}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Tenders}
-  note: "expected behaviour from tools/sharepoint_read_file.py:86-96 (_NOT_A_FILE_HANDLE, raised at :153-155 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:230-231), so the assistant may browse without the failed read, which is why that step is optional."
+  note: "expected behaviour from tools/sharepoint_read_file.py:86-96 (_NOT_A_FILE_HANDLE, raised at :153-155 for a folder handle): a folder handle is not a file handle and a folder holds no content, pass it to sharepoint_browse_folder instead. The search hit of a folder has is_folder true (shared/files.py:233), so the assistant may browse without the failed read, which is why that step is optional."
 
 uc-01-23:
   status: working
@@ -701,7 +701,7 @@ uc-01-40:
   chain:
     - tool: sharepoint_read_file
       uses: {file: handle of the file}
-  note: "expected behaviour from tools/sharepoint_read_file.py:263-269 (_media_type) and shared/files.py:496-501 (is_utf8): a file with no type from Microsoft, and a text type with a body that is not valid UTF-8, come back as application/octet-stream."
+  note: "expected behaviour from tools/sharepoint_read_file.py:263-269 (_media_type) and shared/files.py:499-504 (is_utf8): a file with no type from Microsoft, and a text type with a body that is not valid UTF-8, come back as application/octet-stream."
 
 uc-01-41:
   status: working
