@@ -142,6 +142,17 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       expect(results).toHaveLength(1);
     });
 
+    it('titles a hit by its subject, or "(no subject)" when it has none', async () => {
+      const mockPost = makeSuccessPost({
+        [OWN_EMAIL]: [makeMessage('msg1'), makeMessage('msg2', { subject: null })],
+      });
+      const { instance } = createQuery({ mockPost });
+
+      const { results } = await instance.run(testUserId, [{ kqlQuery: 'subject:test' }]);
+
+      expect(results.map((result) => result.title)).toEqual(['Subject msg1', '(no subject)']);
+    });
+
     it('fans out to own + all delegated mailboxes when no mailbox filter given', async () => {
       const mockPost = makeSuccessPost({
         [OWN_EMAIL]: [makeMessage('own-1')],
