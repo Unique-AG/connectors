@@ -1,4 +1,5 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
+import { uniqueAttachmentsEnabled } from '../draft-input.schemas';
 
 export const META = createMeta({
   icon: 'paperclip',
@@ -7,8 +8,7 @@ export const META = createMeta({
 
     ### Attachments
     Each entry in \`attachments\` has a \`fileName\` (the name shown on the attachment, with extension) and \`data\`, a URI identifying the content:
-    - \`unique://content/{contentId}\` — a file from the Unique knowledge base.
-    - \`data:[mediatype];base64,<base64data>\` — inline base64 content.
+    ${uniqueAttachmentsEnabled ? '- `unique://content/{contentId}` — a file from the Unique knowledge base.\n    ' : ''}- \`data:[mediatype];base64,<base64data>\` — inline base64 content.
 
     External URLs (\`https://\`) are **not supported**. Adding a file whose name is already on the draft attaches a second copy — remove the old one first if the user wants to replace it.
 

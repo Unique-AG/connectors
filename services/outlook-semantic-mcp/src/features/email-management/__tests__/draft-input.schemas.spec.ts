@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as z from 'zod';
 import { ExistingDraftTargetShape } from '../draft-input.schemas';
 
@@ -30,5 +30,30 @@ describe('ExistingDraftTargetShape', () => {
     ['a path in parentFolderId', { draftId: 'draft-1', parentFolderId: '../inbox' }],
   ])('rejects %s', (_name, target) => {
     expect(schema.safeParse(target).success).toBe(false);
+  });
+});
+
+describe('DraftAttachmentsSchema', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  const dataDescriptionWith = async (uniqueAttachments: 'enabled' | 'disabled') => {
+    vi.stubEnv('UNIQUE_ATTACHMENTS', uniqueAttachments);
+    vi.resetModules();
+    const { DraftAttachmentsSchema } = await import('../draft-input.schemas');
+    return DraftAttachmentsSchema.element.shape.data.description;
+  };
+
+  it('offers unique:// files when Unique attachments are on', async () => {
+    expect(await dataDescriptionWith('enabled')).toContain('unique://content/{contentId}');
+  });
+
+  it('offers only data: URIs when Unique attachments are off', async () => {
+    const description = await dataDescriptionWith('disabled');
+
+    expect(description).not.toContain('unique://');
+    expect(description).toContain('data:[mediatype];base64,<base64data>');
   });
 });

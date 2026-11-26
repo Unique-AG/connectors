@@ -1,5 +1,6 @@
 import { NamespacedConfigType, registerConfig } from '@proventuslabs/nestjs-zod';
 import { z } from 'zod/v4';
+import { enabledDisabledBoolean } from '~/utils/zod';
 import { mcpDebugModeSchema } from './app.config';
 import { McpBackendType, mcpBackendSchema } from './mcp-backend-type.config';
 import {
@@ -27,6 +28,16 @@ const mcpToolsSchema = z
   .pipe(z.array(z.string(), { error: TOOLS_FORMAT }).nonempty({ error: 'lists no tool' }))
   .describe('JSON array of the tools to register. Required.');
 
+export const uniqueAttachmentsSchema = enabledDisabledBoolean(
+  'Whether the draft tools attach files from the Unique knowledge base (`unique://content/...`).',
+);
+
+export const UNIQUE_REQUIRED_BY =
+  'MCP_BACKEND=microsoft_graph_and_unique_api or UNIQUE_ATTACHMENTS=enabled, the default';
+
+export const needsUnique = (mode: McpBackendType, uniqueAttachments: boolean): boolean =>
+  mode === McpBackendType.MicrosoftGraphAndUniqueApi || uniqueAttachments;
+
 const FeaturesEnvSchema = z.object({
   mcpBackend: mcpBackendSchema,
   mcpDebugMode: mcpDebugModeSchema,
@@ -34,6 +45,7 @@ const FeaturesEnvSchema = z.object({
   delegatedAccessScan: z
     .enum(['disabled', 'full_access_only', 'granular_access'])
     .describe('Shared mailboxes are on unless DELEGATED_ACCESS_SCAN is "disabled".'),
+  uniqueAttachments: uniqueAttachmentsSchema,
 });
 
 const FEATURE_ENV_KEYS = {
@@ -41,6 +53,7 @@ const FEATURE_ENV_KEYS = {
   mcpDebugMode: 'MCP_DEBUG_MODE',
   mcpTools: 'MCP_TOOLS',
   delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
+  uniqueAttachments: 'UNIQUE_ATTACHMENTS',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -79,6 +92,8 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     tools,
     calendar: [...tools].some((name) => TOOL_DECLARATIONS[name].group === 'calendar'),
     sharedMailboxes: env.delegatedAccessScan !== 'disabled',
+    uniqueAttachments: env.uniqueAttachments,
+    unique: needsUnique(env.mcpBackend, env.uniqueAttachments),
   };
 });
 

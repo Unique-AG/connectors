@@ -1,5 +1,8 @@
 import * as z from 'zod';
+import { loadFeaturesConfig } from '~/config';
 import { GRAPH_ID_PATTERN } from '~/msgraph/graph-id-pattern';
+
+export const uniqueAttachmentsEnabled = loadFeaturesConfig().uniqueAttachments;
 
 export const DraftRecipientsSchema = z.array(
   z.object({
@@ -18,10 +21,13 @@ export const DraftAttachmentsSchema = z.array(
     data: z
       .string()
       .describe(
-        'URI identifying the file content. Two schemes are supported:\n' +
-          '- unique://content/{contentId} — file from the Unique knowledge base; use the content ID (e.g. unique://content/cont_a2vgv63szfwudzstjx7ihf3n).\n' +
-          '- data:[mediatype];base64,<base64data> — inline base64-encoded content with an explicit MIME type.\n' +
-          'External URLs (https://) are not supported.',
+        uniqueAttachmentsEnabled
+          ? 'URI identifying the file content. Two schemes are supported:\n' +
+              '- unique://content/{contentId} — file from the Unique knowledge base; use the content ID (e.g. unique://content/cont_a2vgv63szfwudzstjx7ihf3n).\n' +
+              '- data:[mediatype];base64,<base64data> — inline base64-encoded content with an explicit MIME type.\n' +
+              'External URLs (https://) are not supported.'
+          : 'URI identifying the file content: data:[mediatype];base64,<base64data> — inline base64-encoded content with an explicit MIME type.\n' +
+              'External URLs (https://) are not supported.',
       ),
   }),
 );

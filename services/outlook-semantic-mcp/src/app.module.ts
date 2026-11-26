@@ -79,9 +79,10 @@ import { deploymentSecrets } from './utils/log-secrets';
     }),
     ProxyModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (config: ConfigService<UniqueConfigNamespaced, true>) => ({
-        isExternal: config.get('unique', { infer: true }).serviceAuthMode === 'external',
-      }),
+      useFactory: (config: ConfigService<UniqueConfigNamespaced, true>) => {
+        const unique = config.get('unique', { infer: true });
+        return { isExternal: unique.enabled && unique.serviceAuthMode === 'external' };
+      },
     }),
     ScheduleModule.forRoot(),
     LoggerModule.forRootAsync({

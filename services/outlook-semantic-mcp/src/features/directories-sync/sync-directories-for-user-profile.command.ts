@@ -5,6 +5,7 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { and, count, eq, inArray, not, sql } from 'drizzle-orm';
 import { Span } from 'nestjs-otel';
 import { prop } from 'remeda';
+import { type FeaturesConfig, featuresConfig, McpBackendType } from '~/config';
 import {
   DirectoryType,
   DRIZZLE,
@@ -52,6 +53,7 @@ export class SyncDirectoriesForUserProfileCommand {
     private readonly upsertDirectoryCommand: UpsertDirectoryCommand,
     private readonly isInboxDeletingQuery: IsInboxDeletingQuery,
     private readonly msGraphClientResolver: MsGraphClientResolver,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   @Span()
@@ -96,9 +98,11 @@ export class SyncDirectoriesForUserProfileCommand {
   ): Promise<void> {
     const userEmail = smearEmail(createSmeared(userProfile.email));
 
-    await this.createRootScopeCommand.run({
-      userProviderUserId: userProfile.providerUserId,
-    });
+    if (this.ingestsIntoUnique()) {
+      await this.createRootScopeCommand.run({
+        userProviderUserId: userProfile.providerUserId,
+      });
+    }
 
     const totalSystemDirectories = await this.db
       .select({ count: count() })
@@ -285,6 +289,10 @@ export class SyncDirectoriesForUserProfileCommand {
       )
       .execute();
 
+    if (!this.ingestsIntoUnique()) {
+      return;
+    }
+
     const rootScope = await this.uniqueApi.scopes.getByExternalId(
       getRootScopeExternalIdForUser(providerUserId),
     );
@@ -321,6 +329,11 @@ export class SyncDirectoriesForUserProfileCommand {
         await this.uniqueApi.files.deleteByIds(contentIds);
       }
     }
+  }
+
+  // Only Unique mode ingests mail, so only it has a root scope and files to keep in step.
+  private ingestsIntoUnique(): boolean {
+    return this.features.mode === McpBackendType.MicrosoftGraphAndUniqueApi;
   }
 
   private async getDirectoriesToRemove({

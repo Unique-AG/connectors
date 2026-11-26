@@ -1,8 +1,10 @@
 import type { McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
-import type { Context } from '@unique-ag/mcp-server-module';
+import { type Context, MCP_TOOL_METADATA_KEY } from '@unique-ag/mcp-server-module';
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import type * as z from 'zod';
 import { loadFeaturesConfig } from '~/config';
+import { OpenEmailQuery } from '../open-email.query';
 import { OpenEmailTool } from '../open-email.tool';
 
 vi.mock('~/utils/extract-user-profile-id', () => ({
@@ -94,5 +96,73 @@ describe('OpenEmailTool', () => {
     openEmailQuery.run.mockRejectedValue(error);
 
     await expect(tool.openEmailById({ id: 'msg-1' }, context, request)).rejects.toBe(error);
+  });
+});
+
+describe('OpenEmailTool input', () => {
+  const READ_ONLY_ENV = {
+    MCP_BACKEND: 'microsoft_graph',
+    DELEGATED_ACCESS_SCAN: 'disabled',
+    UNIQUE_ATTACHMENTS: 'disabled',
+    MCP_TOOLS: JSON.stringify(['open_email']),
+  };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  async function loadToolWith(env: Record<string, string>) {
+    for (const [key, value] of Object.entries(env)) {
+      vi.stubEnv(key, value);
+    }
+    vi.resetModules();
+    const module = await import('../open-email.tool');
+    const schema: z.ZodObject = Reflect.getMetadata(
+      MCP_TOOL_METADATA_KEY,
+      module.OpenEmailTool.prototype.openEmailById,
+    ).parameters;
+    return { OpenEmailToolClass: module.OpenEmailTool, schema };
+  }
+
+  it('offers the ingested chunk params in Unique mode', async () => {
+    const { schema } = await loadToolWith({ MCP_BACKEND: 'microsoft_graph_and_unique_api' });
+
+    expect(Object.keys(schema.shape)).toEqual(
+      expect.arrayContaining(['uniqueContentId', 'chunkIds']),
+    );
+  });
+
+  it('opens an email in microsoft_graph mode with Unique off without calling Unique', async () => {
+    const { OpenEmailToolClass, schema } = await loadToolWith(READ_ONLY_ENV);
+    const graphRequest = {
+      header: vi.fn().mockReturnThis(),
+      select: vi.fn().mockReturnThis(),
+      expand: vi.fn().mockReturnThis(),
+      get: vi.fn().mockResolvedValue({ id: 'msg-1', body: { content: 'Hello' } }),
+    };
+    const getContentById = vi.fn();
+    const openEmail = new OpenEmailToolClass(
+      { run: vi.fn() } as never,
+      new OpenEmailQuery(
+        { createClientForUser: () => ({ api: () => graphRequest }) } as never,
+        { content: { getContentById } } as never,
+      ),
+      { run: vi.fn().mockResolvedValue(undefined) } as never,
+      loadFeaturesConfig(READ_ONLY_ENV),
+      { run: vi.fn().mockResolvedValue({ allowed: true }) } as never,
+    );
+
+    expect(Object.keys(schema.shape)).not.toContain('uniqueContentId');
+    expect(Object.keys(schema.shape)).not.toContain('chunkIds');
+    const input = schema.parse({
+      id: 'msg-1',
+      uniqueContentId: 'cont-1',
+      chunkIds: ['chunk-1'],
+    }) as Parameters<OpenEmailTool['openEmailById']>[0];
+    const result = await openEmail.openEmailById(input, context, request);
+
+    expect(result).toMatchObject({ success: true, emailData: { id: 'msg-1', text: 'Hello' } });
+    expect(getContentById).not.toHaveBeenCalled();
   });
 });

@@ -423,6 +423,10 @@ mcpConfig:
 
   # -- Unique API configuration
   unique:
+    # -- Whether the draft tools attach files from the Unique knowledge base (unique://content/...).
+    # Unique is needed, and the settings below are rendered, in microsoft_graph_and_unique_api mode
+    # or when this is enabled. Values: enabled or disabled. Env var: UNIQUE_ATTACHMENTS
+    attachments: enabled
     # -- Authentication mode for Unique API services
     # possible values: cluster_local, external
     # cluster_local: communicates using in-cluster URLs with service headers

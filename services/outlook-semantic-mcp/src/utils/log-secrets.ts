@@ -38,7 +38,9 @@ export function deploymentSecrets({
     encryption.key.value.toString('base64'),
     ...urlPassword(database.url.value),
     ...urlPassword(amqp.url.value),
-    ...(unique.serviceAuthMode === 'external' ? [unique.zitadelClientSecret] : []),
+    ...(unique.enabled && unique.serviceAuthMode === 'external'
+      ? [unique.zitadelClientSecret]
+      : []),
     ...proxySecrets(proxy),
   ];
 }
