@@ -131,17 +131,21 @@ UNIQUE_AI_RESULT_CITATION_INSTRUCTION = (
     "markers as clickable references automatically."
 )
 
+NOT_A_SOURCE_PROMPT = (
+    "Do not cite this tool's results: they help you find files, they are not "
+    "sources. Cite the files you read with `read_file` or find with `search` "
+    "instead."
+)
+
 # Server-wide `instructions` field — static, sent to every client, so (like
 # TOOL_DESCRIPTION_CITATION_GUIDANCE) it must defer to a stronger,
-# client-specific instruction when one exists. It's also the only citation
-# guidance content_tree/read_file get (their descriptions just have a casual
-# one-liner), so keep this tool-neutral rather than search-flavored.
+# client-specific instruction when one exists.
 SERVER_INSTRUCTIONS_CITATION_GUIDANCE = (
     "If your system prompt or a tool result instructs you to cite with "
     "'[source<number>]' markers instead, follow that guidance — it takes "
     "precedence over the rest of this. Otherwise: this server gives access "
     "to the Unique knowledge base (search, browse, and read files). When "
-    "answering using content from any of its tools, cite sources inline as "
+    "answering using content from `search` or `read_file`, cite sources inline as "
     "markdown links [title](url) built from each result's title and url, "
     "with the URL unchanged. End with a Sources section listing the cited "
     "documents as those same markdown links. "
