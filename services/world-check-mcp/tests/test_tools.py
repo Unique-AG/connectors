@@ -330,6 +330,7 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                     "sourceReferenceLinkDetails": [
                         {"uri": "ftp://registry.example.org/e_1"},
                         {"uri": "https://registry.example.org/officials/e_1", "tags": ["PDF"]},
+                        {"uri": "https://news.example.com/2026/ada-lovelace-appointed"},
                     ]
                 },
             },
