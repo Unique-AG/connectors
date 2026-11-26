@@ -90,7 +90,7 @@ mcp-openapi = { path = "../../packages/mcp-openapi" }
 
 [tool.mcp-openapi]
 spec = "src/architecture_demo_mcp/upstream/openapi.yml"
-operation-ids = ["getDailyMeta", "getDailyPrices"]
+operation-ids = ["getDailyMeta", "getDailyPrices", "getIexTopOfBook"]
 operation-module = "mcp_openapi.upstream"
 models-module = "architecture_demo_mcp.upstream.generated.vendor_responses"
 models-output = "src/architecture_demo_mcp/upstream/generated/vendor_responses.py"
