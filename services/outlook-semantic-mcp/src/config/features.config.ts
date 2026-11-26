@@ -93,7 +93,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     calendar: [...tools].some((name) => TOOL_DECLARATIONS[name].group === 'calendar'),
     sharedMailboxes: env.delegatedAccessScan !== 'disabled',
     uniqueAttachments: env.uniqueAttachments,
-    unique: needsUnique(env.mcpBackend, env.uniqueAttachments),
+    uniqueNeeded: needsUnique(env.mcpBackend, env.uniqueAttachments),
   };
 });
 

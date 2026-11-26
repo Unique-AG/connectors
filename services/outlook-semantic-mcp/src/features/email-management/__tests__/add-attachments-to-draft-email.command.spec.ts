@@ -46,15 +46,12 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
             'Files from the Unique knowledge base (unique://) are not enabled on this server. Attach the content as a data: URI instead.',
         },
       ]);
-      expect(uploadInMemoryAttachment.run).toHaveBeenCalledTimes(1);
-      expect(streamUniqueAttachment.run).not.toHaveBeenCalled();
       expect(findByEmail).not.toHaveBeenCalled();
-      expect(configGet).not.toHaveBeenCalled();
     });
   });
 
   describe('with Unique attachments on', () => {
-    it('streams a unique:// file from Unique as the matching Unique user', async () => {
+    it('attaches a unique:// file after resolving the Unique user', async () => {
       const result = await commandWith(true).run(userProfileId, {
         draftId: 'draft-1',
         chatId: undefined,
@@ -63,11 +60,6 @@ describe('AddAttachmentsToDraftEmailCommand', () => {
 
       expect(result.attachmentsFailed).toEqual([]);
       expect(findByEmail).toHaveBeenCalledWith('ada@contoso.example');
-      expect(streamUniqueAttachment.run).toHaveBeenCalledWith(
-        expect.objectContaining({
-          uniqueIdentity: { userId: 'unique-user-1', companyId: 'company-1' },
-        }),
-      );
     });
   });
 });

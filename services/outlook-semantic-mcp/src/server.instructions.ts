@@ -1,11 +1,11 @@
 import { type FeaturesConfig, loadFeaturesConfig, McpBackendType } from '~/config';
 
-const EMAIL_SEARCH_INSTRUCTIONS = `
+const emailSearchInstructions = (ingestedChunks: boolean) => `
 ## Email search
 - \`search_emails\` returns pages of results with partial content in \`text\` (matched passages and/or a short body preview), never full bodies. Call \`open_email\` with a result's \`openEmailParams\` to read an email in full.
 - Targeted questions: up to 3 queries per backend from different angles. Overview or listing questions: one query per backend, then call \`fetch_next_search_pages\` with the returned cursor ids until \`hasMore\` is false before answering.
 - Every mailbox and folder is searched on the first call, each as its own entry in \`pages\`. When a search fans out widely, first pages are smaller; follow the \`cursorId\`s of the mailboxes and folders you need (all of them if unsure) to get the rest.
-- \`openEmailParams\` opens the live Microsoft Graph message: HTML when \`isDraft\` is true, plain text otherwise. When it includes \`uniqueContentId\` and \`chunkIds\`, \`open_email\` also returns those matched passages in \`chunks\`. To change a draft, call \`open_email\` with \`openEmailParams\`, edit the HTML in \`text\` (not \`chunks\`), and send it back with \`update_draft_email\`, which stores it unchanged and does not convert Markdown. Also \`add_attachments_to_draft_email\` and \`remove_attachments_from_draft_email\` (inline images stay unless the user explicitly asked to remove them). Do not create a new draft for an edit.
+- \`openEmailParams\` opens the live Microsoft Graph message: HTML when \`isDraft\` is true, plain text otherwise.${ingestedChunks ? ' When it includes `uniqueContentId` and `chunkIds`, `open_email` also returns those matched passages in `chunks`.' : ''} To change a draft, call \`open_email\` with \`openEmailParams\`, edit the HTML in \`text\`${ingestedChunks ? ' (not `chunks`)' : ''}, and send it back with \`update_draft_email\`, which stores it unchanged and does not convert Markdown. Also \`add_attachments_to_draft_email\` and \`remove_attachments_from_draft_email\` (inline images stay unless the user explicitly asked to remove them). Do not create a new draft for an edit.
 - Microsoft can throttle searches (\`throttled\` pages). Retry them once with \`fetch_next_search_pages\` after \`retryAfterSeconds\`. The results are complete only when every entry in \`pages\` is \`complete\`; otherwise tell the user they are incomplete.
 `;
 
@@ -13,7 +13,7 @@ const MICROSOFT_GRAPH_INSTRUCTIONS = `
 Emails are searched directly via Microsoft Graph KQL —
 no ingestion, sync, or knowledge base is involved.
 All tools operate directly against the live mailbox.
-${EMAIL_SEARCH_INSTRUCTIONS}`;
+${emailSearchInstructions(false)}`;
 
 const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 ## Tool Selection Guidelines for Outlook MCP
@@ -23,7 +23,7 @@ const MICROSOFT_GRAPH_AND_UNIQUE_INSTRUCTIONS = `
 
 ### Search Results and Incomplete Ingestion
 - When \`search_emails\` returns a \`syncWarning\` field, relay that warning message to the user so they know results may not reflect all emails.
-${EMAIL_SEARCH_INSTRUCTIONS}`;
+${emailSearchInstructions(true)}`;
 
 export const CALENDAR_INSTRUCTIONS = `
 ## Outlook Calendar

@@ -88,7 +88,7 @@ const uniqueApiClient: {
   imports: DynamicModule[];
   providers: Provider[];
   exports: (DynamicModule | string)[];
-} = loadFeaturesConfig().unique
+} = loadFeaturesConfig().uniqueNeeded
   ? { imports: [UNIQUE_API_FEATURE_MODULE], providers: [], exports: [UNIQUE_API_FEATURE_MODULE] }
   : {
       imports: [],

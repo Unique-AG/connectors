@@ -118,19 +118,34 @@ describe('OpenEmailTool input', () => {
     }
     vi.resetModules();
     const module = await import('../open-email.tool');
-    const schema: z.ZodObject = Reflect.getMetadata(
+    const metadata: { parameters: z.ZodObject; description: string } = Reflect.getMetadata(
       MCP_TOOL_METADATA_KEY,
       module.OpenEmailTool.prototype.openEmailById,
-    ).parameters;
-    return { OpenEmailToolClass: module.OpenEmailTool, schema };
+    );
+    return {
+      OpenEmailToolClass: module.OpenEmailTool,
+      schema: metadata.parameters,
+      description: metadata.description,
+    };
   }
 
-  it('offers the ingested chunk params in Unique mode', async () => {
-    const { schema } = await loadToolWith({ MCP_BACKEND: 'microsoft_graph_and_unique_api' });
+  it('offers and describes the ingested chunk params in Unique mode', async () => {
+    const { schema, description } = await loadToolWith({
+      MCP_BACKEND: 'microsoft_graph_and_unique_api',
+    });
 
     expect(Object.keys(schema.shape)).toEqual(
       expect.arrayContaining(['uniqueContentId', 'chunkIds']),
     );
+    expect(description).toContain('`uniqueContentId` and `chunkIds`');
+  });
+
+  it('neither offers nor describes the ingested chunk params in microsoft_graph mode', async () => {
+    const { schema, description } = await loadToolWith(READ_ONLY_ENV);
+
+    expect(Object.keys(schema.shape)).not.toContain('uniqueContentId');
+    expect(Object.keys(schema.shape)).not.toContain('chunkIds');
+    expect(description).not.toMatch(/uniqueContentId|chunkIds|chunks/);
   });
 
   it('opens an email in microsoft_graph mode with Unique off without calling Unique', async () => {
@@ -153,8 +168,6 @@ describe('OpenEmailTool input', () => {
       { run: vi.fn().mockResolvedValue({ allowed: true }) } as never,
     );
 
-    expect(Object.keys(schema.shape)).not.toContain('uniqueContentId');
-    expect(Object.keys(schema.shape)).not.toContain('chunkIds');
     const input = schema.parse({
       id: 'msg-1',
       uniqueContentId: 'cont-1',

@@ -48,20 +48,20 @@ describe(loadFeaturesConfig.name, () => {
       const config = load({ UNIQUE_ATTACHMENTS: 'disabled', MCP_TOOLS: tools('search_emails') });
 
       expect(config.uniqueAttachments).toBe(false);
-      expect(config.unique).toBe(true);
+      expect(config.uniqueNeeded).toBe(true);
     });
 
     it('is needed in microsoft_graph mode while Unique attachments are on by default', () => {
       const config = load({ MCP_BACKEND: 'microsoft_graph', MCP_TOOLS: tools('search_emails') });
 
       expect(config.uniqueAttachments).toBe(true);
-      expect(config.unique).toBe(true);
+      expect(config.uniqueNeeded).toBe(true);
     });
 
     it('is not needed in microsoft_graph mode with Unique attachments off', () => {
       const config = load({ ...READ_ONLY_ENV, UNIQUE_ATTACHMENTS: 'disabled' });
 
-      expect(config.unique).toBe(false);
+      expect(config.uniqueNeeded).toBe(false);
     });
 
     it('throws naming UNIQUE_ATTACHMENTS when it is not enabled or disabled', () => {

@@ -1,4 +1,5 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
+import { OFFERS_INGESTED_CHUNKS } from '../ingested-chunks';
 import { SEARCH_CONFIG } from './search.config';
 import { SEARCH_PAGE_STATUS_DESCRIPTION } from './search-emails-output.schema';
 
@@ -17,12 +18,12 @@ export const META = createMeta({
   - One response holds at most ${SEARCH_CONFIG.maxResultsPerResponse} results. Cursors are fetched in the order passed until their pages would exceed that; the rest come back unchanged with status \`deferred\`. Pass them again in the next call.
   - Each response returns new \`cursorId\`s. Use those for the next call, not the ones you already followed.
   - Semantic pages are ranked by relevance: each next page holds less relevant passages than the one before, and a semantic search stops after ${SEARCH_CONFIG.semanticSearch.maxPages} pages.
-  - The same email can appear on several pages: on pages of different requests, and on later semantic pages with further passages. Treat results with the same \`msGraphMessageId\` or \`uniqueContentId\` as one email.
+  - The same email can appear on several pages: on pages of different requests, and on later semantic pages with further passages. Treat results with the same \`msGraphMessageId\`${OFFERS_INGESTED_CHUNKS ? ' or `uniqueContentId`' : ''} as one email.
 
   ## Statuses
   ${SEARCH_PAGE_STATUS_DESCRIPTION}
 
   Before answering, tell the user when the results are incomplete: they are complete only when every entry in \`pages\` is \`complete\`.
 
-  Results carry only partial content in \`text\`. To read an email in full, call \`open_email\` with the result's \`openEmailParams\`, passed through unchanged. A draft's object requests the HTML body. \`uniqueContentId\` and \`chunkIds\` add the matched ingested passages.`,
+  Results carry only partial content in \`text\`. To read an email in full, call \`open_email\` with the result's \`openEmailParams\`, passed through unchanged. A draft's object requests the HTML body.${OFFERS_INGESTED_CHUNKS ? ' `uniqueContentId` and `chunkIds` add the matched ingested passages.' : ''}`,
 });
