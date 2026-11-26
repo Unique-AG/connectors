@@ -20,7 +20,7 @@ The ids are internal. The tool descriptions, output schemas and server instructi
 
 ### Citations
 
-Every message that `get_chat_messages`, `get_channel_messages` and `search_messages` return carries a `title` and a `webUrl`. Conduct (`unique-cli mcp`) cites each message that has an http(s) `webUrl` by its title, with that link. `list_teams`, `list_chats` and `list_channels` are not cited: they are lookup steps the agent uses to find the messages. The tools send the module's default content, one JSON text item of the output, so Unique AI does not cite them.
+Every message that `get_chat_messages`, `get_channel_messages` and `search_messages` return carries a `title` and a `webUrl`. A chat message always has a link: the one Graph sends, else the chat deep link. A channel post has the link Graph sends, or `null` when Graph sends none. Conduct (`unique-cli mcp`) cites each message that has an http(s) `webUrl` by its title, with that link, so a channel post without a link is not cited. `list_teams`, `list_chats` and `list_channels` are not cited: they are lookup steps the agent uses to find the messages. The tools send the module's default content, one JSON text item of the output, so Unique AI does not cite them.
 
 ## Tool Overview
 
@@ -154,9 +154,9 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
 
 ## Messages
 
-Both `get_*_messages` tools return a message exactly as Graph gives it: `body.contentType` plus the raw `body.content`, which is usually Teams HTML. Nothing is rewritten and no placeholder text is invented. The structured metadata — `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId`, `channelIdentity` — is returned alongside, so a caller reads those instead of parsing the body.
+Both `get_*_messages` tools return the body exactly as Graph gives it: `body.contentType` plus the raw `body.content`, which is usually Teams HTML. Nothing is rewritten and no placeholder text is invented. The structured metadata — `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId`, `channelIdentity` — is returned alongside, so a caller reads those instead of parsing the body.
 
-Each message also carries a `title` and a `webUrl`, so a client can cite it. Chat messages rarely have a subject, so `title` is the subject when there is one, and otherwise the sender's name and the first 80 characters of the text (`Carol Lee: Deploy is green.`). It is `null` only for an event with neither. `webUrl` opens the message in Teams. Graph normally sends one. A chat message that arrives without one gets the documented deep link `https://teams.microsoft.com/l/message/<chatId>/<messageId>?context={"contextType":"chat"}`.
+Each message also carries a `title` and a `webUrl`, so a client can cite it. `title` is not a Graph field: the server derives it. Chat messages rarely have a subject, so `title` is the subject when there is one, and otherwise the sender's name and the first 80 characters of the text (`Carol Lee: Deploy is green.`). It is `null` only for an event with neither. `webUrl` opens the message in Teams. Graph normally sends one. A chat message that arrives without one gets the documented deep link `https://teams.microsoft.com/l/message/<chatId>/<messageId>?context={"contextType":"chat"}`. A channel post gets no fallback: its `webUrl` is `null` when Graph sends none.
 
 ### `get_chat_messages`
 
@@ -181,10 +181,25 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
     {
       "id": "1718901120000",
       "title": "Alice Smith: Bob Jones can you review the PR?",
-      "senderDisplayName": "Alice Smith",
+      "messageType": "message",
+      "subject": null,
       "body": { "contentType": "html", "content": "<p><at id=\"0\">Bob Jones</at> can you review the PR?</p>" },
+      "from": { "id": "user-alice", "displayName": "Alice Smith" },
       "createdDateTime": "2024-06-20T14:32:07.113Z",
-      "webUrl": "https://teams.microsoft.com/l/message/19%3A1on1%40unq.gbl.spaces/1718901120000?context=%7B%22contextType%22%3A%22chat%22%7D"
+      "lastModifiedDateTime": "2024-06-20T14:32:07.113Z",
+      "lastEditedDateTime": null,
+      "deletedDateTime": null,
+      "importance": "normal",
+      "locale": "en-us",
+      "webUrl": "https://teams.microsoft.com/l/message/19%3A1on1%40unq.gbl.spaces/1718901120000?context=%7B%22contextType%22%3A%22chat%22%7D",
+      "etag": "1718901120000",
+      "replyToId": null,
+      "channelIdentity": null,
+      "mentions": [
+        { "id": 0, "mentionText": "Bob Jones", "mentioned": { "id": "user-bob", "displayName": "Bob Jones" } }
+      ],
+      "reactions": [],
+      "attachments": []
     }
   ]
 }
@@ -217,10 +232,23 @@ Retrieve recent messages from a channel, identified by `teamId` + `channelId`. C
     {
       "id": "1718900000000",
       "title": "Carol Lee: Deploy is green.",
-      "senderDisplayName": "Carol Lee",
-      "content": "Deploy is green.",
-      "createdDateTime": "2024-06-20 13:50",
-      "webUrl": "https://teams.microsoft.com/l/message/19%3Ach1...%40thread.tacv2/1718900000000?groupId=..."
+      "messageType": "message",
+      "subject": null,
+      "body": { "contentType": "html", "content": "<p>Deploy is green.</p>" },
+      "from": { "id": "user-carol", "displayName": "Carol Lee" },
+      "createdDateTime": "2024-06-20T13:50:00.000Z",
+      "lastModifiedDateTime": "2024-06-20T13:50:00.000Z",
+      "lastEditedDateTime": null,
+      "deletedDateTime": null,
+      "importance": "normal",
+      "locale": "en-us",
+      "webUrl": "https://teams.microsoft.com/l/message/19%3Ach1...%40thread.tacv2/1718900000000?groupId=...",
+      "etag": "1718900000000",
+      "replyToId": null,
+      "channelIdentity": { "teamId": "19:abc...@thread.tacv2", "channelId": "19:ch1...@thread.tacv2" },
+      "mentions": [],
+      "reactions": [],
+      "attachments": []
     }
   ]
 }
