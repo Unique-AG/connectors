@@ -274,7 +274,7 @@ describe('OpenEmailQuery', () => {
     // As Graph returns the two properties (probed 2026-11-26).
     const GRAPH_PURVIEW = 'String {00020386-0000-0000-c000-000000000046} Name msip_labels';
     const GRAPH_LEGACY = 'Integer 0x36';
-    const LABEL_ID = '2d69afbc-f32c-424f-83ad-75460acd2aa1';
+    const LABEL_ID = '4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8';
 
     beforeEach(() => {
       instance = createInstance({

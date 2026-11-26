@@ -639,7 +639,7 @@ Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook 
 
 #### Sensitivity exclusions
 
-Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` refuses it. Nothing of such a message reaches the agent, not its subject, sender or id. The agent is told how many results were withheld and under which labels, and that the user can read them in Outlook:
+Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` refuses it. Nothing of such a message reaches the agent, not its subject, sender or id. Each message is judged by its own label: an unlabelled reply or forward that quotes a labelled message is returned in full. The agent is told how many results were withheld and under which labels, and that the user can read them in Outlook:
 
 ```text
 3 emails were withheld because of their sensitivity labels ("Confidential Encrypted", "Private"). Their content cannot be shown here; the user can read them in Outlook.
@@ -652,16 +652,16 @@ mcpConfig:
   app:
     mcpBackend: microsoft_graph
     excludedSensitivity:
-      labels: [Confidential, 2d69afbc-f32c-424f-83ad-75460acd2aa1]
+      labels: [Confidential, 4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8]
       legacy: [private, confidential]
 ```
 
-- **`labels`** (`EXCLUDED_SENSITIVITY_LABELS`) — Microsoft Purview sensitivity labels, each by its id (a GUID) or its name, ignoring case. A message is excluded when one of its labels matches. A sublabel carries only its own name and id, so list each sublabel to exclude.
+- **`labels`** (`EXCLUDED_SENSITIVITY_LABELS`) — Microsoft Purview sensitivity labels, each by its id (a GUID, with or without braces) or its name, ignoring case. A message is excluded when one of its labels matches. A sublabel carries only its own name and id, so list each sublabel to exclude. The name is the label's *Name* in Purview, not the display name Outlook shows; the two differ once an admin renames the display name, and `Get-Label | Format-Table Name, DisplayName, Guid` lists both. A label id never changes, so list labels by id where the exclusion protects data, and by name only where the agent should be able to name the label.
 - **`legacy`** (`EXCLUDED_LEGACY_SENSITIVITY`) — the sensitivity flag Outlook sets under *Options → Sensitivity*: `personal`, `private` or `confidential`.
 
 The server reads both from each message Microsoft Graph returns, without an extra request: a search asks Graph for the two properties alongside its results, and `open_email` asks for them with the message. A message whose properties Graph does not return, or returns in a form the server cannot read, is left out as well, and the note says its label could not be read. A results page the filter empties still carries its cursor, so `fetch_next_search_pages` continues past it. With both lists empty (the default) the requests to Graph are unchanged and nothing is filtered.
 
-Both settings need `MCP_BACKEND=microsoft_graph`, because semantic search results from the Unique knowledge base carry no sensitivity to filter on. The server refuses to start otherwise, naming the setting, and the chart refuses to render. An unknown legacy flag, a blank label, or a value that is not a JSON array also stops the server at startup. `lookup_contacts` and the draft tools are not filtered.
+Both settings need `MCP_BACKEND=microsoft_graph`, because semantic search results from the Unique knowledge base carry no sensitivity to filter on. The server refuses to start otherwise, naming the setting, and the chart refuses to render. An unknown legacy flag, a blank label, or a value that is not a JSON array also stops the server at startup. `lookup_contacts`, the draft tools and the calendar tools are not filtered: `search_calendar_events` returns the body of a private or labelled event.
 
 #### Calendar tools
 

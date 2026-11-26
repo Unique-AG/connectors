@@ -115,7 +115,7 @@ describe('OpenEmailTool', () => {
     openEmailQuery.run.mockResolvedValue({
       withheld: {
         verdict: SensitivityVerdict.Excluded,
-        label: '2d69afbc-f32c-424f-83ad-75460acd2aa1',
+        label: '4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8',
         configuredById: true,
       },
     });
@@ -125,7 +125,7 @@ describe('OpenEmailTool', () => {
     expect(result).toEqual({
       success: false,
       message:
-        "This email is withheld because of a sensitivity label excluded by its id (2d69afbc-f32c-424f-83ad-75460acd2aa1); the label's name is not known, because the exclusion is configured by id. Its content cannot be shown here; the user can read it in Outlook.",
+        "This email is withheld because of a sensitivity label excluded by its id (4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8); the label's name is not known, because the exclusion is configured by id. Its content cannot be shown here; the user can read it in Outlook.",
     });
   });
 

@@ -87,7 +87,7 @@ export class SensitivityFilter {
         configuredById: GUID_PATTERN.test(configured),
       };
     }
-    // Graph cuts the value at 255 characters in some responses, which can lose a label's name.
+    // Graph cuts the value at 255 characters in some responses, which can lose or cut a label's name.
     if (this.excludesLabelNames && labels.some(({ name }) => name === undefined)) {
       return UNREADABLE;
     }
@@ -99,10 +99,16 @@ export class SensitivityFilter {
     if (!value.trim()) {
       return [];
     }
+    // A value cut at 255 characters can end inside its last field, so that field's value is not
+    // trusted: a name cut to `Conf` must not pass for a label that is not excluded.
+    const cut = value.length >= PURVIEW_VALUE_CUT_LENGTH && !value.trimEnd().endsWith(';');
+    const entries = [...value.matchAll(PURVIEW_ENTRY_PATTERN)];
     const names = new Map<string, string | undefined>();
-    for (const [, id = '', field, fieldValue] of value.matchAll(PURVIEW_ENTRY_PATTERN)) {
+    for (const [index, [, id = '', field, fieldValue]] of entries.entries()) {
       const labelId = id.toLowerCase();
-      const name = field?.toLowerCase() === 'name' ? fieldValue : undefined;
+      const isLastAndCut = cut && index === entries.length - 1;
+      const name =
+        field?.toLowerCase() === 'name' && fieldValue && !isLastAndCut ? fieldValue : undefined;
       names.set(labelId, name ?? names.get(labelId));
     }
     if (names.size === 0) {
@@ -136,6 +142,7 @@ const LEGACY_DISPLAY_NAMES: Record<LegacySensitivity, string> = {
   [LegacySensitivity.Confidential]: 'Confidential',
 };
 
+const PURVIEW_VALUE_CUT_LENGTH = 255;
 const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const PURVIEW_ENTRY_PATTERN =
   /MSIP_Label_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_([A-Za-z]+)=([^;]*)/gi;

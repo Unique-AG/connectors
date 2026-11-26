@@ -1441,7 +1441,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
     const LEGACY = 'Integer 0x0036';
     const GRAPH_PURVIEW = 'String {00020386-0000-0000-c000-000000000046} Name msip_labels';
     const GRAPH_LEGACY = 'Integer 0x36';
-    const LABEL_ID = '2d69afbc-f32c-424f-83ad-75460acd2aa1';
+    const LABEL_ID = '4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8';
     const OTHER_LABEL_ID = '0e4c1a54-7f3b-4d0a-9d4e-1c2b3a4d5e6f';
 
     const purviewValue = (id: string, name: string) =>
@@ -1707,6 +1707,32 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
 
       expect(results).toEqual([]);
     });
+
+    it.each([
+      ['cut inside the name', 'Confidential;'],
+      ['with an empty name', ';'],
+    ])(
+      'drops a hit whose Purview value was %s when labels are excluded by name',
+      async (_case, nameTail) => {
+        const withSiteId = (siteId: string) =>
+          `MSIP_Label_${OTHER_LABEL_ID}_Enabled=True;MSIP_Label_${OTHER_LABEL_ID}_SiteId=${siteId};MSIP_Label_${OTHER_LABEL_ID}_Name=`;
+        // Graph cuts the value at 255 characters; the name starts 4 characters before the cut.
+        const head = withSiteId('0'.repeat(251 - withSiteId('').length));
+        const value = nameTail === ';' ? `${head};` : `${head}${nameTail}`.slice(0, 255);
+        const { results } = await searchOwnMailbox(excluding(['confidential']), {
+          value: [
+            makeMessage('msg-cut', {
+              singleValueExtendedProperties: [
+                { id: GRAPH_LEGACY, value: '0' },
+                { id: GRAPH_PURVIEW, value },
+              ],
+            }),
+          ],
+        });
+
+        expect(results).toEqual([]);
+      },
+    );
 
     it('filters the pages fetched from a cursor too', async () => {
       const mockPost = makeSuccessPost({

@@ -34,7 +34,15 @@ const LABELS_FORMAT =
 
 const excludedSensitivityLabelsSchema = parseJsonArray(LABELS_FORMAT)
   .pipe(
-    z.array(z.string().trim().nonempty({ error: 'lists a blank label' }), { error: LABELS_FORMAT }),
+    z.array(
+      z
+        .string()
+        .trim()
+        // PowerShell and the registry write a label id in braces; the message carries it without.
+        .transform((label) => label.replace(/^\{([^{}]*)\}$/, '$1').trim())
+        .pipe(z.string().nonempty({ error: 'lists a blank label' })),
+      { error: LABELS_FORMAT },
+    ),
   )
   .prefault('[]')
   .describe(

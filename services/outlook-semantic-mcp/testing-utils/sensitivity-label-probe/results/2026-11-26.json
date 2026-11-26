@@ -11,7 +11,7 @@
       "folder": "Inbox",
       "legacy": "0",
       "purview": {
-        "labelId": "2d69afbc-f32c-424f-83ad-75460acd2aa1",
+        "labelId": "4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8",
         "name": "Confidential Encrypted",
         "method": "Privileged",
         "contentBits": "9"
@@ -30,7 +30,7 @@
       "folder": "Sent Items",
       "legacy": "1 / 2 / 3",
       "purview": {
-        "labelId": "2d69afbc-f32c-424f-83ad-75460acd2aa1",
+        "labelId": "4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8",
         "name": "Confidential Encrypted",
         "method": "Standard",
         "contentBits": "1"
