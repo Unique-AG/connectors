@@ -1593,8 +1593,18 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
     });
 
-    it.each([
+    it.each<[string, unknown]>([
       ['Graph returns no extended properties', undefined],
+      ['Graph returns null in place of the properties', null],
+      ['a property has no id', [{ value: '0' }]],
+      [
+        'the Purview property has a null value',
+        [
+          { id: LEGACY, value: '0' },
+          { id: PURVIEW, value: null },
+        ],
+      ],
+      ['the Purview property has no value', [{ id: LEGACY, value: '0' }, { id: PURVIEW }]],
       [
         'Graph returns other properties in place of the requested ones',
         [
@@ -1620,6 +1630,19 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
 
       expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+    });
+
+    it('keeps the other hits and the cursor of a page with malformed sensitivity properties', async () => {
+      const { results, pages } = await searchOwnMailbox(excluding(['confidential']), {
+        value: [
+          makeMessage('msg-malformed', { singleValueExtendedProperties: [{ id: 42 }] }),
+          unlabelled('msg-plain'),
+        ],
+        '@odata.nextLink': `${GRAPH_ROOT}/users/${OWN_EMAIL}/messages?$skip=50`,
+      });
+
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+      expect(pages[0]?.status).toBe(SearchPageStatus.HasMore);
     });
 
     it('drops a hit whose Purview label lost its name when labels are excluded by name', async () => {

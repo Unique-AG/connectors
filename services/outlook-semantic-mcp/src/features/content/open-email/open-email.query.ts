@@ -13,12 +13,7 @@ import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone'
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
 import { subjectOrFallback } from '~/utils/no-subject';
 import { Nullish } from '~/utils/nullish';
-import {
-  extendedPropertiesSchema,
-  SensitivityFilter,
-  SensitivityJudgement,
-  SensitivityVerdict,
-} from '../sensitivity-filter';
+import { SensitivityFilter, SensitivityJudgement, SensitivityVerdict } from '../sensitivity-filter';
 
 const recipientSchema = z.object({
   emailAddress: z.object({ address: z.string() }).optional(),
@@ -47,7 +42,7 @@ const graphMessageSchema = z.object({
     .nullish()
     .transform((attachments) => attachments ?? []),
   'attachments@odata.nextLink': z.string().optional(),
-  singleValueExtendedProperties: extendedPropertiesSchema,
+  singleValueExtendedProperties: z.unknown().optional(),
 });
 
 export interface OpenEmailResult {

@@ -19,12 +19,7 @@ import { parseRetryAfterMs } from '~/utils/parse-retry-after-ms';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { sleep } from '~/utils/sleep';
-import {
-  extendedPropertiesSchema,
-  SensitivityFilter,
-  SensitivityJudgement,
-  SensitivityVerdict,
-} from '../sensitivity-filter';
+import { SensitivityFilter, SensitivityJudgement, SensitivityVerdict } from '../sensitivity-filter';
 import {
   BuildMsGraphKqlBatchRequestsQuery,
   GraphBatchRequest,
@@ -707,7 +702,7 @@ const messagePageSchema = z.object({
       webLink: z.string().optional().nullish(),
       bodyPreview: z.string().optional().nullish(),
       isDraft: z.boolean().optional().nullish(),
-      singleValueExtendedProperties: extendedPropertiesSchema,
+      singleValueExtendedProperties: z.unknown().optional(),
     }),
   ),
   '@odata.nextLink': z.string().optional(),

@@ -333,6 +333,28 @@ describe('OpenEmailQuery', () => {
       });
     });
 
+    it('withholds a message whose Purview property has no value', async () => {
+      graphRequest.get.mockResolvedValue({
+        ...graphMessage,
+        singleValueExtendedProperties: [
+          { id: 'Integer 0x0036', value: '0' },
+          { id: PURVIEW, value: null },
+        ],
+      });
+
+      await expect(instance.run({ userProfileId: 'user-1', id: 'msg-1' })).resolves.toEqual({
+        withheld: { verdict: SensitivityVerdict.Unreadable },
+      });
+    });
+
+    it('withholds a message whose sensitivity properties are malformed', async () => {
+      graphRequest.get.mockResolvedValue({ ...graphMessage, singleValueExtendedProperties: null });
+
+      await expect(instance.run({ userProfileId: 'user-1', id: 'msg-1' })).resolves.toEqual({
+        withheld: { verdict: SensitivityVerdict.Unreadable },
+      });
+    });
+
     it('withholds a message whose sensitivity Graph did not return', async () => {
       await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
         withheld: { verdict: SensitivityVerdict.Unreadable },

@@ -36,18 +36,21 @@ export class SensitivityFilter {
     this.excludesLabelNames = [...this.excludedLabels].some((label) => !GUID_PATTERN.test(label));
   }
 
-  public judge(properties: ExtendedProperty[] | undefined): SensitivityJudgement {
+  // Takes the message's `singleValueExtendedProperties` as Graph sent them, so one malformed
+  // message is judged unreadable instead of failing the page it is on.
+  public judge(rawProperties: unknown): SensitivityJudgement {
     if (!this.isActive) {
       return ALLOWED;
     }
-    if (!properties) {
+    const parsed = extendedPropertiesSchema.safeParse(rawProperties);
+    if (!parsed.success) {
       return UNREADABLE;
     }
-    const values = new Map(properties.map(({ id, value }) => [id.toLowerCase(), value ?? '']));
+    const values = new Map(parsed.data.map(({ id, value }) => [id.toLowerCase(), value]));
     // Other property ids mean Graph ignored the $expand filter. Every message carries the legacy
     // flag, 0 when unset.
     const legacyValue = values.get(LEGACY_SENSITIVITY_PROPERTY.toLowerCase());
-    const legacy = legacyValue === undefined ? undefined : LEGACY_VALUES.get(legacyValue);
+    const legacy = typeof legacyValue === 'string' ? LEGACY_VALUES.get(legacyValue) : undefined;
     if ([...values.keys()].some((id) => !KNOWN_PROPERTIES.has(id)) || legacy === undefined) {
       return UNREADABLE;
     }
@@ -55,7 +58,11 @@ export class SensitivityFilter {
       return { verdict: SensitivityVerdict.Excluded, label: LEGACY_DISPLAY_NAMES[legacy] };
     }
 
-    const labels = this.parsePurviewLabels(values.get(PURVIEW_LABELS_PROPERTY.toLowerCase()) ?? '');
+    // Absent or empty means no label; present without a value cannot be read.
+    const purviewKey = PURVIEW_LABELS_PROPERTY.toLowerCase();
+    const purviewValue = values.has(purviewKey) ? values.get(purviewKey) : '';
+    const labels =
+      typeof purviewValue === 'string' ? this.parsePurviewLabels(purviewValue) : undefined;
     if (!labels) {
       return UNREADABLE;
     }
@@ -116,11 +123,7 @@ const GUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{
 const PURVIEW_ENTRY_PATTERN =
   /MSIP_Label_([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})_([A-Za-z]+)=([^;]*)/gi;
 
-export const extendedPropertiesSchema = z
-  .array(z.object({ id: z.string(), value: z.string().nullish() }))
-  .optional();
-
-type ExtendedProperty = NonNullable<z.infer<typeof extendedPropertiesSchema>>[number];
+const extendedPropertiesSchema = z.array(z.object({ id: z.string(), value: z.string().nullish() }));
 
 interface PurviewLabel {
   id: string;
