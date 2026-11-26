@@ -156,7 +156,7 @@ List the signed-in user's chats (1:1, group, and meeting chats), most recent fir
 
 Both `get_*_messages` tools return the body exactly as Graph gives it: `body.contentType` plus the raw `body.content`, which is usually Teams HTML. Nothing is rewritten and no placeholder text is invented. The structured metadata — `mentions`, `attachments`, `reactions`, `deletedDateTime`, `replyToId`, `channelIdentity` — is returned alongside, so a caller reads those instead of parsing the body.
 
-Each message also carries a `title` and a `webUrl`, so a client can cite it. `title` is not a Graph field: the server derives it. Chat messages rarely have a subject, so `title` is the subject when there is one, and otherwise the sender's name and the first 80 characters of the text (`Carol Lee: Deploy is green.`). It is `null` only for an event with neither. `webUrl` opens the message in Teams. Graph normally sends one. A chat message that arrives without one gets the documented deep link `https://teams.microsoft.com/l/message/<chatId>/<messageId>?context={"contextType":"chat"}`. A channel post gets no fallback: its `webUrl` is `null` when Graph sends none.
+Each message also carries a `title` and a `webUrl`, so a client can cite it. `title` is not a Graph field: the server derives it. Chat messages rarely have a subject, so `title` is the subject when there is one, and otherwise the sender's name and the first 80 characters of the text (`Carol Lee: Deploy is green.`). A reply leaves out the message it quotes, and a message with no text, such as a shared file, is named by its first attachment (`Carol Lee: Q3 plan.xlsx`). It is `null` only for an event with none of them. `webUrl` opens the message in Teams. Graph normally sends one. A chat message that arrives without one gets the documented deep link `https://teams.microsoft.com/l/message/<chatId>/<messageId>?context={"contextType":"chat"}`. A channel post gets no fallback: its `webUrl` is `null` when Graph sends none.
 
 ### `get_chat_messages`
 
@@ -191,7 +191,7 @@ Retrieve recent messages from a chat, identified by `chatId`. Call `list_chats` 
       "deletedDateTime": null,
       "importance": "normal",
       "locale": "en-us",
-      "webUrl": "https://teams.microsoft.com/l/message/19%3A1on1%40unq.gbl.spaces/1718901120000?context=%7B%22contextType%22%3A%22chat%22%7D",
+      "webUrl": "https://teams.microsoft.com/l/message/19:1on1@unq.gbl.spaces/1718901120000?context=%7B%22contextType%22%3A%22chat%22%7D",
       "etag": "1718901120000",
       "replyToId": null,
       "channelIdentity": null,

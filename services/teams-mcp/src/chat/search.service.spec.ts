@@ -736,7 +736,7 @@ describe('SearchService', () => {
       const result = await unit.searchMessages(userProfileId, searchParams);
 
       expect(result.messages[0]?.webUrl).toBe(
-        'https://teams.microsoft.com/l/message/19%3Achat-1%40thread.v2/msg-1?context=%7B%22contextType%22%3A%22chat%22%7D',
+        'https://teams.microsoft.com/l/message/19:chat-1@thread.v2/msg-1?context=%7B%22contextType%22%3A%22chat%22%7D',
       );
     });
 

@@ -87,10 +87,15 @@ function chatName(chat: MsChat): string | null {
 function withoutContent(row: SearchMessageRow, senderAddress: string | null): SearchMessageRow {
   const senderDisplayName = row.senderDisplayName ?? senderAddress;
   // The summary is the index's excerpt, with <c0> highlights and a <ddd/> ellipsis.
-  const title = messageTitle(null, senderDisplayName, {
-    contentType: 'html',
-    content: row.summary ?? '',
-  });
+  const title = messageTitle(
+    null,
+    senderDisplayName,
+    {
+      contentType: 'html',
+      content: row.summary ?? '',
+    },
+    null,
+  );
   return { ...row, senderDisplayName, title };
 }
 

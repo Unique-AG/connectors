@@ -225,7 +225,7 @@ describe('ChatService chat message title and link', () => {
   };
   const chatId = '19:launch@thread.v2';
   const chatMessageLink =
-    'https://teams.microsoft.com/l/message/19%3Alaunch%40thread.v2/1657782060227?context=%7B%22contextType%22%3A%22chat%22%7D';
+    'https://teams.microsoft.com/l/message/19:launch@thread.v2/1657782060227?context=%7B%22contextType%22%3A%22chat%22%7D';
 
   it('titles a message without a subject by its sender and text, and links it to Teams', async () => {
     const { service } = makeService(makePage([graphMessage]));
@@ -244,6 +244,63 @@ describe('ChatService chat message title and link', () => {
     const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
 
     expect(message?.title).toBe('Release 4.2');
+  });
+
+  it('titles a message by its sender and text when its subject is blank', async () => {
+    const { service } = makeService(makePage([{ ...graphMessage, subject: '   ' }]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Deploy is green.');
+  });
+
+  it('titles a quoted reply by its own text, without the quoted message', async () => {
+    const quotedReply =
+      '<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="1657782000000">' +
+      '<strong itemprop="mri" itemid="8:orgid:user-2">Ben Ortiz</strong>' +
+      '<span itemprop="time" itemid="1657782000000"></span>' +
+      '<p itemprop="preview">Is the deploy done?</p></blockquote><p>Yes, green.</p>';
+    const { service } = makeService(
+      makePage([{ ...graphMessage, body: { contentType: 'html', content: quotedReply } }]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Yes, green.');
+  });
+
+  it('titles a message without text by its first named attachment', async () => {
+    const { service } = makeService(
+      makePage([
+        {
+          ...graphMessage,
+          body: { contentType: 'html', content: '<attachment id="file-1"></attachment>' },
+          attachments: [
+            { id: 'ref-1', name: null, contentType: 'messageReference' },
+            { id: 'file-1', name: 'Q3 plan.xlsx', contentType: 'reference' },
+          ],
+        },
+      ]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Q3 plan.xlsx');
+  });
+
+  it('titles a message with text by its text, not its attachment', async () => {
+    const { service } = makeService(
+      makePage([
+        {
+          ...graphMessage,
+          attachments: [{ id: 'file-1', name: 'Q3 plan.xlsx', contentType: 'reference' }],
+        },
+      ]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Deploy is green.');
   });
 
   it('cuts a long text in the title to an excerpt', async () => {

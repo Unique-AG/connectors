@@ -56,13 +56,22 @@ const PREVIEW_HTML_OPTIONS: HtmlToTextOptions = {
   },
 };
 
+// A reply that quotes another message opens with the quote, which would crowd the
+// reply's own text out of the title.
+const TITLE_HTML_OPTIONS: HtmlToTextOptions = {
+  ...PREVIEW_HTML_OPTIONS,
+  selectors: [
+    ...(PREVIEW_HTML_OPTIONS.selectors ?? []),
+    { selector: 'blockquote[itemtype*="schema.skype.com/Reply"]', format: 'skip' },
+  ],
+};
+
 function toPreviewText(
   body: { contentType: string; content: string },
   maxLength: number,
+  htmlOptions: HtmlToTextOptions = PREVIEW_HTML_OPTIONS,
 ): string | null {
-  const text = (
-    body.contentType === 'html' ? convert(body.content, PREVIEW_HTML_OPTIONS) : body.content
-  )
+  const text = (body.contentType === 'html' ? convert(body.content, htmlOptions) : body.content)
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -79,16 +88,21 @@ function toPreviewText(
 }
 
 // Chat messages rarely carry a subject, so a message is named by its sender and the
-// start of its text instead, which keeps two messages of one chat apart.
+// start of its text instead, which keeps two messages of one chat apart. A message
+// with no text, such as a shared file, is named by its first attachment.
 export function messageTitle(
   subject: string | null,
   senderName: string | null,
   body: { contentType: string; content: string },
+  attachmentName: string | null,
 ): string | null {
-  if (subject) {
-    return subject;
+  const trimmedSubject = subject?.trim();
+  if (trimmedSubject) {
+    return trimmedSubject;
   }
-  const excerpt = toPreviewText(body, MESSAGE_TITLE_EXCERPT_MAX_LENGTH);
+  const excerpt =
+    toPreviewText(body, MESSAGE_TITLE_EXCERPT_MAX_LENGTH, TITLE_HTML_OPTIONS) ??
+    attachmentName?.trim();
   return [senderName, excerpt].filter(Boolean).join(': ') || null;
 }
 
@@ -206,6 +220,7 @@ export const MsChatMessageSchema = z
       msg.subject ?? null,
       msg.from?.user?.displayName ?? msg.from?.application?.displayName ?? null,
       msg.body,
+      msg.attachments?.find((attachment) => attachment.name?.trim())?.name ?? null,
     ),
     messageType: msg.messageType,
     subject: msg.subject ?? null,
@@ -255,7 +270,7 @@ export const MessageOutputSchema = z.object({
     .string()
     .nullable()
     .describe(
-      'The subject, or else the sender and the start of the text. Null for an event with neither.',
+      'The subject, or else the sender and the start of the text, or the name of the first attachment when there is no text. Null for an event with none of them.',
     ),
   messageType: z.string(),
   subject: z.string().nullable(),
