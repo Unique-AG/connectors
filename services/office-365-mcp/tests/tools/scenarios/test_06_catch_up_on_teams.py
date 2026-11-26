@@ -1383,6 +1383,26 @@ class TestWhatACitationOfTeamsShows:
 
         assert read["title"] == "Ada Lovelace: Yes, green."
 
+    async def test_a_message_with_only_a_file_is_named_by_the_file(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200,
+                json=message_payload(
+                    content='<attachment id="a1"></attachment>',
+                    attachments=[
+                        {"id": "a1", "contentType": "reference", "name": None},
+                        {"id": "a2", "contentType": "reference", "name": "Q3 budget.xlsx"},
+                    ],
+                ),
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["title"] == "Ada Lovelace: Q3 budget.xlsx"
+
     async def test_a_deleted_message_has_no_title(self, graph: respx.MockRouter) -> None:
         _ = graph.get(CHAT_MESSAGE_PATH).mock(
             return_value=httpx.Response(

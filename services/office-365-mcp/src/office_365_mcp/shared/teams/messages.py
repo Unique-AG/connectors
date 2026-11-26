@@ -165,9 +165,9 @@ class TeamsMessage(BaseModel):
         description=(
             "A short label for this message, to name it when you cite it: its subject; else who "
             + "sent it and how its text opens; else, when it has no text, the file name of its "
-            + "meeting recording or the name of its system event. This connector builds it, so "
-            + "read `body` for what the message says. Null for a deleted message, and when none "
-            + "of these exists."
+            + "meeting recording, the name of its first attachment, or the name of its system "
+            + "event. This connector builds it, so read `body` for what the message says. Null "
+            + "for a deleted message, and when none of these exists."
         )
     )
     message_id: str = Field(description="The message's Graph id.")
@@ -245,6 +245,7 @@ class TeamsMessage(BaseModel):
                 sender,
                 text,
                 recording.display_name if recording is not None else None,
+                next((name for item in attachments if (name := _present(item.name))), None),
                 event,
                 plain_text=plain_text,
             ),
@@ -279,6 +280,7 @@ def _message_title(
     sender: MessageSender | None,
     body: str | None,
     recording: str | None,
+    attachment: str | None,
     event: str | None,
     *,
     plain_text: bool,
@@ -287,7 +289,7 @@ def _message_title(
         return subject.strip()
     who = sender.display_name if sender is not None else None
     opening = _body_opening(body, plain_text=plain_text) if body is not None else None
-    what = opening or recording or event
+    what = opening or recording or attachment or event
     if who and what:
         return f"{who}: {what}"
     return who or what or None
