@@ -13,9 +13,9 @@ Prometheus metrics, and the routes Kubernetes and Prometheus call. A scaffolded 
   `log_config=None` so its lines do too. The access log lines of the ops routes, and of an MCP's
   own `/ready`, are dropped.
   - `LOG_LEVEL` is the level of `own_loggers` (the MCP's package). `LIBRARY_LOG_LEVELS`, a JSON
-    object such as `{"httpx": "INFO"}`, sets libraries, over defaults that keep `httpx` and
-    `httpcore` at WARNING (their INFO lines are request URLs) and `sse_starlette` at INFO (its
-    DEBUG lines are tool results). A library not named logs at INFO.
+    object such as `{"httpx": "INFO"}`, sets libraries, over defaults that keep `httpx`,
+    `httpx2` and `httpcore` at WARNING (their INFO lines are request URLs) and `sse_starlette` at
+    INFO (its DEBUG lines are tool results). A library not named logs at INFO.
   - A line logged with an exception names it in `error_type`. Below ERROR its stack is dropped; at
     ERROR, `err` keeps the frames and exception types but no message, which can quote a payload. A
     pydantic `ValidationError`, or one it was raised from, adds `failed_fields`: `path (error
