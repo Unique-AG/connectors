@@ -96,14 +96,25 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
   }
 
   const sharedMailboxes = env.delegatedAccessScan !== 'disabled';
-  if (env.directorySyncMode === DirectorySyncMode.OnDemand && sharedMailboxes) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['directorySyncMode'],
-      input: env.directorySyncMode,
-      message:
-        '"on_demand" needs DELEGATED_ACCESS_SCAN=disabled, because only the scheduled sync refreshes shared mailbox folders',
-    });
+  if (env.directorySyncMode === DirectorySyncMode.OnDemand) {
+    const conflicts = [
+      ...(env.mcpBackend === McpBackendType.MicrosoftGraph
+        ? []
+        : ['MCP_BACKEND=microsoft_graph, because ingestion syncs the folders itself']),
+      ...(sharedMailboxes
+        ? [
+            'DELEGATED_ACCESS_SCAN=disabled, because only the scheduled sync refreshes shared mailbox folders',
+          ]
+        : []),
+    ];
+    for (const conflict of conflicts) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['directorySyncMode'],
+        input: env.directorySyncMode,
+        message: `"on_demand" needs ${conflict}`,
+      });
+    }
   }
 
   const tools: ReadonlySet<ToolName> = new Set(

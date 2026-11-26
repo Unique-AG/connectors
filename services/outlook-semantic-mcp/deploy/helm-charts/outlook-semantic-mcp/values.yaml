@@ -315,7 +315,7 @@ mcpConfig:
     #   scheduled - a cron (directorySyncCronSchedule) and a scan at startup refresh every user's folders
     #   on_demand - no cron and no startup scan. list_mailboxes_and_directories refreshes the caller's folders on
     #               every call, and search_emails with a folder filter does when they are over 4 hours old.
-    #               Needs delegatedAccess.scan: disabled.
+    #               Needs mcpBackend: microsoft_graph and delegatedAccess.scan: disabled.
     directorySyncMode: scheduled
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE

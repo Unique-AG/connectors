@@ -619,7 +619,7 @@ Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook 
 - **`scheduled`** (default) — a scan at startup and a cron job (`DIRECTORY_SYNC_CRON_SCHEDULE`) refresh the folders of every signed-in user and shared mailbox, with the stored Microsoft tokens.
 - **`on_demand`** — no scan at startup and no cron job. The folders are refreshed with the calling user's own token: on every `list_mailboxes_and_directories` call, and before a `search_emails` call with a folder filter when the user's folders were last refreshed over 4 hours ago. When that refresh fails, the search uses the folders already cached, unless the user's Microsoft sign-in was revoked. The sign-in also refreshes them. A folder created in Outlook is therefore found by a folder filter at the latest 4 hours later, or at once after `list_mailboxes_and_directories`.
 
-`on_demand` needs `DELEGATED_ACCESS_SCAN=disabled`, because shared mailbox folders are refreshed only by the scheduled sync. The server refuses to start otherwise.
+`on_demand` needs `MCP_BACKEND=microsoft_graph`, because ingestion syncs the folders itself, and `DELEGATED_ACCESS_SCAN=disabled`, because shared mailbox folders are refreshed only by the scheduled sync. The server refuses to start otherwise, and the chart refuses to render.
 
 #### Calendar tools
 

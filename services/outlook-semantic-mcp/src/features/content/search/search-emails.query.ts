@@ -50,12 +50,8 @@ export class SearchEmailsQuery {
         ? []
         : (input.uniqueSemanticSearchQueries ?? []);
     const kqlQueries = input.msGraphKeywordSearchQueries ?? [];
-    const filtersByFolder =
-      kqlQueries.some((query) => isNonNullish(query.directories)) ||
-      semanticQueries.some((query) =>
-        query.conditions?.some((condition) => isNonNullish(condition.directories)),
-      );
-    if (filtersByFolder) {
+    // On-demand folder sync runs only with the Graph backend, so only KQL queries filter by folder.
+    if (kqlQueries.some((query) => isNonNullish(query.directories))) {
       await this.refreshStaleDirectoriesCommand.run(userProfileId);
     }
 

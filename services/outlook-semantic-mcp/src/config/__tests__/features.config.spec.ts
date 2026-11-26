@@ -84,8 +84,22 @@ describe(loadFeaturesConfig.name, () => {
 
     it('throws naming DIRECTORY_SYNC_MODE when on_demand is set with shared mailboxes on', () => {
       expect(() =>
-        load({ DIRECTORY_SYNC_MODE: 'on_demand', MCP_TOOLS: tools('search_emails') }),
+        load({
+          MCP_BACKEND: 'microsoft_graph',
+          DIRECTORY_SYNC_MODE: 'on_demand',
+          MCP_TOOLS: tools('search_emails'),
+        }),
       ).toThrow(/DIRECTORY_SYNC_MODE: "on_demand" needs DELEGATED_ACCESS_SCAN=disabled/);
+    });
+
+    it('throws naming DIRECTORY_SYNC_MODE when on_demand is set in Unique mode', () => {
+      expect(() =>
+        load({
+          DIRECTORY_SYNC_MODE: 'on_demand',
+          DELEGATED_ACCESS_SCAN: 'disabled',
+          MCP_TOOLS: tools('search_emails'),
+        }),
+      ).toThrow(/DIRECTORY_SYNC_MODE: "on_demand" needs MCP_BACKEND=microsoft_graph/);
     });
 
     it('throws naming DIRECTORY_SYNC_MODE on an unknown value', () => {
