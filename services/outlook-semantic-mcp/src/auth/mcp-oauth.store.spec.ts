@@ -312,6 +312,23 @@ describe('McpOAuthStore', () => {
       );
     });
 
+    it('stores a null refresh token when Microsoft returned none', async () => {
+      mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_01kcrvsne6fq9att23mp4z5ef2' }];
+      const unit = new McpOAuthStore(
+        mockDrizzle as unknown as DrizzleDatabase,
+        mockEncryption,
+        mockCache as unknown as Cache,
+        mockAmqpConnection as unknown as AmqpConnection,
+        TEST_HMAC_SECRET,
+      );
+
+      await unit.upsertUserProfile({ ...mockUser, refreshToken: undefined });
+
+      const insertBuilder = mockDrizzle.insert.mock.results[0]?.value;
+      expect(insertBuilder.values.mock.calls[0][0].refreshToken).toBeNull();
+      expect(insertBuilder.onConflictDoUpdate.mock.calls[0][0].set.refreshToken).toBeNull();
+    });
+
     it('on conflict uses sourceOnLoginConflict so a shared-mailbox upgrades and oauth is not flipped', async () => {
       mockDrizzle.__nextInsertReturningRows = [{ id: 'user_profile_upgraded' }];
 

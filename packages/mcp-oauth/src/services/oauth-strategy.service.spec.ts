@@ -113,6 +113,19 @@ describe('OAuthStrategyService', () => {
       });
     });
 
+    it('signs the user in without a refresh token when the provider issued none', () => {
+      service.onModuleInit();
+
+      const strategyCallback = mockStrategy.mock.calls[0][1];
+      const done = vi.fn();
+      strategyCallback('access-token', undefined, { id: 'user-123' }, done);
+
+      expect(done).toHaveBeenCalledWith(
+        null,
+        expect.objectContaining({ accessToken: 'access-token', refreshToken: undefined }),
+      );
+    });
+
     it('handles profile mapping errors gracefully', () => {
       service.onModuleInit();
 

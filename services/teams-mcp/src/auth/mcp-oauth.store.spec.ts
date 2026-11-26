@@ -296,6 +296,21 @@ describe('McpOAuthStore', () => {
       expect(mockDrizzle.insert).toHaveBeenCalled();
     });
 
+    it('rejects a sign-in without a refresh token and saves nothing', async () => {
+      const unit = new McpOAuthStore(
+        mockDrizzle as any,
+        mockEncryption,
+        mockCache as any,
+        mockAmqp as any,
+        TEST_HMAC_SECRET,
+      );
+
+      await expect(
+        unit.upsertUserProfile({ ...mockUser, refreshToken: undefined }),
+      ).rejects.toThrow('Microsoft returned no refresh token');
+      expect(mockDrizzle.insert).not.toHaveBeenCalled();
+    });
+
     it('publishes a user-authorized event after upserting the profile', async () => {
       const userProfileId = 'user_profile_01kcrvsne6fq9att23mp4z5ef2';
       mockDrizzle.__nextInsertReturningRows = [{ id: userProfileId }];
