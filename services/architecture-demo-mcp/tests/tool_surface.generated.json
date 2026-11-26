@@ -1175,7 +1175,7 @@
                     "type": "null"
                   }
                 ],
-                "description": "Tiingo's last price: the last sale, else the mid, else the previous close."
+                "description": "Tiingo's last price: the last sale, or the mid when Tiingo judges the spread tight, then the official close once it is in."
               },
               "volume": {
                 "anyOf": [

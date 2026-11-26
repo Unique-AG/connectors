@@ -47,7 +47,8 @@ class Quote(BaseModel):
     timestamp: str | None = Field(description="When Tiingo last refreshed the quote.")
     last: float | None = Field(description="Last sale price on IEX.")
     tngo_last: float | None = Field(
-        description="Tiingo's last price: the last sale, else the mid, else the previous close."
+        description="Tiingo's last price: the last sale, or the mid when Tiingo judges the spread "
+        "tight, then the official close once it is in."
     )
     prev_close: float | None = Field(description="Previous trading day's close.")
     open: float | None = Field(description="Today's opening price.")
