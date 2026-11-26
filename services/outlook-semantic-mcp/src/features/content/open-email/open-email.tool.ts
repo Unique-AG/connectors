@@ -86,7 +86,9 @@ const OpenEmailByIdOutputSchema = z.object({
   title: z
     .string()
     .optional()
-    .describe(`Subject of the email, or "${NO_SUBJECT}" when it has none.`),
+    .describe(
+      `Subject of the email, or "${NO_SUBJECT}" when it has none. Absent when webLink is null.`,
+    ),
   webLink: z
     .string()
     .nullable()
@@ -149,7 +151,9 @@ export class OpenEmailTool {
         chunkIds: input.chunkIds,
         outputTimeZone: outputTimeZone,
       });
-      return { success: true, title: emailData.title || NO_SUBJECT, webLink, emailData };
+      // A top-level title makes Unique cite the email, which it should only do with a link to open.
+      const title = webLink === null ? undefined : emailData.title || NO_SUBJECT;
+      return { success: true, title, webLink, emailData };
     } catch (err) {
       // 404: deleted or moved in Outlook since it was indexed. 400: an id Graph does not accept,
       // such as a Unique content id from `openEmailParams` of an older search.

@@ -64,10 +64,11 @@ describe('OpenEmailTool', () => {
   });
 
   it('titles an email without a subject "(no subject)"', async () => {
+    const webLink = 'https://outlook.office365.com/owa/?ItemID=AAMk2&exvsurl=1';
     openEmailQuery.run.mockResolvedValue({
       id: 'msg-2',
       title: null,
-      webLink: null,
+      webLink,
       metadata: null,
       text: 'Hi',
       bodyContentType: 'text',
@@ -75,7 +76,27 @@ describe('OpenEmailTool', () => {
 
     const result = await tool.openEmailById({ id: 'msg-2' }, context, request);
 
-    expect(result).toMatchObject({ success: true, title: '(no subject)', webLink: null });
+    expect(result).toMatchObject({ success: true, title: '(no subject)', webLink });
+  });
+
+  it('leaves out the top-level title when the email has no web link', async () => {
+    openEmailQuery.run.mockResolvedValue({
+      id: 'msg-3',
+      title: 'Budget Q3',
+      webLink: null,
+      metadata: null,
+      text: 'Hi',
+      bodyContentType: 'text',
+    });
+
+    const result = await tool.openEmailById({ id: 'msg-3' }, context, request);
+
+    expect(result.title).toBeUndefined();
+    expect(result).toMatchObject({
+      success: true,
+      webLink: null,
+      emailData: { title: 'Budget Q3' },
+    });
   });
 
   it('rethrows any other Graph failure', async () => {
