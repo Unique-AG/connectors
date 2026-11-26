@@ -3,6 +3,7 @@ import { DrizzleModule } from '~/db/drizzle.module';
 import { MsGraphModule } from '~/msgraph/msgraph.module';
 import { UniqueApiFeatureModule } from '~/unique/unique-api.module';
 import { DelegatedAccessUtilsModule } from '../delegated-access/delegated-access-utils.module';
+import { DirectoriesSyncModule } from '../directories-sync/directories-sync.module';
 import { GraphUtilsModule } from '../graph-utils/graph-utils.module';
 import { FullSyncModule } from '../sync/full-sync';
 import { UserUtilsModule } from '../user-utils/user-utils.module';
@@ -32,6 +33,7 @@ const QUERIES = [
     GraphUtilsModule,
     UserUtilsModule,
     DelegatedAccessUtilsModule,
+    DirectoriesSyncModule,
   ],
   providers: [...QUERIES, SearchCursorCleanupSchedulerService],
   exports: [...QUERIES],

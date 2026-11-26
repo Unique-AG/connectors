@@ -71,6 +71,30 @@ describe(loadFeaturesConfig.name, () => {
     });
   });
 
+  describe('DIRECTORY_SYNC_MODE', () => {
+    it('is scheduled by default', () => {
+      expect(load({ MCP_TOOLS: tools('search_emails') }).directorySyncMode).toBe('scheduled');
+    });
+
+    it('reads on_demand with shared mailboxes off', () => {
+      expect(load({ ...READ_ONLY_ENV, DIRECTORY_SYNC_MODE: 'on_demand' }).directorySyncMode).toBe(
+        'on_demand',
+      );
+    });
+
+    it('throws naming DIRECTORY_SYNC_MODE when on_demand is set with shared mailboxes on', () => {
+      expect(() =>
+        load({ DIRECTORY_SYNC_MODE: 'on_demand', MCP_TOOLS: tools('search_emails') }),
+      ).toThrow(/DIRECTORY_SYNC_MODE: "on_demand" needs DELEGATED_ACCESS_SCAN=disabled/);
+    });
+
+    it('throws naming DIRECTORY_SYNC_MODE on an unknown value', () => {
+      expect(() => load({ ...READ_ONLY_ENV, DIRECTORY_SYNC_MODE: 'hourly' })).toThrow(
+        /DIRECTORY_SYNC_MODE: /,
+      );
+    });
+  });
+
   it('throws naming MCP_BACKEND when it is unset', () => {
     expect(() =>
       loadFeaturesConfig({ DELEGATED_ACCESS_SCAN: 'disabled', MCP_TOOLS: tools('search_emails') }),

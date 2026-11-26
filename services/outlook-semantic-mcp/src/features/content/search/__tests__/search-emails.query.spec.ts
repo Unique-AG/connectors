@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import { loadFeaturesConfig } from '~/config';
+import type { RefreshStaleDirectoriesCommand } from '~/features/directories-sync/refresh-stale-directories.command';
 import type { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import {
   convertUserProfileIdToTypeId,
@@ -86,6 +87,7 @@ describe('SearchEmailsQuery', () => {
       msGraphKqlQuery as unknown as MsGraphKqlSearchEmailsQuery,
       { run: vi.fn().mockResolvedValue(undefined) } as unknown as GetMailboxTimezoneQuery,
       searchCursorRepository as unknown as SearchCursorRepository,
+      { run: vi.fn() } as unknown as RefreshStaleDirectoriesCommand,
       loadFeaturesConfig({
         MCP_BACKEND: 'microsoft_graph_and_unique_api',
         MCP_TOOLS: JSON.stringify(['search_emails']),

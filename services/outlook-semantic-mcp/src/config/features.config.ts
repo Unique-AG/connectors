@@ -35,6 +35,11 @@ export const uniqueAttachmentsSchema = enabledDisabledBoolean(
 export const UNIQUE_REQUIRED_BY =
   'MCP_BACKEND=microsoft_graph_and_unique_api or UNIQUE_ATTACHMENTS=enabled, the default';
 
+export enum DirectorySyncMode {
+  Scheduled = 'scheduled',
+  OnDemand = 'on_demand',
+}
+
 export const needsUnique = (mode: McpBackendType, uniqueAttachments: boolean): boolean =>
   mode === McpBackendType.MicrosoftGraphAndUniqueApi || uniqueAttachments;
 
@@ -46,6 +51,12 @@ const FeaturesEnvSchema = z.object({
     .enum(['disabled', 'full_access_only', 'granular_access'])
     .describe('Shared mailboxes are on unless DELEGATED_ACCESS_SCAN is "disabled".'),
   uniqueAttachments: uniqueAttachmentsSchema,
+  directorySyncMode: z
+    .enum(DirectorySyncMode)
+    .prefault(DirectorySyncMode.Scheduled)
+    .describe(
+      'How the folder cache is refreshed: "scheduled" by a cron and a scan at startup, "on_demand" by the tool calls that read it.',
+    ),
 });
 
 const FEATURE_ENV_KEYS = {
@@ -54,6 +65,7 @@ const FEATURE_ENV_KEYS = {
   mcpTools: 'MCP_TOOLS',
   delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
   uniqueAttachments: 'UNIQUE_ATTACHMENTS',
+  directorySyncMode: 'DIRECTORY_SYNC_MODE',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -83,6 +95,17 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     }
   }
 
+  const sharedMailboxes = env.delegatedAccessScan !== 'disabled';
+  if (env.directorySyncMode === DirectorySyncMode.OnDemand && sharedMailboxes) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['directorySyncMode'],
+      input: env.directorySyncMode,
+      message:
+        '"on_demand" needs DELEGATED_ACCESS_SCAN=disabled, because only the scheduled sync refreshes shared mailbox folders',
+    });
+  }
+
   const tools: ReadonlySet<ToolName> = new Set(
     TOOL_NAMES.filter((name) => env.mcpTools.includes(name)),
   );
@@ -91,9 +114,10 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     mode: env.mcpBackend,
     tools,
     calendar: [...tools].some((name) => TOOL_DECLARATIONS[name].group === 'calendar'),
-    sharedMailboxes: env.delegatedAccessScan !== 'disabled',
+    sharedMailboxes,
     uniqueAttachments: env.uniqueAttachments,
     uniqueNeeded: needsUnique(env.mcpBackend, env.uniqueAttachments),
+    directorySyncMode: env.directorySyncMode,
   };
 });
 

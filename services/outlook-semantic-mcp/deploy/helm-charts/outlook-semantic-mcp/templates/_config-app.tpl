@@ -11,6 +11,8 @@
 {{- end }}
 - name: MCP_TOOLS
   value: {{ toJson .app.tools | quote }}
+- name: DIRECTORY_SYNC_MODE
+  value: {{ .app.directorySyncMode | quote }}
 {{- if .app.directorySyncCronSchedule }}
 - name: DIRECTORY_SYNC_CRON_SCHEDULE
   value: {{ .app.directorySyncCronSchedule | quote }}

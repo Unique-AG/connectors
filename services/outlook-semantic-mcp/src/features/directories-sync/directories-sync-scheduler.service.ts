@@ -1,7 +1,13 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { SchedulerRegistry } from '@nestjs/schedule';
 import { CronJob } from 'cron';
-import { AppConfig, appConfig } from '~/config';
+import {
+  AppConfig,
+  appConfig,
+  DirectorySyncMode,
+  type FeaturesConfig,
+  featuresConfig,
+} from '~/config';
 import { NewTrace } from '~/features/tracing.utils';
 import { LogSecretsScope } from '~/utils/log-secrets';
 import { SyncDirectoriesForAllUserProfilesCommand } from './sync-directories-for-all-user-profiles.command';
@@ -15,9 +21,14 @@ export class DirectorySyncSchedulerService implements OnModuleInit, OnModuleDest
     private readonly schedulerRegistry: SchedulerRegistry,
     private syncDirectoriesForAllUserProfilesCommand: SyncDirectoriesForAllUserProfilesCommand,
     @Inject(appConfig.KEY) private readonly config: AppConfig,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   public onModuleInit() {
+    if (this.features.directorySyncMode === DirectorySyncMode.OnDemand) {
+      this.logger.log({ msg: 'Directory sync is on demand: no startup scan and no cron job' });
+      return;
+    }
     this.logger.log({ msg: 'Triggering initial scan on service startup...' });
     void this.runScheduledScan();
     this.setupScheduledScan();
