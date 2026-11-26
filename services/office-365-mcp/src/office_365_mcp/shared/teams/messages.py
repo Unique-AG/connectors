@@ -164,9 +164,9 @@ class TeamsMessage(BaseModel):
     title: str | None = Field(
         description=(
             "A short label for this message, to name it when you cite it: its subject; else who "
-            + "sent it and how its text opens, or the name of its system event when it has no "
-            + "text. This connector builds it, so read `body` for what the message says. Null "
-            + "when none of these exists."
+            + "sent it and how its text opens; else, when it has no text, the file name of its "
+            + "meeting recording or the name of its system event. This connector builds it, so "
+            + "read `body` for what the message says. Null when none of these exists."
         )
     )
     message_id: str = Field(description="The message's Graph id.")
@@ -234,9 +234,17 @@ class TeamsMessage(BaseModel):
         plain_text = body is not None and text is not None and body.content_type == BodyType.Text
         sender = MessageSender.from_identity(message.from_)
         event = event_of(message)
+        recording = recording_of(message)
         return cls(
             uri=handle.uri,
-            title=_message_title(message.subject, sender, text, event, plain_text=plain_text),
+            title=_message_title(
+                message.subject,
+                sender,
+                text,
+                recording.display_name if recording is not None else None,
+                event,
+                plain_text=plain_text,
+            ),
             message_id=message.id or handle.message_id,
             chat_id=handle.chat_id,
             team_id=handle.team_id,
@@ -245,7 +253,7 @@ class TeamsMessage(BaseModel):
             body=text,
             body_is_plain_text=plain_text,
             event=event,
-            recording=recording_of(message),
+            recording=recording,
             created_at=message.created_date_time,
             last_edited_at=message.last_edited_date_time,
             deleted_at=message.deleted_date_time,
@@ -267,6 +275,7 @@ def _message_title(
     subject: str | None,
     sender: MessageSender | None,
     body: str | None,
+    recording: str | None,
     event: str | None,
     *,
     plain_text: bool,
@@ -274,7 +283,8 @@ def _message_title(
     if subject is not None and subject.strip():
         return subject.strip()
     who = sender.display_name if sender is not None else None
-    what = (_body_opening(body, plain_text=plain_text) if body is not None else None) or event
+    opening = _body_opening(body, plain_text=plain_text) if body is not None else None
+    what = opening or recording or event
     if who and what:
         return f"{who}: {what}"
     return who or what or None
