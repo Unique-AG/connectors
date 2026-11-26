@@ -4,6 +4,7 @@ import { GraphError } from '@microsoft/microsoft-graph-client';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
 import type * as z from 'zod';
 import { loadFeaturesConfig } from '~/config';
+import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
 import { OpenEmailQuery } from '../open-email.query';
 import { OpenEmailTool } from '../open-email.tool';
 
@@ -162,6 +163,8 @@ describe('OpenEmailTool input', () => {
       new OpenEmailQuery(
         { createClientForUser: () => ({ api: () => graphRequest }) } as never,
         { content: { getContentById } } as never,
+        { run: vi.fn().mockResolvedValue({ id: 'user-1', email: 'own@example.com' }) } as never,
+        new BuildWebLinksCommand({ run: vi.fn().mockResolvedValue(new Map()) } as never),
       ),
       { run: vi.fn().mockResolvedValue(undefined) } as never,
       loadFeaturesConfig(READ_ONLY_ENV),
