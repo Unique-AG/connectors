@@ -47,6 +47,9 @@ def _quote(*, book: IexTopOfBook) -> Quote | None:
 
 def _title(*, quotes: list[Quote]) -> str:
     """Such as `IEX top of book: AAPL, MSFT`, naming at most five tickers."""
+    name = "IEX top of book"
+    if not quotes:
+        return name
     shown = ", ".join(quote.ticker for quote in quotes[:_TITLED_TICKERS])
     rest = len(quotes) - _TITLED_TICKERS
-    return f"IEX top of book: {shown} and {rest} more" if rest > 0 else f"IEX top of book: {shown}"
+    return f"{name}: {shown} and {rest} more" if rest > 0 else f"{name}: {shown}"
