@@ -9,7 +9,10 @@ from typing import cast
 from unittest.mock import AsyncMock
 from unittest.mock import patch
 
+from fastmcp import FastMCP
 from fastmcp.client import Client
+from fastmcp.client.client import CallToolResult
+import mcp_types
 import pytest
 import unique_sdk
 
@@ -44,7 +47,7 @@ def _module(
 
 
 @pytest.fixture
-def server():
+def server() -> FastMCP:
     return build_server(auth_settings=None)
 
 
@@ -58,11 +61,13 @@ def identity_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("ZITADEL_BASE_URL", raising=False)
 
 
-def _data(result) -> dict[str, object]:  # noqa: ANN001
+def _data(result: CallToolResult) -> dict[str, object]:
     """Extract the dict payload from a tool result."""
     if result.structured_content is not None:
         return cast(dict[str, object], result.structured_content)
-    return cast(dict[str, object], json.loads(result.content[0].text))
+    content = result.content[0]
+    assert isinstance(content, mcp_types.TextContent)
+    return cast(dict[str, object], json.loads(content.text))
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +76,7 @@ def _data(result) -> dict[str, object]:  # noqa: ANN001
 
 
 class TestUniqueAISpace:
-    async def test_get_space_returns_space_data(self, server):
+    async def test_get_space_returns_space_data(self, server: FastMCP) -> None:
         space = _space()
         with patch("unique_sdk.Space.get_space_async", new=AsyncMock(return_value=space)):
             async with Client(server) as client:
@@ -81,7 +86,7 @@ class TestUniqueAISpace:
         assert data["id"] == "assistant_testspace"
         assert data["name"] == "Test Space"
 
-    async def test_list_language_models_returns_model_list(self, server):
+    async def test_list_language_models_returns_model_list(self, server: FastMCP) -> None:
         raw = {"models": ["gpt-4o", "gpt-4o-mini"]}
         with patch(
             "space_config_mcp.upstream.client.LLMModels.get_models_async",
@@ -91,7 +96,7 @@ class TestUniqueAISpace:
                 result = await client.call_tool("list_language_models", {})
         assert not result.is_error
         data = _data(result)
-        assert "gpt-4o" in data["models"]
+        assert "gpt-4o" in cast(list[str], data["models"])
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +105,7 @@ class TestUniqueAISpace:
 
 
 class TestConductSpace:
-    async def test_get_conduct_config_returns_typed_config(self, server):
+    async def test_get_conduct_config_returns_typed_config(self, server: FastMCP) -> None:
         mod = _module(
             "mod-conduct-1",
             "SwappableIntelligence",
@@ -112,15 +117,17 @@ class TestConductSpace:
         assert not result.is_error
         data = _data(result)
         assert data["module_id"] == "mod-conduct-1"
-        assert data["configuration"]["strategy"] == "claude_code"
+        assert cast(dict[str, object], data["configuration"])["strategy"] == "claude_code"
 
-    async def test_get_conduct_config_errors_when_no_swappable_intelligence_module(self, server):
+    async def test_get_conduct_config_errors_when_no_swappable_intelligence_module(
+        self, server: FastMCP
+    ) -> None:
         with patch("unique_sdk.Module.list_async", new=AsyncMock(return_value=[])):
             async with Client(server) as client:
                 result = await client.call_tool("get_conduct_config", {}, raise_on_error=False)
         assert result.is_error
 
-    async def test_update_conduct_config_patches_strategy(self, server):
+    async def test_update_conduct_config_patches_strategy(self, server: FastMCP) -> None:
         mod = _module(
             "mod-conduct-1",
             "SwappableIntelligence",
@@ -140,12 +147,20 @@ class TestConductSpace:
                 result = await client.call_tool("update_conduct_config", {"strategy": "pi_agent"})
         assert not result.is_error
         data = _data(result)
-        assert data["configuration"]["strategy"] == "pi_agent"
+        assert cast(dict[str, object], data["configuration"])["strategy"] == "pi_agent"
 
-    async def test_update_conduct_config_patches_max_turns(self, server):
-        config = {"strategy": "claude_code", "maxTurns": 10, "claude": {"maxTurns": 10}}
+    async def test_update_conduct_config_patches_max_turns(self, server: FastMCP) -> None:
+        config: dict[str, object] = {
+            "strategy": "claude_code",
+            "maxTurns": 10,
+            "claude": {"maxTurns": 10},
+        }
         mod = _module("mod-conduct-1", "SwappableIntelligence", config)
-        updated_config = {"strategy": "claude_code", "maxTurns": 20, "claude": {"maxTurns": 20}}
+        updated_config: dict[str, object] = {
+            "strategy": "claude_code",
+            "maxTurns": 20,
+            "claude": {"maxTurns": 20},
+        }
         updated = _module("mod-conduct-1", "SwappableIntelligence", updated_config)
         with (
             patch("space_config_mcp.contexts.modules.write.snapshot_space", new=AsyncMock()),
@@ -156,7 +171,7 @@ class TestConductSpace:
                 result = await client.call_tool("update_conduct_config", {"max_turns": 20})
         assert not result.is_error
         data = _data(result)
-        assert data["configuration"]["maxTurns"] == 20
+        assert cast(dict[str, object], data["configuration"])["maxTurns"] == 20
 
 
 # ---------------------------------------------------------------------------
@@ -165,7 +180,7 @@ class TestConductSpace:
 
 
 class TestMagicTableSpace:
-    async def test_get_magic_table_config_returns_config(self, server):
+    async def test_get_magic_table_config_returns_config(self, server: FastMCP) -> None:
         mod = _module("mod-rfp-1", "RfpAgent", {"languageModel": "gpt-4o", "columns": []})
         with patch("unique_sdk.Module.list_async", new=AsyncMock(return_value=[mod])):
             async with Client(server) as client:
@@ -173,15 +188,17 @@ class TestMagicTableSpace:
         assert not result.is_error
         data = _data(result)
         assert data["module_id"] == "mod-rfp-1"
-        assert data["configuration"]["languageModel"] == "gpt-4o"
+        assert cast(dict[str, object], data["configuration"])["languageModel"] == "gpt-4o"
 
-    async def test_get_magic_table_config_errors_when_no_rfp_agent_module(self, server):
+    async def test_get_magic_table_config_errors_when_no_rfp_agent_module(
+        self, server: FastMCP
+    ) -> None:
         with patch("unique_sdk.Module.list_async", new=AsyncMock(return_value=[])):
             async with Client(server) as client:
                 result = await client.call_tool("get_magic_table_config", {}, raise_on_error=False)
         assert result.is_error
 
-    async def test_update_magic_table_config_patches_language_model(self, server):
+    async def test_update_magic_table_config_patches_language_model(self, server: FastMCP) -> None:
         mod = _module("mod-rfp-1", "RfpAgent", {"languageModel": "gpt-4o", "columns": []})
         updated = _module("mod-rfp-1", "RfpAgent", {"languageModel": "gpt-4o-mini", "columns": []})
         with (
@@ -199,4 +216,4 @@ class TestMagicTableSpace:
                 )
         assert not result.is_error
         data = _data(result)
-        assert data["configuration"]["languageModel"] == "gpt-4o-mini"
+        assert cast(dict[str, object], data["configuration"])["languageModel"] == "gpt-4o-mini"

@@ -97,11 +97,12 @@ async def get_caller() -> tuple[str, str]:
             _LOG.info("get_caller: resolved via env vars")
             return uid, cid
 
+    ephemeral = os.environ.get("ALLOW_EPHEMERAL_OAUTH_STORAGE", "unset")
     raise ToolError(
         "Cannot resolve caller identity. "
         f"auth_configured={auth_configured}, "
         f"meta_injector={'available' if _get_request_meta is not None else 'missing'}, "
-        f"ALLOW_EPHEMERAL_OAUTH_STORAGE={os.environ.get('ALLOW_EPHEMERAL_OAUTH_STORAGE', 'unset')!r}. "
+        f"ALLOW_EPHEMERAL_OAUTH_STORAGE={ephemeral!r}. "
         "Set UNIQUE_AUTH_USER_ID / UNIQUE_AUTH_COMPANY_ID or register via Zitadel."
     )
 
@@ -145,10 +146,11 @@ async def get_space_id(
             _LOG.info("get_space_id: resolved via env var: %s", aid)
             return aid
 
+    ephemeral = os.environ.get("ALLOW_EPHEMERAL_OAUTH_STORAGE", "unset")
     raise ToolError(
         "Cannot resolve space ID. "
         f"auth_configured={auth_configured}, "
         f"meta_injector={'available' if _get_request_meta is not None else 'missing'}, "
-        f"ALLOW_EPHEMERAL_OAUTH_STORAGE={os.environ.get('ALLOW_EPHEMERAL_OAUTH_STORAGE', 'unset')!r}. "
+        f"ALLOW_EPHEMERAL_OAUTH_STORAGE={ephemeral!r}. "
         "Set UNIQUE_AUTH_ASSISTANT_ID or register via Zitadel."
     )
