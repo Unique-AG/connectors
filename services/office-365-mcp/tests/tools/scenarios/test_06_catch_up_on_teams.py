@@ -1364,6 +1364,25 @@ class TestWhatACitationOfTeamsShows:
 
         assert read["title"] == "Ada Lovelace: Deploy <release-id> now"
 
+    async def test_a_reply_is_named_by_its_own_text_and_not_the_message_it_quotes(
+        self, graph: respx.MockRouter
+    ) -> None:
+        quoted = (
+            '<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" '
+            + 'itemid="1769999999999"><strong itemprop="mri">Alice Smith</strong>'
+            + '<span itemprop="time" itemid="1769999999999"></span>'
+            + '<p itemprop="preview">Is the deploy done?</p></blockquote>'
+        )
+        _ = graph.get(CHAT_MESSAGE_PATH).mock(
+            return_value=httpx.Response(
+                200, json=message_payload(content=f"{quoted}<p>Yes, green.</p>")
+            )
+        )
+
+        read = await call("teams_read_message", uri=CHAT_MESSAGE_URI)
+
+        assert read["title"] == "Ada Lovelace: Yes, green."
+
     async def test_a_chat_message_without_a_link_opens_through_the_deep_link_to_its_chat(
         self, graph: respx.MockRouter
     ) -> None:

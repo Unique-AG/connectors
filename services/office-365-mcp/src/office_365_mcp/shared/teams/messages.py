@@ -293,7 +293,14 @@ def _message_title(
 def _body_opening(body: str, *, plain_text: bool) -> str:
     if plain_text:
         return cut_for_a_question(" ".join(body.split()))
-    return body_opening(body)
+    return body_opening(_A_QUOTED_REPLY.sub(" ", body))
+
+
+# Teams puts the message a reply quotes in a blockquote of this type, ahead of the reply's own text.
+_A_QUOTED_REPLY = re.compile(
+    r"<blockquote\b[^<>]*itemtype=[\"']http://schema\.skype\.com/Reply[\"'][^<>]*>.*?</blockquote\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 # The documented deep link to a chat message:
