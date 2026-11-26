@@ -732,10 +732,7 @@ async def update_magic_table_config(  # noqa: PLR0913
     model_changed = module_patch is not None and (
         module_patch.language_model is not None
         or module_patch.question_extraction_language_model is not None
-        or any(
-            col.language_model is not None
-            for col in (module_patch.columns or [])
-        )
+        or any(col.language_model is not None for col in (module_patch.columns or []))
     )
     try:
         module = await contexts.update_magic_table_config(
