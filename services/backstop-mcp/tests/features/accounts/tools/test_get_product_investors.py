@@ -20,12 +20,7 @@ from backstop_mcp.server.tools import TOOLS
 from tests.features.accounts.conftest import make_get_product_investors_query
 from tests.features.party_resolver.helpers import ctx_accept, ctx_decline, ctx_never_elicit
 from tests.helpers import BASE_URL, recorded_params, resource
-from tests.server.tools.helpers import (
-    object_dict,
-    object_list,
-    tool_model,
-    tool_payload,
-)
+from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _MAX_VALUED_ACCOUNTS = 50
 

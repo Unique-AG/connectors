@@ -36,12 +36,7 @@ from tests.features.party_resolver.helpers import (
     resource,
 )
 from tests.helpers import build_employment_index_factory, custom_fields_service
-from tests.server.tools.helpers import (
-    object_dict,
-    object_list,
-    tool_model,
-    tool_payload,
-)
+from tests.server.tools.helpers import object_dict, object_list, tool_model, tool_payload
 
 _INDEX = build_employment_index_factory()
 _EMPTY_DEFINITIONS: dict[str, object] = {"data": [], "links": {"next": None}}
