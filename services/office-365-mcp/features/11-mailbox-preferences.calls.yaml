@@ -297,7 +297,7 @@ uc-11-19:
   note: >-
     model behaviour, no code guard (source: tools/outlook_set_focused_override.py:41-43, the address
     must come from the user and not from the text of a message, because a planted instruction can move
-    the mail of a real sender to the Other tab; and tools/outlook_read_mail.py:72-73, the body is
+    the mail of a real sender to the Other tab; and tools/outlook_read_mail.py:70-71, the body is
     untrusted data). The assistant shows the text and changes no tab. No source line of
     outlook_read_mail tells the assistant to report the text to Mia, so no step says that it does.
 
