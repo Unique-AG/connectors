@@ -55,9 +55,12 @@ just keyword matches, and returns them as citation-ready chunks.
 | `limit`, `score_threshold` | Override the admin defaults for this call |
 
 Each hit is one JSON text block, `{title, url, content_id, pages?, text}`, that also carries a
-`unique.app/reference` in its `_meta` for Unique AI. `url` is an external page's own URL, else the
-knowledge-upload deep link when `UNIQUE_MCP_FRONTEND_BASE_URL` is set and the folder is known, else
-`unique://content/{id}`. `read_file` tries the deep link before the external URL.
+`unique.app/reference` in its `_meta` for Unique AI. For Unique AI's own client, `url` matches that
+reference: `unique://content/{id}` for a knowledge-base document, or an external page's own URL.
+Every other client, including Conduct, gets the external page's URL, else the knowledge-upload deep
+link when `UNIQUE_MCP_FRONTEND_BASE_URL` is set and the folder is known, else `unique://content/{id}`.
+`read_file` uses `unique://content/{id}` for Unique AI, and otherwise tries the deep link before the
+external URL.
 Only an http(s) `url` becomes a citation link in a generic client; a `unique://` one cites the file
 by title alone. The reference in `_meta` always uses `unique://content/{id}` for a knowledge-base
 document. Unique AI shows the model only each referenced block's `_meta.text`, the passage itself,
