@@ -64,9 +64,16 @@ def _daily_price(*, bar: DailyPriceBar) -> DailyPrice | None:
 
 
 def _title(*, ticker: str, frequency: ResampleFrequency, prices: list[DailyPrice]) -> str:
-    """Such as `AAPL daily prices, 2026-11-02 to 2026-11-20`, from the dates Tiingo sent."""
+    """Such as `AAPL daily prices, 2026-11-02 to 2026-11-20`, from the dates Tiingo sent. Tiingo
+    dates a longer period by its last day: `AAPL weekly prices, periods ending 2026-11-06 to
+    2026-11-20`.
+    """
     name = f"{ticker} {frequency} prices"
     if not prices:
         return name
     first, last = prices[0].date, prices[-1].date
-    return f"{name}, {first}" if first == last else f"{name}, {first} to {last}"
+    dates = str(first) if first == last else f"{first} to {last}"
+    if frequency == "daily":
+        return f"{name}, {dates}"
+    ending = "period ending" if first == last else "periods ending"
+    return f"{name}, {ending} {dates}"
