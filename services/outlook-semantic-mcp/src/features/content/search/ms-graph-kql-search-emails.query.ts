@@ -231,9 +231,16 @@ export class MsGraphKqlSearchEmailsQuery {
       count === 1
         ? `1 email was withheld ${singular}. Its content cannot be shown here; the user can read it in Outlook.`
         : `${count} emails were withheld ${plural}. Their content cannot be shown here; the user can read them in Outlook.`;
-    const labels = unique(excluded.map(({ label }) => `"${label}"`))
-      .sort()
-      .join(', ');
+    const named = excluded.filter(({ configuredById }) => !configuredById);
+    const byId = excluded.filter(({ configuredById }) => configuredById);
+    const labels = [
+      ...unique(named.map(({ label }) => `"${label}"`)).sort(),
+      ...unique(byId.map(({ label }) => `label id ${label}`)).sort(),
+    ].join(', ');
+    const unnamed =
+      byId.length > 0
+        ? ' Labels shown by id are excluded by their id, so their names are not known.'
+        : '';
     return [
       ...(excluded.length > 0
         ? [
@@ -241,7 +248,7 @@ export class MsGraphKqlSearchEmailsQuery {
               excluded.length,
               `because of its sensitivity label (${labels})`,
               `because of their sensitivity labels (${labels})`,
-            ),
+            ) + unnamed,
           ]
         : []),
       ...(unreadable > 0

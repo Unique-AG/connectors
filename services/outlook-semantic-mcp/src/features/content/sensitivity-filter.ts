@@ -11,8 +11,9 @@ export enum SensitivityVerdict {
 
 export type SensitivityJudgement =
   | { verdict: SensitivityVerdict.Allowed }
-  // `label` is the matched label's name as Outlook shows it, or its id when Graph omits the name.
-  | { verdict: SensitivityVerdict.Excluded; label: string }
+  // `label` is the configured entry that matched, never text from the message, which its sender
+  // controls. An entry configured by id says nothing about the label's name.
+  | { verdict: SensitivityVerdict.Excluded; label: string; configuredById: boolean }
   | { verdict: SensitivityVerdict.Unreadable };
 
 const ALLOWED: SensitivityJudgement = { verdict: SensitivityVerdict.Allowed };
@@ -25,15 +26,20 @@ export class SensitivityFilter {
   public readonly isActive: boolean;
   public readonly expand =
     `singleValueExtendedProperties($filter=id eq '${PURVIEW_LABELS_PROPERTY}' or id eq '${LEGACY_SENSITIVITY_PROPERTY}')`;
-  private readonly excludedLabels: ReadonlySet<string>;
+  // Lower-cased entry → the entry as configured.
+  private readonly excludedLabels: ReadonlyMap<string, string>;
   private readonly excludedLegacy: ReadonlySet<LegacySensitivity>;
   private readonly excludesLabelNames: boolean;
 
   public constructor(@Inject(featuresConfig.KEY) features: FeaturesConfig) {
-    this.excludedLabels = features.sensitivityExclusions.labels;
+    this.excludedLabels = new Map(
+      [...features.sensitivityExclusions.labels].map((label) => [label.toLowerCase(), label]),
+    );
     this.excludedLegacy = features.sensitivityExclusions.legacy;
     this.isActive = this.excludedLabels.size > 0 || this.excludedLegacy.size > 0;
-    this.excludesLabelNames = [...this.excludedLabels].some((label) => !GUID_PATTERN.test(label));
+    this.excludesLabelNames = [...this.excludedLabels.keys()].some(
+      (label) => !GUID_PATTERN.test(label),
+    );
   }
 
   // Takes the message's `singleValueExtendedProperties` as Graph sent them, so one malformed
@@ -55,7 +61,11 @@ export class SensitivityFilter {
       return UNREADABLE;
     }
     if (legacy !== null && this.excludedLegacy.has(legacy)) {
-      return { verdict: SensitivityVerdict.Excluded, label: LEGACY_DISPLAY_NAMES[legacy] };
+      return {
+        verdict: SensitivityVerdict.Excluded,
+        label: LEGACY_DISPLAY_NAMES[legacy],
+        configuredById: false,
+      };
     }
 
     // Absent or empty means no label; present without a value cannot be read.
@@ -66,13 +76,16 @@ export class SensitivityFilter {
     if (!labels) {
       return UNREADABLE;
     }
-    const excluded = labels.find(
-      ({ id, name }) =>
-        this.excludedLabels.has(id) ||
-        (name !== undefined && this.excludedLabels.has(name.toLowerCase())),
-    );
-    if (excluded) {
-      return { verdict: SensitivityVerdict.Excluded, label: excluded.name ?? excluded.id };
+    // A name entry is preferred, so the agent can be told the label's name when one is configured.
+    const configured =
+      labels.map(({ name }) => this.excludedLabels.get(name?.toLowerCase() ?? '')).find(Boolean) ??
+      labels.map(({ id }) => this.excludedLabels.get(id)).find(Boolean);
+    if (configured) {
+      return {
+        verdict: SensitivityVerdict.Excluded,
+        label: configured,
+        configuredById: GUID_PATTERN.test(configured),
+      };
     }
     // Graph cuts the value at 255 characters in some responses, which can lose a label's name.
     if (this.excludesLabelNames && labels.some(({ name }) => name === undefined)) {

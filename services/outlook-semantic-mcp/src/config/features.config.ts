@@ -208,7 +208,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     offlineAccess: env.microsoftOfflineAccess,
     profileScopes: env.microsoftProfileScopes,
     sensitivityExclusions: {
-      labels: new Set(env.excludedSensitivityLabels.map((label) => label.toLowerCase())),
+      labels: new Set(env.excludedSensitivityLabels),
       legacy: new Set(env.excludedLegacySensitivity),
     },
   };

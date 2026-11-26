@@ -190,9 +190,11 @@ export class OpenEmailTool {
 
   private describeWithheld({ withheld }: WithheldEmail): string {
     const reason =
-      withheld.verdict === SensitivityVerdict.Excluded
-        ? `because of its sensitivity label "${withheld.label}"`
-        : 'because its sensitivity label could not be read';
+      withheld.verdict === SensitivityVerdict.Unreadable
+        ? 'because its sensitivity label could not be read'
+        : withheld.configuredById
+          ? `because of a sensitivity label excluded by its id (${withheld.label}); the label's name is not known, because the exclusion is configured by id`
+          : `because of its sensitivity label "${withheld.label}"`;
     return `This email is withheld ${reason}. Its content cannot be shown here; the user can read it in Outlook.`;
   }
 }

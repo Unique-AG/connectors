@@ -165,7 +165,7 @@ describe(loadFeaturesConfig.name, () => {
       });
     });
 
-    it('read Purview labels trimmed and lower-cased, and legacy flags', () => {
+    it('read Purview labels trimmed and as written, and legacy flags', () => {
       const config = load({
         ...READ_ONLY_ENV,
         EXCLUDED_SENSITIVITY_LABELS: JSON.stringify([
@@ -176,7 +176,7 @@ describe(loadFeaturesConfig.name, () => {
       });
 
       expect(config.sensitivityExclusions).toEqual({
-        labels: new Set(['highly confidential', '2d69afbc-f32c-424f-83ad-75460acd2aa1']),
+        labels: new Set(['Highly Confidential', '2D69AFBC-F32C-424F-83AD-75460ACD2AA1']),
         legacy: new Set([LegacySensitivity.Private, LegacySensitivity.Confidential]),
       });
     });

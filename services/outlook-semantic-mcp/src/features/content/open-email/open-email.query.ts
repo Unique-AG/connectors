@@ -63,7 +63,7 @@ export interface OpenEmailResult {
   chunks?: string;
 }
 
-// A message the sensitivity filter keeps from the agent. Nothing of its content is read.
+// A message the sensitivity filter withholds. Its content is not returned to the agent.
 export interface WithheldEmail {
   withheld: Exclude<SensitivityJudgement, { verdict: SensitivityVerdict.Allowed }>;
 }

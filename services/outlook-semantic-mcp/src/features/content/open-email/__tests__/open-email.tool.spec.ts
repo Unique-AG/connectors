@@ -95,7 +95,11 @@ describe('OpenEmailTool', () => {
 
   it('names the label of a message withheld for its sensitivity and points to Outlook', async () => {
     openEmailQuery.run.mockResolvedValue({
-      withheld: { verdict: SensitivityVerdict.Excluded, label: 'Confidential Encrypted' },
+      withheld: {
+        verdict: SensitivityVerdict.Excluded,
+        label: 'Confidential Encrypted',
+        configuredById: false,
+      },
     });
 
     const result = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
@@ -104,6 +108,24 @@ describe('OpenEmailTool', () => {
       success: false,
       message:
         'This email is withheld because of its sensitivity label "Confidential Encrypted". Its content cannot be shown here; the user can read it in Outlook.',
+    });
+  });
+
+  it('says the name of a label excluded by id is not known', async () => {
+    openEmailQuery.run.mockResolvedValue({
+      withheld: {
+        verdict: SensitivityVerdict.Excluded,
+        label: '2d69afbc-f32c-424f-83ad-75460acd2aa1',
+        configuredById: true,
+      },
+    });
+
+    const result = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
+
+    expect(result).toEqual({
+      success: false,
+      message:
+        "This email is withheld because of a sensitivity label excluded by its id (2d69afbc-f32c-424f-83ad-75460acd2aa1); the label's name is not known, because the exclusion is configured by id. Its content cannot be shown here; the user can read it in Outlook.",
     });
   });
 

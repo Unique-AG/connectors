@@ -275,7 +275,7 @@ describe('OpenEmailQuery', () => {
 
     beforeEach(() => {
       instance = createInstance({
-        labels: new Set(['confidential encrypted']),
+        labels: new Set(['Confidential Encrypted']),
         legacy: new Set([LegacySensitivity.Private]),
       });
     });
@@ -318,7 +318,26 @@ describe('OpenEmailQuery', () => {
       });
 
       await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
-        withheld: { verdict: SensitivityVerdict.Excluded, label: 'Confidential Encrypted' },
+        withheld: {
+          verdict: SensitivityVerdict.Excluded,
+          label: 'Confidential Encrypted',
+          configuredById: false,
+        },
+      });
+    });
+
+    it("returns the configured id, not the message's label name, for a label excluded by id", async () => {
+      instance = createInstance({ labels: new Set([LABEL_ID]), legacy: new Set() });
+      graphRequest.get.mockResolvedValue({
+        ...graphMessage,
+        singleValueExtendedProperties: [
+          { id: 'Integer 0x0036', value: '0' },
+          { id: PURVIEW, value: `MSIP_Label_${LABEL_ID}_Name=Any text the sender chose;` },
+        ],
+      });
+
+      await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
+        withheld: { verdict: SensitivityVerdict.Excluded, label: LABEL_ID, configuredById: true },
       });
     });
 
@@ -329,7 +348,7 @@ describe('OpenEmailQuery', () => {
       });
 
       await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
-        withheld: { verdict: SensitivityVerdict.Excluded, label: 'Private' },
+        withheld: { verdict: SensitivityVerdict.Excluded, label: 'Private', configuredById: false },
       });
     });
 
@@ -342,7 +361,7 @@ describe('OpenEmailQuery', () => {
         ],
       });
 
-      await expect(instance.run({ userProfileId: 'user-1', id: 'msg-1' })).resolves.toEqual({
+      await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
         withheld: { verdict: SensitivityVerdict.Unreadable },
       });
     });
@@ -350,7 +369,7 @@ describe('OpenEmailQuery', () => {
     it('withholds a message whose sensitivity properties are malformed', async () => {
       graphRequest.get.mockResolvedValue({ ...graphMessage, singleValueExtendedProperties: null });
 
-      await expect(instance.run({ userProfileId: 'user-1', id: 'msg-1' })).resolves.toEqual({
+      await expect(instance.run({ userProfileId: USER_PROFILE_ID, id: 'msg-1' })).resolves.toEqual({
         withheld: { verdict: SensitivityVerdict.Unreadable },
       });
     });

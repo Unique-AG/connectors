@@ -645,7 +645,7 @@ Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity i
 3 emails were withheld because of their sensitivity labels ("Confidential Encrypted", "Private"). Their content cannot be shown here; the user can read them in Outlook.
 ```
 
-`open_email` names the label in the same way. The note shows a label by the name Outlook shows, even when it is configured by id.
+`open_email` names the label in the same way. A label is shown as you wrote it in `labels`, never by the name the message carries, because the sender of a received message controls that text. A label you list by id is shown by its id, and the agent is told its name is not known. List a label by name if the agent should be able to name it to the user.
 
 ```yaml
 mcpConfig:
