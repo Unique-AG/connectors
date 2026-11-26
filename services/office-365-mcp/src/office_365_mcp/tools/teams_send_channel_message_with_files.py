@@ -14,6 +14,7 @@ from pydantic import Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.body_html import TEAMS_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.files import attachable_files, attachment_handles
 from office_365_mcp.shared.handles import MessageHandle
 from office_365_mcp.shared.seam import (
@@ -59,7 +60,7 @@ GRAPH_CALL_EXAMPLE: Mapping[str, object] = {
     "attachments": ["sharepoint:///files/b%21SYNTHETICDRIVE0000/01SYNTHETICFILE0000"],
 }
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Posts one new message as the signed-in user to an existing channel of a Teams team. The message \
 attaches one or more files that are already in SharePoint. With `reply_to_id`, this tool replies \
 in the thread of an existing post. The message can @mention people. The mentions come first, in \
@@ -75,6 +76,7 @@ nothing unless the user agrees.
 question is only a label. The message shows the same label.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 the channel does not already show the message.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

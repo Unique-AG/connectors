@@ -12,6 +12,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, ConfigDict, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import task_handle
 from office_365_mcp.shared.outlook.tasks import (
     AGAIN,
@@ -72,7 +73,7 @@ _NOT_HTTPS = (
     + f"{_NOTHING_ADDED} {AGAIN}"
 )
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Adds one link to a Microsoft To Do task of the signed-in user, given the `uri` of an \
 outlook_list_tasks row. A link opens an item that the task is about, such as the message that \
 the task came from. To Do and Outlook show the link on the task.
@@ -84,6 +85,7 @@ outlook_read_mail. This tool refuses every other kind of address.
 because they see the new link. A task in the user's own unshared list changes without a question.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 outlook_read_task does not show the new link.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

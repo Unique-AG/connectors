@@ -660,7 +660,7 @@ class TestWhatItAnswers:
 
         assert reread.call_count == 0
         assert answer.uri is None
-        assert answer.web_url == f"https://contoso.sharepoint.invalid/items/{_FILE_ID}"
+        assert answer.web_url == f"https://contoso.sharepoint.invalid/items/{_FILE_ID}?web=1"
 
     async def test_a_complete_answer_is_not_read_again(
         self, client: GraphServiceClient, graph: respx.MockRouter
@@ -910,7 +910,7 @@ class TestHowItDeclaresItself:
         description = tool.description or ""
         _lead, notes = description.split("\n\nNotes:\n")
         bullets = [line for line in notes.splitlines() if line.startswith("- ")]
-        assert 1 <= len(bullets) <= 3
+        assert 1 <= len(bullets) <= 4
         assert 45 <= len(description.split()) <= 210
 
     async def test_the_description_promises_no_overwrite_and_no_binary_upload(

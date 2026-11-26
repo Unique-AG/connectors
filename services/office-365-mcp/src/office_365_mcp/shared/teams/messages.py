@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Self, cast
+from urllib.parse import quote
 
 from kiota_abstractions.base_request_configuration import RequestConfiguration
 from kiota_abstractions.headers_collection import HeadersCollection
@@ -160,6 +161,15 @@ BODY_IS_PLAIN_TEXT_FIELD: str = (
 
 class TeamsMessage(BaseModel):
     uri: str = Field(description="The handle this message was read from.")
+    title: str | None = Field(
+        description=(
+            "A short label for this message, to name it when you cite it: its subject; else who "
+            + "sent it and how its text opens; else, when it has no text, the file name of its "
+            + "meeting recording, the name of its first attachment, or the name of its system "
+            + "event. This connector builds it, so read `body` for what the message says. Null "
+            + "for a deleted message, and when none of these exists."
+        )
+    )
     message_id: str = Field(description="The message's Graph id.")
     chat_id: str | None = Field(description="The chat this message is in, or null for channels.")
     team_id: str | None = Field(description="The team, for channel messages, or null for chats.")
@@ -201,7 +211,12 @@ class TeamsMessage(BaseModel):
         description="`normal`, `high` or `urgent`, as the sender marked it."
     )
     web_url: str | None = Field(
-        description="A link to open the message in Microsoft Teams, or null for chats."
+        description=(
+            "A link that opens the message in Microsoft Teams. Give it to the user when you "
+            + "answer from this message. Graph normally sends one. For a chat message it sends "
+            + "without one, this connector gives Teams' deep link to the message in its chat. "
+            + "Null when neither exists."
+        )
     )
     mentions: list[MessageMention] = Field(
         description="Everyone and everything this message @-mentions."
@@ -216,26 +231,40 @@ class TeamsMessage(BaseModel):
         mentions = message.mentions or []
         attachments = message.attachments or []
         body = None if message.deleted_date_time is not None else message.body
+        text = body.content if body is not None else None
+        plain_text = body is not None and text is not None and body.content_type == BodyType.Text
+        sender = MessageSender.from_identity(message.from_)
+        event = event_of(message)
+        recording = recording_of(message)
         return cls(
             uri=handle.uri,
+            title=None
+            if message.deleted_date_time is not None
+            else _message_title(
+                message.subject,
+                sender,
+                text,
+                recording.display_name if recording is not None else None,
+                next((name for item in attachments if (name := _present(item.name))), None),
+                event,
+                plain_text=plain_text,
+            ),
             message_id=message.id or handle.message_id,
             chat_id=handle.chat_id,
             team_id=handle.team_id,
             channel_id=handle.channel_id,
-            sender=MessageSender.from_identity(message.from_),
-            body=body.content if body is not None else None,
-            body_is_plain_text=body is not None
-            and body.content is not None
-            and body.content_type == BodyType.Text,
-            event=event_of(message),
-            recording=recording_of(message),
+            sender=sender,
+            body=text,
+            body_is_plain_text=plain_text,
+            event=event,
+            recording=recording,
             created_at=message.created_date_time,
             last_edited_at=message.last_edited_date_time,
             deleted_at=message.deleted_date_time,
             reply_to_id=message.reply_to_id or handle.reply_to_id,
             subject=message.subject,
             importance=message.importance,
-            web_url=message.web_url,
+            web_url=message.web_url or _chat_message_link(handle),
             mentions=[MessageMention.from_mention(mention) for mention in mentions],
             attachments=[
                 MessageAttachment.from_attachment(attachment) for attachment in attachments
@@ -244,6 +273,53 @@ class TeamsMessage(BaseModel):
                 MessageReaction.from_reaction(reaction) for reaction in (message.reactions or [])
             ],
         )
+
+
+def _message_title(
+    subject: str | None,
+    sender: MessageSender | None,
+    body: str | None,
+    recording: str | None,
+    attachment: str | None,
+    event: str | None,
+    *,
+    plain_text: bool,
+) -> str | None:
+    if subject is not None and subject.strip():
+        return subject.strip()
+    who = sender.display_name if sender is not None else None
+    opening = _body_opening(body, plain_text=plain_text) if body is not None else None
+    what = opening or recording or attachment or event
+    if who and what:
+        return f"{who}: {what}"
+    return who or what or None
+
+
+def _body_opening(body: str, *, plain_text: bool) -> str:
+    if plain_text:
+        return cut_for_a_question(" ".join(body.split()))
+    return body_opening(_A_QUOTED_REPLY.sub(" ", body))
+
+
+# Teams puts the message a reply quotes in a blockquote of this type, ahead of the reply's own text.
+_A_QUOTED_REPLY = re.compile(
+    r"<blockquote\b[^<>]*itemtype=[\"']http://schema\.skype\.com/Reply[\"'][^<>]*>.*?</blockquote\s*>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+# The documented deep link to a chat message:
+# https://learn.microsoft.com/en-us/microsoftteams/platform/concepts/build-and-test/deep-link-teams
+_CHAT_CONTEXT = quote('{"contextType":"chat"}', safe="")
+
+
+def _chat_message_link(handle: MessageHandle) -> str | None:
+    if handle.chat_id is None:
+        return None
+    return (
+        f"https://teams.microsoft.com/l/message/{quote(handle.chat_id, safe=':@')}/"
+        + f"{quote(handle.message_id, safe='')}?context={_CHAT_CONTEXT}"
+    )
 
 
 STEP_CHAT_MESSAGE = "chat_message"

@@ -28,6 +28,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
     OnenoteOwner,
@@ -100,7 +101,11 @@ _MIN_NAME_FRAGMENT_CHARACTERS = 1
 
 _Role = Literal["Owner", "Contributor", "Reader"]
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source(
+    "notebooks and their sections", cite="the page you read with onenote_read_page"
+)
+
+_DESCRIPTION = f"""\
 Lists every notebook the signed-in user owns or that somebody else shares with them, with every \
 section of each. This is the starting point for OneNote: notebook and section handles come from \
 here. A section group appears only through a section's `group_uri`. onenote_list_sections lists \
@@ -109,6 +114,7 @@ instead. Pass `site` to list the notebooks of one SharePoint site instead.
 
 Notes:
 - `capped` true means a safety cap cut the listing short.
+- {_NOT_A_SOURCE}
 """
 
 

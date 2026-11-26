@@ -940,6 +940,7 @@ class TestTheToolsThisServerAdvertises:
         }
         assert set(_properties(tools["teams_read_message"].output_schema)) == {
             "uri",
+            "title",
             "message_id",
             "chat_id",
             "team_id",
@@ -2023,6 +2024,19 @@ class TestCallingThem:
         }
         assert len(graph.calls) == 1, "the server never opens the link"
 
+    @pytest.mark.usefixtures("obo")
+    async def test_a_saved_call_recording_event_is_named_by_its_recording(
+        self,
+        mcp_client: Client[FastMCPTransport],
+        graph: respx.MockRouter,
+    ) -> None:
+        event = _recording_event("success", _RECORDING_LINK)
+        _ = graph.get(_MESSAGE_PATH).mock(return_value=httpx.Response(200, json=event))
+
+        result = await mcp_client.call_tool("teams_read_message", {"uri": _MESSAGE_URI})
+
+        assert _structured(result)["title"] == "Weekly sync-20261124_101500-Meeting Recording.mp4"
+
     @pytest.mark.parametrize(
         ("status", "url"),
         [("initial", None), ("chunkFinished", ""), ("chunkFinished", _RECORDING_LINK)],
@@ -2043,6 +2057,7 @@ class TestCallingThem:
         body = _structured(result)
         assert body["event"] == "call recording"
         assert body["recording"] is None
+        assert body["title"] == "call recording"
 
     @pytest.mark.usefixtures("obo")
     async def test_a_message_that_is_no_recording_event_has_no_recording(

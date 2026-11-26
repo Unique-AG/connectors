@@ -15,6 +15,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
 TOOL_NAME = "sharepoint_search_sites"
@@ -32,7 +33,9 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Sites.Read.All",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {"query": "finance"}
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source("sites", cite="the file you read with sharepoint_read_file")
+
+_DESCRIPTION = f"""\
 Finds SharePoint sites by free text, for the signed-in user. Each row has the `web_url` of one \
 site, with its `display_name` and its `description`. If this deployment exposes \
 sharepoint_search_files, pass `web_url` as `path` to it to search only this site. This tool finds \
@@ -41,6 +44,7 @@ or folders.
 
 Notes:
 - This tool does not sort the rows.
+- {_NOT_A_SOURCE}
 """
 
 

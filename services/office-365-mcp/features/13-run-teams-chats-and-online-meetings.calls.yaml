@@ -411,7 +411,7 @@ uc-13-23:
     - tool: teams_create_chat
       args: {chat_type: group}
       uses: {topic: the title that Mia gave, members: user id and name of Anna and Tom from the member rows}
-  note: "The argument rules refuse the title before the tool runs and before any question to Mia. Expected behaviour from src/office_365_mcp/tools/teams_create_chat.py:257-268 and src/office_365_mcp/shared/teams/messages.py:330-332: the topic has at most 250 characters and must not contain a colon. Row 1 breaks the colon rule, and row 2 is one character above the limit."
+  note: "The argument rules refuse the title before the tool runs and before any question to Mia. Expected behaviour from src/office_365_mcp/tools/teams_create_chat.py:257-268 and src/office_365_mcp/shared/teams/messages.py:445-447: the topic has at most 250 characters and must not contain a colon. Row 1 breaks the colon rule, and row 2 is one character above the limit."
 
 uc-13-24:
   status: working
@@ -426,7 +426,7 @@ uc-13-24:
     - tool: teams_create_chat
       args: {chat_type: group}
       uses: {topic: the title of 250 characters, members: user id and name of Anna and Tom from the member rows}
-  note: "Expected behaviour from src/office_365_mcp/shared/teams/messages.py:335 and src/office_365_mcp/tools/teams_create_chat.py:329: the limit is 250 characters, so a title of exactly 250 characters is accepted."
+  note: "Expected behaviour from src/office_365_mcp/shared/teams/messages.py:445 and src/office_365_mcp/tools/teams_create_chat.py:329: the limit is 250 characters, so a title of exactly 250 characters is accepted."
 
 uc-13-25:
   status: working
@@ -529,7 +529,7 @@ uc-13-31:
   asks_user: true
   chain:
     - any_of: [teams_create_chat, teams_add_chat_member, teams_remove_chat_member, teams_rename_chat, teams_create_meeting, teams_update_meeting, teams_delete_meeting]
-  note: "Mia declines the question. Rows 1 to 7 are teams_create_chat, teams_add_chat_member, teams_remove_chat_member, teams_rename_chat, teams_create_meeting, teams_update_meeting, teams_delete_meeting. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:73-78: nothing was changed, and the assistant says that the request was not confirmed. The tool words are No chat was created (src/office_365_mcp/tools/teams_create_chat.py:53), Nobody was added (teams_add_chat_member.py:47), Nobody was removed (teams_remove_chat_member.py:49), Nothing was renamed (teams_rename_chat.py:41), No meeting was created (teams_create_meeting.py:58), No meeting was changed (teams_update_meeting.py:58), No meeting was deleted (teams_delete_meeting.py:50)."
+  note: "Mia declines the question. Rows 1 to 7 are teams_create_chat, teams_add_chat_member, teams_remove_chat_member, teams_rename_chat, teams_create_meeting, teams_update_meeting, teams_delete_meeting. Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:73-78: nothing was changed, and the assistant says that the request was not confirmed. The tool words are No chat was created (src/office_365_mcp/tools/teams_create_chat.py:53), Nobody was added (teams_add_chat_member.py:47), Nobody was removed (teams_remove_chat_member.py:49), Nothing was renamed (teams_rename_chat.py:41), No meeting was created (teams_create_meeting.py:59), No meeting was changed (teams_update_meeting.py:58), No meeting was deleted (teams_delete_meeting.py:50)."
 
 uc-13-32:
   status: working
@@ -561,7 +561,7 @@ uc-13-33:
   asks_user: true
   chain:
     - any_of: [teams_create_chat, teams_add_chat_member, teams_remove_chat_member, teams_rename_chat, teams_create_meeting, teams_update_meeting, teams_delete_meeting]
-  note: "Rows 1 to 7 name the tools in the order of uc-13-31. Every tool binds the answer to its arguments: the chat type, the people and the title (src/office_365_mcp/tools/teams_create_chat.py:199-200), the chat, the person and the choice about the earlier messages (teams_add_chat_member.py:133-134), the chat and the membership (teams_remove_chat_member.py:138-139), the chat and the title (teams_rename_chat.py:96-97), the subject, the time and the attendees (teams_create_meeting.py:185), the same fields of a change (teams_update_meeting.py:232-242), and the meeting (teams_delete_meeting.py:125). Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:81-86 and :118: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (shared/seam/elicitation.py:45-47)."
+  note: "Rows 1 to 7 name the tools in the order of uc-13-31. Every tool binds the answer to its arguments: the chat type, the people and the title (src/office_365_mcp/tools/teams_create_chat.py:199-200), the chat, the person and the choice about the earlier messages (teams_add_chat_member.py:133-134), the chat and the membership (teams_remove_chat_member.py:138-139), the chat and the title (teams_rename_chat.py:96-97), the subject, the time and the attendees (teams_create_meeting.py:187), the same fields of a change (teams_update_meeting.py:232-242), and the meeting (teams_delete_meeting.py:125). Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:81-86 and :118: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (shared/seam/elicitation.py:45-47)."
 
 uc-13-34:
   status: working
@@ -720,7 +720,7 @@ uc-13-50:
       args: {chat_type: group}
     - tool: teams_add_chat_member
       uses: {chat_id: id of the chat, member: user id and name of Priya from her chat}
-  note: "Expected behaviour from src/office_365_mcp/shared/teams/messages.py:628: a chat with no topic is named by the display names of its members."
+  note: "Expected behaviour from src/office_365_mcp/shared/teams/messages.py:723-733: a chat with no topic is named by the display names of its members."
 
 uc-13-47:
   deferred:

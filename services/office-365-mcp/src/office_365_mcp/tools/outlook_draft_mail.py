@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry
 from office_365_mcp.shared.addresses import repeated_address
 from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import MailMessageHandle
 from office_365_mcp.shared.mail import (
     AddressFault,
@@ -67,7 +68,7 @@ _AGREE = "create the draft"
 _DECLINE = "do not create the draft"
 _NOTHING_CREATED = "No draft was created."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates one new message in Drafts, for the user to review. The draft goes into the signed-in \
 user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send mail. \
 outlook_draft_reply is the tool for a reply to, or a forward of, a message that exists.
@@ -80,6 +81,7 @@ file, tell them to add it in Outlook before they send the draft. Never put file 
 in the body.
 - This tool asks the user to agree before it changes a shared or delegated mailbox. It changes \
 the user's own mailbox without a question.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

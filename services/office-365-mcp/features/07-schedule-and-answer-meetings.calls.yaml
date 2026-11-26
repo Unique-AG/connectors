@@ -128,7 +128,7 @@ uc-07-08:
   chain:
     - tool: outlook_create_event
       args: {subject: Board prep, starts_at: Monday 10:00, ends_at: Monday 11:00, time_zone: Europe/Zurich, attendees: []}
-  note: "the workaround creates the event with an empty `attendees` list and the required `time_zone` (tools/outlook_create_event.py:629-662), and it asks nothing, because the tool asks only for an event with an attendee, a room, or a location (:135-137). Adding the attendees is a separate later request, after Mia finishes: outlook_update_event with `attendees` and `optional_attendees` together (tools/outlook_update_event.py:167-174 and :441-445 refuse one list alone), and that call asks Mia (:118-121). The update is not a step of this chain."
+  note: "the workaround creates the event with an empty `attendees` list and the required `time_zone` (tools/outlook_create_event.py:631-664), and it asks nothing, because the tool asks only for an event with an attendee, a room, or a location (:135-137). Adding the attendees is a separate later request, after Mia finishes: outlook_update_event with `attendees` and `optional_attendees` together (tools/outlook_update_event.py:169-176 and :443-447 refuse one list alone), and that call asks Mia (:118-121). The update is not a step of this chain."
 
 uc-07-09:
   status: working
@@ -301,7 +301,7 @@ uc-07-21:
       optional: true
     - tool: outlook_create_event
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna and Tom}
-  note: "expected behaviour from shared/seam/advice.py, one row each. Sign-in expired, :251-256: ask the user to sign in to this connector again. No access, :261-270: ask a Microsoft 365 administrator to grant the permission, retrying will not help. Busy with a wait of 30 seconds, :240-244: retry after that, not sooner. Rejected booking, :312-317: a bad request that fails the same way again, with the reason of Microsoft. For a rejected zone name after Mia agreed, see the time_zone description of tools/outlook_create_event.py:636-649."
+  note: "expected behaviour from shared/seam/advice.py, one row each. Sign-in expired, :251-256: ask the user to sign in to this connector again. No access, :261-270: ask a Microsoft 365 administrator to grant the permission, retrying will not help. Busy with a wait of 30 seconds, :240-244: retry after that, not sooner. Rejected booking, :312-317: a bad request that fails the same way again, with the reason of Microsoft. For a rejected zone name after Mia agreed, see the time_zone description of tools/outlook_create_event.py:638-651."
 
 uc-07-22:
   status: working
@@ -324,7 +324,7 @@ uc-07-22:
       bind: {starts_on: "2026-11-02", ends_on: "2026-11-03"}
       expect:
         result: {events: []}
-  note: "expected behaviour from shared/seam/advice.py:182-201 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (CHANGE_SHOWN_BY in tools/outlook_create_event.py). The same advice is chosen at shared/seam/advice.py:279-281 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Launch review. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:429), but the advice does not rely on it. The write is not repeated by the SDK (graph_client/client.py:220-232)."
+  note: "expected behaviour from shared/seam/advice.py:182-201 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (CHANGE_SHOWN_BY in tools/outlook_create_event.py). The same advice is chosen at shared/seam/advice.py:279-281 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Launch review. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:438), but the advice does not rely on it. The write is not repeated by the SDK (graph_client/client.py:220-232)."
   variants:
     fails:
       fixture: uc-07-22
@@ -344,7 +344,7 @@ uc-07-23:
     - tool: outlook_create_event
       optional: true
       args: {subject: Launch review, starts_at: Monday 15:00, ends_at: Monday 14:00, attendees: Anna}
-  note: "expected behaviour from tools/outlook_create_event.py:170-178 _ENDS_BEFORE_IT_STARTS: no event is created and nobody is invited, check which of the two times the user meant, and mind that a meeting past midnight ends on the next day. The call is optional, because Mia states 15:00 to 14:00 and an assistant that asks her first never makes it."
+  note: "expected behaviour from tools/outlook_create_event.py:172-180 _ENDS_BEFORE_IT_STARTS: no event is created and nobody is invited, check which of the two times the user meant, and mind that a meeting past midnight ends on the next day. The call is optional, because Mia states 15:00 to 14:00 and an assistant that asks her first never makes it."
 
 uc-07-24:
   status: working
@@ -359,7 +359,7 @@ uc-07-24:
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna, online_meeting: true}
     - tool: outlook_create_event
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna, online_meeting: false}
-  note: "expected behaviour from tools/outlook_create_event.py:233-242 _no_teams_meeting: no event is created, this is a property of the calendar, call again with online_meeting off and tell the user the event carries no joining link. The first call refuses before it asks Mia, the second call asks."
+  note: "expected behaviour from tools/outlook_create_event.py:235-244 _no_teams_meeting: no event is created, this is a property of the calendar, call again with online_meeting off and tell the user the event carries no joining link. The first call refuses before it asks Mia, the second call asks."
 
 uc-07-25:
   status: working
@@ -439,7 +439,7 @@ uc-07-30:
     - tool: outlook_list_events
       optional: true
     - any_of: [outlook_create_event, outlook_respond_to_invite, outlook_cancel_event, outlook_update_event, outlook_forward_event, outlook_delete_event]
-  note: "expected behaviour from shared/seam/elicitation.py:81-86 _another_request, reached from :118-119 when the answer carries the state of another question: the agreement does not cover this request, nothing was changed, ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that hands the question back to the client (shared/seam/elicitation.py:103-125). Each tool binds the answer to its own details: create_event to its transaction id (tools/outlook_create_event.py:429), the others through confirmation_id_for."
+  note: "expected behaviour from shared/seam/elicitation.py:81-86 _another_request, reached from :118-119 when the answer carries the state of another question: the agreement does not cover this request, nothing was changed, ask the user again and call the tool with exactly what they confirm. The check runs only on a connection that hands the question back to the client (shared/seam/elicitation.py:103-125). Each tool binds the answer to its own details: create_event to its transaction id (tools/outlook_create_event.py:438), the others through confirmation_id_for."
 
 uc-07-31:
   status: working
@@ -468,7 +468,7 @@ uc-07-32:
   chain:
     - tool: outlook_create_event
       args: {subject: Launch review, starts_at: Monday 14:00, ends_at: Monday 14:30, attendees: Anna and Tom}
-  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The create runs with no_retry (tools/outlook_create_event.py:445), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the event exists. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:429), which protects a repeat only if Microsoft honours it, and no source states what it does."
+  note: "expected behaviour from graph_client/errors.py:293-303 and shared/seam/advice.py:245-249: a 503 or a 504 with a wait time is classified as throttling and gets the text to retry after that time, also on a write. The create runs with no_retry (tools/outlook_create_event.py:452), and graph_client/client.py:220-231 says that such a 503 can arrive after Microsoft did the change. So the text does not say whether the event exists. The create sends a transaction id that is the same for the same details (tools/outlook_create_event.py:438), which protects a repeat only if Microsoft honours it, and no source states what it does."
 
 uc-07-33:
   status: working
@@ -603,7 +603,7 @@ uc-07-41:
       uses: {uri: uri of the event from the listing}
     - tool: outlook_list_events
       args: {subject_contains: Launch review}
-  note: "expected behaviour from tools/outlook_update_event.py:93-99 GRAPH_NOT_FOUND: nothing was changed, Microsoft gives one 404 for deleted, moved to another calendar, and not visible, retrying will not help, call outlook_list_events again and read the new handle if the event should still exist. The tool reads the event before it asks Mia (tools/outlook_update_event.py:371-406), so the refusal needs no approval. The scenario is one possible cause of the failed call in prod, which the logs do not show."
+  note: "expected behaviour from tools/outlook_update_event.py:94-100 GRAPH_NOT_FOUND: nothing was changed, Microsoft gives one 404 for deleted, moved to another calendar, and not visible, retrying will not help, call outlook_list_events again and read the new handle if the event should still exist. The tool reads the event before it asks Mia (tools/outlook_update_event.py:373-408), so the refusal needs no approval. The scenario is one possible cause of the failed call in prod, which the logs do not show."
 
 uc-07-42:
   status: working
@@ -661,7 +661,7 @@ uc-07-45:
       optional: true
     - tool: outlook_create_event
       args: {subject: Launch review, starts_at: Monday 15:00, ends_at: Monday 15:30, attendees: Priya}
-  note: "tools/outlook_create_event.py:636-649 time_zone: the zone is required with no default, take it from where the user said the meeting is, and Microsoft accepts every Windows zone name and a fixed list of IANA names. tools/outlook_list_time_zones.py:43-57: the tool lists the zone names that the mailbox server supports, with the Windows names as the default. The listing is optional, because an assistant that knows a name that Microsoft accepts needs no listing."
+  note: "tools/outlook_create_event.py:638-651 time_zone: the zone is required with no default, take it from where the user said the meeting is, and Microsoft accepts every Windows zone name and a fixed list of IANA names. tools/outlook_list_time_zones.py:43-57: the tool lists the zone names that the mailbox server supports, with the Windows names as the default. The listing is optional, because an assistant that knows a name that Microsoft accepts needs no listing."
 
 uc-07-46:
   status: working
@@ -672,7 +672,7 @@ uc-07-46:
   chain:
     - tool: outlook_list_time_zones
   must_not: [outlook_create_event]
-  note: "model behaviour, no code guard (source: tools/outlook_list_time_zones.py:55-56, find the row that matches the place that the user named and do not guess a zone name; and tools/outlook_create_event.py:637-640, a wrong guess puts the meeting hours off in every attendee calendar, ask the user)."
+  note: "model behaviour, no code guard (source: tools/outlook_list_time_zones.py:55-56, find the row that matches the place that the user named and do not guess a zone name; and tools/outlook_create_event.py:639-642, a wrong guess puts the meeting hours off in every attendee calendar, ask the user)."
 
 uc-07-47:
   status: working
@@ -708,7 +708,7 @@ uc-07-49:
     - tool: outlook_list_events
     - tool: outlook_cancel_event
       uses: {uri: uri of the event from the listing}
-  note: "expected behaviour from tools/outlook_cancel_event.py:86, tools/outlook_delete_event.py:80, tools/outlook_forward_event.py:80, tools/outlook_respond_to_invite.py:99 and tools/outlook_update_event.py:128: a subject line is not a handle, so the tool does nothing, asks nobody, and names the tool that gives the link."
+  note: "expected behaviour from tools/outlook_cancel_event.py:86, tools/outlook_delete_event.py:80, tools/outlook_forward_event.py:80, tools/outlook_respond_to_invite.py:99 and tools/outlook_update_event.py:130: a subject line is not a handle, so the tool does nothing, asks nobody, and names the tool that gives the link."
 
 uc-07-50:
   status: working
@@ -720,7 +720,7 @@ uc-07-50:
   chain:
     - any_of: [outlook_create_event, outlook_create_event_on_behalf]
   must_not: [outlook_forward_event]
-  note: "expected behaviour from tools/outlook_create_event.py:147-242, tools/outlook_create_event_on_behalf.py:167-247 and shared/calendar.py:969-1005 recurrence_refusal: each fault is refused before Microsoft is asked, no meeting is created, nobody is invited, and the text names the argument to correct."
+  note: "expected behaviour from tools/outlook_create_event.py:149-244, tools/outlook_create_event_on_behalf.py:169-249 and shared/calendar.py:969-1005 recurrence_refusal: each fault is refused before Microsoft is asked, no meeting is created, nobody is invited, and the text names the argument to correct."
 
 uc-07-51:
   status: working
@@ -744,7 +744,7 @@ uc-07-52:
   asks_user: true
   chain:
     - any_of: [outlook_create_event, outlook_create_event_on_behalf]
-  note: "tools/outlook_create_event.py:537-542 and tools/outlook_create_event_on_behalf.py:537-557: with no person the question says that no person is invited and that Microsoft sends the request to the mailbox of the room. The second test shows that a calendar with no named owner is called the person who owns that calendar."
+  note: "tools/outlook_create_event.py:539-544 and tools/outlook_create_event_on_behalf.py:539-559: with no person the question says that no person is invited and that Microsoft sends the request to the mailbox of the room. The second test shows that a calendar with no named owner is called the person who owns that calendar."
 
 uc-07-53:
   status: working
@@ -782,7 +782,7 @@ uc-07-55:
     - tool: outlook_list_events
     - tool: outlook_update_event
       uses: {uri: uri of the event from the listing}
-  note: "expected behaviour from tools/outlook_update_event.py:144-223 and :430-483: each fault is refused before Microsoft is asked, nothing is changed, and the text names the argument to correct."
+  note: "expected behaviour from tools/outlook_update_event.py:146-225 and :432-485: each fault is refused before Microsoft is asked, nothing is changed, and the text names the argument to correct."
 
 uc-07-56:
   status: working
@@ -797,7 +797,7 @@ uc-07-56:
       optional: true
     - tool: outlook_update_event
       args: {online_meeting: true}
-  note: "expected behaviour from tools/outlook_update_event.py:234-274 and :497-510 _refusal: Microsoft can turn a Teams meeting off when a body drops its joining text, so the new body must keep the stored body, and the tool quotes the stored body when it is short enough."
+  note: "expected behaviour from tools/outlook_update_event.py:236-276 and :499-512 _refusal: Microsoft can turn a Teams meeting off when a body drops its joining text, so the new body must keep the stored body, and the tool quotes the stored body when it is short enough."
 
 uc-07-57:
   status: working
@@ -846,7 +846,7 @@ uc-07-60:
   chain:
     - tool: outlook_update_event
       args: {body_html: the stored body and a new line}
-  note: "tools/outlook_update_event.py:520-528 _kept: the new body is accepted when it holds all of the stored body, with spaces counted as one."
+  note: "tools/outlook_update_event.py:522-530 _kept: the new body is accepted when it holds all of the stored body, with spaces counted as one."
 
 uc-07-61:
   status: working

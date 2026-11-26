@@ -20,6 +20,7 @@ from office_365_mcp.graph_client import (
     request_with_query,
     send_parsed,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
@@ -81,7 +82,7 @@ _NOTHING_CREATED = "No file was created."
 
 _EVERY_TEXT_EXTENSION = ", ".join(f"`.{extension}`" for extension in TEXT_EXTENSIONS)
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 This tool creates one new text file in a OneDrive or SharePoint folder where the signed-in user \
 has write access. It cannot replace a file or upload a binary file. To replace a file, or to save \
 a mail \
@@ -95,6 +96,7 @@ Notes:
 - If a file named `name` is already there, Microsoft refuses and creates nothing.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 sharepoint_browse_folder does not show a file named `name`.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_FOLDER_HANDLE = (
