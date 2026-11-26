@@ -142,8 +142,8 @@ class InvestorResponse(OmitNoneModel):
         default=None,
         description=(
             "Canonical CRM UI URL for this investor (no tab). Omitted when this deployment has "
-            "no UI origin, or when `resource_type` is `contacts` and so names no page. Echo "
-            "it; never invent one."
+            "no UI origin, or when `resource_type` is not `organizations` or `people` and so "
+            "names no page. Echo it; never invent one."
         ),
     )
     has_open_account: bool = Field(
