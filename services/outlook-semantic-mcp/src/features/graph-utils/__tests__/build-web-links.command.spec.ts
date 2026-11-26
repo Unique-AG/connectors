@@ -42,6 +42,25 @@ describe('BuildWebLinksCommand', () => {
     expect(translateQuery.run).not.toHaveBeenCalled();
   });
 
+  it('treats a mailbox that differs from the user email only in case as the own mailbox', async () => {
+    const { command, translateQuery } = makeCommand();
+    const result = await command.run({
+      userProfileId: USER_PROFILE_ID,
+      userProfileEmail: OWN_EMAIL,
+      ids: [
+        {
+          id: 'msg-1',
+          isImmutable: true,
+          mailbox: 'User@Example.com',
+          webLink: 'https://outlook.test/own',
+        },
+      ],
+    });
+
+    expect(result.get('User@Example.com', 'msg-1')).toBe('https://outlook.test/own');
+    expect(translateQuery.run).not.toHaveBeenCalled();
+  });
+
   it('builds OWA URL from translated RestId for delegated immutable IDs', async () => {
     const { command } = makeCommand(new Map([['immutable-1', 'rest-1']]));
     const result = await command.run({
