@@ -360,6 +360,30 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
                 },
             },
         )
+    if path.endswith("/references/records/e_4"):
+        return _json(
+            200,
+            {
+                "entityType": "INDIVIDUAL",
+                "referenceId": "e_4",
+                "names": {
+                    "nameDetails": [
+                        {
+                            "type": "AKA",
+                            "details": [{"type": "FULL_NAME", "value": "Queen of Code"}],
+                        },
+                        {
+                            "type": "PRIMARY",
+                            "details": [
+                                {"type": "FIRST_NAME", "value": "Grace"},
+                                {"type": "LAST_NAME", "value": "Hopper"},
+                            ],
+                        },
+                    ]
+                },
+                "sources": [],
+            },
+        )
     if path.endswith("/references/countries"):
         return _json(200, {"GBR": "United Kingdom"})
     if path.endswith("/references/nationalities"):
@@ -902,6 +926,15 @@ async def test_get_profile_has_no_link_when_lseg_cites_no_source_page() -> None:
     assert profile is not None
     assert profile["name"] == "Grace Hopper"
     assert profile["url"] is None
+
+
+async def test_get_profile_prefers_a_primary_name_part_to_an_aka_full_name() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_4"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["name"] == "Grace"
 
 
 async def test_get_profile_links_a_source_page_whose_scheme_is_uppercase() -> None:
