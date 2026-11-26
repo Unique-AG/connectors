@@ -1,5 +1,17 @@
 # Changelog
 
+## [5.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.3...outlook-semantic-mcp@5.1.0) (2026-11-26)
+
+
+### Features
+
+* **outlook-semantic-mcp:** keep a failed delegate's access records and rerun only unfinished delegates ([#1867](https://github.com/Unique-AG/connectors/issues/1867)) ([3ae8f9e](https://github.com/Unique-AG/connectors/commit/3ae8f9e4b05b43246879797298fa34763bfb423f))
+
+
+### Bug Fixes
+
+* **mcp-oauth,outlook-semantic-mcp:** share one Microsoft token refresh per user and back off after transient failures ([#1866](https://github.com/Unique-AG/connectors/issues/1866)) ([999636f](https://github.com/Unique-AG/connectors/commit/999636f661350e29111d74fa27660b76d0c9f6e0))
+
 ## [5.0.3](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.2...outlook-semantic-mcp@5.0.3) (2026-11-23)
 
 
