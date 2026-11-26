@@ -61,7 +61,7 @@ const OpenEmailByIdInputSchema = z.object({
 
 export const EmailDataSchema = z.object({
   id: z.string(),
-  title: z.string().nullable(),
+  title: z.string().describe(`Subject of the email, or "${NO_SUBJECT}" when it has none.`),
   metadata: z.unknown().nullable(),
   text: z
     .string()
@@ -152,7 +152,7 @@ export class OpenEmailTool {
         outputTimeZone: outputTimeZone,
       });
       // A top-level title makes Unique cite the email, which it should only do with a link to open.
-      const title = webLink === null ? undefined : emailData.title || NO_SUBJECT;
+      const title = webLink === null ? undefined : emailData.title;
       return { success: true, title, webLink, emailData };
     } catch (err) {
       // 404: deleted or moved in Outlook since it was indexed. 400: an id Graph does not accept,

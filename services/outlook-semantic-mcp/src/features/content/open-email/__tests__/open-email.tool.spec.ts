@@ -63,22 +63,6 @@ describe('OpenEmailTool', () => {
     });
   });
 
-  it('titles an email without a subject "(no subject)"', async () => {
-    const webLink = 'https://outlook.office365.com/owa/?ItemID=AAMk2&exvsurl=1';
-    openEmailQuery.run.mockResolvedValue({
-      id: 'msg-2',
-      title: null,
-      webLink,
-      metadata: null,
-      text: 'Hi',
-      bodyContentType: 'text',
-    });
-
-    const result = await tool.openEmailById({ id: 'msg-2' }, context, request);
-
-    expect(result).toMatchObject({ success: true, title: '(no subject)', webLink });
-  });
-
   it('leaves out the top-level title when the email has no web link', async () => {
     openEmailQuery.run.mockResolvedValue({
       id: 'msg-3',

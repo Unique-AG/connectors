@@ -54,6 +54,14 @@ describe('OpenEmailQuery', () => {
     expect(result.metadata).not.toHaveProperty('webLink');
   });
 
+  it.each([null, '', '   '])('titles an email with subject %j "(no subject)"', async (subject) => {
+    graphRequest.get.mockResolvedValue({ ...graphMessage, subject });
+
+    const result = await run();
+
+    expect(result.title).toBe('(no subject)');
+  });
+
   it('builds the classic Outlook web link of a shared-mailbox message from its RestId', async () => {
     graphRequest.get.mockResolvedValue({ ...graphMessage, id: 'AAk-msg', webLink: GRAPH_WEB_LINK });
     translateImmutableIdsToRestIds.run.mockResolvedValue(new Map([['AAk-msg', 'AAMk/rest=']]));

@@ -11,6 +11,7 @@ import { InjectUniqueApi } from '~/unique/unique-api.module';
 import { concatChunks } from '~/utils/concat-chunks';
 import { convertDateTimeToTimezone } from '~/utils/convert-datetime-to-timezone';
 import { UserProfileTypeID } from '~/utils/convert-user-profile-id-to-type-id';
+import { subjectOrFallback } from '~/utils/no-subject';
 import { Nullish } from '~/utils/nullish';
 
 const recipientSchema = z.object({
@@ -44,7 +45,7 @@ const graphMessageSchema = z.object({
 
 export interface OpenEmailResult {
   id: string;
-  title: string | null;
+  title: string;
   webLink: string | null;
   metadata: {
     from: Nullish<string>;
@@ -149,7 +150,7 @@ export class OpenEmailQuery {
 
     return {
       id: message.id,
-      title: message.subject ?? null,
+      title: subjectOrFallback(message.subject),
       webLink: await this.buildWebLink({
         userProfileId,
         messageId: message.id,

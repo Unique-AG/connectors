@@ -364,7 +364,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
   webLink?: string | null;     // opens the email in Outlook on the web; null when no link could be built
   emailData?: {
     id: string;
-    title: string | null;
+    title: string;             // email subject, or "(no subject)"
     metadata: unknown | null;  // includes isDraft and attachments (name, size, isInline)
     text: string;              // live body. Plain text, or HTML when bodyContentType is "html"
     bodyContentType: "text" | "html";
