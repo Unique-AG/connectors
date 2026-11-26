@@ -121,6 +121,55 @@ class TestStatus:
         assert result.mandates[0].awarded_to == "Example Macro Fund"
 
 
+class TestCitation:
+    @respx.mock
+    async def test_titles_a_mandate_by_its_service_and_strategies(self) -> None:
+        _mock([OPEN_SEARCH])
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        mandate = result.mandates[0]
+        assert mandate.title == "Manager Search: Equity, Long/Short Equity"
+        assert mandate.url == "https://platform.withintelligence.com/explore/mandates/21"
+
+    @respx.mock
+    async def test_falls_back_to_asset_classes_then_the_service_then_the_id(self) -> None:
+        _mock(
+            [
+                {"id": 31, "asset_class": [{"id": 1, "name": "Hedge Funds"}]},
+                {"id": 32, "service": {"id": 2, "name": "Manager Search"}},
+                AWARDED,
+            ]
+        )
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        assert [mandate.title for mandate in result.mandates] == [
+            "Mandate: Hedge Funds",
+            "Manager Search",
+            "Mandate 22",
+        ]
+
+    @respx.mock
+    async def test_an_unavailable_detail_keeps_a_title_and_link(self) -> None:
+        respx.get(f"{BASE_URL}/v3/mandates").mock(
+            return_value=httpx.Response(
+                200,
+                json=page_body([{"id": 21, "updated_at": "2026-08-01"}], total=1),
+            )
+        )
+        respx.get(f"{BASE_URL}/v3/mandates/21").mock(return_value=httpx.Response(403))
+        respx.get(f"{BASE_URL}/v3/investors/2504").mock(
+            return_value=httpx.Response(200, json=INVESTOR)
+        )
+        client, _ = build_client()
+        result = await get_mandates(investor_id=2504, client=client)
+        assert isinstance(result, InvestorMandatesResponse)
+        mandate = result.mandates[0]
+        assert mandate.title == "Mandate 21"
+        assert mandate.url == "https://platform.withintelligence.com/explore/mandates/21"
+
+
 class TestWhatTheyAreLookingFor:
     @respx.mock
     async def test_sparse_detail_keeps_omitted_collections_unknown(self) -> None:

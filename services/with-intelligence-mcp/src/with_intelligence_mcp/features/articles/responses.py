@@ -8,7 +8,7 @@ from with_intelligence_mcp.features.articles.api_responses import (
     ArticleListItemAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown, when_present
+from with_intelligence_mcp.utils import article_url, attachment_url, html_to_markdown, when_present
 
 
 class ArticleFirmResponse(OmitNoneModel):
@@ -39,6 +39,12 @@ class ArticleResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence article identifier.", examples=[100])
     title: str | None = Field(default=None, description="Article title.")
+    url: str = Field(
+        description=(
+            "This article's page in the With Intelligence app. It opens for a user signed in to "
+            "With Intelligence."
+        )
+    )
     published_at: str | None = Field(
         default=None,
         description="When the article was published. The page is not ordered by this.",
@@ -66,7 +72,11 @@ class ArticleResponse(OmitNoneModel):
     )
     author: str | None = Field(default=None, description="Author display name.")
     document_url: str | None = Field(
-        default=None, description="Link to an attached document, when the article has one."
+        default=None,
+        description=(
+            "Link to an attached document, when the article has one. It opens for a user signed "
+            "in to With Intelligence."
+        ),
     )
     document_title: str | None = Field(default=None, description="Title of the attached document.")
     firms: list[ArticleFirmResponse] | None = Field(
@@ -78,12 +88,17 @@ class ArticleResponse(OmitNoneModel):
         return cls(
             id=attributes.id,
             title=attributes.post_title,
+            url=article_url(attributes.id, attributes.post_name),
             published_at=attributes.post_date,
             excerpt=html_to_markdown(attributes.post_excerpt),
             body=html_to_markdown(attributes.post_content),
             article_type=attributes.article_type.name if attributes.article_type else None,
             author=attributes.post_author.display_name if attributes.post_author else None,
-            document_url=attributes.document.url if attributes.document else None,
+            document_url=(
+                attachment_url(attributes.document.url)
+                if attributes.document and attributes.document.url
+                else None
+            ),
             document_title=attributes.document.title if attributes.document else None,
             firms=when_present(
                 attributes,
@@ -97,7 +112,12 @@ class ArticleResponse(OmitNoneModel):
 
     @classmethod
     def from_listing(cls, attributes: ArticleListItemAttributes) -> Self:
-        return cls(id=attributes.id, title=attributes.post_title, published_at=attributes.post_date)
+        return cls(
+            id=attributes.id,
+            title=attributes.post_title,
+            url=article_url(attributes.id, None),
+            published_at=attributes.post_date,
+        )
 
 
 class InvestorArticlesResponse(OmitNoneModel):

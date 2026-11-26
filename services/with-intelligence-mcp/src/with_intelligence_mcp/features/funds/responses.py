@@ -4,7 +4,13 @@ from pydantic import Field
 
 from with_intelligence_mcp.features.funds.api_responses import FundExtendedAttributes
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown, names, when_either, when_present
+from with_intelligence_mcp.utils import (
+    explore_url,
+    html_to_markdown,
+    names,
+    when_either,
+    when_present,
+)
 
 
 class FundProfileResponse(OmitNoneModel):
@@ -16,6 +22,12 @@ class FundProfileResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence fund identifier.", examples=[8677])
     name: str | None = Field(default=None, description="Fund name.")
+    url: str = Field(
+        description=(
+            "This fund's page in the With Intelligence app. It opens for a user signed in to "
+            "With Intelligence."
+        )
+    )
     updated_at: str | None = Field(
         default=None, description="When With Intelligence last changed this fund record."
     )
@@ -123,6 +135,7 @@ class FundProfileResponse(OmitNoneModel):
         return cls(
             id=attributes.id,
             name=attributes.name,
+            url=explore_url("funds", attributes.id),
             updated_at=attributes.updated_at,
             manager=manager.name if manager else None,
             manager_id=manager.id if manager else None,

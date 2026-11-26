@@ -8,7 +8,13 @@ from with_intelligence_mcp.features.managers.api_responses import (
     ManagerExtendedAttributes,
 )
 from with_intelligence_mcp.models import OmitNoneModel
-from with_intelligence_mcp.utils import html_to_markdown, names, when_either, when_present
+from with_intelligence_mcp.utils import (
+    explore_url,
+    html_to_markdown,
+    names,
+    when_either,
+    when_present,
+)
 
 
 class ManagerAumResponse(OmitNoneModel):
@@ -40,6 +46,12 @@ class ManagerProfileResponse(OmitNoneModel):
 
     id: int = Field(description="With Intelligence manager identifier.", examples=[2145860302])
     name: str | None = Field(default=None, description="Management company name.")
+    url: str = Field(
+        description=(
+            "This manager's page in the With Intelligence app. It opens for a user signed in to "
+            "With Intelligence."
+        )
+    )
     updated_at: str | None = Field(
         default=None, description="When With Intelligence last changed this manager record."
     )
@@ -87,6 +99,7 @@ class ManagerProfileResponse(OmitNoneModel):
         return cls(
             id=attributes.id,
             name=attributes.name,
+            url=explore_url("managers", attributes.id),
             updated_at=attributes.updated_at,
             summary=html_to_markdown(attributes.summary),
             website=attributes.website,
