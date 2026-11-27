@@ -1,11 +1,9 @@
 # The permission rule of the service's `resolveScopes`, applied to the locals in
 # registry.generated.tf.json. `offline_access` and the OpenID scopes need no registration.
 locals {
-  preset_names = var.tools_preset == null ? null : [for name in try(tolist(var.tools_preset), split(",", var.tools_preset)) : trimspace(name)]
-
   tools = (
     var.tools_enabled != null ? var.tools_enabled :
-    local.preset_names != null ? distinct(flatten([for name in local.preset_names : local.presets[name]])) :
+    var.tools_preset != null ? distinct(flatten([for name in var.tools_preset : local.presets[name]])) :
     local.presets["mail"]
   )
 
