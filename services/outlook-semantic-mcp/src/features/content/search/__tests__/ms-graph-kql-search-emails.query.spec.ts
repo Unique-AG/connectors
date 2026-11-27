@@ -1702,10 +1702,11 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
               { id: GRAPH_PURVIEW, value: truncated },
             ],
           }),
+          unlabelled('msg-plain'),
         ],
       });
 
-      expect(results).toEqual([]);
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
     });
 
     it.each([
@@ -1727,12 +1728,49 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
                 { id: GRAPH_PURVIEW, value },
               ],
             }),
+            unlabelled('msg-plain'),
           ],
         });
 
-        expect(results).toEqual([]);
+        expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
       },
     );
+
+    it('drops a hit whose Purview value was cut before a label excluded by id', async () => {
+      const value = `${purviewValue(OTHER_LABEL_ID, 'General')}${purviewValue(LABEL_ID, 'Confidential')}`;
+      const { results } = await searchOwnMailbox(excluding([LABEL_ID]), {
+        value: [
+          makeMessage('msg-cut', {
+            singleValueExtendedProperties: [
+              { id: GRAPH_LEGACY, value: '0' },
+              { id: GRAPH_PURVIEW, value: value.slice(0, 255) },
+            ],
+          }),
+          unlabelled('msg-plain'),
+        ],
+      });
+
+      expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+    });
+
+    it('counts a withheld email found by two queries once', async () => {
+      const respond = ({ requests }: { requests: { id: string }[] }) => ({
+        responses: requests.map((req) => ({
+          id: req.id,
+          status: 200,
+          body: { value: [labelled('msg-labelled', LABEL_ID, 'Confidential')] },
+        })),
+      });
+      const mockPost = vi.fn().mockImplementation(async (batch) => respond(batch));
+      const { instance } = createQuery({ mockPost, sensitivityExclusions: excluding([LABEL_ID]) });
+
+      const { searchSummary } = await instance.run(testUserId, [
+        { kqlQuery: 'subject:test' },
+        { kqlQuery: 'from:someone' },
+      ]);
+
+      expect(searchSummary).toContain('1 email was withheld');
+    });
 
     it('filters the pages fetched from a cursor too', async () => {
       const mockPost = makeSuccessPost({
@@ -1740,7 +1778,7 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       });
       const { instance } = createQuery({ mockPost, sensitivityExclusions: excluding([LABEL_ID]) });
 
-      const { results } = await instance.fetchNextPages(testUserId, [
+      const { results, searchSummary } = await instance.fetchNextPages(testUserId, [
         {
           id: 'cursor-1',
           createdAt: new Date(),
@@ -1757,6 +1795,9 @@ describe('MsGraphKqlSearchEmailsQuery', () => {
       ]);
 
       expect(results.map((r) => r.msGraphMessageId)).toEqual(['msg-plain']);
+      expect(searchSummary).toContain(
+        `1 email was withheld because of its sensitivity label (label id ${LABEL_ID})`,
+      );
     });
   });
 });

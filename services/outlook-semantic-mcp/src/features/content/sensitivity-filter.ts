@@ -71,11 +71,12 @@ export class SensitivityFilter {
     // Absent or empty means no label; present without a value cannot be read.
     const purviewKey = canonicalPropertyId(PURVIEW_LABELS_PROPERTY);
     const purviewValue = values.has(purviewKey) ? values.get(purviewKey) : '';
-    const labels =
+    const purview =
       typeof purviewValue === 'string' ? this.parsePurviewLabels(purviewValue) : undefined;
-    if (!labels) {
+    if (!purview) {
       return UNREADABLE;
     }
+    const { labels, cut } = purview;
     // A name entry is preferred, so the agent can be told the label's name when one is configured.
     const configured =
       labels.map(({ name }) => this.excludedLabels.get(name?.toLowerCase() ?? '')).find(Boolean) ??
@@ -87,7 +88,10 @@ export class SensitivityFilter {
         configuredById: GUID_PATTERN.test(configured),
       };
     }
-    // Graph cuts the value at 255 characters in some responses, which can lose or cut a label's name.
+    // Graph cuts the value at 255 characters in some responses. The cut can hide further labels.
+    if (cut) {
+      return UNREADABLE;
+    }
     if (this.excludesLabelNames && labels.some(({ name }) => name === undefined)) {
       return UNREADABLE;
     }
@@ -95,13 +99,16 @@ export class SensitivityFilter {
   }
 
   // One group of `MSIP_Label_<id>_<field>=<value>;` entries per label.
-  private parsePurviewLabels(value: string): PurviewLabel[] | undefined {
+  private parsePurviewLabels(value: string): { labels: PurviewLabel[]; cut: boolean } | undefined {
     if (!value.trim()) {
-      return [];
+      return { labels: [], cut: false };
     }
     // A value cut at 255 characters can end inside its last field, so that field's value is not
-    // trusted: a name cut to `Conf` must not pass for a label that is not excluded.
-    const cut = value.length >= PURVIEW_VALUE_CUT_LENGTH && !value.trimEnd().endsWith(';');
+    // trusted: a name cut to `Conf` must not pass for a label that is not excluded. A cut that
+    // falls right after a `;` looks complete, so a value of exactly that length counts as cut.
+    const cut =
+      value.length === PURVIEW_VALUE_CUT_LENGTH ||
+      (value.length > PURVIEW_VALUE_CUT_LENGTH && !value.trimEnd().endsWith(';'));
     const entries = [...value.matchAll(PURVIEW_ENTRY_PATTERN)];
     const names = new Map<string, string | undefined>();
     for (const [index, [, id = '', field, fieldValue]] of entries.entries()) {
@@ -114,7 +121,7 @@ export class SensitivityFilter {
     if (names.size === 0) {
       return undefined;
     }
-    return [...names].map(([id, name]) => ({ id, name }));
+    return { labels: [...names].map(([id, name]) => ({ id, name })), cut };
   }
 }
 
