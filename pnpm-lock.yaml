@@ -6165,8 +6165,8 @@ packages:
     resolution: {integrity: sha512-0OJWD12D7XX3KUg1DYkMaTTjSTo2k/mhIYI3HlBlceXSMcJhW/1qO735fPKS5prcyjvn57Ub151vvASYXpQrEw==}
     engines: {node: '>=18'}
 
-  systeminformation@5.33.23:
-    resolution: {integrity: sha512-OBOvemo4WHf8bGMszwszn3JcFxkIMZt7adjhdgJh3eePo37EIBZovZbhJDQ2zfVYPEtXScHDJXGik8eYd3WMNw==}
+  systeminformation@5.33.24:
+    resolution: {integrity: sha512-ZYxVg6y2T+zZI7gDL+vk7otPgZ08vyhElrjOMe1qjCXO/ClwerwVwUHvEaFuTNivhE5WHt56PEgX+IPVVpxMxQ==}
     engines: {node: '>=10.0.0'}
     os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
     hasBin: true
@@ -7570,7 +7570,7 @@ snapshots:
   '@opentelemetry/host-metrics@0.38.3(@opentelemetry/api@1.10.0)':
     dependencies:
       '@opentelemetry/api': 1.10.0
-      systeminformation: 5.33.23
+      systeminformation: 5.33.24
 
   '@opentelemetry/instrumentation-amqplib@0.72.0(@opentelemetry/api@1.10.0)':
     dependencies:
@@ -7700,7 +7700,7 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.10.0
       '@opentelemetry/instrumentation': 0.301.2(@opentelemetry/api@1.10.0)
-      systeminformation: 5.33.23
+      systeminformation: 5.33.24
     transitivePeerDependencies:
       - supports-color
 
@@ -11396,7 +11396,7 @@ snapshots:
 
   system-architecture@1.0.0: {}
 
-  systeminformation@5.33.23: {}
+  systeminformation@5.33.24: {}
 
   tagged-tag@1.0.0: {}
 
