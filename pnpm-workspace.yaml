@@ -49,7 +49,7 @@ catalog:
   amqplib: 0.10.9
   bottleneck: 2.19.5
   cache-manager: 7.2.9
-  cron: 4.4.0
+  cron: 4.4.2
   drizzle-kit: 0.31.11
   drizzle-orm: 0.45.4
   graphql: 17.1.0
