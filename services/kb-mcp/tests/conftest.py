@@ -21,7 +21,7 @@ _TEST_ENV_FILE = Path(__file__).parent.parent / "test.env"
 _DEFAULT_TEST_ENV = {
     "ZITADEL_BASE_URL": "https://id.test.unique.app",
     "ZITADEL_CLIENT_ID": "test-client-id",
-    "ZITADEL_JWT_SIGNING_KEY": "test-jwt-signing-key",
+    "ZITADEL_JWT_SIGNING_KEY": "test-jwt-signing-key-0123456789abcdef",
     "ALLOW_EPHEMERAL_OAUTH_STORAGE": "true",
 }
 

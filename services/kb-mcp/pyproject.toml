@@ -6,6 +6,7 @@ requires-python = ">=3.14"
 dependencies = [
     "cryptography==50.0.2",
     "fastmcp==4.1.6",
+    "mcp-auth==0.1.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "pydantic==2.14.4",
@@ -103,5 +104,6 @@ reportDeprecated = "none"
 reportUnannotatedClassAttribute = "none"
 
 [tool.uv.sources]
+mcp-auth = { path = "../../packages/mcp-auth" }
 mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-observability = { path = "../../packages/mcp-observability" }

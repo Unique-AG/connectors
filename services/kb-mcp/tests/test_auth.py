@@ -11,13 +11,40 @@ lets that fallback trigger.
 import secrets
 from unittest.mock import MagicMock, patch
 
+import httpx2
 import pytest
+from fastmcp.server.auth.oidc_proxy import OIDCProxy
+from key_value.aio.stores.memory import MemoryStore
 
 from kb_mcp.auth import build_auth
 from kb_mcp.auth.storage import build_storage
 from kb_mcp.settings import get_settings
 
 pytestmark = pytest.mark.ai
+
+_SIGNING_KEY = "test-jwt-signing-key-0123456789abcdef"
+
+
+@pytest.fixture
+def zitadel_discovery(monkeypatch):
+    """Answers the proxy's OIDC discovery request without a network."""
+
+    def get(url: str, **_: object) -> httpx2.Response:
+        issuer = url.removesuffix("/.well-known/openid-configuration")
+        configuration = {
+            "issuer": issuer,
+            "authorization_endpoint": f"{issuer}/oauth/v2/authorize",
+            "token_endpoint": f"{issuer}/oauth/v2/token",
+            "jwks_uri": f"{issuer}/oauth/v2/keys",
+            "response_types_supported": ["code"],
+            "subject_types_supported": ["public"],
+            "id_token_signing_alg_values_supported": ["RS256"],
+        }
+        return httpx2.Response(
+            200, json=configuration, request=httpx2.Request("GET", url)
+        )
+
+    monkeypatch.setattr(httpx2, "get", get)
 
 
 @pytest.fixture
@@ -59,6 +86,7 @@ def test_build_auth_never_passes_none_client_storage(durable_settings):
 
     _, kwargs = mock_create.call_args
     assert kwargs["client_storage"] is not None
+    assert kwargs.get("encryption_salt") is None
 
 
 def test_build_auth_uses_a_secretless_zitadel_client(durable_settings, monkeypatch):
@@ -68,37 +96,46 @@ def test_build_auth_uses_a_secretless_zitadel_client(durable_settings, monkeypat
         build_auth(durable_settings)
 
     _, kwargs = mock_create.call_args
-    zitadel_settings = kwargs["zitadel_oidc_proxy_settings"]
-    assert zitadel_settings.client_secret is None
+    zitadel = kwargs["zitadel"]
+    assert zitadel.client_secret is None
+    assert zitadel.org_id is None
+    assert zitadel.client_id == "test-client-id"
+    assert zitadel.issuer == "https://id.test.unique.app"
     # Local secret for FastMCP's own downstream JWTs, never sent to Zitadel —
     # required because OIDCProxy raises without either client_secret or this.
-    assert zitadel_settings.jwt_signing_key.get_secret_value() == "test-jwt-signing-key"
+    assert zitadel.jwt_signing_key.get_secret_value() == _SIGNING_KEY
+    assert kwargs["base_url"] == durable_settings.base_url.encoded_string()
 
 
-def test_build_auth_passes_required_scopes(durable_settings):
-    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
-        mock_create.return_value = MagicMock()
-        build_auth(durable_settings)
+@pytest.mark.usefixtures("zitadel_discovery")
+def test_build_auth_requires_identity_scopes_and_verifies_the_id_token(
+    durable_settings,
+):
+    proxy = build_auth(durable_settings)
 
-    _, kwargs = mock_create.call_args
+    assert isinstance(proxy, OIDCProxy)
     # Identity only — mcp:* must stay advertised, not required (RequireAuthMiddleware).
-    assert kwargs["required_scopes"] == [
+    assert proxy.required_scopes == [
         "openid",
         "profile",
         "urn:zitadel:iam:user:resourceowner",
     ]
-    assert kwargs["verify_id_token"] is True
+    # FastMCP has no public accessor for this; pinned by fastmcp's version in uv.lock.
+    assert proxy._verify_id_token
 
 
+@pytest.mark.usefixtures("zitadel_discovery")
 def test_build_auth_requests_offline_access_from_zitadel(durable_settings):
-    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
-        mock_create.return_value = MagicMock()
-        build_auth(durable_settings)
+    proxy = build_auth(durable_settings)
 
-    _, kwargs = mock_create.call_args
-    assert "offline_access" in kwargs["extra_authorize_params"]["scope"].split()
-    assert "offline_access" in kwargs["valid_scopes"]
-    assert "offline_access" not in kwargs["required_scopes"]
+    registration_options = proxy.client_registration_options
+    assert registration_options is not None
+    asked = proxy._extra_authorize_params["scope"].split()
+    assert "offline_access" in asked
+    assert "offline_access" in (registration_options.valid_scopes or [])
+    assert "offline_access" not in (proxy.required_scopes or [])
+    assert not {s for s in proxy.required_scopes or [] if s.startswith("mcp:")}
+    assert {"mcp:tools", "mcp:prompts", "mcp:resources"} <= set(asked)
 
 
 def test_build_storage_treats_decryption_errors_as_misses(durable_settings):
@@ -106,13 +143,13 @@ def test_build_storage_treats_decryption_errors_as_misses(durable_settings):
     assert store.raise_on_decryption_error is False
 
 
+@pytest.mark.usefixtures("zitadel_discovery")
 def test_build_auth_passes_storage_even_in_ephemeral_dev_mode(ephemeral_settings):
-    with patch("kb_mcp.auth.oidc_proxy.create_zitadel_oidc_proxy") as mock_create:
-        mock_create.return_value = MagicMock()
-        build_auth(ephemeral_settings)
+    store = MemoryStore()
+    with patch("kb_mcp.auth.oidc_proxy.build_storage", return_value=store):
+        proxy = build_auth(ephemeral_settings)
 
-    _, kwargs = mock_create.call_args
-    assert kwargs["client_storage"] is not None
+    assert proxy._client_storage is store
 
 
 def test_missing_database_url_raises_instead_of_falling_back(monkeypatch):
