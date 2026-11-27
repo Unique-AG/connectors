@@ -185,12 +185,13 @@ If it stays local, leave it: `run_server` keeps it on loopback. Otherwise write 
 1. **FastMCP first.** Read the installed FastMCP before writing anything
    (`.venv/lib/python3.14/site-packages/fastmcp/server/auth/`): `JWTVerifier`,
    `StaticTokenVerifier`, the introspection verifier, `OAuthProxy`, `OIDCProxy`, and the
-   providers under `fastmcp.server.auth.providers`. For Zitadel, use
-   `unique_mcp.auth.zitadel.create_zitadel_oidc_proxy`, configured by the environment
-   `ZitadelSettings` in `mcp-configs` reads; the scaffold does not add `unique-mcp`, so add it
-   with the version `architecture-demo-mcp` pins. If one of them does the job, pass it to
+   providers under `fastmcp.server.auth.providers`. For Zitadel, call
+   `mcp_auth.zitadel.create_zitadel_oidc_proxy` with `ZitadelSettings` from `mcp-configs`. The
+   scaffold does not add `mcp-auth`, so add it the way `kyckr-mcp` does, including
+   `COPY packages/mcp-auth` in the Dockerfile. `guides/auth.md` says which scopes are
+   required and how `ZITADEL_ORG_ID` is checked. If one of them does the job, pass it to
    `FastMCP(auth=...)` in `create_server` and write nothing else.
-2. **Our code in `mcp/auth/`.** Only what FastMCP and `unique_mcp` lack goes there, exported
+2. **Our code in `mcp/auth/`.** Only what FastMCP and `mcp-auth` lack goes there, exported
    from `mcp/auth/__init__.py`. Its settings are built on `shared_config` and passed in from
    `main.py`, so tests pass their own.
 3. **The client reads it through a `Depends` function.** As the OpenAPI client gets its

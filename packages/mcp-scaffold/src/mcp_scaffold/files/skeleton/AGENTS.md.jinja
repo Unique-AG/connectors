@@ -31,5 +31,5 @@ serve this MCP, with `mcp-skeleton` for `<name>`.
 {% if options.auth %}
 - Auth: Each user signs in at `/sign-in` with their own credentials for the upstream. `shared/contracts/auth.py` is what the layers agree on: the `AuthStore` protocol and the `UpstreamCredentials` each call carries. `mcp/auth/` is the OAuth server the MCP's clients use; `persistence/auth/` implements the store, the credentials encrypted with `MCP_AUTH_ENCRYPTION_KEY`; `upstream/credentials.py` says how a request is signed with them, and `verify_credentials` checks a sign-in at `UPSTREAM_VERIFY_PATH`. `Upstream` signs every request with the credentials of the user the call acts for, so contexts never see them. [`guides/auth.md`](../../packages/mcp-architecture/guides/auth.md) says how to change what is kept or sent.
 {% else %}
-- Auth: Not implemented. `run_server` refuses to serve beyond loopback until the server has an auth provider, `FastMCP(auth=...)`. The `new-mcp` skill's rules for coding auth say how to add one.
+- Auth: Not implemented. `run_server` refuses to serve beyond loopback until the server has an auth provider, `FastMCP(auth=...)`. Zitadel sign-in is `mcp_auth.zitadel.create_zitadel_oidc_proxy`. The `new-mcp` skill's rules for coding auth say how to add one.
 {% endif %}

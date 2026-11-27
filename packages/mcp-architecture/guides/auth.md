@@ -5,12 +5,20 @@
 An MCP starts without auth, and `run_server` keeps it on loopback until it has an auth provider.
 Adding one:
 
-1. Use what FastMCP provides first: `fastmcp.server.auth` has token verifiers (`JWTVerifier`,
+1. Use what FastMCP provides first. `fastmcp.server.auth` has token verifiers (`JWTVerifier`,
    `StaticTokenVerifier`, introspection), `OAuthProxy`, `OIDCProxy` and, under
-   `fastmcp.server.auth.providers`, providers for common identity services. A Zitadel sign-in is
-   `unique_mcp.auth.zitadel.create_zitadel_oidc_proxy`, configured by the same environment as
-   `ZitadelSettings` from `mcp-configs`; add `unique-mcp` to the MCP's dependencies for it, as
-   `architecture-demo-mcp` does. Write code only for what neither provides.
+   `fastmcp.server.auth.providers`, providers for common identity services. For Zitadel, call
+   `mcp_auth.zitadel.create_zitadel_oidc_proxy` with `ZitadelSettings` from `mcp-configs`. Add
+   `mcp-auth` to the dependencies and `COPY packages/mcp-auth` in the Dockerfile, as
+   `kyckr-mcp` does. The proxy requires `openid`, `profile` and
+   `urn:zitadel:iam:user:resourceowner`. Clients may register `offline_access` and the `mcp:*`
+   scopes. Those scopes are asked for and are not required, because Zitadel does not put `mcp:*`
+   on the token. With `ZITADEL_ORG_ID`, the proxy asks for `urn:zitadel:iam:org:id:<org>` and
+   does not let a client register that scope. `IdTokenVerifier` refuses an id token whose
+   `urn:zitadel:iam:user:resourceowner:id` claim is missing or names another organisation. Pass
+   `encryption_salt` so the sign-in store is encrypted with a key derived from
+   `ZITADEL_JWT_SIGNING_KEY`. Changing the salt or the signing key signs every user out. Write
+   code only for what neither provides.
 2. Code of our own lives in `mcp/auth/`, exported from its `__init__.py`. `create_server` passes
    the provider to `FastMCP(auth=...)`.
 3. The upstream never sees how the user signed in. When it needs the caller's credentials,

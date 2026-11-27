@@ -57,8 +57,8 @@ codegen's output, an Alembic migration or the tool surface snapshot.
    server and tool middleware, `Depends` and `CurrentContext`, elicitation, providers such as
    `FileSystemProvider` and `OpenAPIProvider`, auth and its exceptions.
 2. The packages every MCP shares: `mcp-configs` for settings, `mcp-observability` for logs,
-   traces and metrics, `mcp-openapi` for an upstream's client, retries and locks, and
-   `unique_mcp` for Zitadel sign-in.
+   traces and metrics, and `mcp-openapi` for an upstream's client, retries and locks.
+   `mcp-auth` signs users in. Zitadel is `mcp_auth.zitadel`. Add it when the MCP signs users in, as `kyckr-mcp` does.
 3. A library the MCP already depends on, such as SQLAlchemy, `py-key-value-aio` or pydantic.
 
 Write code only for what none of them provide.

@@ -10,6 +10,7 @@ on:
       - "services/**"
       - "packages/**"
       - "!packages/mcp-architecture/**"
+      - "!packages/mcp-auth/**"
       - "!packages/mcp-configs/**"
       - "!packages/mcp-credential-auth/**"
       - "!packages/mcp-observability/**"
@@ -61,6 +62,7 @@ jobs:
             packages:
               - 'packages/**'
               - '!packages/mcp-architecture/**'
+              - '!packages/mcp-auth/**'
               - '!packages/mcp-configs/**'
               - '!packages/mcp-credential-auth/**'
               - '!packages/mcp-observability/**'

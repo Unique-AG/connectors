@@ -44,6 +44,7 @@ services = services/**
 # Packages
 logger = packages/logger/**
 mcp-architecture = packages/mcp-architecture/**
+mcp-auth = packages/mcp-auth/**
 mcp-configs = packages/mcp-configs/**
 mcp-observability = packages/mcp-observability/**
 mcp-credential-auth = packages/mcp-credential-auth/**
