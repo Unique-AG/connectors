@@ -9,14 +9,12 @@ from world_check_mcp.contexts.groups.models import ResolutionToolkit
 from world_check_mcp.contexts.groups.models import SecondaryField
 from world_check_mcp.contexts.groups.models import SettingsSection
 from world_check_mcp.contexts.groups.summary import group_entry
+from world_check_mcp.contexts.lookups import case_template
 from world_check_mcp.contexts.screening import EntityType
 from world_check_mcp.persistence import Cache
 from world_check_mcp.upstream import CaseTemplateResponse
-from world_check_mcp.upstream import GET_CASE_TEMPLATE_FOR_GROUP
 from world_check_mcp.upstream import GET_GROUP_BY_ID
 from world_check_mcp.upstream import GET_RESOLUTION_TOOLKITS_FOR_GROUP
-from world_check_mcp.upstream import GetCaseTemplateForGroupPath
-from world_check_mcp.upstream import GetCaseTemplateForGroupRequest
 from world_check_mcp.upstream import GetGroupByIdPath
 from world_check_mcp.upstream import GetGroupByIdRequest
 from world_check_mcp.upstream import GetResolutionToolkitsForGroupPath
@@ -45,7 +43,7 @@ async def get_group_settings(
         key=f"group-settings:{group_id}",
         adapter=_SETTINGS,
         ttl_seconds=_CACHE_SECONDS,
-        load=lambda: _load(upstream=upstream, group_id=group_id),
+        load=lambda: _load(upstream=upstream, cache=cache, group_id=group_id),
     )
     fields = [
         field
@@ -61,15 +59,12 @@ async def get_group_settings(
     )
 
 
-async def _load(*, upstream: Upstream, group_id: str) -> GroupSettings:
+async def _load(*, upstream: Upstream, cache: Cache, group_id: str) -> GroupSettings:
     group, template, toolkits = await asyncio.gather(
         upstream.call(
             GET_GROUP_BY_ID, GetGroupByIdRequest(path=GetGroupByIdPath(group_id=group_id))
         ),
-        upstream.call(
-            GET_CASE_TEMPLATE_FOR_GROUP,
-            GetCaseTemplateForGroupRequest(path=GetCaseTemplateForGroupPath(group_id=group_id)),
-        ),
+        case_template(upstream=upstream, cache=cache, group_id=group_id),
         upstream.call(
             GET_RESOLUTION_TOOLKITS_FOR_GROUP,
             GetResolutionToolkitsForGroupRequest(
