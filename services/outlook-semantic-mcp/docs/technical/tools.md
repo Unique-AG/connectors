@@ -350,8 +350,8 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 | `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Without it, a `mailbox` message is read from `/users/{mailbox}/messages/{id}`. |
 | `idIsImmutable` | boolean | No | Use `idIsImmutable` from that object when present. |
 | `bodyContentType` | `"text"` \| `"html"` | No | `"html"` when the message is a draft. Omit for plain text. |
-| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. |
-| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. |
+| `uniqueContentId` | string | No | Ingested content id from a semantic match. When set, the matched chunks are returned in `chunks`. Offered only with `MCP_BACKEND=microsoft_graph_and_unique_api`, the only backend whose search returns it. |
+| `chunkIds` | string[] | No | Ids of those matched chunks. Pass them through with `uniqueContentId`. Offered only with `MCP_BACKEND=microsoft_graph_and_unique_api`. |
 
 **Return shape:**
 
@@ -375,8 +375,8 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 
 **Usage notes:**
 
-- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
-- When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
+- Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds` (present only with `MCP_BACKEND=microsoft_graph_and_unique_api`). The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
+- With `MCP_BACKEND=microsoft_graph_and_unique_api`, when `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
 - With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
 - `webLink` is the Outlook on the web link of the email. For a shared or delegated mailbox it is the classic OWA link built from the message RestId (see `BuildWebLinksCommand`), because the link Graph returns for those mailboxes does not always open. Link the subject to it when it is set; otherwise show the subject as plain text.
@@ -433,7 +433,7 @@ Supports two modes selected by `recipientsData.type`:
 | Inline base64 | `data:[mediatype];base64,<data>` | Base64-encoded content with explicit MIME type |
 
 !!! warning "Attachment scheme availability"
-    The `unique://content/{contentId}` scheme only works when `UNIQUE_SERVICE_AUTH_MODE=cluster_local`. In external auth mode the Unique ingestion service cannot resolve internal content URIs — use the `data:[mediatype];base64,<data>` scheme instead.
+    The `unique://content/{contentId}` scheme only works when `UNIQUE_ATTACHMENTS=enabled` (the default) and `UNIQUE_SERVICE_AUTH_MODE=cluster_local`. With `UNIQUE_ATTACHMENTS=disabled` the tool does not offer it and fails such an attachment. In external auth mode the Unique ingestion service cannot resolve internal content URIs. Use the `data:[mediatype];base64,<data>` scheme instead.
 
 **Return shape:**
 

@@ -1,10 +1,11 @@
+import assert from 'node:assert';
 import { UniqueApiClient } from '@unique-ag/unique-api';
 import { createSmeared, Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Span } from 'nestjs-otel';
-import { type UniqueConfigNamespaced } from '~/config';
+import { type FeaturesConfig, featuresConfig, type UniqueConfigNamespaced } from '~/config';
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { GraphClientFactory } from '~/msgraph/graph-client.factory';
 import { InjectUniqueApi } from '~/unique/unique-api.module';
@@ -44,6 +45,7 @@ export class AddAttachmentsToDraftEmailCommand {
     private readonly uploadInMemoryAttachmentCommand: UploadInMemoryAttachmentCommand,
     private readonly streamUniqueAttachmentCommand: StreamUniqueAttachmentCommand,
     private readonly configService: ConfigService<UniqueConfigNamespaced, true>,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   @Span()
@@ -147,6 +149,16 @@ export class AddAttachmentsToDraftEmailCommand {
 
     switch (parsed.type) {
       case 'unique': {
+        if (!this.features.uniqueAttachments) {
+          return {
+            status: 'failed',
+            failedInfo: {
+              fileName: fileName.value,
+              reason:
+                'Files from the Unique knowledge base (unique://) are not enabled on this server. Attach the content as a data: URI instead.',
+            },
+          };
+        }
         const uniqueIdentity = await resolveUniqueIdentity();
         const result = await this.streamUniqueAttachmentCommand.run({
           client,
@@ -189,6 +201,7 @@ export class AddAttachmentsToDraftEmailCommand {
   private createUniqueIdentityResolver(email: string): IdentityResolver {
     const getIdentity = async (): Promise<ResolvedUniqueIdentity> => {
       const uniqueConfig = this.configService.get('unique', { infer: true });
+      assert.ok(uniqueConfig.enabled, 'Unique attachments need the Unique config');
       if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
         return null;
       }

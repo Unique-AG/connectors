@@ -1,4 +1,15 @@
 import { createMeta } from '@unique-ag/mcp-server-module';
+import { uniqueAttachmentsEnabled } from '../draft-input.schemas';
+
+const ATTACHMENT_SCHEMES = uniqueAttachmentsEnabled
+  ? `- \`data\`: a URI identifying the file content. Supported URI schemes:
+      - **Unique content**: \`unique://content/{contentId}\` — attach a file from the Unique knowledge base using its content ID. Example: \`unique://content/cont_j23i0ifr44sdn7cz97ubleb7\`.
+      - **Data URIs**: \`data:[mediatype];base64,<base64data>\` — inline base64-encoded content.
+
+    External URLs (\`https://\`) are **not supported**. Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files.`
+  : `- \`data\`: a data URI, \`data:[mediatype];base64,<base64data>\` — inline base64-encoded content.
+
+    External URLs (\`https://\`) are **not supported**.`;
 
 export const META = createMeta({
   icon: 'mail',
@@ -146,11 +157,7 @@ export const META = createMeta({
     ### Attachments
     To attach files, pass an array of objects in the \`attachments\` field. Each object must have:
     - \`fileName\`: the name that will appear on the attachment (e.g. \`report.pdf\`)
-    - \`data\`: a URI identifying the file content. Supported URI schemes:
-      - **Unique content**: \`unique://content/{contentId}\` — attach a file from the Unique knowledge base using its content ID. Example: \`unique://content/cont_j23i0ifr44sdn7cz97ubleb7\`.
-      - **Data URIs**: \`data:[mediatype];base64,<base64data>\` — inline base64-encoded content.
-
-    External URLs (\`https://\`) are **not supported**. Do not pass raw content IDs — always use the \`unique://\` URI scheme for Unique knowledge base files.
+    ${ATTACHMENT_SCHEMES}
 
     ### Failed Attachments
     The response may include an \`attachmentsFailed\` array when one or more attachments could not be added. The draft is still created in that case. Each entry has a \`fileName\` and a \`reason\`. When \`attachmentsFailed\` is non-empty, inform the user which files failed and why, for example:

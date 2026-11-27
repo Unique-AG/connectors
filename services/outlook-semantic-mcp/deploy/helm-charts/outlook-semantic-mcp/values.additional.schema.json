@@ -238,6 +238,12 @@
           "type": "object",
           "description": "Unique API configuration",
           "properties": {
+            "attachments": {
+              "type": "string",
+              "enum": ["enabled", "disabled"],
+              "description": "Whether the draft tools attach files from the Unique knowledge base (unique://content/...). Unique, and the rest of this section, is needed in microsoft_graph_and_unique_api mode or when this is enabled. Env var: UNIQUE_ATTACHMENTS",
+              "default": "enabled"
+            },
             "serviceAuthMode": {
               "type": "string",
               "enum": ["cluster_local", "external"],

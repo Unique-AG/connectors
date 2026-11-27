@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import { ProxyService } from '@unique-ag/proxy';
 import { Smeared } from '@unique-ag/utils';
 import { Client } from '@microsoft/microsoft-graph-client';
@@ -47,6 +48,7 @@ export class StreamUniqueAttachmentCommand {
     idIsImmutable?: boolean;
   }): Promise<AttachmentUploadResult> {
     const uniqueConfig = this.configService.get('unique', { infer: true });
+    assert.ok(uniqueConfig.enabled, 'Unique attachments need the Unique config');
     if (uniqueConfig.serviceAuthMode !== 'cluster_local') {
       return {
         status: 'failed',

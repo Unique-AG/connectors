@@ -29,7 +29,7 @@ const mockConfigs = {
     webhookSecret: new Redacted('w'.repeat(128)),
   } as MicrosoftConfig,
   proxy: ProxyConfigSchema.parse({}),
-  unique: { serviceAuthMode: 'cluster_local' } as UniqueConfig,
+  unique: { enabled: true, serviceAuthMode: 'cluster_local' } as UniqueConfig,
 };
 
 describe('deploymentSecrets', () => {
@@ -48,11 +48,18 @@ describe('deploymentSecrets', () => {
 
   it('adds the Zitadel client secret in external mode', () => {
     const unique = {
+      enabled: true,
       serviceAuthMode: 'external',
       zitadelClientSecret: 'zitadel-client-secret',
     } as UniqueConfig;
 
     expect(deploymentSecrets({ ...mockConfigs, unique })).toContain('zitadel-client-secret');
+  });
+
+  it('lists no Unique secret when Unique is off', () => {
+    expect(deploymentSecrets({ ...mockConfigs, unique: { enabled: false } })).toEqual(
+      deploymentSecrets(mockConfigs),
+    );
   });
 
   it('adds the proxy password and the Basic credentials it is sent as', () => {

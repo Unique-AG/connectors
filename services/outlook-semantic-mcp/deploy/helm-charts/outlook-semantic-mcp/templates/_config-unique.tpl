@@ -1,5 +1,8 @@
 {{- define "chart.config.unique" -}}
 {{- with .Values.mcpConfig.unique }}
+- name: UNIQUE_ATTACHMENTS
+  value: {{ .attachments | quote }}
+{{- if or (eq $.Values.mcpConfig.app.mcpBackend "microsoft_graph_and_unique_api") (eq .attachments "enabled") }}
 - name: UNIQUE_SERVICE_AUTH_MODE
   value: {{ .serviceAuthMode | quote }}
 - name: UNIQUE_INGESTION_SERVICE_BASE_URL
@@ -21,6 +24,7 @@
   value: {{ tpl .zitadel.oauthTokenUrl $ | quote }}
 - name: UNIQUE_ZITADEL_PROJECT_ID
   value: {{ tpl .zitadel.projectId $ | quote }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

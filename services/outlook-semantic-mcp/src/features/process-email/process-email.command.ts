@@ -260,7 +260,7 @@ export class ProcessEmailCommand {
       sourceOwnerType: UniqueOwnerType.Company,
       sourceKind: INGESTION_SOURCE_KIND,
       sourceName: INGESTION_SOURCE_NAME,
-      storeInternally: this.configService.get('unique.storeInternally', { infer: true }),
+      storeInternally: this.storeInternally(),
       expiresAt: getMessageExpirationDate({
         receivedDateTime: graphMessage.receivedDateTime,
         retentionWindowInDays: filters.retentionWindowInDays,
@@ -375,6 +375,15 @@ export class ProcessEmailCommand {
         msg: `Failed to delete content with id: ${contentId}`,
       });
     }
+  }
+
+  private storeInternally(): boolean {
+    const uniqueConfig = this.configService.get('unique', { infer: true });
+    assert.ok(
+      uniqueConfig.enabled,
+      'Ingestion runs only in Unique mode, which needs the Unique config',
+    );
+    return uniqueConfig.storeInternally;
   }
 }
 
