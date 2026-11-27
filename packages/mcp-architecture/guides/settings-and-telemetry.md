@@ -14,9 +14,10 @@ Build a settings class with a required field as `from_environment(UpstreamSettin
 `mcp_configs`, rather than `UpstreamSettings()`: the type check cannot see that the environment
 gives the field, and rejects the call.
 
-A tool that elicits reads `ElicitationSettings` before it asks. It skips the question when the
-toggle for its kind (`for_disambiguation`, `for_data_modification` or `for_data_removal`) is
-`disabled`, and stops waiting after `timeout_before_cancel_seconds`.
+A tool that asks a person something uses `packages/mcp-elicitation`, which reads
+`ElicitationSettings`: it stops waiting after `timeout_before_cancel_seconds`, and seals what a
+question hands the client with `request_state_keys`. [Its README](../../mcp-elicitation/README.md)
+shows how a tool confirms or asks for a choice.
 
 What is particular to one MCP stays in the layer that owns it, such as `UpstreamSettings` in
 `upstream`, built on `shared_config` so it reads the environment the same way. `.env.example`

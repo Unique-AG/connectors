@@ -1,5 +1,5 @@
 from mcp_configs.config import from_environment, shared_config
-from mcp_configs.elicitation import ElicitationSettings, Toggle
+from mcp_configs.elicitation import ElicitationSettings
 from mcp_configs.logging import (
     DiagnosticsDataPolicy,
     ErrorDetailsPolicy,
@@ -27,7 +27,6 @@ __all__ = [
     "RetrySettings",
     "ServerSettings",
     "SslMode",
-    "Toggle",
     "TraceExporter",
     "TracingSettings",
     "ZitadelSettings",

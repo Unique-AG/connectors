@@ -62,8 +62,6 @@ def create_server(
             yield {
                 "upstream": upstream_resource,
                 "persistence": persistence_resource,
-                # A saved match decision or passport check is a regulatory record, so its
-                # approval is asked for even when `for_data_modification` is disabled.
                 "approvals": ApprovalGate(
                     store=persistence_resource.store,
                     ttl_seconds=elicitation.timeout_before_cancel_seconds,

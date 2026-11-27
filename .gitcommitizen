@@ -47,6 +47,7 @@ mcp-architecture = packages/mcp-architecture/**
 mcp-configs = packages/mcp-configs/**
 mcp-observability = packages/mcp-observability/**
 mcp-credential-auth = packages/mcp-credential-auth/**
+mcp-elicitation = packages/mcp-elicitation/**
 mcp-oauth = packages/mcp-oauth/**
 mcp-openapi = packages/mcp-openapi/**
 mcp-scaffold = packages/mcp-scaffold/**
