@@ -9,7 +9,7 @@
 
 ## Overview
 
-The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 13 mail MCP tools (plus 4 additional debug-mode tools), and query Outlook calendar through 8 more tools when a calendar tool is listed in `MCP_TOOLS`. `MCP_TOOLS` selects which of these tools the server registers.
+The Outlook Semantic MCP Server is a cloud-native MCP server that gives AI assistants direct access to a user's Microsoft Outlook mailbox. Users connect their Microsoft account once, after which the server syncs emails within an operator-configured time frame (with additional content and sender filters) and maintains a live, webhook-driven view of new mail. AI clients can then search emails, compose drafts, look up contacts, and list folders through 10 mail MCP tools (plus 4 sync tools and 5 debug-mode tools in `microsoft_graph_and_unique_api` mode), and query Outlook calendar through 8 calendar tools. `MCP_TOOLS` selects which of these tools the server registers.
 
 **Note:** This service is both an MCP server and a connector. It exposes tools for AI clients to invoke on demand, and once a user connects their account, it automatically syncs their emails (within an operator-configured time frame and [filters](./operator/configuration.md)) into the Unique knowledge base in the background.
 
@@ -17,7 +17,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ## Quick Summary
 
-**What it does:** Provides AI clients with 13 mail MCP tools (plus 4 debug-mode tools) for searching emails, composing drafts, looking up contacts, listing folders, and monitoring sync status, plus 8 calendar tools when a calendar tool is listed in `MCP_TOOLS`. `MCP_TOOLS` selects which tools are registered
+**What it does:** Provides AI clients with 10 mail MCP tools for searching emails, composing drafts, looking up contacts and listing folders, 4 sync tools for monitoring sync status (`microsoft_graph_and_unique_api` mode only), 5 debug-mode tools, and 8 calendar tools. `MCP_TOOLS` selects which tools are registered
 
 **Deployment:** Kubernetes-based NestJS microservice
 
@@ -227,7 +227,7 @@ Existing drafts are edited with `update_draft_email`, `add_attachments_to_draft_
    - Compose drafts with `draft_email` and edit them with `update_draft_email`
    - Look up contacts with `lookup_contacts`
    - Use `list_mailboxes_and_directories` and `list_categories` to obtain folder IDs and category names for filtering searches
-   - When calendar is enabled: list calendars, search events, check availability, and create or update meetings
+   - When a calendar tool is listed in `MCP_TOOLS`: list calendars, search events, check availability, and create or update meetings
 
 ## Limitations and Constraints
 

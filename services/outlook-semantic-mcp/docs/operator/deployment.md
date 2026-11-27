@@ -132,6 +132,23 @@ server:
 mcpConfig:
   app:
     selfUrl: https://outlook.semantic.mcp.example.com
+    mcpBackend: microsoft_graph_and_unique_api
+    # Mandatory: the tools to register. See Configuration — MCP_TOOLS.
+    tools:
+      - list_mailboxes_and_directories
+      - list_categories
+      - draft_email
+      - update_draft_email
+      - add_attachments_to_draft_email
+      - remove_attachments_from_draft_email
+      - lookup_contacts
+      - search_emails
+      - fetch_next_search_pages
+      - open_email
+      - sync_progress
+      - verify_inbox_connection
+      - delete_inbox_data
+      - reconnect_inbox
 
   microsoft:
     clientId: "12345678-1234-1234-1234-123456789012"

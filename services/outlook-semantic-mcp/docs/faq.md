@@ -73,22 +73,22 @@
 
 ### What type of MCP server is this?
 
-**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 13 mail tools in `microsoft_graph_and_unique_api` mode (plus 4 debug-mode tools), or 9 mail tools in `microsoft_graph` mode, and 8 more calendar tools when a calendar tool is listed in `MCP_TOOLS`. `MCP_TOOLS` selects which of them are registered. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
+**Answer:** The Outlook Semantic MCP Server is both an **MCP server** and a **connector**. It exposes 10 mail tools and 8 calendar tools in both modes, plus 4 sync tools and 5 debug-mode tools in `microsoft_graph_and_unique_api` mode. `MCP_TOOLS` selects which of them are registered. Once a user connects their account, it automatically syncs their emails into the Unique knowledge base in the background (Mode A only).
 
 **What it does:**
 
 - Automatically ingests the user's email history into the Unique knowledge base after connection, based on the configured filters
-- Exposes 13 mail tools (plus 4 debug-mode tools) for searching emails, managing drafts, listing folders, and monitoring sync status, and 8 calendar tools when a calendar tool is listed in `MCP_TOOLS`
+- Exposes 10 mail tools for searching emails, managing drafts and listing folders, 4 sync tools for monitoring sync status, 5 debug-mode tools, and 8 calendar tools
 - Keeps the knowledge base up to date in real time via webhook-driven live catch-up
 - Requires no manual setup beyond the initial connection
 
 **What the user sees:**
 
 - An initial OAuth consent screen to connect their Outlook account
-- 13 mail MCP tools available in their AI client immediately after connection (17 with debug mode enabled; 8 more when calendar tools are listed), out of those the operator lists in `MCP_TOOLS`
+- The tools the operator lists in `MCP_TOOLS`, available in their AI client immediately after connection: up to 14 mail and sync tools, 5 debug-mode tools when debug mode is on, and 8 calendar tools
 - Search results that may be incomplete while the initial full sync is running (a `syncWarning` is returned by `search_emails`)
 
-The server supports two deployment modes controlled by `MCP_BACKEND`. In the default `microsoft_graph_and_unique_api` mode, it ingests emails into the Unique knowledge base and exposes 13 mail tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, exposing 9 mail tools. Calendar tools are added when a calendar tool is listed in `MCP_TOOLS`. In both modes `MCP_TOOLS` selects the registered tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
+The server supports two deployment modes controlled by `MCP_BACKEND`. In `microsoft_graph_and_unique_api` mode, the chart default, it ingests emails into the Unique knowledge base and offers 10 mail and 4 sync tools. In `microsoft_graph` mode, it skips ingestion entirely and queries Microsoft Graph directly, offering the 10 mail tools. Calendar tools are added when a calendar tool is listed in `MCP_TOOLS`. In both modes `MCP_TOOLS` selects the registered tools. See [Operator Configuration — Deployment Modes](./operator/configuration.md#Deployment-Modes).
 
 **See also:** [Architecture](./technical/architecture.md) — [Tools](./technical/tools.md)
 
@@ -108,7 +108,7 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. In the def
 
 An additional 5 debug tools can be registered only when the server is running in debug mode (`MCP_DEBUG_MODE=enabled`) and the tool is listed in `MCP_TOOLS`: `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`, `admin_ops`. These are intended for development and troubleshooting and are not exposed in production deployments.
 
-In `microsoft_graph` mode, only the first 6 categories are available (Email Search, Draft Creation, Contact Lookup, Mailbox Utilities). Subscription Management and Sync Monitoring tools cannot be listed in `MCP_TOOLS`; the server refuses to start if they are.
+In `microsoft_graph` mode, only Email Search, Draft Creation and Editing, Contact Lookup, Mailbox Utilities and Calendar are available. Subscription Management and Sync Monitoring tools cannot be listed in `MCP_TOOLS`; the server refuses to start if they are.
 
 **See also:** [Tools Reference](./technical/tools.md) — [Debug Mode Tools](./technical/tools.md#Debug-Mode-Tools) — [Calendar](./technical/tools.md#Calendar)
 
@@ -116,7 +116,7 @@ In `microsoft_graph` mode, only the first 6 categories are available (Email Sear
 
 **Answer:** No. After granting consent, the server automatically creates a Microsoft Graph subscription and starts ingesting emails within the operator-configured time frame and filters (see [INGESTION_DEFAULT_MAIL_FILTERS](./operator/configuration.md)). The tools listed in `MCP_TOOLS` become available immediately. Search results may be incomplete while the initial full sync is running.
 
-**Mode B (`microsoft_graph`):** No. After granting consent, all 6 tools are available immediately. There is no ingestion pipeline — search results come from live Microsoft Graph queries.
+**Mode B (`microsoft_graph`):** No. After granting consent, the tools listed in `MCP_TOOLS` are available immediately. There is no ingestion pipeline — search results come from live Microsoft Graph queries.
 
 
 ## Data Privacy & Storage
@@ -469,7 +469,7 @@ If one or more attachments fail to upload, the draft is still created and the fa
 
 **Answer:** Yes, when [`DELEGATED_ACCESS_SCAN`](./operator/configuration.md#DELEGATED_ACCESS_SCAN) is `full_access_only` or `granular_access`. Pass the shared mailbox UPN as the `mailbox` parameter (e.g. `"support@company.com"`). The signed-in user must have been granted at least **Send As** or **Full Access** permissions to the shared mailbox in Microsoft 365 — the Graph API enforces this at request time.
 
-With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only, and the draft tools refuse any other `mailbox` with a tool error.
+With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only, and a `mailbox` other than the user's own makes the draft tools and `open_email` return `success: false` with a message, before any Microsoft Graph call.
 
 Both draft types work with shared mailboxes:
 

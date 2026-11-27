@@ -262,7 +262,7 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 
 **Setup**
 
-Enablement is operator-side: Entra admin consent for `Calendars.ReadWrite.Shared` first, then list the calendar tools in `MCP_TOOLS`. Existing users must reconnect Outlook after the first calendar tool is listed (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
+Enablement is operator-side: register `Calendars.ReadWrite.Shared` on the Entra app first, then list the calendar tools in `MCP_TOOLS`. Existing users must reconnect Outlook after the first calendar tool is listed (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
 
 **See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools)
 

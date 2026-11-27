@@ -94,7 +94,7 @@ Follow these steps to go from zero to a running deployment:
 4. **Create Kubernetes secrets** — Generate cryptographic secrets and store them as Kubernetes Secrets. See [Deployment — Required Secrets](./deployment.md#Required-Secrets).
 5. **Configure Helm values** — Create a `values.yaml` with your secrets, Microsoft client ID, and Unique API endpoints. See [Configuration Guide](./configuration.md).
 
-   > **Key decisions:** Set `MCP_BACKEND` (see [Deployment Modes](./deployment.md#Deployment-Modes)), list the tools to register in `MCP_TOOLS` (see [Configuration](./configuration.md#MCP_TOOLS)), optionally set `DELEGATED_ACCESS_SCAN` (see [Configuration](./configuration.md#DELEGATED_ACCESS_SCAN)), and optionally list calendar tools (Entra consent first — see [Configuration — Calendar tools](./configuration.md#Calendar-tools)).
+   > **Key decisions:** Set `MCP_BACKEND` (see [Deployment Modes](./deployment.md#Deployment-Modes)), list the tools to register in `MCP_TOOLS` (see [Configuration](./configuration.md#MCP_TOOLS)), optionally set `DELEGATED_ACCESS_SCAN` (see [Configuration](./configuration.md#DELEGATED_ACCESS_SCAN)), and optionally list calendar tools (register the scope on the Entra app first — see [Configuration — Calendar tools](./configuration.md#Calendar-tools)).
 
 6. **Deploy with Helm** — Install the chart. See [Deployment — Install](./deployment.md#Install).
 7. **Security checklist** — Before going to production, verify the following:

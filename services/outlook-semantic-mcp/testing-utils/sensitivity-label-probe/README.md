@@ -9,7 +9,8 @@ Two markers exist, and both are read with
 
 - the Purview sensitivity label, `String {00020386-0000-0000-C000-000000000046} Name msip_labels`.
   Its value is `MSIP_Label_<label id>_Enabled=True;...;MSIP_Label_<label id>_Name=<name>;...`,
-  one group per label. A sublabel carries only its own name.
+  one group per label. The results hold no sublabel and no renamed label, so which name a
+  sublabel or a renamed label carries was not probed.
 - the legacy Outlook flag, `Integer 0x0036` (PidTagSensitivity): 0 normal, 1 personal, 2 private,
   3 confidential.
 
@@ -31,6 +32,10 @@ Two markers exist, and both are read with
   `singleValueExtendedProperties/any(ep: ep/id eq 'Integer 0x0036' and cast(ep/value, Edm.Int32) ne 0)`,
   but Graph rejects `$filter` together with `$search` (400 `SearchWithFilter`), so it cannot
   narrow a search.
+- Graph returns a property under its own spelling of the requested id: `Integer 0x36` for
+  `Integer 0x0036`, and the property set GUID in lower case. This was seen in the end-to-end run
+  of the server against the test tenant, not in this probe's results. The server compares ids in
+  that canonical form.
 
 ## Requests
 

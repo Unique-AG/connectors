@@ -36,6 +36,8 @@ Copy `.env.example` to `.env` and configure the following:
 | Variable | Description |
 |----------|-------------|
 | `SELF_URL` | Base URL for OAuth callbacks |
+| `MCP_BACKEND` | `microsoft_graph_and_unique_api` (ingestion and semantic search) or `microsoft_graph` (direct Graph search). No default |
+| `MCP_TOOLS` | JSON array of the tools to register, e.g. `["search_emails","open_email"]` |
 | `DATABASE_URL` | PostgreSQL connection string |
 | `AMQP_URL` | RabbitMQ connection string |
 | `MICROSOFT_CLIENT_ID` | Azure AD application client ID |
