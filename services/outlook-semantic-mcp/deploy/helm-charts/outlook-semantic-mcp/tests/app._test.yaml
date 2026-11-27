@@ -45,3 +45,104 @@ tests:
           content:
             name: CALENDAR_INTEGRATION
           any: true
+
+  - it: renders DIRECTORY_SYNC_MODE scheduled by default
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIRECTORY_SYNC_MODE
+            value: scheduled
+
+  - it: renders DIRECTORY_SYNC_MODE on_demand when set
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+          directorySyncMode: on_demand
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DIRECTORY_SYNC_MODE
+            value: on_demand
+
+  - it: rejects an unknown directorySyncMode
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          tools:
+            - search_emails
+          directorySyncMode: hourly
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "directorySyncMode"
+
+  - it: fails to render directorySyncMode on_demand outside microsoft_graph mode
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph_and_unique_api
+          tools:
+            - search_emails
+          directorySyncMode: on_demand
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "directorySyncMode on_demand needs mcpConfig.app.mcpBackend microsoft_graph"
+
+  - it: fails to render directorySyncMode on_demand with delegated access on
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+          directorySyncMode: on_demand
+        delegatedAccess:
+          scan: full_access_only
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "directorySyncMode on_demand needs mcpConfig.delegatedAccess.scan disabled"

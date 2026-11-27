@@ -2366,6 +2366,15 @@
               "description": "Mandatory. The tools to register, by name. Listing a calendar tool turns calendar on. Env var: MCP_TOOLS (JSON array)",
               "default": []
             },
+            "directorySyncMode": {
+              "type": "string",
+              "enum": [
+                "scheduled",
+                "on_demand"
+              ],
+              "description": "How the folder cache is refreshed. scheduled: a cron and a scan at startup (default). on_demand: list_mailboxes_and_directories and folder-filtered searches refresh the caller's folders. on_demand needs mcpBackend microsoft_graph and delegatedAccess.scan disabled. Env var: DIRECTORY_SYNC_MODE",
+              "default": "scheduled"
+            },
             "delegatedAccessScan": {
               "type": "string",
               "enum": [

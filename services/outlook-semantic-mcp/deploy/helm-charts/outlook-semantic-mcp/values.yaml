@@ -311,6 +311,12 @@ mcpConfig:
     # -- Mandatory, non-empty list of the tools to register. Env var: MCP_TOOLS (JSON array).
     #    A calendar tool needs Calendars.ReadWrite.Shared on the Entra app first.
     tools: []
+    # -- How the folder cache is refreshed. Env var: DIRECTORY_SYNC_MODE
+    #   scheduled - a cron (directorySyncCronSchedule) and a scan at startup refresh every user's folders
+    #   on_demand - no cron and no startup scan. list_mailboxes_and_directories refreshes the caller's folders on
+    #               every call, and search_emails with a folder filter does when they are over 4 hours old.
+    #               Needs mcpBackend: microsoft_graph and delegatedAccess.scan: disabled.
+    directorySyncMode: scheduled
     # -- Optional. Cron schedule for syncing mail folder structure for all active subscriptions.
     # Default: '*/5 * * * *'. Env var: DIRECTORY_SYNC_CRON_SCHEDULE
     # directorySyncCronSchedule: '*/5 * * * *'

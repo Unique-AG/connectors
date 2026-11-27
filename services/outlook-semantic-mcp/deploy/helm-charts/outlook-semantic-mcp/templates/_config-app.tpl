@@ -11,6 +11,16 @@
 {{- end }}
 - name: MCP_TOOLS
   value: {{ toJson .app.tools | quote }}
+{{- if eq .app.directorySyncMode "on_demand" }}
+{{- if ne .app.mcpBackend "microsoft_graph" }}
+{{- fail "mcpConfig.app.directorySyncMode on_demand needs mcpConfig.app.mcpBackend microsoft_graph: ingestion syncs the folders itself." }}
+{{- end }}
+{{- if ne .delegatedAccess.scan "disabled" }}
+{{- fail "mcpConfig.app.directorySyncMode on_demand needs mcpConfig.delegatedAccess.scan disabled: only the scheduled sync refreshes shared mailbox folders." }}
+{{- end }}
+{{- end }}
+- name: DIRECTORY_SYNC_MODE
+  value: {{ .app.directorySyncMode | quote }}
 {{- if .app.directorySyncCronSchedule }}
 - name: DIRECTORY_SYNC_CRON_SCHEDULE
   value: {{ .app.directorySyncCronSchedule | quote }}
