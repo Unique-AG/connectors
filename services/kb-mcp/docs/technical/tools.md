@@ -74,7 +74,9 @@ build the deep links.
 
 Browses, lists, and fuzzy-searches the folders and files visible to the caller. `mode` picks the
 view; only that mode's arguments apply, and passing one that doesn't (e.g. `query` under
-`mode='tree'`) is a tool error, not a silent no-op.
+`mode='tree'`) is a tool error, not a silent no-op. `list` and `search` rows start with a markdown
+link: `unique://content/{id}` for Unique AI, otherwise the knowledge-upload deep link when the
+frontend URL and folder are known, else `unique://content/{id}`.
 
 | Argument | Applies to | Purpose |
 |---|---|---|
