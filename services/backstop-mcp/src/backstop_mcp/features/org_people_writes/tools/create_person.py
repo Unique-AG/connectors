@@ -39,6 +39,9 @@ async def create_person(
     `update_custom_field_values`. Category ids come from `list_contact_categories`.
     To change an existing person, use `update_person`.
 
+    Do not cite this tool's result: it confirms the write, it is not a source. Cite the
+    person you read with `get_person` instead.
+
     Call like: {"person": {"last_name": "Smith", "gender": "Female",
     "category_ids": ["<id from list_contact_categories>"]}}
     """

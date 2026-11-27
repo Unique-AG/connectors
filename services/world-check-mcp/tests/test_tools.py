@@ -11,6 +11,7 @@ from typing import cast, Self
 
 from fastmcp import Client
 from fastmcp import FastMCP
+from fastmcp.client.client import CallToolResult
 from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 from fastmcp.server.auth import StaticTokenVerifier
@@ -20,6 +21,7 @@ from mcp.client import session
 from mcp.shared.exceptions import MCPError
 from mcp_configs import ServerSettings
 from mcp_types import ElicitResult
+from mcp_types import TextContent
 from pydantic import AnyHttpUrl
 from pydantic import TypeAdapter
 import pytest
@@ -310,9 +312,76 @@ def _world_check(request: httpx2.Request) -> httpx2.Response:
             {
                 "entityType": "INDIVIDUAL",
                 "referenceId": "e_1",
-                "names": {"nameDetails": [{"details": [{"value": "Ada Lovelace"}]}]},
+                "names": {
+                    "nameDetails": [
+                        {"type": "AKA", "details": [{"type": "FULL_NAME", "value": "Countess A"}]},
+                        {
+                            "type": "PRIMARY",
+                            "details": [
+                                {"type": "FIRST_NAME", "value": "Ada"},
+                                {"type": "FULL_NAME", "value": "Ada Lovelace"},
+                            ],
+                        },
+                    ]
+                },
                 "sources": [],
                 "categories": [{"value": "PEP"}],
+                "sourceReferenceLinks": {
+                    "sourceReferenceLinkDetails": [
+                        {"uri": "ftp://registry.example.org/e_1"},
+                        {"uri": "https://registry.example.org/officials/e_1", "tags": ["PDF"]},
+                        {"uri": "https://news.example.com/2026/ada-lovelace-appointed"},
+                    ]
+                },
+            },
+        )
+    if path.endswith("/references/records/e_2"):
+        return _json(
+            200,
+            {
+                "entityType": "INDIVIDUAL",
+                "referenceId": "e_2",
+                "names": {"nameDetails": [{"details": [{"value": "Grace Hopper"}]}]},
+                "sources": [],
+            },
+        )
+    if path.endswith("/references/records/e_3"):
+        return _json(
+            200,
+            {
+                "entityType": "INDIVIDUAL",
+                "referenceId": "e_3",
+                "names": {"nameDetails": [{"details": [{"value": "Mary Somerville"}]}]},
+                "sources": [],
+                "sourceReferenceLinks": {
+                    "sourceReferenceLinkDetails": [
+                        {"uri": "HTTPS://registry.example.org/officials/e_3"},
+                    ]
+                },
+            },
+        )
+    if path.endswith("/references/records/e_4"):
+        return _json(
+            200,
+            {
+                "entityType": "INDIVIDUAL",
+                "referenceId": "e_4",
+                "names": {
+                    "nameDetails": [
+                        {
+                            "type": "AKA",
+                            "details": [{"type": "FULL_NAME", "value": "Queen of Code"}],
+                        },
+                        {
+                            "type": "PRIMARY",
+                            "details": [
+                                {"type": "FIRST_NAME", "value": "Grace"},
+                                {"type": "LAST_NAME", "value": "Hopper"},
+                            ],
+                        },
+                    ]
+                },
+                "sources": [],
             },
         )
     if path.endswith("/references/countries"):
@@ -835,8 +904,62 @@ async def test_get_profile_uses_the_record_reference_id() -> None:
 
     profile = result.structured_content
     assert profile is not None
-    assert profile["names"] == ["Ada Lovelace"]
+    assert profile["names"] == ["Countess A", "Ada", "Ada Lovelace"]
     assert profile["categories"] == ["PEP"]
+
+
+async def test_get_profile_is_titled_by_the_primary_name_and_links_its_first_source_page() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_1"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["name"] == "Ada Lovelace"
+    assert profile["url"] == "https://registry.example.org/officials/e_1"
+
+
+async def test_get_profile_has_no_link_when_lseg_cites_no_source_page() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_2"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["name"] == "Grace Hopper"
+    assert profile["url"] is None
+
+
+async def test_get_profile_prefers_a_primary_name_part_to_an_aka_full_name() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_4"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["name"] == "Grace"
+
+
+async def test_get_profile_links_a_source_page_whose_scheme_is_uppercase() -> None:
+    async with Client(_server()) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_3"})
+
+    profile = result.structured_content
+    assert profile is not None
+    assert profile["url"] == "HTTPS://registry.example.org/officials/e_3"
+
+
+def _texts(result: CallToolResult) -> list[TextContent]:
+    assert all(isinstance(item, TextContent) for item in result.content)
+    return cast(list[TextContent], result.content)
+
+
+async def test_get_profile_sends_the_record_over_http_as_one_json_item() -> None:
+    async with _serve_over_http(_server()) as url, Client(url) as client:
+        result = await client.call_tool("get_profile", {"reference_id": "e_1"})
+
+    (profile,) = _texts(result)
+    assert profile.meta is None
+    assert json.loads(profile.text) == result.structured_content
+    assert result.structured_content is not None
+    assert result.structured_content["name"] == "Ada Lovelace"
 
 
 async def test_list_cases_filters_to_the_group() -> None:

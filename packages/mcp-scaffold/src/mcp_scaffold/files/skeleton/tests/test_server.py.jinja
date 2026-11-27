@@ -80,6 +80,21 @@ def test_cors_lets_a_browser_client_read_the_auth_and_session_headers(client: Te
     assert response.headers["access-control-expose-headers"] == "WWW-Authenticate, Mcp-Session-Id"
 
 
+def test_cors_preflight_allows_the_mcp_request_headers(client: TestClient) -> None:
+    headers = {
+        "Host": LOCAL_HOST,
+        "Origin": "http://localhost:6274",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "mcp-method, mcp-name, content-type",
+    }
+
+    response = client.options("/mcp", headers=headers)
+
+    assert response.status_code == 200
+    allowed = response.headers["access-control-allow-headers"].split(", ")
+    assert {"Mcp-Method", "Mcp-Name"} <= set(allowed)
+
+
 {% if options.auth %}
 def test_the_server_signs_users_in_so_it_serves_beyond_loopback(
     server: FastMCP, served: list[str]

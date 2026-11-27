@@ -116,7 +116,7 @@ uc-14-08:
     - tool: outlook_create_event_on_behalf
       args: {subject: Budget review, attendees: Anna}
       uses: {calendar_ref: handle of Lena's calendar}
-  note: "expected behaviour, one row each. Sign-in expired, shared/seam/advice.py:251-256: ask the user to sign in to this connector again. No access, shared/seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the permission, retrying will not help. No calendar of Lena, tools/outlook_create_event_on_behalf.py:116-125 GRAPH_NOT_FOUND: no event was created, the calendar was removed or the owner withdrew the share, tell the user the calendar is no longer theirs to write to. Busy with a wait of 30 seconds, shared/seam/advice.py:240-244: retry after that, not sooner. Rejected booking, shared/seam/advice.py:312-317: a bad request that fails the same way again, with the reason of Microsoft."
+  note: "expected behaviour, one row each. Sign-in expired, shared/seam/advice.py:251-256: ask the user to sign in to this connector again. No access, shared/seam/advice.py:261-270: ask a Microsoft 365 administrator to grant the permission, retrying will not help. No calendar of Lena, tools/outlook_create_event_on_behalf.py:117-126 GRAPH_NOT_FOUND: no event was created, the calendar was removed or the owner withdrew the share, tell the user the calendar is no longer theirs to write to. Busy with a wait of 30 seconds, shared/seam/advice.py:240-244: retry after that, not sooner. Rejected booking, shared/seam/advice.py:312-317: a bad request that fails the same way again, with the reason of Microsoft."
 
 uc-14-09:
   status: working
@@ -132,7 +132,7 @@ uc-14-09:
       uses: {calendar_ref: handle of Lena's calendar}
     - tool: outlook_list_events
       uses: {calendar_ref: handle of Lena's calendar}
-  note: "expected behaviour from shared/seam/advice.py:182-201 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (tools/outlook_create_event_on_behalf.py:105). The same advice is chosen at shared/seam/advice.py:279-281 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Budget review. The write is not repeated by the SDK (graph_client/client.py:220-232)."
+  note: "expected behaviour from shared/seam/advice.py:182-201 _OUTCOME_UNKNOWN: this connector does not know if Microsoft made the change, do not call this tool again first, make sure the change is not already there with outlook_list_events (tools/outlook_create_event_on_behalf.py:106). The same advice is chosen at shared/seam/advice.py:279-281 because the tool is not read-only and not idempotent. The create runs once. A second create follows only when the listing shows no Budget review. The write is not repeated by the SDK (graph_client/client.py:220-232)."
 
 uc-14-10:
   status: working
@@ -147,7 +147,7 @@ uc-14-10:
       optional: true
       args: {subject: Budget review, attendees: Anna}
       uses: {calendar_ref: handle of Lena's calendar}
-  note: "expected behaviour from tools/outlook_create_event_on_behalf.py:166-173 _READ_ONLY_CALENDAR: no event is created and nobody is invited, tell the user they can read that calendar and cannot add to it and that the owner has to grant edit access in Outlook first, and to put the event in the own calendar of the user call outlook_create_event. The refusal comes before the question to Mia (:453). The listing already shows can_edit false, so the assistant can stop before the call, and then the call is not made. This scenario differs from uc-14-04: there Lena shared nothing with Mia, here Lena shared the calendar for reading only."
+  note: "expected behaviour from tools/outlook_create_event_on_behalf.py:168-175 _READ_ONLY_CALENDAR: no event is created and nobody is invited, tell the user they can read that calendar and cannot add to it and that the owner has to grant edit access in Outlook first, and to put the event in the own calendar of the user call outlook_create_event. The refusal comes before the question to Mia (:453). The listing already shows can_edit false, so the assistant can stop before the call, and then the call is not made. This scenario differs from uc-14-04: there Lena shared nothing with Mia, here Lena shared the calendar for reading only."
 
 uc-14-11:
   status: working
@@ -357,4 +357,4 @@ uc-14-25:
     - tool: outlook_create_event_on_behalf
       args: {subject: Budget review, online_meeting: true}
       uses: {calendar_ref: handle of the calendar of Lena}
-  note: "tools/outlook_create_event_on_behalf.py:523-527: when the calendar allows Teams meetings, the tool asks Mia and sends the event as a Teams meeting. When it takes none, the tool refuses (uc-07-24 shows the same rule for Mia's own calendar)."
+  note: "tools/outlook_create_event_on_behalf.py:525-529: when the calendar allows Teams meetings, the tool asks Mia and sends the event as a Teams meeting. When it takes none, the tool refuses (uc-07-24 shows the same rule for Mia's own calendar)."

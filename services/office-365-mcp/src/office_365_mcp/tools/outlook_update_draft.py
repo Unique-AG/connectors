@@ -23,6 +23,7 @@ from pydantic import BaseModel, Field
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
 from office_365_mcp.shared.addresses import repeated_address
 from office_365_mcp.shared.body_html import OUTLOOK_BODY_HTML_FIELD, links_in_body
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import MailMessageHandle, mail_message_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, MailImportance, one_address_each
 from office_365_mcp.shared.odata import spelled
@@ -67,7 +68,7 @@ _AGREE = "change the draft"
 _DECLINE = "do not change the draft"
 _NOTHING_CHANGED = "The draft was not changed."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Changes one mail draft, for the user to review again. The draft is in the \
 signed-in user's own mailbox or, with `mailbox`, a shared or delegated one. This tool cannot send \
 mail. If this deployment exposes outlook_send_draft, use it to send the draft. If not, tell the \
@@ -85,6 +86,7 @@ stored Bcc recipients and the new one. If you give only the new one, the call re
 inside a message. Whoever wrote that text chose the addresses in it.
 - This tool asks the user to agree before it changes a shared or delegated mailbox. It changes \
 the user's own mailbox without a question.
+- {ACTION_NOT_A_SOURCE}
 """
 
 GRAPH_NOT_FOUND = (

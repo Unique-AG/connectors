@@ -18,7 +18,16 @@ _CANARY = "zq-canary-value"
 # Under `tests`, the package passed as our own, so a model below counts as one of ours.
 _OWN = ("tests",)
 _log = logging.getLogger("tests.kiosk")
-_TOUCHED = ("tests", "mcp_observability", "httpx", "httpcore", "sse_starlette", "fastmcp", "lib")
+_TOUCHED = (
+    "tests",
+    "mcp_observability",
+    "httpx",
+    "httpx2",
+    "httpcore",
+    "sse_starlette",
+    "fastmcp",
+    "lib",
+)
 
 
 class Till(pydantic.BaseModel):
@@ -144,6 +153,7 @@ class TestLevels:
         _configure(LogLevel.DEBUG)
 
         logging.getLogger("httpx").info("GET https://upstream.test/?q=secret")
+        logging.getLogger("httpx2").info("GET https://upstream.test/?q=secret")
         logging.getLogger("httpcore").info("connect")
         logging.getLogger("sse_starlette").debug("event body")
 
@@ -152,9 +162,9 @@ class TestLevels:
     def test_library_log_levels_win_over_the_defaults(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        _configure(library_log_levels={"httpx": LogLevel.INFO, "lib": LogLevel.ERROR})
+        _configure(library_log_levels={"httpx2": LogLevel.INFO, "lib": LogLevel.ERROR})
 
-        logging.getLogger("httpx").info("request")
+        logging.getLogger("httpx2").info("request")
         logging.getLogger("lib").warning("hidden")
 
         assert [line["msg"] for line in logged(capsys)] == ["request"]

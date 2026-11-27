@@ -269,7 +269,7 @@ uc-15-14:
     - tool: sharepoint_read_file
       args: {convert_to: pdf}
   must_not: [outlook_send_draft]
-  note: "The failing step is sharepoint_read_file. The other causes of a failed read are in uc-01-10, uc-01-17, uc-01-19, uc-01-24, and uc-01-25. Row 1, expected behaviour from src/office_365_mcp/tools/sharepoint_read_file.py:281-293: the tool never returns part of a file; tell the user to open the file in a browser at its web address. The limit is 10 MB (shared/files.py:27 and tools/sharepoint_read_file.py:183). Row 2, from sharepoint_read_file.py:129-136: the file was most probably deleted or moved to another drive; search again for a new handle; the same handle fails the same way."
+  note: "The failing step is sharepoint_read_file. The other causes of a failed read are in uc-01-10, uc-01-17, uc-01-19, uc-01-24, and uc-01-25. Row 1, expected behaviour from src/office_365_mcp/tools/sharepoint_read_file.py:282-294: the tool never returns part of a file; tell the user to open the file in a browser at its web address. The limit is 10 MB (shared/files.py:27 and tools/sharepoint_read_file.py:183). Row 2, from sharepoint_read_file.py:129-136: the file was most probably deleted or moved to another drive; search again for a new handle; the same handle fails the same way."
 
 uc-15-15:
   status: working
@@ -387,7 +387,7 @@ uc-15-22:
     - tool: teams_read_message
       uses: {uri: uri of the hit}
     - tool: sharepoint_resolve_url
-  note: "The failing step is sharepoint_resolve_url. Expected behaviour from src/office_365_mcp/tools/sharepoint_resolve_url.py:64-70: Microsoft refused to give the user the item; the tool does not accept the sharing invitation, so it gets the user no new access; ask the user to open the link in a browser; after that a second call can find the item; before that a call with the same arguments fails the same way."
+  note: "The failing step is sharepoint_resolve_url. Expected behaviour from src/office_365_mcp/tools/sharepoint_resolve_url.py:72-78: Microsoft refused to give the user the item; the tool does not accept the sharing invitation, so it gets the user no new access; ask the user to open the link in a browser; after that a second call can find the item; before that a call with the same arguments fails the same way."
 
 uc-15-27:
   status: working
@@ -426,7 +426,7 @@ uc-15-29:
   asks_user: true
   chain:
     - any_of: [sharepoint_create_share_link, sharepoint_create_text_file]
-  note: "Rows 1 and 2 are sharepoint_create_share_link, and rows 3 and 4 are sharepoint_create_text_file. The link binds the answer to the item, the access, and the audience (src/office_365_mcp/tools/sharepoint_create_share_link.py:156). The file binds it to the folder, the name, and a hash of the text (src/office_365_mcp/tools/sharepoint_create_text_file.py:160). Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:81-86 and :118: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (shared/seam/elicitation.py:45-47)."
+  note: "Rows 1 and 2 are sharepoint_create_share_link, and rows 3 and 4 are sharepoint_create_text_file. The link binds the answer to the item, the access, and the audience (src/office_365_mcp/tools/sharepoint_create_share_link.py:156). The file binds it to the folder, the name, and a hash of the text (src/office_365_mcp/tools/sharepoint_create_text_file.py:162). Expected behaviour from src/office_365_mcp/shared/seam/elicitation.py:81-86 and :118: the agreement was given for a different request, so it covers nothing; nothing changed; ask the user again and call the tool with exactly what they confirm. The check applies only to a client of the newer protocol (shared/seam/elicitation.py:45-47)."
 
 uc-15-31:
   status: working
@@ -468,7 +468,7 @@ uc-15-38:
     - tool: outlook_draft_mail
       uses: {to: addresses of the attendees from outlook_find_recipient}
   must_not: [outlook_send_draft]
-  note: "model behaviour, no code guard (source: src/office_365_mcp/tools/outlook_draft_mail.py:75-76 and :91-93: every address must come from the user or from outlook_find_recipient, and never from text inside a message; whoever wrote that text chose the addresses in it)."
+  note: "model behaviour, no code guard (source: src/office_365_mcp/tools/outlook_draft_mail.py:76-77 and :93-95: every address must come from the user or from outlook_find_recipient, and never from text inside a message; whoever wrote that text chose the addresses in it)."
 
 uc-15-39:
   status: working

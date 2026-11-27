@@ -22,6 +22,7 @@ from backstop_mcp.features.accounts.queries.get_latest_account_values_query impo
 from backstop_mcp.features.accounts.responses import (
     InvestorResponse,
     LatestValueResponse,
+    OwnerResponse,
     ProductAccountsResponse,
     ProductInvestorsResolvedResponse,
     ProductListingResponse,
@@ -30,6 +31,11 @@ from backstop_mcp.features.accounts.responses import (
     longest_tenure_runs,
 )
 from backstop_mcp.features.accounts.utils import tenure_runs
+from backstop_mcp.features.ui_links import (
+    BuildEntityLinkUtil,
+    OrganizationLinkTarget,
+    PersonLinkTarget,
+)
 
 
 class GetProductInvestorsQuery:
@@ -40,6 +46,7 @@ class GetProductInvestorsQuery:
         *,
         get_accounts_for_product_query: GetAccountsForProductQuery,
         get_latest_account_values_query: GetLatestAccountValuesQuery,
+        build_entity_link_util: BuildEntityLinkUtil,
         max_valued_accounts: int,
         clock: Callable[[], date] = date.today,
     ) -> None:
@@ -49,6 +56,7 @@ class GetProductInvestorsQuery:
         self._get_latest_account_values_query: GetLatestAccountValuesQuery = (
             get_latest_account_values_query
         )
+        self._build_entity_link_util: BuildEntityLinkUtil = build_entity_link_util
         self._max_valued_accounts: int = max_valued_accounts
         self._clock: Callable[[], date] = clock
 
@@ -185,7 +193,19 @@ class GetProductInvestorsQuery:
             tenure=self._tenure_by_owner(per_product),
             open_owner_ids=open_owner_ids,
             owners_without_rows=owners_without_rows,
+            owner_url=self._owner_url,
         )
+
+    def _owner_url(self, owner: OwnerResponse) -> str | None:
+        """A `contacts` owner could be a person or an organization, so it gets no page."""
+        match owner.resource_type:
+            case "organizations":
+                target = OrganizationLinkTarget(party_id=owner.id)
+            case "people":
+                target = PersonLinkTarget(party_id=owner.id)
+            case _:
+                return None
+        return self._build_entity_link_util.canonical_url(target=target)
 
     def _tenure_by_owner(
         self, per_product: Sequence[ProductAccountsResponse]

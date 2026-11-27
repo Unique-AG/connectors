@@ -78,6 +78,7 @@ from office_365_mcp.shared.calendar import (
     with_default_online_meeting,
     zone_named,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import EventHandle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each
 from office_365_mcp.shared.odata import spelled
@@ -122,7 +123,7 @@ _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No event was created."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates one event on the signed-in user's own default calendar. With any attendee, this tool \
 sends the invitation immediately, and nothing here can recall it. If this deployment \
 exposes outlook_create_event_on_behalf, use it for a calendar that somebody else shared, and for a \
@@ -141,6 +142,7 @@ no draft state to hold that event for review first.
 call.
 - If a call times out, do not call this tool again first. An invitation can already be out. \
 Before you create the event again, make sure that outlook_list_events does not already show it.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

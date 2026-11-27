@@ -5,6 +5,10 @@ from pydantic import Field
 
 
 class Profile(BaseModel):
+    name: str | None = Field(description="Primary name of the record.")
+    url: str | None = Field(
+        description="First public source page LSEG cites for the record, or null when it has none."
+    )
     reference_id: str = Field(description="World-Check record reference ID.")
     entity_type: str = Field(description="Entity type, INDIVIDUAL or ORGANISATION.")
     names: list[str] = Field(description="Names on the record, primary first.")

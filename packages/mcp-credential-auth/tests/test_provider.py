@@ -3,18 +3,23 @@ from datetime import UTC, datetime, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from mcp.server.auth.provider import AuthorizationCode, AuthorizationParams, TokenError
-from mcp.shared.auth import OAuthClientInformationFull, OAuthToken
+from mcp.server.auth.provider import (
+    AuthorizationCode,
+    AuthorizationParams,
+    RegistrationError,
+    TokenError,
+)
+from mcp.shared.auth import InvalidRedirectUriError, OAuthClientInformationFull, OAuthToken
 from pydantic import AnyUrl
-from sqlalchemy import update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from mcp_credential_auth import CredentialOAuthProvider, transaction
+from mcp_credential_auth import CredentialOAuthProvider, read_session, transaction
 from mcp_credential_auth.models import AuthorizationCode as AuthorizationCodeRow
 from mcp_credential_auth.models import OAuthClient as OAuthClientRow
 from mcp_credential_auth.models import PendingAuthorization
 
-_REDIRECT_URI = "https://client.example/callback"
+_REDIRECT_URI = "https://claude.ai/api/mcp/auth_callback"
 
 
 def _provider(
@@ -30,20 +35,22 @@ def _provider(
     )
 
 
-def _client(client_id: str) -> OAuthClientInformationFull:
+def _client(client_id: str, redirect_uris: list[str] | None = None) -> OAuthClientInformationFull:
     return OAuthClientInformationFull(
         client_id=client_id,
-        redirect_uris=[AnyUrl(_REDIRECT_URI)],
+        redirect_uris=[AnyUrl(uri) for uri in redirect_uris or [_REDIRECT_URI]],
         client_name="Test Client",
     )
 
 
-def _params(*, scopes: list[str] | None = None) -> AuthorizationParams:
+def _params(
+    *, scopes: list[str] | None = None, redirect_uri: str = _REDIRECT_URI
+) -> AuthorizationParams:
     return AuthorizationParams(
         state="state",
         scopes=scopes or ["read"],
         code_challenge="challenge",
-        redirect_uri=AnyUrl(_REDIRECT_URI),
+        redirect_uri=AnyUrl(redirect_uri),
         redirect_uri_provided_explicitly=True,
     )
 
@@ -80,6 +87,118 @@ async def test_client_registration_round_trips(
     await provider.register_client(client)
 
     assert await provider.get_client(client.client_id or "") == client
+
+
+@pytest.mark.parametrize(
+    "redirect_uris",
+    [
+        ["https://claude.ai/api/mcp/auth_callback"],
+        ["http://localhost:3118/callback", "http://127.0.0.1:33418/"],
+        [
+            "cursor://anysphere.cursor-mcp/oauth/callback",
+            "http://localhost:8787/callback",
+            "https://www.cursor.com/agents/mcp/oauth/callback",
+        ],
+    ],
+)
+async def test_registers_clients_with_allowed_redirect_uris(
+    session_factory: async_sessionmaker[AsyncSession], redirect_uris: list[str]
+) -> None:
+    provider = _provider(session_factory)
+    client = _client(f"client-allowed-{len(redirect_uris)}", redirect_uris)
+
+    await provider.register_client(client)
+
+    assert await provider.get_client(client.client_id or "") == client
+
+
+@pytest.mark.parametrize(
+    ("redirect_uri", "description"),
+    [
+        (
+            "https://attacker.example/callback",
+            "Redirect URI https://attacker.example/callback has host attacker.example, "
+            + "which is not on the allowlist",
+        ),
+        ("javascript:alert(1)", "Redirect URI javascript:alert(1) uses the javascript: scheme"),
+        ("data:text/html,hi", "Redirect URI data:text/html,hi uses the data: scheme"),
+        ("file:///etc/passwd", "Redirect URI file:///etc/passwd uses the file: scheme"),
+        (
+            "https://claude.ai/api/mcp/auth_callback#x",
+            "Redirect URI https://claude.ai/api/mcp/auth_callback#x has a fragment",
+        ),
+    ],
+)
+async def test_rejects_registration_with_a_disallowed_redirect_uri(
+    session_factory: async_sessionmaker[AsyncSession], redirect_uri: str, description: str
+) -> None:
+    provider = _provider(session_factory)
+    client = _client("client-rejected", [_REDIRECT_URI, redirect_uri])
+
+    with pytest.raises(RegistrationError) as raised:
+        await provider.register_client(client)
+
+    assert raised.value.error == "invalid_redirect_uri"
+    assert raised.value.error_description == description
+    assert await provider.get_client("client-rejected") is None
+
+
+async def test_registration_follows_a_configured_allowlist(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = CredentialOAuthProvider(
+        base_url="https://mcp.example",
+        session_factory=session_factory,
+        login_path="/login",
+        allowed_redirect_hosts=["client.example"],
+        allowed_redirect_schemes=[],
+    )
+    allowed = _client("client-configured", ["https://client.example/callback"])
+
+    await provider.register_client(allowed)
+
+    with pytest.raises(RegistrationError):
+        await provider.register_client(_client("client-default-host"))
+
+
+async def test_previously_registered_client_loses_disallowed_redirect_uris(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = _provider(session_factory)
+    legacy = _client("client-legacy", ["https://attacker.example/callback", _REDIRECT_URI])
+    async with transaction(session_factory) as session:
+        session.add(
+            OAuthClientRow(
+                client_id="client-legacy", client_metadata=legacy.model_dump(mode="json")
+            )
+        )
+
+    loaded = await provider.get_client("client-legacy")
+
+    assert loaded is not None
+    assert loaded.redirect_uris == [AnyUrl(_REDIRECT_URI)]
+    with pytest.raises(InvalidRedirectUriError):
+        loaded.validate_redirect_uri(AnyUrl("https://attacker.example/callback"))
+
+
+async def test_previously_registered_client_with_no_allowed_redirect_uri_cannot_authorize(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    provider = _provider(session_factory)
+    legacy = _client("client-legacy-only", ["https://attacker.example/callback"])
+    async with transaction(session_factory) as session:
+        session.add(
+            OAuthClientRow(
+                client_id="client-legacy-only", client_metadata=legacy.model_dump(mode="json")
+            )
+        )
+
+    loaded = await provider.get_client("client-legacy-only")
+
+    assert loaded is not None
+    assert loaded.redirect_uris is None
+    with pytest.raises(InvalidRedirectUriError):
+        loaded.validate_redirect_uri(None)
 
 
 async def test_authorization_completion_is_single_use(
@@ -125,6 +244,33 @@ async def test_authorization_completion_rechecks_expiry(
         return "subject"
 
     assert await provider.complete_authorization(pending, subject_factory) is None
+
+
+async def test_authorization_completion_rechecks_the_redirect_policy(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    redirect_uri = "https://client.example/callback"
+    before_narrowing = CredentialOAuthProvider(
+        base_url="https://mcp.example",
+        session_factory=session_factory,
+        login_path="/login",
+        allowed_redirect_hosts=["client.example"],
+    )
+    client = _client("client-narrowed", [redirect_uri])
+    await before_narrowing.register_client(client)
+    location = await before_narrowing.authorize(client, _params(redirect_uri=redirect_uri))
+    request_id = parse_qs(urlparse(location).query)["request_id"][0]
+    pending = await before_narrowing.load_pending_authorization(request_id)
+    assert pending is not None
+    after_narrowing = _provider(session_factory)
+
+    async def subject_factory(_session: AsyncSession) -> str:
+        return "subject"
+
+    assert await after_narrowing.complete_authorization(pending, subject_factory) is None
+    async with read_session(session_factory) as session:
+        issued_codes = await session.scalar(select(func.count()).select_from(AuthorizationCodeRow))
+    assert issued_codes == 0
 
 
 async def test_authorization_code_exchange_is_single_use(

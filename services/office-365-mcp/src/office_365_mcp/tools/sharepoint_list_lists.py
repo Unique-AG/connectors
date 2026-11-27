@@ -15,6 +15,7 @@ from office_365_mcp.graph_client import (
     graph_errors,
     graph_step,
 )
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.files import BrowserUrl
 from office_365_mcp.shared.handles import ListHandle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -37,7 +38,9 @@ _LIBRARY_TEMPLATES = frozenset({"documentLibrary", "mySiteDocumentLibrary"})
 
 _ListsQuery = ListsRequestBuilder.ListsRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source("lists", cite="the rows you read with sharepoint_list_items")
+
+_DESCRIPTION = f"""\
 Lists the SharePoint lists of one site, each with a handle. Pass `uri` as `list` to \
 sharepoint_get_list to see its columns, or to sharepoint_list_items to read its items.
 
@@ -46,6 +49,7 @@ Notes:
 sharepoint_list_drives, it lists the libraries of a site. If it exposes sharepoint_search_files, \
 use it to find files.
 - This tool does not sort the rows.
+- {_NOT_A_SOURCE}
 """
 
 

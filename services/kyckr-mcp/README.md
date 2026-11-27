@@ -87,6 +87,8 @@ With `ZITADEL_ORG_ID` set, the MCP asks Zitadel for the org scope `urn:zitadel:i
 
 ## Delivering and rotating the Kyckr key
 
+`deploy/terraform/azure/kyckr-mcp-secrets` creates the Key Vault placeholder `manual-kyckr-mcp-upstream-api-key`, valued `<TO BE SET MANUALLY>`. Set it by hand, then map it in the overlay's ExternalSecret.
+
 In the Unique QA overlay pattern, an ExternalSecret writes the secrets into a Kubernetes Secret from Azure Key Vault. The overlay lists that Secret in `extraEnvSecrets`, and each Secret key becomes an environment variable. An example, with placeholders:
 
 ```yaml

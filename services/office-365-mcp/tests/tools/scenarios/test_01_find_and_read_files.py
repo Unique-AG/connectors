@@ -67,9 +67,8 @@ async def _resource(file: str, **arguments: object) -> TextResourceContents | Bl
     [block] = [
         block
         for block in await _read_blocks(file, **arguments)
-        if not isinstance(block, ResourceLink)
+        if isinstance(block, EmbeddedResource)
     ]
-    assert isinstance(block, EmbeddedResource)
     return block.resource
 
 
@@ -303,6 +302,15 @@ class TestReadingAFile:
         assert opened["name"] == "seed-v1 Project Plan.docx"
         assert await _read(cast("str", opened["uri"])) == (_DOCX, b"PK Q3 plan")
 
+    async def test_the_viewer_address_of_a_result_leads_to_the_same_file(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = serve(graph, "rec-tool-sharepoint_resolve_url-plan")
+
+        opened = await call("sharepoint_resolve_url", url=f"{_SHARING_LINK}?web=1")
+
+        assert opened["name"] == "seed-v1 Project Plan.docx"
+
     async def test_a_pasted_address_that_opens_nothing_sends_the_assistant_to_the_search(
         self, graph: respx.MockRouter
     ) -> None:
@@ -359,7 +367,7 @@ class TestReadingAFile:
 
         assert (link.name, link.uri, link.mime_type) == (
             "Brightway Launch Plan.pdf",
-            "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
+            "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf?web=1",
             _PDF,
         )
 
@@ -370,7 +378,7 @@ class TestReadingAFile:
 
         [link] = [block for block in await _read_blocks(_FILE) if isinstance(block, ResourceLink)]
 
-        assert link.uri == _ESCAPED_ADDRESS
+        assert link.uri == f"{_ESCAPED_ADDRESS}?web=1"
 
     async def test_a_file_of_exactly_ten_megabytes_is_read_as_a_whole(
         self, graph: respx.MockRouter
@@ -799,7 +807,50 @@ class TestWhatTheSearchAndTheListingsShow:
 
         level = await call("sharepoint_browse_folder", folder=_FOLDER)
 
-        assert [row["web_url"] for row in _rows(level, "items")] == [shown]
+        assert [(row["web_url"], row["download_url"]) for row in _rows(level, "items")] == [
+            (f"{shown}?web=1", shown)
+        ]
+
+    async def test_a_file_on_its_own_path_opens_in_the_viewer_and_keeps_its_download_address(
+        self, graph: respx.MockRouter
+    ) -> None:
+        _ = _serve_children(graph, _item())
+
+        [row] = _rows(await call("sharepoint_browse_folder", folder=_FOLDER), "items")
+
+        assert (row["name"], row["web_url"], row["download_url"]) == (
+            "Brightway Launch Plan.pdf",
+            "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf?web=1",
+            "https://contoso.sharepoint.invalid/sites/Sales/Brightway.pdf",
+        )
+
+    @pytest.mark.parametrize(
+        "viewer",
+        [
+            "https://contoso.sharepoint.invalid/sites/Sales/_layouts/15/Doc.aspx"
+            + "?sourcedoc=%7B0A1B2C3D%7D&file=Plan.docx&action=default",
+            "https://contoso.sharepoint.invalid/sites/Sales/_layouts/15/Doc.aspx",
+        ],
+        ids=["with-query", "without-query"],
+    )
+    async def test_an_office_viewer_page_is_kept_and_has_no_download_address(
+        self, graph: respx.MockRouter, viewer: str
+    ) -> None:
+        _ = _serve_children(graph, _item(web_url=viewer, mime_type=_DOCX))
+
+        [row] = _rows(await call("sharepoint_browse_folder", folder=_FOLDER), "items")
+
+        assert (row["web_url"], row["download_url"]) == (viewer, None)
+
+    async def test_a_folder_opens_at_its_own_address_and_has_no_download_address(
+        self, graph: respx.MockRouter
+    ) -> None:
+        folder = "https://contoso.sharepoint.invalid/sites/Sales/Shared%20Documents/Plans"
+        _ = _serve_children(graph, _item({"folder": {"childCount": 2}}, web_url=folder))
+
+        [row] = _rows(await call("sharepoint_browse_folder", folder=_FOLDER), "items")
+
+        assert (row["web_url"], row["download_url"]) == (folder, None)
 
     async def test_a_search_on_a_site_names_the_site(self, graph: respx.MockRouter) -> None:
         sales = "https://contoso.sharepoint.invalid/sites/Sales"

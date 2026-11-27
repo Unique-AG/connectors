@@ -8,9 +8,11 @@ import {
   type MsChatMessage,
   type MsSearchHit,
   MsSearchResponseSchema,
+  messageTitle,
 } from './chat.dtos';
 import { ChatService } from './chat.service';
 import { type BuildSearchQueryParams, buildSearchQuery } from './utils/build-search-query';
+import { chatMessageWebUrl } from './utils/teams-links';
 
 export interface SearchMessagesParams extends BuildSearchQueryParams {
   offset: number;
@@ -19,6 +21,8 @@ export interface SearchMessagesParams extends BuildSearchQueryParams {
 
 export interface SearchMessageRow {
   id: string;
+  /** The message subject, or else its sender and the start of its text. */
+  title: string | null;
   source: 'chat' | 'channel' | 'unknown';
   chatId: string | null;
   teamId: string | null;
@@ -81,7 +85,18 @@ function chatName(chat: MsChat): string | null {
 }
 
 function withoutContent(row: SearchMessageRow, senderAddress: string | null): SearchMessageRow {
-  return { ...row, senderDisplayName: row.senderDisplayName ?? senderAddress };
+  const senderDisplayName = row.senderDisplayName ?? senderAddress;
+  // The summary is the index's excerpt, with <c0> highlights and a <ddd/> ellipsis.
+  const title = messageTitle(
+    null,
+    senderDisplayName,
+    {
+      contentType: 'html',
+      content: row.summary ?? '',
+    },
+    null,
+  );
+  return { ...row, senderDisplayName, title };
 }
 
 // Rejects when `work` outlives `ms`. The request is left to finish on its own:
@@ -199,6 +214,8 @@ export class SearchService {
     const chatId = nonEmpty(resource?.chatId);
 
     const isChannel = teamId !== null && channelId !== null;
+    const messageId = nonEmpty(resource?.id);
+    const id = messageId ?? nonEmpty(hit.hitId) ?? '';
     const source = isChannel ? 'channel' : chatId !== null ? 'chat' : 'unknown';
 
     const from = resource?.from;
@@ -212,7 +229,8 @@ export class SearchService {
 
     return {
       row: {
-        id: nonEmpty(resource?.id) ?? nonEmpty(hit.hitId) ?? '',
+        id,
+        title: null,
         source,
         // The ids a row carries describe the container it reports, so a hit that
         // proves a channel does not also hand back a chat id to follow.
@@ -225,10 +243,12 @@ export class SearchService {
         senderDisplayName,
         summary: hit.summary ?? null,
         createdDateTime: nonEmpty(resource?.createdDateTime),
-        // The retrievable-property list names `webUrl` (a Teams deep link); the
-        // documented example payloads carry `webLink` (an Outlook Web URL)
-        // instead, so this field may hold either kind of link.
-        webUrl: resource?.webUrl ?? resource?.webLink ?? null,
+        // A chat hit links to its Teams message when both ids are present, else to the
+        // hit's own link. `hitId` is an Exchange id, so it never builds a link.
+        webUrl:
+          !isChannel && chatId !== null && messageId !== null
+            ? chatMessageWebUrl(chatId, messageId)
+            : (resource?.webUrl ?? resource?.webLink ?? null),
       },
       senderAddress: nonEmpty(from?.emailAddress?.address),
     };
@@ -361,12 +381,12 @@ export class SearchService {
           try {
             const message = await withDeadline(fetchMessage(), remaining);
 
-            // The hit's own fields only fill gaps, so a row reads the same
-            // whether or not the fetch landed. `webUrl` is never taken from the
-            // message: chatmessage-get returns null for a chat message and would
-            // blank the link the hit gave us.
+            // Hit fields only fill gaps, except the title (built from the whole body, not
+            // the excerpt) and `webUrl` (a Teams link, where the hit's may be an Outlook one).
             return {
               ...row,
+              title: message.title ?? withoutContent(row, senderAddress).title,
+              webUrl: message.webUrl ?? row.webUrl,
               senderDisplayName:
                 row.senderDisplayName ?? message.from?.displayName ?? senderAddress,
               // The hit's timestamp is the index time, not the creation time: a

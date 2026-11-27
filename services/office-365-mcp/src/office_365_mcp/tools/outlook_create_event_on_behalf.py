@@ -79,6 +79,7 @@ from office_365_mcp.shared.calendar import (
     with_default_online_meeting,
     zone_named,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import EventHandle, calendar_handle
 from office_365_mcp.shared.mail import AddressFault, MailAddress, one_address_each
 from office_365_mcp.shared.odata import spelled
@@ -131,7 +132,7 @@ _NOTHING_HAPPENED = "No event was created."
 
 _THE_OWNER = "the person who owns that calendar"
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates one event on a calendar that is not the user's default calendar. That calendar is a \
 second calendar of the user, or a calendar that another person delegated or shared with the \
 user. With any attendee, this tool sends the invitation under the name of the calendar owner \
@@ -149,6 +150,7 @@ call.
 - If a call times out, an invitation can already be out under the owner's name. Before you \
 create the same event again, make sure that outlook_list_events on that calendar does not \
 already show it.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_CALENDAR_HANDLE = (

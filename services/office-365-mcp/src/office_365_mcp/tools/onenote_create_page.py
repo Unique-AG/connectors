@@ -21,6 +21,7 @@ from office_365_mcp.graph_client import (
     send_parsed,
 )
 from office_365_mcp.shared.body_html import ONENOTE_BODY_HTML_FIELD
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenotePageHandle,
@@ -94,7 +95,7 @@ _BOTH_SECTION_AND_SECTION_NAME = (
     + "write into the default section of the default notebook."
 )
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Writes a new page into the signed-in user's OneNote, or into a notebook that a Microsoft 365 \
 group or a SharePoint site owns. There is no way to attach a file or an image. \
 onenote_append_to_page adds to a page later. OneNote can show the change to everyone who opens \
@@ -125,6 +126,7 @@ days.
 on a `p`, `ul`, `ol`, `li` or `h1` to `h6` element. For example, `<p data-tag="to-do">` shows an \
 empty check box, and `data-tag="to-do:completed"` shows a check box with a check mark. Microsoft \
 Graph does not support custom tags.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

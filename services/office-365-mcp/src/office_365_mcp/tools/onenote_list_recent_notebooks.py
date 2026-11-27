@@ -10,6 +10,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.notes import client_url_of, web_url_of
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
 
@@ -32,11 +33,16 @@ GRAPH_PERMISSIONS: tuple[str, ...] = ("Notes.Read",)
 
 GRAPH_CALL_EXAMPLE: Mapping[str, object] = {}
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source("notebooks", cite="the page you read with onenote_read_page")
+
+_DESCRIPTION = f"""\
 Lists the notebooks the signed-in user recently opened, as Microsoft recorded it, newest \
 access first. This is Microsoft's own memory of recent activity, not a full listing. \
 onenote_list_notebooks is the sibling for the full list. A row here carries no handle. Pass \
-its `web_url` to onenote_find_notebook_from_url to get one.\
+its `web_url` to onenote_find_notebook_from_url to get one.
+
+Notes:
+- {_NOT_A_SOURCE}\
 """
 
 

@@ -16,6 +16,7 @@ on:
           - outlook-semantic-mcp
           - polixis-mcp
           - sharepoint-connector
+          - space-config-mcp
           - teams-mcp
           - with-intelligence-mcp
           - world-check-mcp

@@ -60,6 +60,7 @@ _DEFAULT_FIELDS: frozenset[str] = frozenset(
     {
         "id",
         "activity_id",
+        "url",
         "type",
         "title",
         "effective_date",
@@ -308,11 +309,11 @@ async def search_activities(
         Field(
             default=None,
             description=(
-                "Sparse row fields. Default is id, activity_id, type, title, effective_date, "
-                "short_description, associated_with, tags, attendees, author, meeting_type, "
-                "attachments_count. `description` is only filled when include_description "
-                "is true. Select `url` when the answer will link to the activities — it is "
-                "off by default so a firm-wide search stays cheap. Pass `activity_id` to "
+                "Sparse row fields. Default is id, activity_id, url, type, title, "
+                "effective_date, short_description, associated_with, tags, attendees, "
+                "author, meeting_type, attachments_count. `description` is only filled "
+                "when include_description is true. Keep `url` in a custom list when the "
+                "answer will link to the activities. Pass `activity_id` to "
                 "get_activity_detail."
             ),
         ),

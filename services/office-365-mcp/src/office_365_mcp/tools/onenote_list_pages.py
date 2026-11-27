@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.handles import (
     OnenoteOwner,
     OnenoteSectionHandle,
@@ -80,7 +81,9 @@ _ORDER_BY_CLAUSES: Mapping[str, str] = {
     "title_desc": "title desc",
 }
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source("pages", cite="the page you read with onenote_read_page")
+
+_DESCRIPTION = f"""\
 Finds pages across every notebook the signed-in user can reach, inside one section, or inside the \
 notebooks of one group or one SharePoint site. `title_contains` matches the title only: Microsoft \
 Graph has no full-text search over a page's words for a work or school account. If the user asks \
@@ -92,6 +95,7 @@ instead.
 Notes:
 - The four date windows are inclusive at both ends and combine with AND. The default order is \
 newest change first.
+- {_NOT_A_SOURCE}
 """
 
 _NOT_A_SECTION_HANDLE = (

@@ -19,6 +19,7 @@ from office_365_mcp.graph_client import (
     request_with_json_body,
     send_parsed,
 )
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.files import (
     FAIL_ON_CONFLICT,
@@ -58,7 +59,7 @@ _CREATE = "create"
 _DO_NOT_CREATE = "do not create"
 _NOTHING_CREATED = "No folder was created."
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 This tool creates one new, empty folder inside `parent`, for the signed-in user. `parent` is a \
 folder in OneDrive or in a SharePoint document library. To see what a folder holds, use \
 sharepoint_browse_folder. The answer's `uri` is the handle of the new folder. OneDrive and \
@@ -69,6 +70,7 @@ Notes:
 - If a folder named `name` is already there, Microsoft refuses and creates nothing.
 - If a call times out, do not call this tool again first. Before you call again, make sure that \
 sharepoint_browse_folder does not show a folder named `name`.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_FOLDER_HANDLE = (

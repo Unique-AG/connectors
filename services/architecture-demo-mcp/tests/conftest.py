@@ -51,6 +51,10 @@ ACME_OCTOBER = [
     daily_bar("2026-10-19", 121),
 ]
 LATEST_CLOSES = {"ACME": daily_bar("2026-10-20", 120), "GLOBEX": daily_bar("2026-10-20", 40)}
+IEX_QUOTES = [
+    {"ticker": "acme", "last": 120.5, "tngoLast": 120.5, "prevClose": 119, "bidPrice": 120.4},
+    {"ticker": "globex", "last": 40.25, "tngoLast": 40.25, "prevClose": 40, "askPrice": 40.3},
+]
 
 
 class FakeTiingo:
@@ -76,6 +80,8 @@ class FakeTiingo:
                 return httpx2.Response(200, json=self._october(request))
             case ["tiingo", "daily", ticker, "prices"] if ticker in LATEST_CLOSES:
                 return httpx2.Response(200, json=[LATEST_CLOSES[ticker]])
+            case ["iex"]:
+                return httpx2.Response(200, json=IEX_QUOTES)
             case _:
                 return httpx2.Response(404, json={"detail": "Not found."})
 

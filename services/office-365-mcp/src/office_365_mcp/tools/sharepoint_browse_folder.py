@@ -15,6 +15,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import MAX_SCANNED_ITEMS, collect_pages, graph_errors, graph_step
+from office_365_mcp.shared.citations import lookup_not_a_source
 from office_365_mcp.shared.files import DRIVE_ROOT_ITEM_ID, ITEM_FIELDS, DriveItemSummary
 from office_365_mcp.shared.handles import DriveFolderHandle, drive_folder_handle
 from office_365_mcp.shared.seam import READ_ONLY, graph_client_for_caller
@@ -56,7 +57,11 @@ OrderBy = Literal["name", "last_modified", "created", "size"]
 
 _MISSING = float("-inf")
 
-_DESCRIPTION = """\
+_NOT_A_SOURCE = lookup_not_a_source(
+    "files and folders", cite="the file you read with sharepoint_read_file"
+)
+
+_DESCRIPTION = f"""\
 This tool lists every item directly inside one folder in OneDrive or SharePoint. It lists one \
 level only, and does not list items inside subfolders. You can use this tool to look through \
 the contents of a specific folder. The tool `sharepoint_search_files` finds files by name or by \
@@ -67,6 +72,7 @@ this tool instead.
 Notes:
 - With `order_by`, this tool reads up to 1000 items of the level and sorts them. Then it applies \
 `limit`.
+- {_NOT_A_SOURCE}
 """
 
 _NOT_A_FOLDER_HANDLE = (

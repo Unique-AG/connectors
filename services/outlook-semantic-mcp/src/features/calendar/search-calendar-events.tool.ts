@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
+import { NO_SUBJECT, subjectOrFallback } from '~/utils/no-subject';
 import { DateRangeSchema } from '~/utils/relative-range';
 import { SearchCalendarEventsQuery } from './search-calendar-events.query';
 import { META } from './search-calendar-events-tool.meta';
@@ -183,7 +184,11 @@ export const SearchCalendarEventsOutputSchema = z.object({
     ),
   message: z.string().describe('Human-readable summary of the outcome.'),
   events: z
-    .array(CalendarEventSchema)
+    .array(
+      CalendarEventSchema.extend({
+        title: z.string().describe(`Event subject, or "${NO_SUBJECT}" when it has none.`),
+      }),
+    )
     .optional()
     .describe('Matching events, sorted by start time, capped at 100.'),
   searchNotes: z
@@ -225,11 +230,18 @@ export class SearchCalendarEventsTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof SearchCalendarEventsOutputSchema>> {
     const { dateRange, ...filters } = input;
-    return this.searchCalendarEventsQuery.run(extractUserProfileId(request), {
-      ...filters,
-      ...(dateRange.rangeType === 'relative'
-        ? { range: dateRange.range }
-        : { startDateTime: dateRange.startDateTime, endDateTime: dateRange.endDateTime }),
-    });
+    const { events, ...rest } = await this.searchCalendarEventsQuery.run(
+      extractUserProfileId(request),
+      {
+        ...filters,
+        ...(dateRange.rangeType === 'relative'
+          ? { range: dateRange.range }
+          : { startDateTime: dateRange.startDateTime, endDateTime: dateRange.endDateTime }),
+      },
+    );
+    return {
+      ...rest,
+      events: events?.map((event) => ({ ...event, title: subjectOrFallback(event.subject) })),
+    };
   }
 }

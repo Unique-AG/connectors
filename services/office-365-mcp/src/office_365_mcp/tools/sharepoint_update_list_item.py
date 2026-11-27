@@ -19,6 +19,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import Field
 
 from office_365_mcp.graph_client import GraphFailure, graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import ListHandle, ListItemHandle, list_item_handle
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -68,7 +69,7 @@ _EMPTY = "(empty)"
 
 _ItemQuery = ListItemItemRequestBuilder.ListItemItemRequestBuilderGetQueryParameters
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Changes columns of one row of a SharePoint list, given the `uri` of an item from \
 sharepoint_list_items. It changes only the columns named in `fields` and keeps the others. Call \
 sharepoint_get_list first to learn the internal column names, their types, and the allowed choices.
@@ -84,6 +85,7 @@ refusal. Never drop a named column or say the user did not ask for it.
 - If somebody changes the row between this tool's read and its write, Microsoft refuses and \
 nothing changes.
 - This call is safe to repeat after a timeout.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_AN_ITEM_HANDLE = (

@@ -13,6 +13,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_errors, graph_step, no_retry, not_graph
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.confirmation import write_state_for
 from office_365_mcp.shared.handles import (
     OnenoteNotebookHandle,
@@ -61,7 +62,7 @@ _NOTHING_CREATED = "No section was created."
 _UNNAMED_NOTEBOOK = "an unnamed notebook"
 _UNNAMED_SECTION_GROUP = "an unnamed section group"
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates a new, empty section directly under `parent`, a notebook or a section group. The notebook \
 can be the signed-in user's own, or one that a Microsoft 365 group or a SharePoint site owns. \
 OneNote can show the change to everyone who opens the notebook.
@@ -76,6 +77,7 @@ onenote_list_sections does not show a section named `name`.
 notebook is not in the group. Create it there only when the user agrees. A copy of a section \
 into the group with onenote_copy_section works only for a notebook that is not on a SharePoint \
 site.
+- {ACTION_NOT_A_SOURCE}
 """
 
 _NOT_A_PARENT_HANDLE = (

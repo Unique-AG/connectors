@@ -159,7 +159,7 @@ uc-10-11:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour per row. Both rows fail at the read of the folder (item_for_a_question, tools/sharepoint_create_text_file.py:171), before the question to Mia, so asks_user is false. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again. Folder gone, from tools/sharepoint_create_text_file.py:124-131 (GRAPH_NOT_FOUND): the folder was most probably deleted or moved, find it again with sharepoint_search_files or sharepoint_browse_folder, and do not retry the same handle. A refusal at the save itself, after the question, is uc-10-35."
+  note: "expected behaviour per row. Both rows fail at the read of the folder (item_for_a_question, tools/sharepoint_create_text_file.py:173), before the question to Mia, so asks_user is false. Sign-in expired, from shared/seam/advice.py:251-256: ask the user to sign in to this connector again. Folder gone, from tools/sharepoint_create_text_file.py:126-133 (GRAPH_NOT_FOUND): the folder was most probably deleted or moved, find it again with sharepoint_search_files or sharepoint_browse_folder, and do not retry the same handle. A refusal at the save itself, after the question, is uc-10-35."
 
 uc-10-12:
   status: working
@@ -171,7 +171,7 @@ uc-10-12:
   chain:
     - any_of: [sharepoint_search_files, sharepoint_browse_folder]
     - any_of: [sharepoint_create_text_file, sharepoint_create_folder]
-  note: "expected behaviour for both rows from shared/seam/advice.py:304-311 (status 409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that shows a list of items. Both tools set FAIL_ON_CONFLICT (shared/files.py:55, tools/sharepoint_create_text_file.py:212, tools/sharepoint_create_folder.py:166), and their descriptions say Microsoft refuses and creates nothing (tools/sharepoint_create_text_file.py:95, tools/sharepoint_create_folder.py:69). The row for a folder uses the ask Create a folder 2026 Signed in my Notes folder."
+  note: "expected behaviour for both rows from shared/seam/advice.py:304-311 (status 409): an item at that level already has the same name, the same call fails the same way, change the name or use a tool that shows a list of items. Both tools set FAIL_ON_CONFLICT (shared/files.py:55, tools/sharepoint_create_text_file.py:214, tools/sharepoint_create_folder.py:168), and their descriptions say Microsoft refuses and creates nothing (tools/sharepoint_create_text_file.py:96, tools/sharepoint_create_folder.py:70). The row for a folder uses the ask Create a folder 2026 Signed in my Notes folder."
 
 uc-10-13:
   status: working
@@ -201,7 +201,7 @@ uc-10-14:
       uses: {folder: handle of the folder Notes}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_text_file.py:52) and tools/sharepoint_create_text_file.py:84-94: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a file named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_text_file.py:213), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_text_file.py:53) and tools/sharepoint_create_text_file.py:85-95: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a file named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_text_file.py:215), so the write is sent once. The chain holds exactly one create step, and the check comes before any second create."
 
 uc-10-15:
   status: working
@@ -217,7 +217,7 @@ uc-10-15:
       uses: {folder: handle of the folder Notes}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from tools/sharepoint_create_text_file.py:121-126 (_WRITTEN_BUT_UNREAD): Microsoft 365 created the file, do not call this tool again for this file, use sharepoint_browse_folder on the same folder to find the new file and its uri"
+  note: "expected behaviour from tools/sharepoint_create_text_file.py:123-128 (_WRITTEN_BUT_UNREAD): Microsoft 365 created the file, do not call this tool again for this file, use sharepoint_browse_folder on the same folder to find the new file and its uri"
 
 uc-10-16:
   status: working
@@ -245,7 +245,7 @@ uc-10-17:
     - tool: sharepoint_create_text_file
       args: {name: "Sync: 14 June.txt", content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour per row from shared/files.py:418-458 (unusable_name, NAME_RULES), raised at tools/sharepoint_create_text_file.py:159-161 before any call and before the question to Mia: Nothing was changed, because Microsoft does not allow this name in OneDrive and SharePoint. The name must not contain any of the characters \" * : < > ? / \\ | and must not start with ~$. Remove or replace these characters. This same value fails again, so do not retry it. The row for the name Notes?.txt uses the ask Save these meeting notes as Notes?.txt, and the row for ~$Sync.txt uses the ask Save these meeting notes as ~$Sync.txt. The refusal comes before any call to Microsoft."
+  note: "expected behaviour per row from shared/files.py:452-492 (unusable_name, NAME_RULES), raised at tools/sharepoint_create_text_file.py:161-163 before any call and before the question to Mia: Nothing was changed, because Microsoft does not allow this name in OneDrive and SharePoint. The name must not contain any of the characters \" * : < > ? / \\ | and must not start with ~$. Remove or replace these characters. This same value fails again, so do not retry it. The row for the name Notes?.txt uses the ask Save these meeting notes as Notes?.txt, and the row for ~$Sync.txt uses the ask Save these meeting notes as ~$Sync.txt. The refusal comes before any call to Microsoft."
 
 uc-10-18:
   status: working
@@ -259,7 +259,7 @@ uc-10-18:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.docx, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour for every row from tools/sharepoint_create_text_file.py:108-114 (_NOT_TEXT, raised at :159-161 before any call and before the question to Mia): No file was created, the tool writes text only, the name must end with one of the text extensions, the tool cannot create a Word, Excel, PowerPoint or PDF file, tell the user that this connector cannot create it, this same value fails again. The text endings are txt, md, csv, tsv, json, xml, html, htm, yaml, yml, and log (tools/sharepoint_create_text_file.py:60-72)."
+  note: "expected behaviour for every row from tools/sharepoint_create_text_file.py:110-116 (_NOT_TEXT, raised at :159-161 before any call and before the question to Mia): No file was created, the tool writes text only, the name must end with one of the text extensions, the tool cannot create a Word, Excel, PowerPoint or PDF file, tell the user that this connector cannot create it, this same value fails again. The text endings are txt, md, csv, tsv, json, xml, html, htm, yaml, yml, and log (tools/sharepoint_create_text_file.py:61-73)."
 
 uc-10-19:
   status: working
@@ -273,7 +273,7 @@ uc-10-19:
     - tool: sharepoint_create_text_file
       args: {name: Log.txt, content: the text of one million characters}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from tools/sharepoint_create_text_file.py:74 and 260-263: MAX_CONTENT_CHARACTERS is 1,000,000 and the schema allows content up to that length, so a text of exactly that length is saved"
+  note: "expected behaviour from tools/sharepoint_create_text_file.py:75 and 260-263: MAX_CONTENT_CHARACTERS is 1,000,000 and the schema allows content up to that length, so a text of exactly that length is saved"
 
 uc-10-20:
   status: working
@@ -287,7 +287,7 @@ uc-10-20:
     - tool: sharepoint_create_text_file
       args: {name: Log.txt, content: the text of one million and one characters}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from tools/sharepoint_create_text_file.py:74 and 260-267: the schema of content has max_length 1,000,000, so a longer text fails the validation of the arguments before the tool runs, and nothing is created. The description of the argument says at most 1,000,000 characters."
+  note: "expected behaviour from tools/sharepoint_create_text_file.py:75 and 260-267: the schema of content has max_length 1,000,000, so a longer text fails the validation of the arguments before the tool runs, and nothing is created. The description of the argument says at most 1,000,000 characters."
 
 uc-10-21:
   status: working
@@ -298,7 +298,7 @@ uc-10-21:
   asks_user: false
   chain:
     - any_of: [sharepoint_move_item, sharepoint_rename_item, sharepoint_copy_item, sharepoint_delete_item]
-  note: "expected behaviour per row: move from tools/sharepoint_move_item.py:106-111 (_THE_TOP_FOLDER_STAYS: the top folder of a drive cannot move, to move what it holds move each item inside it). Rename from tools/sharepoint_rename_item.py:73-78 (_THE_DRIVE_ROOT: rename a file or a folder inside the drive instead). Copy from tools/sharepoint_copy_item.py:109-115 (_TOP_FOLDER_CANNOT_BE_COPIED: copy the items inside it one at a time). Delete from tools/sharepoint_delete_item.py:74-80 (_THE_DRIVE_ROOT: to delete a file or a folder inside the drive, pass the handle of that item). Every refusal comes before the question to Mia. The ask names rename, and each row uses the matching ask."
+  note: "expected behaviour per row: move from tools/sharepoint_move_item.py:106-111 (_THE_TOP_FOLDER_STAYS: the top folder of a drive cannot move, to move what it holds move each item inside it). Rename from tools/sharepoint_rename_item.py:73-78 (_THE_DRIVE_ROOT: rename a file or a folder inside the drive instead). Copy from tools/sharepoint_copy_item.py:112-118 (_TOP_FOLDER_CANNOT_BE_COPIED: copy the items inside it one at a time). Delete from tools/sharepoint_delete_item.py:74-80 (_THE_DRIVE_ROOT: to delete a file or a folder inside the drive, pass the handle of that item). Every refusal comes before the question to Mia. The ask names rename, and each row uses the matching ask."
 
 uc-10-22:
   status: working
@@ -348,7 +348,7 @@ uc-10-24:
     - tool: sharepoint_browse_folder
       optional: true
       uses: {folder: handle of the folder Projects}
-  note: "expected behaviour from tools/sharepoint_copy_item.py:70-90 (description): if the destination already holds an item with the same name the copy fails, to copy an item into its own folder give the copy a new name"
+  note: "expected behaviour from tools/sharepoint_copy_item.py:72-92 (description): if the destination already holds an item with the same name the copy fails, to copy an item into its own folder give the copy a new name"
 
 uc-10-25:
   status: working
@@ -508,7 +508,7 @@ uc-10-35:
     - tool: sharepoint_create_text_file
       args: {name: Sync 14 June.txt, content: the notes}
       uses: {folder: handle of the folder Notes}
-  note: "expected behaviour from shared/files.py:397-404 (GRAPH_FORBIDDEN of sharepoint_create_text_file at tools/sharepoint_create_text_file.py:135): no file was created, the user can lack the necessary access or a policy of the organization can refuse, the owner of the item can give the user more access. The folder read works (Mia can open the folder), the question to Mia comes next, and the PUT at :216 is refused after she approves. The PUT uses no_retry."
+  note: "expected behaviour from shared/files.py:434-441 (GRAPH_FORBIDDEN of sharepoint_create_text_file at tools/sharepoint_create_text_file.py:137): no file was created, the user can lack the necessary access or a policy of the organization can refuse, the owner of the item can give the user more access. The folder read works (Mia can open the folder), the question to Mia comes next, and the PUT at :216 is refused after she approves. The PUT uses no_retry."
 
 uc-10-36:
   status: working
@@ -539,7 +539,7 @@ uc-10-37:
       uses: {item: handle of the folder Template, to_folder: handle of the folder Archive}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Archive}
-  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:59) and tools/sharepoint_copy_item.py:88-89: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:265), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:78), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:84-87), and no text says who tells Mia."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_copy_item.py:62) and tools/sharepoint_copy_item.py:91-92: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show the copy in the destination. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_copy_item.py:269), so the call is sent once. The chain holds exactly one copy step, and the check comes before any second copy. The tool asks the user at every call (tools/sharepoint_copy_item.py:81), and the failure comes after the question. OPEN: the description says that a name conflict can show after the call returns and that this tool cannot show it (tools/sharepoint_copy_item.py:88-90), and no text says who tells Mia."
 
 uc-10-38:
   status: working
@@ -555,7 +555,7 @@ uc-10-38:
       uses: {parent: handle of the folder Contracts}
     - tool: sharepoint_browse_folder
       uses: {folder: handle of the folder Contracts}
-  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:50) and tools/sharepoint_create_folder.py:70-71: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:170), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:68), and the failure comes after the question."
+  note: "expected behaviour for both rows from shared/seam/advice.py:182-201 (_OUTCOME_UNKNOWN, shown_by is sharepoint_browse_folder from tools/sharepoint_create_folder.py:51) and tools/sharepoint_create_folder.py:71-72: Microsoft 365 can make a change and then give an error, do not call this tool again first, make sure that sharepoint_browse_folder does not show a folder named name. The tool is WRITE_ADDITIVE with no_retry (tools/sharepoint_create_folder.py:172), so the call is sent once. The chain holds exactly one create step, and the check comes before any second create. The tool asks the user at every call (tools/sharepoint_create_folder.py:69), and the failure comes after the question."
 
 uc-10-39:
   status: working
@@ -566,7 +566,7 @@ uc-10-39:
   asks_user: false
   chain:
     - any_of: [sharepoint_move_item, sharepoint_copy_item, sharepoint_rename_item, sharepoint_delete_item, sharepoint_invite, sharepoint_create_share_link, sharepoint_create_folder, sharepoint_create_text_file]
-  note: "expected behaviour per row: each tool refuses a value that is no handle of the needed kind before any Graph call and before the question. Move tools/sharepoint_move_item.py:75-91 (_NOT_AN_ITEM_HANDLE, _NOT_A_FOLDER_HANDLE). Copy tools/sharepoint_copy_item.py:92-109. Rename tools/sharepoint_rename_item.py:64. Delete tools/sharepoint_delete_item.py:64. Invite tools/sharepoint_invite.py:94. Link tools/sharepoint_create_share_link.py:79. Folder tools/sharepoint_create_folder.py:74. Text file tools/sharepoint_create_text_file.py:100. Each text ends with: this same value fails again, so do not retry it."
+  note: "expected behaviour per row: each tool refuses a value that is no handle of the needed kind before any Graph call and before the question. Move tools/sharepoint_move_item.py:75-91 (_NOT_AN_ITEM_HANDLE, _NOT_A_FOLDER_HANDLE). Copy tools/sharepoint_copy_item.py:95-112. Rename tools/sharepoint_rename_item.py:64. Delete tools/sharepoint_delete_item.py:64. Invite tools/sharepoint_invite.py:94. Link tools/sharepoint_create_share_link.py:79. Folder tools/sharepoint_create_folder.py:76. Text file tools/sharepoint_create_text_file.py:102. Each text ends with: this same value fails again, so do not retry it."
 
 uc-10-40:
   status: working
@@ -577,7 +577,7 @@ uc-10-40:
   asks_user: false
   chain:
     - any_of: [sharepoint_create_folder, sharepoint_rename_item, sharepoint_copy_item, sharepoint_create_text_file]
-  note: "expected behaviour from shared/files.py:422-424 and 434-436 (_BLANK_NAME): the name is empty or has only spaces in it, use a name with at least one other character. Every tool that takes a name calls unusable_name before any Graph call."
+  note: "expected behaviour from shared/files.py:456-458 and 434-436 (_BLANK_NAME): the name is empty or has only spaces in it, use a name with at least one other character. Every tool that takes a name calls unusable_name before any Graph call."
 
 uc-10-41:
   status: working
@@ -588,7 +588,7 @@ uc-10-41:
   asks_user: false
   chain:
     - any_of: [sharepoint_create_folder, sharepoint_create_text_file, sharepoint_copy_item, sharepoint_move_item]
-  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:84-88 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:115-119. Copy tools/sharepoint_copy_item.py:116-120 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:112-116. Every refusal comes before the question to Mia."
+  note: "expected behaviour per row: the tool reads the item and sees no folder in it. Folder tools/sharepoint_create_folder.py:86-90 (_NOT_A_FOLDER). Text file tools/sharepoint_create_text_file.py:117-121. Copy tools/sharepoint_copy_item.py:120-124 (_DESTINATION_IS_NOT_A_FOLDER). Move tools/sharepoint_move_item.py:112-116. Every refusal comes before the question to Mia."
 
 uc-10-42:
   status: working
@@ -674,7 +674,7 @@ uc-10-48:
   asks_user: true
   chain:
     - any_of: [sharepoint_create_folder, sharepoint_invite, sharepoint_rename_item]
-  note: "expected behaviour from shared/files.py:323-352 (folder_label, item_label, parent_folder_label): the question says the top folder of the drive for a root, an unnamed folder for a folder with no name, and the name of the folder of an item when Microsoft sends a name and no path."
+  note: "expected behaviour from shared/files.py:357-386 (folder_label, item_label, parent_folder_label): the question says the top folder of the drive for a root, an unnamed folder for a folder with no name, and the name of the folder of an item when Microsoft sends a name and no path."
 
 uc-10-49:
   status: working
@@ -687,7 +687,7 @@ uc-10-49:
     - tool: sharepoint_rename_item
       args: {name: Plan v2.docx}
       uses: {item: handle of the file Plan v1.docx}
-  note: "expected behaviour from shared/files.py:378-394 (summary_after_write) and tools/sharepoint_rename_item.py:90-95 (_WRITTEN_BUT_UNREAD): the tool reads the item again when the answer has none, and when that read fails it says that the rename happened and that a second call sets the same name again."
+  note: "expected behaviour from shared/files.py:412-428 (summary_after_write) and tools/sharepoint_rename_item.py:90-95 (_WRITTEN_BUT_UNREAD): the tool reads the item again when the answer has none, and when that read fails it says that the rename happened and that a second call sets the same name again."
 
 uc-10-50:
   status: working
@@ -699,7 +699,7 @@ uc-10-50:
   chain:
     - tool: teams_send_channel_message_with_files
       uses: {attachments: handle of the notebook}
-  note: "expected behaviour from shared/files.py:297-302 (_attachable): the item is not a plain file in Microsoft 365, a OneNote notebook is an example, this tool attaches files only. The refusal comes before the question to Mia."
+  note: "expected behaviour from shared/files.py:334-339 (_attachable): the item is not a plain file in Microsoft 365, a OneNote notebook is an example, this tool attaches files only. The refusal comes before the question to Mia."
 
 uc-10-51:
   status: working

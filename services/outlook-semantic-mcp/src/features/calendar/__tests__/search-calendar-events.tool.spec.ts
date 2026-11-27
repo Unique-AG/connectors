@@ -97,6 +97,72 @@ describe(SearchCalendarEventsTool.name, () => {
       endDateTime: '2026-08-26T00:00:00+02:00',
     });
   });
+
+  it('titles each event by its subject or "(no subject)"', async () => {
+    const webLink =
+      'https://outlook.office365.com/owa/?itemid=AAMkEvent1&exvsurl=1&path=/calendar/item';
+    const event = (overrides: Record<string, unknown>) => ({
+      subject: 'Quarterly review',
+      body: 'Agenda',
+      bodyTruncated: false,
+      start: { dateTime: '2026-08-25T10:00:00.0000000', timeZone: 'Europe/Zurich' },
+      end: { dateTime: '2026-08-25T11:00:00.0000000', timeZone: 'Europe/Zurich' },
+      location: null,
+      joinUrl: 'https://teams.microsoft.com/l/meetup-join/abc',
+      attendees: [
+        { name: 'Alex', email: 'alex@example.com', response: 'accepted', type: 'required' },
+      ],
+      organizerName: 'Alex',
+      organizerEmail: 'alex@example.com',
+      isCancelled: false,
+      isAllDay: false,
+      isPrivate: false,
+      sensitivity: 'normal',
+      categories: [],
+      recurrence: null,
+      seriesMasterId: null,
+      type: 'singleInstance',
+      showAs: 'busy',
+      webLink,
+      calendarName: 'Calendar',
+      ownerEmail: 'own@example.com',
+      ownerName: 'Own',
+      isOwn: true,
+      eventRef: { eventId: 'event-1', calendarId: 'cal-own' },
+      ...overrides,
+    });
+    const linked = event({});
+    const redacted = event({
+      subject: null,
+      webLink: null,
+      eventRef: { eventId: 'event-2', calendarId: 'cal-own' },
+    });
+    const output = {
+      success: true,
+      message: 'Found 2 events.',
+      events: [linked, redacted],
+      searchNotes: ['Results were capped.'],
+    };
+    const tool = new SearchCalendarEventsTool({
+      run: vi.fn().mockResolvedValue(output),
+    } as unknown as SearchCalendarEventsQuery);
+
+    const result = await tool.searchCalendarEvents(
+      { calendars: CALENDARS, dateRange: { rangeType: 'relative', range: 'today' } },
+      {} as unknown as Context,
+      { user: { userProfileId: USER_PROFILE_ID.toString() } } as unknown as McpAuthenticatedRequest,
+    );
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Found 2 events.',
+      searchNotes: ['Results were capped.'],
+      events: [
+        { ...linked, title: 'Quarterly review' },
+        { ...redacted, title: '(no subject)' },
+      ],
+    });
+  });
 });
 
 describe('SearchCalendarEventsInputSchema', () => {

@@ -19,6 +19,7 @@ from msgraph.graph_service_client import GraphServiceClient
 from pydantic import BaseModel, Field
 
 from office_365_mcp.graph_client import graph_step, no_retry, not_graph
+from office_365_mcp.shared.citations import ACTION_NOT_A_SOURCE
 from office_365_mcp.shared.handles import meeting_uri_for
 from office_365_mcp.shared.identity import Person
 from office_365_mcp.shared.prose import cut_for_a_question
@@ -61,7 +62,7 @@ _FAILS_THE_SAME_WAY = (
 )
 _REFUSED = f"{_NOTHING_CREATED} {_FAILS_THE_SAME_WAY}"
 
-_DESCRIPTION = """\
+_DESCRIPTION = f"""\
 Creates one Teams online meeting as the signed-in user, with the attendees that the user names. \
 The meeting is standalone. It is on no calendar, and this tool sends no invitation. To share the \
 meeting, use the `join_web_url` of the answer. teams_read_meeting reads the meeting later.
@@ -75,6 +76,7 @@ a meeting later. If the user will want a transcript or a calendar event, tell th
 you create the meeting.
 - This call is safe to repeat after a timeout. The same request returns the same meeting, and it \
 creates no second meeting.
+- {ACTION_NOT_A_SOURCE}
 """
 
 

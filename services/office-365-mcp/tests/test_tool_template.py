@@ -77,7 +77,6 @@ _DESCRIPTION_WITHOUT_NOTES = frozenset(
         "outlook_move_mail",
         "outlook_list_categories",
         "sharepoint_get_list",
-        "onenote_list_recent_notebooks",
     }
 )
 

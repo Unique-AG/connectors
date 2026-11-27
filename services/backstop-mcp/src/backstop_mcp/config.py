@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Annotated, ClassVar, Literal, Self, TypedDict, cast
 from urllib.parse import urlparse
 
+from mcp_credential_auth import RedirectAllowlistSettings
 from pydantic import (
     BaseModel,
     BeforeValidator,
@@ -544,7 +545,7 @@ class DatabaseConfig(BaseSettings):
         return self._connect_args
 
 
-class AuthConfig(BaseSettings):
+class AuthConfig(RedirectAllowlistSettings):
     """Retention and sweep cadence for the OAuth rows this service issues.
 
     See `auth/cleanup.py`: without a periodic sweep, `pending_authorizations`,

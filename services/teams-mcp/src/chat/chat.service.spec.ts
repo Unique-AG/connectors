@@ -213,3 +213,137 @@ describe('ChatService listChats lastMessagePreview', () => {
     expect(preview).toBeNull();
   });
 });
+
+describe('ChatService chat message title and link', () => {
+  const graphMessage = {
+    id: '1657782060227',
+    messageType: 'message',
+    body: { contentType: 'html', content: '<p>Deploy is <strong>green</strong>.</p>' },
+    from: { user: { id: 'user-1', displayName: 'Carol Lee' } },
+    createdDateTime: '2026-07-14T07:01:01.123Z',
+    webUrl: null,
+  };
+  const chatId = '19:launch@thread.v2';
+  const chatMessageLink =
+    'https://teams.microsoft.com/l/message/19:launch@thread.v2/1657782060227?context=%7B%22contextType%22%3A%22chat%22%7D';
+
+  it('titles a message without a subject by its sender and text, and links it to Teams', async () => {
+    const { service } = makeService(makePage([graphMessage]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message).toMatchObject({
+      title: 'Carol Lee: Deploy is green.',
+      webUrl: chatMessageLink,
+    });
+  });
+
+  it('titles a message by its subject when it has one', async () => {
+    const { service } = makeService(makePage([{ ...graphMessage, subject: 'Release 4.2' }]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Release 4.2');
+  });
+
+  it('titles a message by its sender and text when its subject is blank', async () => {
+    const { service } = makeService(makePage([{ ...graphMessage, subject: '   ' }]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Deploy is green.');
+  });
+
+  it('titles a quoted reply by its own text, without the quoted message', async () => {
+    const quotedReply =
+      '<blockquote itemscope="" itemtype="http://schema.skype.com/Reply" itemid="1657782000000">' +
+      '<strong itemprop="mri" itemid="8:orgid:user-2">Ben Ortiz</strong>' +
+      '<span itemprop="time" itemid="1657782000000"></span>' +
+      '<p itemprop="preview">Is the deploy done?</p></blockquote><p>Yes, green.</p>';
+    const { service } = makeService(
+      makePage([{ ...graphMessage, body: { contentType: 'html', content: quotedReply } }]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Yes, green.');
+  });
+
+  it('titles a message without text by its first named attachment', async () => {
+    const { service } = makeService(
+      makePage([
+        {
+          ...graphMessage,
+          body: { contentType: 'html', content: '<attachment id="file-1"></attachment>' },
+          attachments: [
+            { id: 'ref-1', name: null, contentType: 'messageReference' },
+            { id: 'file-1', name: 'Q3 plan.xlsx', contentType: 'reference' },
+          ],
+        },
+      ]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Q3 plan.xlsx');
+  });
+
+  it('titles a message with text by its text, not its attachment', async () => {
+    const { service } = makeService(
+      makePage([
+        {
+          ...graphMessage,
+          attachments: [{ id: 'file-1', name: 'Q3 plan.xlsx', contentType: 'reference' }],
+        },
+      ]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe('Carol Lee: Deploy is green.');
+  });
+
+  it('cuts a long text in the title to an excerpt', async () => {
+    const { service } = makeService(
+      makePage([{ ...graphMessage, body: { contentType: 'text', content: 'a'.repeat(200) } }]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBe(`Carol Lee: ${'a'.repeat(79)}…`);
+  });
+
+  it('leaves the title null for an event with no sender and no text', async () => {
+    const { service } = makeService(
+      makePage([
+        {
+          ...graphMessage,
+          messageType: 'systemEventMessage',
+          from: null,
+          body: { contentType: 'html', content: '<systemEventMessage/>' },
+        },
+      ]),
+    );
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.title).toBeNull();
+  });
+
+  it('keeps the Teams link Graph sends for a message', async () => {
+    const webUrl = 'https://teams.microsoft.com/l/message/19%3Alaunch%40thread.v2/1657782060227';
+    const { service } = makeService(makePage([{ ...graphMessage, webUrl }]));
+
+    const [message] = await service.getChatMessages('user-profile-1', chatId, 20);
+
+    expect(message?.webUrl).toBe(webUrl);
+  });
+
+  it('links a message read by id to Teams', async () => {
+    const { service } = makeService(graphMessage as unknown as PageCollection);
+
+    const message = await service.getChatMessageById('user-profile-1', chatId, graphMessage.id);
+
+    expect(message.webUrl).toBe(chatMessageLink);
+  });
+});
