@@ -5,14 +5,14 @@
 
 The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose your mode before configuring anything else** — it determines which infrastructure components you need and which configuration sections apply.
 
-| | `microsoft_graph_and_unique_api` (default) | `microsoft_graph` |
+| | `microsoft_graph_and_unique_api` (chart default) | `microsoft_graph` |
 |---|---|---|
 | Search | Semantic (Unique KB) + KQL (Graph), merged | KQL (Graph) only |
 | Ingestion | Full sync + live catch-up | None |
 | Tools | Those listed in `MCP_TOOLS`, from 10 mail, 4 sync, 5 debug and 8 calendar tools | Those listed in `MCP_TOOLS`, from 10 mail and 8 calendar tools |
 | Requires Unique KB | Yes | Only with `UNIQUE_ATTACHMENTS=enabled` (the default) |
 | Requires RabbitMQ | Yes | Yes |
-| Folder filtering | Supported | Not supported |
+| Folder filtering | Supported | Supported (KQL search, through `directories`) |
 
 **Configuration impact:**
 
@@ -23,8 +23,8 @@ The server supports two deployment modes controlled by `MCP_BACKEND`. **Choose y
 
 Two values are accepted for `MCP_BACKEND`:
 
-- **`microsoft_graph_and_unique_api`** (default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; the sync tools (`sync_progress`, `run_full_sync`, etc.) can be listed in [`MCP_TOOLS`](#MCP_TOOLS). Requires the `mcpConfig.ingestion` section to be configured.
-- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not available; the server refuses to start when [`MCP_TOOLS`](#MCP_TOOLS) lists one. Folder filtering is not supported because the Graph Search API does not expose a folder-scoped KQL predicate. The `mcpConfig.ingestion` section is not required and is ignored.
+- **`microsoft_graph_and_unique_api`** (chart default) — dual backend mode. Emails are ingested into the Unique Knowledge Base via the full sync pipeline; `search_emails` runs both Microsoft Graph KQL search and Unique KB semantic search in parallel and merges the results; the sync tools (`sync_progress`, `run_full_sync`, etc.) can be listed in [`MCP_TOOLS`](#MCP_TOOLS). Requires the `mcpConfig.ingestion` section to be configured.
+- **`microsoft_graph`** — lean mode. No ingestion pipeline is started; `search_emails` and `open_email` call the Microsoft Graph Search API directly. Sync tools (`sync_progress`, `run_full_sync`, `pause_full_sync`, `resume_full_sync`, `restart_full_sync`) are not available; the server refuses to start when [`MCP_TOOLS`](#MCP_TOOLS) lists one. The `mcpConfig.ingestion` section is not required and is ignored.
 
 The Helm chart sets `microsoft_graph_and_unique_api` by default. The service itself has no default, so set `MCP_BACKEND` when running it outside the chart.
 
@@ -202,6 +202,8 @@ Set via `mcpConfig.app` in Helm values:
 | `MCP_BACKEND` | `mcpBackend` | (required; the chart sets `microsoft_graph_and_unique_api`) | Selects the search backend — see [Deployment Modes](#Deployment-Modes) |
 | `MCP_TOOLS` | `tools` | (required) | Non-empty JSON array of the tool names to register. Listing a calendar tool turns calendar on — see [MCP_TOOLS](#MCP_TOOLS) and [Calendar tools](#Calendar-tools) |
 | `DIRECTORY_SYNC_MODE` | `directorySyncMode` | `scheduled` | How the folder cache is refreshed: `scheduled` or `on_demand` — see [DIRECTORY_SYNC_MODE](#DIRECTORY_SYNC_MODE) |
+| `EXCLUDED_SENSITIVITY_LABELS` | `excludedSensitivity.labels` | `[]` | JSON array of Purview sensitivity label ids or names. Mail carrying one is left out — see [Sensitivity exclusions](#Sensitivity-exclusions) |
+| `EXCLUDED_LEGACY_SENSITIVITY` | `excludedSensitivity.legacy` | `[]` | JSON array of legacy Outlook sensitivity flags: `personal`, `private`, `confidential`. Mail flagged with one is left out — see [Sensitivity exclusions](#Sensitivity-exclusions) |
 | `LOGS_BUFFERING` | `app.logsBuffering` | `enabled` | Buffer logs before writing. Set to `disabled` only for startup debugging |
 | `LOGS_DIAGNOSTICS_DATA_POLICY` | `app.logsDiagnosticsDataPolicy` | `conceal` | Controls what diagnostic data is logged: `conceal` hides sensitive data, `disclose` shows full data |
 
@@ -253,7 +255,7 @@ Set via `server.env` in Helm values for plain config, or via `server.envVars` (w
 | `OTEL_METRICS_EXPORTER` | `prometheus` | OpenTelemetry metrics exporter |
 | `OTEL_EXPORTER_PROMETHEUS_HOST` | `0.0.0.0` | Host for the Prometheus metrics scrape endpoint |
 | `OTEL_EXPORTER_PROMETHEUS_PORT` | `51346` | Port for the Prometheus metrics scrape endpoint |
-| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync with `DIRECTORY_SYNC_MODE=scheduled`. No dedicated `mcpConfig.app` Helm path exists — set via `server.env` |
+| `DIRECTORY_SYNC_CRON_SCHEDULE` | `*/5 * * * *` | Cron schedule for directory (folder tree) delta sync with `DIRECTORY_SYNC_MODE=scheduled`. Helm: `mcpConfig.app.directorySyncCronSchedule` |
 
 ## Helm Values Reference
 
@@ -583,7 +585,7 @@ The server sends the list sorted. Some selections and what they request:
 | `search_emails`, `fetch_next_search_pages`, `open_email`, `list_mailboxes_and_directories`, `list_categories` and `lookup_contacts`, with `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read Mail.Read People.Read MailboxSettings.Read` |
 | The same, with `MICROSOFT_OFFLINE_ACCESS=disabled` and `MICROSOFT_PROFILE_SCOPES=disabled` | `openid User.Read Mail.Read People.Read MailboxSettings.Read` |
 
-Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module registers exactly this list, without `offline_access` and the OpenID scopes, which need no registration. It grants the list tenant-wide only when `service_principal_configuration` is set; without it, users or an admin consent at sign-in. Give it the same selection through `tools_preset` or `tools_enabled` and `delegated_access_scan` — see [Authentication](./authentication.md). Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
+Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module registers exactly this list, without `offline_access` and the OpenID scopes, which need no registration. It grants the list tenant-wide unless `service_principal_configuration` is `null`; with `null`, users or an admin consent at sign-in. Give it the same selection through `tools_preset` or `tools_enabled` and `delegated_access_scan` — see [Authentication](./authentication.md). Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 
 ### Unique API
 
@@ -635,11 +637,37 @@ Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook 
 
 `on_demand` needs `MCP_BACKEND=microsoft_graph`, because ingestion syncs the folders itself, and `DELEGATED_ACCESS_SCAN=disabled`, because shared mailbox folders are refreshed only by the scheduled sync. The server refuses to start otherwise, and the chart refuses to render.
 
+#### Sensitivity exclusions
+
+Set via `mcpConfig.app.excludedSensitivity`. Mail with an excluded sensitivity is left out of `search_emails` and `fetch_next_search_pages`, and `open_email` refuses it. Nothing of such a message reaches the agent, not its subject, sender or id. Each message is judged by its own label: an unlabelled reply or forward that quotes a labelled message is returned in full. The agent is told how many results were withheld and under which labels, and that the user can read them in Outlook. With the configuration below, a search that withholds one message labelled with the excluded label id and two flagged private tells the agent:
+
+```text
+3 emails were withheld because of their sensitivity labels ("Private", label id 4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8). Their content cannot be shown here; the user can read them in Outlook. Labels shown by id are excluded by their id, so their names are not known.
+```
+
+`open_email` names the label in the same way. A label is shown as you wrote it in `labels`, never by the name the message carries, because the sender of a received message controls that text. A label you list by id is shown by its id, and the agent is told its name is not known. List a label by name if the agent should be able to name it to the user.
+
+```yaml
+mcpConfig:
+  app:
+    mcpBackend: microsoft_graph
+    excludedSensitivity:
+      labels: [Confidential, 4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8]
+      legacy: [private, confidential]
+```
+
+- **`labels`** (`EXCLUDED_SENSITIVITY_LABELS`) — Microsoft Purview sensitivity labels, each by its id (a GUID, with or without braces) or its name, ignoring case. A message is excluded when one of its labels matches. The message carries the label's id and a name. Which name that is for a sublabel, or for a label whose display name an admin changed, has not been probed; `Get-Label | Format-Table Name, DisplayName, Guid` lists both names and the id. A label id never changes, so list labels by id where the exclusion protects data, and by name only where the agent should be able to name the label.
+- **`legacy`** (`EXCLUDED_LEGACY_SENSITIVITY`) — the sensitivity flag Outlook sets under *Options → Sensitivity*: `personal`, `private` or `confidential`.
+
+The server reads both from each message Microsoft Graph returns, without an extra request: a search asks Graph for the two properties alongside its results, and `open_email` asks for them with the message. A message whose properties Graph does not return, or returns in a form the server cannot read, is left out as well, and the note says its label could not be read. A results page the filter empties still carries its cursor, so `fetch_next_search_pages` continues past it. With both lists empty (the default) the requests to Graph are unchanged and nothing is filtered.
+
+Both settings need `MCP_BACKEND=microsoft_graph`, because semantic search results from the Unique knowledge base carry no sensitivity to filter on. The server refuses to start otherwise, naming the setting, and the chart refuses to render. An unknown legacy flag, a blank label, or a value that is not a JSON array also stops the server at startup. `lookup_contacts`, the draft tools and the calendar tools are not filtered: `search_calendar_events` returns the body of a private or labelled event.
+
 #### Calendar tools
 
 The calendar tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event` and `cancel_event`. When [`MCP_TOOLS`](#MCP_TOOLS) lists at least one of them, the service registers the listed calendar tools, adds the calendar server instructions, and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. When none is listed, calendar is off. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` notify other people after the user confirms. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
-The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when its selection includes a calendar tool, e.g. `tools_preset = ["mail", "calendar"]`. Runtime `getScopes()` still omits the calendar scope until `MCP_TOOLS` lists a calendar tool.
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates unless `service_principal_configuration` is `null` — when its selection includes a calendar tool, e.g. `tools_preset = ["mail", "calendar"]`. Runtime `getScopes()` still omits the calendar scope until `MCP_TOOLS` lists a calendar tool.
 
 Do this in order. Listing a calendar tool before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
 
@@ -659,7 +687,7 @@ For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Set
 
 Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
-- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. The server works with the signed-in user's own mailbox only. `draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` and `open_email` refuse a `mailbox` other than the user's own email address or user principal name (compared case-insensitively) with a tool error, before calling Microsoft Graph. `search_emails` searches only the mailboxes the user can access, so it skips another mailbox.
+- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. The server works with the signed-in user's own mailbox only. `draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` and `open_email` refuse a `mailbox` other than the user's own email address or user principal name (compared case-insensitively): they return `success: false` with a message, before calling Microsoft Graph. `search_emails` searches only the mailboxes the user can access, so it skips another mailbox.
 - **`full_access_only`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
 - **`granular_access`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
 

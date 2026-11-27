@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vite
 import type * as z from 'zod';
 import { loadFeaturesConfig } from '~/config';
 import { BuildWebLinksCommand } from '~/features/graph-utils/build-web-links.command';
+import { SensitivityFilter, SensitivityVerdict } from '../../sensitivity-filter';
 import { OpenEmailQuery } from '../open-email.query';
 import { OpenEmailTool } from '../open-email.tool';
 
@@ -92,6 +93,54 @@ describe('OpenEmailTool', () => {
     });
   });
 
+  it('names the label of a message withheld for its sensitivity and points to Outlook', async () => {
+    openEmailQuery.run.mockResolvedValue({
+      withheld: {
+        verdict: SensitivityVerdict.Excluded,
+        label: 'Confidential Encrypted',
+        configuredById: false,
+      },
+    });
+
+    const result = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
+
+    expect(result).toEqual({
+      success: false,
+      message:
+        'This email is withheld because of its sensitivity label "Confidential Encrypted". Its content cannot be shown here; the user can read it in Outlook.',
+    });
+  });
+
+  it('says the name of a label excluded by id is not known', async () => {
+    openEmailQuery.run.mockResolvedValue({
+      withheld: {
+        verdict: SensitivityVerdict.Excluded,
+        label: '4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8',
+        configuredById: true,
+      },
+    });
+
+    const result = await tool.openEmailById({ id: 'msg-labelled' }, context, request);
+
+    expect(result).toEqual({
+      success: false,
+      message:
+        "This email is withheld because of a sensitivity label excluded by its id (4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8); the label's name is not known, because the exclusion is configured by id. Its content cannot be shown here; the user can read it in Outlook.",
+    });
+  });
+
+  it('says when a message is withheld because its sensitivity label could not be read', async () => {
+    openEmailQuery.run.mockResolvedValue({ withheld: { verdict: SensitivityVerdict.Unreadable } });
+
+    const result = await tool.openEmailById({ id: 'msg-unreadable' }, context, request);
+
+    expect(result).toEqual({
+      success: false,
+      message:
+        'This email is withheld because its sensitivity label could not be read. Its content cannot be shown here; the user can read it in Outlook.',
+    });
+  });
+
   it('rethrows any other Graph failure', async () => {
     const error = new GraphError(503, 'Unavailable');
     openEmailQuery.run.mockRejectedValue(error);
@@ -165,6 +214,7 @@ describe('OpenEmailTool input', () => {
         { content: { getContentById } } as never,
         { run: vi.fn().mockResolvedValue({ id: 'user-1', email: 'own@example.com' }) } as never,
         new BuildWebLinksCommand({ run: vi.fn().mockResolvedValue(new Map()) } as never),
+        new SensitivityFilter(loadFeaturesConfig(READ_ONLY_ENV)),
       ),
       { run: vi.fn().mockResolvedValue(undefined) } as never,
       loadFeaturesConfig(READ_ONLY_ENV),

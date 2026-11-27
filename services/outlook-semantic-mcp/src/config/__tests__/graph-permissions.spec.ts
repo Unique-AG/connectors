@@ -3,7 +3,7 @@ import { loadFeaturesConfig } from '../features.config';
 import { resolveScopes } from '../graph-permissions';
 
 // Literal expected scopes, the fixed list earlier versions requested; never derived from the code under test.
-const MAIN_MAIL_SCOPES = [
+const EARLIER_MAIL_SCOPES = [
   'openid',
   'profile',
   'email',
@@ -15,7 +15,7 @@ const MAIN_MAIL_SCOPES = [
   'Mail.ReadWrite.Shared',
   'People.Read',
 ];
-const MAIN_CALENDAR_SCOPES = ['Calendars.ReadWrite.Shared'];
+const EARLIER_CALENDAR_SCOPES = ['Calendars.ReadWrite.Shared'];
 
 const MAIL_TOOLS = [
   'list_mailboxes_and_directories',
@@ -72,24 +72,24 @@ describe(resolveScopes.name, () => {
     it.each([
       ['microsoft_graph_and_unique_api', [...MAIL_TOOLS, ...SYNC_TOOLS]],
       ['microsoft_graph', MAIL_TOOLS],
-    ])('equals main’s MAIL_SCOPES in %s mode', (backend, tools) => {
+    ])('equals the scopes earlier versions requested in %s mode', (backend, tools) => {
       expect(scopesFor({ MCP_BACKEND: backend, MCP_TOOLS: JSON.stringify(tools) })).toEqual(
-        sorted(MAIN_MAIL_SCOPES),
+        sorted(EARLIER_MAIL_SCOPES),
       );
     });
 
     it('adds only Calendars.ReadWrite.Shared when the calendar tools are listed', () => {
       expect(scopesFor({ MCP_TOOLS: JSON.stringify([...MAIL_TOOLS, ...CALENDAR_TOOLS]) })).toEqual(
-        sorted([...MAIN_MAIL_SCOPES, ...MAIN_CALENDAR_SCOPES]),
+        sorted([...EARLIER_MAIL_SCOPES, ...EARLIER_CALENDAR_SCOPES]),
       );
     });
   });
 
   describe("today's tools with DELEGATED_ACCESS_SCAN=disabled", () => {
-    it('equals main’s MAIL_SCOPES without Mail.ReadWrite.Shared and User.Read.All', () => {
+    it('equals the scopes earlier versions requested without Mail.ReadWrite.Shared and User.Read.All', () => {
       expect(
         scopesFor({ DELEGATED_ACCESS_SCAN: 'disabled', MCP_TOOLS: JSON.stringify(MAIL_TOOLS) }),
-      ).toEqual(sorted(without(MAIN_MAIL_SCOPES, 'Mail.ReadWrite.Shared', 'User.Read.All')));
+      ).toEqual(sorted(without(EARLIER_MAIL_SCOPES, 'Mail.ReadWrite.Shared', 'User.Read.All')));
     });
 
     it('adds only Calendars.ReadWrite.Shared when the calendar tools are listed', () => {
@@ -100,8 +100,8 @@ describe(resolveScopes.name, () => {
         }),
       ).toEqual(
         sorted([
-          ...without(MAIN_MAIL_SCOPES, 'Mail.ReadWrite.Shared', 'User.Read.All'),
-          ...MAIN_CALENDAR_SCOPES,
+          ...without(EARLIER_MAIL_SCOPES, 'Mail.ReadWrite.Shared', 'User.Read.All'),
+          ...EARLIER_CALENDAR_SCOPES,
         ]),
       );
     });

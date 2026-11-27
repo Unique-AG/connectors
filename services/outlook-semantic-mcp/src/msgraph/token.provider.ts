@@ -126,7 +126,7 @@ export class TokenProvider implements AuthenticationProvider {
     if (startedMeanwhile) {
       return startedMeanwhile;
     }
-    const refresh = this.refreshOnce(userProfileId).finally(() =>
+    const refresh = this.refreshOnce(userProfileId, rejectedAccessToken).finally(() =>
       inFlightRefreshes.delete(userProfileId),
     );
     inFlightRefreshes.set(userProfileId, refresh);
@@ -137,6 +137,10 @@ export class TokenProvider implements AuthenticationProvider {
     const userProfile = await this.drizzle.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
+    return this.decryptAccessToken(userProfile);
+  }
+
+  private decryptAccessToken(userProfile: UserProfile | undefined): string | undefined {
     if (!userProfile?.accessToken) {
       return undefined;
     }
@@ -147,7 +151,7 @@ export class TokenProvider implements AuthenticationProvider {
     return accessToken;
   }
 
-  private async refreshOnce(userProfileId: string): Promise<string> {
+  private async refreshOnce(userProfileId: string, rejectedAccessToken?: string): Promise<string> {
     const userProfile = await this.drizzle.query.userProfiles.findFirst({
       where: eq(userProfiles.id, userProfileId),
     });
@@ -157,6 +161,12 @@ export class TokenProvider implements AuthenticationProvider {
       // Another request already cleared this grant and revoked the session.
       if (!userProfile.accessToken) {
         throw new UpstreamCredentialRevokedError(SIGN_IN_EXPIRED_REASON);
+      }
+      // A sign-in that landed after the rejected token was read is kept, not revoked.
+      const storedAccessToken = this.decryptAccessToken(userProfile);
+      assert.ok(storedAccessToken, 'The stored access token was checked above');
+      if (rejectedAccessToken && storedAccessToken !== rejectedAccessToken) {
+        return storedAccessToken;
       }
       // Signed in without offline_access: the only way to a new Graph token is a new sign-in.
       return await this.revokeUpstreamCredential(userProfile, {

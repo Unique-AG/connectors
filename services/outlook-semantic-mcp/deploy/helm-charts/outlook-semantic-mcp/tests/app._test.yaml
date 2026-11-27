@@ -109,6 +109,67 @@ tests:
       - failedTemplate:
           errorPattern: "directorySyncMode"
 
+  - it: fails to render a sync tool outside microsoft_graph_and_unique_api mode
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+            - sync_progress
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "lists sync_progress, which needs mcpConfig.app.mcpBackend microsoft_graph_and_unique_api"
+
+  - it: fails to render a debug tool with debug mode off
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph_and_unique_api
+          tools:
+            - search_emails
+            - admin_ops
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "lists admin_ops, which needs mcpConfig.app.mcpDebugMode enabled"
+
+  - it: renders sync and debug tools in microsoft_graph_and_unique_api mode with debug mode on
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph_and_unique_api
+          mcpDebugMode: enabled
+          tools:
+            - sync_progress
+            - admin_ops
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_TOOLS
+            value: '["sync_progress","admin_ops"]'
+
   - it: fails to render directorySyncMode on_demand outside microsoft_graph mode
     values:
       - ../ci-values.yaml
@@ -146,3 +207,125 @@ tests:
     asserts:
       - failedTemplate:
           errorPattern: "directorySyncMode on_demand needs mcpConfig.delegatedAccess.scan disabled"
+
+  - it: renders no sensitivity exclusion by default
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          tools:
+            - search_emails
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EXCLUDED_SENSITIVITY_LABELS
+          any: true
+      - notContains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EXCLUDED_LEGACY_SENSITIVITY
+          any: true
+
+  - it: renders the excluded sensitivity labels and legacy flags as JSON arrays
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+          excludedSensitivity:
+            labels:
+              - 4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8
+              - Highly Confidential
+            legacy:
+              - private
+              - confidential
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EXCLUDED_SENSITIVITY_LABELS
+            value: '["4f1c2a7e-9b3d-4e85-a6c0-d2b71e93f5a8","Highly Confidential"]'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: EXCLUDED_LEGACY_SENSITIVITY
+            value: '["private","confidential"]'
+
+  - it: fails to render sensitivity exclusions outside microsoft_graph mode
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph_and_unique_api
+          tools:
+            - search_emails
+          excludedSensitivity:
+            legacy:
+              - confidential
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "excludedSensitivity needs mcpConfig.app.mcpBackend microsoft_graph"
+
+  - it: rejects an unknown legacy sensitivity flag
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+          excludedSensitivity:
+            legacy:
+              - secret
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "excludedSensitivity"
+
+  - it: rejects a blank sensitivity label
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+          excludedSensitivity:
+            labels:
+              - "  "
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "excludedSensitivity"

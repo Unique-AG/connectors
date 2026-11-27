@@ -13,20 +13,56 @@ import {
   type ToolName,
 } from './tool-declarations';
 
-const TOOLS_FORMAT = 'required, a JSON array of tool names such as ["search_emails","open_email"]';
-
-const mcpToolsSchema = z
-  .string({ error: TOOLS_FORMAT })
-  .transform((value, ctx) => {
+const parseJsonArray = (format: string) =>
+  z.string({ error: format }).transform((value, ctx) => {
     try {
       return JSON.parse(value) as unknown;
     } catch {
-      ctx.addIssue({ code: 'custom', input: value, message: TOOLS_FORMAT });
+      ctx.addIssue({ code: 'custom', input: value, message: format });
       return z.NEVER;
     }
-  })
+  });
+
+const TOOLS_FORMAT = 'required, a JSON array of tool names such as ["search_emails","open_email"]';
+
+const mcpToolsSchema = parseJsonArray(TOOLS_FORMAT)
   .pipe(z.array(z.string(), { error: TOOLS_FORMAT }).nonempty({ error: 'lists no tool' }))
   .describe('JSON array of the tools to register. Required.');
+
+const LABELS_FORMAT =
+  'a JSON array of Purview sensitivity label ids or names such as ["Confidential"]';
+
+const excludedSensitivityLabelsSchema = parseJsonArray(LABELS_FORMAT)
+  .pipe(
+    z.array(
+      z
+        .string()
+        .trim()
+        // PowerShell and the registry write a label id in braces; the message carries it without.
+        .transform((label) => label.replace(/^\{([^{}]*)\}$/, '$1').trim())
+        .pipe(z.string().nonempty({ error: 'lists a blank label' })),
+      { error: LABELS_FORMAT },
+    ),
+  )
+  .prefault('[]')
+  .describe(
+    'JSON array of Purview sensitivity label ids or names. Mail carrying one is left out of search_emails, fetch_next_search_pages and open_email.',
+  );
+
+export enum LegacySensitivity {
+  Personal = 'personal',
+  Private = 'private',
+  Confidential = 'confidential',
+}
+
+const LEGACY_FORMAT = 'a JSON array of "personal", "private" or "confidential"';
+
+const excludedLegacySensitivitySchema = parseJsonArray(LEGACY_FORMAT)
+  .pipe(z.array(z.enum(LegacySensitivity), { error: LEGACY_FORMAT }))
+  .prefault('[]')
+  .describe(
+    "JSON array of Outlook's legacy sensitivity flags. Mail flagged with one is left out of search_emails, fetch_next_search_pages and open_email.",
+  );
 
 export const uniqueAttachmentsSchema = enabledDisabledBoolean(
   'Whether the draft tools attach files from the Unique knowledge base (`unique://content/...`).',
@@ -65,6 +101,8 @@ const FeaturesEnvSchema = z.object({
   microsoftProfileScopes: enabledDisabledBoolean(
     'Whether sign-in requests the `profile` and `email` scopes. `openid` is always requested.',
   ),
+  excludedSensitivityLabels: excludedSensitivityLabelsSchema,
+  excludedLegacySensitivity: excludedLegacySensitivitySchema,
 });
 
 const FEATURE_ENV_KEYS = {
@@ -76,6 +114,8 @@ const FEATURE_ENV_KEYS = {
   directorySyncMode: 'DIRECTORY_SYNC_MODE',
   microsoftOfflineAccess: 'MICROSOFT_OFFLINE_ACCESS',
   microsoftProfileScopes: 'MICROSOFT_PROFILE_SCOPES',
+  excludedSensitivityLabels: 'EXCLUDED_SENSITIVITY_LABELS',
+  excludedLegacySensitivity: 'EXCLUDED_LEGACY_SENSITIVITY',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -146,6 +186,21 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     }
   }
 
+  // Semantic search reads the ingested knowledge base, whose hits carry no sensitivity to filter on.
+  if (env.mcpBackend !== McpBackendType.MicrosoftGraph) {
+    for (const field of ['excludedSensitivityLabels', 'excludedLegacySensitivity'] as const) {
+      if (env[field].length > 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [field],
+          input: env[field],
+          message:
+            'needs MCP_BACKEND=microsoft_graph, because semantic search results cannot be filtered by sensitivity',
+        });
+      }
+    }
+  }
+
   const tools: ReadonlySet<ToolName> = new Set(
     TOOL_NAMES.filter((name) => env.mcpTools.includes(name)),
   );
@@ -160,6 +215,10 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     directorySyncMode: env.directorySyncMode,
     offlineAccess: env.microsoftOfflineAccess,
     profileScopes: env.microsoftProfileScopes,
+    sensitivityExclusions: {
+      labels: new Set(env.excludedSensitivityLabels),
+      legacy: new Set(env.excludedLegacySensitivity),
+    },
   };
 });
 

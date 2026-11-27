@@ -31,6 +31,7 @@ The Outlook Semantic MCP Server registers only the tools listed in [`MCP_TOOLS`]
 | [`pause_full_sync`](#pause_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`resume_full_sync`](#resume_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
 | [`restart_full_sync`](#restart_full_sync) | Full Sync Control (debug only) | Yes | Mode A only |
+| [`admin_ops`](#admin_ops) | Diagnostics (debug only) | No | Mode A only |
 | [`list_calendars`](#list_calendars) | Calendar | No | Both |
 | [`search_calendar_events`](#search_calendar_events) | Calendar | No | Both |
 | [`check_availability`](#check_availability) | Calendar | No | Both |
@@ -334,6 +335,7 @@ Fetch the next page of results, or retry a throttled or failed page, for searche
 - Cursors are stored server-side (`search_cursors` table) and scoped to the user. The agent only sees the id. Unknown ids, ids of another user, and ids older than 30 days are reported in `searchNotes`.
 - Cursor rows are immutable: each page gets a new id, and following an id again returns the same page. A throttled or failed page keeps its id so it can be retried without skipping results.
 - The same email can appear on pages of different requests; `msGraphMessageId` identifies it.
+- With [sensitivity exclusions](../operator/configuration.md#Sensitivity-exclusions) set, excluded mail is dropped from each page after Graph returns it. A page can therefore come back with fewer results than its size, or none, and still carry a cursor. `searchNotes` says how many emails were withheld and under which labels.
 
 ---
 
@@ -379,6 +381,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 - With `MCP_BACKEND=microsoft_graph_and_unique_api`, when `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
 - With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
+- A message with a sensitivity excluded by [`EXCLUDED_SENSITIVITY_LABELS` or `EXCLUDED_LEGACY_SENSITIVITY`](../operator/configuration.md#Sensitivity-exclusions), or whose sensitivity cannot be read while one is set, returns `success: false` and a `message` naming the label as configured (its id, with a note that its name is not known, when it is configured by id; or saying it could not be read) and telling the agent the user can read the email in Outlook. No content of it is returned.
 - `webLink` is the Outlook on the web link of the email. For a shared or delegated mailbox it is the classic OWA link built from the message RestId (see `BuildWebLinksCommand`), because the link Graph returns for those mailboxes does not always open. Link the subject to it when it is set; otherwise show the subject as plain text.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
 - `metadata.isDraft` tells whether the message is an unsent draft. Read a draft with this tool before editing it with [`update_draft_email`](#update_draft_email), and edit `text`, not `chunks`. `metadata.attachments` lists the attachments (file name and `isInline`; inline ones are signature images and the like). [`remove_attachments_from_draft_email`](#remove_attachments_from_draft_email) skips inline ones unless `includeInline` is true.
@@ -649,10 +652,10 @@ List all Outlook mailboxes and their folder trees available to the user. With `D
 **Usage notes:**
 
 - Folder `id` values can be passed to the `directories` filter in `search_emails` to narrow results to a specific folder.
-- In Mode A, the folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool triggers a fresh sync of the folder tree.
-- Folder filtering via `directories` is only effective in Mode A (`microsoft_graph_and_unique_api`). In Mode B, the Microsoft Graph Search API does not support folder-scoped filtering — the `directories` condition is ignored.
+- The folder tree is synced from Microsoft Graph and reflects the user's current mailbox structure. Calling this tool syncs the caller's folder tree first, in both modes.
+- Folder filtering via `directories` works in both modes. In Mode B it narrows each KQL query in `msGraphKeywordSearchQueries` to the listed folders.
 - Well-known system folder names (`"Inbox"`, `"Sent Items"`, `"Drafts"`, etc.) can be used directly in `search_emails` without calling this tool first.
-- When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox (folder filtering via `directories` is only effective in Mode A).
+- When `DELEGATED_ACCESS_SCAN` is enabled, the `mailboxes` array includes delegated mailboxes alongside the user's own mailbox. The `isOwn` field is `true` for the user's primary mailbox and `false` for delegated ones. Folder IDs from delegated mailboxes can be passed to the `directories` condition in `search_emails` to narrow results to a specific folder in a delegated mailbox.
 
 ---
 
@@ -857,6 +860,23 @@ Restart the full sync from scratch, discarding all previous progress.
 **Return shape:** `{ success: boolean; message: string; version?: string }`
 
 **Usage notes:** This is destructive — all sync progress counters and the next-page cursor are reset. Use only when recovering from a corrupted sync state.
+
+---
+
+### `admin_ops`
+
+Run a diagnostic on the caller's own mailbox. Its description tells the AI assistant not to call it; an operator calls it directly.
+
+**Input parameters:**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `tool` | object | Yes | The operation: `{ type: "sync_diagnostics", params: {} }` or `{ type: "search_recall_check", params: { cases } }` |
+
+- **`sync_diagnostics`** compares the messages in Microsoft Graph with the files ingested into the Unique knowledge base. It returns `messageIdsSkippedBecauseOfFilters`, `messageIdsFoundInMicrosoftButNotFoundInUnique` and `messageIdsFoundInUniqueButNotFoundInMicrosoft`.
+- **`search_recall_check`** takes 1 to 20 `cases`, each `{ id, graphFilter?, graphSearch?, search }`. For each case it lists the messages Microsoft Graph returns for `graphFilter` or `graphSearch`, runs `search` as `search_emails` would, and reports which Graph messages the search missed. Each result has `id`, `checkStatus` (`success` or `failure`), `accuracy`, `stats` (`graphEmailsCount`, `searchEmailsCount`, `missedEmailsCount`, `foundEmailsCount`) and, on failure, `missedMessages` with whether each missed message exists in Unique and its ingestion state.
+
+**Usage notes:** Read-only. Both operations read the user's mailbox and the Unique knowledge base.
 
 ---
 

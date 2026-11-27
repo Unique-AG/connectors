@@ -12,7 +12,8 @@ import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timez
 import { GRAPH_ID_PATTERN } from '~/msgraph/graph-id-pattern';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { NO_SUBJECT } from '~/utils/no-subject';
-import { OpenEmailQuery } from './open-email.query';
+import { SensitivityVerdict } from '../sensitivity-filter';
+import { OpenEmailQuery, WithheldEmail } from './open-email.query';
 import { META } from './open-email-tool.meta';
 
 const OpenEmailByIdInputSchema = z.object({
@@ -155,7 +156,7 @@ export class OpenEmailTool {
 
     const outputTimeZone = await this.getMailboxTimezoneQuery.run(userProfileTypeId);
     try {
-      const { webLink, ...emailData } = await this.openEmailQuery.run({
+      const result = await this.openEmailQuery.run({
         userProfileId: userProfileTypeId,
         id: input.id,
         mailbox: input.mailbox,
@@ -166,6 +167,10 @@ export class OpenEmailTool {
         chunkIds: input.chunkIds,
         outputTimeZone: outputTimeZone,
       });
+      if ('withheld' in result) {
+        return { success: false, message: this.describeWithheld(result) };
+      }
+      const { webLink, ...emailData } = result;
       // A top-level title makes Unique cite the email, which it should only do with a link to open.
       const title = webLink === null ? undefined : emailData.title;
       return { success: true, title, webLink, emailData };
@@ -181,5 +186,15 @@ export class OpenEmailTool {
       }
       throw err;
     }
+  }
+
+  private describeWithheld({ withheld }: WithheldEmail): string {
+    const reason =
+      withheld.verdict === SensitivityVerdict.Unreadable
+        ? 'because its sensitivity label could not be read'
+        : withheld.configuredById
+          ? `because of a sensitivity label excluded by its id (${withheld.label}); the label's name is not known, because the exclusion is configured by id`
+          : `because of its sensitivity label "${withheld.label}"`;
+    return `This email is withheld ${reason}. Its content cannot be shown here; the user can read it in Outlook.`;
   }
 }

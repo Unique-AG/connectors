@@ -17,6 +17,7 @@ import { IsInboxDeletingQuery } from '~/features/delete-inbox/is-inbox-deleting.
 import type { GraphOutlookDirectory } from '~/features/directories-sync/microsoft-graph.dtos';
 import {
   ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS,
+  ON_DEMAND_DIRECTORY_SYNC_RETRY_AFTER_MS,
   RefreshStaleDirectoriesCommand,
 } from '~/features/directories-sync/refresh-stale-directories.command';
 import { SyncDirectoriesCommand } from '~/features/directories-sync/sync-directories.command';
@@ -26,6 +27,7 @@ import { UpsertDirectoryCommand } from '~/features/directories-sync/upsert-direc
 import { GetUserProfileQuery } from '~/features/user-utils/get-user-profile.query';
 import { convertUserProfileIdToTypeId } from '~/utils/convert-user-profile-id-to-type-id';
 import { createPostgresPool, stopPostgres } from '../../../../__mocks__/stop-postgres';
+import { SensitivityFilter } from '../../sensitivity-filter';
 import { BuildMsGraphKqlBatchRequestsQuery } from '../build-ms-graph-kql-batch-requests.query';
 import { SearchCursorRepository } from '../cursors/search-cursor.repository';
 import { MsGraphKqlSearchEmailsQuery } from '../ms-graph-kql-search-emails.query';
@@ -154,6 +156,7 @@ describe('Folder cache with DIRECTORY_SYNC_MODE against Postgres', () => {
         getUserProfileQuery,
       ),
       { run: vi.fn() } as any,
+      new SensitivityFilter(features),
     );
     return new SearchEmailsQuery(
       { run: vi.fn() } as any,
@@ -259,6 +262,30 @@ describe('Folder cache with DIRECTORY_SYNC_MODE against Postgres', () => {
       expect(readsAfterFailure).toBeGreaterThan(0);
       expect(folderDeltaReads).toHaveBeenCalledTimes(readsAfterFailure);
       expect(searchedUrls()).toHaveLength(2);
+    });
+
+    it('retries a failed folder sync once the pause after the failure has passed', async () => {
+      await lastSyncedHoursAgo(ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS / HOUR_MS + 1);
+      folderDeltaReads.mockRejectedValue(new Error('Graph is unavailable'));
+      const query = searchEmailsQuery(features);
+      const search = () =>
+        query.run(convertUserProfileIdToTypeId(userProfileId), {
+          msGraphKeywordSearchQueries: [{ kqlQuery: 'budget', directories: [INBOX.id] }],
+        });
+
+      await search();
+      const readsAfterFailure = folderDeltaReads.mock.calls.length;
+      const failedAt = Date.now();
+      const clock = vi
+        .spyOn(Date, 'now')
+        .mockReturnValue(failedAt + ON_DEMAND_DIRECTORY_SYNC_RETRY_AFTER_MS + 1);
+      try {
+        await search();
+      } finally {
+        clock.mockRestore();
+      }
+
+      expect(folderDeltaReads.mock.calls.length).toBeGreaterThan(readsAfterFailure);
     });
 
     it('passes on a revoked sign-in from the folder sync', async () => {

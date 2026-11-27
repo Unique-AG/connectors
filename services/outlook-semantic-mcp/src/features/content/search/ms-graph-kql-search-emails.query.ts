@@ -19,6 +19,7 @@ import { parseRetryAfterMs } from '~/utils/parse-retry-after-ms';
 import { safeStringify } from '~/utils/safe-stringify';
 import { sanitizeKqlQuery } from '~/utils/sanitize-kql-query';
 import { sleep } from '~/utils/sleep';
+import { SensitivityFilter, SensitivityJudgement, SensitivityVerdict } from '../sensitivity-filter';
 import {
   BuildMsGraphKqlBatchRequestsQuery,
   GraphBatchRequest,
@@ -42,6 +43,7 @@ export class MsGraphKqlSearchEmailsQuery {
     private readonly translateGraphIdsToImmutableIdsQuery: TranslateGraphIdsToImmutableIdsQuery,
     private readonly buildMsGraphKqlBatchRequestsQuery: BuildMsGraphKqlBatchRequestsQuery,
     private readonly removeDelegatedAccessCommand: RemoveDelegatedAccessCommand,
+    private readonly sensitivityFilter: SensitivityFilter,
   ) {}
 
   @Span()
@@ -193,14 +195,72 @@ export class MsGraphKqlSearchEmailsQuery {
       .filter((hit) => !lostAccessMailboxes.has(hit.mailbox));
 
     return {
-      results: await this.buildResults(userProfile, hits),
+      results: await this.buildResults(
+        userProfile,
+        hits.filter(({ sensitivity }) => sensitivity.verdict === SensitivityVerdict.Allowed),
+      ),
       pages: outcomes.map((outcome) => this.toBackendPage(outcome, lostAccessMailboxes)),
       searchSummary: this.buildSearchSummary({
         ...buildNotes,
         throttledMailboxes,
         lostAccessMailboxes,
+        additionalMessages: this.describeWithheldHits(hits),
       }),
     };
+  }
+
+  // The agent learns how many hits were withheld and why, never what they hold. Pages keep their
+  // cursors whatever the filter drops, so a page left empty still leads on.
+  private describeWithheldHits(hits: Hit[]): string[] {
+    const judgements = uniqueBy(hits, ({ restId }) => restId).map(({ sensitivity }) => sensitivity);
+    const excluded = judgements.filter(
+      (judgement): judgement is Extract<SensitivityJudgement, { label: string }> =>
+        judgement.verdict === SensitivityVerdict.Excluded,
+    );
+    const unreadable = judgements.filter(
+      ({ verdict }) => verdict === SensitivityVerdict.Unreadable,
+    ).length;
+    if (unreadable > 0) {
+      this.logger.warn({
+        msg: 'Withheld search hits whose sensitivity could not be read',
+        unreadable,
+        hits: judgements.length,
+      });
+    }
+    const note = (count: number, singular: string, plural: string) =>
+      count === 1
+        ? `1 email was withheld ${singular}. Its content cannot be shown here; the user can read it in Outlook.`
+        : `${count} emails were withheld ${plural}. Their content cannot be shown here; the user can read them in Outlook.`;
+    const named = excluded.filter(({ configuredById }) => !configuredById);
+    const byId = excluded.filter(({ configuredById }) => configuredById);
+    const labels = [
+      ...unique(named.map(({ label }) => `"${label}"`)).sort(),
+      ...unique(byId.map(({ label }) => `label id ${label}`)).sort(),
+    ].join(', ');
+    const unnamed =
+      byId.length > 0
+        ? ' Labels shown by id are excluded by their id, so their names are not known.'
+        : '';
+    return [
+      ...(excluded.length > 0
+        ? [
+            note(
+              excluded.length,
+              `because of its sensitivity label (${labels})`,
+              `because of their sensitivity labels (${labels})`,
+            ) + unnamed,
+          ]
+        : []),
+      ...(unreadable > 0
+        ? [
+            note(
+              unreadable,
+              'because its sensitivity label could not be read',
+              'because their sensitivity labels could not be read',
+            ),
+          ]
+        : []),
+    ];
   }
 
   private async buildResults(
@@ -466,6 +526,7 @@ export class MsGraphKqlSearchEmailsQuery {
         webLink: msg.webLink ?? '',
         bodyPreview: msg.bodyPreview ?? '',
         isDraft: msg.isDraft === true,
+        sensitivity: this.sensitivityFilter.judge(msg.singleValueExtendedProperties),
       }),
     );
 
@@ -558,7 +619,12 @@ export class MsGraphKqlSearchEmailsQuery {
     const search = encodeURIComponent(sanitizeKqlQuery(request.kqlQuery));
     const select =
       'subject,from,sentDateTime,receivedDateTime,parentFolderId,webLink,bodyPreview,isDraft';
-    return `${base}?$search=${search}&$select=${select}&$top=${top}`;
+    if (!this.sensitivityFilter.isActive) {
+      return `${base}?$search=${search}&$select=${select}&$top=${top}`;
+    }
+    // $search honours the $expand only with internetMessageHeaders selected. The nextLink keeps both.
+    const expand = encodeURIComponent(this.sensitivityFilter.expand);
+    return `${base}?$search=${search}&$select=${select},internetMessageHeaders&$expand=${expand}&$top=${top}`;
   }
 
   // Round-robin over the queries, so deferral holds back the last mailboxes and folders of every
@@ -643,6 +709,7 @@ const messagePageSchema = z.object({
       webLink: z.string().optional().nullish(),
       bodyPreview: z.string().optional().nullish(),
       isDraft: z.boolean().optional().nullish(),
+      singleValueExtendedProperties: z.unknown().optional(),
     }),
   ),
   '@odata.nextLink': z.string().optional(),
@@ -661,6 +728,7 @@ interface Hit {
   webLink: string;
   bodyPreview: string;
   isDraft: boolean;
+  sensitivity: SensitivityJudgement;
 }
 
 // One Graph request: the first page of a (query × mailbox × folder), or the page a cursor points at.

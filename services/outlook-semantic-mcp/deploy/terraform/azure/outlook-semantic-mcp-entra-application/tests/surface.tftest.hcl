@@ -98,7 +98,7 @@ run "the_mail_and_calendar_tools_add_only_the_calendar_scope" {
 
 run "the_sync_tools_add_no_scope" {
   variables {
-    tools_preset = "mail,sync"
+    tools_preset = ["mail", "sync"]
   }
 
   assert {
@@ -184,7 +184,7 @@ run "tools_preset_and_tools_enabled_together_are_rejected" {
   command = plan
 
   variables {
-    tools_preset  = "mail"
+    tools_preset  = ["mail"]
     tools_enabled = ["search_emails"]
   }
 

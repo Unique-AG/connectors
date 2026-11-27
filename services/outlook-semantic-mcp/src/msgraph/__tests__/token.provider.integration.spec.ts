@@ -245,6 +245,25 @@ describe('TokenProvider against Postgres', () => {
       expect(await storedProfile()).toMatchObject({ accessToken: 'new-access-token' });
       expect(onPermanentAuthFailure).not.toHaveBeenCalled();
     });
+
+    it('returns a new sign-in that landed after the rejected token was read', async () => {
+      const stale = await db.query.userProfiles.findFirst({
+        where: eq(schema.userProfiles.id, userProfileId),
+      });
+      await db
+        .update(schema.userProfiles)
+        .set({ accessToken: encryption.encryptToString('new-access-token') })
+        .where(eq(schema.userProfiles.id, userProfileId));
+      // The check for an already replaced token reads the row before the sign-in lands; the
+      // refresh reads it after.
+      vi.spyOn(db.query.userProfiles, 'findFirst').mockResolvedValueOnce(stale);
+
+      await expect(
+        createProvider().refreshAccessToken(userProfileId, 'old-access-token'),
+      ).resolves.toBe('new-access-token');
+      expect(await storedProfile()).toMatchObject({ accessToken: 'new-access-token' });
+      expect(onPermanentAuthFailure).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps a new sign-in when Entra ID rejects the grant it replaced', async () => {

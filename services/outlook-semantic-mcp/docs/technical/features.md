@@ -27,6 +27,7 @@ Where a feature works the same in both modes, this page says so once. Where beha
 - `search_emails` queries Microsoft Graph directly using KQL keyword search only. No knowledge base interaction occurs.
 - Folder filtering is supported via the `directories` field on each `msGraphKeywordSearchQueries` entry. Pass a well-known folder name (e.g. `Inbox`) or a folder ID from `list_mailboxes_and_directories`. This works for the user's own mailbox and for fully delegated mailboxes (Full Access).
 - Search is **not supported** for mailboxes where the user only has folder-level (partial) access — Microsoft Graph requires full mailbox access for `$search` queries. See [Known limitations](#Known-Limitations) below.
+- Mail with a configured Purview sensitivity label or legacy Outlook sensitivity flag can be left out of search and `open_email`. See [Configuration — Sensitivity exclusions](../operator/configuration.md#Sensitivity-exclusions).
 
 **What's not supported (both modes)**
 
@@ -261,7 +262,7 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 
 **Setup**
 
-Enablement is operator-side: Entra admin consent for `Calendars.ReadWrite.Shared` first, then list the calendar tools in `MCP_TOOLS`. Existing users must reconnect Outlook after the first calendar tool is listed (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
+Enablement is operator-side: register `Calendars.ReadWrite.Shared` on the Entra app first, then list the calendar tools in `MCP_TOOLS`. Existing users must reconnect Outlook after the first calendar tool is listed (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
 
 **See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools)
 

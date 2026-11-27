@@ -51,15 +51,11 @@ const LEGACY_GRAPH_CALENDAR_TOOLS = [
   'cancel_event',
 ];
 
+// One fixture per shape of existing deployment.
 const DEPLOYMENTS: Record<string, { grant: string[]; legacyTools: string[] }> = {
-  'preview-1': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
-  'preview-2': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-1': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-2': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-3': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
-  'prod-calendar-4': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
-  'prod-1': { grant: MAIL_GRANT, legacyTools: LEGACY_GRAPH_TOOLS },
-  'prod-2': { grant: MAIL_GRANT, legacyTools: LEGACY_GRAPH_TOOLS },
+  mail: { grant: MAIL_GRANT, legacyTools: LEGACY_GRAPH_TOOLS },
+  'mail-calendar': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
+  'mail-calendar-debug': { grant: CALENDAR_GRANT, legacyTools: LEGACY_GRAPH_CALENDAR_TOOLS },
 };
 
 interface DeploymentValues {

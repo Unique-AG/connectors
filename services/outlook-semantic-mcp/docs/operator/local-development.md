@@ -81,6 +81,8 @@ cp .env.example .env
 ```env
 # Application
 SELF_URL=http://localhost:9542
+MCP_BACKEND=microsoft_graph_and_unique_api
+MCP_TOOLS=["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","sync_progress","verify_inbox_connection","delete_inbox_data","reconnect_inbox"]
 LOG_LEVEL=debug
 
 # Database

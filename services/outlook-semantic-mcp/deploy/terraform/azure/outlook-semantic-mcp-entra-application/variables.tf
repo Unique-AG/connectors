@@ -77,17 +77,16 @@ variable "confidential_clients" {
 
 variable "tools_preset" {
   description = <<-EOT
-    The tools the running service lists in MCP_TOOLS, named by group: mail, calendar, sync, debug.
-    Give one group, a list of groups, or a comma-separated string; the union of their tools is
-    used. Set this or tools_enabled, not both. With neither, the mail tools are used, which
-    registers what earlier versions of this module did. The sync and debug tools need no
-    permission beyond the mail ones.
+    The tools the running service lists in MCP_TOOLS, as a list of groups: mail, calendar, sync,
+    debug. The union of their tools is used. Set this or tools_enabled, not both. With neither,
+    the mail tools are used, which registers what earlier versions of this module did. The sync
+    and debug tools need no permission beyond the mail ones.
   EOT
-  type        = any
+  type        = list(string)
   default     = null
 
   validation {
-    condition     = var.tools_preset == null ? true : alltrue([for names in [[for name in try(tolist(var.tools_preset), split(",", var.tools_preset)) : trimspace(name)]] : length(names) > 0 && alltrue([for name in names : contains(keys(local.presets), name)])])
+    condition     = var.tools_preset == null || (length(coalesce(var.tools_preset, [])) > 0 && alltrue([for name in coalesce(var.tools_preset, []) : contains(keys(local.presets), name)]))
     error_message = "tools_preset names no group, or one this service does not have. Valid groups: ${join(", ", sort(keys(local.presets)))}."
   }
 }
@@ -135,8 +134,9 @@ variable "service_principal_configuration" {
   description = <<-EOT
     Configuration for the service principal. Set to null to skip service principal creation
     (useful in cross-tenant scenarios where the customer tenant manages the service principal).
-    When set (even to {}), creates a service principal and grants admin consent for all
-    Microsoft Graph delegated scopes on behalf of all users in the tenant.
+    When set (even to {}), creates a service principal and grants admin consent for the
+    Microsoft Graph delegated scopes the tool selection registers, on behalf of all users in
+    the tenant.
     For multi-tenant apps, each customer tenant admin must grant consent separately
     (via the admin consent URL or interactive flow).
   EOT
