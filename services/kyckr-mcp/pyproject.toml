@@ -13,13 +13,13 @@ dependencies = [
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
     "mcp-types==2.3.0",
+    "mcp-zitadel==0.1.0",
     "py-key-value-aio[postgresql,wrappers-encryption]==0.4.6",
     "pydantic-settings==2.16.3",
     "pydantic==2.14.4",
     "pyyaml==6.0.4",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.48.0",
     "uvicorn[standard]==0.54.0",
 ]
 
@@ -81,6 +81,7 @@ mcp-architecture = { path = "../../packages/mcp-architecture" }
 mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-observability = { path = "../../packages/mcp-observability" }
 mcp-openapi = { path = "../../packages/mcp-openapi" }
+mcp-zitadel = { path = "../../packages/mcp-zitadel" }
 
 [tool.mcp-openapi]
 spec = "src/kyckr_mcp/upstream/openapi.yml"

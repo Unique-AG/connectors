@@ -79,7 +79,7 @@ The chart also sets `HOST`, `MCP_AUTH_MODE=zitadel` and `DB_SSL_ROOT_CERT` (the 
 
 ## Sign-in and the organisation restriction
 
-Users sign in with Zitadel through the OIDC proxy of `unique_mcp`. The Zitadel application needs the redirect URI `<MCP_BASE_URL>/auth/callback`.
+Users sign in with Zitadel through `mcp-zitadel`. The Zitadel application needs the redirect URI `<MCP_BASE_URL>/auth/callback`.
 
 The application also needs the Refresh Token grant, or Zitadel issues no refresh token and every user signs in again when the access token expires. The MCP asks for `offline_access` at sign-in and lets clients register it, but does not require it, so a token without it is still accepted.
 

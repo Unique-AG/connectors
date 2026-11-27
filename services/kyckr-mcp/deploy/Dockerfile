@@ -8,6 +8,7 @@ WORKDIR /workspace/services/kyckr-mcp
 COPY packages/mcp-configs /workspace/packages/mcp-configs
 COPY packages/mcp-observability /workspace/packages/mcp-observability
 COPY packages/mcp-openapi /workspace/packages/mcp-openapi
+COPY packages/mcp-zitadel /workspace/packages/mcp-zitadel
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=services/kyckr-mcp/uv.lock,target=uv.lock \
     --mount=type=bind,source=services/kyckr-mcp/pyproject.toml,target=pyproject.toml \
