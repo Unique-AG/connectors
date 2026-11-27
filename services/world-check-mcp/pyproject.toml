@@ -9,6 +9,7 @@ dependencies = [
     "asyncpg==0.32.0",
     "fastmcp==4.1.6",
     "httpx2==2.16.2",
+    "mcp-auth==0.1.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
@@ -19,7 +20,6 @@ dependencies = [
     "pyyaml==6.0.4",
     "starlette==1.10.0",
     "tenacity==9.2.1",
-    "unique-mcp==2026.48.0",
     "uvicorn[standard]==0.54.0",
 ]
 
@@ -60,7 +60,6 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["src", "."]
-filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
 
 [tool.ruff]
 # The code style every MCP keeps. Add to it here; a rule turned off here is an exception for review.
@@ -83,6 +82,7 @@ executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsag
 
 [tool.uv.sources]
 mcp-architecture = { path = "../../packages/mcp-architecture" }
+mcp-auth = { path = "../../packages/mcp-auth" }
 mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-observability = { path = "../../packages/mcp-observability" }
 mcp-openapi = { path = "../../packages/mcp-openapi" }
