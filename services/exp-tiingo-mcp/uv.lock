@@ -1302,6 +1302,56 @@ wheels = [
 ]
 
 [[package]]
+name = "mcp-auth"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-auth" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "mcp-configs" },
+    { name = "py-key-value-aio", extra = ["wrappers-encryption"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=4.1.6,<4.2" },
+    { name = "mcp-configs", directory = "../../packages/mcp-configs" },
+    { name = "py-key-value-aio", extras = ["wrappers-encryption"], specifier = ">=0.4.6,<0.5" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "httpx2", specifier = "==2.16.2" },
+    { name = "poethepoet", specifier = "==0.49.0" },
+    { name = "pytest", specifier = "==9.2.0" },
+    { name = "pytest-asyncio", specifier = "==1.5.0" },
+    { name = "ruff", specifier = "==0.17.6" },
+]
+
+[[package]]
+name = "mcp-configs"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-configs" }
+dependencies = [
+    { name = "pydantic" },
+    { name = "pydantic-settings" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "pydantic", specifier = ">=2.13,<3" },
+    { name = "pydantic-settings", specifier = ">=2.15,<3" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "poethepoet", specifier = "==0.49.0" },
+    { name = "pytest", specifier = "==9.2.0" },
+    { name = "ruff", specifier = "==0.17.6" },
+]
+
+[[package]]
 name = "mcp-openapi"
 version = "0.1.0"
 source = { directory = "../../packages/mcp-openapi" }
@@ -2029,6 +2079,9 @@ filetree = [
 memory = [
     { name = "cachetools" },
 ]
+wrappers-encryption = [
+    { name = "cryptography" },
+]
 
 [[package]]
 name = "pycparser"
@@ -2686,6 +2739,8 @@ source = { editable = "." }
 dependencies = [
     { name = "fastmcp" },
     { name = "httpx2" },
+    { name = "mcp-auth" },
+    { name = "mcp-configs" },
     { name = "mcp-openapi" },
     { name = "py-key-value-aio", extra = ["memory"] },
     { name = "pydantic" },
@@ -2708,6 +2763,8 @@ dev = [
 requires-dist = [
     { name = "fastmcp", specifier = "==4.1.6" },
     { name = "httpx2", specifier = "==2.16.2" },
+    { name = "mcp-auth", directory = "../../packages/mcp-auth" },
+    { name = "mcp-configs", directory = "../../packages/mcp-configs" },
     { name = "mcp-openapi", directory = "../../packages/mcp-openapi" },
     { name = "py-key-value-aio", extras = ["memory"], specifier = "==0.4.6" },
     { name = "pydantic", specifier = "==2.14.4" },
