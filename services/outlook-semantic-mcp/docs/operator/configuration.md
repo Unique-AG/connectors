@@ -81,6 +81,8 @@ Set via `mcpConfig.microsoft` in Helm values:
 | `MICROSOFT_ADMIN_CONSENT_REDIRECT_URI` | `adminConsentRedirectUri` | `https://www.unique.ai/setup/consent-completed/entra-id` | Where Microsoft Entra sends a tenant admin after they grant admin consent through `/admin/consent`. Must be registered as a redirect URI on the app registration |
 | `MICROSOFT_PUBLIC_WEBHOOK_URL` | `publicWebhookUrl` | defaults to `SELF_URL` | Base URL for Microsoft Graph webhook callbacks — see [MICROSOFT_PUBLIC_WEBHOOK_URL](#MICROSOFT_PUBLIC_WEBHOOK_URL) |
 | `MICROSOFT_SUBSCRIPTION_EXPIRATION_TIME_HOURS_UTC` | `subscriptionExpirationTimeHoursUTC` | `3` | UTC hour (0–23) when daily subscription renewals run |
+| `MICROSOFT_OFFLINE_ACCESS` | `offlineAccess` | `enabled` | Whether sign-in requests `offline_access` — see [MICROSOFT_OFFLINE_ACCESS](#MICROSOFT_OFFLINE_ACCESS) |
+| `MICROSOFT_PROFILE_SCOPES` | `profileScopes` | `enabled` | Whether sign-in requests `profile` and `email`. `openid` is always requested. The server reads the user's profile from Microsoft Graph `GET /me`, not from the ID token these scopes shape, so `disabled` changes nothing it stores |
 
 ### Unique API Configuration
 
@@ -185,7 +187,7 @@ Set via `mcpConfig.auth` in Helm values (optional — defaults are suitable for 
 | Variable | Helm key | Default | Description |
 |----------|----------|---------|-------------|
 | `AUTH_ACCESS_TOKEN_EXPIRES_IN_SECONDS` | `accessTokenExpiresInSeconds` | `60` | TTL of the short-lived access token issued to MCP clients |
-| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days) |
+| `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` | `refreshTokenExpiresInSeconds` | `2592000` | TTL of the long-lived refresh token issued to MCP clients (30 days). At most `3600` with `MICROSOFT_OFFLINE_ACCESS=disabled`, where it is the session length — see [MICROSOFT_OFFLINE_ACCESS](#MICROSOFT_OFFLINE_ACCESS) |
 | `AUTH_DISABLE_RATE_LIMITING` | `disableRateLimiting` | `false` | Emergency switch: skip the rate limit on every OAuth route. Leave off unless rate limiting itself is suspected in an incident |
 
 ### Application Configuration
@@ -545,11 +547,22 @@ This defaults to `SELF_URL`. Set it explicitly only when the externally reachabl
 
 Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
 
+#### MICROSOFT_OFFLINE_ACCESS
+
+Set via `mcpConfig.microsoft.offlineAccess`. With `enabled` (default), sign-in requests `offline_access`, Microsoft returns a refresh token, and the server uses it to renew the user's Microsoft token and to run background jobs.
+
+With `disabled`, sign-in does not request `offline_access` and the server stores no refresh token. The Microsoft access token lasts about an hour (60 to 90 minutes by default; a tenant policy can shorten it), and nothing renews it. So that the MCP client signs the user in again before it runs out:
+
+- The MCP session ends `AUTH_REFRESH_TOKEN_EXPIRES_IN_SECONDS` after sign-in, however active the user is. Refreshing the MCP access token does not extend it. The server refuses to start when that is above `3600`.
+- If Microsoft still rejects the token before then, the server clears the user's Microsoft token, ends their MCP session and answers with the error the MCP client turns into a sign-in prompt.
+
+No background job can run without a refresh token, so `disabled` needs `MCP_BACKEND=microsoft_graph`, [`DIRECTORY_SYNC_MODE=on_demand`](#DIRECTORY_SYNC_MODE) and `DELEGATED_ACCESS_SCAN=disabled`. The server refuses to start otherwise, naming `MICROSOFT_OFFLINE_ACCESS`, and the chart refuses to render.
+
 #### Requested Graph permissions
 
 The server computes the Microsoft Graph permissions it requests from its configuration. The OAuth authorize request, token refresh and the Graph client all use the same list:
 
-1. Always: `openid`, `profile`, `email`, `offline_access`, `User.Read` (sign-in) and `Mail.Read` (the folder sync runs for every deployment).
+1. Always: `openid`, `User.Read` (sign-in) and `Mail.Read` (the folder sync runs for every deployment). Also `profile` and `email` unless [`MICROSOFT_PROFILE_SCOPES`](#Microsoft-Configuration) is `disabled`, and `offline_access` unless [`MICROSOFT_OFFLINE_ACCESS`](#MICROSOFT_OFFLINE_ACCESS) is `disabled`.
 2. Each tool in [`MCP_TOOLS`](#MCP_TOOLS) adds what its Microsoft Graph calls need:
    - `draft_email`, `update_draft_email`, `add_attachments_to_draft_email` and `remove_attachments_from_draft_email`: `Mail.ReadWrite`.
    - `lookup_contacts`: `People.Read`.
@@ -568,6 +581,7 @@ The server sends the list sorted. Some selections and what they request:
 | The same, plus calendar tools | The list above plus `Calendars.ReadWrite.Shared` |
 | The 10 mail tools, or the 14 with the sync tools, and `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read MailboxSettings.Read Mail.ReadWrite People.Read` |
 | `search_emails`, `fetch_next_search_pages`, `open_email`, `list_mailboxes_and_directories`, `list_categories` and `lookup_contacts`, with `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read Mail.Read People.Read MailboxSettings.Read` |
+| The same, with `MICROSOFT_OFFLINE_ACCESS=disabled` and `MICROSOFT_PROFILE_SCOPES=disabled` | `openid User.Read Mail.Read People.Read MailboxSettings.Read` |
 
 Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module still registers a fixed list: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. It does not register `Mail.Read` or `Mail.Read.Shared`. A selection without a draft tool requests them, so add them to an app made with that module and grant consent. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 

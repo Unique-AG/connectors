@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import type { Pool } from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MockEncryptionService } from '../../__mocks__';
 import { createPostgresPool, stopPostgres } from '../../__mocks__/stop-postgres';
 import type { DrizzleDatabase } from '../../db/drizzle.module';
@@ -191,6 +191,60 @@ describe('TokenProvider against Postgres', () => {
 
     expect(await storedProfile()).toMatchObject({ accessToken: null, refreshToken: null });
     expect(onPermanentAuthFailure).toHaveBeenCalledWith(userProfileId);
+  });
+
+  describe('a user signed in without offline_access', () => {
+    beforeEach(async () => {
+      await db
+        .update(schema.userProfiles)
+        .set({ refreshToken: null })
+        .where(eq(schema.userProfiles.id, userProfileId));
+    });
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('skips the token endpoint, clears the tokens and revokes the MCP session', async () => {
+      await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+
+      expect(mockFetch).not.toHaveBeenCalled();
+      expect(await storedProfile()).toMatchObject({ accessToken: null, refreshToken: null });
+      expect(onPermanentAuthFailure).toHaveBeenCalledWith(userProfileId);
+    });
+
+    it('asks for a new sign-in again when a concurrent request already revoked the grant', async () => {
+      await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+
+      await expect(createProvider().refreshAccessToken(userProfileId)).rejects.toBeInstanceOf(
+        UpstreamCredentialRevokedError,
+      );
+      expect(onPermanentAuthFailure).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps a new sign-in that replaced the expired one', async () => {
+      const provider = createProvider();
+      const stale = await db.query.userProfiles.findFirst({
+        where: eq(schema.userProfiles.id, userProfileId),
+      });
+      await db
+        .update(schema.userProfiles)
+        .set({ accessToken: encryption.encryptToString('new-access-token') })
+        .where(eq(schema.userProfiles.id, userProfileId));
+      // The provider read the profile just before the new sign-in landed. No Microsoft call sits
+      // between that read and the revoke to hook into, so the read itself returns the stale row.
+      vi.spyOn(db.query.userProfiles, 'findFirst').mockResolvedValueOnce(stale);
+
+      await expect(provider.refreshAccessToken(userProfileId)).rejects.toThrow(
+        'the grant was replaced by a new sign-in',
+      );
+      expect(await storedProfile()).toMatchObject({ accessToken: 'new-access-token' });
+      expect(onPermanentAuthFailure).not.toHaveBeenCalled();
+    });
   });
 
   it('keeps a new sign-in when Entra ID rejects the grant it replaced', async () => {

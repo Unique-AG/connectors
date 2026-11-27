@@ -114,7 +114,36 @@ describe(resolveScopes.name, () => {
       MCP_TOOLS: JSON.stringify(READ_ONLY_TOOLS),
     };
 
-    it('requests only the four read permissions', () => {
+    it('requests only the four read permissions and openid with offline access and profile scopes off', () => {
+      expect(
+        scopesFor({
+          ...readOnly,
+          DIRECTORY_SYNC_MODE: 'on_demand',
+          MICROSOFT_OFFLINE_ACCESS: 'disabled',
+          MICROSOFT_PROFILE_SCOPES: 'disabled',
+        }),
+      ).toEqual(
+        sorted(['openid', 'User.Read', 'Mail.Read', 'People.Read', 'MailboxSettings.Read']),
+      );
+    });
+
+    it('drops only offline_access with offline access off', () => {
+      expect(
+        scopesFor({
+          ...readOnly,
+          DIRECTORY_SYNC_MODE: 'on_demand',
+          MICROSOFT_OFFLINE_ACCESS: 'disabled',
+        }),
+      ).toEqual(without(scopesFor(readOnly), 'offline_access'));
+    });
+
+    it('drops only profile and email with profile scopes off', () => {
+      expect(scopesFor({ ...readOnly, MICROSOFT_PROFILE_SCOPES: 'disabled' })).toEqual(
+        without(scopesFor(readOnly), 'profile', 'email'),
+      );
+    });
+
+    it('requests the four read permissions with offline access and profile scopes on by default', () => {
       expect(scopesFor(readOnly)).toEqual(
         sorted([
           'openid',

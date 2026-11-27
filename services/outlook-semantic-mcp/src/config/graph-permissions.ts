@@ -1,7 +1,8 @@
 import { McpBackendType } from './mcp-backend-type.config';
 import { type GraphPermission, TOOL_DECLARATIONS, type ToolName } from './tool-declarations';
 
-const OPENID_SCOPES = ['openid', 'profile', 'email'] as const;
+// The profile is read from GET /me, so `profile` and `email` only shape the ID token, which is not read.
+const PROFILE_SCOPES = ['profile', 'email'] as const;
 
 // Sign-in reads GET /me, and the folder sync reads every deployment's mail folders whatever the tools.
 const BASE_PERMISSIONS: readonly GraphPermission[] = ['User.Read', 'Mail.Read'];
@@ -27,6 +28,8 @@ interface PermissionSelection {
   readonly mode: McpBackendType;
   readonly tools: ReadonlySet<ToolName>;
   readonly sharedMailboxes: boolean;
+  readonly offlineAccess: boolean;
+  readonly profileScopes: boolean;
 }
 
 function resolveGraphPermissions(selection: PermissionSelection): GraphPermission[] {
@@ -46,5 +49,10 @@ function resolveGraphPermissions(selection: PermissionSelection): GraphPermissio
 }
 
 export function resolveScopes(selection: PermissionSelection): string[] {
-  return [...OPENID_SCOPES, 'offline_access', ...resolveGraphPermissions(selection)].sort();
+  return [
+    'openid',
+    ...(selection.profileScopes ? PROFILE_SCOPES : []),
+    ...(selection.offlineAccess ? ['offline_access'] : []),
+    ...resolveGraphPermissions(selection),
+  ].sort();
 }
