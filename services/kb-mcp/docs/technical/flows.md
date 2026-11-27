@@ -69,8 +69,8 @@ sequenceDiagram
     K-->>C: Chunks with citations
 ```
 
-Scope resolution only builds clickable citation links. If it fails, results still return, with
-`unique://content/{id}` references instead.
+Scope resolution builds https citation links for clients other than Unique AI. Unique AI gets
+`unique://content/{id}`. If scope resolution fails, other clients get that scheme too.
 
 ## Content Tree & Content Metadata
 

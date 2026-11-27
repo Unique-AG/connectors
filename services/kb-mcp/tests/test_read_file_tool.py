@@ -771,6 +771,32 @@ async def test_read_prefers_deep_link_over_the_files_own_web_page(monkeypatch):
     )
 
 
+@pytest.mark.asyncio
+async def test_unique_ai_read_cites_content_url_not_the_deep_link(monkeypatch):
+    monkeypatch.setenv("UNIQUE_MCP_FRONTEND_BASE_URL", "https://example.unique.app")
+    content = Content(
+        id="cont_abc",
+        key="doc.pdf",
+        title="Annual Report 2025",
+        url="https://example.com/page",
+        chunks=[_make_chunk("hello", 0, 1, 1)],
+        metadata={"folderIdPath": "uniquepathid://scope_root/scope_leaf"},
+    )
+    with (
+        _patch_search_contents(content),
+        patch("kb_mcp.tools.read_file.tool.is_unique_ai_client", return_value=True),
+    ):
+        result = await read_file(content_id="cont_abc", config=ReadFileToolConfig())
+
+    assert _read(result) == {
+        "title": "Annual Report 2025",
+        "url": "unique://content/cont_abc",
+        "content_id": "cont_abc",
+        "text": "--- page 1 ---\nhello",
+    }
+    assert result.content[0].meta is None  # type: ignore[union-attr]
+
+
 @pytest.mark.parametrize(
     ("requested", "expected"),
     [(None, 8_000), (500, 500), (99_999, 99_999)],
