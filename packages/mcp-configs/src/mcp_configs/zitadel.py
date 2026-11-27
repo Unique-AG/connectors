@@ -11,10 +11,9 @@ _REQUIRED_SCOPES = ("openid", "profile", "urn:zitadel:iam:user:resourceowner")
 
 
 class ZitadelSettings(BaseSettings):
-    """The Zitadel instance an MCP signs its users in with, as an OIDC proxy.
+    """The Zitadel instance an MCP signs its users in with.
 
-    The names match `unique_mcp.auth.zitadel.ZitadelOIDCProxySettings`, so the same environment
-    configures both.
+    `mcp-zitadel` reads these fields. The environment names are `ZITADEL_*`.
     """
 
     model_config: ClassVar[SettingsConfigDict] = shared_config("ZITADEL_")
