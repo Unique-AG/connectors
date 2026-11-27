@@ -34,7 +34,7 @@ Not covered: durable OAuth storage (it is in memory, and the auth is expected to
 
 ## Layout
 
-- `settings.py`: pydantic settings with a security validator. `auth.py`: Zitadel OIDC proxy from `unique_mcp`. `params.py`: argument and date types shared by the tools and models.
+- `settings.py`: pydantic settings with a security validator. `auth.py`: Zitadel OIDC proxy from `mcp_auth`. `params.py`: argument and date types shared by the tools and models.
 - `server.py` builds the server (instructions, the HTTP client and the lifespan). It fails at startup if an operationId it uses is not in the spec or a tool file cannot be loaded. `main.py` runs it and mounts `/probe`, `/health` and `/metrics` with `unique_mcp.monitoring.setup_ops` (per-tool call counts and durations included).
 - `openapi/`: the spec (loaded as `SPEC` in `server.py`) and `EXPOSED`, the allow-list of operationIds served as generated tools. Anything not listed is hidden. `CLIENT_BACKED` lists the operations the tools call through `OperationClient`.
 - `deps.py`: the dependencies tools declare with `Depends`: `get_api` (the `OperationClient`, which `create_server` builds and the server lifespan hands out and closes with the HTTP client). `tools/`: the tools and the widget resource. `FileSystemProvider` imports every `.py` file there and registers each `@tool` and `@resource` it finds, so there is no list to update. `fundamentals.py` holds two tools, and `returns.py` holds the chart tool and its widget.
