@@ -38,6 +38,7 @@ async def passport_check(
         ExternalId | None,
         Field(description="External caseId. Defaults to one derived from the document."),
     ] = None,
+    *,
     name: Annotated[
         str | None, Field(description="Case name. Defaults to the given and last names.")
     ] = None,

@@ -41,6 +41,7 @@ async def get_case_results(
     case: CaseArgument,
     limit: PageSize = 50,
     page_reference: PageReference = None,
+    *,
     expression: Annotated[
         Expression | None, Field(description="Optional FIQL filter, such as matchStrength==EXACT.")
     ] = None,

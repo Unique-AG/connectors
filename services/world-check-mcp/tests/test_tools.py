@@ -1603,10 +1603,10 @@ async def test_resolve_result_saves_an_approved_watchlist_decision() -> None:
 
 
 async def _approve_after_ext_1_moves(
-    message: str, response_type: object, params: object, context: object
+    message: str, _response_type: object, _params: object, _context: object
 ) -> dict[str, bool]:
     _ext_1_maps_to.append("sys-pass")
-    return await _approve(message, response_type, params, context)
+    return await _approve(message, _response_type, _params, _context)
 
 
 async def test_resolve_result_refuses_when_the_case_id_maps_to_another_case_after_approval() -> (

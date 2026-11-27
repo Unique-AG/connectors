@@ -47,6 +47,7 @@ async def verify_passport_check(
         Field(description="True when the generated MRZ matches the document. Not the approval."),
     ],
     ctx: Context,
+    *,
     note: Note = "",
     upstream: Upstream = Depends(get_upstream),
     approvals: ApprovalGate = Depends(get_approvals),

@@ -37,6 +37,7 @@ async def screen_entity(
     name: Name,
     entity_type: Annotated[contexts.EntityType, Field(description="INDIVIDUAL or ORGANISATION.")],
     group_id: GroupId,
+    *,
     case_id: Annotated[
         ExternalId | None,
         Field(description="External caseId. Defaults to one derived from the details."),

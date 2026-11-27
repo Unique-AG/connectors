@@ -43,6 +43,7 @@ async def search_cases(
     expression: Annotated[
         Expression | None, Field(description="Extra FIQL filter. The group filter is always added.")
     ] = None,
+    *,
     search_mode: Annotated[
         contexts.SearchMode,
         Field(description="DEFAULT, BEGINS_WITH, EXACT, or CONTAINS. EXACT matches a caseId."),

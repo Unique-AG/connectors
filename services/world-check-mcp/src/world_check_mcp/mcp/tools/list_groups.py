@@ -38,6 +38,7 @@ async def list_groups(
         str | None, Field(min_length=1, description="Only the groups directly under this group.")
     ] = None,
     limit: PageSize = 25,
+    *,
     page_reference: Annotated[
         str | None,
         Field(description="next_page from the previous page. Keep the same query and parent_id."),
