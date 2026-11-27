@@ -106,9 +106,6 @@ catalogs:
     cache-manager:
       specifier: 7.2.9
       version: 7.2.9
-    cron:
-      specifier: 4.4.2
-      version: 4.4.2
     drizzle-kit:
       specifier: 0.31.11
       version: 0.31.11
@@ -204,6 +201,7 @@ overrides:
   effect@<3.22.1: 3.22.1
   multer@<2.5.0: 2.5.0
   js-yaml@>=5 <5.4.1: 5.4.1
+  cron: 4.4.2
 
 importers:
 
@@ -695,7 +693,7 @@ importers:
         specifier: 'catalog:'
         version: 2.19.5
       cron:
-        specifier: 'catalog:'
+        specifier: 4.4.2
         version: 4.4.2
       htmlparser2:
         specifier: 12.0.0
@@ -873,7 +871,7 @@ importers:
         specifier: 'catalog:'
         version: 7.2.9
       cron:
-        specifier: 'catalog:'
+        specifier: 4.4.2
         version: 4.4.2
       drizzle-kit:
         specifier: 'catalog:'
@@ -1072,7 +1070,7 @@ importers:
         specifier: 'catalog:'
         version: 2.19.5
       cron:
-        specifier: 'catalog:'
+        specifier: 4.4.2
         version: 4.4.2
       graphql:
         specifier: 'catalog:'
@@ -4257,10 +4255,6 @@ packages:
     resolution: {integrity: sha512-piICUB6ei4IlTv1+653yq5+KoqfBYmj9bw6LqXoOneTMDXk5nM1qt12mFW1caG3LlJXEKW1Bp0WggEmIfQB34g==}
     engines: {node: '>= 14'}
 
-  cron@4.4.0:
-    resolution: {integrity: sha512-fkdfq+b+AHI4cKdhZlppHveI/mgz2qpiYxcm+t5E5TsxX7QrLS1VE0+7GENEk9z0EeGPcpSciGv6ez24duWhwQ==}
-    engines: {node: '>=18.x'}
-
   cron@4.4.2:
     resolution: {integrity: sha512-sXlg/D5CdX7M4q3isDCbBD3XCHXExr3yBFwfZ1xaSe/IUVd3DmsnVzeSRjLlJeohbK+j4UtdKmY9k735RMl5XQ==}
     engines: {node: '>=18.x'}
@@ -7337,7 +7331,7 @@ snapshots:
     dependencies:
       '@nestjs/common': 12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 12.5.1(@nestjs/common@12.5.1(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@12.5.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      cron: 4.4.0
+      cron: 4.4.2
 
   '@nestjs/schematics@12.0.13(chokidar@5.0.0)(typescript@5.9.3)':
     dependencies:
@@ -9456,11 +9450,6 @@ snapshots:
     dependencies:
       crc-32: 1.2.2
       readable-stream: 4.8.0
-
-  cron@4.4.0:
-    dependencies:
-      '@types/luxon': 3.7.6
-      luxon: 3.7.2
 
   cron@4.4.2:
     dependencies:
