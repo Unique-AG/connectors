@@ -109,6 +109,67 @@ tests:
       - failedTemplate:
           errorPattern: "directorySyncMode"
 
+  - it: fails to render a sync tool outside microsoft_graph_and_unique_api mode
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph
+          tools:
+            - search_emails
+            - sync_progress
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "lists sync_progress, which needs mcpConfig.app.mcpBackend microsoft_graph_and_unique_api"
+
+  - it: fails to render a debug tool with debug mode off
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph_and_unique_api
+          tools:
+            - search_emails
+            - admin_ops
+        microsoft:
+          clientId: test-client-id
+    asserts:
+      - failedTemplate:
+          errorPattern: "lists admin_ops, which needs mcpConfig.app.mcpDebugMode enabled"
+
+  - it: renders sync and debug tools in microsoft_graph_and_unique_api mode with debug mode on
+    values:
+      - ../ci-values.yaml
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+          mcpBackend: microsoft_graph_and_unique_api
+          mcpDebugMode: enabled
+          tools:
+            - sync_progress
+            - admin_ops
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_TOOLS
+            value: '["sync_progress","admin_ops"]'
+
   - it: fails to render directorySyncMode on_demand outside microsoft_graph mode
     values:
       - ../ci-values.yaml
