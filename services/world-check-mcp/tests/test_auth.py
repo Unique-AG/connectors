@@ -1,6 +1,5 @@
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
 import httpx2
-from mcp_auth.zitadel import IdTokenVerifier
 from mcp_configs import ServerSettings
 from mcp_configs import ZitadelSettings
 from pydantic import AnyHttpUrl
@@ -20,7 +19,6 @@ OIDC_CONFIGURATION = {
     "subject_types_supported": ["public"],
     "id_token_signing_alg_values_supported": ["RS256"],
 }
-ORG_SCOPE = "urn:zitadel:iam:org:id:123456789"
 STORE = StoreSettings(
     url=SecretStr("postgresql://user:secret@localhost:5432/world_check"),
     _env_file=None,  # pyright: ignore[reportCallIssue]
@@ -46,51 +44,57 @@ def test_create_auth_signs_no_one_in_without_zitadel_settings(
     assert create_auth(zitadel=None, server=server_settings, store=None) is None
 
 
-def _zitadel(org_id: str | None = None) -> ZitadelSettings:
-    return ZitadelSettings(
+def test_create_auth_signs_in_through_the_zitadel_it_is_given(
+    server_settings: ServerSettings, zitadel_discovery: list[str]
+) -> None:
+    zitadel = ZitadelSettings(
         base_url=AnyHttpUrl(ISSUER),
         client_id="world-check",
         jwt_signing_key=SecretStr("k" * 32),
-        org_id=org_id,
         _env_file=None,  # pyright: ignore[reportCallIssue]
     )
 
-
-def test_create_auth_signs_in_with_identity_scopes_and_verifies_the_id_token(
-    server_settings: ServerSettings, zitadel_discovery: list[str]
-) -> None:
-    auth = create_auth(zitadel=_zitadel(), server=server_settings, store=STORE)
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=STORE)
 
     assert isinstance(auth, OIDCProxy)
     assert zitadel_discovery == [f"{ISSUER}/.well-known/openid-configuration"]
-    assert auth.required_scopes == ["openid", "profile", "urn:zitadel:iam:user:resourceowner"]
-    # FastMCP has no public accessor for these; both are pinned by fastmcp's version in uv.lock.
-    assert auth._verify_id_token
-    assert isinstance(auth._token_validator, IdTokenVerifier)
-    assert auth._token_validator._org_id is None
+    assert auth.required_scopes == zitadel.required_scopes
 
 
 @pytest.mark.usefixtures("zitadel_discovery")
-def test_create_auth_asks_for_the_organisation_scope_without_registering_or_requiring_it(
+def test_create_auth_asks_for_the_organisation_scope_without_registering_it(
     server_settings: ServerSettings,
 ) -> None:
-    auth = create_auth(zitadel=_zitadel("123456789"), server=server_settings, store=STORE)
+    zitadel = ZitadelSettings(
+        base_url=AnyHttpUrl(ISSUER),
+        client_id="world-check",
+        jwt_signing_key=SecretStr("k" * 32),
+        org_id="123456789",
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=STORE)
 
     assert isinstance(auth, OIDCProxy)
     registration = auth.client_registration_options
     assert registration is not None
-    assert ORG_SCOPE not in (registration.valid_scopes or [])
-    assert ORG_SCOPE not in (auth.required_scopes or [])
-    assert ORG_SCOPE in auth._extra_authorize_params["scope"].split()
-    assert isinstance(auth._token_validator, IdTokenVerifier)
-    assert auth._token_validator._org_id == "123456789"
+    assert registration.valid_scopes is not None
+    assert "urn:zitadel:iam:org:id:123456789" not in registration.valid_scopes
+    assert "urn:zitadel:iam:org:id:123456789" in auth._extra_authorize_params["scope"].split()
 
 
 @pytest.mark.usefixtures("zitadel_discovery")
 def test_create_auth_asks_zitadel_for_a_refresh_token_without_requiring_one(
     server_settings: ServerSettings,
 ) -> None:
-    auth = create_auth(zitadel=_zitadel(), server=server_settings, store=STORE)
+    zitadel = ZitadelSettings(
+        base_url=AnyHttpUrl(ISSUER),
+        client_id="world-check",
+        jwt_signing_key=SecretStr("k" * 32),
+        _env_file=None,  # pyright: ignore[reportCallIssue]
+    )
+
+    auth = create_auth(zitadel=zitadel, server=server_settings, store=STORE)
 
     assert isinstance(auth, OIDCProxy)
     registration = auth.client_registration_options
