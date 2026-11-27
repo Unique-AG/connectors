@@ -47,7 +47,7 @@ class GetMandatesQuery:
         mandates = [
             MandateResponse.from_attributes(detail)
             if detail
-            else MandateResponse(id=listed[index].id)
+            else MandateResponse.from_listing(listed[index])
             for index, detail in enumerate(details)
         ]
         response = InvestorMandatesResponse(

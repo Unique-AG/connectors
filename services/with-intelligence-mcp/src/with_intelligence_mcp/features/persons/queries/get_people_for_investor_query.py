@@ -39,7 +39,7 @@ class GetPeopleForInvestorQuery:
         people = [
             PersonResponse.from_attributes(detail, organisation_id=investor.id)
             if detail
-            else PersonResponse(id=listed[index].id, name=listed[index].name)
+            else PersonResponse.from_listing(listed[index])
             for index, detail in enumerate(details)
         ]
         response = PeopleForInvestorResponse(

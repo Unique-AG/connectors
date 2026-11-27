@@ -49,6 +49,7 @@ class TestProjection:
         result = await get_manager(manager_id=10, client=client)
         assert isinstance(result, ManagerProfileResponse)
         assert result.location == "Westport, United States"
+        assert result.url == "https://platform.withintelligence.com/explore/managers/10"
         assert result.prime_brokers == ["JP Morgan"]
         assert result.aums is not None
         assert result.aums[0].value_millions == 85000

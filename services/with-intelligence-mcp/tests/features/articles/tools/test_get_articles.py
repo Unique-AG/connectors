@@ -20,6 +20,11 @@ ARTICLE: dict[str, object] = {
     "id": 100,
     "post_title": "Example portfolio update",
     "post_date": "2026-09-29T15:56:19",
+    "post_name": "example-portfolio-update",
+    "document": {
+        "title": "Example pack",
+        "url": "https://cms.example.invalid/wp-content/uploads/2026/11/Example-Pack.pdf",
+    },
     "post_excerpt": (
         '<sc_entity type="institutional_investor" id="2504">Example RS</sc_entity> returned 7%.'
     ),
@@ -80,10 +85,16 @@ class TestProjection:
         assert "sort%5Bid%5D=desc" in query
         article = result.articles[0]
         assert article.title == "Example portfolio update"
+        assert article.url == (
+            "https://platform.withintelligence.com/insights/example-portfolio-update?a=100"
+        )
         assert article.excerpt == "Example RS returned 7%."
         assert article.body == "The full note on Example RS."
         assert article.article_type == "Snippet"
         assert article.author == "A. Writer"
+        assert article.document_url == (
+            "https://platform.withintelligence.com/files/2026/11/Example-Pack.pdf"
+        )
         assert article.firms is not None
         assert article.firms[0].entity_id == 2504
         assert article.firms[0].is_primary is True
@@ -106,3 +117,6 @@ class TestProjection:
         assert isinstance(result, InvestorArticlesResponse)
         assert result.articles[0].title == "Listing title"
         assert result.articles[0].excerpt is None
+        assert result.articles[0].url == (
+            "https://platform.withintelligence.com/insights/article?a=100"
+        )

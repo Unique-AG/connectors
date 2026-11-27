@@ -51,6 +51,7 @@ class TestProjection:
         result = await get_consultant(consultant_id=-1098972655, client=client)
         assert isinstance(result, ConsultantProfileResponse)
         assert result.location == "Boston, MA, United States"
+        assert result.url == "https://platform.withintelligence.com/explore/consultants/-1098972655"
         assert result.email == "contact@example.invalid"
         assert result.services == ["Consultant", "Investment Consultant"]
         assert result.strategies == ["Global Macro"]
