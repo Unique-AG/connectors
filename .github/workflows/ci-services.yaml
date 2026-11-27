@@ -15,6 +15,7 @@ on:
       - "!packages/mcp-observability/**"
       - "!packages/mcp-openapi/**"
       - "!packages/mcp-scaffold/**"
+      - "!packages/mcp-zitadel/**"
       - "pnpm-lock.yaml"
       - ".github/workflows/ci-services.yaml"
       - ".github/workflows/_template-ci.yaml"
@@ -66,6 +67,7 @@ jobs:
               - '!packages/mcp-observability/**'
               - '!packages/mcp-openapi/**'
               - '!packages/mcp-scaffold/**'
+              - '!packages/mcp-zitadel/**'
             lockfile:
               - 'pnpm-lock.yaml'
             workflow:
