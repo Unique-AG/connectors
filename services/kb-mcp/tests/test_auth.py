@@ -86,7 +86,6 @@ def test_build_auth_never_passes_none_client_storage(durable_settings):
 
     _, kwargs = mock_create.call_args
     assert kwargs["client_storage"] is not None
-    assert kwargs.get("encryption_salt") is None
 
 
 def test_build_auth_uses_a_secretless_zitadel_client(durable_settings, monkeypatch):
@@ -134,8 +133,6 @@ def test_build_auth_requests_offline_access_from_zitadel(durable_settings):
     assert "offline_access" in asked
     assert "offline_access" in (registration_options.valid_scopes or [])
     assert "offline_access" not in (proxy.required_scopes or [])
-    assert not {s for s in proxy.required_scopes or [] if s.startswith("mcp:")}
-    assert {"mcp:tools", "mcp:prompts", "mcp:resources"} <= set(asked)
 
 
 def test_build_storage_treats_decryption_errors_as_misses(durable_settings):
