@@ -193,6 +193,7 @@ dependencies = [
     { name = "asyncpg" },
     { name = "fastmcp" },
     { name = "httpx2" },
+    { name = "mcp-auth" },
     { name = "mcp-configs" },
     { name = "mcp-observability" },
     { name = "mcp-openapi" },
@@ -204,7 +205,6 @@ dependencies = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "starlette" },
     { name = "tenacity" },
-    { name = "unique-mcp" },
     { name = "unique-sdk" },
     { name = "unique-toolkit", extra = ["monitoring", "otel"] },
     { name = "uvicorn", extra = ["standard"] },
@@ -228,6 +228,7 @@ requires-dist = [
     { name = "asyncpg", specifier = "==0.32.0" },
     { name = "fastmcp", specifier = "==4.1.6" },
     { name = "httpx2", specifier = "==2.16.2" },
+    { name = "mcp-auth", directory = "../../packages/mcp-auth" },
     { name = "mcp-configs", directory = "../../packages/mcp-configs" },
     { name = "mcp-observability", directory = "../../packages/mcp-observability" },
     { name = "mcp-openapi", directory = "../../packages/mcp-openapi" },
@@ -239,7 +240,6 @@ requires-dist = [
     { name = "sqlalchemy", extras = ["asyncio"], specifier = "==2.1.9" },
     { name = "starlette", specifier = "==1.10.0" },
     { name = "tenacity", specifier = "==9.2.1" },
-    { name = "unique-mcp", specifier = "==2026.48.0" },
     { name = "unique-sdk", specifier = "==2026.48.0" },
     { name = "unique-toolkit", extras = ["monitoring", "otel"], specifier = "==2026.48.0" },
     { name = "uvicorn", extras = ["standard"], specifier = "==0.54.0" },
@@ -1654,6 +1654,33 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "poethepoet", specifier = "==0.49.0" },
+    { name = "pytest", specifier = "==9.2.0" },
+    { name = "pytest-asyncio", specifier = "==1.5.0" },
+    { name = "ruff", specifier = "==0.17.6" },
+]
+
+[[package]]
+name = "mcp-auth"
+version = "0.1.0"
+source = { directory = "../../packages/mcp-auth" }
+dependencies = [
+    { name = "fastmcp" },
+    { name = "mcp-configs" },
+    { name = "py-key-value-aio", extra = ["wrappers-encryption"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastmcp", specifier = ">=4.1.6,<4.2" },
+    { name = "mcp-configs", directory = "../../packages/mcp-configs" },
+    { name = "py-key-value-aio", extras = ["wrappers-encryption"], specifier = ">=0.4.6,<0.5" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "basedpyright", specifier = "==1.40.2" },
+    { name = "httpx2", specifier = "==2.16.2" },
     { name = "poethepoet", specifier = "==0.49.0" },
     { name = "pytest", specifier = "==9.2.0" },
     { name = "pytest-asyncio", specifier = "==1.5.0" },
@@ -3308,29 +3335,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/a3/60/993a9757dc4a41727351828dc784e66fd467ed81d46cbec25d44cae69657/uncalled_for-0.6.2.tar.gz", hash = "sha256:58835db667a85408c7b6d6ad8dfdd74d7713d3be669b46396ba3d2c6a889242d", size = 73820, upload-time = "2026-11-19T01:15:30.596Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/4e/fb/81dabcc9c8f4200eb5eaa600458978303f1a84ffa5ed356f70bf6c5d1f04/uncalled_for-0.6.2-py3-none-any.whl", hash = "sha256:bcac08897ceb7113b52e6c8070eead4da1610ae23e6e0d0e9f2a6c4bba7905cb", size = 20127, upload-time = "2026-11-19T01:15:29.148Z" },
-]
-
-[[package]]
-name = "unique-mcp"
-version = "2026.48.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "fastmcp" },
-    { name = "httpx" },
-    { name = "joserfc" },
-    { name = "opentelemetry-api" },
-    { name = "platformdirs" },
-    { name = "pydantic" },
-    { name = "pydantic-settings" },
-    { name = "pyjwt" },
-    { name = "python-dotenv" },
-    { name = "starlette" },
-    { name = "typing-extensions" },
-    { name = "unique-toolkit", extra = ["monitoring", "otel"] },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/fb/ef/7864b7a2bcc8a93c5ca532c0035ca2d3be4018cf9a9535a93f4be58e7281/unique_mcp-2026.48.0.tar.gz", hash = "sha256:3a962142c3ec143022326c13a0e772e5dfebf550ae6fc6680bf58e05f440be81", size = 18457, upload-time = "2026-11-20T13:48:28.034Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/0d/1d/735cb719d96457289d24444a801dea7cfa6c8b778c2e369638dd7411454a/unique_mcp-2026.48.0-py3-none-any.whl", hash = "sha256:7f4d1e851bdf61e1d5cb75f0c79f46f7735485a2f0cccea9ae5ecae3e19d6f51", size = 25580, upload-time = "2026-11-20T13:48:27.33Z" },
 ]
 
 [[package]]

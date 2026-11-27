@@ -9,6 +9,7 @@ from architecture_demo_mcp.mcp import create_auth
 from architecture_demo_mcp.persistence import StoreSettings
 
 ISSUER = "https://zitadel.example.com"
+ORG_SCOPE = "urn:zitadel:iam:org:id:123456789"
 STORE = StoreSettings(url=SecretStr("redis://localhost:6379/0"), _env_file=None)  # pyright: ignore[reportCallIssue]
 
 
@@ -32,11 +33,11 @@ def test_create_auth_signs_in_through_the_zitadel_it_is_given(
 
     assert isinstance(auth, OIDCProxy)
     assert zitadel_discovery == [f"{ISSUER}/.well-known/openid-configuration"]
-    assert auth.required_scopes == zitadel.required_scopes
+    assert auth.required_scopes == ["openid", "profile", "urn:zitadel:iam:user:resourceowner"]
 
 
 @pytest.mark.usefixtures("zitadel_discovery")
-def test_create_auth_lets_a_client_register_with_the_organisation_scope(
+def test_create_auth_asks_for_the_organisation_scope_without_registering_it(
     server_settings: ServerSettings,
 ) -> None:
     zitadel = ZitadelSettings(
@@ -52,9 +53,9 @@ def test_create_auth_lets_a_client_register_with_the_organisation_scope(
     assert isinstance(auth, OIDCProxy)
     registration = auth.client_registration_options
     assert registration is not None
-    assert registration.valid_scopes is not None
-    assert set(zitadel.required_scopes) <= set(registration.valid_scopes)
-    assert "urn:zitadel:iam:org:id:123456789" in registration.valid_scopes
+    assert ORG_SCOPE not in (auth.required_scopes or [])
+    assert ORG_SCOPE not in (registration.valid_scopes or [])
+    assert ORG_SCOPE in auth._extra_authorize_params["scope"].split()
 
 
 @pytest.mark.usefixtures("zitadel_discovery")
