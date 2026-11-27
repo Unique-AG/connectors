@@ -1,7 +1,7 @@
 <!-- confluence-page-id: 2062254116 -->
 <!-- confluence-space-key: PUBDOC -->
 
-The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, contact lookup, and — when `CALENDAR_INTEGRATION` is enabled — live Outlook calendar.
+The Outlook Semantic MCP Server is a NestJS-based microservice that connects Microsoft Outlook with the Unique platform through the Model Context Protocol (MCP). It syncs emails from connected mailboxes into the Unique knowledge base and exposes MCP tools for AI-assisted email search, draft creation, contact lookup, and — when a calendar tool is listed in `MCP_TOOLS` — live Outlook calendar.
 
 ## High-Level Architecture
 
@@ -59,7 +59,7 @@ Tools fall into these categories:
 - **Contact lookup** — Searches the user's Microsoft contacts directory via Graph API
 - **Mailbox utilities** — Lists folders and categories via Graph API for search filtering
 - **Connection management** — Checks webhook status, reconnects, or removes the mailbox connection
-- **Calendar** (when `CALENDAR_INTEGRATION` is enabled) — Live Graph query-through for calendars and events; no ingest, webhooks, or calendar tables
+- **Calendar** (when a calendar tool is listed in `MCP_TOOLS`) — Live Graph query-through for calendars and events; no ingest, webhooks, or calendar tables
 
 See [Tools Reference](./tools.md) for the full list and behavior details.
 

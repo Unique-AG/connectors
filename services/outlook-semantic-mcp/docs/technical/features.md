@@ -30,7 +30,7 @@ Where a feature works the same in both modes, this page says so once. Where beha
 
 **What's not supported (both modes)**
 
-- Task or file data — only mail is in scope here. Calendar is a separate, flag-gated live Graph path; see [Calendar](#Calendar).
+- Task or file data — only mail is in scope here. Calendar is a separate live Graph path, turned on by listing a calendar tool in `MCP_TOOLS`; see [Calendar](#Calendar).
 
 **See also:** [Tools — search_emails](./tools.md#search_emails)
 
@@ -241,7 +241,7 @@ Configure scanning via [`DELEGATED_ACCESS_SCAN`](../operator/configuration.md#DE
 
 ## Calendar
 
-**Both modes**, only when [`CALENDAR_INTEGRATION`](../operator/configuration.md#CALENDAR_INTEGRATION) is `enabled`.
+**Both modes**, only when a calendar tool is listed in [`MCP_TOOLS`](../operator/configuration.md#MCP_TOOLS). Only the listed calendar tools are registered.
 
 Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar tables. The tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event`, and `cancel_event`.
 
@@ -261,9 +261,9 @@ Live query-through to Microsoft Graph. No calendar ingest, webhooks, or calendar
 
 **Setup**
 
-Enablement is operator-side: Entra admin consent for `Calendars.ReadWrite.Shared` first, then `CALENDAR_INTEGRATION=enabled`. Existing users must reconnect Outlook after the flag is turned on (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
+Enablement is operator-side: Entra admin consent for `Calendars.ReadWrite.Shared` first, then list the calendar tools in `MCP_TOOLS`. Existing users must reconnect Outlook after the first calendar tool is listed (unless tenant admin consent already covers that scope). `reconnect_inbox` only renews the mail webhook — it does not re-run OAuth. If a tool returns `consentRequired: true`, the user must reconnect Outlook; do not send them to `/auth/authorize`.
 
-**See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — CALENDAR_INTEGRATION](../operator/configuration.md#CALENDAR_INTEGRATION)
+**See also:** [Tools — Calendar](./tools.md#Calendar) — [Configuration — Calendar tools](../operator/configuration.md#Calendar-tools)
 
 ---
 

@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import type * as http from 'node:http';
 import { type OAuthProviderConfig } from '@unique-ag/mcp-oauth';
 import { Strategy as MicrosoftStrategy } from 'passport-microsoft';
-import { isCalendarEnabled } from '~/utils/backend-config.utils';
+import { loadFeaturesConfig } from '~/config';
 
 export const MAIL_SCOPES = [
   'openid',
@@ -20,7 +20,7 @@ export const MAIL_SCOPES = [
 export const CALENDAR_SCOPES = ['Calendars.ReadWrite.Shared'] as const;
 
 export function getScopes(): string[] {
-  return isCalendarEnabled() ? [...MAIL_SCOPES, ...CALENDAR_SCOPES] : [...MAIL_SCOPES];
+  return loadFeaturesConfig().calendar ? [...MAIL_SCOPES, ...CALENDAR_SCOPES] : [...MAIL_SCOPES];
 }
 
 export function microsoftOAuthTokenUrl(signInTenantId: string): string {

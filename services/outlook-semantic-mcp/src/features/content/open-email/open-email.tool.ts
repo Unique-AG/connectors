@@ -1,13 +1,13 @@
 import { type McpAuthenticatedRequest } from '@unique-ag/mcp-oauth';
 import { type Context, Tool } from '@unique-ag/mcp-server-module';
 import { GraphError } from '@microsoft/microsoft-graph-client';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { type FeaturesConfig, featuresConfig, McpBackendType } from '~/config';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetMailboxTimezoneQuery } from '~/features/user-utils/get-mailbox-timezone.query';
 import { GRAPH_ID_PATTERN } from '~/msgraph/graph-id-pattern';
-import { isMicrosoftGraphBackend } from '~/utils/backend-config.utils';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { NO_SUBJECT } from '~/utils/no-subject';
 import { OpenEmailQuery } from './open-email.query';
@@ -105,6 +105,7 @@ export class OpenEmailTool {
     private readonly getSubscriptionStatusQuery: GetSubscriptionStatusQuery,
     private readonly openEmailQuery: OpenEmailQuery,
     private readonly getMailboxTimezoneQuery: GetMailboxTimezoneQuery,
+    @Inject(featuresConfig.KEY) private readonly features: FeaturesConfig,
   ) {}
 
   @Tool({
@@ -131,7 +132,7 @@ export class OpenEmailTool {
   ): Promise<z.infer<typeof OpenEmailByIdOutputSchema>> {
     const userProfileTypeId = extractUserProfileId(request);
 
-    if (!isMicrosoftGraphBackend()) {
+    if (this.features.mode !== McpBackendType.MicrosoftGraph) {
       const subscriptionStatus = await this.getSubscriptionStatusQuery.run(userProfileTypeId);
       if (!subscriptionStatus.success) {
         return subscriptionStatus;

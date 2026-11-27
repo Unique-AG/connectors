@@ -1,39 +1,38 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildServerInstructions } from '../server.instructions';
 
-describe(buildServerInstructions.name, () => {
-  const original = process.env.CALENDAR_INTEGRATION;
+const CALENDAR_TOOL_NAMES = [
+  'list_calendars',
+  'search_calendar_events',
+  'check_availability',
+  'suggest_meeting_times',
+  'respond_to_invite',
+  'create_event',
+  'update_event',
+  'cancel_event',
+];
 
+describe(buildServerInstructions.name, () => {
   afterEach(() => {
-    if (original === undefined) {
-      delete process.env.CALENDAR_INTEGRATION;
-    } else {
-      process.env.CALENDAR_INTEGRATION = original;
+    vi.unstubAllEnvs();
+  });
+
+  it('omits calendar instructions when no calendar tool is listed', () => {
+    vi.stubEnv('MCP_TOOLS', JSON.stringify(['search_emails']));
+    const instructions = buildServerInstructions();
+
+    for (const name of CALENDAR_TOOL_NAMES) {
+      expect(instructions).not.toContain(name);
     }
   });
 
-  it('omits calendar instructions when CALENDAR_INTEGRATION is disabled', () => {
-    process.env.CALENDAR_INTEGRATION = 'disabled';
-    expect(buildServerInstructions()).not.toContain('list_calendars');
-    expect(buildServerInstructions()).not.toContain('search_calendar_events');
-    expect(buildServerInstructions()).not.toContain('check_availability');
-    expect(buildServerInstructions()).not.toContain('suggest_meeting_times');
-    expect(buildServerInstructions()).not.toContain('respond_to_invite');
-    expect(buildServerInstructions()).not.toContain('create_event');
-    expect(buildServerInstructions()).not.toContain('update_event');
-    expect(buildServerInstructions()).not.toContain('cancel_event');
-  });
+  it('includes calendar instructions when a calendar tool is listed', () => {
+    vi.stubEnv('MCP_TOOLS', JSON.stringify(['search_emails', 'list_calendars']));
+    const instructions = buildServerInstructions();
 
-  it('includes calendar instructions when CALENDAR_INTEGRATION is enabled', () => {
-    process.env.CALENDAR_INTEGRATION = 'enabled';
-    expect(buildServerInstructions()).toContain('list_calendars');
-    expect(buildServerInstructions()).toContain('search_calendar_events');
-    expect(buildServerInstructions()).toContain('check_availability');
-    expect(buildServerInstructions()).toContain('suggest_meeting_times');
-    expect(buildServerInstructions()).toContain('respond_to_invite');
-    expect(buildServerInstructions()).toContain('create_event');
-    expect(buildServerInstructions()).toContain('update_event');
-    expect(buildServerInstructions()).toContain('cancel_event');
+    for (const name of CALENDAR_TOOL_NAMES) {
+      expect(instructions).toContain(name);
+    }
   });
 });
 

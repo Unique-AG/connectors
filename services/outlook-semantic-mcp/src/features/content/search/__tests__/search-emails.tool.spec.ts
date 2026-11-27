@@ -6,6 +6,7 @@ import { Test } from '@nestjs/testing';
 import type { NextFunction, Request, Response } from 'express';
 import { OpenTelemetryModule } from 'nestjs-otel';
 import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { featuresConfig, loadFeaturesConfig } from '~/config';
 import { GetSubscriptionStatusQuery } from '~/features/subscriptions/get-subscription-status.query';
 import { GetFullSyncStatsQuery } from '~/features/sync/full-sync/get-full-sync-stats.query';
 import { FetchNextSearchPagesTool } from '../fetch-next-search-pages.tool';
@@ -18,7 +19,10 @@ import {
   SearchPageStatus,
 } from '../search-results.types';
 
-vi.mock('~/utils/backend-config.utils', () => ({ isMicrosoftGraphBackend: () => true }));
+// The tools pick their input schema from the mode while their files load.
+vi.hoisted(() => {
+  process.env.MCP_BACKEND = 'microsoft_graph';
+});
 
 const WEB_LINK =
   'https://outlook.office365.com/owa/?ItemID=AAMk1&exvsurl=1&viewmodel=ReadMessageItem';
@@ -72,6 +76,10 @@ describe('search_emails and fetch_next_search_pages over MCP', () => {
         { provide: SearchEmailsQuery, useValue: searchEmailsQuery },
         { provide: GetSubscriptionStatusQuery, useValue: { run: vi.fn() } },
         { provide: GetFullSyncStatsQuery, useValue: { run: vi.fn() } },
+        {
+          provide: featuresConfig.KEY,
+          useValue: loadFeaturesConfig(),
+        },
       ],
     }).compile();
 

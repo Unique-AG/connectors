@@ -122,28 +122,17 @@ describe(authorizeTenant.name, () => {
 });
 
 describe(getScopes.name, () => {
-  const original = process.env.CALENDAR_INTEGRATION;
-
   afterEach(() => {
-    if (original === undefined) {
-      delete process.env.CALENDAR_INTEGRATION;
-    } else {
-      process.env.CALENDAR_INTEGRATION = original;
-    }
+    vi.unstubAllEnvs();
   });
 
-  it('returns the mail-only scope string when CALENDAR_INTEGRATION is unset', () => {
-    delete process.env.CALENDAR_INTEGRATION;
+  it('returns the mail-only scope string when no calendar tool is listed', () => {
+    vi.stubEnv('MCP_TOOLS', JSON.stringify(['search_emails', 'draft_email']));
     expect(getScopes().join(' ')).toBe(MAIL_ONLY_SCOPE_STRING);
   });
 
-  it('returns the mail-only scope string when CALENDAR_INTEGRATION=disabled', () => {
-    process.env.CALENDAR_INTEGRATION = 'disabled';
-    expect(getScopes().join(' ')).toBe(MAIL_ONLY_SCOPE_STRING);
-  });
-
-  it('appends Calendars.ReadWrite.Shared when CALENDAR_INTEGRATION=enabled', () => {
-    process.env.CALENDAR_INTEGRATION = 'enabled';
+  it('appends Calendars.ReadWrite.Shared when a calendar tool is listed', () => {
+    vi.stubEnv('MCP_TOOLS', JSON.stringify(['search_emails', 'list_calendars']));
     expect(getScopes().join(' ')).toBe(`${MAIL_ONLY_SCOPE_STRING} Calendars.ReadWrite.Shared`);
   });
 });
