@@ -139,7 +139,7 @@ describe(getScopes.name, () => {
     vi.unstubAllEnvs();
   });
 
-  it("requests main's mail scopes for main's mail tools with shared mailboxes on", () => {
+  it('requests the scopes earlier versions requested for the mail tools with shared mailboxes on', () => {
     vi.stubEnv('DELEGATED_ACCESS_SCAN', 'full_access_only');
     vi.stubEnv('MCP_TOOLS', JSON.stringify(MAIL_TOOLS));
     expect(getScopes()).toEqual(MAIL_ONLY_SCOPE_STRING.split(' ').sort());

@@ -1,14 +1,86 @@
 # yaml-language-server: $schema=https://raw.githubusercontent.com/helm-unittest/helm-unittest/main/schema/helm-testsuite.json
-# Each existing deployment's values, rewritten to the current config. The service test
+# One values file per shape of existing deployment, rewritten to the current config. The service test
 # src/__tests__/existing-deployments.spec.ts reads the same files and checks the tools and scopes.
 suite: Existing deployments render the env the service is tested with
 templates:
   - all.yaml
 tests:
-  - it: renders preview-1
+  - it: renders mail
     values:
       - ../ci-values.yaml
-      - deployments/preview-1.values.json
+      - deployments/mail.values.json
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_BACKEND
+            value: 'microsoft_graph'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_DEBUG_MODE
+            value: 'disabled'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_TOOLS
+            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email"]'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DELEGATED_ACCESS_SCAN
+            value: 'full_access_only'
+
+  - it: renders mail-calendar
+    values:
+      - ../ci-values.yaml
+      - deployments/mail-calendar.values.json
+    set:
+      mcpConfig:
+        enabled: true
+        app:
+          selfUrl: https://outlook-mcp.example.com
+        microsoft:
+          clientId: test-client-id
+    documentSelector:
+      path: kind
+      value: Deployment
+    asserts:
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_BACKEND
+            value: 'microsoft_graph'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_DEBUG_MODE
+            value: 'disabled'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: MCP_TOOLS
+            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
+      - contains:
+          path: spec.template.spec.containers[0].env
+          content:
+            name: DELEGATED_ACCESS_SCAN
+            value: 'full_access_only'
+
+  - it: renders mail-calendar-debug
+    values:
+      - ../ci-values.yaml
+      - deployments/mail-calendar-debug.values.json
     set:
       mcpConfig:
         enabled: true
@@ -35,258 +107,6 @@ tests:
           content:
             name: MCP_TOOLS
             value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders preview-2
-    values:
-      - ../ci-values.yaml
-      - deployments/preview-2.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders prod-calendar-1
-    values:
-      - ../ci-values.yaml
-      - deployments/prod-calendar-1.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders prod-calendar-2
-    values:
-      - ../ci-values.yaml
-      - deployments/prod-calendar-2.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders prod-calendar-3
-    values:
-      - ../ci-values.yaml
-      - deployments/prod-calendar-3.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders prod-calendar-4
-    values:
-      - ../ci-values.yaml
-      - deployments/prod-calendar-4.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email","list_calendars","search_calendar_events","check_availability","suggest_meeting_times","respond_to_invite","create_event","update_event","cancel_event"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders prod-1
-    values:
-      - ../ci-values.yaml
-      - deployments/prod-1.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email"]'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: DELEGATED_ACCESS_SCAN
-            value: 'full_access_only'
-
-  - it: renders prod-2
-    values:
-      - ../ci-values.yaml
-      - deployments/prod-2.values.json
-    set:
-      mcpConfig:
-        enabled: true
-        app:
-          selfUrl: https://outlook-mcp.example.com
-        microsoft:
-          clientId: test-client-id
-    documentSelector:
-      path: kind
-      value: Deployment
-    asserts:
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_BACKEND
-            value: 'microsoft_graph'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_DEBUG_MODE
-            value: 'disabled'
-      - contains:
-          path: spec.template.spec.containers[0].env
-          content:
-            name: MCP_TOOLS
-            value: '["list_mailboxes_and_directories","list_categories","draft_email","update_draft_email","add_attachments_to_draft_email","remove_attachments_from_draft_email","lookup_contacts","search_emails","fetch_next_search_pages","open_email"]'
       - contains:
           path: spec.template.spec.containers[0].env
           content:

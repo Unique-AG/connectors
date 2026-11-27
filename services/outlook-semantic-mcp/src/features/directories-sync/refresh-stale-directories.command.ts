@@ -10,11 +10,8 @@ import { SyncDirectoriesCommand } from './sync-directories.command';
 export const ON_DEMAND_DIRECTORY_SYNC_MAX_AGE_MS = 4 * 60 * 60 * 1000;
 export const ON_DEMAND_DIRECTORY_SYNC_RETRY_AFTER_MS = 5 * 60 * 1000;
 
-// With DIRECTORY_SYNC_MODE=on_demand no job keeps the folder cache fresh, so a tool that reads
-// it refreshes the caller's folders first once they are older than the max age. Concurrent calls
-// share one refresh. A failed refresh leaves the cached folders in use and is not retried for a
-// while, so a throttled or failing Graph is not hit again before every search; only a revoked
-// sign-in is passed on, so the client asks the user to sign in again.
+// on_demand: no job keeps the folder cache fresh, so a reading tool refreshes stale folders first.
+// A failed refresh keeps the cached folders and pauses retries; only a revoked sign-in is passed on.
 @Injectable()
 export class RefreshStaleDirectoriesCommand {
   private readonly logger = new Logger(this.constructor.name);
