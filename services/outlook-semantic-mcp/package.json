@@ -15,6 +15,7 @@
     "mac:kill-dangling": "lsof -i tcp:9229 | grep node | awk '{print $2}' | xargs -r kill -9 && ps | grep \"[c]onnectors\" | awk '{print $1}' | xargs -r kill -9",
     "debug": "nest start --debug",
     "codegen": "echo \"No codegen for this server\"",
+    "terraform:registry": "vitest run src/config/__tests__/terraform-registry.spec.ts --update",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",

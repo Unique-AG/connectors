@@ -1,4 +1,6 @@
-export type ToolGroup = 'mail' | 'calendar' | 'sync' | 'debug';
+export const TOOL_GROUPS = ['mail', 'calendar', 'sync', 'debug'] as const;
+
+export type ToolGroup = (typeof TOOL_GROUPS)[number];
 
 export type ToolFeature = 'uniqueMode' | 'debugMode';
 

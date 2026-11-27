@@ -75,20 +75,59 @@ variable "confidential_clients" {
   }
 }
 
-variable "calendar_integration" {
+variable "tools_preset" {
   description = <<-EOT
-    When 'enabled', register Calendars.ReadWrite.Shared on the Entra app and include it in
-    the consent grant. Must be 'enabled' when the running service's MCP_TOOLS lists a
-    calendar tool. Default 'disabled' keeps mail-only app registrations unchanged. Enabling
-    calendar still requires this apply before listing a calendar tool in MCP_TOOLS,
-    otherwise token refresh requests a scope the app does not expose.
+    The tools the running service lists in MCP_TOOLS, named by group: mail, calendar, sync, debug.
+    Give one group, a list of groups, or a comma-separated string; the union of their tools is
+    used. Set this or tools_enabled, not both. With neither, the mail tools are used, which
+    registers what earlier versions of this module did. The sync and debug tools need no
+    permission beyond the mail ones.
   EOT
-  type        = string
-  default     = "disabled"
+  type        = any
+  default     = null
 
   validation {
-    condition     = contains(["enabled", "disabled"], var.calendar_integration)
-    error_message = "The calendar_integration must be one of: 'enabled', or 'disabled'."
+    condition     = var.tools_preset == null ? true : alltrue([for names in [[for name in try(tolist(var.tools_preset), split(",", var.tools_preset)) : trimspace(name)]] : length(names) > 0 && alltrue([for name in names : contains(keys(local.presets), name)])])
+    error_message = "tools_preset names no group, or one this service does not have. Valid groups: ${join(", ", sort(keys(local.presets)))}."
+  }
+}
+
+variable "tools_enabled" {
+  description = <<-EOT
+    The tools the running service lists in MCP_TOOLS, as a list of tool names, for a selection no
+    group covers. Set this or tools_preset, not both.
+  EOT
+  type        = list(string)
+  default     = null
+
+  validation {
+    condition     = !(var.tools_preset != null && var.tools_enabled != null)
+    error_message = "tools_preset and tools_enabled are alternatives and both are set: remove one."
+  }
+
+  validation {
+    condition     = var.tools_enabled == null || length(coalesce(var.tools_enabled, [])) > 0
+    error_message = "tools_enabled is set but names no tool. List the tools of MCP_TOOLS, or set tools_preset."
+  }
+
+  validation {
+    condition     = var.tools_enabled == null || length(setsubtract(toset(coalesce(var.tools_enabled, [])), toset(local.tool_names))) == 0
+    error_message = "tools_enabled names ${join(", ", sort(setsubtract(toset(coalesce(var.tools_enabled, [])), toset(local.tool_names))))}, which this service has no tool for. Its tools are: ${join(", ", local.tool_names)}."
+  }
+}
+
+variable "delegated_access_scan" {
+  description = <<-EOT
+    The running service's DELEGATED_ACCESS_SCAN. Anything but 'disabled' turns shared mailboxes on,
+    which registers User.Read.All and the .Shared counterpart of each mail permission. The default
+    registers what earlier versions of this module did.
+  EOT
+  type        = string
+  default     = "full_access_only"
+
+  validation {
+    condition     = contains(["disabled", "full_access_only", "granular_access"], var.delegated_access_scan)
+    error_message = "delegated_access_scan must be one of: 'disabled', 'full_access_only', or 'granular_access'."
   }
 }
 

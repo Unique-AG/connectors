@@ -5,21 +5,21 @@ import { type GraphPermission, TOOL_DECLARATIONS, type ToolName } from './tool-d
 const PROFILE_SCOPES = ['profile', 'email'] as const;
 
 // Sign-in reads GET /me, and the folder sync reads every deployment's mail folders whatever the tools.
-const BASE_PERMISSIONS: readonly GraphPermission[] = ['User.Read', 'Mail.Read'];
+export const BASE_PERMISSIONS: readonly GraphPermission[] = ['User.Read', 'Mail.Read'];
 
 // Full sync, live catch-up and the mail subscription.
-const UNIQUE_MODE_PERMISSIONS: readonly GraphPermission[] = ['Mail.Read'];
+export const UNIQUE_MODE_PERMISSIONS: readonly GraphPermission[] = ['Mail.Read'];
 
 // With shared mailboxes on, each own mail permission brings its `.Shared` counterpart.
-const SHARED_COUNTERPARTS: Partial<Record<GraphPermission, GraphPermission>> = {
+export const SHARED_COUNTERPARTS: Partial<Record<GraphPermission, GraphPermission>> = {
   'Mail.Read': 'Mail.Read.Shared',
   'Mail.ReadWrite': 'Mail.ReadWrite.Shared',
 };
 
-const SHARED_MAILBOX_PERMISSIONS: readonly GraphPermission[] = ['User.Read.All'];
+export const SHARED_MAILBOX_PERMISSIONS: readonly GraphPermission[] = ['User.Read.All'];
 
 // A write permission covers its read permission, so the read one is not requested.
-const REPLACES: Partial<Record<GraphPermission, GraphPermission>> = {
+export const REPLACES: Partial<Record<GraphPermission, GraphPermission>> = {
   'Mail.ReadWrite': 'Mail.Read',
   'Mail.ReadWrite.Shared': 'Mail.Read.Shared',
 };
@@ -32,7 +32,9 @@ interface PermissionSelection {
   readonly profileScopes: boolean;
 }
 
-function resolveGraphPermissions(selection: PermissionSelection): GraphPermission[] {
+export function resolveGraphPermissions(
+  selection: Pick<PermissionSelection, 'mode' | 'tools' | 'sharedMailboxes'>,
+): GraphPermission[] {
   const own = [
     ...BASE_PERMISSIONS,
     ...(selection.mode === McpBackendType.MicrosoftGraphAndUniqueApi

@@ -583,7 +583,7 @@ The server sends the list sorted. Some selections and what they request:
 | `search_emails`, `fetch_next_search_pages`, `open_email`, `list_mailboxes_and_directories`, `list_categories` and `lookup_contacts`, with `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read Mail.Read People.Read MailboxSettings.Read` |
 | The same, with `MICROSOFT_OFFLINE_ACCESS=disabled` and `MICROSOFT_PROFILE_SCOPES=disabled` | `openid User.Read Mail.Read People.Read MailboxSettings.Read` |
 
-Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module still registers a fixed list: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. It does not register `Mail.Read` or `Mail.Read.Shared`. A selection without a draft tool requests them, so add them to an app made with that module and grant consent. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
+Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module registers exactly this list, without `offline_access` and the OpenID scopes, which need no registration. It grants the list tenant-wide only when `service_principal_configuration` is set; without it, users or an admin consent at sign-in. Give it the same selection through `tools_preset` or `tools_enabled` and `delegated_access_scan` — see [Authentication](./authentication.md). Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 
 ### Unique API
 
@@ -639,11 +639,11 @@ Set via `mcpConfig.app.directorySyncMode`. The server keeps each user's Outlook 
 
 The calendar tools are `list_calendars`, `search_calendar_events`, `check_availability`, `suggest_meeting_times`, `respond_to_invite`, `create_event`, `update_event` and `cancel_event`. When [`MCP_TOOLS`](#MCP_TOOLS) lists at least one of them, the service registers the listed calendar tools, adds the calendar server instructions, and appends `Calendars.ReadWrite.Shared` to the Microsoft Graph OAuth and token-refresh scope string. When none is listed, calendar is off. `respond_to_invite` notifies the organizer immediately. `create_event`, `update_event`, and `cancel_event` notify other people after the user confirms. There is no draft state. `cancel_event` notifies attendees; it is not a silent delete.
 
-The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when `calendar_integration = "enabled"`. Runtime `getScopes()` still omits the calendar scope until `MCP_TOOLS` lists a calendar tool.
+The Entra app registration is gated separately: the `outlook-semantic-mcp-entra-application` Terraform module only registers `Calendars.ReadWrite.Shared` — and includes it in the tenant-wide delegated permission grant it creates when `service_principal_configuration` is set — when its selection includes a calendar tool, e.g. `tools_preset = ["mail", "calendar"]`. Runtime `getScopes()` still omits the calendar scope until `MCP_TOOLS` lists a calendar tool.
 
 Do this in order. Listing a calendar tool before Entra has the scope breaks **mail** token refresh (`invalid_grant`).
 
-1. Apply Terraform `outlook-semantic-mcp-entra-application` with `calendar_integration = "enabled"`.
+1. Apply Terraform `outlook-semantic-mcp-entra-application` with the calendar tools in its selection, e.g. `tools_preset = ["mail", "calendar"]`.
 2. Confirm the Entra app lists that delegated permission.
 3. Add the calendar tools to `mcpConfig.app.tools` (`MCP_TOOLS`).
 4. Existing connected users must **reconnect Outlook**, unless an Entra admin has already granted the extra scope tenant-wide. `reconnect_inbox` only renews the mail webhook; it does not re-run OAuth. The user has to start a new Outlook connection.
