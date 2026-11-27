@@ -7,9 +7,10 @@ classifiers = ["Development Status :: 3 - Alpha"]
 requires-python = ">=3.14"
 dependencies = [
     "cryptography==50.0.2",
-    "fastmcp==4.1.4",
+    "fastmcp==4.1.6",
     "httpx==0.28.1",
     "httpx2==2.16.0",
+    "mcp-auth==0.1.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
@@ -80,6 +81,7 @@ executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsag
 
 [tool.uv.sources]
 mcp-architecture = { path = "../../packages/mcp-architecture" }
+mcp-auth = { path = "../../packages/mcp-auth" }
 mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-observability = { path = "../../packages/mcp-observability" }
 mcp-openapi = { path = "../../packages/mcp-openapi" }
