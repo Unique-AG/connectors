@@ -52,6 +52,7 @@ describe('OAuthController', () => {
       authCodeExpiresIn: 600,
       accessTokenExpiresIn: 3600,
       refreshTokenExpiresIn: 86400,
+      refreshTokenExpiry: 'sliding',
       oauthSessionExpiresIn: 600000,
       serverUrl: 'https://auth.example.com',
       resource: 'https://mcp.example.com',
