@@ -67,9 +67,6 @@ filterwarnings = ["ignore::DeprecationWarning:unique_toolkit.*"]
 extend = "../../packages/mcp-architecture/src/mcp_architecture/code_style.toml"
 
 [tool.ruff.lint.per-file-ignores]
-# A context function takes keyword arguments only, so a call names what it passes. Here and not in
-# the shared code style, since ruff reads a path there from the folder of that file.
-"!src/world_check_mcp/contexts/**" = ["PLR0917"]
 # Generated from the vendor's spec, so its field names are the vendor's.
 "src/world_check_mcp/upstream/generated/vendor_responses.py" = ["N815"]
 

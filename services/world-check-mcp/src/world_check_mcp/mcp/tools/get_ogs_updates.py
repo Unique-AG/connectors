@@ -35,6 +35,7 @@ async def get_ogs_updates(
     since: When = None,
     until: When = None,
     group_id: Annotated[str | None, Field(description="Limit updates to this group.")] = None,
+    *,
     case: Annotated[
         str | None,
         Field(description="Internal caseSystemId or exact external caseId."),

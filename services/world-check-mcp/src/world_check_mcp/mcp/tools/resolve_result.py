@@ -50,6 +50,7 @@ async def resolve_result(
         Choice,
         Field(description="Status id, label, or POSITIVE, FALSE, POSSIBLE, or UNSPECIFIED."),
     ],
+    *,
     risk: Choice,
     ctx: Context,
     reason: Annotated[

@@ -44,6 +44,7 @@ async def get_case_audit_events(
         Field(description="Optional FIQL query. Without eventDate, the last seven days."),
     ] = None,
     limit: PageSize = 25,
+    *,
     page_reference: PageReference = None,
     upstream: Upstream = Depends(get_upstream),
 ) -> contexts.AuditPage:
