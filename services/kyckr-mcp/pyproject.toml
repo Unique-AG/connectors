@@ -9,11 +9,11 @@ dependencies = [
     "asyncpg==0.32.0",
     "fastmcp==4.1.6",
     "httpx2==2.16.2",
+    "mcp-auth==0.1.0",
     "mcp-configs==0.1.0",
     "mcp-observability==0.1.0",
     "mcp-openapi==0.1.0",
     "mcp-types==2.3.0",
-    "mcp-zitadel==0.1.0",
     "py-key-value-aio[postgresql,wrappers-encryption]==0.4.6",
     "pydantic-settings==2.16.3",
     "pydantic==2.14.4",
@@ -78,10 +78,10 @@ executionEnvironments = [{ root = "tests", extraPaths = ["."], reportPrivateUsag
 
 [tool.uv.sources]
 mcp-architecture = { path = "../../packages/mcp-architecture" }
+mcp-auth = { path = "../../packages/mcp-auth" }
 mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-observability = { path = "../../packages/mcp-observability" }
 mcp-openapi = { path = "../../packages/mcp-openapi" }
-mcp-zitadel = { path = "../../packages/mcp-zitadel" }
 
 [tool.mcp-openapi]
 spec = "src/kyckr_mcp/upstream/openapi.yml"

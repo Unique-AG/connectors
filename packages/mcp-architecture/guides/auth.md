@@ -8,8 +8,8 @@ Adding one:
 1. Use what FastMCP provides first. `fastmcp.server.auth` has token verifiers (`JWTVerifier`,
    `StaticTokenVerifier`, introspection), `OAuthProxy`, `OIDCProxy` and, under
    `fastmcp.server.auth.providers`, providers for common identity services. For Zitadel, call
-   `mcp_zitadel.create_zitadel_oidc_proxy` with `ZitadelSettings` from `mcp-configs`. Add
-   `mcp-zitadel` to the dependencies and `COPY packages/mcp-zitadel` in the Dockerfile, as
+   `mcp_auth.zitadel.create_zitadel_oidc_proxy` with `ZitadelSettings` from `mcp-configs`. Add
+   `mcp-auth` to the dependencies and `COPY packages/mcp-auth` in the Dockerfile, as
    `kyckr-mcp` does. The proxy requires `openid`, `profile` and
    `urn:zitadel:iam:user:resourceowner`. Clients may register `offline_access` and the `mcp:*`
    scopes. Those scopes are asked for and are not required, because Zitadel does not put `mcp:*`

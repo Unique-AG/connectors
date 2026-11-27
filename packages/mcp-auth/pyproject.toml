@@ -1,7 +1,7 @@
 [project]
-name = "mcp-zitadel"
+name = "mcp-auth"
 version = "0.1.0"
-description = "Zitadel sign-in for a Python MCP: one OIDC proxy, identity scopes, an optional org check"
+description = "User sign-in for a Python MCP. Zitadel is mcp_auth.zitadel"
 requires-python = ">=3.14"
 dependencies = [
     "fastmcp>=4.1.6,<4.2",
@@ -14,7 +14,7 @@ requires = ["hatchling==1.33.0"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mcp_zitadel"]
+packages = ["src/mcp_auth"]
 
 [dependency-groups]
 dev = [

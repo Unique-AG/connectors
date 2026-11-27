@@ -13,7 +13,7 @@ _REQUIRED_SCOPES = ("openid", "profile", "urn:zitadel:iam:user:resourceowner")
 class ZitadelSettings(BaseSettings):
     """The Zitadel instance an MCP signs its users in with.
 
-    `mcp-zitadel` reads these fields. The environment names are `ZITADEL_*`.
+    `mcp-auth` reads these fields. The environment names are `ZITADEL_*`.
     """
 
     model_config: ClassVar[SettingsConfigDict] = shared_config("ZITADEL_")

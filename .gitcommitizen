@@ -44,6 +44,7 @@ services = services/**
 # Packages
 logger = packages/logger/**
 mcp-architecture = packages/mcp-architecture/**
+mcp-auth = packages/mcp-auth/**
 mcp-configs = packages/mcp-configs/**
 mcp-observability = packages/mcp-observability/**
 mcp-credential-auth = packages/mcp-credential-auth/**
@@ -51,7 +52,6 @@ mcp-oauth = packages/mcp-oauth/**
 mcp-openapi = packages/mcp-openapi/**
 mcp-scaffold = packages/mcp-scaffold/**
 mcp-server-module = packages/mcp-server-module/**
-mcp-zitadel = packages/mcp-zitadel/**
 utils = packages/utils/**
 unique-api = packages/unique-api/**
 packages = packages/**

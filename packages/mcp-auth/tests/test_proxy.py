@@ -7,8 +7,8 @@ from mcp_configs import ZitadelSettings
 from pydantic import AnyHttpUrl
 from pydantic import SecretStr
 
-from mcp_zitadel import IdTokenVerifier
-from mcp_zitadel import create_zitadel_oidc_proxy
+from mcp_auth.zitadel import IdTokenVerifier
+from mcp_auth.zitadel import create_zitadel_oidc_proxy
 
 _ORG_SCOPE = "urn:zitadel:iam:org:id:org-1"
 _ORG_CLAIM = "urn:zitadel:iam:user:resourceowner:id"

@@ -10,12 +10,12 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "packages/mcp-architecture/**"
+      - "packages/mcp-auth/**"
       - "packages/mcp-configs/**"
       - "packages/mcp-credential-auth/**"
       - "packages/mcp-observability/**"
       - "packages/mcp-openapi/**"
       - "packages/mcp-scaffold/**"
-      - "packages/mcp-zitadel/**"
       # What mcp-scaffold edits by matching its text when it registers a new MCP.
       - ".gitcommitizen"
       - "release-please-config.json"
@@ -52,11 +52,11 @@ jobs:
       packages: ${{ steps.build-matrix.outputs.packages }}
       shared-auth-changed: ${{ steps.filter.outputs.shared_auth }}
       mcp-architecture-changed: ${{ steps.filter.outputs.mcp_architecture }}
+      mcp-auth-changed: ${{ steps.filter.outputs.mcp_auth }}
       mcp-openapi-changed: ${{ steps.filter.outputs.mcp_openapi }}
       mcp-configs-changed: ${{ steps.filter.outputs.mcp_configs }}
       mcp-observability-changed: ${{ steps.filter.outputs.mcp_observability }}
       mcp-scaffold-changed: ${{ steps.filter.outputs.mcp_scaffold }}
-      mcp-zitadel-changed: ${{ steps.filter.outputs.mcp_zitadel }}
       workflow-changed: ${{ steps.filter.outputs.workflow }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -75,14 +75,14 @@ jobs:
               - 'packages/mcp-credential-auth/**'
             mcp_architecture:
               - 'packages/mcp-architecture/**'
+            mcp_auth:
+              - 'packages/mcp-auth/**'
             mcp_openapi:
               - 'packages/mcp-openapi/**'
             mcp_configs:
               - 'packages/mcp-configs/**'
             mcp_observability:
               - 'packages/mcp-observability/**'
-            mcp_zitadel:
-              - 'packages/mcp-zitadel/**'
             # The MCPs the scaffold's tests generate depend on mcp-configs and mcp-observability, run
             # mcp-architecture's rules, and use mcp-openapi for an OpenAPI upstream, so a change to any
             # of them runs them too.
@@ -115,10 +115,10 @@ jobs:
           SERVICES_CHANGED: ${{ steps.filter.outputs.services }}
           SERVICES_FILES: ${{ steps.filter.outputs.services_files }}
           MCP_ARCHITECTURE_CHANGED: ${{ steps.filter.outputs.mcp_architecture }}
+          MCP_AUTH_CHANGED: ${{ steps.filter.outputs.mcp_auth }}
           MCP_OPENAPI_CHANGED: ${{ steps.filter.outputs.mcp_openapi }}
           MCP_CONFIGS_CHANGED: ${{ steps.filter.outputs.mcp_configs }}
           MCP_OBSERVABILITY_CHANGED: ${{ steps.filter.outputs.mcp_observability }}
-          MCP_ZITADEL_CHANGED: ${{ steps.filter.outputs.mcp_zitadel }}
           SHARED_AUTH_CHANGED: ${{ steps.filter.outputs.shared_auth }}
           WORKFLOW_CHANGED: ${{ steps.filter.outputs.workflow }}
         run: |
@@ -179,8 +179,8 @@ jobs:
               consumers=$(grep -l '"mcp-observability' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
-            if [ "$MCP_ZITADEL_CHANGED" = "true" ]; then
-              consumers=$(grep -l '"mcp-zitadel' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
+            if [ "$MCP_AUTH_CHANGED" = "true" ]; then
+              consumers=$(grep -l '"mcp-auth' services/*/pyproject.toml | cut -d/ -f2 | jq -R -s -c 'split("\n") | map(select(length > 0))')
               packages=$(jq -c --argjson consumers "$consumers" '. + $consumers | unique' <<< "$packages")
             fi
           fi
@@ -454,18 +454,18 @@ jobs:
       - name: Run tests
         run: uv run pytest
 
-  test-mcp-zitadel:
-    name: Test mcp-zitadel
+  test-mcp-auth:
+    name: Test mcp-auth
     needs: detect-changes
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      needs.detect-changes.outputs.mcp-zitadel-changed == 'true' ||
+      needs.detect-changes.outputs.mcp-auth-changed == 'true' ||
       needs.detect-changes.outputs.workflow-changed == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: packages/mcp-zitadel
+        working-directory: packages/mcp-auth
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

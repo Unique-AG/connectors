@@ -12,13 +12,13 @@ from key_value.aio.wrappers.encryption import FernetEncryptionWrapper
 from mcp_configs import ZitadelSettings
 from pydantic import AnyHttpUrl
 
-# Asked for and registrable. Zitadel drops `mcp:*` from the token, so requiring them rejects
-# every sign-in. `offline_access` is what makes Zitadel send a refresh token.
 _IDENTITY_SCOPES = (
     "openid",
     "profile",
     "urn:zitadel:iam:user:resourceowner",
 )
+# Asked for and registrable. Zitadel drops `mcp:*` from the token, so requiring them rejects
+# every sign-in. `offline_access` is what makes Zitadel send a refresh token.
 _ADVERTISED_SCOPES = (
     "mcp:tools",
     "mcp:prompts",

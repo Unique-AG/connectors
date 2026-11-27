@@ -1,4 +1,4 @@
-from mcp_zitadel import IdTokenVerifier
+from mcp_auth.zitadel import IdTokenVerifier
 
 from kyckr_mcp.mcp.auth.settings import AuthMode
 from kyckr_mcp.mcp.auth.settings import AuthSettings
