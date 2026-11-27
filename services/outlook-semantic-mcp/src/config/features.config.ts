@@ -31,12 +31,16 @@ const FeaturesEnvSchema = z.object({
   mcpBackend: mcpBackendSchema,
   mcpDebugMode: mcpDebugModeSchema,
   mcpTools: mcpToolsSchema,
+  delegatedAccessScan: z
+    .enum(['disabled', 'full_access_only', 'granular_access'])
+    .describe('Shared mailboxes are on unless DELEGATED_ACCESS_SCAN is "disabled".'),
 });
 
 const FEATURE_ENV_KEYS = {
   mcpBackend: 'MCP_BACKEND',
   mcpDebugMode: 'MCP_DEBUG_MODE',
   mcpTools: 'MCP_TOOLS',
+  delegatedAccessScan: 'DELEGATED_ACCESS_SCAN',
 } as const satisfies Record<keyof z.input<typeof FeaturesEnvSchema>, string>;
 
 export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
@@ -74,6 +78,7 @@ export const FeaturesConfigSchema = FeaturesEnvSchema.transform((env, ctx) => {
     mode: env.mcpBackend,
     tools,
     calendar: [...tools].some((name) => TOOL_DECLARATIONS[name].group === 'calendar'),
+    sharedMailboxes: env.delegatedAccessScan !== 'disabled',
   };
 });
 

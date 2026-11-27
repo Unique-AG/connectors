@@ -5,17 +5,22 @@ How the app registration is provisioned depends on your deployment model.
 
 ## Required Permissions
 
-All permissions are **delegated** — they act on behalf of the signed-in user. Mail permissions do not require admin consent. `Mail.ReadWrite.Shared` is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`). `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically **does** require admin consent.
+All permissions are **delegated** — they act on behalf of the signed-in user. The server requests only the permissions its configuration needs: `MCP_TOOLS` and `DELEGATED_ACCESS_SCAN` decide the list. See [Configuration — Requested Graph permissions](./configuration.md#Requested-Graph-permissions). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on. `Calendars.ReadWrite.Shared` is requested when a calendar tool is listed in `MCP_TOOLS`, and is user-consentable like the mail permissions.
 
-| Permission | Type | Admin Consent |
-|------------|------|---------------|
-| `User.Read` | Delegated | No |
-| `Mail.ReadWrite` | Delegated | No |
-| `Mail.ReadWrite.Shared` | Delegated | No |
-| `MailboxSettings.Read` | Delegated | No |
-| `People.Read` | Delegated | No |
-| `Calendars.ReadWrite.Shared` | Delegated | Yes — only when a calendar tool is listed in `MCP_TOOLS` |
-| `offline_access` | Delegated | No |
+| Permission | Type | Admin Consent | Requested when |
+|------------|------|---------------|----------------|
+| `User.Read` | Delegated | No | Always |
+| `Mail.Read` | Delegated | No | Always, unless `Mail.ReadWrite` is requested |
+| `Mail.ReadWrite` | Delegated | No | A draft tool is listed in `MCP_TOOLS` |
+| `Mail.Read.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled`, unless `Mail.ReadWrite.Shared` is requested |
+| `Mail.ReadWrite.Shared` | Delegated | No | `DELEGATED_ACCESS_SCAN` is not `disabled` and a draft tool is listed |
+| `User.Read.All` | Delegated | Yes | `DELEGATED_ACCESS_SCAN` is not `disabled` |
+| `MailboxSettings.Read` | Delegated | No | `list_categories`, `search_emails`, `fetch_next_search_pages`, `open_email` or a calendar tool other than `list_calendars` and `respond_to_invite` is listed |
+| `People.Read` | Delegated | No | `lookup_contacts` is listed |
+| `Calendars.ReadWrite.Shared` | Delegated | No | A calendar tool is listed in `MCP_TOOLS` |
+| `offline_access` | Delegated | No | Always |
+
+Register and grant at least the permissions your configuration requests. Asking for fewer permissions than the app was granted needs no consent; asking for one it was not granted does. A deployment without a draft tool requests `Mail.Read` rather than `Mail.ReadWrite`, so its app must grant `Mail.Read`. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
 
 For full justifications, see [Microsoft Graph Permissions](../technical/permissions.md).
 
@@ -29,7 +34,7 @@ https://<your-outlook-mcp-host>/admin/consent
 
 The link needs no sign-in. It redirects to the Microsoft admin consent page for the app registration and sign-in tenant of that deployment. After approving, you are redirected to a Unique confirmation page.
 
-The consent prompt lists the [Required Permissions](#Required-Permissions) above. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. If calendar is enabled, `Calendars.ReadWrite.Shared` typically requires admin consent.
+The link asks for every permission registered on the app registration, which can be more than the deployment's configuration requests, for example `User.Read.All` with shared mailboxes off. Review the listed permissions before granting. Mail permissions do not require admin consent — users can also approve those themselves on first connection. Granting admin consent up front is optional for mail but skips the per-user consent prompt. `User.Read.All`, requested with shared mailboxes on, needs admin consent.
 
 If your organization uses multiple Azure tenants, confirm you are granting consent for the correct directory. Unless Unique pinned your deployment to one directory, Microsoft opens the directory of the admin account you sign in with. See [Admin consent link](#Admin-consent-link).
 
@@ -76,6 +81,8 @@ module "outlook_semantic_mcp_app" {
 
 > **`service_principal_configuration` (optional):** When set, the module creates a service principal and pre-grants delegated permissions tenant-wide via `azuread_service_principal_delegated_permission_grant`. Omit this variable for multi-tenant deployments where admin consent is granted by each customer tenant individually.
 
+> **Registered permissions:** The module registers a fixed list whatever the server's configuration: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. A deployment that lists no draft tool requests `Mail.Read`, and `Mail.Read.Shared` with shared mailboxes on, which the module does not register yet; add them to the app registration and grant consent.
+
 #### Option 2: Azure Portal (Manual)
 
 1. Go to [Azure Portal](https://portal.azure.com) → **Azure Active Directory** → **App registrations** → **New registration**:
@@ -84,8 +91,8 @@ module "outlook_semantic_mcp_app" {
    - **Redirect URI**: Web — `https://outlook.semantic.mcp.example.com/auth/callback`
 
 2. Go to **API permissions** → **Add a permission** → **Microsoft Graph** → **Delegated permissions**:
-   - Add all permissions listed under [Required Permissions](#Required-Permissions)
-   - If you will list calendar tools in `MCP_TOOLS`, also add `Calendars.ReadWrite.Shared` and grant admin consent before listing them
+   - Add the permissions your configuration requests, listed under [Required Permissions](#Required-Permissions)
+   - If you will list calendar tools in `MCP_TOOLS`, also add `Calendars.ReadWrite.Shared` before listing them
 
 3. Go to **Certificates & secrets** → **New client secret**:
    - Set description and expiration
@@ -266,7 +273,7 @@ For the full security context, see [Secret Management](../technical/security.md#
 
 **This is standard Microsoft behavior, not Outlook Semantic MCP specific.** All Microsoft 365 apps use the same consent model.
 
-Because no permission in this app requires admin consent, users can complete the full consent flow independently:
+With shared mailboxes off, no requested permission needs admin consent, so users can complete the full consent flow independently:
 
 1. **User consent** — on first connection, the user sees the Microsoft consent screen and approves the listed permissions
 2. **Optional admin pre-consent** — an admin can grant consent organisation-wide via Azure Portal to skip the per-user consent prompt

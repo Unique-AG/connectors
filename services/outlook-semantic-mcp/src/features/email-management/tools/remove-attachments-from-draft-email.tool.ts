@@ -3,6 +3,7 @@ import { Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable, Logger } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { CheckMailboxAccessQuery } from '~/features/user-utils/check-mailbox-access.query';
 import { ConfirmSchema, confirmWrite } from '~/utils/confirm-write';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { subjectOrFallback } from '~/utils/no-subject';
@@ -52,6 +53,7 @@ export class RemoveAttachmentsFromDraftEmailTool {
   public constructor(
     private readonly getDraftStateQuery: GetDraftStateQuery,
     private readonly removeAttachmentsFromDraftEmailCommand: RemoveAttachmentsFromDraftEmailCommand,
+    private readonly checkMailboxAccessQuery: CheckMailboxAccessQuery,
   ) {}
 
   @Tool({
@@ -77,6 +79,10 @@ export class RemoveAttachmentsFromDraftEmailTool {
     request: McpAuthenticatedRequest,
   ): Promise<z.infer<typeof RemoveAttachmentsOutputSchema>> {
     const userProfileId = extractUserProfileId(request);
+    const mailboxAccess = await this.checkMailboxAccessQuery.run(userProfileId, input.mailbox);
+    if (!mailboxAccess.allowed) {
+      return { success: false, message: mailboxAccess.message };
+    }
 
     const draftTarget = {
       userProfileId: userProfileId.toString(),

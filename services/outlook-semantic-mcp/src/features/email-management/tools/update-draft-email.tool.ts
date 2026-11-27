@@ -3,6 +3,7 @@ import { Context, Tool } from '@unique-ag/mcp-server-module';
 import { Injectable } from '@nestjs/common';
 import { Span } from 'nestjs-otel';
 import * as z from 'zod';
+import { CheckMailboxAccessQuery } from '~/features/user-utils/check-mailbox-access.query';
 import { extractUserProfileId } from '~/utils/extract-user-profile-id';
 import { DraftRecipientsSchema, ExistingDraftTargetShape } from '../draft-input.schemas';
 import { UpdateDraftEmailCommand } from '../update-draft-email.command';
@@ -55,7 +56,10 @@ const UpdateDraftEmailOutputSchema = z.object({
 
 @Injectable()
 export class UpdateDraftEmailTool {
-  public constructor(private readonly updateDraftEmailCommand: UpdateDraftEmailCommand) {}
+  public constructor(
+    private readonly updateDraftEmailCommand: UpdateDraftEmailCommand,
+    private readonly checkMailboxAccessQuery: CheckMailboxAccessQuery,
+  ) {}
 
   @Tool({
     name: 'update_draft_email',
@@ -79,6 +83,11 @@ export class UpdateDraftEmailTool {
     _context: Context,
     request: McpAuthenticatedRequest,
   ) {
-    return this.updateDraftEmailCommand.run(extractUserProfileId(request), input);
+    const userProfileId = extractUserProfileId(request);
+    const mailboxAccess = await this.checkMailboxAccessQuery.run(userProfileId, input.mailbox);
+    if (!mailboxAccess.allowed) {
+      return { success: false, message: mailboxAccess.message };
+    }
+    return this.updateDraftEmailCommand.run(userProfileId, input);
   }
 }

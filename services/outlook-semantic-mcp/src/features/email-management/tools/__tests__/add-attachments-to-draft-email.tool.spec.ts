@@ -24,7 +24,11 @@ describe('AddAttachmentsToDraftEmailTool', () => {
   beforeEach(() => {
     getDraftStateQuery = { run: vi.fn().mockResolvedValue(DRAFT_STATE) };
     addCommand = { run: vi.fn().mockResolvedValue({ attachmentsFailed: [] }) };
-    tool = new AddAttachmentsToDraftEmailTool(getDraftStateQuery as never, addCommand as never);
+    tool = new AddAttachmentsToDraftEmailTool(
+      getDraftStateQuery as never,
+      addCommand as never,
+      { run: vi.fn().mockResolvedValue({ allowed: true }) } as never,
+    );
   });
 
   it('adds the attachments to the draft', async () => {

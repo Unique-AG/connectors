@@ -42,7 +42,7 @@ For deployment, configuration, and operational details, see the [IT Operator Gui
 
 ### Permissions
 
-All permissions are delegated. Mail permissions require no admin consent. This includes `Mail.ReadWrite.Shared`, which is always requested at OAuth time (even when `DELEGATED_ACCESS_SCAN=disabled`) and enables delegated mailbox access when configured. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and typically does require admin consent. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
+All permissions are delegated. The server requests only what its configuration needs: `MCP_TOOLS` and `DELEGATED_ACCESS_SCAN` decide the list (see [Configuration — Requested Graph permissions](./operator/configuration.md#Requested-Graph-permissions)). Only `User.Read.All` requires admin consent: it is requested with shared mailboxes on. `Mail.ReadWrite` is requested only when a draft tool is listed, and the `.Shared` mail permissions only when `DELEGATED_ACCESS_SCAN` is not `disabled`. `Calendars.ReadWrite.Shared` is requested only when a calendar tool is listed in `MCP_TOOLS` and is user-consentable like the mail permissions. See [Permissions](./technical/permissions.md) for the full list and least-privilege justifications.
 
 ## Features
 
@@ -56,7 +56,7 @@ All permissions are delegated. Mail permissions require no admin consent. This i
 
 **Draft Creation**
 
-- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or in a shared mailbox via `draft_email`
+- Create fresh draft emails (subject, body, recipients, attachments) in the signed-in user's personal mailbox or, when `DELEGATED_ACCESS_SCAN` is not `disabled`, in a shared mailbox via `draft_email`
 - Create reply-all drafts for existing emails in personal or shared mailboxes — Graph pre-fills all original recipients automatically
 - Drafts are written directly to the Outlook Drafts folder via Microsoft Graph and are not sent automatically
 - Edit an existing draft (including one the user wrote in Outlook) — subject, body, recipients — via `update_draft_email`, and add or remove its attachments via `add_attachments_to_draft_email` and `remove_attachments_from_draft_email` (removal asks the user to confirm)

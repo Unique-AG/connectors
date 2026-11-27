@@ -18,6 +18,7 @@ export * from './database.config';
 export * from './delegated-access.config';
 export * from './encryption.config';
 export * from './features.config';
+export * from './graph-permissions';
 export * from './ingestion.config';
 export * from './mcp-backend-type.config';
 export * from './microsoft.config';

@@ -541,6 +541,32 @@ This defaults to `SELF_URL`. Set it explicitly only when the externally reachabl
 
 Note: the Entra ID app registration redirect URI must match `SELF_URL/auth/callback`, not this variable.
 
+#### Requested Graph permissions
+
+The server computes the Microsoft Graph permissions it requests from its configuration. The OAuth authorize request, token refresh and the Graph client all use the same list:
+
+1. Always: `openid`, `profile`, `email`, `offline_access`, `User.Read` (sign-in) and `Mail.Read` (the folder sync runs for every deployment).
+2. Each tool in [`MCP_TOOLS`](#MCP_TOOLS) adds what its Microsoft Graph calls need:
+   - `draft_email`, `update_draft_email`, `add_attachments_to_draft_email` and `remove_attachments_from_draft_email`: `Mail.ReadWrite`.
+   - `lookup_contacts`: `People.Read`.
+   - `list_categories`, `search_emails`, `fetch_next_search_pages` and `open_email`: `MailboxSettings.Read` (categories and the mailbox time zone).
+   - The calendar tools: `Calendars.ReadWrite.Shared`; all but `list_calendars` and `respond_to_invite` also `MailboxSettings.Read`. See [Calendar tools](#Calendar-tools).
+   - The other tools need nothing beyond `Mail.Read`.
+3. `MCP_BACKEND=microsoft_graph_and_unique_api` needs `Mail.Read` for the sync and the mail subscription.
+4. Shared mailboxes, meaning [`DELEGATED_ACCESS_SCAN`](#DELEGATED_ACCESS_SCAN) is anything but `disabled`, add `User.Read.All` and `Mail.Read.Shared`. With a draft tool listed, they add `Mail.ReadWrite.Shared` instead of `Mail.Read.Shared`.
+5. A write permission replaces its read permission: `Mail.ReadWrite` removes `Mail.Read`, and `Mail.ReadWrite.Shared` removes `Mail.Read.Shared`. A permission and its `.Shared` counterpart stay side by side.
+
+The server sends the list sorted. Some selections and what they request:
+
+| Selection | Requested permissions |
+|-----------|-----------------------|
+| The 10 mail tools, or the 14 with the sync tools, and `DELEGATED_ACCESS_SCAN` not `disabled` | `openid profile email offline_access User.Read User.Read.All MailboxSettings.Read Mail.ReadWrite Mail.ReadWrite.Shared People.Read`. This is the fixed list earlier versions always requested |
+| The same, plus calendar tools | The list above plus `Calendars.ReadWrite.Shared` |
+| The 10 mail tools, or the 14 with the sync tools, and `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read MailboxSettings.Read Mail.ReadWrite People.Read` |
+| `search_emails`, `fetch_next_search_pages`, `open_email`, `list_mailboxes_and_directories`, `list_categories` and `lookup_contacts`, with `DELEGATED_ACCESS_SCAN=disabled` | `openid profile email offline_access User.Read Mail.Read People.Read MailboxSettings.Read` |
+
+Asking Entra for fewer permissions than the app was granted needs no consent. Asking for one the app was not granted does: users see a consent prompt, or need an admin where the tenant disables user consent. The `outlook-semantic-mcp-entra-application` Terraform module still registers a fixed list: `User.Read`, `User.Read.All`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `MailboxSettings.Read` and `People.Read`, plus `Calendars.ReadWrite.Shared` with `calendar_integration = "enabled"`. It does not register `Mail.Read` or `Mail.Read.Shared`. A selection without a draft tool requests them, so add them to an app made with that module and grant consent. Changing `MCP_TOOLS` or `DELEGATED_ACCESS_SCAN` can change the list, and users then consent to any permission the app was not granted before.
+
 ### Unique API
 
 #### UNIQUE_STORE_INTERNALLY
@@ -571,6 +597,8 @@ When set to `enabled`, adds debug data to tool responses and allows five debug t
 Required. Set via `mcpConfig.app.tools`, a YAML list the chart renders as a JSON array. The chart fails to render while the list is empty. Only the listed tools are registered; there is no setting that registers every tool. For example, `["search_emails","fetch_next_search_pages","open_email"]` registers those three tools only.
 
 Listing at least one calendar tool turns calendar on. See [Calendar tools](#Calendar-tools).
+
+The listed tools decide part of the Microsoft Graph permissions the server requests. See [Requested Graph permissions](#Requested-Graph-permissions).
 
 The server refuses to start, naming the tool and the setting, when:
 
@@ -604,15 +632,20 @@ For step-by-step Microsoft 365 setup, see [Features — Delegated Access — Set
 
 Set via `mcpConfig.delegatedAccess.scan`. Controls whether the service scans for delegated mailbox access granted between users at the Microsoft Exchange level. Three values are accepted:
 
-- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. Users only see their own mailbox.
+- **`disabled`** (default) — delegated access scanning is off. No discovery or verification runs are scheduled. The server works with the signed-in user's own mailbox only. `draft_email`, `update_draft_email`, `add_attachments_to_draft_email`, `remove_attachments_from_draft_email` and `open_email` refuse a `mailbox` other than the user's own email address or user principal name (compared case-insensitively) with a tool error, before calling Microsoft Graph. `search_emails` searches only the mailboxes the user can access, so it skips another mailbox.
 - **`full_access_only`** — discovers users who have been granted **Full Access (Read & Manage)** on a mailbox via Exchange admin. Uses the `/users/{email}/messages` endpoint to detect access. Requires `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE`.
 - **`granular_access`** — discovers users who have been granted **folder-level access** (e.g., only "Inbox" or "RFQ" shared, not the entire mailbox). Uses the `/users/{email}/mailFolders` endpoint for discovery, followed by a verification pass to determine which folders are actually readable (since the folder listing can include parent folders of shared subfolders that are not themselves accessible). Requires both `DELEGATED_ACCESS_DISCOVERY_CRON_SCHEDULE` and `DELEGATED_ACCESS_VERIFICATION_CRON_SCHEDULE`.
+
+`disabled` adds no shared-mailbox permission. `full_access_only` and `granular_access` add `User.Read.All` and `Mail.Read.Shared`, or `Mail.ReadWrite.Shared` instead of `Mail.Read.Shared` when a draft tool is listed in `MCP_TOOLS`. See [Requested Graph permissions](#Requested-Graph-permissions).
+
+Earlier versions used any `mailbox` passed to those five tools, through `Mail.ReadWrite.Shared`, even with `disabled`. A deployment that drafts in or opens emails from shared mailboxes now sets `full_access_only` or `granular_access`.
 
 **Choosing a mode:**
 
 | Scenario | Recommended mode |
 |----------|-----------------|
 | No delegated mailbox access in your org | `disabled` |
+| Users draft in or open emails from shared mailboxes | `full_access_only`, or `granular_access` for folder-level access |
 | Users have Full Access (Read & Manage) granted via Exchange admin | `full_access_only` |
 | Users share individual folders (e.g., Inbox, RFQ) with others | `granular_access` |
 

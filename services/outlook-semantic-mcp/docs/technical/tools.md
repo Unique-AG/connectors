@@ -346,7 +346,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `id` | string | Yes | Microsoft Graph message id. Use `openEmailParams.id`. |
-| `mailbox` | email | No | Use `mailbox` from that object when present. |
+| `mailbox` | email | No | Use `mailbox` from that object when present. With `DELEGATED_ACCESS_SCAN=disabled`, any mailbox other than the user's own is refused. |
 | `parentFolderId` | string | No | Use `parentFolderId` from that object when present. Without it, a `mailbox` message is read from `/users/{mailbox}/messages/{id}`. |
 | `idIsImmutable` | boolean | No | Use `idIsImmutable` from that object when present. |
 | `bodyContentType` | `"text"` \| `"html"` | No | `"html"` when the message is a draft. Omit for plain text. |
@@ -377,6 +377,7 @@ Retrieve the full content of an email by its ID returned from `search_emails` or
 
 - Always pass the `openEmailParams` object from a `search_emails` result directly as the tool input — do not construct these parameters manually and do not drop `uniqueContentId` or `chunkIds`. The tool reads the live message from Microsoft Graph. A draft's object sets `bodyContentType` to `"html"`, and `emailData.text` is then that HTML. Every other message is plain text.
 - When `uniqueContentId` and `chunkIds` are set, `emailData.chunks` holds those matched ingested passages, including attachment text. The live body stays in `text`. If the ingested email cannot be read from Unique, or it was ingested again and none of the matched chunks remain, the body is still returned and `chunks` is left out.
+- With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - When Microsoft Graph answers 404 or 400 (the email was deleted or moved in Outlook, or the params come from an older search, such as a Unique content id), the tool returns `success: false` and a `message` telling the agent to run `search_emails` again.
 - `webLink` is the Outlook on the web link of the email. For a shared or delegated mailbox it is the classic OWA link built from the message RestId (see `BuildWebLinksCommand`), because the link Graph returns for those mailboxes does not always open. Link the subject to it when it is set; otherwise show the subject as plain text.
 - The `text` field in `emailData` contains the full email body from Graph. This is distinct from the `text` field in search results, which contains only matched passages and/or a short preview.
@@ -400,7 +401,7 @@ Supports two modes selected by `recipientsData.type`:
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `content` | string | Yes | Email body in Markdown. Paragraphs, bold, italic, lists, links, blockquotes, and inline code are supported. Raw HTML is escaped, not rendered. |
-| `mailbox` | string (UPN) | No | Shared mailbox to create the draft in (e.g. `"support@company.com"`). Omit to use the signed-in user's own mailbox. |
+| `mailbox` | string (UPN) | No | Shared mailbox to create the draft in (e.g. `"support@company.com"`). Omit to use the signed-in user's own mailbox. With `DELEGATED_ACCESS_SCAN=disabled`, any mailbox other than the user's own is refused. |
 | `attachments` | array | No | Files to attach |
 | `attachments[].fileName` | string | Yes | File name including extension (e.g. `"report.pdf"`) |
 | `attachments[].data` | string | Yes | File content URI. Two schemes supported (see below) |
@@ -455,6 +456,7 @@ Supports two modes selected by `recipientsData.type`:
 - Use `lookup_contacts` to resolve recipient email addresses before calling this tool.
 - If attachments partially fail, the draft is still created and `draftId` is returned alongside the `attachmentsFailed` list.
 - The `webLink` in the response opens the draft directly in Outlook Web.
+- With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 - For shared mailbox reply drafts: in Outlook Web the reply appears in the **Drafts** folder rather than inline in the thread — this is expected Outlook Web behaviour. The draft sends correctly regardless. In Outlook desktop the reply appears and sends normally.
 
 ---
@@ -469,10 +471,12 @@ All three tools take the same target fields:
 |-----------|------|----------|-------------|
 | `draftId` | string | Yes | Microsoft Graph message ID of the draft: `openEmailParams.id` from a `search_emails` result with `isDraft: true`, or the `draftId` returned by `draft_email`. |
 | `idIsImmutable` | boolean | No | `openEmailParams.idIsImmutable` from the search result, or the `idIsImmutable` returned by `draft_email`. |
-| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. |
+| `mailbox` | string (UPN) | No | Shared mailbox that holds the draft (`openEmailParams.mailbox` when set). Omit for the signed-in user's own mailbox. With `DELEGATED_ACCESS_SCAN=disabled`, any mailbox other than the user's own is refused. |
 | `parentFolderId` | string | No | `openEmailParams.parentFolderId` from the search result when set. Without it, a `mailbox` draft is reached through `/users/{mailbox}/messages/{id}`, which Microsoft Graph refuses when access to the shared mailbox is granted per folder. With it, every request goes through `/users/{mailbox}/mailFolders/{parentFolderId}/messages/{id}`. |
 
 Before changing anything, every tool reads the message from Microsoft Graph and refuses — leaving it untouched — when it is no longer a draft (for example because it was already sent) or cannot be read.
+
+With `DELEGATED_ACCESS_SCAN=disabled` the server works with the signed-in user's own mailbox only. A `mailbox` other than the user's own email address or user principal name (compared case-insensitively) returns `success: false` with a message, before any Microsoft Graph call. See [Configuration — DELEGATED_ACCESS_SCAN](../operator/configuration.md#DELEGATED_ACCESS_SCAN).
 
 ### `update_draft_email`
 
@@ -616,7 +620,7 @@ List all Outlook mail categories available for the user.
 
 ### `list_mailboxes_and_directories`
 
-List all Outlook mailboxes and their folder trees available to the user.
+List all Outlook mailboxes and their folder trees available to the user. With `DELEGATED_ACCESS_SCAN=disabled` only the user's own mailbox is listed, and search covers only that mailbox.
 
 **Available in:** Both modes
 

@@ -25,7 +25,9 @@ describe('OpenEmailTool', () => {
       loadFeaturesConfig({
         MCP_BACKEND: 'microsoft_graph',
         MCP_TOOLS: JSON.stringify(['open_email']),
+        DELEGATED_ACCESS_SCAN: 'disabled',
       }),
+      { run: vi.fn().mockResolvedValue({ allowed: true }) } as never,
     );
   });
 
