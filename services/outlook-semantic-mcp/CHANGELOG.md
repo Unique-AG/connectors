@@ -1,5 +1,31 @@
 # Changelog
 
+## [6.0.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.1.0...outlook-semantic-mcp@6.0.0) (2026-11-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **outlook-semantic-mcp:** register and grant only the selected Graph permissions in the Entra module (UN-30476) ([#1919](https://github.com/Unique-AG/connectors/issues/1919))
+* **outlook-semantic-mcp:** request only the Graph permissions the tools and features need (UN-30470) ([#1890](https://github.com/Unique-AG/connectors/issues/1890))
+* **outlook-semantic-mcp:** register only the tools MCP_TOOLS lists and turn calendar on from the tools (UN-30469) ([#1889](https://github.com/Unique-AG/connectors/issues/1889))
+* **outlook-semantic-mcp:** cite emails by subject with their Outlook link (UN-30123, UN-30574) ([#1771](https://github.com/Unique-AG/connectors/issues/1771))
+
+### Features
+
+* **mcp-oauth,teams-mcp,outlook-semantic-mcp:** absolute refresh-token expiry and an optional provider refresh token (UN-30471) ([#1917](https://github.com/Unique-AG/connectors/issues/1917)) ([d8f0d03](https://github.com/Unique-AG/connectors/commit/d8f0d03bbb05c4fc94c59fab55ca8be24c7b4de7))
+* **outlook-semantic-mcp:** exclude mail with configured sensitivity labels (UN-30474) ([#1920](https://github.com/Unique-AG/connectors/issues/1920)) ([ee87991](https://github.com/Unique-AG/connectors/commit/ee87991c39881e97ed77ce3caad5eef874185327))
+* **outlook-semantic-mcp:** refresh the folder cache from tool calls with DIRECTORY_SYNC_MODE=on_demand (UN-30472) ([#1914](https://github.com/Unique-AG/connectors/issues/1914)) ([946598f](https://github.com/Unique-AG/connectors/commit/946598f4089056b847dcec91d33858c568dda3b6))
+* **outlook-semantic-mcp:** register and grant only the selected Graph permissions in the Entra module (UN-30476) ([#1919](https://github.com/Unique-AG/connectors/issues/1919)) ([4cb28c3](https://github.com/Unique-AG/connectors/commit/4cb28c39ed4c84650cf7183fc783d2a6466dccb7))
+* **outlook-semantic-mcp:** register only the tools MCP_TOOLS lists and turn calendar on from the tools (UN-30469) ([#1889](https://github.com/Unique-AG/connectors/issues/1889)) ([81481ef](https://github.com/Unique-AG/connectors/commit/81481ef67ee968590ca501d41d9ac33871b80646))
+* **outlook-semantic-mcp:** request only the Graph permissions the tools and features need (UN-30470) ([#1890](https://github.com/Unique-AG/connectors/issues/1890)) ([99a14ff](https://github.com/Unique-AG/connectors/commit/99a14ffd4da677be37ee2d4bc2b5562f5b39b637))
+* **outlook-semantic-mcp:** run without offline_access, profile and email (UN-30471) ([#1918](https://github.com/Unique-AG/connectors/issues/1918)) ([2883b17](https://github.com/Unique-AG/connectors/commit/2883b17c0f379d4625cfb5998476f3caad3de4e8))
+* **outlook-semantic-mcp:** start and run without Unique when no enabled feature needs it (UN-30473) ([#1913](https://github.com/Unique-AG/connectors/issues/1913)) ([a926488](https://github.com/Unique-AG/connectors/commit/a926488fb45c629b81f22945df61217856ec965d))
+
+
+### Bug Fixes
+
+* **outlook-semantic-mcp:** cite emails by subject with their Outlook link (UN-30123, UN-30574) ([#1771](https://github.com/Unique-AG/connectors/issues/1771)) ([7fb0604](https://github.com/Unique-AG/connectors/commit/7fb060444ebe894fdf66aee5cd4909dd2673a142))
+
 ## [5.1.0](https://github.com/Unique-AG/connectors/compare/outlook-semantic-mcp@5.0.3...outlook-semantic-mcp@5.1.0) (2026-11-26)
 
 
