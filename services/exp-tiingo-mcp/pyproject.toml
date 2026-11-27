@@ -10,6 +10,8 @@ requires-python = ">=3.14"
 dependencies = [
     "fastmcp==4.1.6",
     "httpx2==2.16.2",
+    "mcp-auth==0.1.0",
+    "mcp-configs==0.1.0",
     "mcp-openapi==0.1.0",
     "py-key-value-aio[memory]==0.4.6",
     "pydantic==2.14.4",
@@ -77,6 +79,8 @@ reportDeprecated = "none"
 reportUnannotatedClassAttribute = "none"
 
 [tool.uv.sources]
+mcp-auth = { path = "../../packages/mcp-auth" }
+mcp-configs = { path = "../../packages/mcp-configs" }
 mcp-openapi = { path = "../../packages/mcp-openapi" }
 
 [tool.mcp-openapi]

@@ -3,8 +3,8 @@ from typing import Any
 import httpx2
 import pytest
 from fastmcp.server.auth.oidc_proxy import OIDCProxy
+from mcp_auth import zitadel
 from pydantic import SecretStr
-from unique_mcp.auth.zitadel import oidc_proxy
 
 from tiingo_mcp.auth import create_auth
 from tiingo_mcp.settings import Settings
@@ -43,7 +43,7 @@ def proxy_kwargs(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
             received.update(kwargs)
             super().__init__(**kwargs)
 
-    monkeypatch.setattr(oidc_proxy, "OIDCProxy", RecordingProxy)
+    monkeypatch.setattr(zitadel, "OIDCProxy", RecordingProxy)
     return received
 
 
@@ -80,12 +80,15 @@ def test_zitadel_proxy_is_a_public_client_even_if_a_secret_is_in_the_environment
     assert proxy_kwargs["token_endpoint_auth_method"] == "none"
 
 
-def test_org_restriction_is_required_and_requested(proxy_kwargs: dict[str, Any]) -> None:
+def test_org_scope_is_requested_but_not_required_or_registrable(
+    proxy_kwargs: dict[str, Any],
+) -> None:
     auth = create_auth(zitadel_settings(zitadel_org_id="42"))
     assert auth is not None
     org_scope = "urn:zitadel:iam:org:id:42"
-    assert org_scope in auth.required_scopes
     assert org_scope in proxy_kwargs["extra_authorize_params"]["scope"].split()
+    assert org_scope not in auth.required_scopes
+    assert org_scope not in proxy_kwargs["valid_scopes"]
 
 
 def test_refresh_token_is_requested_but_not_required(proxy_kwargs: dict[str, Any]) -> None:
